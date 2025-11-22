@@ -104,16 +104,19 @@ export default function MerchantLinks() {
     <div className="space-y-8">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-3xl font-bold text-foreground mb-2">Liens marchands</h1>
+          <h1 className="text-3xl font-bold text-foreground mb-2">Lien marchand</h1>
           <p className="text-muted-foreground">
-            Créez un lien unique où vos clients choisissent le montant à payer
+            Vous pouvez créer un seul lien marchand où vos clients choisissent le montant à payer
           </p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button data-testid="button-create-merchant-link">
+            <Button 
+              data-testid="button-create-merchant-link"
+              disabled={merchantLinks && merchantLinks.length > 0}
+            >
               <Plus className="w-4 h-4 mr-2" />
-              Nouveau lien marchand
+              {merchantLinks && merchantLinks.length > 0 ? "Lien créé" : "Créer mon lien"}
             </Button>
           </DialogTrigger>
           <DialogContent>
@@ -241,7 +244,7 @@ export default function MerchantLinks() {
                 </p>
                 <Button onClick={() => setDialogOpen(true)} data-testid="button-create-first">
                   <Plus className="w-4 h-4 mr-2" />
-                  Créer votre premier lien marchand
+                  Créer mon lien marchand
                 </Button>
               </div>
             </CardContent>

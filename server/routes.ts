@@ -247,6 +247,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/merchant-links", requireAuth, async (req: Request, res: Response) => {
     try {
+      // Check if user already has a merchant link
+      const existingUserMerchant = await storage.getMerchantLinks(req.session.userId!);
+      if (existingUserMerchant.length > 0) {
+        return res.status(400).json({ error: "Vous pouvez créer un seul lien marchand. Vous en avez déjà un." });
+      }
+
       const validatedData = insertMerchantLinkSchema.parse(req.body);
       
       // Check if merchant name already exists (globally unique)
