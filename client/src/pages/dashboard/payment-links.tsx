@@ -463,9 +463,6 @@ export default function PaymentLinks() {
                         {link.isActive ? "Actif" : "Inactif"}
                       </Badge>
                     </div>
-                    {link.description && (
-                      <CardDescription className="mt-2">{link.description}</CardDescription>
-                    )}
                   </div>
                   <div className="text-right">
                     <p className="text-2xl font-bold">

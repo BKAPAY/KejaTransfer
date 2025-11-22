@@ -151,6 +151,9 @@ export default function Pay() {
           )}
           <div>
             <CardTitle className="text-sm sm:text-lg lg:text-2xl mb-1 sm:mb-2">{paymentLink.productName}</CardTitle>
+            {paymentLink.description && (
+              <CardDescription className="text-xs sm:text-sm lg:text-base">{paymentLink.description}</CardDescription>
+            )}
           </div>
           <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-primary">
             {formatAmount(paymentLink.amount)}
