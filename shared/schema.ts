@@ -87,6 +87,11 @@ export const insertMerchantLinkSchema = createInsertSchema(merchantLinks).omit({
   userId: true,
   token: true,
   createdAt: true,
+}).extend({
+  merchantName: z.string()
+    .min(3, "Le nom marchand doit contenir au minimum 3 caractères")
+    .max(10, "Le nom marchand doit contenir au maximum 10 caractères")
+    .regex(/^[A-Z]+$/, "Le nom marchand doit contenir uniquement des lettres majuscules"),
 });
 
 export const insertApiKeySchema = createInsertSchema(apiKeys).omit({

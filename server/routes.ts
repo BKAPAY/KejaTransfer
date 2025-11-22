@@ -248,6 +248,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/merchant-links", requireAuth, async (req: Request, res: Response) => {
     try {
       const validatedData = insertMerchantLinkSchema.parse(req.body);
+      
+      // Check if merchant name already exists (globally unique)
+      const existingMerchant = await storage.getMerchantLinkByName(validatedData.merchantName);
+      if (existingMerchant) {
+        return res.status(400).json({ error: "Ce nom marchand est déjà utilisé. Veuillez choisir un autre nom." });
+      }
+      
       const link = await storage.createMerchantLink({
         ...validatedData,
         userId: req.session.userId!,
@@ -259,15 +266,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.delete("/api/merchant-links/:id", requireAuth, async (req: Request, res: Response) => {
-    try {
-      const success = await storage.deleteMerchantLink(req.params.id, req.session.userId!);
-      if (!success) {
-        return res.status(404).json({ error: "Lien non trouvé" });
-      }
-      res.json({ success: true });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
+    return res.status(403).json({ error: "Les liens marchands ne peuvent pas être supprimés" });
   });
 
   // ===== API Keys Routes =====

@@ -22,7 +22,10 @@ import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 
 const merchantLinkSchema = z.object({
-  merchantName: z.string().min(1, "Le nom du marchand est requis"),
+  merchantName: z.string()
+    .min(3, "Le nom marchand doit contenir au minimum 3 caractères")
+    .max(10, "Le nom marchand doit contenir au maximum 10 caractères")
+    .regex(/^[A-Z]+$/, "Le nom marchand doit contenir uniquement des lettres majuscules"),
 });
 
 type MerchantLinkFormData = z.infer<typeof merchantLinkSchema>;
@@ -130,12 +133,18 @@ export default function MerchantLinks() {
                       <FormLabel>Nom du marchand</FormLabel>
                       <FormControl>
                         <Input
-                          placeholder="Ex: Boutique Électronique"
+                          placeholder="Ex: BOUTIQUE (3-10 majuscules)"
                           data-testid="input-merchant-name"
-                          {...field}
+                          value={field.value || ""}
+                          onChange={(e) => {
+                            const val = e.target.value.toUpperCase();
+                            field.onChange(val);
+                          }}
+                          maxLength={10}
                         />
                       </FormControl>
                       <FormMessage />
+                      <p className="text-xs text-muted-foreground mt-1">3-10 lettres majuscules. Unique et immuable.</p>
                     </FormItem>
                   )}
                 />
@@ -215,17 +224,8 @@ export default function MerchantLinks() {
                       </a>
                     </Button>
                   </div>
-                  <div className="flex justify-end">
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => deleteMutation.mutate(link.id)}
-                      disabled={deleteMutation.isPending}
-                      data-testid={`button-delete-${link.id}`}
-                    >
-                      <Trash2 className="w-4 h-4 mr-2" />
-                      Supprimer
-                    </Button>
+                  <div className="text-xs text-muted-foreground p-3 bg-muted rounded-md">
+                    Ce lien marchand a été créé une seule fois et ne peut pas être modifié ni supprimé.
                   </div>
                 </div>
               </CardContent>

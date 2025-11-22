@@ -124,9 +124,9 @@ export default function Merchant() {
             <img src={logoImage} alt="BKApay" className="h-8 sm:h-10 lg:h-12 w-auto" />
           </div>
           <div>
-            <CardTitle className="text-sm sm:text-lg lg:text-2xl mb-1 sm:mb-2">{merchantLink.merchantName}</CardTitle>
+            <CardTitle className="text-sm sm:text-lg lg:text-2xl mb-1 sm:mb-2">Envoyer de l'argent</CardTitle>
             <CardDescription className="text-xs sm:text-sm lg:text-base">
-              Entrez le montant à payer
+              À {merchantLink.merchantName}
             </CardDescription>
           </div>
         </CardHeader>
