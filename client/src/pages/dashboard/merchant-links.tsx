@@ -227,9 +227,6 @@ export default function MerchantLinks() {
                       </a>
                     </Button>
                   </div>
-                  <div className="text-xs text-muted-foreground p-3 bg-muted rounded-md">
-                    Ce lien marchand a été créé une seule fois et ne peut pas être modifié ni supprimé.
-                  </div>
                 </div>
               </CardContent>
             </Card>
