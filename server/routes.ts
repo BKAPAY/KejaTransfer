@@ -380,7 +380,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       } else {
         await storage.updateTransactionStatus(transaction.id, "failed");
-        res.status(400).json({ error: "Erreur lors de l'initiation du paiement" });
+        const errorMsg = paydunyaResponse.response_text || "Erreur lors de l'initiation du paiement";
+        res.status(400).json({ error: errorMsg });
       }
     } catch (error: any) {
       console.error("Payment processing error:", error);
@@ -447,7 +448,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       } else {
         await storage.updateTransactionStatus(transaction.id, "failed");
-        res.status(400).json({ error: "Erreur lors de l'initiation du paiement" });
+        const errorMsg = paydunyaResponse.response_text || "Erreur lors de l'initiation du paiement";
+        res.status(400).json({ error: errorMsg });
       }
     } catch (error: any) {
       console.error("Merchant payment processing error:", error);
@@ -510,7 +512,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       } else {
         await storage.updateTransactionStatus(transaction.id, "failed");
-        res.status(400).json({ error: "Erreur lors de l'initiation du dépôt" });
+        const errorMsg = paydunyaResponse.response_text || "Erreur lors de l'initiation du dépôt";
+        res.status(400).json({ error: errorMsg });
       }
     } catch (error: any) {
       console.error("Deposit error:", error);
