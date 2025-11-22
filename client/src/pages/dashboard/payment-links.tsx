@@ -478,12 +478,12 @@ export default function PaymentLinks() {
                 <div className="space-y-4">
                   <div className="flex items-center gap-2 p-3 bg-muted rounded-md">
                     <code className="flex-1 text-sm truncate">
-                      {window.location.origin}/pay/{link.token}
+                      {link.token}
                     </code>
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => copyToClipboard(link.token)}
+                      onClick={() => copyToClipboard(link.token, true)}
                       data-testid={`button-copy-${link.id}`}
                     >
                       <Copy className="w-4 h-4" />
