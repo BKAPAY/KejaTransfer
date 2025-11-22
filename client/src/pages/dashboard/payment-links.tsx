@@ -214,12 +214,12 @@ export default function PaymentLinks() {
     },
   });
 
-  const copyToClipboard = (token: string) => {
-    const url = `${window.location.origin}/pay/${token}`;
-    navigator.clipboard.writeText(url);
+  const copyToClipboard = (token: string, isShortToken = false) => {
+    const textToCopy = isShortToken ? token : `${window.location.origin}/pay/${token}`;
+    navigator.clipboard.writeText(textToCopy);
     toast({
       title: "Copié",
-      description: "Le lien a été copié dans le presse-papiers",
+      description: isShortToken ? "Le token a été copié" : "Le lien a été copié dans le presse-papiers",
     });
   };
 
@@ -236,43 +236,40 @@ export default function PaymentLinks() {
     }
   };
 
-  // Success screen overlay
+  // Success screen overlay - show ONLY image and short link
   if (successToken) {
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4">
         <Card className="w-full max-w-sm">
-          <CardContent className="pt-6 flex flex-col items-center text-center space-y-6">
+          <CardContent className="pt-6 flex flex-col items-center text-center space-y-4">
             {successImage && (
               <img
                 src={successImage}
                 alt="Produit"
-                className="max-h-48 w-auto rounded-md"
+                className="max-h-56 w-auto rounded-md"
               />
             )}
-            <div className="space-y-4 w-full">
-              <p className="text-lg font-semibold text-foreground">Lien créé avec succès!</p>
-              <div className="bg-muted rounded-md p-3 flex items-center justify-between gap-2">
-                <code className="text-sm font-mono text-foreground truncate">
-                  {window.location.origin}/pay/{successToken}
-                </code>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => copyToClipboard(successToken)}
-                  className="flex-shrink-0"
-                  data-testid="button-copy-success"
-                >
-                  <Copy className="w-4 h-4" />
-                </Button>
-              </div>
+            <div className="bg-muted rounded-md p-3 flex items-center justify-between gap-2 w-full">
+              <code className="text-xs sm:text-sm font-mono text-foreground flex-1 text-center">
+                {successToken}
+              </code>
               <Button
-                onClick={closeSuccess}
-                className="w-full"
-                data-testid="button-done"
+                size="sm"
+                variant="ghost"
+                onClick={() => copyToClipboard(successToken, true)}
+                className="flex-shrink-0"
+                data-testid="button-copy-success"
               >
-                Continuer
+                <Copy className="w-4 h-4" />
               </Button>
             </div>
+            <Button
+              onClick={closeSuccess}
+              className="w-full"
+              data-testid="button-done"
+            >
+              Continuer
+            </Button>
           </CardContent>
         </Card>
       </div>
