@@ -166,16 +166,16 @@ export default function Home() {
             <h2 className="text-lg sm:text-2xl md:text-3xl lg:text-4xl font-bold mb-2 sm:mb-4 text-foreground">Tous les opérateurs supportés</h2>
             <p className="text-xs sm:text-sm md:text-base lg:text-lg text-muted-foreground">Acceptez les paiements de tous les principaux opérateurs</p>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
+          <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-7 gap-1 sm:gap-2">
             {operators.map((operator, index) => (
               <div
                 key={index}
-                className="flex items-center justify-center bg-background border border-border rounded-lg p-4 sm:p-6 lg:p-8 hover-elevate min-h-24 sm:min-h-32"
+                className="flex items-center justify-center bg-background border border-border rounded-md p-1 sm:p-2 hover-elevate"
               >
                 <img 
                   src={operator.image} 
                   alt={operator.name} 
-                  className="w-full h-full object-contain max-w-[120px] max-h-[120px]"
+                  className="w-12 h-12 sm:w-16 sm:h-16 object-contain"
                 />
               </div>
             ))}
