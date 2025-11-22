@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Wallet, ArrowDownToLine, ArrowUpFromLine, TrendingUp } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import type { User, Transaction } from "@shared/schema";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -58,7 +59,7 @@ export default function Dashboard() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-6 md:grid-cols-3">
+      <div className="space-y-6">
         {/* Solde total */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
@@ -82,45 +83,24 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Dépôts */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Dépôts</CardTitle>
-            <ArrowDownToLine className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {statsLoading ? (
-              <Skeleton className="h-8 w-32" />
-            ) : (
-              <>
-                <div className="text-2xl font-bold" data-testid="stat-deposits">
-                  {formatAmount(stats?.totalDeposits || 0)}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">Total reçu</p>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Transferts */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Transferts</CardTitle>
-            <ArrowUpFromLine className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {statsLoading ? (
-              <Skeleton className="h-8 w-32" />
-            ) : (
-              <>
-                <div className="text-2xl font-bold" data-testid="stat-transfers">
-                  {formatAmount(stats?.totalTransfers || 0)}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">Total envoyé</p>
-              </>
-            )}
-          </CardContent>
-        </Card>
+        {/* Action Buttons */}
+        <div className="flex gap-4">
+          <Button 
+            data-testid="button-deposit"
+            className="flex-1 flex items-center justify-center gap-2"
+          >
+            <ArrowDownToLine className="h-4 w-4" />
+            Dépôt
+          </Button>
+          <Button 
+            data-testid="button-transfer"
+            variant="outline"
+            className="flex-1 flex items-center justify-center gap-2"
+          >
+            <ArrowUpFromLine className="h-4 w-4" />
+            Transfert
+          </Button>
+        </div>
       </div>
 
       {/* Recent Transactions */}
