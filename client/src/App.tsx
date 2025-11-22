@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
+import { useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
@@ -25,6 +26,27 @@ import Pay from "@/pages/pay";
 import Merchant from "@/pages/merchant";
 
 function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const [location, setLocation] = useLocation();
+  const { isLoading, error } = useAuth();
+
+  // Si pas authentifié, rediriger vers login
+  useEffect(() => {
+    if (!isLoading && error && location.startsWith("/dashboard")) {
+      setLocation("/login");
+    }
+  }, [isLoading, error, location, setLocation]);
+
+  // En attente de vérification d'auth
+  if (isLoading) {
+    return (
+      <div className="h-screen w-full flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-muted-foreground">Vérification en cours...</p>
+        </div>
+      </div>
+    );
+  }
+
   const style = {
     "--sidebar-width": "20rem",
     "--sidebar-width-icon": "4rem",
@@ -49,27 +71,8 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
   );
 }
 
-function ProtectedRouter() {
-  const [location, setLocation] = useLocation();
-  const { isLoading, error } = useAuth();
-
-  // En attente de vérification d'auth
-  if (isLoading) {
-    return (
-      <div className="h-screen w-full flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-muted-foreground">Vérification en cours...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Si pas authentifié, rediriger vers login
-  if (error && location.startsWith("/dashboard")) {
-    setLocation("/login");
-    return null;
-  }
-
+function Router() {
+  const [location] = useLocation();
   const isDashboard = location.startsWith("/dashboard");
 
   if (isDashboard) {
@@ -110,7 +113,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
-        <ProtectedRouter />
+        <Router />
       </TooltipProvider>
     </QueryClientProvider>
   );
