@@ -285,4 +285,18 @@
   .border.hover-elevate:not(.no-hover-interaction-elevate)::after {
     inset: -1px;
   }
+
+  /* Infinite scroll animation from right to left */
+  @keyframes scroll-left {
+    0% {
+      transform: translateX(0);
+    }
+    100% {
+      transform: translateX(-100%);
+    }
+  }
+
+  .carousel-scroll {
+    animation: scroll-left 30s linear infinite;
+  }
 }

@@ -119,15 +119,15 @@ export default function Home() {
       </section>
 
       {/* Countries Section */}
-      <section className="py-6 sm:py-8 md:py-12 lg:py-16 bg-card">
+      <section className="py-6 sm:py-8 md:py-12 lg:py-16 bg-card overflow-hidden">
         <div className="container mx-auto px-2 sm:px-4 md:px-8 max-w-7xl">
           <div className="text-center mb-4 sm:mb-8">
             <h2 className="text-lg sm:text-xl md:text-3xl lg:text-4xl font-bold mb-2 sm:mb-4 text-foreground">Disponible dans 6 pays</h2>
             <p className="text-xs sm:text-sm md:text-base lg:text-lg text-muted-foreground">Couvrant toute l'Afrique de l'Ouest francophone</p>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-4">
-            {countries.map((country) => (
-              <Card key={country.code} className="p-2 sm:p-3 lg:p-6 text-center hover-elevate">
+          <div className="flex gap-2 sm:gap-4 carousel-scroll">
+            {[...countries, ...countries].map((country, index) => (
+              <Card key={`${country.code}-${index}`} className="p-2 sm:p-3 lg:p-6 text-center hover-elevate flex-shrink-0 min-w-max">
                 <div className="text-2xl sm:text-3xl lg:text-4xl mb-1 sm:mb-2 lg:mb-3">{country.flag}</div>
                 <div className="text-xs sm:text-sm font-medium text-foreground">{country.name}</div>
               </Card>
@@ -160,17 +160,17 @@ export default function Home() {
       </section>
 
       {/* Operators Section */}
-      <section className="py-6 sm:py-10 md:py-14 lg:py-16 bg-card">
+      <section className="py-6 sm:py-10 md:py-14 lg:py-16 bg-card overflow-hidden">
         <div className="container mx-auto px-2 sm:px-4 md:px-8 max-w-7xl">
           <div className="text-center mb-4 sm:mb-8">
             <h2 className="text-lg sm:text-2xl md:text-3xl lg:text-4xl font-bold mb-2 sm:mb-4 text-foreground">Tous les opérateurs supportés</h2>
             <p className="text-xs sm:text-sm md:text-base lg:text-lg text-muted-foreground">Acceptez les paiements de tous les principaux opérateurs</p>
           </div>
-          <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-7 gap-1 sm:gap-2">
-            {operators.map((operator, index) => (
+          <div className="flex gap-1 sm:gap-2 carousel-scroll">
+            {[...operators, ...operators].map((operator, index) => (
               <div
-                key={index}
-                className="flex items-center justify-center bg-background border border-border rounded-md p-1 sm:p-2 hover-elevate"
+                key={`${index}`}
+                className="flex items-center justify-center bg-background border border-border rounded-md p-1 sm:p-2 hover-elevate flex-shrink-0 min-w-max"
               >
                 <img 
                   src={operator.image} 
