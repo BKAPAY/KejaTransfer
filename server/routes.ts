@@ -159,6 +159,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/analytics", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const analytics = await storage.getAnalytics(req.session.userId!);
+      res.json(analytics);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // ===== Payment Links Routes =====
   
   app.get("/api/payment-links", requireAuth, async (req: Request, res: Response) => {

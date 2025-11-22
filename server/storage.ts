@@ -210,6 +210,83 @@ export class DbStorage implements IStorage {
       recentTransactions: transactions.slice(0, 10),
     };
   }
+
+  async getAnalytics(userId: string): Promise<{
+    revenueByDate: { date: string; amount: number }[];
+    revenueByOperator: { operator: string; amount: number; count: number }[];
+    revenueByCountry: { country: string; amount: number; count: number }[];
+    revenueByType: { type: string; amount: number; count: number }[];
+    totalRevenue: number;
+    completedTransactions: number;
+    pendingTransactions: number;
+  }> {
+    const transactions = await this.getTransactions(userId, 500);
+    const completed = transactions.filter((t) => t.status === "completed");
+
+    // Revenue by date
+    const revenueByDateMap = new Map<string, number>();
+    completed.forEach((t) => {
+      const date = new Date(t.createdAt).toLocaleDateString("fr-FR");
+      revenueByDateMap.set(date, (revenueByDateMap.get(date) || 0) + t.amount);
+    });
+    const revenueByDate = Array.from(revenueByDateMap.entries())
+      .map(([date, amount]) => ({ date, amount }))
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    // Revenue by operator
+    const revenueByOperatorMap = new Map<string, { amount: number; count: number }>();
+    completed.forEach((t) => {
+      const op = t.operator || "Unknown";
+      const current = revenueByOperatorMap.get(op) || { amount: 0, count: 0 };
+      revenueByOperatorMap.set(op, {
+        amount: current.amount + t.amount,
+        count: current.count + 1,
+      });
+    });
+    const revenueByOperator = Array.from(revenueByOperatorMap.entries())
+      .map(([operator, { amount, count }]) => ({ operator, amount, count }))
+      .sort((a, b) => b.amount - a.amount);
+
+    // Revenue by country
+    const revenueByCountryMap = new Map<string, { amount: number; count: number }>();
+    completed.forEach((t) => {
+      const country = t.country || "Unknown";
+      const current = revenueByCountryMap.get(country) || { amount: 0, count: 0 };
+      revenueByCountryMap.set(country, {
+        amount: current.amount + t.amount,
+        count: current.count + 1,
+      });
+    });
+    const revenueByCountry = Array.from(revenueByCountryMap.entries())
+      .map(([country, { amount, count }]) => ({ country, amount, count }))
+      .sort((a, b) => b.amount - a.amount);
+
+    // Revenue by type
+    const revenueByTypeMap = new Map<string, { amount: number; count: number }>();
+    completed.forEach((t) => {
+      const current = revenueByTypeMap.get(t.type) || { amount: 0, count: 0 };
+      revenueByTypeMap.set(t.type, {
+        amount: current.amount + t.amount,
+        count: current.count + 1,
+      });
+    });
+    const revenueByType = Array.from(revenueByTypeMap.entries())
+      .map(([type, { amount, count }]) => ({ type, amount, count }))
+      .sort((a, b) => b.amount - a.amount);
+
+    const totalRevenue = completed.reduce((sum, t) => sum + t.amount, 0);
+    const pendingTransactions = transactions.filter((t) => t.status === "pending").length;
+
+    return {
+      revenueByDate,
+      revenueByOperator,
+      revenueByCountry,
+      revenueByType,
+      totalRevenue,
+      completedTransactions: completed.length,
+      pendingTransactions,
+    };
+  }
 }
 
 export const storage = new DbStorage();

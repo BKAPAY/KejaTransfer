@@ -23,6 +23,7 @@ import {
   FileText,
   HelpCircle,
   LogOut,
+  TrendingUp,
 } from "lucide-react";
 import logoImage from "@assets/Gemini_Generated_Image_3r9yqh3r9yqh3r9y_2_1763454657143.png";
 import { Button } from "@/components/ui/button";
@@ -60,6 +61,12 @@ const menuItems = [
     url: "/dashboard/api",
     icon: Code,
     testId: "nav-api",
+  },
+  {
+    title: "Analytics",
+    url: "/dashboard/analytics",
+    icon: TrendingUp,
+    testId: "nav-analytics",
   },
   {
     title: "Historique",
