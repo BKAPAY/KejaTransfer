@@ -60,7 +60,7 @@ export default function ApiPayment() {
 
   if (isLoadingTransaction) {
     return (
-      <div className="h-screen flex items-center justify-center bg-background">
+      <div className="w-full min-h-screen flex items-center justify-center bg-background overflow-hidden">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2 text-primary" />
           <p className="text-muted-foreground">Chargement...</p>
@@ -71,7 +71,7 @@ export default function ApiPayment() {
 
   if (error || !transaction) {
     return (
-      <div className="h-screen flex items-center justify-center bg-background">
+      <div className="w-full min-h-screen flex items-center justify-center bg-background overflow-hidden">
         <Card className="w-full max-w-md">
           <CardContent className="pt-6">
             <div className="flex gap-3 items-start">
@@ -88,7 +88,7 @@ export default function ApiPayment() {
   }
 
   return (
-    <div className="h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">
+    <div className="w-full min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4 overflow-hidden">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-2">
           <div className="flex items-center gap-2 mb-2">

@@ -89,7 +89,7 @@ export default function Pay() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center p-4">
+      <div className="w-full min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center p-4 overflow-hidden">
         <Card className="w-full max-w-lg">
           <CardContent className="py-12">
             <p className="text-center text-muted-foreground">Chargement...</p>
@@ -101,7 +101,7 @@ export default function Pay() {
 
   if (!paymentLink || !paymentLink.isActive) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center p-4">
+      <div className="w-full min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center p-4 overflow-hidden">
         <Card className="w-full max-w-lg">
           <CardContent className="py-12">
             <div className="text-center">
@@ -115,7 +115,7 @@ export default function Pay() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center p-4">
+    <div className="w-full min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center p-4 overflow-hidden">
       <Card className="w-full max-w-lg">
         <CardHeader className="text-center space-y-4">
           <div className="flex justify-center mb-2">
