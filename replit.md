@@ -1,10 +1,10 @@
-# KEJAtransfer - Plateforme de Paiement Mobile Money
+# BKApay - Plateforme de Paiement Mobile Money
 
 ## Vue d'ensemble
-KEJAtransfer est une plateforme moderne de paiement mobile money pour l'Afrique de l'Ouest. Elle permet aux entreprises et particuliers d'accepter des paiements via mobile money (Orange Money, MTN, Moov, Wave, Free Money, T-Money, Wizall, Expresso) dans 6 pays: Bénin, Togo, Côte d'Ivoire, Sénégal, Burkina Faso et Mali.
+BKApay est une plateforme moderne de paiement mobile money pour l'Afrique de l'Ouest. Elle permet aux entreprises et particuliers d'accepter des paiements via mobile money (Orange Money, MTN, Moov, Wave, Free Money, T-Money, Wizall, Expresso) dans 6 pays: Bénin, Togo, Côte d'Ivoire, Sénégal, Burkina Faso et Mali.
 
 ## Dernières modifications (22 Novembre 2025)
-- ✅ Création complète de la plateforme KEJAtransfer (MVP achevé)
+- ✅ Création complète de la plateforme BKApay (MVP achevé)
 - ✅ Implémentation de l'authentération personnalisée (sans Replit Auth)
 - ✅ Configuration complète du frontend avec React, Tailwind CSS et Shadcn UI
 - ✅ Mise en place du backend avec Express, PostgreSQL et intégration Paydunya

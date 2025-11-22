@@ -38,7 +38,7 @@ export default function Login() {
     onSuccess: () => {
       toast({
         title: "Connexion réussie",
-        description: "Bienvenue sur KEJAtransfer",
+        description: "Bienvenue sur BKApay",
       });
       setLocation("/dashboard");
     },
@@ -60,10 +60,10 @@ export default function Login() {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-4 text-center">
           <div className="flex justify-center mb-2">
-            <img src={logoImage} alt="KEJAtransfer" className="h-16 w-auto" />
+            <img src={logoImage} alt="BKApay" className="h-16 w-auto" />
           </div>
           <CardTitle className="text-2xl font-bold">Se connecter</CardTitle>
-          <CardDescription>Accédez à votre tableau de bord KEJAtransfer</CardDescription>
+          <CardDescription>Accédez à votre tableau de bord BKApay</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>

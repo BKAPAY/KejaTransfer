@@ -111,7 +111,7 @@ export default function ApiPage() {
         <div>
           <h1 className="text-3xl font-bold text-foreground mb-2">API Gateway</h1>
           <p className="text-muted-foreground">
-            Gérez vos clés API pour intégrer KEJAtransfer dans vos applications
+            Gérez vos clés API pour intégrer BKApay dans vos applications
           </p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

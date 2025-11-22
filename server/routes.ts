@@ -353,7 +353,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           description: `Paiement - ${paymentLink.productName}`,
         },
         store: {
-          name: "KEJAtransfer",
+          name: "BKApay",
           tagline: "Plateforme de paiement mobile money",
         },
         custom_data: {
@@ -485,10 +485,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const paydunyaData = {
         invoice: {
           total_amount: Math.floor(amount),
-          description: `Dépôt de ${amount} XOF sur KEJAtransfer`,
+          description: `Dépôt de ${amount} XOF sur BKApay`,
         },
         store: {
-          name: "KEJAtransfer",
+          name: "BKApay",
         },
         custom_data: {
           transaction_id: transaction.id,
@@ -670,10 +670,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const paydunyaData = {
         invoice: {
           total_amount: Math.floor(amount),
-          description: description || "Paiement via API KEJAtransfer",
+          description: description || "Paiement via API BKApay",
         },
         store: {
-          name: "KEJAtransfer",
+          name: "BKApay",
           tagline: "Plateforme de paiement mobile money",
         },
         custom_data: {
@@ -722,10 +722,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const paydunyaData = {
         invoice: {
           total_amount: transaction.amount,
-          description: transaction.description || "Paiement via KEJAtransfer",
+          description: transaction.description || "Paiement via BKApay",
         },
         store: {
-          name: "KEJAtransfer",
+          name: "BKApay",
           tagline: "Plateforme de paiement mobile money",
         },
         custom_data: {

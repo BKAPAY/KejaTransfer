@@ -14,7 +14,7 @@ export default function Documentation() {
     });
   };
 
-  const incomingCode = `// 1. Récupérez votre clé API publique depuis votre dashboard KEJAtransfer
+  const incomingCode = `// 1. Récupérez votre clé API publique depuis votre dashboard BKApay
 // Section "API Gateway" -> Copiez "Clé publique"
 
 // 2. Sur votre site, intégrez le bouton de paiement
@@ -28,7 +28,7 @@ async function handlePayment() {
 
   try {
     // 3. Appelez l'endpoint de paiement
-    const response = await fetch('https://keja.app/api/payments/create', {
+    const response = await fetch('https://bkapay.app/api/payments/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -45,7 +45,7 @@ async function handlePayment() {
 
     const data = await response.json();
     
-    // 4. Redirigez le client vers KEJAtransfer pour payer
+    // 4. Redirigez le client vers BKApay pour payer
     if (data.success) {
       window.location.href = data.redirectUrl;
     } else {
@@ -85,7 +85,7 @@ async function handlePayment() {
 document.getElementById('withdrawalForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   
-  const response = await fetch('https://keja.app/api/withdrawals/create', {
+  const response = await fetch('https://bkapay.app/api/withdrawals/create', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -105,7 +105,7 @@ document.getElementById('withdrawalForm').addEventListener('submit', async (e) =
   }
 });`;
 
-  const outgoingCode = `// Sur votre dashboard KEJAtransfer, allez à "Transferts"
+  const outgoingCode = `// Sur votre dashboard BKApay, allez à "Transferts"
 
 // 1. Entrez le montant à retirer (en XOF)
 amount = 50000; // 50 000 francs CFA
@@ -123,7 +123,7 @@ phone = '+221781234567'; // Format international
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold text-foreground mb-2">Documentation API KEJAtransfer</h1>
+        <h1 className="text-3xl font-bold text-foreground mb-2">Documentation API BKApay</h1>
         <p className="text-muted-foreground">Guide complet pour intégrer les paiements et retraits sur votre site</p>
       </div>
 
@@ -132,8 +132,8 @@ phone = '+221781234567'; // Format international
         <div className="flex gap-3">
           <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
           <div className="text-sm text-amber-900 dark:text-amber-100">
-            <p className="font-semibold mb-1">⚠️ KEJAtransfer - Votre Fournisseur de Paiements</p>
-            <p>KEJAtransfer est votre plateforme complète de paiement et retrait. Les clients payent directement sur KEJAtransfer, et vous gérez les retraits depuis votre dashboard.</p>
+            <p className="font-semibold mb-1">⚠️ BKApay - Votre Fournisseur de Paiements</p>
+            <p>BKApay est votre plateforme complète de paiement et retrait. Les clients payent directement sur BKApay, et vous gérez les retraits depuis votre dashboard.</p>
           </div>
         </div>
       </div>
@@ -146,7 +146,7 @@ phone = '+221781234567'; // Format international
         <CardContent className="space-y-6">
           <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
             <p className="text-sm text-blue-900 dark:text-blue-100">
-              Les clients payent directement sur <span className="font-bold">KEJAtransfer</span>. L'argent arrive immédiatement sur votre dashboard.
+              Les clients payent directement sur <span className="font-bold">BKApay</span>. L'argent arrive immédiatement sur votre dashboard.
             </p>
           </div>
 
@@ -155,9 +155,9 @@ phone = '+221781234567'; // Format international
             <ol className="space-y-2 list-decimal list-inside text-sm text-muted-foreground">
               <li>Votre client remplir le formulaire de paiement sur votre site</li>
               <li>Vous appelez l'API avec votre clé publique</li>
-              <li>Le client est redirigé vers <span className="font-bold">KEJAtransfer</span> pour payer</li>
+              <li>Le client est redirigé vers <span className="font-bold">BKApay</span> pour payer</li>
               <li>Le client choisit son opérateur mobile money (Orange, Wave, Moov, etc.)</li>
-              <li>L'argent arrive immédiatement sur votre dashboard KEJAtransfer</li>
+              <li>L'argent arrive immédiatement sur votre dashboard BKApay</li>
               <li>Vous pouvez alors faire des retraits vers vos clients</li>
             </ol>
           </div>
@@ -227,11 +227,11 @@ phone = '+221781234567'; // Format international
             <div className="bg-gray-950 dark:bg-gray-900 text-gray-100 p-4 rounded-lg font-mono text-xs overflow-x-auto">
               <pre>{`{
   "success": true,
-  "redirectUrl": "https://keja.app/payment/xyz..." 
+  "redirectUrl": "https://bkapay.app/payment/xyz..." 
 }
 
 // Redirigez le client vers redirectUrl
-// Il paiera sur KEJAtransfer`}</pre>
+// Il paiera sur BKApay`}</pre>
             </div>
           </div>
         </CardContent>
@@ -245,7 +245,7 @@ phone = '+221781234567'; // Format international
         <CardContent className="space-y-6">
           <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-4">
             <p className="text-sm text-green-900 dark:text-green-100">
-              <span className="font-bold">Depuis votre dashboard KEJAtransfer</span>, vous pouvez faire des retraits vers vos clients ou partenaires via mobile money.
+              <span className="font-bold">Depuis votre dashboard BKApay</span>, vous pouvez faire des retraits vers vos clients ou partenaires via mobile money.
             </p>
           </div>
 

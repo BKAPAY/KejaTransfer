@@ -92,9 +92,9 @@ export default function ApiPayment() {
         <CardHeader className="space-y-2">
           <div className="flex items-center gap-2 mb-2">
             <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-              <span className="text-lg font-bold text-primary">K</span>
+              <span className="text-lg font-bold text-primary">B</span>
             </div>
-            <p className="font-bold text-lg text-foreground">KEJAtransfer</p>
+            <p className="font-bold text-lg text-foreground">BKApay</p>
           </div>
           <CardTitle>Paiement Sécurisé</CardTitle>
         </CardHeader>

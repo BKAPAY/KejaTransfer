@@ -12,7 +12,7 @@ export default function Settings() {
       <Card>
         <CardHeader>
           <CardTitle>Paramètres du compte</CardTitle>
-          <CardDescription>Gérez les paramètres de votre compte KEJAtransfer</CardDescription>
+          <CardDescription>Gérez les paramètres de votre compte BKApay</CardDescription>
         </CardHeader>
         <CardContent className="py-12">
           <div className="text-center">

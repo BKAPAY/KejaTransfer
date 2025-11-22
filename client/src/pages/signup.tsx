@@ -76,10 +76,10 @@ export default function Signup() {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-4 text-center">
           <div className="flex justify-center mb-2">
-            <img src={logoImage} alt="KEJAtransfer" className="h-16 w-auto" />
+            <img src={logoImage} alt="BKApay" className="h-16 w-auto" />
           </div>
           <CardTitle className="text-2xl font-bold">Créer un compte</CardTitle>
-          <CardDescription>Rejoignez KEJAtransfer et commencez à accepter des paiements</CardDescription>
+          <CardDescription>Rejoignez BKApay et commencez à accepter des paiements</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>

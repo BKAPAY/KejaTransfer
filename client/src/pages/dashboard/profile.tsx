@@ -28,7 +28,7 @@ export default function Profile() {
       <Card>
         <CardHeader>
           <CardTitle>Informations personnelles</CardTitle>
-          <CardDescription>Vos informations de compte KEJAtransfer</CardDescription>
+          <CardDescription>Vos informations de compte BKApay</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           {isLoading ? (

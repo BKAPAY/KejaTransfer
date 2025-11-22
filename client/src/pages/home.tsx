@@ -65,8 +65,8 @@ export default function Home() {
         <div className="container mx-auto px-4 md:px-8 py-4">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <img src={logoImage} alt="KEJAtransfer" className="h-10 w-auto" />
-              <span className="text-xl font-bold text-foreground">KEJAtransfer</span>
+              <img src={logoImage} alt="BKApay" className="h-10 w-auto" />
+              <span className="text-xl font-bold text-foreground">BKApay</span>
             </div>
             <div className="flex items-center gap-3">
               <Link href="/login">
@@ -107,7 +107,7 @@ export default function Home() {
               </div>
             </div>
             <div className="flex justify-center">
-              <img src={logoImage} alt="KEJAtransfer Platform" className="w-full max-w-md rounded-lg" />
+              <img src={logoImage} alt="BKApay Platform" className="w-full max-w-md rounded-lg" />
             </div>
           </div>
         </div>

@@ -1,4 +1,4 @@
-# KEJAtransfer Design Guidelines
+# BKApay Design Guidelines
 
 ## Design Approach: Material Design System
 **Rationale**: Financial applications require trust, clarity, and data-dense interfaces. Material Design provides excellent patterns for forms, data visualization, and transactional interfaces essential for payment platforms.

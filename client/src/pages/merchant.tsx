@@ -107,7 +107,7 @@ export default function Merchant() {
         <Card className="w-full max-w-lg">
           <CardContent className="py-12">
             <div className="text-center">
-              <img src={logoImage} alt="KEJAtransfer" className="h-16 w-auto mx-auto mb-4" />
+              <img src={logoImage} alt="BKApay" className="h-16 w-auto mx-auto mb-4" />
               <p className="text-muted-foreground">Lien marchand introuvable ou inactif</p>
             </div>
           </CardContent>
@@ -121,7 +121,7 @@ export default function Merchant() {
       <Card className="w-full max-w-lg">
         <CardHeader className="text-center space-y-4">
           <div className="flex justify-center mb-2">
-            <img src={logoImage} alt="KEJAtransfer" className="h-12 w-auto" />
+            <img src={logoImage} alt="BKApay" className="h-12 w-auto" />
           </div>
           <div>
             <CardTitle className="text-2xl mb-2">{merchantLink.merchantName}</CardTitle>
