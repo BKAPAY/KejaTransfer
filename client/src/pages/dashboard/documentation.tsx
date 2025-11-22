@@ -286,7 +286,7 @@ phone = '+221781234567'; // Format international
         <CardContent className="space-y-6">
           <div className="bg-purple-50 dark:bg-purple-950 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
             <p className="text-sm text-purple-900 dark:text-purple-100">
-              Intégrez un bouton <span className="font-bold">"Retrait"</span> sur votre site pour que vos clients demandent des paiements. Les retraits sont collectés sur votre dashboard KEJAtransfer.
+              Intégrez un bouton <span className="font-bold">"Retrait"</span> sur votre site pour que vos clients demandent des paiements. Les retraits sont collectés sur votre dashboard BKApay.
             </p>
           </div>
 
@@ -296,7 +296,7 @@ phone = '+221781234567'; // Format international
               <li>Votre client clique le bouton "Retrait" sur votre site</li>
               <li>Il remplit: montant, pays, opérateur, numéro de téléphone</li>
               <li>Vous appelez l'API de retrait avec votre clé privée</li>
-              <li>KEJAtransfer valide et crée une demande de retrait</li>
+              <li>BKApay valide et crée une demande de retrait</li>
               <li>La demande apparaît dans votre dashboard "Transferts"</li>
               <li>Vous confirmez et l'argent est envoyé au client</li>
             </ol>
@@ -336,8 +336,8 @@ phone = '+221781234567'; // Format international
 app.post('/api/request-withdrawal', async (req, res) => {
   const { amount, country, operator, phone } = req.body;
   
-  // Appelez KEJAtransfer depuis votre serveur
-  const response = await fetch('https://keja.app/api/withdrawals/create', {
+  // Appelez BKApay depuis votre serveur
+  const response = await fetch('https://bkapay.app/api/withdrawals/create', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -387,8 +387,8 @@ document.getElementById('withdrawalForm').addEventListener('submit', async (e) =
             <p className="font-bold text-foreground">1️⃣ Votre Plateforme (vos clients qui intègrent vos API)</p>
             <div className="ml-4 space-y-2 text-muted-foreground">
               <p>✓ Vos clients intègrent votre clé publique sur leur site</p>
-              <p>✓ Leurs clients paient directement sur KEJAtransfer</p>
-              <p>✓ L'argent arrive sur VOTRE dashboard KEJAtransfer</p>
+              <p>✓ Leurs clients paient directement sur BKApay</p>
+              <p>✓ L'argent arrive sur VOTRE dashboard BKApay</p>
             </div>
           </div>
 

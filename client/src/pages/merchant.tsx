@@ -7,7 +7,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import type { MerchantLink } from "@shared/schema";
 import { COUNTRIES, OPERATORS } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
-import logoImage from "@assets/Gemini_Generated_Image_3r9yqh3r9yqh3r9y_2_1763454657143.png";
+import logoImage from "@assets/bkapay-logo.png";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -294,7 +294,7 @@ export default function Merchant() {
           </Form>
 
           <div className="mt-6 text-center text-xs text-muted-foreground">
-            <p>Paiement sécurisé par KEJAtransfer</p>
+            <p>Paiement sécurisé par BKApay</p>
           </div>
         </CardContent>
       </Card>

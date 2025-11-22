@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertCircle, Loader2 } from "lucide-react";
 import { OPERATORS } from "@shared/schema";
 import type { Transaction } from "@shared/schema";
+import logoImage from "@assets/bkapay-logo.png";
 
 export default function ApiPayment() {
   const { transactionId } = useParams<{ transactionId: string }>();

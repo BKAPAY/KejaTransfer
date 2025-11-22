@@ -2,7 +2,7 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { CreditCard, Link as LinkIcon, Code, BarChart3, Shield, Zap } from "lucide-react";
-import logoImage from "@assets/Gemini_Generated_Image_3r9yqh3r9yqh3r9y_2_1763454657143.png";
+import logoImage from "@assets/bkapay-logo.png";
 
 const countries = [
   { code: "BJ", name: "Bénin", flag: "🇧🇯" },
@@ -181,7 +181,7 @@ export default function Home() {
             Prêt à commencer ?
           </h2>
           <p className="text-lg md:text-xl text-primary-foreground/90 mb-8">
-            Rejoignez des milliers d'entreprises qui font confiance à KEJAtransfer pour leurs paiements
+            Rejoignez des milliers d'entreprises qui font confiance à BKApay pour leurs paiements
           </p>
           <Link href="/signup">
             <Button size="lg" variant="secondary" className="text-base" data-testid="button-cta-signup">
@@ -197,8 +197,8 @@ export default function Home() {
           <div className="grid md:grid-cols-3 gap-12 mb-8">
             <div>
               <div className="flex items-center gap-2 mb-4">
-                <img src={logoImage} alt="KEJAtransfer" className="h-8 w-auto" />
-                <span className="font-bold text-lg">KEJAtransfer</span>
+                <img src={logoImage} alt="BKApay" className="h-8 w-auto" />
+                <span className="font-bold text-lg">BKApay</span>
               </div>
               <p className="text-sm text-muted-foreground">
                 Plateforme de paiement mobile money pour l'Afrique de l'Ouest
@@ -224,7 +224,7 @@ export default function Home() {
             </div>
           </div>
           <div className="border-t pt-8 flex flex-wrap justify-between items-center gap-4 text-sm text-muted-foreground">
-            <p>© 2024 KEJAtransfer. Tous droits réservés.</p>
+            <p>© 2024 BKApay. Tous droits réservés.</p>
             <div className="flex gap-6">
               <span>Conditions</span>
               <span>Confidentialité</span>
