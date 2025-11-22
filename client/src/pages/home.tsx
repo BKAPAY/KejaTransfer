@@ -88,31 +88,26 @@ export default function Home() {
       {/* Hero Section */}
       <section className="relative py-8 md:py-20 lg:py-32 overflow-hidden bg-gradient-to-br from-primary/5 via-background to-accent/5">
         <div className="container mx-auto px-2 sm:px-4 md:px-8 max-w-7xl">
-          <div className="grid lg:grid-cols-2 gap-4 sm:gap-8 lg:gap-12 items-center">
-            <div className="space-y-3 sm:space-y-6 lg:space-y-8">
-              <div className="space-y-2 sm:space-y-4">
-                <h1 className="text-xl sm:text-2xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-foreground leading-tight">
-                  Paiements Mobile Money pour l'Afrique de l'Ouest
-                </h1>
-                <p className="text-xs sm:text-sm md:text-base lg:text-lg text-muted-foreground">
-                  Acceptez les paiements Orange Money, MTN, Moov, Wave et plus dans 6 pays. Plateforme simple, sécurisée et fiable.
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2 sm:gap-4">
-                <Link href="/signup">
-                  <Button size="sm" className="text-xs sm:text-sm md:text-base" data-testid="button-hero-signup">
-                    Commencer
-                  </Button>
-                </Link>
-                <Link href="/login">
-                  <Button size="sm" variant="outline" className="text-xs sm:text-sm md:text-base" data-testid="button-hero-login">
-                    Se connecter
-                  </Button>
-                </Link>
-              </div>
+          <div className="space-y-3 sm:space-y-6 lg:space-y-8">
+            <div className="space-y-2 sm:space-y-4">
+              <h1 className="text-xl sm:text-2xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-foreground leading-tight">
+                Paiements Mobile Money pour l'Afrique de l'Ouest
+              </h1>
+              <p className="text-xs sm:text-sm md:text-base lg:text-lg text-muted-foreground">
+                Acceptez les paiements Orange Money, MTN, Moov, Wave et plus dans 6 pays. Plateforme simple, sécurisée et fiable.
+              </p>
             </div>
-            <div className="flex justify-center hidden md:block">
-              <img src={logoImage} alt="BKApay Platform" className="w-full max-w-xs lg:max-w-md rounded-lg" />
+            <div className="flex flex-wrap gap-2 sm:gap-4">
+              <Link href="/signup">
+                <Button size="sm" className="text-xs sm:text-sm md:text-base" data-testid="button-hero-signup">
+                  Commencer
+                </Button>
+              </Link>
+              <Link href="/login">
+                <Button size="sm" variant="outline" className="text-xs sm:text-sm md:text-base" data-testid="button-hero-login">
+                  Se connecter
+                </Button>
+              </Link>
             </div>
           </div>
         </div>
