@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Copy, ExternalLink, Trash2, Image as ImageIcon } from "lucide-react";
+import { Plus, Copy, ExternalLink, Trash2, Image as ImageIcon, Link as LinkIcon } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { PaymentLink } from "@shared/schema";
