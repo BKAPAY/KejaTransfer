@@ -93,9 +93,10 @@ export default function PaymentLinks() {
       if (data.imageFile) {
         try {
           const compressedImage = await compressImage(data.imageFile);
-          const imageResponse = await apiRequest("POST", "/api/images", {
+          const res = await apiRequest("POST", "/api/images", {
             imageData: compressedImage,
           });
+          const imageResponse = await res.json() as { imageId: string };
           imageId = imageResponse.imageId;
         } catch (error) {
           throw new Error("Erreur lors du traitement de l'image");
@@ -162,8 +163,8 @@ export default function PaymentLinks() {
   };
 
   return (
-    <div className="space-y-8">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
+    <div className="flex flex-col h-full">
+      <div className="flex items-center justify-between gap-4 flex-wrap mb-6">
         <div>
           <h1 className="text-3xl font-bold text-foreground mb-2">Liens de paiement</h1>
           <p className="text-muted-foreground">
@@ -319,16 +320,17 @@ export default function PaymentLinks() {
         </Dialog>
       </div>
 
-      {/* Payment Links List */}
-      <div className="grid gap-6">
-        {isLoading ? (
-          <Card>
-            <CardContent className="py-12">
-              <p className="text-center text-muted-foreground">Chargement...</p>
-            </CardContent>
-          </Card>
-        ) : paymentLinks && paymentLinks.length > 0 ? (
-          paymentLinks.map((link) => (
+      {/* Payment Links List - Scrollable Container */}
+      <div className="flex-1 overflow-y-auto pr-3">
+        <div className="grid gap-6">
+          {isLoading ? (
+            <Card>
+              <CardContent className="py-12">
+                <p className="text-center text-muted-foreground">Chargement...</p>
+              </CardContent>
+            </Card>
+          ) : paymentLinks && paymentLinks.length > 0 ? (
+            paymentLinks.map((link) => (
             <Card key={link.id} data-testid={`payment-link-${link.id}`}>
               <CardHeader>
                 <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -395,24 +397,25 @@ export default function PaymentLinks() {
                   </div>
                 </div>
               </CardContent>
+              </Card>
+            ))
+          ) : (
+            <Card>
+              <CardContent className="py-12">
+                <div className="text-center">
+                  <LinkIcon className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                  <p className="text-muted-foreground mb-4">
+                    Vous n'avez pas encore créé de lien de paiement
+                  </p>
+                  <Button onClick={() => setDialogOpen(true)} data-testid="button-create-first">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Créer votre premier lien
+                  </Button>
+                </div>
+              </CardContent>
             </Card>
-          ))
-        ) : (
-          <Card>
-            <CardContent className="py-12">
-              <div className="text-center">
-                <LinkIcon className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-                <p className="text-muted-foreground mb-4">
-                  Vous n'avez pas encore créé de lien de paiement
-                </p>
-                <Button onClick={() => setDialogOpen(true)} data-testid="button-create-first">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Créer votre premier lien
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );
