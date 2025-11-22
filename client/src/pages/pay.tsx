@@ -144,11 +144,14 @@ export default function Pay() {
             <div className="flex justify-center mb-2 sm:mb-3">
               <img
                 src={imageData}
-                alt="Payment"
+                alt={paymentLink.productName}
                 className="max-h-24 sm:max-h-32 lg:max-h-48 w-auto rounded-md object-cover"
               />
             </div>
           )}
+          <div>
+            <CardTitle className="text-sm sm:text-lg lg:text-2xl mb-1 sm:mb-2">{paymentLink.productName}</CardTitle>
+          </div>
           <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-primary">
             {formatAmount(paymentLink.amount)}
           </div>
