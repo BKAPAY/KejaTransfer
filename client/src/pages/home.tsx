@@ -3,6 +3,13 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { CreditCard, Link as LinkIcon, Code, BarChart3, Shield, Zap } from "lucide-react";
 import logoImage from "@assets/bkapay-logo.png";
+import omImage from "@assets/om_1763835083036.png";
+import mtnImage from "@assets/mtn (1)_1763835082904.png";
+import moovImage from "@assets/moov (1)_1763835082986.png";
+import waveImage from "@assets/wave (1)_1763835083242.png";
+import freeImage from "@assets/mixxByYas-web-page_1763835083140.png";
+import tmonyImage from "@assets/e-money_1763835083190.png";
+import wizallImage from "@assets/wizall_1763835083090.png";
 
 const countries = [
   { code: "BJ", name: "Bénin", flag: "🇧🇯" },
@@ -14,14 +21,13 @@ const countries = [
 ];
 
 const operators = [
-  "Orange Money",
-  "MTN Mobile Money",
-  "Moov Money",
-  "Wave",
-  "Free Money",
-  "T-Money",
-  "Wizall",
-  "Expresso",
+  { name: "Orange Money", image: omImage },
+  { name: "MTN Mobile Money", image: mtnImage },
+  { name: "Moov Money", image: moovImage },
+  { name: "Wave", image: waveImage },
+  { name: "Free Money", image: freeImage },
+  { name: "T-Money", image: tmonyImage },
+  { name: "Wizall", image: wizallImage },
 ];
 
 const features = [
@@ -160,13 +166,17 @@ export default function Home() {
             <h2 className="text-lg sm:text-2xl md:text-3xl lg:text-4xl font-bold mb-2 sm:mb-4 text-foreground">Tous les opérateurs supportés</h2>
             <p className="text-xs sm:text-sm md:text-base lg:text-lg text-muted-foreground">Acceptez les paiements de tous les principaux opérateurs</p>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 lg:gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
             {operators.map((operator, index) => (
               <div
                 key={index}
-                className="bg-background border border-border rounded-md p-2 sm:p-3 lg:p-4 text-center text-xs sm:text-sm font-medium hover-elevate"
+                className="flex items-center justify-center bg-background border border-border rounded-lg p-4 sm:p-6 lg:p-8 hover-elevate min-h-24 sm:min-h-32"
               >
-                {operator}
+                <img 
+                  src={operator.image} 
+                  alt={operator.name} 
+                  className="w-full h-full object-contain max-w-[120px] max-h-[120px]"
+                />
               </div>
             ))}
           </div>
