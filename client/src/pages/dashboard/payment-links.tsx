@@ -71,6 +71,8 @@ type PaymentLinkFormData = z.infer<typeof paymentLinkSchema>;
 export default function PaymentLinks() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [successToken, setSuccessToken] = useState<string | null>(null);
+  const [successImage, setSuccessImage] = useState<string | null>(null);
   const { toast } = useToast();
 
   const { data: paymentLinks, isLoading } = useQuery<PaymentLink[]>({
@@ -103,19 +105,25 @@ export default function PaymentLinks() {
         }
       }
 
-      return await apiRequest("POST", "/api/payment-links", {
+      const res = await apiRequest("POST", "/api/payment-links", {
         productName: data.productName,
         description: data.description,
         amount: data.amount,
         imageUrl: imageId, // Store only the short ID, not the full base64
       });
+      return res.json() as Promise<PaymentLink>;
     },
-    onSuccess: () => {
+    onSuccess: (data: PaymentLink) => {
       queryClient.invalidateQueries({ queryKey: ["/api/payment-links"] });
-      toast({
-        title: "Lien créé",
-        description: "Votre lien de paiement a été créé avec succès",
-      });
+      // Show success screen with image and short link
+      if (data.imageUrl) {
+        // Load image from cache
+        fetch(`/api/images/${data.imageUrl}`)
+          .then(res => res.json())
+          .then(data => setSuccessImage(data.data))
+          .catch(() => setSuccessImage(null));
+      }
+      setSuccessToken(data.token);
       setDialogOpen(false);
       setImagePreview(null);
       form.reset();
@@ -158,9 +166,57 @@ export default function PaymentLinks() {
     });
   };
 
+  const closeSuccess = () => {
+    setSuccessImage(null);
+    setSuccessToken(null);
+  };
+
   const onSubmit = (data: PaymentLinkFormData) => {
     createMutation.mutate(data);
   };
+
+  // Success screen overlay
+  if (successToken) {
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4">
+        <Card className="w-full max-w-sm">
+          <CardContent className="pt-6 flex flex-col items-center text-center space-y-6">
+            {successImage && (
+              <img
+                src={successImage}
+                alt="Produit"
+                className="max-h-48 w-auto rounded-md"
+              />
+            )}
+            <div className="space-y-4 w-full">
+              <p className="text-lg font-semibold text-foreground">Lien créé avec succès!</p>
+              <div className="bg-muted rounded-md p-3 flex items-center justify-between gap-2">
+                <code className="text-sm font-mono text-foreground truncate">
+                  {window.location.origin}/pay/{successToken}
+                </code>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => copyToClipboard(successToken)}
+                  className="flex-shrink-0"
+                  data-testid="button-copy-success"
+                >
+                  <Copy className="w-4 h-4" />
+                </Button>
+              </div>
+              <Button
+                onClick={closeSuccess}
+                className="w-full"
+                data-testid="button-done"
+              >
+                Continuer
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full">
@@ -354,12 +410,6 @@ export default function PaymentLinks() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {link.imageUrl && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <ImageIcon className="w-4 h-4" />
-                      <span className="truncate">{link.imageUrl}</span>
-                    </div>
-                  )}
                   <div className="flex items-center gap-2 p-3 bg-muted rounded-md">
                     <code className="flex-1 text-sm truncate">
                       {window.location.origin}/pay/{link.token}

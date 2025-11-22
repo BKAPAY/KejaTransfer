@@ -107,7 +107,8 @@ export class DbStorage implements IStorage {
   }
 
   async createPaymentLink(link: InsertPaymentLink & { userId: string }): Promise<PaymentLink> {
-    const token = randomUUID();
+    // Generate a short token (8 random hex chars)
+    const token = randomUUID().replace(/-/g, '').substring(0, 8);
     const results = await db.insert(schema.paymentLinks).values({ ...link, token }).returning();
     return results[0];
   }
