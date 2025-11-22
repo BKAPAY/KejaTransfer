@@ -182,7 +182,7 @@ export default function Deposit() {
                 disabled={depositMutation.isPending}
                 data-testid="button-submit-deposit"
               >
-                {depositMutation.isPending ? "En cours..." : "Continuer vers le paiement"}
+                {depositMutation.isPending ? "En cours..." : "Confirmer"}
               </Button>
             </form>
           </Form>

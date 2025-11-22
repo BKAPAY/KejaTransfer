@@ -37,19 +37,25 @@ if (!PAYDUNYA_CONFIG.masterKey || !PAYDUNYA_CONFIG.publicKey || !PAYDUNYA_CONFIG
 
 // Helper function to call Paydunya API
 async function callPaydunyaAPI(endpoint: string, data: any) {
-  const response = await fetch(`${PAYDUNYA_CONFIG.apiUrl}${endpoint}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "PAYDUNYA-MASTER-KEY": PAYDUNYA_CONFIG.masterKey,
-      "PAYDUNYA-PRIVATE-KEY": PAYDUNYA_CONFIG.privateKey,
-      "PAYDUNYA-TOKEN": PAYDUNYA_CONFIG.token,
-    },
-    body: JSON.stringify(data),
-  });
+  try {
+    const response = await fetch(`${PAYDUNYA_CONFIG.apiUrl}${endpoint}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "PAYDUNYA-MASTER-KEY": PAYDUNYA_CONFIG.masterKey,
+        "PAYDUNYA-PRIVATE-KEY": PAYDUNYA_CONFIG.privateKey,
+        "PAYDUNYA-TOKEN": PAYDUNYA_CONFIG.token,
+      },
+      body: JSON.stringify(data),
+    });
 
-  const result = await response.json();
-  return result;
+    const result = await response.json();
+    console.log(`[Paydunya API] ${endpoint} - Status: ${response.status}`, result);
+    return result;
+  } catch (error) {
+    console.error(`[Paydunya API Error] ${endpoint}:`, error);
+    throw error;
+  }
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
