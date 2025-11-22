@@ -23,6 +23,42 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 
+// Compress image to reduce size
+const compressImage = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let width = img.width;
+        let height = img.height;
+
+        // Reduce to max 500x500 to save space
+        if (width > 500 || height > 500) {
+          const ratio = Math.min(500 / width, 500 / height);
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          reject(new Error("Cannot get canvas context"));
+          return;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", 0.7));
+      };
+      img.onerror = () => reject(new Error("Cannot load image"));
+    };
+    reader.onerror = () => reject(new Error("Cannot read file"));
+  });
+};
+
 const paymentLinkSchema = z.object({
   productName: z.string().min(1, "Le nom du produit est requis"),
   description: z.string().optional(),
@@ -55,14 +91,11 @@ export default function PaymentLinks() {
     mutationFn: async (data: PaymentLinkFormData) => {
       let imageUrl: string | undefined;
       if (data.imageFile) {
-        const reader = new FileReader();
-        imageUrl = await new Promise<string>((resolve, reject) => {
-          reader.onloadend = () => {
-            resolve(reader.result as string);
-          };
-          reader.onerror = reject;
-          reader.readAsDataURL(data.imageFile!);
-        });
+        try {
+          imageUrl = await compressImage(data.imageFile);
+        } catch (error) {
+          throw new Error("Erreur lors du traitement de l'image");
+        }
       }
 
       return await apiRequest("POST", "/api/payment-links", {
@@ -224,6 +257,15 @@ export default function PaymentLinks() {
                             onChange={(e) => {
                               const file = e.target.files?.[0];
                               if (file) {
+                                // Validate file size (max 5MB)
+                                if (file.size > 5 * 1024 * 1024) {
+                                  toast({
+                                    title: "Fichier trop volumineux",
+                                    description: "L'image doit faire moins de 5MB",
+                                    variant: "destructive",
+                                  });
+                                  return;
+                                }
                                 onChange(file);
                                 const reader = new FileReader();
                                 reader.onloadend = () => {
