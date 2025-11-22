@@ -244,7 +244,7 @@ export default function Home() {
             </div>
           </div>
           <div className="border-t pt-4 sm:pt-6 lg:pt-8 flex flex-col sm:flex-row flex-wrap justify-between items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
-            <p>© 2024 BKApay</p>
+            <p>© 2025</p>
             <div className="flex gap-3 sm:gap-6">
               <span>Conditions</span>
               <span>Confidentialité</span>
