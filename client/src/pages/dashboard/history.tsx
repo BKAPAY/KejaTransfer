@@ -4,11 +4,21 @@ import { useQuery } from "@tanstack/react-query";
 import type { Transaction } from "@shared/schema";
 import { History as HistoryIcon } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { TransactionDetailsDialog } from "@/components/transaction-details-dialog";
+import { useState } from "react";
 
 export default function History() {
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+
   const { data: transactions, isLoading } = useQuery<Transaction[]>({
     queryKey: ["/api/transactions"],
   });
+
+  const handleTransactionClick = (transaction: Transaction) => {
+    setSelectedTransaction(transaction);
+    setDialogOpen(true);
+  };
 
   const formatAmount = (amount: number) => {
     return new Intl.NumberFormat("fr-FR", {
@@ -82,8 +92,9 @@ export default function History() {
               {transactions.map((transaction) => (
                 <div
                   key={transaction.id}
-                  className="flex items-center justify-between gap-4 py-4 border-b last:border-0 hover-elevate rounded-md px-3"
+                  className="flex items-center justify-between gap-4 py-4 border-b last:border-0 hover-elevate rounded-md px-3 cursor-pointer"
                   data-testid={`transaction-${transaction.id}`}
+                  onClick={() => handleTransactionClick(transaction)}
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap mb-1">
@@ -128,6 +139,12 @@ export default function History() {
           )}
         </CardContent>
       </Card>
+
+      <TransactionDetailsDialog
+        transaction={selectedTransaction}
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+      />
     </div>
   );
 }
