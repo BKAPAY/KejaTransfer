@@ -27,13 +27,14 @@ const paymentLinkSchema = z.object({
   productName: z.string().min(1, "Le nom du produit est requis"),
   description: z.string().optional(),
   amount: z.number().min(1, "Le montant doit être supérieur à 0"),
-  imageUrl: z.string().optional(),
+  imageFile: z.instanceof(File).optional(),
 });
 
 type PaymentLinkFormData = z.infer<typeof paymentLinkSchema>;
 
 export default function PaymentLinks() {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const { toast } = useToast();
 
   const { data: paymentLinks, isLoading } = useQuery<PaymentLink[]>({
@@ -46,13 +47,30 @@ export default function PaymentLinks() {
       productName: "",
       description: "",
       amount: undefined as any,
-      imageUrl: "",
+      imageFile: undefined,
     },
   });
 
   const createMutation = useMutation({
     mutationFn: async (data: PaymentLinkFormData) => {
-      return await apiRequest("POST", "/api/payment-links", data);
+      let imageUrl: string | undefined;
+      if (data.imageFile) {
+        const reader = new FileReader();
+        imageUrl = await new Promise<string>((resolve, reject) => {
+          reader.onloadend = () => {
+            resolve(reader.result as string);
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(data.imageFile!);
+        });
+      }
+
+      return await apiRequest("POST", "/api/payment-links", {
+        productName: data.productName,
+        description: data.description,
+        amount: data.amount,
+        imageUrl,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/payment-links"] });
@@ -61,6 +79,7 @@ export default function PaymentLinks() {
         description: "Votre lien de paiement a été créé avec succès",
       });
       setDialogOpen(false);
+      setImagePreview(null);
       form.reset();
     },
     onError: (error: any) => {
@@ -192,16 +211,39 @@ export default function PaymentLinks() {
 
                 <FormField
                   control={form.control}
-                  name="imageUrl"
-                  render={({ field }) => (
+                  name="imageFile"
+                  render={({ field: { onChange, value, ...field } }) => (
                     <FormItem>
-                      <FormLabel>URL de l'image (optionnel)</FormLabel>
+                      <FormLabel>Image du produit (optionnel)</FormLabel>
                       <FormControl>
-                        <Input
-                          placeholder="https://example.com/image.jpg"
-                          data-testid="input-image-url"
-                          {...field}
-                        />
+                        <div className="space-y-3">
+                          <Input
+                            type="file"
+                            accept="image/*"
+                            data-testid="input-image-file"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                onChange(file);
+                                const reader = new FileReader();
+                                reader.onloadend = () => {
+                                  setImagePreview(reader.result as string);
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                            }}
+                            {...field}
+                          />
+                          {imagePreview && (
+                            <div className="relative w-full max-w-xs">
+                              <img
+                                src={imagePreview}
+                                alt="Aperçu"
+                                className="w-full h-32 object-cover rounded-md border"
+                              />
+                            </div>
+                          )}
+                        </div>
                       </FormControl>
                       <FormMessage />
                     </FormItem>
