@@ -4,15 +4,19 @@
 KEJAtransfer est une plateforme moderne de paiement mobile money pour l'Afrique de l'Ouest. Elle permet aux entreprises et particuliers d'accepter des paiements via mobile money (Orange Money, MTN, Moov, Wave, Free Money, T-Money, Wizall, Expresso) dans 6 pays: Bénin, Togo, Côte d'Ivoire, Sénégal, Burkina Faso et Mali.
 
 ## Dernières modifications (22 Novembre 2025)
-- Création complète de la plateforme KEJAtransfer (MVP achevé)
-- Implémentation de l'authentification personnalisée (sans Replit Auth)
-- Configuration complète du frontend avec React, Tailwind CSS et Shadcn UI
-- Mise en place du backend avec Express, PostgreSQL et intégration Paydunya
-- Création de toutes les fonctionnalités: liens de paiement, liens marchands, API Gateway
-- Design professionnel aux couleurs du logo (vert et doré)
-- **NOUVEAUTÉ**: Dashboard Analytics avec graphiques détaillés (revenus par date, opérateur, pays, type)
-- **NOUVEAUTÉ**: Support multi-devises (XOF, USD, EUR) avec conversion
-- Migration vers driver postgres-js pour une meilleure stabilité
+- ✅ Création complète de la plateforme KEJAtransfer (MVP achevé)
+- ✅ Implémentation de l'authentération personnalisée (sans Replit Auth)
+- ✅ Configuration complète du frontend avec React, Tailwind CSS et Shadcn UI
+- ✅ Mise en place du backend avec Express, PostgreSQL et intégration Paydunya
+- ✅ Création de toutes les fonctionnalités: liens de paiement, liens marchands, API Gateway
+- ✅ Design professionnel aux couleurs du logo (vert et doré)
+- ✅ Dashboard Analytics avec graphiques détaillés (revenus par date, opérateur, pays, type)
+- ✅ Support multi-devises (XOF, USD, EUR) avec conversion
+- ✅ Migration vers driver postgres-js pour une meilleure stabilité
+- ✅ **CORRECTION**: Persistance de session - l'utilisateur reste connecté après actualisation
+- ✅ **NOUVEAU**: Détails des transactions cliquables dans l'historique (email, téléphone du client)
+- ✅ **NOUVEAU**: Dépôts via Paydunya (formulaire simplifié: montant + pays + opérateur)
+- ✅ **NOUVEAU**: Transferts via API Paydunya Disburse (débits de compte)
 
 ## Architecture du projet
 

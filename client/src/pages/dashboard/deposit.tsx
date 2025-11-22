@@ -17,9 +17,6 @@ const depositSchema = z.object({
   amount: z.number().min(1, "Le montant doit être supérieur à 0"),
   country: z.string().min(1, "Sélectionnez un pays"),
   operator: z.string().min(1, "Sélectionnez un opérateur"),
-  customerName: z.string().optional(),
-  customerEmail: z.string().email().optional().or(z.literal("")),
-  customerPhone: z.string().optional(),
 });
 
 type DepositFormData = z.infer<typeof depositSchema>;
@@ -33,9 +30,6 @@ export default function Deposit() {
       amount: 0,
       country: "",
       operator: "",
-      customerName: "",
-      customerEmail: "",
-      customerPhone: "",
     },
   });
 
@@ -160,61 +154,6 @@ export default function Deposit() {
                   )}
                 />
               )}
-
-              <FormField
-                control={form.control}
-                name="customerName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Nom (optionnel)</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="Votre nom"
-                        data-testid="input-name"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="customerEmail"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Email (optionnel)</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="email"
-                        placeholder="votre@email.com"
-                        data-testid="input-email"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="customerPhone"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Téléphone (optionnel)</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="77123456"
-                        data-testid="input-phone"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
 
               <Button
                 type="submit"
