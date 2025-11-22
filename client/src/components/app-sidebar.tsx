@@ -133,7 +133,6 @@ export function AppSidebar() {
       <SidebarHeader className="p-6">
         <div className="flex items-center gap-3">
           <img src={logoImage} alt="BKApay" className="h-10 w-auto" />
-          <span className="text-lg font-bold text-sidebar-foreground">BKApay</span>
         </div>
       </SidebarHeader>
       <SidebarContent>

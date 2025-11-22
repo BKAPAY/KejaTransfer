@@ -66,7 +66,6 @@ export default function Home() {
           <div className="flex items-center justify-between gap-2 sm:gap-4">
             <div className="flex items-center gap-2 sm:gap-3">
               <img src={logoImage} alt="BKApay" className="h-8 sm:h-10 w-auto" />
-              <span className="text-sm sm:text-xl font-bold text-foreground hidden sm:inline">BKApay</span>
             </div>
             <div className="flex items-center gap-2 sm:gap-3">
               <Link href="/login">
@@ -198,7 +197,6 @@ export default function Home() {
             <div>
               <div className="flex items-center gap-2 mb-2 sm:mb-4">
                 <img src={logoImage} alt="BKApay" className="h-6 sm:h-8 w-auto" />
-                <span className="font-bold text-sm sm:text-lg hidden sm:inline">BKApay</span>
               </div>
               <p className="text-xs sm:text-sm text-muted-foreground">
                 Plateforme de paiement mobile money pour l'Afrique de l'Ouest
