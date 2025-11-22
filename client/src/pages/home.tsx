@@ -1,7 +1,13 @@
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { CreditCard, Link as LinkIcon, Code, BarChart3, Shield, Zap } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { CreditCard, Link as LinkIcon, Code, BarChart3, Shield, Zap, Menu } from "lucide-react";
 import logoImage from "@assets/bkapay-logo.png";
 import omImage from "@assets/om_1763835083036.png";
 import mtnImage from "@assets/mtn (1)_1763835082904.png";
@@ -73,14 +79,25 @@ export default function Home() {
             <div className="flex items-center gap-2 sm:gap-3">
               <img src={logoImage} alt="BKApay" className="h-8 sm:h-10 w-auto" />
             </div>
-            <div className="flex items-center gap-2 sm:gap-3">
-              <Link href="/login">
-                <Button variant="ghost" size="sm" data-testid="button-login" className="text-xs sm:text-sm">Se connecter</Button>
-              </Link>
-              <Link href="/signup">
-                <Button size="sm" data-testid="button-signup" className="text-xs sm:text-sm">S'inscrire</Button>
-              </Link>
-            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" data-testid="button-auth-menu">
+                  <Menu className="w-5 h-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem asChild>
+                  <Link href="/login" data-testid="menu-login">
+                    Se connecter
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/signup" data-testid="menu-signup">
+                    S'inscrire
+                  </Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </header>
