@@ -631,6 +631,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== API Key Payment Route (Public) =====
+  // Allow developers to integrate payments using their API key
+  app.post("/api/payments/create", async (req: Request, res: Response) => {
+    try {
+      const { publicKey, amount, description, customerName, customerEmail, customerPhone, country, operator } = req.body;
+
+      if (!publicKey) {
+        return res.status(400).json({ error: "Clé API publique requise" });
+      }
+
+      if (!amount || amount <= 0) {
+        return res.status(400).json({ error: "Montant invalide" });
+      }
+
+      // Get API key and its owner
+      const apiKey = await storage.getApiKeyByPublicKey(publicKey);
+      if (!apiKey || !apiKey.isActive) {
+        return res.status(401).json({ error: "Clé API invalide ou inactive" });
+      }
+
+      // Create transaction record for the API key owner
+      const transaction = await storage.createTransaction({
+        userId: apiKey.userId,
+        type: "api_payment",
+        amount: Math.floor(amount),
+        currency: "XOF",
+        status: "pending",
+        country,
+        operator,
+        customerName,
+        customerEmail,
+        customerPhone,
+        description: description || "Paiement via API",
+      });
+
+      // Call Paydunya API to create checkout invoice
+      const paydunyaData = {
+        invoice: {
+          total_amount: Math.floor(amount),
+          description: description || "Paiement via API KEJAtransfer",
+        },
+        store: {
+          name: "KEJAtransfer",
+          tagline: "Plateforme de paiement mobile money",
+        },
+        custom_data: {
+          transaction_id: transaction.id,
+          customer_name: customerName,
+          customer_email: customerEmail,
+          api_key_id: apiKey.id,
+        },
+        actions: {
+          callback_url: `${process.env.BASE_URL || 'http://localhost:5000'}/api/webhooks/paydunya`,
+        },
+      };
+
+      const paydunyaResponse = await callPaydunyaAPI("/checkout-invoice/create", paydunyaData);
+
+      if (paydunyaResponse.response_code === "00") {
+        // Update transaction with Paydunya token
+        await storage.updateTransactionStatus(transaction.id, "pending", {
+          paydunyaToken: paydunyaResponse.token,
+        });
+
+        res.json({
+          success: true,
+          redirectUrl: paydunyaResponse.response_text,
+        });
+      } else {
+        await storage.updateTransactionStatus(transaction.id, "failed");
+        const errorMsg = paydunyaResponse.response_text || "Erreur lors de l'initiation du paiement";
+        res.status(400).json({ error: errorMsg });
+      }
+    } catch (error: any) {
+      console.error("API payment processing error:", error);
+      res.status(500).json({ error: error.message || "Erreur lors du traitement du paiement" });
+    }
+  });
+
   // Paydunya webhook
   app.post("/api/webhooks/paydunya", async (req: Request, res: Response) => {
     try {

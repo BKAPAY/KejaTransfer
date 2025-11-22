@@ -17,6 +17,7 @@ KEJAtransfer est une plateforme moderne de paiement mobile money pour l'Afrique 
 - ✅ **NOUVEAU**: Détails des transactions cliquables dans l'historique (email, téléphone du client)
 - ✅ **NOUVEAU**: Dépôts via Paydunya (formulaire simplifié: montant + pays + opérateur)
 - ✅ **NOUVEAU**: Transferts via API Paydunya Disburse (débits de compte)
+- ✅ **NOUVEAU**: Endpoint public `/api/payments/create` pour intégration par clés API (paiements entrants et sortants)
 
 ## Architecture du projet
 
@@ -46,6 +47,9 @@ KEJAtransfer est une plateforme moderne de paiement mobile money pour l'Afrique 
   - `/api/transactions` - Historique des transactions
   - `/api/payments/process/:token` - Traitement paiements (liens)
   - `/api/merchant-payments/process/:token` - Traitement paiements (marchands)
+  - `/api/payments/create` - Paiements via clé API (public, pour développeurs)
+  - `/api/deposits` - Dépôts sur le compte
+  - `/api/transfers` - Transferts/retraits vers mobile money
   - `/api/webhooks/paydunya` - Webhook pour notifications Paydunya
 
 ### Base de données (PostgreSQL)
@@ -104,10 +108,13 @@ L'application utilise l'API Paydunya pour traiter les paiements mobile money:
 - Parfait pour donations, pourboires, etc.
 
 ### 3. API Gateway
-- Génération de clés API (publique/privée)
-- Intégration sur sites web tiers
-- Redirection vers interface de paiement KEJAtransfer
-- Webhook pour notifications
+- Génération de clés API (publique/privée) pour développeurs
+- **Paiements entrants**: Endpoint public `/api/payments/create` pour intégrer collecte de paiements
+  - Les revenus vont directement au dashboard du développeur
+  - Pas besoin de gérer directement Paydunya
+- **Paiements sortants**: Les développeurs peuvent faire des transferts/retraits depuis leur dashboard
+- Redirection vers interface de paiement Paydunya
+- Webhook pour notifications des paiements
 
 ### 4. Gestion des transactions
 - Historique complet
@@ -122,8 +129,35 @@ L'application utilise l'API Paydunya pour traiter les paiements mobile money:
 - Composants Shadcn UI
 - Mode sombre supporté
 
-## Note sur les paiements sortants
-L'API Paydunya utilisée ne supporte actuellement que les paiements entrants (collecte de fonds). Pour les paiements sortants (transferts vers les utilisateurs), il faudra soit contacter Paydunya pour une API de payout, soit intégrer un service complémentaire.
+## Système de clés API (Paiements entrants et sortants)
+
+### Flux complet des paiements via clés API:
+1. **Développeur crée une clé API** sur KEJAtransfer (génère publicKey et privateKey)
+2. **Intègre sur son site** en appelant `/api/payments/create` avec sa publicKey
+3. **Clients du développeur payent** → funds vont au dashboard du développeur
+4. **Développeur fait un retrait** depuis sa page Transferts → prélève sur son dashboard et envoie aux clients finaux via mobile money
+
+### Exemple d'intégration:
+```javascript
+// Sur le site du développeur
+const response = await fetch('https://keja.app/api/payments/create', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    publicKey: 'pk_live_xxxxx',
+    amount: 50000,
+    description: 'Achat produit',
+    customerName: 'Jean',
+    customerEmail: 'jean@example.com',
+    customerPhone: '+221781234567',
+    country: 'SN',
+    operator: 'orange'
+  })
+});
+const { redirectUrl } = await response.json();
+// Rediriger client vers Paydunya
+window.location.href = redirectUrl;
+```
 
 ## Prochaines étapes potentielles
 - Implémenter les paiements sortants (si API disponible)

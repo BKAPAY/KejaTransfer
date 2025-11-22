@@ -62,16 +62,44 @@ export default function Documentation() {
               Intégrez les paiements directement dans votre application
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              Utilisez nos clés API pour intégrer KEJAtransfer dans votre site web ou application.
-              Les clients seront redirigés vers notre interface de paiement sécurisée.
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Vos clés API gèrent à la fois les paiements entrants (paiements clients) et les transferts sortants (retraits vers mobile money).
-            </p>
-            <p className="text-sm font-semibold text-foreground">
-              Consultez la section API Gateway pour créer et gérer vos clés.
+          <CardContent className="space-y-4">
+            <div>
+              <h4 className="text-sm font-semibold text-foreground mb-2">Paiements entrants (collecte)</h4>
+              <p className="text-sm text-muted-foreground mb-3">
+                Acceptez des paiements de vos clients directement sur votre site. Les fonds vont sur votre dashboard KEJAtransfer.
+              </p>
+              <div className="bg-background p-3 rounded-md font-mono text-xs overflow-x-auto">
+                <pre>{`const response = await fetch('/api/payments/create', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    publicKey: 'pk_live_YOUR_PUBLIC_KEY',
+    amount: 50000,
+    description: 'Achat produit',
+    customerName: 'Jean Dupont',
+    customerEmail: 'jean@example.com',
+    customerPhone: '+221781234567',
+    country: 'SN',
+    operator: 'orange'
+  })
+});
+const data = await response.json();
+// Redirigez l'utilisateur vers data.redirectUrl
+window.location.href = data.redirectUrl;`}</pre>
+              </div>
+            </div>
+            
+            <div>
+              <h4 className="text-sm font-semibold text-foreground mb-2">Paiements sortants (retraits)</h4>
+              <p className="text-sm text-muted-foreground">
+                Transférez l'argent collecté vers vos clients via mobile money. Accédez à la section Transferts pour initialiser des retraits.
+              </p>
+            </div>
+
+            <p className="text-sm font-semibold text-foreground pt-2">
+              Créez et gérez vos clés dans la section API Gateway.
             </p>
           </CardContent>
         </Card>

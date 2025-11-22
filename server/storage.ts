@@ -44,6 +44,7 @@ export interface IStorage {
 
   // API Keys
   getApiKeys(userId: string): Promise<ApiKey[]>;
+  getApiKeyByPublicKey(publicKey: string): Promise<ApiKey | undefined>;
   createApiKey(key: InsertApiKey & { userId: string }): Promise<ApiKey>;
   deleteApiKey(id: string, userId: string): Promise<boolean>;
 
@@ -139,6 +140,11 @@ export class DbStorage implements IStorage {
   // API Keys
   async getApiKeys(userId: string): Promise<ApiKey[]> {
     return db.select().from(schema.apiKeys).where(eq(schema.apiKeys.userId, userId)).orderBy(desc(schema.apiKeys.createdAt));
+  }
+
+  async getApiKeyByPublicKey(publicKey: string): Promise<ApiKey | undefined> {
+    const results = await db.select().from(schema.apiKeys).where(eq(schema.apiKeys.publicKey, publicKey)).limit(1);
+    return results[0];
   }
 
   async createApiKey(key: InsertApiKey & { userId: string }): Promise<ApiKey> {
