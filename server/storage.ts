@@ -151,7 +151,7 @@ export class DbStorage implements IStorage {
   }
 
   async createMerchantLink(link: InsertMerchantLink & { userId: string }): Promise<MerchantLink> {
-    const token = randomUUID();
+    const token = randomUUID().replace(/-/g, '').substring(0, 8);
     const results = await db.insert(schema.merchantLinks).values({ ...link, token }).returning();
     return results[0];
   }

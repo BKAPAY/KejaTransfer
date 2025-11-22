@@ -205,7 +205,7 @@ export default function MerchantLinks() {
               <CardContent>
                 <div className="space-y-4">
                   <div className="flex items-center gap-2 p-3 bg-muted rounded-md">
-                    <code className="flex-1 text-sm truncate">
+                    <code className="flex-1 text-xs sm:text-sm truncate">
                       {link.token}
                     </code>
                     <Button
