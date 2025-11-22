@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
+import { useAuth } from "@/hooks/use-auth";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import Signup from "@/pages/signup";
@@ -48,8 +49,27 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
   );
 }
 
-function Router() {
-  const [location] = useLocation();
+function ProtectedRouter() {
+  const [location, setLocation] = useLocation();
+  const { isLoading, error } = useAuth();
+
+  // En attente de vérification d'auth
+  if (isLoading) {
+    return (
+      <div className="h-screen w-full flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-muted-foreground">Vérification en cours...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Si pas authentifié, rediriger vers login
+  if (error && location.startsWith("/dashboard")) {
+    setLocation("/login");
+    return null;
+  }
+
   const isDashboard = location.startsWith("/dashboard");
 
   if (isDashboard) {
@@ -90,7 +110,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
-        <Router />
+        <ProtectedRouter />
       </TooltipProvider>
     </QueryClientProvider>
   );
