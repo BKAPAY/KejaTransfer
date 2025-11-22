@@ -106,8 +106,8 @@ export default function ApiPage() {
   };
 
   return (
-    <div className="space-y-8">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
+    <div className="flex flex-col h-full">
+      <div className="flex items-center justify-between gap-4 flex-wrap mb-6">
         <div>
           <h1 className="text-3xl font-bold text-foreground mb-2">API Gateway</h1>
           <p className="text-muted-foreground">
@@ -171,8 +171,9 @@ export default function ApiPage() {
         </Dialog>
       </div>
 
-      {/* API Keys List */}
-      <div className="grid gap-6">
+      {/* API Keys List - Scrollable Container */}
+      <div className="flex-1 overflow-y-auto pr-3">
+        <div className="grid gap-6">
         {isLoading ? (
           <Card>
             <CardContent className="py-12">
@@ -290,6 +291,7 @@ export default function ApiPage() {
             </CardContent>
           </Card>
         )}
+        </div>
       </div>
     </div>
   );
