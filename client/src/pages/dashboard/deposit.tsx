@@ -17,6 +17,7 @@ const depositSchema = z.object({
   amount: z.number().min(1, "Le montant doit être supérieur à 0"),
   country: z.string().min(1, "Sélectionnez un pays"),
   operator: z.string().min(1, "Sélectionnez un opérateur"),
+  phone: z.string().min(8, "Le numéro de téléphone est requis"),
 });
 
 type DepositFormData = z.infer<typeof depositSchema>;
@@ -30,6 +31,7 @@ export default function Deposit() {
       amount: undefined as any,
       country: "",
       operator: "",
+      phone: "",
     },
   });
 
@@ -154,6 +156,24 @@ export default function Deposit() {
                   )}
                 />
               )}
+
+              <FormField
+                control={form.control}
+                name="phone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Numéro de téléphone</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="77123456"
+                        data-testid="input-phone"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               <Button
                 type="submit"
