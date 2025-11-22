@@ -118,6 +118,19 @@ export type ApiKey = typeof apiKeys.$inferSelect;
 export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
 export type Transaction = typeof transactions.$inferSelect;
 
+// Currency constants
+export const CURRENCIES = [
+  { code: "XOF", name: "Franc CFA", symbol: "Fr", rate: 1 },
+  { code: "USD", name: "Dollar US", symbol: "$", rate: 0.0015 },
+  { code: "EUR", name: "Euro", symbol: "€", rate: 0.0015 },
+] as const;
+
+export const CURRENCY_CONVERSION_RATES: Record<string, number> = {
+  XOF: 1,
+  USD: 0.0015,
+  EUR: 0.0014,
+};
+
 // Country and operator constants
 export const COUNTRIES = [
   { code: "BJ", name: "Bénin", flag: "🇧🇯" },
