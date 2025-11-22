@@ -89,10 +89,14 @@ export default function PaymentLinks() {
 
   const createMutation = useMutation({
     mutationFn: async (data: PaymentLinkFormData) => {
-      let imageUrl: string | undefined;
+      let imageId: string | undefined;
       if (data.imageFile) {
         try {
-          imageUrl = await compressImage(data.imageFile);
+          const compressedImage = await compressImage(data.imageFile);
+          const imageResponse = await apiRequest("POST", "/api/images", {
+            imageData: compressedImage,
+          });
+          imageId = imageResponse.imageId;
         } catch (error) {
           throw new Error("Erreur lors du traitement de l'image");
         }
@@ -102,7 +106,7 @@ export default function PaymentLinks() {
         productName: data.productName,
         description: data.description,
         amount: data.amount,
-        imageUrl,
+        imageUrl: imageId, // Store only the short ID, not the full base64
       });
     },
     onSuccess: () => {

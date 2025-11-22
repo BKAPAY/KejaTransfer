@@ -13,7 +13,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { apiRequest } from "@/lib/queryClient";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const paymentSchema = z.object({
   customerName: z.string().min(2, "Le nom doit contenir au moins 2 caractères"),
@@ -30,11 +30,30 @@ export default function Pay() {
   const token = params?.token;
   const { toast } = useToast();
   const [selectedCountry, setSelectedCountry] = useState("");
+  const [imageData, setImageData] = useState<string | null>(null);
 
   const { data: paymentLink, isLoading } = useQuery<PaymentLink>({
     queryKey: ["/api/payment-links/public", token],
     enabled: !!token,
   });
+
+  // Load image if imageUrl is an ID
+  useEffect(() => {
+    if (paymentLink?.imageUrl) {
+      const loadImage = async () => {
+        try {
+          const response = await fetch(`/api/images/${paymentLink.imageUrl}`);
+          if (response.ok) {
+            const data = await response.json();
+            setImageData(data.data);
+          }
+        } catch (error) {
+          console.error("Error loading image:", error);
+        }
+      };
+      loadImage();
+    }
+  }, [paymentLink?.imageUrl]);
 
   const form = useForm<PaymentFormData>({
     resolver: zodResolver(paymentSchema),
@@ -121,10 +140,10 @@ export default function Pay() {
           <div className="flex justify-center mb-1 sm:mb-2">
             <img src={logoImage} alt="BKApay" className="h-8 sm:h-10 lg:h-12 w-auto" />
           </div>
-          {paymentLink.imageUrl && (
+          {imageData && (
             <div className="flex justify-center">
               <img
-                src={paymentLink.imageUrl}
+                src={imageData}
                 alt={paymentLink.productName}
                 className="max-h-24 sm:max-h-32 lg:max-h-48 w-auto rounded-md object-cover"
               />
