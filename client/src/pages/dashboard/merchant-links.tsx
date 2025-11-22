@@ -87,12 +87,12 @@ export default function MerchantLinks() {
     },
   });
 
-  const copyToClipboard = (token: string) => {
-    const url = `${window.location.origin}/merchant/${token}`;
-    navigator.clipboard.writeText(url);
+  const copyToClipboard = (token: string, isShortToken = false) => {
+    const textToCopy = isShortToken ? token : `${window.location.origin}/merchant/${token}`;
+    navigator.clipboard.writeText(textToCopy);
     toast({
       title: "Copié",
-      description: "Le lien a été copié dans le presse-papiers",
+      description: isShortToken ? "Le token a été copié" : "Le lien a été copié dans le presse-papiers",
     });
   };
 
@@ -206,12 +206,12 @@ export default function MerchantLinks() {
                 <div className="space-y-4">
                   <div className="flex items-center gap-2 p-3 bg-muted rounded-md">
                     <code className="flex-1 text-sm truncate">
-                      {window.location.origin}/merchant/{link.token}
+                      {link.token}
                     </code>
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => copyToClipboard(link.token)}
+                      onClick={() => copyToClipboard(link.token, true)}
                       data-testid={`button-copy-${link.id}`}
                     >
                       <Copy className="w-4 h-4" />
