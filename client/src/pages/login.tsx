@@ -57,17 +57,17 @@ export default function Login() {
 
   return (
     <div className="w-full min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center p-4 overflow-hidden">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-4 text-center">
-          <div className="flex justify-center mb-2">
-            <img src={logoImage} alt="BKApay" className="h-16 w-auto" />
+      <Card className="w-full max-w-xs sm:max-w-sm">
+        <CardHeader className="space-y-2 sm:space-y-3 lg:space-y-4 text-center p-3 sm:p-4 lg:p-6">
+          <div className="flex justify-center mb-1 sm:mb-2">
+            <img src={logoImage} alt="BKApay" className="h-10 sm:h-12 lg:h-16 w-auto" />
           </div>
-          <CardTitle className="text-2xl font-bold">Se connecter</CardTitle>
-          <CardDescription>Accédez à votre tableau de bord BKApay</CardDescription>
+          <CardTitle className="text-lg sm:text-xl lg:text-2xl font-bold">Se connecter</CardTitle>
+          <CardDescription className="text-xs sm:text-sm">Accédez à votre tableau de bord</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-3 sm:p-4 lg:p-6">
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-2 sm:space-y-3 lg:space-y-4">
               <FormField
                 control={form.control}
                 name="email"

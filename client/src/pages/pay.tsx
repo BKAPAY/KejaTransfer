@@ -116,43 +116,44 @@ export default function Pay() {
 
   return (
     <div className="w-full min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center p-4 overflow-hidden">
-      <Card className="w-full max-w-lg">
-        <CardHeader className="text-center space-y-4">
-          <div className="flex justify-center mb-2">
-            <img src={logoImage} alt="BKApay" className="h-12 w-auto" />
+      <Card className="w-full max-w-xs sm:max-w-sm md:max-w-lg">
+        <CardHeader className="text-center space-y-2 sm:space-y-3 lg:space-y-4 p-3 sm:p-4 lg:p-6">
+          <div className="flex justify-center mb-1 sm:mb-2">
+            <img src={logoImage} alt="BKApay" className="h-8 sm:h-10 lg:h-12 w-auto" />
           </div>
           {paymentLink.imageUrl && (
             <div className="flex justify-center">
               <img
                 src={paymentLink.imageUrl}
                 alt={paymentLink.productName}
-                className="max-h-48 w-auto rounded-md object-cover"
+                className="max-h-24 sm:max-h-32 lg:max-h-48 w-auto rounded-md object-cover"
               />
             </div>
           )}
           <div>
-            <CardTitle className="text-2xl mb-2">{paymentLink.productName}</CardTitle>
+            <CardTitle className="text-sm sm:text-lg lg:text-2xl mb-1 sm:mb-2">{paymentLink.productName}</CardTitle>
             {paymentLink.description && (
-              <CardDescription className="text-base">{paymentLink.description}</CardDescription>
+              <CardDescription className="text-xs sm:text-sm lg:text-base">{paymentLink.description}</CardDescription>
             )}
           </div>
-          <div className="text-3xl font-bold text-primary">
+          <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-primary">
             {formatAmount(paymentLink.amount)}
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-3 sm:p-4 lg:p-6">
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-2 sm:space-y-3 lg:space-y-4">
               <FormField
                 control={form.control}
                 name="customerName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Nom complet</FormLabel>
+                    <FormLabel className="text-xs sm:text-sm">Nom complet</FormLabel>
                     <FormControl>
                       <Input
                         placeholder="Jean Dupont"
                         data-testid="input-name"
+                        className="text-xs sm:text-sm"
                         {...field}
                       />
                     </FormControl>
@@ -271,7 +272,7 @@ export default function Pay() {
             </form>
           </Form>
 
-          <div className="mt-6 text-center text-xs text-muted-foreground">
+          <div className="mt-3 sm:mt-4 lg:mt-6 text-center text-xs text-muted-foreground">
             <p>Paiement sécurisé par BKApay</p>
           </div>
         </CardContent>
