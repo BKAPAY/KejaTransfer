@@ -5,7 +5,6 @@ import session from "express-session";
 import bcrypt from "bcrypt";
 import { z } from "zod";
 import { insertUserSchema, insertPaymentLinkSchema, insertMerchantLinkSchema, insertApiKeySchema } from "@shared/schema";
-import { imageCache } from "./index";
 import { randomUUID } from "crypto";
 
 declare module "express-session" {
@@ -176,41 +175,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ===== Image Upload Routes =====
-  
-  app.post("/api/images", requireAuth, async (req: Request, res: Response) => {
-    try {
-      const { imageData } = req.body;
-      if (!imageData || typeof imageData !== "string") {
-        return res.status(400).json({ error: "Image data is required" });
-      }
-      
-      const imageId = randomUUID().replace(/-/g, '').substring(0, 12);
-      imageCache.set(imageId, imageData);
-      res.json({ imageId });
-    } catch (error: any) {
-      res.status(400).json({ error: error.message });
-    }
-  });
-
-  app.get("/api/images/:imageId", async (req: Request, res: Response) => {
-    try {
-      const imageData = imageCache.get(req.params.imageId);
-      if (!imageData) {
-        return res.status(404).json({ error: "Image not found" });
-      }
-      
-      // Return as data URL
-      res.setHeader("Content-Type", "application/json");
-      res.json({ data: imageData });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-
   // ===== Payment Links Routes =====
-  // NOTE: Payment links are IMMUTABLE once created - no PATCH/PUT endpoints
-  // Users can only create and delete them, not modify
   
   app.get("/api/payment-links", requireAuth, async (req: Request, res: Response) => {
     try {

@@ -104,15 +104,10 @@ export default function PaymentLinks() {
 
   const createMutation = useMutation({
     mutationFn: async (data: PaymentLinkFormData) => {
-      let imageId: string | undefined;
+      let imageData: string | undefined;
       if (data.imageFile) {
         try {
-          const compressedImage = await compressImage(data.imageFile);
-          const res = await apiRequest("POST", "/api/images", {
-            imageData: compressedImage,
-          });
-          const imageResponse = await res.json() as { imageId: string };
-          imageId = imageResponse.imageId;
+          imageData = await compressImage(data.imageFile);
         } catch (error) {
           throw new Error("Erreur lors du traitement de l'image");
         }
@@ -122,7 +117,7 @@ export default function PaymentLinks() {
         productName: data.productName,
         description: data.description,
         amount: data.amount,
-        imageUrl: imageId, // Store only the short ID, not the full base64
+        imageUrl: imageData, // Store base64 data directly
       });
       return res.json() as Promise<PaymentLink>;
     },
@@ -130,11 +125,7 @@ export default function PaymentLinks() {
       queryClient.invalidateQueries({ queryKey: ["/api/payment-links"] });
       // Show success screen with image and short link
       if (data.imageUrl) {
-        // Load image from cache
-        fetch(`/api/images/${data.imageUrl}`)
-          .then(res => res.json())
-          .then(data => setSuccessImage(data.data))
-          .catch(() => setSuccessImage(null));
+        setSuccessImage(data.imageUrl);
       }
       setSuccessToken(data.token);
       setDialogOpen(false);
@@ -152,15 +143,10 @@ export default function PaymentLinks() {
 
   const editMutation = useMutation({
     mutationFn: async (data: PaymentLinkFormData) => {
-      let imageId: string | undefined;
+      let imageData: string | undefined;
       if (data.imageFile) {
         try {
-          const compressedImage = await compressImage(data.imageFile);
-          const res = await apiRequest("POST", "/api/images", {
-            imageData: compressedImage,
-          });
-          const imageResponse = await res.json() as { imageId: string };
-          imageId = imageResponse.imageId;
+          imageData = await compressImage(data.imageFile);
         } catch (error) {
           throw new Error("Erreur lors du traitement de l'image");
         }
@@ -170,7 +156,7 @@ export default function PaymentLinks() {
         productName: data.productName,
         description: data.description,
         amount: data.amount,
-        ...(imageId && { imageUrl: imageId }),
+        ...(imageData && { imageUrl: imageData }),
       });
       return res.json() as Promise<PaymentLink>;
     },

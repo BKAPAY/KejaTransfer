@@ -1,10 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
-import { randomUUID } from "crypto";
-
-// In-memory image cache
-export const imageCache = new Map<string, string>();
 
 const app = express();
 
