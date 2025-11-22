@@ -687,11 +687,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
       };
 
+      res.json({
+        success: true,
+        redirectUrl: `${process.env.BASE_URL || 'http://localhost:5000'}/api-payment/${transaction.id}`,
+      });
+    } catch (error: any) {
+      console.error("API payment processing error:", error);
+      res.status(500).json({ error: error.message || "Erreur lors du traitement du paiement" });
+    }
+  });
+
+  // ===== API Payment Submit Route =====
+  // Called from the payment form page when user selects country/operator
+  app.post("/api/payments/submit", async (req: Request, res: Response) => {
+    try {
+      const { transactionId, country, operator } = req.body;
+
+      if (!transactionId) {
+        return res.status(400).json({ error: "Transaction ID requis" });
+      }
+
+      // Get transaction
+      const transactions = await storage.getTransactions("", 1);
+      let transaction = transactions.find((t) => t.id === transactionId);
+
+      if (!transaction) {
+        return res.status(404).json({ error: "Transaction non trouvée" });
+      }
+
+      // Update transaction with country and operator
+      await storage.updateTransactionStatus(transactionId, "pending");
+
+      // Call Paydunya API to create checkout invoice
+      const paydunyaData = {
+        invoice: {
+          total_amount: transaction.amount,
+          description: transaction.description || "Paiement via KEJAtransfer",
+        },
+        store: {
+          name: "KEJAtransfer",
+          tagline: "Plateforme de paiement mobile money",
+        },
+        custom_data: {
+          transaction_id: transaction.id,
+          customer_name: transaction.customerName,
+          customer_email: transaction.customerEmail,
+          customer_phone: transaction.customerPhone,
+          country: country,
+          operator: operator,
+        },
+        actions: {
+          callback_url: `${process.env.BASE_URL || 'http://localhost:5000'}/api/webhooks/paydunya`,
+        },
+      };
+
       const paydunyaResponse = await callPaydunyaAPI("/checkout-invoice/create", paydunyaData);
 
       if (paydunyaResponse.response_code === "00") {
         // Update transaction with Paydunya token
-        await storage.updateTransactionStatus(transaction.id, "pending", {
+        await storage.updateTransactionStatus(transactionId, "pending", {
           paydunyaToken: paydunyaResponse.token,
         });
 
@@ -700,13 +754,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
           redirectUrl: paydunyaResponse.response_text,
         });
       } else {
-        await storage.updateTransactionStatus(transaction.id, "failed");
+        await storage.updateTransactionStatus(transactionId, "failed");
         const errorMsg = paydunyaResponse.response_text || "Erreur lors de l'initiation du paiement";
         res.status(400).json({ error: errorMsg });
       }
     } catch (error: any) {
-      console.error("API payment processing error:", error);
-      res.status(500).json({ error: error.message || "Erreur lors du traitement du paiement" });
+      console.error("Payment submission error:", error);
+      res.status(500).json({ error: error.message || "Erreur lors de la soumission du paiement" });
+    }
+  });
+
+  // ===== Withdrawal Request Route (for API developers) =====
+  // Developers can create withdrawal requests from their client's site
+  app.post("/api/withdrawals/create", async (req: Request, res: Response) => {
+    try {
+      const { privateKey, amount, country, operator, phone } = req.body;
+
+      if (!privateKey) {
+        return res.status(400).json({ error: "Clé API privée requise" });
+      }
+
+      if (!amount || amount < 500) {
+        return res.status(400).json({ error: "Montant minimum: 500 XOF" });
+      }
+
+      // Validate private key and get its owner
+      const apiKey = await storage.getApiKeyByPrivateKey(privateKey);
+      if (!apiKey || !apiKey.isActive) {
+        return res.status(401).json({ error: "Clé API invalide ou inactive" });
+      }
+
+      // Get the developer's balance
+      const user = await storage.getUserById(apiKey.userId);
+      if (!user || user.balance < amount) {
+        return res.status(400).json({ error: "Solde insuffisant pour ce retrait" });
+      }
+
+      // Create a withdrawal transaction (pending until developer confirms from dashboard)
+      const transaction = await storage.createTransaction({
+        userId: apiKey.userId,
+        type: "api_withdrawal",
+        amount: Math.floor(amount),
+        currency: "XOF",
+        status: "pending",
+        country,
+        operator,
+        customerPhone: phone,
+        description: "Retrait demandé via API",
+      });
+
+      res.json({
+        success: true,
+        message: "Demande de retrait créée. Confirmez depuis votre dashboard.",
+        transactionId: transaction.id,
+      });
+    } catch (error: any) {
+      console.error("Withdrawal creation error:", error);
+      res.status(500).json({ error: error.message || "Erreur lors de la création du retrait" });
     }
   });
 

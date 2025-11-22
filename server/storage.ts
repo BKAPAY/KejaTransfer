@@ -26,6 +26,7 @@ const db = drizzle(client, { schema });
 export interface IStorage {
   // Users
   getUser(id: string): Promise<User | undefined>;
+  getUserById(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUserBalance(id: string, amount: number): Promise<User | undefined>;
@@ -45,6 +46,7 @@ export interface IStorage {
   // API Keys
   getApiKeys(userId: string): Promise<ApiKey[]>;
   getApiKeyByPublicKey(publicKey: string): Promise<ApiKey | undefined>;
+  getApiKeyByPrivateKey(privateKey: string): Promise<ApiKey | undefined>;
   createApiKey(key: InsertApiKey & { userId: string }): Promise<ApiKey>;
   deleteApiKey(id: string, userId: string): Promise<boolean>;
 
@@ -65,6 +67,10 @@ export class DbStorage implements IStorage {
   async getUser(id: string): Promise<User | undefined> {
     const results = await db.select().from(schema.users).where(eq(schema.users.id, id)).limit(1);
     return results[0];
+  }
+
+  async getUserById(id: string): Promise<User | undefined> {
+    return this.getUser(id);
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
@@ -144,6 +150,11 @@ export class DbStorage implements IStorage {
 
   async getApiKeyByPublicKey(publicKey: string): Promise<ApiKey | undefined> {
     const results = await db.select().from(schema.apiKeys).where(eq(schema.apiKeys.publicKey, publicKey)).limit(1);
+    return results[0];
+  }
+
+  async getApiKeyByPrivateKey(privateKey: string): Promise<ApiKey | undefined> {
+    const results = await db.select().from(schema.apiKeys).where(eq(schema.apiKeys.privateKey, privateKey)).limit(1);
     return results[0];
   }
 

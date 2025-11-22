@@ -1,0 +1,192 @@
+import { useParams } from "wouter";
+import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { AlertCircle, Loader2 } from "lucide-react";
+import { OPERATORS } from "@shared/schema";
+import type { Transaction } from "@shared/schema";
+
+export default function ApiPayment() {
+  const { transactionId } = useParams<{ transactionId: string }>();
+  const [country, setCountry] = useState("");
+  const [operator, setOperator] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Fetch transaction details
+  const { data: transaction, isLoading: isLoadingTransaction, error } = useQuery<Transaction>({
+    queryKey: [`/api/transactions/${transactionId}`],
+  });
+
+  const countryOperators = OPERATORS[(country as keyof typeof OPERATORS) || ("BJ" as const)] || [];
+
+  const handlePayment = async () => {
+    if (!country || !operator) {
+      alert("Sélectionnez un pays et un opérateur");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      // Call the Paydunya API to get payment URL
+      const response = await fetch("/api/payments/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          transactionId,
+          country,
+          operator,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.redirectUrl) {
+        // Redirect to Paydunya
+        window.location.href = data.redirectUrl;
+      } else {
+        alert("Erreur: " + (data.error || "Impossible de traiter le paiement"));
+      }
+    } catch (err: any) {
+      alert("Erreur: " + err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (isLoadingTransaction) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2 text-primary" />
+          <p className="text-muted-foreground">Chargement...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !transaction) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-background">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6">
+            <div className="flex gap-3 items-start">
+              <AlertCircle className="w-5 h-5 text-destructive mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="font-semibold text-foreground">Erreur</p>
+                <p className="text-sm text-muted-foreground">La transaction n'a pas pu être trouvée</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="space-y-2">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+              <span className="text-lg font-bold text-primary">K</span>
+            </div>
+            <p className="font-bold text-lg text-foreground">KEJAtransfer</p>
+          </div>
+          <CardTitle>Paiement Sécurisé</CardTitle>
+        </CardHeader>
+
+        <CardContent className="space-y-6">
+          {/* Transaction Details */}
+          <div className="space-y-3 pb-4 border-b">
+            <div>
+              <p className="text-sm text-muted-foreground mb-1">Montant à payer</p>
+              <p className="text-3xl font-bold text-primary">
+                {transaction.amount.toLocaleString()} <span className="text-lg">XOF</span>
+              </p>
+            </div>
+            {transaction.description && (
+              <div>
+                <p className="text-sm text-muted-foreground">Détail</p>
+                <p className="text-sm text-foreground">{transaction.description}</p>
+              </div>
+            )}
+            {transaction.customerName && (
+              <div>
+                <p className="text-sm text-muted-foreground">Client</p>
+                <p className="text-sm text-foreground">{transaction.customerName}</p>
+              </div>
+            )}
+          </div>
+
+          {/* Payment Method Selection */}
+          <div className="space-y-4">
+            <h3 className="font-semibold text-foreground">Choisissez votre méthode de paiement</h3>
+
+            <div className="space-y-2">
+              <Label htmlFor="country">Pays</Label>
+              <Select value={country} onValueChange={setCountry}>
+                <SelectTrigger id="country" data-testid="select-country">
+                  <SelectValue placeholder="Sélectionnez un pays" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="SN">🇸🇳 Sénégal</SelectItem>
+                  <SelectItem value="CI">🇨🇮 Côte d'Ivoire</SelectItem>
+                  <SelectItem value="BF">🇧🇫 Burkina Faso</SelectItem>
+                  <SelectItem value="BJ">🇧🇯 Bénin</SelectItem>
+                  <SelectItem value="TG">🇹🇬 Togo</SelectItem>
+                  <SelectItem value="ML">🇲🇱 Mali</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="operator">Opérateur Mobile Money</Label>
+              <Select value={operator} onValueChange={setOperator} disabled={!country}>
+                <SelectTrigger id="operator" data-testid="select-operator">
+                  <SelectValue placeholder={country ? "Sélectionnez un opérateur" : "Choisissez un pays d'abord"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {countryOperators.map((op) => (
+                    <SelectItem key={op.code} value={op.code}>
+                      {op.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Info */}
+          <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+            <p className="text-xs text-blue-900 dark:text-blue-100">
+              ✓ Vous serez redirigé vers votre opérateur pour confirmer le paiement<br />
+              ✓ Vos données de paiement sont sécurisées
+            </p>
+          </div>
+
+          {/* Submit Button */}
+          <Button
+            onClick={handlePayment}
+            disabled={!country || !operator || isLoading}
+            className="w-full"
+            size="lg"
+            data-testid="button-submit-payment"
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Traitement...
+              </>
+            ) : (
+              `Payer ${transaction.amount.toLocaleString()} XOF`
+            )}
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
