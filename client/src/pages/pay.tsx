@@ -141,20 +141,14 @@ export default function Pay() {
             <img src={logoImage} alt="BKApay" className="h-8 sm:h-10 lg:h-12 w-auto" />
           </div>
           {imageData && (
-            <div className="flex justify-center">
+            <div className="flex justify-center mb-2 sm:mb-3">
               <img
                 src={imageData}
-                alt={paymentLink.productName}
+                alt="Payment"
                 className="max-h-24 sm:max-h-32 lg:max-h-48 w-auto rounded-md object-cover"
               />
             </div>
           )}
-          <div>
-            <CardTitle className="text-sm sm:text-lg lg:text-2xl mb-1 sm:mb-2">{paymentLink.productName}</CardTitle>
-            {paymentLink.description && (
-              <CardDescription className="text-xs sm:text-sm lg:text-base">{paymentLink.description}</CardDescription>
-            )}
-          </div>
           <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-primary">
             {formatAmount(paymentLink.amount)}
           </div>
