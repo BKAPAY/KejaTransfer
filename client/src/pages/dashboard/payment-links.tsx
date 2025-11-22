@@ -179,7 +179,10 @@ export default function PaymentLinks() {
                           placeholder="10000"
                           data-testid="input-amount"
                           value={field.value || ""}
-                          onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            field.onChange(val === "" ? undefined : Number(val));
+                          }}
                         />
                       </FormControl>
                       <FormMessage />
