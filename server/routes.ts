@@ -209,6 +209,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ===== Payment Links Routes =====
+  // NOTE: Payment links are IMMUTABLE once created - no PATCH/PUT endpoints
+  // Users can only create and delete them, not modify
   
   app.get("/api/payment-links", requireAuth, async (req: Request, res: Response) => {
     try {
