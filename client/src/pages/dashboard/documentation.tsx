@@ -62,10 +62,16 @@ export default function Documentation() {
               Intégrez les paiements directement dans votre application
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-3">
             <p className="text-sm text-muted-foreground">
               Utilisez nos clés API pour intégrer KEJAtransfer dans votre site web ou application.
-              Documentation complète disponible dans la section API.
+              Les clients seront redirigés vers notre interface de paiement sécurisée.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Vos clés API gèrent à la fois les paiements entrants (paiements clients) et les transferts sortants (retraits vers mobile money).
+            </p>
+            <p className="text-sm font-semibold text-foreground">
+              Consultez la section API Gateway pour créer et gérer vos clés.
             </p>
           </CardContent>
         </Card>

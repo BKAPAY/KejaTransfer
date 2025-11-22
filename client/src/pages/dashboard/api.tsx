@@ -171,39 +171,6 @@ export default function ApiPage() {
         </Dialog>
       </div>
 
-      {/* Documentation */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Documentation</CardTitle>
-          <CardDescription>
-            Utilisez ces clés pour intégrer les paiements sur votre site web ou application
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="p-4 bg-muted rounded-md">
-            <h3 className="font-semibold mb-2">Utilisation</h3>
-            <p className="text-sm text-muted-foreground mb-3">
-              Les clés API permettent d'intégrer KEJAtransfer directement dans votre application.
-              Les clients seront redirigés vers notre interface de paiement sécurisée.
-            </p>
-            <div className="bg-background p-3 rounded-md font-mono text-xs overflow-x-auto">
-              <pre>{`// Exemple d'intégration
-const payment = await fetch('${window.location.origin}/api/payments/create', {
-  method: 'POST',
-  headers: {
-    'Authorization': 'Bearer YOUR_PRIVATE_KEY',
-    'Content-Type': 'application/json'
-  },
-  body: JSON.stringify({
-    amount: 10000,
-    description: 'Achat produit'
-  })
-});`}</pre>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* API Keys List */}
       <div className="grid gap-6">
         {isLoading ? (
