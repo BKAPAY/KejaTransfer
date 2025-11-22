@@ -449,6 +449,179 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== Deposit Routes =====
+  app.post("/api/deposits", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { amount, country, operator, customerName, customerEmail, customerPhone } = req.body;
+
+      if (!amount || amount <= 0) {
+        return res.status(400).json({ error: "Montant invalide" });
+      }
+
+      // Create transaction
+      const transaction = await storage.createTransaction({
+        userId: req.session.userId!,
+        type: "deposit",
+        amount: Math.floor(amount),
+        currency: "XOF",
+        status: "pending",
+        country,
+        operator,
+        customerName,
+        customerEmail,
+        customerPhone,
+        description: `Dépôt de ${amount} XOF`,
+      });
+
+      // Create Paydunya invoice
+      const paydunyaData = {
+        invoice: {
+          total_amount: Math.floor(amount),
+          description: `Dépôt de ${amount} XOF sur KEJAtransfer`,
+        },
+        store: {
+          name: "KEJAtransfer",
+        },
+        custom_data: {
+          transaction_id: transaction.id,
+          type: "deposit",
+        },
+        actions: {
+          callback_url: `${process.env.BASE_URL || 'http://localhost:5000'}/api/webhooks/paydunya`,
+        },
+      };
+
+      const paydunyaResponse = await callPaydunyaAPI("/checkout-invoice/create", paydunyaData);
+
+      if (paydunyaResponse.response_code === "00") {
+        await storage.updateTransactionStatus(transaction.id, "pending", {
+          paydunyaToken: paydunyaResponse.token,
+        });
+
+        res.json({
+          success: true,
+          redirectUrl: paydunyaResponse.response_text,
+        });
+      } else {
+        await storage.updateTransactionStatus(transaction.id, "failed");
+        res.status(400).json({ error: "Erreur lors de l'initiation du dépôt" });
+      }
+    } catch (error: any) {
+      console.error("Deposit error:", error);
+      res.status(500).json({ error: error.message || "Erreur lors du dépôt" });
+    }
+  });
+
+  // ===== Withdrawal/Transfer Routes =====
+  app.post("/api/transfers", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { amount, phone, country, operator } = req.body;
+      const user = await storage.getUser(req.session.userId!);
+
+      if (!user) {
+        return res.status(404).json({ error: "Utilisateur non trouvé" });
+      }
+
+      if (!amount || amount <= 0) {
+        return res.status(400).json({ error: "Montant invalide" });
+      }
+
+      if (user.balance < amount) {
+        return res.status(400).json({ error: "Solde insuffisant" });
+      }
+
+      if (!phone || !country || !operator) {
+        return res.status(400).json({ error: "Informations de transfert incomplètes" });
+      }
+
+      // Create transaction
+      const transaction = await storage.createTransaction({
+        userId: req.session.userId!,
+        type: "transfer",
+        amount: Math.floor(amount),
+        currency: "XOF",
+        status: "pending",
+        country,
+        operator,
+        customerPhone: phone,
+        description: `Transfert de ${amount} XOF vers ${phone}`,
+      });
+
+      // Map operator to Paydunya withdraw mode
+      const withdrawModeMap: Record<string, string> = {
+        "orange-sn": "orange-money-senegal",
+        "free-sn": "free-money-senegal",
+        "expresso-sn": "expresso-senegal",
+        "wave-sn": "wave-senegal",
+        "wizall-sn": "wizall-senegal",
+        "orange-ci": "orange-money-ci",
+        "mtn-ci": "mtn-ci",
+        "moov-ci": "moov-ci",
+        "wave-ci": "wave-ci",
+        "orange-bf": "orange-money-burkina",
+        "moov-bf": "moov-burkina-faso",
+        "moov-bj": "moov-benin",
+        "mtn-bj": "mtn-benin",
+        "tmoney-tg": "t-money-togo",
+        "moov-tg": "moov-togo",
+        "orange-ml": "orange-money-mali",
+        "moov-ml": "moov-mali",
+      };
+
+      const withdrawMode = withdrawModeMap[`${operator}-${country.toLowerCase()}`];
+      if (!withdrawMode) {
+        await storage.updateTransactionStatus(transaction.id, "failed");
+        return res.status(400).json({ error: "Opérateur ou pays non supporté" });
+      }
+
+      // Initiate withdrawal with Paydunya
+      const callbackUrl = `${process.env.BASE_URL || 'http://localhost:5000'}/api/webhooks/paydunya`;
+      const paydunyaData = {
+        account_alias: phone.replace(/^[+\d]{1,3}/, ""), // Remove country code if present
+        amount: Math.floor(amount),
+        withdraw_mode: withdrawMode,
+        callback_url: callbackUrl,
+      };
+
+      const paydunyaResponse = await callPaydunyaAPI("/disburse/get-invoice", paydunyaData);
+
+      if (paydunyaResponse.response_code === "00") {
+        const disbursalToken = paydunyaResponse.disburse_token;
+
+        // Submit the disbursal
+        const submitData = {
+          disburse_invoice: disbursalToken,
+          disburse_id: transaction.id,
+        };
+
+        const submitResponse = await callPaydunyaAPI("/disburse/submit-invoice", submitData);
+
+        if (submitResponse.response_code === "00") {
+          // Update balance and transaction
+          await storage.updateUserBalance(req.session.userId!, -amount);
+          await storage.updateTransactionStatus(transaction.id, submitResponse.status || "pending", {
+            paydunyaToken: disbursalToken,
+          });
+
+          res.json({
+            success: true,
+            message: "Transfert initialisé avec succès",
+            transactionId: transaction.id,
+          });
+        } else {
+          await storage.updateTransactionStatus(transaction.id, "failed");
+          res.status(400).json({ error: "Erreur lors de la soumission du transfert" });
+        }
+      } else {
+        await storage.updateTransactionStatus(transaction.id, "failed");
+        res.status(400).json({ error: "Erreur lors de l'initiation du transfert" });
+      }
+    } catch (error: any) {
+      console.error("Transfer error:", error);
+      res.status(500).json({ error: error.message || "Erreur lors du transfert" });
+    }
+  });
+
   // Paydunya webhook
   app.post("/api/webhooks/paydunya", async (req: Request, res: Response) => {
     try {

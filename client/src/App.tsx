@@ -22,6 +22,8 @@ import Settings from "@/pages/dashboard/settings";
 import Announcements from "@/pages/dashboard/announcements";
 import Documentation from "@/pages/dashboard/documentation";
 import Support from "@/pages/dashboard/support";
+import Deposit from "@/pages/dashboard/deposit";
+import Transfer from "@/pages/dashboard/transfer";
 import Pay from "@/pages/pay";
 import Merchant from "@/pages/merchant";
 
@@ -90,6 +92,8 @@ function Router() {
           <Route path="/dashboard/announcements" component={Announcements} />
           <Route path="/dashboard/documentation" component={Documentation} />
           <Route path="/dashboard/support" component={Support} />
+          <Route path="/dashboard/deposit" component={Deposit} />
+          <Route path="/dashboard/transfer" component={Transfer} />
           <Route component={NotFound} />
         </Switch>
       </DashboardLayout>

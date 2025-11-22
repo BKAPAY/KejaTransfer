@@ -2,11 +2,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Wallet, ArrowDownToLine, ArrowUpFromLine, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import type { User, Transaction } from "@shared/schema";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 
 export default function Dashboard() {
+  const [, setLocation] = useLocation();
   const { data: user, isLoading: userLoading } = useQuery<User>({
     queryKey: ["/api/auth/me"],
   });
@@ -88,6 +90,7 @@ export default function Dashboard() {
           <Button 
             data-testid="button-deposit"
             className="flex-1 flex items-center justify-center gap-2"
+            onClick={() => setLocation("/dashboard/deposit")}
           >
             <ArrowDownToLine className="h-4 w-4" />
             Dépôt
@@ -96,6 +99,7 @@ export default function Dashboard() {
             data-testid="button-transfer"
             variant="outline"
             className="flex-1 flex items-center justify-center gap-2"
+            onClick={() => setLocation("/dashboard/transfer")}
           >
             <ArrowUpFromLine className="h-4 w-4" />
             Transfert
