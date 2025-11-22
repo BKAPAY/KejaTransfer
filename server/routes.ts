@@ -185,7 +185,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Image data is required" });
       }
       
-      const imageId = randomUUID().substring(0, 12);
+      const imageId = randomUUID().replace(/-/g, '').substring(0, 12);
       imageCache.set(imageId, imageData);
       res.json({ imageId });
     } catch (error: any) {
