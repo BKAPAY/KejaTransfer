@@ -34,7 +34,7 @@ export default function Transfer() {
   const form = useForm<TransferFormData>({
     resolver: zodResolver(transferSchema),
     defaultValues: {
-      amount: 0,
+      amount: undefined as any,
       country: "",
       operator: "",
       phone: "",
@@ -131,8 +131,8 @@ export default function Transfer() {
                         min="1"
                         step="100"
                         data-testid="input-transfer-amount"
-                        {...field}
-                        onChange={(e) => field.onChange(Number(e.target.value))}
+                        value={field.value || ""}
+                        onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
                       />
                     </FormControl>
                     <FormMessage />

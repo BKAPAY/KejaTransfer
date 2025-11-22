@@ -40,7 +40,7 @@ export default function Merchant() {
   const form = useForm<MerchantPaymentFormData>({
     resolver: zodResolver(merchantPaymentSchema),
     defaultValues: {
-      amount: 0,
+      amount: undefined as any,
       customerName: "",
       customerEmail: "",
       customerPhone: "",
@@ -144,12 +144,12 @@ export default function Merchant() {
                         type="number"
                         placeholder="10000"
                         data-testid="input-amount"
-                        {...field}
-                        onChange={(e) => field.onChange(Number(e.target.value))}
+                        value={field.value || ""}
+                        onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
                       />
                     </FormControl>
                     <FormMessage />
-                    {field.value > 0 && (
+                    {field.value && field.value > 0 && (
                       <p className="text-sm text-muted-foreground mt-1">
                         {formatAmount(field.value)}
                       </p>
