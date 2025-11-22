@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Copy, ExternalLink, Trash2, Image as ImageIcon, Link as LinkIcon } from "lucide-react";
+import { Plus, Copy, ExternalLink, Trash2, Image as ImageIcon, Link as LinkIcon, Edit2 } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { PaymentLink } from "@shared/schema";
@@ -70,6 +70,7 @@ type PaymentLinkFormData = z.infer<typeof paymentLinkSchema>;
 
 export default function PaymentLinks() {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [successToken, setSuccessToken] = useState<string | null>(null);
   const [successImage, setSuccessImage] = useState<string | null>(null);
@@ -88,6 +89,18 @@ export default function PaymentLinks() {
       imageFile: undefined,
     },
   });
+
+  const startEditingLink = (link: PaymentLink) => {
+    setEditingId(link.id);
+    form.reset({
+      productName: link.productName,
+      description: link.description || "",
+      amount: link.amount,
+      imageFile: undefined,
+    });
+    setImagePreview(null);
+    setDialogOpen(true);
+  };
 
   const createMutation = useMutation({
     mutationFn: async (data: PaymentLinkFormData) => {
@@ -137,6 +150,50 @@ export default function PaymentLinks() {
     },
   });
 
+  const editMutation = useMutation({
+    mutationFn: async (data: PaymentLinkFormData) => {
+      let imageId: string | undefined;
+      if (data.imageFile) {
+        try {
+          const compressedImage = await compressImage(data.imageFile);
+          const res = await apiRequest("POST", "/api/images", {
+            imageData: compressedImage,
+          });
+          const imageResponse = await res.json() as { imageId: string };
+          imageId = imageResponse.imageId;
+        } catch (error) {
+          throw new Error("Erreur lors du traitement de l'image");
+        }
+      }
+
+      const res = await apiRequest("PATCH", `/api/payment-links/${editingId}`, {
+        productName: data.productName,
+        description: data.description,
+        amount: data.amount,
+        ...(imageId && { imageUrl: imageId }),
+      });
+      return res.json() as Promise<PaymentLink>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/payment-links"] });
+      toast({
+        title: "Lien modifié",
+        description: "Le lien de paiement a été modifié avec succès",
+      });
+      setEditingId(null);
+      setDialogOpen(false);
+      setImagePreview(null);
+      form.reset();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erreur",
+        description: error.message || "Erreur lors de la modification",
+        variant: "destructive",
+      });
+    },
+  });
+
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       return await apiRequest("DELETE", `/api/payment-links/${id}`, {});
@@ -172,7 +229,11 @@ export default function PaymentLinks() {
   };
 
   const onSubmit = (data: PaymentLinkFormData) => {
-    createMutation.mutate(data);
+    if (editingId) {
+      editMutation.mutate(data);
+    } else {
+      createMutation.mutate(data);
+    }
   };
 
   // Success screen overlay
@@ -236,9 +297,9 @@ export default function PaymentLinks() {
           </DialogTrigger>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
-              <DialogTitle>Créer un lien de paiement</DialogTitle>
+              <DialogTitle>{editingId ? "Modifier le lien de paiement" : "Créer un lien de paiement"}</DialogTitle>
               <DialogDescription>
-                Remplissez les informations de votre produit ou service
+                {editingId ? "Modifiez les informations de votre produit ou service" : "Remplissez les informations de votre produit ou service"}
               </DialogDescription>
             </DialogHeader>
             <Form {...form}>
@@ -357,17 +418,25 @@ export default function PaymentLinks() {
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => setDialogOpen(false)}
+                    onClick={() => {
+                      setDialogOpen(false);
+                      setEditingId(null);
+                      form.reset();
+                    }}
                     data-testid="button-cancel"
                   >
                     Annuler
                   </Button>
                   <Button
                     type="submit"
-                    disabled={createMutation.isPending}
+                    disabled={editingId ? editMutation.isPending : createMutation.isPending}
                     data-testid="button-submit"
                   >
-                    {createMutation.isPending ? "Création..." : "Créer le lien"}
+                    {editingId ? (
+                      editMutation.isPending ? "Modification..." : "Modifier le lien"
+                    ) : (
+                      createMutation.isPending ? "Création..." : "Créer le lien"
+                    )}
                   </Button>
                 </div>
               </form>
@@ -433,7 +502,16 @@ export default function PaymentLinks() {
                       </a>
                     </Button>
                   </div>
-                  <div className="flex justify-end">
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => startEditingLink(link)}
+                      data-testid={`button-edit-${link.id}`}
+                    >
+                      <Edit2 className="w-4 h-4 mr-2" />
+                      Modifier
+                    </Button>
                     <Button
                       variant="destructive"
                       size="sm"

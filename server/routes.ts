@@ -246,6 +246,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/payment-links/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const updatePaymentLinkSchema = z.object({
+        productName: z.string().min(1, "Le nom du produit est requis").optional(),
+        description: z.string().optional(),
+        amount: z.number().min(1, "Le montant doit être supérieur à 0").optional(),
+        imageUrl: z.string().optional(),
+        isActive: z.boolean().optional(),
+      });
+      const validatedData = updatePaymentLinkSchema.parse(req.body);
+      const link = await storage.updatePaymentLink(req.params.id, req.session.userId!, validatedData);
+      if (!link) {
+        return res.status(404).json({ error: "Lien non trouvé" });
+      }
+      res.json(link);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
   app.delete("/api/payment-links/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const success = await storage.deletePaymentLink(req.params.id, req.session.userId!);

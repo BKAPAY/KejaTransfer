@@ -18,7 +18,7 @@ BKApay est une plateforme moderne de paiement mobile money pour l'Afrique de l'O
 - ✅ **NOUVEAU**: Dépôts via Paydunya (formulaire simplifié: montant + pays + opérateur)
 - ✅ **NOUVEAU**: Transferts via API Paydunya Disburse (débits de compte)
 - ✅ **NOUVEAU**: Endpoint public `/api/payments/create` pour intégration par clés API (paiements entrants et sortants)
-- ✅ **CORRECTION**: Liens de paiement immuables (users can only create/delete, not modify)
+- ✅ **NOUVEAU**: Modification des liens de paiement (users can create, modify, or delete)
 
 ## Architecture du projet
 

@@ -82,6 +82,14 @@ export const insertPaymentLinkSchema = createInsertSchema(paymentLinks).omit({
   createdAt: true,
 });
 
+export const updatePaymentLinkSchema = z.object({
+  productName: z.string().min(1, "Le nom du produit est requis").optional(),
+  description: z.string().optional(),
+  amount: z.number().min(1, "Le montant doit être supérieur à 0").optional(),
+  imageUrl: z.string().optional(),
+  isActive: z.boolean().optional(),
+});
+
 export const insertMerchantLinkSchema = createInsertSchema(merchantLinks).omit({
   id: true,
   userId: true,

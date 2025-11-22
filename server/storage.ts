@@ -35,6 +35,7 @@ export interface IStorage {
   getPaymentLinks(userId: string): Promise<PaymentLink[]>;
   getPaymentLinkByToken(token: string): Promise<PaymentLink | undefined>;
   createPaymentLink(link: InsertPaymentLink & { userId: string }): Promise<PaymentLink>;
+  updatePaymentLink(id: string, userId: string, link: Partial<InsertPaymentLink>): Promise<PaymentLink | undefined>;
   deletePaymentLink(id: string, userId: string): Promise<boolean>;
 
   // Merchant Links
@@ -110,6 +111,19 @@ export class DbStorage implements IStorage {
     // Generate a short token (8 random hex chars)
     const token = randomUUID().replace(/-/g, '').substring(0, 8);
     const results = await db.insert(schema.paymentLinks).values({ ...link, token }).returning();
+    return results[0];
+  }
+
+  async updatePaymentLink(id: string, userId: string, link: Partial<InsertPaymentLink>): Promise<PaymentLink | undefined> {
+    const existing = await db.select().from(schema.paymentLinks).where(eq(schema.paymentLinks.id, id)).limit(1);
+    if (existing.length === 0 || existing[0].userId !== userId) {
+      return undefined;
+    }
+    const results = await db
+      .update(schema.paymentLinks)
+      .set(link)
+      .where(eq(schema.paymentLinks.id, id))
+      .returning();
     return results[0];
   }
 
