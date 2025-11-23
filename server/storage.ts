@@ -53,6 +53,7 @@ export interface IStorage {
   deleteApiKey(id: string, userId: string): Promise<boolean>;
 
   // Transactions
+  getTransaction(id: string): Promise<Transaction | undefined>;
   getTransactions(userId: string, limit?: number): Promise<Transaction[]>;
   createTransaction(transaction: InsertTransaction): Promise<Transaction>;
   updateTransactionStatus(id: string, status: string, paydunyaData?: any): Promise<Transaction | undefined>;
@@ -195,6 +196,11 @@ export class DbStorage implements IStorage {
   }
 
   // Transactions
+  async getTransaction(id: string): Promise<Transaction | undefined> {
+    const results = await db.select().from(schema.transactions).where(eq(schema.transactions.id, id)).limit(1);
+    return results[0];
+  }
+
   async getTransactions(userId: string, limit: number = 50): Promise<Transaction[]> {
     return db
       .select()

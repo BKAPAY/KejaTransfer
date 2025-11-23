@@ -378,6 +378,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get transaction by ID (PUBLIC - no auth required for payment status page)
+  app.get("/api/transactions/:id", async (req: Request, res: Response) => {
+    try {
+      const transaction = await storage.getTransaction(req.params.id);
+      if (!transaction) {
+        return res.status(404).json({ error: "Transaction non trouvée" });
+      }
+      res.json(transaction);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // ===== Payment Processing Routes =====
   
   // Process payment link payment
