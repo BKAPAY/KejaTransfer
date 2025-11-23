@@ -50,7 +50,8 @@ export default function Merchant() {
 
   const paymentMutation = useMutation({
     mutationFn: async (data: MerchantPaymentFormData) => {
-      return await apiRequest("POST", `/api/merchant-payments/process/${token}`, data);
+      const res = await apiRequest("POST", `/api/merchant-payments/process/${token}`, data);
+      return await res.json();
     },
     onSuccess: (data: any) => {
       if (data.transactionId) {

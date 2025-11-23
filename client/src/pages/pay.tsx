@@ -48,7 +48,8 @@ export default function Pay() {
 
   const paymentMutation = useMutation({
     mutationFn: async (data: PaymentFormData) => {
-      return await apiRequest("POST", `/api/payments/process/${token}`, data);
+      const res = await apiRequest("POST", `/api/payments/process/${token}`, data);
+      return await res.json();
     },
     onSuccess: (data: any) => {
       if (data.transactionId) {

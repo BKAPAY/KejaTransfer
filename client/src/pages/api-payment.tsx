@@ -45,9 +45,9 @@ export default function ApiPayment() {
 
       const data = await response.json();
 
-      if (data.success) {
-        // Redirect to payment status page
-        setLocation(`/payment-status/${transactionId}`);
+      if (data.transactionId) {
+        // Redirect to payment status page - will show loading, then success or error
+        setLocation(`/payment-status/${data.transactionId}`);
       }
     } catch (err: any) {
       // Silently fail - redirect to status page which will show error
