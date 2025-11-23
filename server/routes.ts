@@ -441,9 +441,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           redirectUrl: paydunyaResponse.response_text, // This is the Paydunya checkout URL
         });
       } else {
+        // Paydunya error - still return transactionId so client can redirect to status page
         await storage.updateTransactionStatus(transaction.id, "failed");
-        const errorMsg = paydunyaResponse.response_text || "Erreur lors de l'initiation du paiement";
-        res.status(400).json({ error: errorMsg });
+        res.json({
+          success: false,
+          transactionId: transaction.id,
+          error: paydunyaResponse.response_text || "Erreur lors de l'initiation du paiement",
+        });
       }
     } catch (error: any) {
       console.error("Payment processing error:", error);
@@ -510,9 +514,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           redirectUrl: paydunyaResponse.response_text,
         });
       } else {
+        // Paydunya error - still return transactionId so client can redirect to status page
         await storage.updateTransactionStatus(transaction.id, "failed");
-        const errorMsg = paydunyaResponse.response_text || "Erreur lors de l'initiation du paiement";
-        res.status(400).json({ error: errorMsg });
+        res.json({
+          success: false,
+          transactionId: transaction.id,
+          error: paydunyaResponse.response_text || "Erreur lors de l'initiation du paiement",
+        });
       }
     } catch (error: any) {
       console.error("Merchant payment processing error:", error);
@@ -818,9 +826,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           redirectUrl: paydunyaResponse.response_text,
         });
       } else {
+        // Paydunya error - still return transactionId so client can redirect to status page
         await storage.updateTransactionStatus(transactionId, "failed");
-        const errorMsg = paydunyaResponse.response_text || "Erreur lors de l'initiation du paiement";
-        res.status(400).json({ error: errorMsg });
+        res.json({
+          success: false,
+          transactionId: transactionId,
+          error: paydunyaResponse.response_text || "Erreur lors de l'initiation du paiement",
+        });
       }
     } catch (error: any) {
       console.error("Payment submission error:", error);
