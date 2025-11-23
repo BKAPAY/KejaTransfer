@@ -1,7 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertCircle, Copy, Download } from "lucide-react";
+import { AlertCircle, Copy, Shield, Code } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { Badge } from "@/components/ui/badge";
 
 export default function Documentation() {
   const { toast } = useToast();
@@ -14,392 +15,377 @@ export default function Documentation() {
     });
   };
 
-  const incomingCode = `// 1. Récupérez votre clé API publique depuis votre dashboard BKApay
-// Section "API Gateway" -> Copiez "Clé publique"
+  const frontendCode = `// 🔑 FRONTEND - Utilisez la CLÉ PUBLIQUE
+// Cette clé peut être exposée au navigateur - c'est normal!
 
-// 2. Sur votre site, intégrez le bouton de paiement
 async function handlePayment() {
-  const amount = document.getElementById('amount').value;
-  const customerName = document.getElementById('name').value;
-  const customerEmail = document.getElementById('email').value;
-  const customerPhone = document.getElementById('phone').value;
-  const country = document.getElementById('country').value;
-  const operator = document.getElementById('operator').value;
-
+  const publicKey = 'pk_live_YOUR_PUBLIC_KEY'; // Visible au frontend
+  
   try {
-    // 3. Appelez l'endpoint de paiement
     const response = await fetch('https://bkapay.app/api/payments/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        publicKey: 'pk_live_YOUR_PUBLIC_KEY',
-        amount: parseInt(amount),
-        description: 'Achat sur votre site',
-        customerName: customerName,
-        customerEmail: customerEmail,
-        customerPhone: customerPhone,
-        country: country,
-        operator: operator
+        publicKey: publicKey,  // ✅ Clé publique
+        amount: 50000,
+        description: 'Achat de produit',
+        customerName: 'Jean Dupont',
+        customerEmail: 'jean@example.com',
+        customerPhone: '+221781234567',
+        country: 'SN',
+        operator: 'orange'
       })
     });
 
     const data = await response.json();
-    
-    // 4. Redirigez le client vers BKApay pour payer
     if (data.success) {
-      window.location.href = data.redirectUrl;
+      // Rediriger vers le paiement
+      window.location.href = data.data.redirectUrl;
     } else {
-      alert('Erreur: ' + data.error);
+      console.error('Erreur:', data.error);
     }
   } catch (error) {
-    alert('Erreur: ' + error.message);
+    console.error('Erreur réseau:', error.message);
   }
 }`;
 
-  const outgoingIntegrationCode = `// Intégrez un bouton "Retrait" sur votre site pour vos clients
+  const backendCode = `// 🔒 BACKEND - Utilisez la CLÉ PRIVÉE UNIQUEMENT
+// Cette clé doit rester secrète! En variable d'environnement.
 
-// 1. Formulaire HTML simple
-<form id="withdrawalForm">
-  <input type="number" id="amount" placeholder="Montant (XOF)" min="500" required />
-  <select id="country" required>
-    <option value="">Sélectionnez un pays</option>
-    <option value="SN">Sénégal</option>
-    <option value="CI">Côte d'Ivoire</option>
-    <option value="BF">Burkina Faso</option>
-    <option value="BJ">Bénin</option>
-    <option value="TG">Togo</option>
-    <option value="ML">Mali</option>
-  </select>
-  <select id="operator" required>
-    <option value="">Sélectionnez un opérateur</option>
-    <option value="orange">Orange Money</option>
-    <option value="wave">Wave</option>
-    <option value="moov">Moov</option>
-    <option value="mtn">MTN</option>
-  </select>
-  <input type="tel" id="phone" placeholder="Numéro de téléphone" required />
-  <button type="submit">Demander un retrait</button>
-</form>
+const BKAPAY_SECRET_KEY = process.env.BKAPAY_SECRET_KEY; // sk_live_xxxxx
 
-// 2. Code JavaScript pour envoyer la demande
-document.getElementById('withdrawalForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  
-  const response = await fetch('https://bkapay.app/api/withdrawals/create', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      privateKey: 'sk_live_YOUR_PRIVATE_KEY', // ← Clé privée (SÉCURISÉE, côté serveur!)
-      amount: parseInt(document.getElementById('amount').value),
-      country: document.getElementById('country').value,
-      operator: document.getElementById('operator').value,
-      phone: document.getElementById('phone').value
-    })
-  });
-
-  const data = await response.json();
-  if (data.success) {
-    alert('Retrait demandé avec succès!');
-  } else {
-    alert('Erreur: ' + data.error);
+// Exemple 1: Récupérer les transactions
+app.get('/api/check-transactions', async (req, res) => {
+  try {
+    const response = await fetch('https://bkapay.app/api/transactions', {
+      headers: {
+        'Authorization': \`Bearer \${BKAPAY_SECRET_KEY}\` // 🔒 Clé privée
+      }
+    });
+    
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
+});
+
+// Exemple 2: Vérifier la signature du webhook (sécurité)
+import crypto from 'crypto';
+
+function verifyWebhookSignature(payload, signature, secret) {
+  const hash = crypto
+    .createHmac('sha256', secret)
+    .update(JSON.stringify(payload))
+    .digest('hex');
+  return hash === signature;
+}
+
+app.post('/webhook/bkapay', (req, res) => {
+  const signature = req.headers['x-webhook-signature'];
+  
+  if (!verifyWebhookSignature(req.body, signature, BKAPAY_SECRET_KEY)) {
+    return res.status(401).json({ error: 'Invalid signature' });
+  }
+  
+  // Webhook vérifié, traiter en confiance
+  console.log('Paiement reçu:', req.body);
+  res.json({ success: true });
 });`;
 
-  const outgoingCode = `// Sur votre dashboard BKApay, allez à "Transferts"
-
-// 1. Entrez le montant à retirer (en XOF)
-amount = 50000; // 50 000 francs CFA
-
-// 2. Sélectionnez le pays et l'opérateur
-country = 'SN';      // Code du pays
-operator = 'orange'; // Code de l'opérateur
-
-// 3. Entrez le numéro de téléphone du bénéficiaire
-phone = '+221781234567'; // Format international
-
-// 4. Cliquez sur "Confirmer"
-// L'argent est débité de votre solde et envoyé au client`;
+  const alternativeAuthCode = `// Alternative: Utiliser Authorization header avec clé publique
+fetch('https://bkapay.app/api/payments/create', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer pk_live_YOUR_PUBLIC_KEY' // ✅ Bearer token
+  },
+  body: JSON.stringify({
+    amount: 50000,
+    description: 'Mon paiement',
+    customerName: 'Jean',
+    customerEmail: 'jean@example.com',
+    customerPhone: '+221781234567',
+    country: 'SN',
+    operator: 'orange'
+  })
+})`;
 
   return (
     <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-bold text-foreground mb-2">Documentation API BKApay</h1>
-        <p className="text-muted-foreground">Guide complet pour intégrer les paiements et retraits sur votre site</p>
+        <p className="text-muted-foreground">Guide complet pour intégrer les paiements dans votre application</p>
       </div>
 
-      {/* Important Notice */}
-      <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
-        <div className="flex gap-3">
-          <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
-          <div className="text-sm text-amber-900 dark:text-amber-100">
-            <p className="font-semibold mb-1">⚠️ BKApay - Votre Fournisseur de Paiements</p>
-            <p>BKApay est votre plateforme complète de paiement et retrait. Les clients payent directement sur BKApay, et vous gérez les retraits depuis votre dashboard.</p>
+      {/* Authentication Overview */}
+      <Card className="border-primary/20 bg-primary/5">
+        <CardHeader>
+          <CardTitle className="text-2xl flex items-center gap-2">
+            <Shield className="w-6 h-6 text-primary" />
+            Authentification API - 3 Méthodes
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid md:grid-cols-3 gap-4">
+            {/* Public Key */}
+            <div className="border rounded-lg p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <Badge variant="outline">Public</Badge>
+                <span className="font-semibold text-sm">Clé Publique</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                <span className="font-mono text-primary">pk_live_xxxxx</span>
+              </p>
+              <div className="text-sm space-y-2">
+                <p className="font-semibold">Où l'utiliser:</p>
+                <p className="text-muted-foreground">Frontend / JavaScript côté client</p>
+              </div>
+              <div className="text-sm">
+                <p className="font-semibold">Pour:</p>
+                <p className="text-muted-foreground">Créer des paiements</p>
+              </div>
+              <p className="text-xs bg-blue-50 dark:bg-blue-950 p-2 rounded text-blue-900 dark:text-blue-100">
+                ✅ Peut être exposée au navigateur
+              </p>
+            </div>
+
+            {/* Private Key */}
+            <div className="border rounded-lg p-4 space-y-3 border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950">
+              <div className="flex items-center gap-2">
+                <Badge variant="destructive">Secret</Badge>
+                <span className="font-semibold text-sm">Clé Privée</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                <span className="font-mono text-red-600 dark:text-red-400">sk_live_xxxxx</span>
+              </p>
+              <div className="text-sm space-y-2">
+                <p className="font-semibold">Où l'utiliser:</p>
+                <p className="text-muted-foreground">Backend UNIQUEMENT</p>
+              </div>
+              <div className="text-sm">
+                <p className="font-semibold">Pour:</p>
+                <p className="text-muted-foreground">Opérations sensibles</p>
+              </div>
+              <p className="text-xs bg-red-200 dark:bg-red-900 p-2 rounded text-red-900 dark:text-red-100">
+                🔒 Jamais au frontend!
+              </p>
+            </div>
+
+            {/* Session */}
+            <div className="border rounded-lg p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <Badge variant="outline">Session</Badge>
+                <span className="font-semibold text-sm">Authentification</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Cookies de session
+              </p>
+              <div className="text-sm space-y-2">
+                <p className="font-semibold">Où l'utiliser:</p>
+                <p className="text-muted-foreground">Dashboard Web</p>
+              </div>
+              <div className="text-sm">
+                <p className="font-semibold">Pour:</p>
+                <p className="text-muted-foreground">Authentification utilisateur</p>
+              </div>
+              <p className="text-xs bg-green-50 dark:bg-green-950 p-2 rounded text-green-900 dark:text-green-100">
+                ✅ Automatique après login
+              </p>
+            </div>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
-      {/* Incoming Payments */}
+      {/* Frontend Integration */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-2xl">💰 Paiements Entrants - Collecte</CardTitle>
+          <CardTitle className="text-2xl flex items-center gap-2">
+            <Code className="w-6 h-6 text-primary" />
+            Intégration Frontend (Clé Publique)
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
             <p className="text-sm text-blue-900 dark:text-blue-100">
-              Les clients payent directement sur <span className="font-bold">BKApay</span>. L'argent arrive immédiatement sur votre dashboard.
+              <span className="font-bold">✅ Sûr d'exposer votre clé publique</span> au frontend. C'est son objectif!
             </p>
-          </div>
-
-          <div>
-            <h3 className="text-lg font-semibold text-foreground mb-3">Flux de Paiement</h3>
-            <ol className="space-y-2 list-decimal list-inside text-sm text-muted-foreground">
-              <li>Votre client remplir le formulaire de paiement sur votre site</li>
-              <li>Vous appelez l'API avec votre clé publique</li>
-              <li>Le client est redirigé vers <span className="font-bold">BKApay</span> pour payer</li>
-              <li>Le client choisit son opérateur mobile money (Orange, Wave, Moov, etc.)</li>
-              <li>L'argent arrive immédiatement sur votre dashboard BKApay</li>
-              <li>Vous pouvez alors faire des retraits vers vos clients</li>
-            </ol>
           </div>
 
           <div className="space-y-3">
             <h3 className="text-lg font-semibold text-foreground">Code d'Intégration</h3>
             <div className="bg-gray-950 dark:bg-gray-900 text-gray-100 p-4 rounded-lg font-mono text-xs overflow-x-auto">
-              <pre>{incomingCode}</pre>
+              <pre>{frontendCode}</pre>
             </div>
             <Button
-              onClick={() => copyCode(incomingCode)}
+              onClick={() => copyCode(frontendCode)}
               variant="outline"
               size="sm"
               className="w-full"
-              data-testid="button-copy-incoming"
+              data-testid="button-copy-frontend"
             >
               <Copy className="w-4 h-4 mr-2" />
               Copier le code
             </Button>
-          </div>
-
-          <div className="space-y-3">
-            <h3 className="text-lg font-semibold text-foreground">Format du Numéro de Téléphone</h3>
-            <p className="text-sm text-muted-foreground mb-2">Format international complet avec code pays:</p>
-            <div className="bg-muted p-3 rounded-md space-y-1 font-mono text-xs">
-              <p>🇸🇳 Sénégal: <span className="text-primary">+221781234567</span></p>
-              <p>🇨🇮 Côte d'Ivoire: <span className="text-primary">+2250709876543</span></p>
-              <p>🇧🇫 Burkina Faso: <span className="text-primary">+22650123456</span></p>
-              <p>🇧🇯 Bénin: <span className="text-primary">+22967891234</span></p>
-              <p>🇹🇬 Togo: <span className="text-primary">+22890123456</span></p>
-              <p>🇲🇱 Mali: <span className="text-primary">+22365123456</span></p>
-            </div>
           </div>
 
           <div className="space-y-3">
             <h3 className="text-lg font-semibold text-foreground">Opérateurs Supportés par Pays</h3>
             <div className="grid grid-cols-2 gap-3">
               <div className="border-l-4 border-primary pl-3">
-                <p className="font-bold text-sm">Sénégal</p>
-                <p className="text-xs text-muted-foreground">Orange, Free, Expresso, Wave, Wizall</p>
+                <p className="font-bold text-sm">Sénégal (SN)</p>
+                <p className="text-xs text-muted-foreground">orange, free, expresso, wave, wizall</p>
               </div>
               <div className="border-l-4 border-primary pl-3">
-                <p className="font-bold text-sm">Côte d'Ivoire</p>
-                <p className="text-xs text-muted-foreground">Orange, MTN, Moov, Wave</p>
+                <p className="font-bold text-sm">Côte d'Ivoire (CI)</p>
+                <p className="text-xs text-muted-foreground">orange, mtn, moov, wave</p>
               </div>
               <div className="border-l-4 border-primary pl-3">
-                <p className="font-bold text-sm">Burkina Faso</p>
-                <p className="text-xs text-muted-foreground">Orange, Moov</p>
+                <p className="font-bold text-sm">Burkina Faso (BF)</p>
+                <p className="text-xs text-muted-foreground">orange, moov</p>
               </div>
               <div className="border-l-4 border-primary pl-3">
-                <p className="font-bold text-sm">Bénin</p>
-                <p className="text-xs text-muted-foreground">Moov, MTN</p>
+                <p className="font-bold text-sm">Bénin (BJ)</p>
+                <p className="text-xs text-muted-foreground">moov, mtn</p>
               </div>
               <div className="border-l-4 border-primary pl-3">
-                <p className="font-bold text-sm">Togo</p>
-                <p className="text-xs text-muted-foreground">T-Money, Moov</p>
+                <p className="font-bold text-sm">Togo (TG)</p>
+                <p className="text-xs text-muted-foreground">tmoney, moov</p>
               </div>
               <div className="border-l-4 border-primary pl-3">
-                <p className="font-bold text-sm">Mali</p>
-                <p className="text-xs text-muted-foreground">Orange, Moov</p>
+                <p className="font-bold text-sm">Mali (ML)</p>
+                <p className="text-xs text-muted-foreground">orange, moov</p>
               </div>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <h3 className="text-lg font-semibold text-foreground">Réponse API</h3>
-            <div className="bg-gray-950 dark:bg-gray-900 text-gray-100 p-4 rounded-lg font-mono text-xs overflow-x-auto">
-              <pre>{`{
-  "success": true,
-  "redirectUrl": "https://bkapay.app/payment/xyz..." 
-}
-
-// Redirigez le client vers redirectUrl
-// Il paiera sur BKApay`}</pre>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Outgoing Payments - Dashboard */}
+      {/* Backend Integration */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-2xl">🔄 Paiements Sortants - Retraits depuis votre Dashboard</CardTitle>
+          <CardTitle className="text-2xl flex items-center gap-2">
+            <Shield className="w-6 h-6 text-red-600" />
+            Intégration Backend (Clé Privée)
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-4">
-            <p className="text-sm text-green-900 dark:text-green-100">
-              <span className="font-bold">Depuis votre dashboard BKApay</span>, vous pouvez faire des retraits vers vos clients ou partenaires via mobile money.
-            </p>
-          </div>
-
-          <div>
-            <h3 className="text-lg font-semibold text-foreground mb-3">Comment ça Marche</h3>
-            <ol className="space-y-2 list-decimal list-inside text-sm text-muted-foreground">
-              <li>Allez à la section <span className="font-bold">"Transferts"</span> sur votre dashboard</li>
-              <li>Entrez le montant à retirer (en XOF - francs CFA)</li>
-              <li>Sélectionnez le pays et l'opérateur mobile money</li>
-              <li>Entrez le numéro de téléphone du bénéficiaire</li>
-              <li>Confirmez le retrait</li>
-              <li>L'argent est débité de votre solde et envoyé au bénéficiaire</li>
-            </ol>
-          </div>
-
-          <div className="space-y-3">
-            <h3 className="text-lg font-semibold text-foreground">Interface Dashboard</h3>
-            <div className="bg-gray-950 dark:bg-gray-900 text-gray-100 p-4 rounded-lg font-mono text-xs overflow-x-auto">
-              <pre>{outgoingCode}</pre>
+          <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg p-4">
+            <div className="flex gap-3">
+              <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+              <div className="text-sm text-red-900 dark:text-red-100">
+                <p className="font-semibold mb-1">🔒 Clé Privée - Sécurité Critique</p>
+                <p className="mb-2">Votre clé privée doit rester SECRÈTE! Stockez-la UNIQUEMENT en variable d'environnement sur votre serveur.</p>
+                <p className="font-mono text-xs">Ne la commitez JAMAIS dans Git, ne l'exposez jamais au frontend!</p>
+              </div>
             </div>
           </div>
 
           <div className="space-y-3">
-            <h3 className="text-lg font-semibold text-foreground">Format du Numéro</h3>
-            <div className="bg-muted p-3 rounded-md text-sm space-y-2">
-              <p><span className="font-bold">Format recommandé:</span> <span className="font-mono text-primary">+221781234567</span> (international complet)</p>
-              <p><span className="font-bold">Ou juste:</span> <span className="font-mono text-primary">781234567</span> (local)</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Outgoing Payments - API Integration */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-2xl">🔗 Paiements Sortants - Intégration sur Votre Site</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="bg-purple-50 dark:bg-purple-950 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
-            <p className="text-sm text-purple-900 dark:text-purple-100">
-              Intégrez un bouton <span className="font-bold">"Retrait"</span> sur votre site pour que vos clients demandent des paiements. Les retraits sont collectés sur votre dashboard BKApay.
-            </p>
-          </div>
-
-          <div>
-            <h3 className="text-lg font-semibold text-foreground mb-3">Flux Complet</h3>
-            <ol className="space-y-2 list-decimal list-inside text-sm text-muted-foreground">
-              <li>Votre client clique le bouton "Retrait" sur votre site</li>
-              <li>Il remplit: montant, pays, opérateur, numéro de téléphone</li>
-              <li>Vous appelez l'API de retrait avec votre clé privée</li>
-              <li>BKApay valide et crée une demande de retrait</li>
-              <li>La demande apparaît dans votre dashboard "Transferts"</li>
-              <li>Vous confirmez et l'argent est envoyé au client</li>
-            </ol>
-          </div>
-
-          <div className="space-y-3">
-            <h3 className="text-lg font-semibold text-foreground">Code d'Intégration</h3>
+            <h3 className="text-lg font-semibold text-foreground">Code d'Intégration Backend</h3>
             <div className="bg-gray-950 dark:bg-gray-900 text-gray-100 p-4 rounded-lg font-mono text-xs overflow-x-auto">
-              <pre>{outgoingIntegrationCode}</pre>
+              <pre>{backendCode}</pre>
             </div>
             <Button
-              onClick={() => copyCode(outgoingIntegrationCode)}
+              onClick={() => copyCode(backendCode)}
               variant="outline"
               size="sm"
               className="w-full"
-              data-testid="button-copy-withdrawal"
+              data-testid="button-copy-backend"
             >
               <Copy className="w-4 h-4 mr-2" />
               Copier le code
             </Button>
           </div>
 
-          <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg p-4">
-            <div className="flex gap-3">
-              <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
-              <div className="text-sm text-red-900 dark:text-red-100">
-                <p className="font-semibold mb-1">🔒 Sécurité Importante</p>
-                <p>Votre <span className="font-mono">privateKey (sk_live_...)</span> doit rester SECRÈTE! Appelez l'API de retrait depuis votre serveur backend, jamais depuis le navigateur du client.</p>
-              </div>
-            </div>
-          </div>
-
           <div className="space-y-3">
-            <h3 className="text-lg font-semibold text-foreground">Exemple Sécurisé (Backend Node.js)</h3>
+            <h3 className="text-lg font-semibold text-foreground">Configuration Environnement</h3>
             <div className="bg-gray-950 dark:bg-gray-900 text-gray-100 p-4 rounded-lg font-mono text-xs overflow-x-auto">
-              <pre>{`// Sur VOTRE serveur backend (Node.js / Express)
-app.post('/api/request-withdrawal', async (req, res) => {
-  const { amount, country, operator, phone } = req.body;
-  
-  // Appelez BKApay depuis votre serveur
-  const response = await fetch('https://bkapay.app/api/withdrawals/create', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      privateKey: process.env.KEJA_PRIVATE_KEY, // ← Clé privée en variable d'env
-      amount: amount,
-      country: country,
-      operator: operator,
-      phone: phone
-    })
-  });
+              <pre>{`# .env (fichier local, ne pas commiter!)
+BKAPAY_SECRET_KEY=sk_live_YOUR_PRIVATE_KEY
 
-  const data = await response.json();
-  res.json(data);
-});
-
-// Sur votre site frontend
-document.getElementById('withdrawalForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  
-  // Appelez VOTRE serveur backend
-  const response = await fetch('/api/request-withdrawal', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      amount: document.getElementById('amount').value,
-      country: document.getElementById('country').value,
-      operator: document.getElementById('operator').value,
-      phone: document.getElementById('phone').value
-    })
-  });
-
-  const data = await response.json();
-  alert(data.success ? 'Retrait demandé!' : 'Erreur: ' + data.error);
-});`}</pre>
+# .env.example (pour Git - version publique)
+BKAPAY_SECRET_KEY=sk_live_xxxxxxxxxxxxxxxx`}</pre>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Summary */}
-      <Card className="bg-primary/5 border-primary/20">
+      {/* Alternative Authentication */}
+      <Card>
         <CardHeader>
-          <CardTitle>📊 Résumé Complet du Système</CardTitle>
+          <CardTitle>Alternative: Header Bearer Token</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4 text-sm">
-          <div className="space-y-3 border-b pb-4">
-            <p className="font-bold text-foreground">1️⃣ Votre Plateforme (vos clients qui intègrent vos API)</p>
-            <div className="ml-4 space-y-2 text-muted-foreground">
-              <p>✓ Vos clients intègrent votre clé publique sur leur site</p>
-              <p>✓ Leurs clients paient directement sur BKApay</p>
-              <p>✓ L'argent arrive sur VOTRE dashboard BKApay</p>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Au lieu de passer la clé dans le body JSON, vous pouvez utiliser le header <span className="font-mono">Authorization: Bearer</span>
+          </p>
+          <div className="bg-gray-950 dark:bg-gray-900 text-gray-100 p-4 rounded-lg font-mono text-xs overflow-x-auto">
+            <pre>{alternativeAuthCode}</pre>
+          </div>
+          <Button
+            onClick={() => copyCode(alternativeAuthCode)}
+            variant="outline"
+            size="sm"
+            className="w-full"
+            data-testid="button-copy-bearer"
+          >
+            <Copy className="w-4 h-4 mr-2" />
+            Copier le code
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Best Practices */}
+      <Card className="bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800">
+        <CardHeader>
+          <CardTitle className="text-2xl">✅ Bonnes Pratiques de Sécurité</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-3">
+            <div>
+              <p className="font-bold text-green-900 dark:text-green-100 mb-2">À FAIRE:</p>
+              <ul className="space-y-1 text-sm text-green-900 dark:text-green-100">
+                <li>✅ Stocker clés privées en variables d'environnement</li>
+                <li>✅ Créer une clé par environnement (dev, staging, prod)</li>
+                <li>✅ Utiliser clé publique UNIQUEMENT au frontend</li>
+                <li>✅ Vérifier les signatures des webhooks</li>
+                <li>✅ Faire appels API depuis votre backend</li>
+              </ul>
+            </div>
+            <div>
+              <p className="font-bold text-red-700 dark:text-red-300 mb-2">À NE PAS FAIRE:</p>
+              <ul className="space-y-1 text-sm text-red-700 dark:text-red-300">
+                <li>❌ Commiter clés dans Git</li>
+                <li>❌ Exposer clés privées au frontend</li>
+                <li>❌ Partager clés entre développeurs</li>
+                <li>❌ Utiliser même clé pour tous environnements</li>
+                <li>❌ Logger ou afficher les clés</li>
+              </ul>
             </div>
           </div>
+        </CardContent>
+      </Card>
 
-          <div className="space-y-3">
-            <p className="font-bold text-foreground">2️⃣ Vos Retraits</p>
-            <div className="ml-4 space-y-2 text-muted-foreground">
-              <p>✓ Depuis votre dashboard, vous pouvez faire des retraits</p>
-              <p>✓ Ou intégrer un bouton retrait sur VOTRE site</p>
-              <p>✓ Les demandes de retrait arrivent sur votre dashboard</p>
-              <p>✓ Vous confirmez et l'argent est envoyé aux bénéficiaires</p>
-            </div>
+      {/* Resources */}
+      <Card>
+        <CardHeader>
+          <CardTitle>📚 Ressources Supplémentaires</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Pour plus d'informations, consultez notre documentation complète:
+          </p>
+          <div className="space-y-2">
+            <a href="https://docs.bkapay.app" target="_blank" rel="noopener noreferrer" className="block text-primary hover:underline text-sm">
+              📖 Documentation Complète → docs.bkapay.app
+            </a>
+            <a href="https://docs.bkapay.app/quick-start" target="_blank" rel="noopener noreferrer" className="block text-primary hover:underline text-sm">
+              ⚡ Quick Start Guide → docs.bkapay.app/quick-start
+            </a>
+            <a href="https://docs.bkapay.app/sdk" target="_blank" rel="noopener noreferrer" className="block text-primary hover:underline text-sm">
+              🔗 SDK Examples → docs.bkapay.app/sdk
+            </a>
           </div>
         </CardContent>
       </Card>
