@@ -1,4 +1,4 @@
-import { useRoute } from "wouter";
+import { useRoute, useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,7 +6,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import type { MerchantLink } from "@shared/schema";
 import { COUNTRIES, OPERATORS } from "@shared/schema";
-import { useToast } from "@/hooks/use-toast";
 import logoImage from "@assets/bkapay-logo.png";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -29,7 +28,7 @@ type MerchantPaymentFormData = z.infer<typeof merchantPaymentSchema>;
 export default function Merchant() {
   const [, params] = useRoute("/merchant/:token");
   const token = params?.token;
-  const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [selectedCountry, setSelectedCountry] = useState("");
 
   const { data: merchantLink, isLoading } = useQuery<MerchantLink>({
@@ -54,21 +53,9 @@ export default function Merchant() {
       return await apiRequest("POST", `/api/merchant-payments/process/${token}`, data);
     },
     onSuccess: (data: any) => {
-      if (data.redirectUrl) {
-        window.location.href = data.redirectUrl;
-      } else {
-        toast({
-          title: "Paiement initié",
-          description: "Votre paiement est en cours de traitement",
-        });
+      if (data.transactionId) {
+        setLocation(`/payment-status/${data.transactionId}`);
       }
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Erreur",
-        description: error.message || "Erreur lors du paiement",
-        variant: "destructive",
-      });
     },
   });
 

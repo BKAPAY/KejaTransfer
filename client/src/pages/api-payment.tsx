@@ -1,4 +1,4 @@
-import { useParams } from "wouter";
+import { useParams, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import type { Transaction } from "@shared/schema";
 import logoImage from "@assets/bkapay-logo.png";
 
 export default function ApiPayment() {
+  const [, setLocation] = useLocation();
   const { transactionId } = useParams<{ transactionId: string }>();
   const [country, setCountry] = useState("");
   const [operator, setOperator] = useState("");
@@ -25,8 +26,7 @@ export default function ApiPayment() {
   const countryOperators = OPERATORS[(country as keyof typeof OPERATORS) || ("BJ" as const)] || [];
 
   const handlePayment = async () => {
-    if (!country || !operator) {
-      alert("Sélectionnez un pays et un opérateur");
+    if (!country || !operator || !transactionId) {
       return;
     }
 
@@ -45,14 +45,13 @@ export default function ApiPayment() {
 
       const data = await response.json();
 
-      if (data.success && data.redirectUrl) {
-        // Redirect to Paydunya
-        window.location.href = data.redirectUrl;
-      } else {
-        alert("Erreur: " + (data.error || "Impossible de traiter le paiement"));
+      if (data.success) {
+        // Redirect to payment status page
+        setLocation(`/payment-status/${transactionId}`);
       }
     } catch (err: any) {
-      alert("Erreur: " + err.message);
+      // Silently fail - redirect to status page which will show error
+      setLocation(`/payment-status/${transactionId}`);
     } finally {
       setIsLoading(false);
     }

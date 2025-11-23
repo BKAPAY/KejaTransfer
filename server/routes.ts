@@ -437,6 +437,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         res.json({
           success: true,
+          transactionId: transaction.id,
           redirectUrl: paydunyaResponse.response_text, // This is the Paydunya checkout URL
         });
       } else {
@@ -505,6 +506,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         res.json({
           success: true,
+          transactionId: transaction.id,
           redirectUrl: paydunyaResponse.response_text,
         });
       } else {
@@ -812,6 +814,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         res.json({
           success: true,
+          transactionId: transactionId,
           redirectUrl: paydunyaResponse.response_text,
         });
       } else {
