@@ -1,5 +1,6 @@
 import { useParams, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, XCircle, Loader2 } from "lucide-react";
@@ -20,6 +21,30 @@ export default function PaymentStatus() {
       return 2000;
     },
   });
+
+  // Redirect to callback URL when payment is completed or failed
+  useEffect(() => {
+    if (!transaction) return;
+
+    const metadata = transaction.metadata ? JSON.parse(transaction.metadata) : {};
+    const callbackUrl = metadata?.callbackUrl;
+
+    if (transaction.status === "completed" && callbackUrl) {
+      // Redirect to callback URL with success status
+      const url = new URL(callbackUrl);
+      url.searchParams.append("status", "success");
+      url.searchParams.append("transactionId", transaction.id);
+      url.searchParams.append("amount", String(transaction.amount));
+      window.location.href = url.toString();
+    } else if (transaction.status === "failed" && callbackUrl) {
+      // Redirect to callback URL with failure status
+      const url = new URL(callbackUrl);
+      url.searchParams.append("status", "failed");
+      url.searchParams.append("transactionId", transaction.id);
+      url.searchParams.append("amount", String(transaction.amount));
+      window.location.href = url.toString();
+    }
+  }, [transaction]);
 
   const formatAmount = (amount: number) => {
     return new Intl.NumberFormat("fr-FR", {

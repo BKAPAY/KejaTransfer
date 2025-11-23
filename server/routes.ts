@@ -752,7 +752,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Allow developers to integrate payments using their API key
   app.post("/api/payments/create", async (req: Request, res: Response) => {
     try {
-      const { publicKey, amount, description, customerName, customerEmail, customerPhone, country, operator } = req.body;
+      const { publicKey, amount, description, customerName, customerEmail, customerPhone, country, operator, callbackUrl } = req.body;
 
       if (!publicKey) {
         return res.status(400).json({ error: "Clé API publique requise" });
@@ -781,6 +781,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customerEmail,
         customerPhone,
         description: description || "Paiement via API",
+        metadata: JSON.stringify({
+          callbackUrl: callbackUrl, // Store the callback URL for redirection
+          api_key_id: apiKey.id,
+        }),
       });
 
       // Call Paydunya API to create checkout invoice
