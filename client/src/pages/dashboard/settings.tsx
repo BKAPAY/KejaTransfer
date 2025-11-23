@@ -24,7 +24,7 @@ export default function Settings() {
     try {
       setActiveCamera(type);
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user" },
+        video: { facingMode: type === "selfie" ? "user" : "environment" },
       });
       streamRef.current = stream;
       if (videoRef.current) {
