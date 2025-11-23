@@ -50,9 +50,18 @@ export default function Settings() {
       setIsValidating(true);
       setValidationError(null);
 
-      const result = await Tesseract.recognize(imageData, "fra");
-      const text = result.data.text.toLowerCase();
+      // Utiliser l'API Tesseract avec configuration optimisée
+      const result = await Tesseract.recognize(imageData, "fra+eng", {
+        logger: (info) => console.log("OCR Progress:", info),
+      });
 
+      const text = result.data.text.toLowerCase();
+      const confidence = result.data.confidence;
+
+      console.log("Texte reconnu:", text);
+      console.log("Confiance:", confidence);
+
+      // Mots-clés spécifiques aux documents d'identité
       const documentKeywords = [
         "identité",
         "carte",
@@ -62,20 +71,28 @@ export default function Settings() {
         "national",
         "numero",
         "numéro",
-        "date",
-        "née",
         "nom",
         "prenom",
         "prénom",
+        "date",
+        "née",
+        "sexe",
+        "lieu",
+        "signature",
+        "validité",
+        "valide",
       ];
 
-      const isValidDocument = documentKeywords.some((keyword) =>
+      // Besoin d'au moins 2 mots-clés pour considérer que c'est un document valide
+      const keywordMatches = documentKeywords.filter((keyword) =>
         text.includes(keyword)
-      );
+      ).length;
 
-      if (!isValidDocument) {
+      console.log("Correspondances détectées:", keywordMatches);
+
+      if (keywordMatches < 2) {
         setValidationError(
-          "Échec. Veuillez utiliser une pièce d'identité valide (passeport, permis de conduire, ou carte d'identité)."
+          `Échec. Le système n'a pas détecté de pièce d'identité valide (${keywordMatches} indicateurs trouvés). Veuillez photographier la pièce directement en bon éclairage.`
         );
         return false;
       }
@@ -83,11 +100,7 @@ export default function Settings() {
       return true;
     } catch (error) {
       console.error("Erreur validation:", error);
-      toast({
-        title: "Erreur de validation",
-        description: "Impossible de valider la photo. Veuillez réessayer.",
-        variant: "destructive",
-      });
+      setValidationError("Erreur lors de l'analyse. Veuillez réessayer.");
       return false;
     } finally {
       setIsValidating(false);
