@@ -270,6 +270,46 @@ export class DbStorage implements IStorage {
     };
   }
 
+  // Admin methods
+  async getAdminStats(): Promise<{
+    totalUsers: number;
+    verifiedUsers: number;
+    totalDeposits: number;
+    totalTransfers: number;
+  }> {
+    const allUsers = await db.select().from(schema.users);
+    const verifiedUsers = allUsers.filter((u) => u.kycStatus === "verified").length;
+
+    const allTransactions = await db.select().from(schema.transactions);
+    const completedDeposits = allTransactions.filter(
+      (t) =>
+        t.status === "completed" &&
+        ["deposit", "payment_link", "merchant_link", "api_payment"].includes(t.type)
+    );
+    const completedTransfers = allTransactions.filter((t) => t.status === "completed" && t.type === "transfer");
+
+    const totalDeposits = completedDeposits.reduce((sum, t) => sum + t.amount, 0);
+    const totalTransfers = completedTransfers.reduce((sum, t) => sum + t.amount, 0);
+
+    return {
+      totalUsers: allUsers.length,
+      verifiedUsers,
+      totalDeposits,
+      totalTransfers,
+    };
+  }
+
+  async searchUsers(query: string): Promise<User[]> {
+    const allUsers = await db.select().from(schema.users);
+    const lowerQuery = query.toLowerCase();
+    return allUsers.filter(
+      (u) =>
+        u.email.toLowerCase().includes(lowerQuery) ||
+        u.firstName.toLowerCase().includes(lowerQuery) ||
+        u.lastName.toLowerCase().includes(lowerQuery)
+    );
+  }
+
   async getAnalytics(userId: string): Promise<{
     revenueByDate: { date: string; amount: number }[];
     revenueByOperator: { operator: string; amount: number; count: number }[];

@@ -24,7 +24,10 @@ import {
   HelpCircle,
   LogOut,
   TrendingUp,
+  Shield,
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import type { User as UserType } from "@shared/schema";
 import logoImage from "@assets/bkapay-logo.png";
 import { Button } from "@/components/ui/button";
 import { useMutation } from "@tanstack/react-query";
@@ -104,6 +107,21 @@ export function AppSidebar() {
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
 
+  const { data: user } = useQuery<UserType>({
+    queryKey: ["/api/auth/me"],
+  });
+
+  // Ajouter item Admin si l'utilisateur est admin
+  const sidebarMenuItems = [...menuItems];
+  if (user?.isAdmin) {
+    sidebarMenuItems.push({
+      title: "Administration",
+      url: "/dashboard/admin",
+      icon: Shield,
+      testId: "nav-admin",
+    });
+  }
+
   const logoutMutation = useMutation({
     mutationFn: async () => {
       await apiRequest("POST", "/api/auth/logout", {});
@@ -140,7 +158,7 @@ export function AppSidebar() {
           <SidebarGroupLabel>Menu</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {menuItems.map((item) => (
+              {sidebarMenuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     asChild
