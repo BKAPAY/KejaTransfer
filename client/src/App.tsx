@@ -61,7 +61,7 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
         <AppSidebar />
         <div className="flex flex-col flex-1 min-w-0">
           <header className="flex items-center gap-4 p-4 border-b bg-card sticky top-0 z-10">
-            <SidebarTrigger data-testid="button-sidebar-toggle" />
+            <SidebarTrigger size="lg" data-testid="button-sidebar-toggle" />
           </header>
           <main className="flex-1 overflow-auto">
             <div className="container max-w-7xl mx-auto px-4 md:px-8 py-8">
