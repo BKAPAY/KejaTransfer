@@ -120,14 +120,14 @@ export default function Settings() {
         return (
           <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-green-100 dark:bg-green-950">
             <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />
-            <span className="text-sm font-medium text-green-700 dark:text-green-300">Vérifiée</span>
+            <span className="text-sm font-medium text-green-700 dark:text-green-300">Vérifié</span>
           </div>
         );
       case "submitted":
         return (
-          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-100 dark:bg-blue-950">
-            <Clock className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-            <span className="text-sm font-medium text-blue-700 dark:text-blue-300">En attente</span>
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-100 dark:bg-red-950">
+            <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400" />
+            <span className="text-sm font-medium text-red-700 dark:text-red-300">Non vérifié</span>
           </div>
         );
       case "rejected":
@@ -139,9 +139,9 @@ export default function Settings() {
         );
       default:
         return (
-          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-800">
-            <AlertCircle className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">En attente</span>
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-100 dark:bg-red-950">
+            <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400" />
+            <span className="text-sm font-medium text-red-700 dark:text-red-300">Non vérifié</span>
           </div>
         );
     }
