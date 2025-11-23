@@ -5,7 +5,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useState, useRef, useEffect } from "react";
-import { Video, Camera, CheckCircle2, Clock, AlertCircle, X } from "lucide-react";
+import { Video, Camera, CheckCircle2, Clock, AlertCircle, X, Loader } from "lucide-react";
+import Tesseract from "tesseract.js";
 
 export default function Settings() {
   const { user } = useAuth();
@@ -16,6 +17,8 @@ export default function Settings() {
   const [selfieData, setSelfieData] = useState<string | null>(null);
   
   const [activeCamera, setActiveCamera] = useState<"front" | "back" | "selfie" | null>(null);
+  const [isValidating, setIsValidating] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -40,7 +43,58 @@ export default function Settings() {
     }
   };
 
-  const capturePhoto = () => {
+  const validateDocument = async (imageData: string): Promise<boolean> => {
+    if (activeCamera === "selfie") return true;
+
+    try {
+      setIsValidating(true);
+      setValidationError(null);
+
+      const result = await Tesseract.recognize(imageData, "fra");
+      const text = result.data.text.toLowerCase();
+
+      const documentKeywords = [
+        "identité",
+        "carte",
+        "passeport",
+        "permis",
+        "conduire",
+        "national",
+        "numero",
+        "numéro",
+        "date",
+        "née",
+        "nom",
+        "prenom",
+        "prénom",
+      ];
+
+      const isValidDocument = documentKeywords.some((keyword) =>
+        text.includes(keyword)
+      );
+
+      if (!isValidDocument) {
+        setValidationError(
+          "Échec. Veuillez utiliser une pièce d'identité valide (passeport, permis de conduire, ou carte d'identité)."
+        );
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error("Erreur validation:", error);
+      toast({
+        title: "Erreur de validation",
+        description: "Impossible de valider la photo. Veuillez réessayer.",
+        variant: "destructive",
+      });
+      return false;
+    } finally {
+      setIsValidating(false);
+    }
+  };
+
+  const capturePhoto = async () => {
     if (!videoRef.current || !canvasRef.current || !activeCamera) return;
 
     const context = canvasRef.current.getContext("2d");
@@ -49,17 +103,29 @@ export default function Settings() {
     canvasRef.current.width = videoRef.current.videoWidth;
     canvasRef.current.height = videoRef.current.videoHeight;
     context.drawImage(videoRef.current, 0, 0);
-    
+
     const imageData = canvasRef.current.toDataURL("image/jpeg");
-    
+
+    stopCamera();
+
+    const isValid = await validateDocument(imageData);
+
+    if (!isValid) {
+      toast({
+        title: "Document non valide",
+        description: validationError || "Veuillez utiliser un document d'identité valide",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (activeCamera === "front") setIdFrontData(imageData);
     else if (activeCamera === "back") setIdBackData(imageData);
     else if (activeCamera === "selfie") setSelfieData(imageData);
 
-    stopCamera();
     toast({
-      title: "Photo capturée",
-      description: "Votre photo a été capturée avec succès",
+      title: "Photo valide",
+      description: "Votre document a été accepté",
     });
   };
 
@@ -192,23 +258,41 @@ export default function Settings() {
                   </div>
                   <canvas ref={canvasRef} className="hidden" />
                   
-                  <div className="flex gap-2">
-                    <Button
-                      className="flex-1"
-                      onClick={capturePhoto}
-                      data-testid="button-capture-photo"
-                    >
-                      <Camera className="w-4 h-4 mr-2" />
-                      Capturer
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="flex-1"
-                      onClick={stopCamera}
-                      data-testid="button-cancel-camera"
-                    >
-                      Annuler
-                    </Button>
+                  <div className="space-y-3">
+                    <div className="flex gap-2">
+                      <Button
+                        className="flex-1"
+                        onClick={capturePhoto}
+                        disabled={isValidating}
+                        data-testid="button-capture-photo"
+                      >
+                        {isValidating ? (
+                          <>
+                            <Loader className="w-4 h-4 mr-2 animate-spin" />
+                            Validation...
+                          </>
+                        ) : (
+                          <>
+                            <Camera className="w-4 h-4 mr-2" />
+                            Capturer
+                          </>
+                        )}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="flex-1"
+                        onClick={stopCamera}
+                        disabled={isValidating}
+                        data-testid="button-cancel-camera"
+                      >
+                        Annuler
+                      </Button>
+                    </div>
+                    {validationError && (
+                      <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-lg p-3">
+                        <p className="text-xs text-red-700 dark:text-red-300">{validationError}</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               ) : (
