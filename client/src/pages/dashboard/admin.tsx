@@ -22,6 +22,12 @@ export default function Admin() {
 
   const { data: searchResults, isLoading: searchLoading } = useQuery<User[]>({
     queryKey: ["/api/admin/search", searchQuery],
+    queryFn: async () => {
+      if (!searchQuery) return [];
+      const response = await fetch(`/api/admin/search?q=${encodeURIComponent(searchQuery)}`);
+      if (!response.ok) throw new Error("Failed to search users");
+      return response.json();
+    },
     enabled: searchQuery.length > 0,
   });
 

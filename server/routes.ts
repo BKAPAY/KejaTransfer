@@ -21,6 +21,18 @@ function requireAuth(req: Request, res: Response, next: Function) {
   next();
 }
 
+// Middleware pour vérifier l'authentification administrateur
+async function requireAdmin(req: Request, res: Response, next: Function) {
+  if (!req.session.userId) {
+    return res.status(401).json({ error: "Non authentifié" });
+  }
+  const user = await storage.getUser(req.session.userId);
+  if (!user || !user.isAdmin) {
+    return res.status(403).json({ error: "Accès administrateur requis" });
+  }
+  next();
+}
+
 // Middleware pour vérifier l'authentification par clé API
 async function requireApiKey(req: Request, res: Response, next: Function) {
   try {
@@ -977,6 +989,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true });
     } catch (error: any) {
       console.error("Webhook error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Admin routes
+  app.get("/api/admin/stats", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const stats = await storage.getAdminStats();
+      res.json(stats);
+    } catch (error: any) {
+      console.error("Admin stats error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/admin/search", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const query = req.query.q as string;
+      if (!query || query.length === 0) {
+        return res.json([]);
+      }
+      const results = await storage.searchUsers(query);
+      res.json(results);
+    } catch (error: any) {
+      console.error("Admin search error:", error);
       res.status(500).json({ error: error.message });
     }
   });
