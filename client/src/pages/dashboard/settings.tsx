@@ -3,21 +3,21 @@ import { Settings as SettingsIcon } from "lucide-react";
 
 export default function Settings() {
   return (
-    <div className="space-y-8">
+    <div className="space-y-4">
       <div>
-        <h1 className="text-3xl font-bold text-foreground mb-2">Paramètres</h1>
-        <p className="text-muted-foreground">Configurez votre compte et vos préférences</p>
+        <h1 className="text-2xl font-bold text-foreground mb-1">Paramètres</h1>
+        <p className="text-sm text-muted-foreground">Configurez votre compte</p>
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Paramètres du compte</CardTitle>
-          <CardDescription>Gérez les paramètres de votre compte BKApay</CardDescription>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg">Paramètres du compte</CardTitle>
+          <CardDescription className="text-xs">Préférences BKApay</CardDescription>
         </CardHeader>
-        <CardContent className="py-12">
+        <CardContent className="py-8">
           <div className="text-center">
-            <SettingsIcon className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-            <p className="text-muted-foreground">Les paramètres seront bientôt disponibles</p>
+            <SettingsIcon className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">Bientôt disponible</p>
           </div>
         </CardContent>
       </Card>

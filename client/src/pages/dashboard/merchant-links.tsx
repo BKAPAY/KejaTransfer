@@ -101,12 +101,12 @@ export default function MerchantLinks() {
   };
 
   return (
-    <div className="space-y-8">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
         <div>
-          <h1 className="text-3xl font-bold text-foreground mb-2">Lien marchand</h1>
-          <p className="text-muted-foreground">
-            Vous pouvez créer un seul lien marchand où vos clients choisissent le montant à payer
+          <h1 className="text-2xl font-bold text-foreground mb-1">Lien marchand</h1>
+          <p className="text-sm text-muted-foreground">
+            Montant flexible choisi par le client
           </p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

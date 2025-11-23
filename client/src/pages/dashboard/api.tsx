@@ -144,11 +144,11 @@ X-API-Key: sk_live_xxxxx`}
         </CardContent>
       </Card>
 
-      <div className="flex items-center justify-between gap-4 flex-wrap mb-6">
+      <div className="flex items-center justify-between gap-2 flex-wrap mb-4">
         <div>
-          <h1 className="text-3xl font-bold text-foreground mb-2">Clés API</h1>
-          <p className="text-muted-foreground">
-            Gérez vos clés pour intégrer BKApay dans vos applications
+          <h1 className="text-2xl font-bold text-foreground mb-1">Clés API</h1>
+          <p className="text-sm text-muted-foreground">
+            Intégrez BKApay dans votre app
           </p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

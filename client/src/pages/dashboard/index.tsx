@@ -52,41 +52,38 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4">
       <div>
-        <h1 className="text-3xl font-bold text-foreground mb-2">Tableau de bord</h1>
-        <p className="text-muted-foreground">
-          Bienvenue {userLoading ? "..." : `${user?.firstName} ${user?.lastName}`}
+        <h1 className="text-2xl font-bold text-foreground mb-1">Tableau de bord</h1>
+        <p className="text-sm text-muted-foreground">
+          Bienvenue {userLoading ? "..." : `${user?.firstName}`}
         </p>
       </div>
 
       {/* Stats Cards */}
-      <div className="space-y-6">
+      <div className="space-y-3">
         {/* Solde total */}
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Solde total</CardTitle>
-            <Wallet className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-1">
+            <CardTitle className="text-xs font-medium">Solde total</CardTitle>
+            <Wallet className="h-3 w-3 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-2">
             {statsLoading ? (
-              <Skeleton className="h-8 w-32" />
+              <Skeleton className="h-6 w-28" />
             ) : (
               <>
-                <div className="text-2xl font-bold" data-testid="stat-balance">
+                <div className="text-xl font-bold" data-testid="stat-balance">
                   {formatAmount(stats?.totalBalance || 0)}
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  <TrendingUp className="inline h-3 w-3 mr-1" />
-                  Disponible
-                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">Disponible</p>
               </>
             )}
           </CardContent>
         </Card>
 
         {/* Action Buttons */}
-        <div className="flex gap-4">
+        <div className="flex gap-2">
           <Button 
             data-testid="button-deposit"
             className="flex-1 flex items-center justify-center gap-2"
@@ -109,8 +106,8 @@ export default function Dashboard() {
 
       {/* Recent Transactions */}
       <Card>
-        <CardHeader>
-          <CardTitle>Transactions récentes</CardTitle>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg">Transactions récentes</CardTitle>
         </CardHeader>
         <CardContent>
           {statsLoading ? (

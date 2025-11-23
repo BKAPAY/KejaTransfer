@@ -1,108 +1,97 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import type { User } from "@shared/schema";
 import { Skeleton } from "@/components/ui/skeleton";
-import { User as UserIcon, Mail, Calendar } from "lucide-react";
+import { User as UserIcon, Mail, Calendar, Lock } from "lucide-react";
 
 export default function Profile() {
   const { data: user, isLoading } = useQuery<User>({
     queryKey: ["/api/auth/me"],
   });
 
-  const formatAmount = (amount: number) => {
-    return new Intl.NumberFormat("fr-FR", {
-      style: "currency",
-      currency: "XOF",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
-
   return (
-    <div className="space-y-8">
+    <div className="space-y-4">
       <div>
-        <h1 className="text-3xl font-bold text-foreground mb-2">Profil</h1>
-        <p className="text-muted-foreground">Gérez les informations de votre compte</p>
+        <h1 className="text-2xl font-bold text-foreground mb-1">Profil</h1>
+        <p className="text-sm text-muted-foreground">Gérez votre compte</p>
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Informations personnelles</CardTitle>
-          <CardDescription>Vos informations de compte BKApay</CardDescription>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg">Informations personnelles</CardTitle>
+          <CardDescription className="text-xs">Vos informations BKApay</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-4">
           {isLoading ? (
-            <div className="space-y-4">
-              {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="space-y-2">
-                  <Skeleton className="h-4 w-24" />
-                  <Skeleton className="h-10 w-full" />
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="space-y-1">
+                  <Skeleton className="h-3 w-20" />
+                  <Skeleton className="h-8 w-full" />
                 </div>
               ))}
             </div>
           ) : user ? (
             <>
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-                  <UserIcon className="w-8 h-8 text-primary" />
+              <div className="flex items-center gap-3 pb-3">
+                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <UserIcon className="w-6 h-6 text-primary" />
                 </div>
-                <div>
-                  <h2 className="text-xl font-semibold" data-testid="user-name">
+                <div className="min-w-0">
+                  <h2 className="text-sm font-semibold" data-testid="user-name">
                     {user.firstName} {user.lastName}
                   </h2>
-                  <p className="text-sm text-muted-foreground" data-testid="user-email">
+                  <p className="text-xs text-muted-foreground truncate" data-testid="user-email">
                     {user.email}
                   </p>
                 </div>
               </div>
 
-              <div className="grid md:grid-cols-2 gap-6 pt-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-muted-foreground">Prénom</label>
-                  <div className="flex items-center gap-3 p-3 bg-muted rounded-md">
-                    <UserIcon className="w-4 h-4 text-muted-foreground" />
-                    <span>{user.firstName}</span>
+              <div className="grid md:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">Prénom</label>
+                  <div className="flex items-center gap-2 p-2 bg-muted rounded-md text-sm">
+                    {user.firstName}
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-muted-foreground">Nom</label>
-                  <div className="flex items-center gap-3 p-3 bg-muted rounded-md">
-                    <UserIcon className="w-4 h-4 text-muted-foreground" />
-                    <span>{user.lastName}</span>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">Nom</label>
+                  <div className="flex items-center gap-2 p-2 bg-muted rounded-md text-sm">
+                    {user.lastName}
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-muted-foreground">Email</label>
-                  <div className="flex items-center gap-3 p-3 bg-muted rounded-md">
-                    <Mail className="w-4 h-4 text-muted-foreground" />
-                    <span>{user.email}</span>
+                <div className="space-y-1 md:col-span-2">
+                  <label className="text-xs font-medium text-muted-foreground">Email</label>
+                  <div className="flex items-center gap-2 p-2 bg-muted rounded-md text-sm truncate">
+                    {user.email}
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-muted-foreground">Membre depuis</label>
-                  <div className="flex items-center gap-3 p-3 bg-muted rounded-md">
-                    <Calendar className="w-4 h-4 text-muted-foreground" />
-                    <span>
-                      {new Date(user.createdAt).toLocaleDateString("fr-FR", {
-                        year: "numeric",
-                        month: "long",
-                        day: "numeric",
-                      })}
-                    </span>
+                <div className="space-y-1 md:col-span-2">
+                  <label className="text-xs font-medium text-muted-foreground">Membre depuis</label>
+                  <div className="flex items-center gap-2 p-2 bg-muted rounded-md text-sm">
+                    {new Date(user.createdAt).toLocaleDateString("fr-FR", {
+                      year: "numeric",
+                      month: "short",
+                      day: "numeric",
+                    })}
                   </div>
                 </div>
               </div>
 
-              <div className="pt-4 border-t">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-muted-foreground">Solde du compte</label>
-                  <div className="text-3xl font-bold text-primary" data-testid="user-balance">
-                    {formatAmount(user.balance)}
-                  </div>
-                </div>
+              <div className="pt-2 border-t">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="w-full"
+                  data-testid="button-change-password"
+                >
+                  <Lock className="w-4 h-4 mr-2" />
+                  Modifier le mot de passe
+                </Button>
               </div>
             </>
           ) : null}

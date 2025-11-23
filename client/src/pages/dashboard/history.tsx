@@ -61,17 +61,17 @@ export default function History() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4">
       <div>
-        <h1 className="text-3xl font-bold text-foreground mb-2">Historique des transactions</h1>
-        <p className="text-muted-foreground">
-          Consultez toutes vos transactions passées
+        <h1 className="text-2xl font-bold text-foreground mb-1">Historique</h1>
+        <p className="text-sm text-muted-foreground">
+          Toutes vos transactions
         </p>
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Toutes les transactions</CardTitle>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg">Transactions</CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (

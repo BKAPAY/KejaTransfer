@@ -122,13 +122,13 @@ export default function Analytics() {
   }));
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4">
       <div>
-        <h1 className="text-3xl font-bold text-foreground mb-2">Analytics</h1>
-        <p className="text-muted-foreground">Rapports détaillés et insights sur vos transactions</p>
+        <h1 className="text-2xl font-bold text-foreground mb-1">Analytics</h1>
+        <p className="text-sm text-muted-foreground">Rapports et insights</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <Card>
           <CardHeader>
             <CardTitle className="text-sm font-medium">Revenus Totaux</CardTitle>

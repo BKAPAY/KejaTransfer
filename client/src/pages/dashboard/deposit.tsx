@@ -65,20 +65,20 @@ export default function Deposit() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4">
       <div>
-        <h1 className="text-3xl font-bold text-foreground mb-2 flex items-center gap-2">
-          <ArrowDownToLine className="h-8 w-8" />
-          Effectuer un dépôt
+        <h1 className="text-2xl font-bold text-foreground mb-1 flex items-center gap-2">
+          <ArrowDownToLine className="h-5 w-5" />
+          Dépôt
         </h1>
-        <p className="text-muted-foreground">
-          Ajoutez des fonds à votre compte via mobile money
+        <p className="text-sm text-muted-foreground">
+          Ajoutez des fonds via mobile money
         </p>
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Détails du dépôt</CardTitle>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg">Détails</CardTitle>
         </CardHeader>
         <CardContent>
           <Form {...form}>

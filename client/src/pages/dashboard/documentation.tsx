@@ -438,18 +438,18 @@ async function fetchWithRetry(url, options, maxRetries = 3) {
 // - Faire tourner les clés régulièrement`;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4">
       <div>
-        <h1 className="text-3xl font-bold text-foreground mb-2">Documentation Complète BKApay</h1>
-        <p className="text-muted-foreground">Guide complet d'intégration des paiements - Du début à la fin</p>
+        <h1 className="text-2xl font-bold text-foreground mb-1">Documentation API BKApay</h1>
+        <p className="text-sm text-muted-foreground">Guide complet - Du début à la fin</p>
       </div>
 
       {/* Overview */}
       <Card className="border-primary/20 bg-primary/5">
-        <CardHeader>
-          <CardTitle className="text-2xl">🎯 Vue d'ensemble générale</CardTitle>
+        <CardHeader className="pb-2">
+          <CardTitle>Vue d'ensemble</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-3 text-sm">
           <p className="text-sm text-muted-foreground">
             BKApay offre une plateforme complète de paiement pour l'Afrique de l'Ouest. Vous pouvez:
           </p>
@@ -478,13 +478,13 @@ async function fetchWithRetry(url, options, maxRetries = 3) {
 
       {/* Authentication */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-2xl flex items-center gap-2">
-            <Shield className="w-6 h-6" />
-            Authentification API (3 méthodes)
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="w-5 h-5" />
+            Authentification API
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-8">
+        <CardContent className="space-y-4 text-sm">
           <div>
             <h3 className="font-semibold text-lg mb-4">Comment ça marche?</h3>
             <p className="text-sm text-muted-foreground mb-4">
@@ -589,13 +589,13 @@ async function fetchWithRetry(url, options, maxRetries = 3) {
 
       {/* PAY-IN Section */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-2xl flex items-center gap-2">
-            <ArrowDown className="w-6 h-6 text-green-600" />
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2">
+            <ArrowDown className="w-5 h-5 text-green-600" />
             PAY-IN: Collecte de Paiements
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-4 text-sm">
           <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-4">
             <p className="text-sm text-green-900 dark:text-green-100">
               <span className="font-bold">PAY-IN</span> signifie que vos clients payent VERS vous. L'argent arrive sur votre dashboard BKApay.
@@ -675,13 +675,13 @@ async function fetchWithRetry(url, options, maxRetries = 3) {
 
       {/* PAY-OUT Section */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-2xl flex items-center gap-2">
-            <ArrowUp className="w-6 h-6 text-blue-600" />
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2">
+            <ArrowUp className="w-5 h-5 text-blue-600" />
             PAY-OUT: Transferts et Retraits
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-4 text-sm">
           <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
             <p className="text-sm text-blue-900 dark:text-blue-100">
               <span className="font-bold">PAY-OUT</span> signifie envoyer de l'argent DEPUIS vous vers vos clients. Débité de votre solde BKApay.
@@ -739,10 +739,10 @@ async function fetchWithRetry(url, options, maxRetries = 3) {
 
       {/* Webhooks */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-2xl">🔔 Webhooks: Notifications en Temps Réel</CardTitle>
+        <CardHeader className="pb-2">
+          <CardTitle>Webhooks: Notifications en Temps Réel</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-4 text-sm">
           <p className="text-sm text-muted-foreground">
             Les webhooks permettent à BKApay de vous notifier en temps réel quand un paiement ou transfert est complété.
           </p>
@@ -800,10 +800,10 @@ async function fetchWithRetry(url, options, maxRetries = 3) {
 
       {/* Error Handling */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-2xl">⚠️ Gestion des Erreurs</CardTitle>
+        <CardHeader className="pb-2">
+          <CardTitle>Gestion des Erreurs</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-3 text-sm">
           <div className="bg-gray-950 dark:bg-gray-900 text-gray-100 p-3 rounded font-mono text-xs overflow-x-auto">
             <pre>{errorHandlingCode}</pre>
           </div>
@@ -821,10 +821,10 @@ async function fetchWithRetry(url, options, maxRetries = 3) {
 
       {/* Limits and Security */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-2xl">🔒 Limites, Montants et Sécurité</CardTitle>
+        <CardHeader className="pb-2">
+          <CardTitle>Limites et Sécurité</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="text-sm">
           <div className="bg-gray-950 dark:bg-gray-900 text-gray-100 p-3 rounded font-mono text-xs overflow-x-auto">
             <pre>{limitsCode}</pre>
           </div>
@@ -842,10 +842,10 @@ async function fetchWithRetry(url, options, maxRetries = 3) {
 
       {/* Summary */}
       <Card className="bg-primary/5 border-primary/20">
-        <CardHeader>
-          <CardTitle className="text-2xl">📋 Résumé Complet</CardTitle>
+        <CardHeader className="pb-2">
+          <CardTitle>Résumé Complet</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4 text-sm">
+        <CardContent className="space-y-3 text-sm">
           <div className="space-y-2">
             <p className="font-bold text-foreground">✅ Vous avez appris:</p>
             <ul className="text-muted-foreground space-y-1 ml-4">

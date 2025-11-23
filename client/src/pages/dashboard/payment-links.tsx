@@ -264,11 +264,11 @@ export default function PaymentLinks() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between gap-4 flex-wrap mb-6">
+      <div className="flex items-center justify-between gap-2 flex-wrap mb-4">
         <div>
-          <h1 className="text-3xl font-bold text-foreground mb-2">Liens de paiement</h1>
-          <p className="text-muted-foreground">
-            Créez des liens pour vos produits et partagez-les avec vos clients
+          <h1 className="text-2xl font-bold text-foreground mb-1">Liens de paiement</h1>
+          <p className="text-sm text-muted-foreground">
+            Montant fixe - partagez vos liens
           </p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

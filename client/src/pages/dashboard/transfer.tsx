@@ -88,21 +88,21 @@ export default function Transfer() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4">
       <div>
-        <h1 className="text-3xl font-bold text-foreground mb-2 flex items-center gap-2">
-          <ArrowUpFromLine className="h-8 w-8" />
-          Transférer de l'argent
+        <h1 className="text-2xl font-bold text-foreground mb-1 flex items-center gap-2">
+          <ArrowUpFromLine className="h-5 w-5" />
+          Transférer
         </h1>
-        <p className="text-muted-foreground">
-          Envoyez de l'argent vers un compte mobile money
+        <p className="text-sm text-muted-foreground">
+          Envoyez de l'argent via mobile money
         </p>
       </div>
 
       {user && (
-        <Alert>
-          <AlertDescription>
-            <strong>Solde disponible:</strong> {new Intl.NumberFormat("fr-FR", {
+        <Alert className="py-2">
+          <AlertDescription className="text-xs">
+            <strong>Solde:</strong> {new Intl.NumberFormat("fr-FR", {
               style: "currency",
               currency: "XOF",
               minimumFractionDigits: 0,
@@ -112,8 +112,8 @@ export default function Transfer() {
       )}
 
       <Card>
-        <CardHeader>
-          <CardTitle>Détails du transfert</CardTitle>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg">Détails</CardTitle>
         </CardHeader>
         <CardContent>
           <Form {...form}>
