@@ -30,6 +30,7 @@ type ApiKeyFormData = z.infer<typeof apiKeySchema>;
 export default function ApiPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [visibleKeys, setVisibleKeys] = useState<Record<string, boolean>>({});
+  const [selectedKeyForExample, setSelectedKeyForExample] = useState<string | null>(null);
   const { toast } = useToast();
 
   const { data: apiKeys, isLoading } = useQuery<ApiKey[]>({
@@ -107,11 +108,47 @@ export default function ApiPage() {
 
   return (
     <div className="flex flex-col h-full">
+      {/* Information Panel */}
+      <Card className="mb-6 bg-primary/5 border-primary/20">
+        <CardHeader>
+          <CardTitle className="text-lg">Comment utiliser vos clés API?</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <h4 className="font-semibold text-sm mb-2">🔑 Clé Publique (pk_live_xxxxx)</h4>
+            <p className="text-sm text-muted-foreground mb-2">
+              À utiliser dans votre frontend ou applications publiques. Utilisez-la pour créer des paiements:
+            </p>
+            <code className="text-xs bg-background p-2 rounded block overflow-x-auto mb-2">
+              {`fetch('https://bkapay.app/api/payments/create', {
+  method: 'POST',
+  body: JSON.stringify({
+    publicKey: 'pk_live_xxxxx',
+    amount: 50000,
+    customerName: 'Jean',
+    ...
+  })
+})`}
+            </code>
+          </div>
+          <div>
+            <h4 className="font-semibold text-sm mb-2">🔒 Clé Privée (sk_live_xxxxx)</h4>
+            <p className="text-sm text-muted-foreground mb-2">
+              À utiliser UNIQUEMENT dans votre backend. Jamais dans le frontend!
+            </p>
+            <code className="text-xs bg-background p-2 rounded block overflow-x-auto">
+              {`Authorization: Bearer sk_live_xxxxx
+X-API-Key: sk_live_xxxxx`}
+            </code>
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="flex items-center justify-between gap-4 flex-wrap mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-foreground mb-2">API Gateway</h1>
+          <h1 className="text-3xl font-bold text-foreground mb-2">Clés API</h1>
           <p className="text-muted-foreground">
-            Gérez vos clés API pour intégrer BKApay dans vos applications
+            Gérez vos clés pour intégrer BKApay dans vos applications
           </p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -202,7 +239,10 @@ export default function ApiPage() {
               <CardContent className="space-y-4">
                 {/* Public Key */}
                 <div>
-                  <label className="text-sm font-medium mb-2 block">Clé publique</label>
+                  <div className="flex items-center gap-2 mb-2">
+                    <label className="text-sm font-medium">Clé publique (Frontend)</label>
+                    <Badge variant="outline" className="text-xs">Public</Badge>
+                  </div>
                   <div className="flex items-center gap-2 p-3 bg-muted rounded-md">
                     <code className="flex-1 text-sm font-mono truncate">
                       {visibleKeys[apiKey.id + '-public'] ? apiKey.publicKey : maskKey(apiKey.publicKey)}
@@ -228,11 +268,17 @@ export default function ApiPage() {
                       <Copy className="w-4 h-4" />
                     </Button>
                   </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Pour les paiements côté client: fetch('/api/payments/create', {'{publicKey: ..}'})
+                  </p>
                 </div>
 
                 {/* Private Key */}
                 <div>
-                  <label className="text-sm font-medium mb-2 block">Clé privée</label>
+                  <div className="flex items-center gap-2 mb-2">
+                    <label className="text-sm font-medium">Clé privée (Backend)</label>
+                    <Badge variant="destructive" className="text-xs">Secret</Badge>
+                  </div>
                   <div className="flex items-center gap-2 p-3 bg-muted rounded-md">
                     <code className="flex-1 text-sm font-mono truncate">
                       {visibleKeys[apiKey.id + '-private'] ? apiKey.privateKey : maskKey(apiKey.privateKey)}
@@ -258,6 +304,9 @@ export default function ApiPage() {
                       <Copy className="w-4 h-4" />
                     </Button>
                   </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Pour le backend: Authorization: Bearer sk_... Gardez cette clé secrète!
+                  </p>
                 </div>
 
                 <div className="flex justify-end pt-2">

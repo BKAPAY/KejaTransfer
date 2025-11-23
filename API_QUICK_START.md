@@ -5,30 +5,36 @@ Intégrez les paiements mobile money en moins de 5 minutes!
 ## 1. Créer une clé API
 
 1. Connectez-vous à [bkapay.app](https://bkapay.app)
-2. Allez à **Paramètres** > **Clés API**
-3. Cliquez **Générer une nouvelle clé**
-4. Donnez-lui un nom (ex: "Mon Site Web")
-5. Copiez votre clé **publique** (pk_live_xxxxx)
+2. Allez à **Tableau de Bord** > **Clés API**
+3. Cliquez **Nouvelle clé API**
+4. Donnez-lui un nom (ex: "Mon Site Web", "Application Mobile", etc.)
+5. Vous recevrez deux clés:
+   - **Clé Publique (pk_live_xxxxx):** Pour votre frontend ✅
+   - **Clé Privée (sk_live_xxxxx):** Pour votre backend 🔒
 
-⚠️ **Important:** Gardez votre clé **privée** sécurisée!
+⚠️ **ATTENTION:**
+- La clé privée n'apparaît qu'une SEULE fois. Copiez-la immédiatement!
+- Gardez votre clé privée sécurisée (ne l'exposez JAMAIS au frontend)
+- Stockez-la en variable d'environnement: `BKAPAY_SECRET_KEY=sk_live_xxxxx`
 
 ---
 
 ## 2. Intégration minimale (1 minute)
 
-### HTML + JavaScript
+### HTML + JavaScript (Utiliser la clé PUBLIQUE)
 ```html
 <button id="payButton">Payer 50 000 XOF</button>
 
 <script>
-  const publicKey = 'pk_live_xxxxx'; // Votre clé publique
+  // 🔑 Utilisez la clé PUBLIQUE au frontend
+  const publicKey = 'pk_live_xxxxx'; // EXPOSÉE au frontend - c'est normal!
 
   document.getElementById('payButton').addEventListener('click', async () => {
     const response = await fetch('https://bkapay.app/api/payments/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        publicKey,
+        publicKey,  // ✅ Clé publique
         amount: 50000,
         description: 'Mon premier paiement',
         customerName: 'Jean Dupont',
@@ -40,18 +46,59 @@ Intégrez les paiements mobile money en moins de 5 minutes!
     });
 
     const { data } = await response.json();
-    window.location.href = data.redirectUrl;
+    if (data.redirectUrl) {
+      window.location.href = data.redirectUrl;
+    }
   });
 </script>
 ```
 
+### Alternative: Utiliser le header Authorization
+```javascript
+// Même résultat avec Authorization header
+const response = await fetch('https://bkapay.app/api/payments/create', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer pk_live_xxxxx'  // ✅ Header Bearer
+  },
+  body: JSON.stringify({
+    amount: 50000,
+    description: 'Mon premier paiement',
+    customerName: 'Jean Dupont',
+    customerEmail: 'jean@example.com',
+    customerPhone: '+221781234567',
+    country: 'SN',
+    operator: 'orange'
+  })
+});
+```
+
 ---
 
-## 3. Traiter un paiement (Backend)
+## 3. Traiter un paiement (Backend avec clé PRIVÉE)
 
 ### Node.js + Express
 ```javascript
-app.post('/api/webhook', (req, res) => {
+// ✅ Utilisez la clé PRIVÉE au backend UNIQUEMENT
+const BKAPAY_SECRET_KEY = process.env.BKAPAY_SECRET_KEY; // sk_live_xxxxx
+
+// Récupérer le statut d'un paiement
+app.get('/api/check-payment/:transactionId', (req, res) => {
+  fetch('https://bkapay.app/api/transactions', {
+    headers: {
+      'Authorization': `Bearer ${BKAPAY_SECRET_KEY}` // 🔒 Header avec clé secrète
+    }
+  })
+  .then(r => r.json())
+  .then(data => {
+    const transaction = data.data.find(t => t.id === req.params.transactionId);
+    res.json(transaction);
+  });
+});
+
+// Webhook pour les notifications BKApay
+app.post('/webhook/bkapay', (req, res) => {
   const { event, data } = req.body;
 
   if (event === 'payment.completed') {
@@ -63,6 +110,32 @@ app.post('/api/webhook', (req, res) => {
     console.log(`${amount} XOF reçu de ${customerEmail}`);
   }
 
+  res.json({ success: true });
+});
+```
+
+### Vérifier la signature du webhook
+```javascript
+import crypto from 'crypto';
+
+function verifyWebhookSignature(payload, signature, secret) {
+  const hash = crypto
+    .createHmac('sha256', secret)
+    .update(JSON.stringify(payload))
+    .digest('hex');
+  
+  return hash === signature;
+}
+
+app.post('/webhook/bkapay', (req, res) => {
+  const signature = req.headers['x-webhook-signature'];
+  
+  if (!verifyWebhookSignature(req.body, signature, BKAPAY_SECRET_KEY)) {
+    return res.status(401).json({ error: 'Invalid signature' });
+  }
+  
+  // Traiter le webhook en confiance
+  console.log('Webhook sécurisé reçu:', req.body);
   res.json({ success: true });
 });
 ```

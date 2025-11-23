@@ -8,25 +8,75 @@ BKApay est une plateforme de paiement mobile money pour l'Afrique de l'Ouest. Ce
 
 ## Authentification
 
-### Par clé API (Recommandé pour les intégrations)
+BKApay supporte **3 méthodes d'authentification**:
 
-Toutes les requêtes d'API qui nécessitent l'authentification doivent inclure votre clé API dans le header:
+### 1️⃣ Clé Publique (Frontend - Pour les paiements)
 
+**Utilisation:** Intégration des paiements côté client (JavaScript, React, Vue, etc.)
+
+**Format:**
+```bash
+curl -X POST https://bkapay.app/api/payments/create \
+  -H "Content-Type: application/json" \
+  -d '{
+    "publicKey": "pk_live_xxxxx",
+    "amount": 50000,
+    ...
+  }'
 ```
-Authorization: Bearer YOUR_PUBLIC_KEY
-```
 
-Ou en paramètre POST:
-
+Ou dans le body JSON:
 ```json
 {
-  "publicKey": "pk_live_xxxxx"
+  "publicKey": "pk_live_xxxxx",
+  "amount": 50000,
+  "description": "Mon paiement",
+  ...
 }
 ```
 
-### Par session (Pour les applications front-end)
+⚠️ **Important:** La clé publique peut être exposée au frontend (nom explicite: PUBLIC)
 
-Les applications web peuvent utiliser les sessions. Une fois connecté, les cookies de session gèrent automatiquement l'authentification.
+### 2️⃣ Clé Privée (Backend - Pour les opérations sensibles)
+
+**Utilisation:** Seulement côté backend pour les opérations sécurisées
+
+**Format - Header:**
+```bash
+curl https://bkapay.app/api/transactions \
+  -H "Authorization: Bearer sk_live_xxxxx"
+```
+
+**Format - Alternative:**
+```bash
+curl https://bkapay.app/api/transactions \
+  -H "X-API-Key: sk_live_xxxxx"
+```
+
+🔒 **CRITIQUE:** Gardez votre clé privée secrète! Ne l'exposez JAMAIS au frontend!
+
+### 3️⃣ Session (Frontend - Pour l'authentification utilisateur)
+
+**Utilisation:** Applications web avec authentification utilisateur
+
+Une fois connecté via `/api/auth/login`, les cookies de session gèrent automatiquement l'authentification:
+
+```bash
+curl https://bkapay.app/api/dashboard/stats \
+  -H "Cookie: connect.sid=s%3A..."
+```
+
+Les requêtes suivantes envoyront automatiquement le cookie de session.
+
+## Tableau comparatif des authentifications
+
+| Méthode | Clé Publique | Clé Privée | Session |
+|---------|-------------|-----------|---------|
+| **Sécurité** | Frontend OK ✅ | Backend Only 🔒 | Web Apps ✅ |
+| **Exposition** | Peut être visible | Doit rester secrète | Automatique (cookie) |
+| **Cas d'usage** | Paiements clients | Backend operations | Web dashboard |
+| **Endpoints** | `/payments/create` | `/transactions`, etc. | `/dashboard/stats` |
+| **Format** | Body JSON | Header Bearer | Cookie HTTP |
 
 ## Codes d'erreur
 
@@ -134,9 +184,16 @@ Requires: Session authentifiée
 
 ---
 
-## 2. CLÉS API
+## 2. GESTION DES CLÉS API
 
-Les clés API permettent aux développeurs d'intégrer les paiements dans leurs applications.
+Les clés API permettent aux développeurs d'intégrer les paiements dans leurs applications. Chaque clé a **deux composantes**:
+
+### 🔑 Structure d'une clé API
+
+```
+Clé Publique: pk_live_xxxxx   → Utilisez au FRONTEND
+Clé Privée:   sk_live_xxxxx   → Gardez au BACKEND UNIQUEMENT
+```
 
 ### Lister les clés API
 **GET** `/api-keys`
@@ -157,6 +214,7 @@ curl https://bkapay.app/api/api-keys \
       "id": "uuid",
       "name": "Production API Key",
       "publicKey": "pk_live_xxxxx",
+      "privateKey": "sk_live_xxxxx",
       "isActive": true,
       "createdAt": "2025-01-15T10:30:00Z"
     }
@@ -178,7 +236,7 @@ curl -X POST https://bkapay.app/api/api-keys \
   }'
 ```
 
-**Réponse:**
+**Réponse:** ⚠️ **IMPORTANT: Cette clé privée n'apparaitra qu'une seule fois. Copie-la maintenant!**
 ```json
 {
   "success": true,
@@ -197,6 +255,26 @@ curl -X POST https://bkapay.app/api/api-keys \
 **DELETE** `/api-keys/:id`
 
 Requires: Session authentifiée
+
+⚠️ **Attention:** Cette action est irréversible! Assurez-vous que votre application n'utilise plus cette clé.
+
+---
+
+### 📋 Bonnes pratiques
+
+✅ **À FAIRE:**
+- Créer une clé par environnement (dev, staging, production)
+- Stocker la clé privée en variable d'environnement backend
+- Utiliser UNIQUEMENT la clé publique au frontend
+- Régulièrement vérifier les clés inutilisées
+- Avoir un plan de rotation des clés
+
+❌ **À NE PAS FAIRE:**
+- Commiter la clé privée dans Git
+- Exposer la clé privée au frontend
+- Utiliser la même clé pour tous les environnements
+- Partager les clés entre développeurs (créer une par personne)
+- Ignorer les alertes de sécurité BKApay
 
 ---
 
