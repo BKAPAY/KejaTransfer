@@ -61,7 +61,6 @@ export default function PaymentStatus() {
           <CardContent className="pt-8 pb-8 flex flex-col items-center text-center space-y-4">
             <img src={logoImage} alt="BKApay" className="h-10 w-auto" />
             <p className="text-muted-foreground">Transaction non trouvée</p>
-            <Button className="w-full" onClick={() => setLocation("/")}> Retour à l'accueil</Button>
           </CardContent>
         </Card>
       </div>
@@ -94,10 +93,6 @@ export default function PaymentStatus() {
                 <span className="font-mono text-sm text-foreground">{transaction.id.substring(0, 8)}</span>
               </div>
             </div>
-
-            <Button className="w-full" size="lg" onClick={() => setLocation("/")}>
-              Retour à l'accueil
-            </Button>
           </CardContent>
         </Card>
       </div>
@@ -131,14 +126,9 @@ export default function PaymentStatus() {
               </div>
             </div>
 
-            <div className="space-y-2 w-full">
-              <Button className="w-full" size="lg" onClick={() => setLocation("/")}>
-                Retour à l'accueil
-              </Button>
-              <Button variant="outline" className="w-full" onClick={() => window.history.back()}>
-                Réessayer
-              </Button>
-            </div>
+            <Button variant="outline" className="w-full" onClick={() => window.history.back()}>
+              Réessayer
+            </Button>
           </CardContent>
         </Card>
       </div>
