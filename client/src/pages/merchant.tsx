@@ -51,12 +51,21 @@ export default function Merchant() {
   const paymentMutation = useMutation({
     mutationFn: async (data: MerchantPaymentFormData) => {
       const res = await apiRequest("POST", `/api/merchant-payments/process/${token}`, data);
-      return await res.json();
+      const jsonData = await res.json();
+      console.log("Merchant payment response:", jsonData);
+      return jsonData;
     },
     onSuccess: (data: any) => {
-      if (data.transactionId) {
-        setLocation(`/payment-status/${data.transactionId}`);
+      console.log("Merchant payment success, data:", data);
+      if (data?.transactionId) {
+        console.log("Redirecting to:", `/payment-status/${data.transactionId}`);
+        window.location.href = `/payment-status/${data.transactionId}`;
+      } else {
+        console.error("No transactionId in response:", data);
       }
+    },
+    onError: (error: any) => {
+      console.error("Merchant payment mutation error:", error);
     },
   });
 

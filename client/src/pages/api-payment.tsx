@@ -47,11 +47,11 @@ export default function ApiPayment() {
 
       if (data.transactionId) {
         // Redirect to payment status page - will show loading, then success or error
-        setLocation(`/payment-status/${data.transactionId}`);
+        window.location.href = `/payment-status/${data.transactionId}`;
       }
     } catch (err: any) {
       // Silently fail - redirect to status page which will show error
-      setLocation(`/payment-status/${transactionId}`);
+      window.location.href = `/payment-status/${transactionId}`;
     } finally {
       setIsLoading(false);
     }

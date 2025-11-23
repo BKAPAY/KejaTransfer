@@ -49,16 +49,26 @@ export default function Pay() {
   const paymentMutation = useMutation({
     mutationFn: async (data: PaymentFormData) => {
       const res = await apiRequest("POST", `/api/payments/process/${token}`, data);
-      return await res.json();
+      const jsonData = await res.json();
+      console.log("Payment response:", jsonData);
+      return jsonData;
     },
     onSuccess: (data: any) => {
-      if (data.transactionId) {
-        setLocation(`/payment-status/${data.transactionId}`);
+      console.log("Payment success, data:", data);
+      if (data?.transactionId) {
+        console.log("Redirecting to:", `/payment-status/${data.transactionId}`);
+        window.location.href = `/payment-status/${data.transactionId}`;
+      } else {
+        console.error("No transactionId in response:", data);
       }
+    },
+    onError: (error: any) => {
+      console.error("Payment mutation error:", error);
     },
   });
 
   const onSubmit = (data: PaymentFormData) => {
+    console.log("Form submitted with data:", data);
     paymentMutation.mutate(data);
   };
 
@@ -257,6 +267,7 @@ export default function Pay() {
               >
                 {paymentMutation.isPending ? "Traitement..." : `Payer ${formatAmount(paymentLink.amount)}`}
               </Button>
+
             </form>
           </Form>
 
