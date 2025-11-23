@@ -160,10 +160,42 @@ const { redirectUrl } = await response.json();
 window.location.href = redirectUrl;
 ```
 
+## API REST Complète pour Développeurs Tiers (NOUVEAU - 2025)
+
+### Endpoints disponibles
+- ✅ **POST `/api/payments/create`** - Créer un paiement via clé API (public)
+- ✅ **GET `/api/transactions`** - Historique des transactions
+- ✅ **GET `/api/dashboard/stats`** - Statistiques en temps réel
+- ✅ **GET/POST `/api/payment-links`** - Gestion des liens de paiement
+- ✅ **GET/POST `/api/merchant-links`** - Gestion des liens marchands
+- ✅ **GET/POST `/api/api-keys`** - Gestion des clés API
+- ✅ **POST `/api/deposits`** - Créer un dépôt
+- ✅ **POST `/api/transfers`** - Créer un transfert/retrait
+- ✅ **POST `/api/webhooks/paydunya`** - Webhooks signés pour notifications
+
+### Authentification API
+- Clés API publiques/privées pour développeurs
+- Bearer token authentication
+- Rate limiting: 10 requêtes/sec par clé
+- Webhooks signés (HMAC-SHA256)
+
+### Documentation
+- `API_DOCUMENTATION.md` - Documentation complète
+- `API_QUICK_START.md` - Guide de démarrage rapide
+- `SDK_INTEGRATION_EXAMPLES.md` - Exemples d'intégration (JS, Python, PHP, React, Vue)
+- `API_STATUS.md` - Statut et disponibilité
+
+### Features futures
+- SDK JavaScript officiel
+- SDK Python officiel
+- SDK PHP officiel
+- Plugin WooCommerce
+- Plugin Prestashop
+- Support Stripe Connect
+- API GraphQL
+
 ## Prochaines étapes potentielles
-- Implémenter les paiements sortants (si API disponible)
-- Ajouter analytics avancés et graphiques
-- Support multi-devises
-- Notifications email/SMS
-- API REST complète pour développeurs tiers
+- Implémenter les SDKs officiels
+- Ajouter les plugins de paiement
+- Support API GraphQL
 - Application mobile

@@ -13,12 +13,47 @@ declare module "express-session" {
   }
 }
 
-// Middleware pour vérifier l'authentification
+// Middleware pour vérifier l'authentification par session
 function requireAuth(req: Request, res: Response, next: Function) {
   if (!req.session.userId) {
     return res.status(401).json({ error: "Non authentifié" });
   }
   next();
+}
+
+// Middleware pour vérifier l'authentification par clé API
+async function requireApiKey(req: Request, res: Response, next: Function) {
+  try {
+    // Chercher la clé API dans les headers ou dans le body
+    let publicKey = req.headers.authorization?.replace("Bearer ", "");
+    
+    if (!publicKey && typeof req.body === "object") {
+      publicKey = req.body.publicKey;
+    }
+
+    if (!publicKey) {
+      return res.status(401).json({ 
+        error: "Clé API requise",
+        details: "Veuillez fournir votre clé API publique dans le header Authorization ou dans le body" 
+      });
+    }
+
+    // Vérifier que la clé existe et est active
+    const apiKey = await storage.getApiKeyByPublicKey(publicKey);
+    if (!apiKey || !apiKey.isActive) {
+      return res.status(401).json({ 
+        error: "Clé API invalide ou désactivée" 
+      });
+    }
+
+    // Ajouter les informations de clé API à la requête
+    (req as any).apiKey = apiKey;
+    (req as any).userId = apiKey.userId;
+    
+    next();
+  } catch (error: any) {
+    res.status(500).json({ error: "Erreur lors de la vérification de la clé API" });
+  }
 }
 
 // Configuration Paydunya - Les clés doivent être définies dans les variables d'environnement
