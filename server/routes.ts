@@ -190,6 +190,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // KYC Submit
+  app.post("/api/kyc/submit", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { kycIdFront, kycIdBack, kycSelfie } = req.body;
+
+      if (!kycIdFront || !kycIdBack || !kycSelfie) {
+        return res.status(400).json({ error: "Tous les documents sont requis" });
+      }
+
+      // Validate base64 strings aren't too large (limit to 5MB per file)
+      const maxSize = 5 * 1024 * 1024;
+      if (kycIdFront.length > maxSize || kycIdBack.length > maxSize || kycSelfie.length > maxSize) {
+        return res.status(400).json({ error: "Les fichiers sont trop volumineux (max 5MB par fichier)" });
+      }
+
+      const user = await storage.submitKyc(req.session.userId!, {
+        kycIdFront,
+        kycIdBack,
+        kycSelfie,
+      });
+
+      if (!user) {
+        return res.status(404).json({ error: "Utilisateur non trouvé" });
+      }
+
+      const { password, ...userWithoutPassword } = user;
+      res.json(userWithoutPassword);
+    } catch (error: any) {
+      console.error("KYC submission error:", error);
+      res.status(500).json({ error: error.message || "Erreur lors de la soumission KYC" });
+    }
+  });
+
   // ===== Dashboard Stats =====
   
   app.get("/api/dashboard/stats", requireAuth, async (req: Request, res: Response) => {

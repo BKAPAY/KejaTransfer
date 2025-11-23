@@ -11,6 +11,10 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
   balance: integer("balance").notNull().default(0), // Balance in XOF
+  kycStatus: text("kyc_status").notNull().default("pending"), // "pending", "submitted", "verified", "rejected"
+  kycIdFront: text("kyc_id_front"), // Base64 encoded or URL
+  kycIdBack: text("kyc_id_back"), // Base64 encoded or URL
+  kycSelfie: text("kyc_selfie"), // Base64 encoded or URL
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -72,7 +76,17 @@ export const transactions = pgTable("transactions", {
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   balance: true,
+  kycStatus: true,
+  kycIdFront: true,
+  kycIdBack: true,
+  kycSelfie: true,
   createdAt: true,
+});
+
+export const submitKycSchema = z.object({
+  kycIdFront: z.string().min(1, "Photo recto requise"),
+  kycIdBack: z.string().min(1, "Photo verso requise"),
+  kycSelfie: z.string().min(1, "Selfie requis"),
 });
 
 export const insertPaymentLinkSchema = createInsertSchema(paymentLinks).omit({
