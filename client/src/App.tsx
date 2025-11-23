@@ -28,6 +28,7 @@ import Pay from "@/pages/pay";
 import Merchant from "@/pages/merchant";
 import ApiPayment from "@/pages/api-payment";
 import PaymentStatus from "@/pages/payment-status";
+import ApiDemo from "@/pages/api-demo";
 
 function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [location, setLocation] = useLocation();
@@ -111,6 +112,7 @@ function Router() {
       <Route path="/merchant/:token" component={Merchant} />
       <Route path="/api-payment/:transactionId" component={ApiPayment} />
       <Route path="/payment-status/:transactionId" component={PaymentStatus} />
+      <Route path="/demo/api-payment" component={ApiDemo} />
       <Route component={NotFound} />
     </Switch>
   );
