@@ -16,6 +16,12 @@ import waveImage from "@assets/wave (1)_1763835083242.png";
 import freeImage from "@assets/mixxByYas-web-page_1763835083140.png";
 import tmonyImage from "@assets/e-money_1763835083190.png";
 import wizallImage from "@assets/wizall_1763835083090.png";
+import paymentLinksImage from "@assets/generated_images/payment_links_feature_image.png";
+import merchantLinksImage from "@assets/generated_images/merchant_links_feature_image.png";
+import apiGatewayImage from "@assets/generated_images/api_gateway_feature_image.png";
+import dashboardImage from "@assets/generated_images/dashboard_analytics_feature_image.png";
+import securityImage from "@assets/generated_images/security_feature_image.png";
+import fastPaymentImage from "@assets/generated_images/fast_payment_processing_image.png";
 
 const countries = [
   { code: "BJ", name: "Bénin", flag: "🇧🇯" },
@@ -41,31 +47,37 @@ const features = [
     icon: LinkIcon,
     title: "Liens de Paiement",
     description: "Créez des liens personnalisés pour vos produits et services. Partagez-les facilement avec vos clients.",
+    image: paymentLinksImage,
   },
   {
     icon: CreditCard,
     title: "Liens Marchands",
     description: "Un lien unique pour votre entreprise. Vos clients choisissent le montant à payer.",
+    image: merchantLinksImage,
   },
   {
     icon: Code,
     title: "API Gateway",
     description: "Intégrez les paiements directement dans votre site web ou application avec notre API sécurisée.",
+    image: apiGatewayImage,
   },
   {
     icon: BarChart3,
     title: "Tableau de Bord",
     description: "Suivez vos transactions en temps réel avec des statistiques détaillées en XOF.",
+    image: dashboardImage,
   },
   {
     icon: Shield,
     title: "Sécurité Maximale",
     description: "Tous les paiements sont sécurisés et conformes aux normes de l'industrie.",
+    image: securityImage,
   },
   {
     icon: Zap,
     title: "Traitement Rapide",
     description: "Recevez vos paiements instantanément via mobile money dans toute l'Afrique de l'Ouest.",
+    image: fastPaymentImage,
   },
 ];
 
@@ -159,12 +171,19 @@ export default function Home() {
           </div>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6 lg:gap-8">
             {features.map((feature, index) => (
-              <Card key={index} className="p-3 sm:p-4 lg:p-8 hover-elevate">
-                <div className="bg-primary/10 w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 rounded-md flex items-center justify-center mb-2 sm:mb-3 lg:mb-4">
-                  <feature.icon className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 text-primary" />
+              <Card key={index} className="overflow-hidden hover-elevate flex flex-col h-full">
+                <img 
+                  src={feature.image} 
+                  alt={feature.title}
+                  className="w-full h-40 sm:h-48 object-cover"
+                />
+                <div className="p-3 sm:p-4 lg:p-6 flex flex-col flex-1">
+                  <div className="bg-primary/10 w-8 h-8 sm:w-10 sm:h-10 rounded-md flex items-center justify-center mb-2 sm:mb-3">
+                    <feature.icon className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
+                  </div>
+                  <h3 className="text-sm sm:text-base lg:text-lg font-semibold mb-1 sm:mb-2 text-foreground">{feature.title}</h3>
+                  <p className="text-xs sm:text-sm text-muted-foreground">{feature.description}</p>
                 </div>
-                <h3 className="text-sm sm:text-base lg:text-xl font-semibold mb-1 sm:mb-2 lg:mb-3 text-foreground">{feature.title}</h3>
-                <p className="text-xs sm:text-sm text-muted-foreground">{feature.description}</p>
               </Card>
             ))}
           </div>
