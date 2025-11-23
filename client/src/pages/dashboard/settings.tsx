@@ -4,43 +4,95 @@ import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { useState, useRef } from "react";
-import { Upload, CheckCircle2, Clock, AlertCircle } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { Video, Camera, CheckCircle2, Clock, AlertCircle, X } from "lucide-react";
 
 export default function Settings() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [idFrontFile, setIdFrontFile] = useState<File | null>(null);
-  const [idBackFile, setIdBackFile] = useState<File | null>(null);
-  const [selfieFile, setSelfieFile] = useState<File | null>(null);
-  const idFrontRef = useRef<HTMLInputElement>(null);
-  const idBackRef = useRef<HTMLInputElement>(null);
-  const selfieRef = useRef<HTMLInputElement>(null);
+  const [idFrontData, setIdFrontData] = useState<string | null>(null);
+  const [idBackData, setIdBackData] = useState<string | null>(null);
+  const [selfieData, setSelfieData] = useState<string | null>(null);
+  
+  const [activeCamera, setActiveCamera] = useState<"front" | "back" | "selfie" | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
-  const fileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
+  const startCamera = async (type: "front" | "back" | "selfie") => {
+    try {
+      setActiveCamera(type);
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: type === "selfie" ? "user" : "environment" },
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+    } catch (error: any) {
+      toast({
+        title: "Erreur",
+        description: "Impossible d'accéder à la caméra",
+        variant: "destructive",
+      });
+      setActiveCamera(null);
+    }
+  };
+
+  const capturePhoto = () => {
+    if (!videoRef.current || !canvasRef.current || !activeCamera) return;
+
+    const context = canvasRef.current.getContext("2d");
+    if (!context) return;
+
+    canvasRef.current.width = videoRef.current.videoWidth;
+    canvasRef.current.height = videoRef.current.videoHeight;
+    context.drawImage(videoRef.current, 0, 0);
+    
+    const imageData = canvasRef.current.toDataURL("image/jpeg");
+    
+    if (activeCamera === "front") setIdFrontData(imageData);
+    else if (activeCamera === "back") setIdBackData(imageData);
+    else if (activeCamera === "selfie") setSelfieData(imageData);
+
+    stopCamera();
+    toast({
+      title: "Photo capturée",
+      description: "Votre photo a été capturée avec succès",
     });
   };
 
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    setActiveCamera(null);
+  };
+
+  const resetCapture = (type: "front" | "back" | "selfie") => {
+    if (type === "front") setIdFrontData(null);
+    else if (type === "back") setIdBackData(null);
+    else if (type === "selfie") setSelfieData(null);
+  };
+
+  useEffect(() => {
+    return () => {
+      stopCamera();
+    };
+  }, []);
+
   const submitKycMutation = useMutation({
     mutationFn: async () => {
-      if (!idFrontFile || !idBackFile || !selfieFile) {
-        throw new Error("Tous les fichiers sont requis");
+      if (!idFrontData || !idBackData || !selfieData) {
+        throw new Error("Tous les documents sont requis");
       }
 
-      const kycIdFront = await fileToBase64(idFrontFile);
-      const kycIdBack = await fileToBase64(idBackFile);
-      const kycSelfie = await fileToBase64(selfieFile);
-
       await apiRequest("POST", "/api/kyc/submit", {
-        kycIdFront,
-        kycIdBack,
-        kycSelfie,
+        kycIdFront: idFrontData,
+        kycIdBack: idBackData,
+        kycSelfie: selfieData,
       });
     },
     onSuccess: () => {
@@ -48,12 +100,9 @@ export default function Settings() {
         title: "Vérification soumise",
         description: "Vos documents ont été envoyés pour vérification",
       });
-      setIdFrontFile(null);
-      setIdBackFile(null);
-      setSelfieFile(null);
-      if (idFrontRef.current) idFrontRef.current.value = "";
-      if (idBackRef.current) idBackRef.current.value = "";
-      if (selfieRef.current) selfieRef.current.value = "";
+      setIdFrontData(null);
+      setIdBackData(null);
+      setSelfieData(null);
       queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
     },
     onError: (error: any) => {
@@ -130,93 +179,144 @@ export default function Settings() {
             </div>
           ) : (
             <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">Veuillez fournir les documents suivants:</p>
-
-              <div className="space-y-3">
-                <div>
-                  <label className="text-sm font-medium text-foreground mb-2 block">
-                    Photo du recto de la pièce d'identité
-                  </label>
-                  <input
-                    ref={idFrontRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => setIdFrontFile(e.target.files?.[0] || null)}
-                    className="hidden"
-                    data-testid="input-kyc-id-front"
-                  />
-                  <button
-                    onClick={() => idFrontRef.current?.click()}
-                    className="w-full border-2 border-dashed border-border rounded-lg p-4 text-center hover:bg-muted transition-colors"
-                  >
-                    <Upload className="w-5 h-5 mx-auto mb-2 text-muted-foreground" />
-                    <p className="text-sm font-medium text-foreground">
-                      {idFrontFile ? idFrontFile.name : "Cliquez pour télécharger"}
-                    </p>
-                  </button>
+              {activeCamera ? (
+                <div className="space-y-3">
+                  <div className="relative w-full bg-black rounded-lg overflow-hidden">
+                    <video
+                      ref={videoRef}
+                      autoPlay
+                      playsInline
+                      className="w-full h-64 object-cover"
+                      data-testid="video-camera"
+                    />
+                  </div>
+                  <canvas ref={canvasRef} className="hidden" />
+                  
+                  <div className="flex gap-2">
+                    <Button
+                      className="flex-1"
+                      onClick={capturePhoto}
+                      data-testid="button-capture-photo"
+                    >
+                      <Camera className="w-4 h-4 mr-2" />
+                      Capturer
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={stopCamera}
+                      data-testid="button-cancel-camera"
+                    >
+                      Annuler
+                    </Button>
+                  </div>
                 </div>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">Veuillez fournir les documents suivants:</p>
 
-                <div>
-                  <label className="text-sm font-medium text-foreground mb-2 block">
-                    Photo du verso de la pièce d'identité
-                  </label>
-                  <input
-                    ref={idBackRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => setIdBackFile(e.target.files?.[0] || null)}
-                    className="hidden"
-                    data-testid="input-kyc-id-back"
-                  />
-                  <button
-                    onClick={() => idBackRef.current?.click()}
-                    className="w-full border-2 border-dashed border-border rounded-lg p-4 text-center hover:bg-muted transition-colors"
-                  >
-                    <Upload className="w-5 h-5 mx-auto mb-2 text-muted-foreground" />
-                    <p className="text-sm font-medium text-foreground">
-                      {idBackFile ? idBackFile.name : "Cliquez pour télécharger"}
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-sm font-medium text-foreground mb-2 block">
+                        Photo du recto de la pièce d'identité
+                      </label>
+                      {idFrontData ? (
+                        <div className="relative">
+                          <img src={idFrontData} alt="Recto" className="w-full h-40 object-cover rounded-lg" />
+                          <button
+                            onClick={() => resetCapture("front")}
+                            className="absolute top-2 right-2 p-1 bg-red-500 rounded-full text-white hover:bg-red-600"
+                            data-testid="button-remove-front"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          className="w-full"
+                          onClick={() => startCamera("front")}
+                          data-testid="button-camera-front"
+                        >
+                          <Video className="w-4 h-4 mr-2" />
+                          Prendre une photo
+                        </Button>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium text-foreground mb-2 block">
+                        Photo du verso de la pièce d'identité
+                      </label>
+                      {idBackData ? (
+                        <div className="relative">
+                          <img src={idBackData} alt="Verso" className="w-full h-40 object-cover rounded-lg" />
+                          <button
+                            onClick={() => resetCapture("back")}
+                            className="absolute top-2 right-2 p-1 bg-red-500 rounded-full text-white hover:bg-red-600"
+                            data-testid="button-remove-back"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          className="w-full"
+                          onClick={() => startCamera("back")}
+                          data-testid="button-camera-back"
+                        >
+                          <Video className="w-4 h-4 mr-2" />
+                          Prendre une photo
+                        </Button>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium text-foreground mb-2 block">
+                        Selfie en tenant votre pièce d'identité
+                      </label>
+                      {selfieData ? (
+                        <div className="relative">
+                          <img src={selfieData} alt="Selfie" className="w-full h-40 object-cover rounded-lg" />
+                          <button
+                            onClick={() => resetCapture("selfie")}
+                            className="absolute top-2 right-2 p-1 bg-red-500 rounded-full text-white hover:bg-red-600"
+                            data-testid="button-remove-selfie"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          className="w-full"
+                          onClick={() => startCamera("selfie")}
+                          data-testid="button-camera-selfie"
+                        >
+                          <Video className="w-4 h-4 mr-2" />
+                          Prendre une photo
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900 rounded-lg p-3">
+                    <p className="text-xs text-blue-900 dark:text-blue-200">
+                      ℹ️ Les documents acceptés: Passeport, Permis de conduire ou Pièce d'identité nationale.
                     </p>
-                  </button>
-                </div>
+                  </div>
 
-                <div>
-                  <label className="text-sm font-medium text-foreground mb-2 block">
-                    Selfie en tenant votre pièce d'identité
-                  </label>
-                  <input
-                    ref={selfieRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => setSelfieFile(e.target.files?.[0] || null)}
-                    className="hidden"
-                    data-testid="input-kyc-selfie"
-                  />
-                  <button
-                    onClick={() => selfieRef.current?.click()}
-                    className="w-full border-2 border-dashed border-border rounded-lg p-4 text-center hover:bg-muted transition-colors"
+                  <Button
+                    className="w-full"
+                    onClick={() => submitKycMutation.mutate()}
+                    disabled={!idFrontData || !idBackData || !selfieData || submitKycMutation.isPending}
+                    data-testid="button-submit-kyc"
                   >
-                    <Upload className="w-5 h-5 mx-auto mb-2 text-muted-foreground" />
-                    <p className="text-sm font-medium text-foreground">
-                      {selfieFile ? selfieFile.name : "Cliquez pour télécharger"}
-                    </p>
-                  </button>
+                    {submitKycMutation.isPending ? "Envoi en cours..." : "Soumettre les documents"}
+                  </Button>
                 </div>
-              </div>
-
-              <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900 rounded-lg p-3">
-                <p className="text-xs text-blue-900 dark:text-blue-200">
-                  ℹ️ Les documents acceptés: Passeport, Permis de conduire ou Pièce d'identité nationale.
-                </p>
-              </div>
-
-              <Button
-                className="w-full"
-                onClick={() => submitKycMutation.mutate()}
-                disabled={!idFrontFile || !idBackFile || !selfieFile || submitKycMutation.isPending}
-                data-testid="button-submit-kyc"
-              >
-                {submitKycMutation.isPending ? "Envoi en cours..." : "Soumettre les documents"}
-              </Button>
+              )}
             </div>
           )}
         </CardContent>
