@@ -113,7 +113,7 @@ export function AppSidebar() {
         title: "Déconnexion réussie",
         description: "À bientôt sur BKApay",
       });
-      setLocation("/login");
+      setLocation("/");
     },
     onError: () => {
       toast({

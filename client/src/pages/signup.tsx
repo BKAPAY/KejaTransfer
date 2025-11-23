@@ -75,9 +75,11 @@ export default function Signup() {
     <div className="w-full min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center p-4 overflow-hidden">
       <Card className="w-full max-w-xs sm:max-w-sm">
         <CardHeader className="space-y-2 sm:space-y-3 lg:space-y-4 text-center p-3 sm:p-4 lg:p-6">
-          <div className="flex justify-center mb-1 sm:mb-2">
-            <img src={logoImage} alt="BKApay" className="h-10 sm:h-12 lg:h-16 w-auto" />
-          </div>
+          <Link href="/">
+            <div className="flex justify-center mb-1 sm:mb-2 cursor-pointer hover:opacity-80 transition-opacity">
+              <img src={logoImage} alt="BKApay" className="h-10 sm:h-12 lg:h-16 w-auto" />
+            </div>
+          </Link>
           <CardTitle className="text-lg sm:text-xl lg:text-2xl font-bold">Créer un compte</CardTitle>
           <CardDescription className="text-xs sm:text-sm">Rejoignez BKApay et commencez</CardDescription>
         </CardHeader>

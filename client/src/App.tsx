@@ -5,7 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
@@ -116,12 +116,29 @@ function Router() {
   );
 }
 
+function AppInitializer() {
+  const { isLoading } = useAuth();
+  const initRef = useRef(false);
+
+  useEffect(() => {
+    if (!initRef.current) {
+      // Prefetch auth data on app init to maintain session persistence
+      queryClient.prefetchQuery({
+        queryKey: ["/api/auth/me"],
+      });
+      initRef.current = true;
+    }
+  }, []);
+
+  return <Router />;
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
-        <Router />
+        <AppInitializer />
       </TooltipProvider>
     </QueryClientProvider>
   );
