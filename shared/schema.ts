@@ -77,6 +77,17 @@ export const transactions = pgTable("transactions", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// Country/Operator Configuration - Admin control
+export const countryOperatorConfig = pgTable("country_operator_config", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  country: text("country").notNull(), // "BJ", "TG", "CI", "SN", "BF", "ML"
+  operator: text("operator").notNull(), // "orange", "mtn", "moov", "wave", "free", "tmoney", "wizall", "expresso"
+  incomingEnabled: boolean("incoming_enabled").notNull().default(true), // For deposits
+  outgoingEnabled: boolean("outgoing_enabled").notNull().default(true), // For withdrawals
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -134,6 +145,17 @@ export const insertTransactionSchema = createInsertSchema(transactions).omit({
   createdAt: true,
 });
 
+export const insertCountryOperatorConfigSchema = createInsertSchema(countryOperatorConfig).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateCountryOperatorConfigSchema = z.object({
+  incomingEnabled: z.boolean().optional(),
+  outgoingEnabled: z.boolean().optional(),
+});
+
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -149,6 +171,10 @@ export type ApiKey = typeof apiKeys.$inferSelect;
 
 export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
 export type Transaction = typeof transactions.$inferSelect;
+
+export type InsertCountryOperatorConfig = z.infer<typeof insertCountryOperatorConfigSchema>;
+export type CountryOperatorConfig = typeof countryOperatorConfig.$inferSelect;
+export type UpdateCountryOperatorConfig = z.infer<typeof updateCountryOperatorConfigSchema>;
 
 // Currency constants
 export const CURRENCIES = [

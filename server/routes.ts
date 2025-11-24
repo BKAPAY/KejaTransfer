@@ -1727,6 +1727,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== Country/Operator Config Routes =====
+  app.get("/api/admin/country-operator-config", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const configs = await storage.getCountryOperatorConfigs();
+      res.json(configs);
+    } catch (error: any) {
+      console.error("Get country operator configs error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.put("/api/admin/country-operator-config/:country/:operator", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { country, operator } = req.params;
+      const { incomingEnabled, outgoingEnabled } = req.body;
+
+      const config = await storage.updateCountryOperatorConfig(country, operator, {
+        incomingEnabled,
+        outgoingEnabled,
+      });
+
+      if (!config) {
+        return res.status(404).json({ error: "Configuration not found" });
+      }
+
+      res.json(config);
+    } catch (error: any) {
+      console.error("Update country operator config error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Public endpoint - get enabled countries/operators for deposits (incoming)
+  app.get("/api/countries-operators/deposits", async (req: Request, res: Response) => {
+    try {
+      const configs = await storage.getCountryOperatorConfigs();
+      const enabledConfigs = configs.filter((c) => c.incomingEnabled);
+      
+      const result: Record<string, string[]> = {};
+      for (const config of enabledConfigs) {
+        if (!result[config.country]) {
+          result[config.country] = [];
+        }
+        result[config.country].push(config.operator);
+      }
+      res.json(result);
+    } catch (error: any) {
+      console.error("Get deposits config error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Public endpoint - get enabled countries/operators for withdrawals (outgoing)
+  app.get("/api/countries-operators/withdrawals", async (req: Request, res: Response) => {
+    try {
+      const configs = await storage.getCountryOperatorConfigs();
+      const enabledConfigs = configs.filter((c) => c.outgoingEnabled);
+      
+      const result: Record<string, string[]> = {};
+      for (const config of enabledConfigs) {
+        if (!result[config.country]) {
+          result[config.country] = [];
+        }
+        result[config.country].push(config.operator);
+      }
+      res.json(result);
+    } catch (error: any) {
+      console.error("Get withdrawals config error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Initialize country/operator configs on startup
+  await storage.initializeCountryOperatorConfigs();
+
   const httpServer = createServer(app);
   return httpServer;
 }

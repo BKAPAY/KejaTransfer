@@ -36,6 +36,11 @@ export default function Deposit() {
     queryKey: ["/api/auth/me"],
   });
 
+  // Fetch enabled countries/operators for deposits
+  const { data: enabledCountriesOperators } = useQuery<Record<string, string[]>>({
+    queryKey: ["/api/countries-operators/deposits"],
+  });
+
   const form = useForm<DepositFormData>({
     resolver: zodResolver(depositSchema),
     defaultValues: {
@@ -48,8 +53,13 @@ export default function Deposit() {
 
   const selectedCountry = form.watch("country");
   const amount = form.watch("amount");
-  const countryOperators =
+  
+  // Filter operators based on admin configuration
+  const allCountryOperators =
     OPERATORS[(selectedCountry as keyof typeof OPERATORS) || ("BJ" as const)] || [];
+  const countryOperators = enabledCountriesOperators 
+    ? (enabledCountriesOperators[selectedCountry] || []).filter(op => allCountryOperators.includes(op))
+    : allCountryOperators;
 
   // Calculate net amount in real-time
   const netAmount = selectedCountry && amount ? calculateIncomingFee(Math.floor(amount), selectedCountry).netAmount : 0;

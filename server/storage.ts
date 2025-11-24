@@ -13,6 +13,9 @@ import type {
   InsertApiKey,
   Transaction,
   InsertTransaction,
+  CountryOperatorConfig,
+  InsertCountryOperatorConfig,
+  UpdateCountryOperatorConfig,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -70,6 +73,12 @@ export interface IStorage {
     totalTransfers: number;
     recentTransactions: Transaction[];
   }>;
+
+  // Country/Operator Config
+  getCountryOperatorConfigs(): Promise<CountryOperatorConfig[]>;
+  getCountryOperatorConfig(country: string, operator: string): Promise<CountryOperatorConfig | undefined>;
+  updateCountryOperatorConfig(country: string, operator: string, config: UpdateCountryOperatorConfig): Promise<CountryOperatorConfig | undefined>;
+  initializeCountryOperatorConfigs(): Promise<void>;
 }
 
 export class DbStorage implements IStorage {
@@ -482,6 +491,70 @@ export class DbStorage implements IStorage {
       completedTransactions: completed.length,
       pendingTransactions,
     };
+  }
+
+  // ===== Country/Operator Config =====
+  async getCountryOperatorConfigs(): Promise<CountryOperatorConfig[]> {
+    return db.select().from(schema.countryOperatorConfig);
+  }
+
+  async getCountryOperatorConfig(country: string, operator: string): Promise<CountryOperatorConfig | undefined> {
+    const results = await db
+      .select()
+      .from(schema.countryOperatorConfig)
+      .where(
+        (c) =>
+          c.country === country && c.operator === operator
+      )
+      .limit(1);
+    return results[0];
+  }
+
+  async updateCountryOperatorConfig(
+    country: string,
+    operator: string,
+    config: UpdateCountryOperatorConfig
+  ): Promise<CountryOperatorConfig | undefined> {
+    const result = await db
+      .update(schema.countryOperatorConfig)
+      .set({
+        ...config,
+        updatedAt: new Date(),
+      })
+      .where((c) => c.country === country && c.operator === operator)
+      .returning()
+      .get();
+    return result;
+  }
+
+  async initializeCountryOperatorConfigs(): Promise<void> {
+    const existing = await this.getCountryOperatorConfigs();
+    if (existing.length > 0) return;
+
+    // Initialize all country/operator combinations as enabled
+    const countries = ["BJ", "TG", "CI", "SN", "BF", "ML"];
+    const operators: Record<string, string[]> = {
+      BJ: ["mtn", "moov"],
+      TG: ["tmoney", "moov"],
+      CI: ["orange", "mtn", "moov", "wave"],
+      SN: ["orange", "free", "expresso", "wave", "wizall"],
+      BF: ["orange", "moov"],
+      ML: ["orange", "moov"],
+    };
+
+    for (const country of countries) {
+      for (const operator of operators[country] || []) {
+        await db
+          .insert(schema.countryOperatorConfig)
+          .values({
+            country,
+            operator,
+            incomingEnabled: true,
+            outgoingEnabled: true,
+          })
+          .catch(() => {}); // Ignore duplicates
+      }
+    }
   }
 }
 

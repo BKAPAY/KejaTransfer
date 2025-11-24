@@ -32,6 +32,11 @@ export default function Withdrawal() {
     queryKey: ["/api/auth/me"],
   });
 
+  // Fetch enabled countries/operators for withdrawals
+  const { data: enabledCountriesOperators } = useQuery<Record<string, string[]>>({
+    queryKey: ["/api/countries-operators/withdrawals"],
+  });
+
   const form = useForm<WithdrawalFormData>({
     resolver: zodResolver(withdrawalSchema),
     defaultValues: {
@@ -44,8 +49,13 @@ export default function Withdrawal() {
 
   const selectedCountry = form.watch("country");
   const amount = form.watch("amount");
-  const countryOperators =
+  
+  // Filter operators based on admin configuration
+  const allCountryOperators =
     OPERATORS[(selectedCountry as keyof typeof OPERATORS) || ("BJ" as const)] || [];
+  const countryOperators = enabledCountriesOperators 
+    ? (enabledCountriesOperators[selectedCountry] || []).filter(op => allCountryOperators.includes(op))
+    : allCountryOperators;
 
   // Calculate total deducted in real-time
   const totalDeducted = selectedCountry && amount ? calculateOutgoingFee(Math.floor(amount), selectedCountry).totalDeductedFromBalance : 0;

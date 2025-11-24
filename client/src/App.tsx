@@ -28,6 +28,7 @@ import Admin from "@/pages/dashboard/admin";
 import Management from "@/pages/dashboard/management";
 import KycVerification from "@/pages/dashboard/kyc-verification";
 import KycHistory from "@/pages/dashboard/kyc-history";
+import CountryOperatorConfig from "@/pages/dashboard/country-operator-config";
 import Pay from "@/pages/pay";
 import Merchant from "@/pages/merchant";
 import ApiPayment from "@/pages/api-payment";
@@ -105,6 +106,7 @@ function Router() {
           <Route path="/dashboard/management" component={Management} />
           <Route path="/dashboard/kyc-verification" component={KycVerification} />
           <Route path="/dashboard/kyc-history" component={KycHistory} />
+          <Route path="/dashboard/country-operator-config" component={CountryOperatorConfig} />
           <Route component={NotFound} />
         </Switch>
       </DashboardLayout>

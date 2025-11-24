@@ -27,6 +27,7 @@ import {
   Shield,
   ArrowDownToLine,
   ArrowUpFromLine,
+  Globe,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import type { User as UserType } from "@shared/schema";

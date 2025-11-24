@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
-import { Users, UserCheck, TrendingDown, TrendingUp, Search, Settings } from "lucide-react";
+import { Users, UserCheck, TrendingDown, TrendingUp, Search, Settings, Globe } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
@@ -57,14 +57,25 @@ export default function Admin() {
           <h1 className="text-2xl font-bold text-foreground mb-1">Panneau Administrateur</h1>
           <p className="text-sm text-muted-foreground">Gestion et surveillance de la plateforme</p>
         </div>
-        <Button
-          onClick={() => setLocation("/dashboard/management")}
-          data-testid="button-management"
-          className="gap-2"
-        >
-          <Settings className="w-4 h-4" />
-          Gestionnaire
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            onClick={() => setLocation("/dashboard/country-operator-config")}
+            data-testid="button-country-operator-config"
+            className="gap-2"
+            variant="outline"
+          >
+            <Globe className="w-4 h-4" />
+            Pays & Opérateurs
+          </Button>
+          <Button
+            onClick={() => setLocation("/dashboard/management")}
+            data-testid="button-management"
+            className="gap-2"
+          >
+            <Settings className="w-4 h-4" />
+            Gestionnaire
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}
