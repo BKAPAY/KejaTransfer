@@ -14,7 +14,7 @@ const faqs = [
   },
   {
     question: "Combien de temps prend le traitement d'un paiement?",
-    answer: "La plupart des paiements sont traités instantanément. Cependant, certaines transactions peuvent prendre jusqu'à 24 heures selon l'opérateur mobile et votre réseau."
+    answer: "Toutes les transactions sont traitées instantanément. Vous recevrez immédiatement la confirmation du paiement."
   },
   {
     question: "Comment générer des clés API?",
