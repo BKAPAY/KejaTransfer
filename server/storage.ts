@@ -290,7 +290,7 @@ export class DbStorage implements IStorage {
     totalTransfers: number;
   }> {
     const allUsers = await db.select().from(schema.users);
-    const verifiedUsers = allUsers.filter((u) => u.kycStatus === "verified").length;
+    const verifiedUsers = allUsers.filter((u) => u.verified === true).length;
 
     const allTransactions = await db.select().from(schema.transactions);
     const completedDeposits = allTransactions.filter(
