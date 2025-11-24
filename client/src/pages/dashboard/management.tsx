@@ -5,7 +5,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Users, Shield, Trash2, Plus, Minus, History, Link as LinkIcon, Store, Key, User as UserIcon, Check, X, FileCheck, AlertCircle, Unlock } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,7 +17,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import type { User } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
-import { useAdminAccess } from "@/hooks/use-admin-access";
 import { queryClient } from "@/lib/queryClient";
 import {
   HistoryDialog,
@@ -26,32 +25,11 @@ import {
   ApiKeysDialog,
   ProfileDialog,
 } from "./management-details";
-import { useLocation } from "wouter";
 
 export default function Management() {
   const [searchQuery, setSearchQuery] = useState("");
   const [fundAmount, setFundAmount] = useState<{ [userId: string]: string }>({});
   const { toast } = useToast();
-  const [, navigate] = useLocation();
-  const { hasAccess, isLoading: accessLoading } = useAdminAccess();
-
-  // Protect management page with access code
-  useEffect(() => {
-    if (!accessLoading && !hasAccess) {
-      navigate("/dashboard/admin-access-code");
-    }
-  }, [accessLoading, hasAccess, navigate]);
-
-  // Show loading while checking access
-  if (accessLoading || !hasAccess) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <p className="text-muted-foreground">Vérification en cours...</p>
-        </div>
-      </div>
-    );
-  }
 
   // Dialog states
   const [promoteDialog, setPromoteDialog] = useState<{ open: boolean; userId?: string; userName?: string }>({ open: false });

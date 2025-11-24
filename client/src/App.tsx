@@ -25,7 +25,7 @@ import Deposit from "@/pages/dashboard/deposit";
 import Transfer from "@/pages/dashboard/transfer";
 import Withdrawal from "@/pages/dashboard/withdrawal";
 import Admin from "@/pages/dashboard/admin";
-import Management from "@/pages/dashboard/management";
+import ManagementWrapper from "@/pages/dashboard/management-wrapper";
 import AdminAccessCode from "@/pages/dashboard/admin-access-code";
 import KycVerification from "@/pages/dashboard/kyc-verification";
 import KycHistory from "@/pages/dashboard/kyc-history";
@@ -105,7 +105,7 @@ function Router() {
           <Route path="/dashboard/withdrawal" component={Withdrawal} />
           <Route path="/dashboard/admin" component={Admin} />
           <Route path="/dashboard/admin-access-code" component={AdminAccessCode} />
-          <Route path="/dashboard/management" component={Management} />
+          <Route path="/dashboard/management" component={ManagementWrapper} />
           <Route path="/dashboard/kyc-verification" component={KycVerification} />
           <Route path="/dashboard/kyc-history" component={KycHistory} />
           <Route path="/dashboard/country-operator-config" component={CountryOperatorConfig} />

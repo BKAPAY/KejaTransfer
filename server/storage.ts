@@ -1,6 +1,6 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, or } from "drizzle-orm";
 import * as schema from "@shared/schema";
 import type {
   User,
@@ -172,10 +172,13 @@ export class DbStorage implements IStorage {
     return db
       .select()
       .from(schema.users)
-      .where((c) => {
-        // Use raw SQL to check if kycStatus is not 'pending'
-        return sql`${c.kycStatus} IN ('submitted', 'verified', 'rejected')`;
-      })
+      .where(
+        or(
+          eq(schema.users.kycStatus, "submitted"),
+          eq(schema.users.kycStatus, "verified"),
+          eq(schema.users.kycStatus, "rejected")
+        )
+      )
       .orderBy(desc(schema.users.createdAt));
   }
 
