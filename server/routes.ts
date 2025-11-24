@@ -656,6 +656,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           tagline: "Plateforme de paiement mobile money",
         },
         custom_data: {
+          type: "payment_link",
+          user_id: paymentLink.userId,
           customer_name: customerName,
           customer_email: customerEmail,
           customer_phone: customerPhone,
@@ -672,14 +674,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const paydunyaResponse = await callPaydunyaAPI("/checkout-invoice/create", paydunyaData);
 
       if (paydunyaResponse.response_code === "00") {
-        // Create transaction now with the Paydunya token
+        // Calculate fees for INCOMING payment (client pays GROSS)
+        const grossAmount = paymentLink.amount;
+        const feeInfo = calculateIncomingFee(grossAmount, country);
+        
+        // Create transaction with GROSS amount (what client pays)
         const transactionId = randomUUID();
         await storage.createTransaction({
           userId: paymentLink.userId,
           type: "payment_link",
-          amount: paymentLink.amount,
-          fee: 0,
-          feePercentage: 0,
+          amount: feeInfo.grossAmount, // Store GROSS amount (e.g., 2000)
+          fee: feeInfo.feeAmount, // Store fee (e.g., 60)
+          feePercentage: feeInfo.feePercentage, // Store percentage (30 or 60)
           currency: "XOF",
           status: "pending",
           country,
@@ -688,8 +694,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           customerName,
           customerEmail,
           customerPhone,
+          paydunyaToken: paydunyaResponse.token, // Store in dedicated column
           metadata: JSON.stringify({
-            paydunyaToken: paydunyaResponse.token,
             paymentLinkId: paymentLink.id,
           }),
         });
@@ -767,14 +773,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const paydunyaResponse = await callPaydunyaAPI("/checkout-invoice/create", paydunyaData);
 
       if (paydunyaResponse.response_code === "00") {
-        // Create transaction now with the Paydunya token
+        // Calculate fees for INCOMING payment (client pays GROSS)
+        const grossAmount = Math.floor(amount);
+        const feeInfo = calculateIncomingFee(grossAmount, country);
+        
+        // Create transaction with GROSS amount (what client pays)
         const transactionId = randomUUID();
         await storage.createTransaction({
           userId: merchantLink.userId,
           type: "merchant_link",
-          amount: amount,
-          fee: 0,
-          feePercentage: 0,
+          amount: feeInfo.grossAmount, // Store GROSS amount (e.g., 2000)
+          fee: feeInfo.feeAmount, // Store fee (e.g., 60)
+          feePercentage: feeInfo.feePercentage, // Store percentage (30 or 60)
           currency: "XOF",
           status: "pending",
           country,
@@ -783,8 +793,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           customerName,
           customerEmail,
           customerPhone,
+          paydunyaToken: paydunyaResponse.token, // Store in dedicated column
           metadata: JSON.stringify({
-            paydunyaToken: paydunyaResponse.token,
             merchantLinkId: merchantLink.id,
           }),
         });
@@ -844,21 +854,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const paydunyaResponse = await callPaydunyaAPI("/checkout-invoice/create", paydunyaData);
 
       if (paydunyaResponse.response_code === "00") {
-        // Create transaction now with the Paydunya token
+        // Calculate fees for INCOMING payment (client pays GROSS)
+        const grossAmount = Math.floor(amount);
+        const feeInfo = calculateIncomingFee(grossAmount, country);
+        
+        // Create transaction with GROSS amount (what client pays)
         const transactionId = randomUUID();
         await storage.createTransaction({
           userId: req.session.userId!,
           type: "deposit",
-          amount: Math.floor(amount),
-          fee: 0,
-          feePercentage: 0,
+          amount: feeInfo.grossAmount, // Store GROSS amount (e.g., 2000)
+          fee: feeInfo.feeAmount, // Store fee (e.g., 60)
+          feePercentage: feeInfo.feePercentage, // Store percentage (30 or 60)
           currency: "XOF",
           status: "pending",
           country,
           operator,
-          description: `Dépôt de ${amount} XOF`,
+          description: `Dépôt de ${grossAmount} XOF`,
+          paydunyaToken: paydunyaResponse.token, // Store in dedicated column
           metadata: JSON.stringify({
-            paydunyaToken: paydunyaResponse.token,
             phone,
           }),
         });
@@ -920,21 +934,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const paydunyaResponse = await callPaydunyaAPI("/checkout-invoice/create", paydunyaData);
 
       if (paydunyaResponse.response_code === "00" && paydunyaResponse.token) {
-        // Create transaction
+        // Calculate fees for INCOMING payment (client pays GROSS)
+        const grossAmount = Math.floor(amount);
+        const feeInfo = calculateIncomingFee(grossAmount, country);
+        
+        // Create transaction with GROSS amount (what client pays)
+        // Balance will be credited with NET amount when webhook confirms
         const transactionId = randomUUID();
         await storage.createTransaction({
           userId: req.session.userId!,
           type: "deposit",
-          amount: Math.floor(amount),
-          fee: 0,
-          feePercentage: 0,
+          amount: feeInfo.grossAmount, // Store GROSS amount (e.g., 2000)
+          fee: feeInfo.feeAmount, // Store fee (e.g., 60)
+          feePercentage: feeInfo.feePercentage, // Store percentage (30 or 60)
           currency: "XOF",
           status: "pending",
           country,
           operator,
-          description: description || `Dépôt de ${amount} XOF`,
+          description: description || `Dépôt de ${grossAmount} XOF`,
+          paydunyaToken: paydunyaResponse.token, // Store in dedicated column
           metadata: JSON.stringify({
-            paydunyaToken: paydunyaResponse.token,
             phone,
             softpay: true,
           }),
@@ -999,49 +1018,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ===== Paydunya Webhook Routes =====
   app.post("/api/webhooks/paydunya", async (req: Request, res: Response) => {
     try {
-      const { token, status, custom_data } = req.body;
+      const { token, status, custom_data, data } = req.body;
 
-      console.log("[WEBHOOK] Paydunya webhook received:", { token, status, custom_data });
+      console.log("[WEBHOOK] Paydunya webhook received:", req.body);
 
-      if (!token) {
+      // Handle PSR format (data.status) or direct format (status)
+      const webhookToken = token || data?.token;
+      const webhookStatus = status || data?.status;
+      const webhookCustomData = custom_data || data?.custom_data;
+      const webhookAmount = data?.amount;
+      const receiptUrl = data?.receipt_url;
+
+      if (!webhookToken) {
         return res.status(400).json({ error: "Token manquant" });
       }
 
-      // Use custom_data.user_id if provided, otherwise we need to search
-      let userId: string | null = null;
-      if (custom_data?.user_id) {
-        userId = custom_data.user_id;
-      }
+      // Normalize user_id from various custom_data formats
+      const userId = webhookCustomData?.user_id || webhookCustomData?.merchant_user_id;
 
-      // Search for transaction by token in metadata
-      // We'll need to search through user's transactions
-      let transaction = null;
-      if (userId) {
-        const userTransactions = await storage.getTransactions(userId, 100);
-        transaction = userTransactions.find((t: any) => {
-          try {
-            const meta = JSON.parse(t.metadata);
-            return meta.paydunyaToken === token;
-          } catch {
-            return false;
-          }
+      // Search for transaction by token - use efficient global lookup
+      let transaction = await storage.getTransactionByPaydunyaToken(webhookToken);
+      
+      if (transaction) {
+        console.log("[WEBHOOK] Transaction found:", { 
+          id: transaction.id, 
+          type: transaction.type,
+          userId: transaction.userId 
         });
       }
 
+      // Transaction should always exist now (created as pending before Paydunya call)
       if (!transaction) {
-        console.log("[WEBHOOK] Transaction not found for token:", token);
-        // Still return 200 to acknowledge receipt
+        console.log("[WEBHOOK] Transaction not found for token:", webhookToken);
+        console.log("[WEBHOOK] This should not happen - all flows create pending transactions");
         return res.status(200).json({ success: true, message: "Transaction not found, but webhook acknowledged" });
       }
 
       // Update transaction status based on webhook status
       let newStatus = "pending";
-      if (status === "completed" || status === "approved") {
+      if (webhookStatus === "completed" || webhookStatus === "approved") {
         newStatus = "completed";
-        // Update user balance
-        await storage.updateUserBalance(transaction.userId, transaction.amount);
-        console.log("[WEBHOOK] User balance updated:", { userId: transaction.userId, amount: transaction.amount });
-      } else if (status === "failed" || status === "cancelled") {
+        
+        // For INCOMING transactions: credit NET amount (GROSS - fee)
+        // Transaction stores: amount = GROSS, fee = fee amount
+        const netAmount = transaction.amount - (transaction.fee || 0);
+        
+        await storage.updateUserBalance(transaction.userId, netAmount);
+        console.log("[WEBHOOK] User balance credited with NET:", { 
+          userId: transaction.userId, 
+          grossAmount: transaction.amount, 
+          fee: transaction.fee,
+          netCredited: netAmount 
+        });
+      } else if (webhookStatus === "failed" || webhookStatus === "cancelled") {
         newStatus = "failed";
       }
 
@@ -1188,8 +1217,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           operator,
           customerPhone: phone,
           description: `Transfert de ${amount} XOF vers ${phone}`,
+          paydunyaToken: disbursalToken, // Store in dedicated column
           metadata: JSON.stringify({
-            paydunyaToken: disbursalToken,
             paydunyaTransactionId: submitResponse.transaction_id,
           }),
         });
@@ -1222,6 +1251,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Montant invalide" });
       }
 
+      // Validate required parameters for fee calculation
+      const validCountries = ["BJ", "TG", "CI", "SN", "BF", "ML"];
+      const paymentCountry = country || "SN"; // Default to Senegal if not specified
+      
+      if (!validCountries.includes(paymentCountry)) {
+        return res.status(400).json({ 
+          error: "Pays invalide", 
+          validCountries: "BJ, TG, CI, SN, BF, ML" 
+        });
+      }
+
       // Get API key and its owner
       const apiKey = await storage.getApiKeyByPublicKey(publicKey);
       if (!apiKey || !apiKey.isActive) {
@@ -1234,10 +1274,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Clé API invalide ou inactive" });
       }
 
+      // Calculate fees for INCOMING payment
+      const grossAmount = Math.floor(amount);
+      const feeInfo = calculateIncomingFee(grossAmount, paymentCountry);
+      
       // Call Paydunya API to create checkout invoice
       const paydunyaData = {
         invoice: {
-          total_amount: Math.floor(amount),
+          total_amount: grossAmount,
           description: description || "Paiement via API BKApay",
         },
         store: {
@@ -1250,6 +1294,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           customer_name: customerName,
           customer_email: customerEmail,
           api_key_id: apiKey.id,
+          country: paymentCountry,
+          operator: operator || "wave",
         },
         actions: {
           callback_url: `${process.env.BASE_URL || 'http://localhost:5000'}/api/webhooks/paydunya`,
@@ -1259,8 +1305,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const paydunyaResponse = await callPaydunyaAPI("/checkout-invoice/create", paydunyaData);
 
       if (paydunyaResponse.response_code === "00") {
+        // Create pending transaction BEFORE returning to client
+        // This ensures webhook can always find the transaction by token
+        const transactionId = randomUUID();
+        await storage.createTransaction({
+          userId: apiKey.userId,
+          type: "api_payment",
+          amount: feeInfo.grossAmount, // Store GROSS amount
+          fee: feeInfo.feeAmount,
+          feePercentage: feeInfo.feePercentage,
+          currency: "XOF",
+          status: "pending",
+          country: paymentCountry,
+          operator: operator || "wave",
+          customerName,
+          customerEmail,
+          description: description || "Paiement via API BKApay",
+          paydunyaToken: paydunyaResponse.token, // Store in dedicated column
+          metadata: JSON.stringify({
+            api_key_id: apiKey.id,
+          }),
+        });
+        
         res.json({
           success: true,
+          transactionId,
           redirectUrl: paydunyaResponse.response_text,
           paydunyaToken: paydunyaResponse.token,
         });
@@ -1380,130 +1449,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Withdrawal creation error:", error);
       res.status(500).json({ error: error.message || "Erreur lors de la création du retrait" });
-    }
-  });
-
-  // Paydunya webhook - Create/Update transactions only on completion
-  app.post("/api/webhooks/paydunya", async (req: Request, res: Response) => {
-    try {
-      const paymentData = req.body;
-
-      if (paymentData.data?.status === "completed") {
-        const customData = paymentData.data.custom_data;
-        
-        if (customData) {
-          // Determine transaction type and create transaction with COMPLETED status
-          const amount = Math.floor(paymentData.data.amount || 0);
-          
-          if (customData.user_id && customData.type === "deposit") {
-            // Deposit payment
-            const feeInfo = calculateIncomingFee(amount, customData.country);
-            const transaction = await storage.createTransaction({
-              userId: customData.user_id,
-              type: "deposit",
-              amount: feeInfo.netAmount,
-              fee: feeInfo.feeAmount,
-              feePercentage: feeInfo.feePercentage,
-              currency: "XOF",
-              status: "completed",
-              country: customData.country,
-              operator: customData.operator,
-              description: `Dépôt de ${amount} XOF`,
-              metadata: JSON.stringify({
-                paydunyaToken: paymentData.data.token,
-                receiptUrl: paymentData.data.receipt_url,
-              }),
-            });
-            
-            // Credit user balance
-            await storage.updateUserBalance(customData.user_id, feeInfo.netAmount);
-          } 
-          else if (customData.type === "merchant_link" && customData.merchant_user_id) {
-            // Merchant link payment
-            const feeInfo = calculateIncomingFee(amount, "SN"); // Default country
-            const transaction = await storage.createTransaction({
-              userId: customData.merchant_user_id,
-              type: "merchant_link",
-              amount: feeInfo.netAmount,
-              fee: feeInfo.feeAmount,
-              feePercentage: feeInfo.feePercentage,
-              currency: "XOF",
-              status: "completed",
-              country: "SN",
-              operator: "wave",
-              customerName: customData.customer_name,
-              customerEmail: customData.customer_email,
-              description: `Paiement marchand - ${customData.merchant_name}`,
-              metadata: JSON.stringify({
-                paydunyaToken: paymentData.data.token,
-                receiptUrl: paymentData.data.receipt_url,
-              }),
-            });
-            
-            // Credit user balance
-            await storage.updateUserBalance(customData.merchant_user_id, feeInfo.netAmount);
-          }
-          else if (customData.type === "api_payment" && customData.user_id) {
-            // API payment
-            const feeInfo = calculateIncomingFee(amount, "SN");
-            const transaction = await storage.createTransaction({
-              userId: customData.user_id,
-              type: "api_payment",
-              amount: feeInfo.netAmount,
-              fee: feeInfo.feeAmount,
-              feePercentage: feeInfo.feePercentage,
-              currency: "XOF",
-              status: "completed",
-              country: "SN",
-              operator: "wave",
-              customerName: customData.customer_name,
-              customerEmail: customData.customer_email,
-              description: "Paiement via API",
-              metadata: JSON.stringify({
-                paydunyaToken: paymentData.data.token,
-                receiptUrl: paymentData.data.receipt_url,
-                api_key_id: customData.api_key_id,
-              }),
-            });
-            
-            // Credit user balance
-            await storage.updateUserBalance(customData.user_id, feeInfo.netAmount);
-          }
-          else if (customData.user_id) {
-            // Payment link or other user transaction
-            const feeInfo = calculateIncomingFee(amount, "SN");
-            const transaction = await storage.createTransaction({
-              userId: customData.user_id,
-              type: "payment_link",
-              amount: feeInfo.netAmount,
-              fee: feeInfo.feeAmount,
-              feePercentage: feeInfo.feePercentage,
-              currency: "XOF",
-              status: "completed",
-              country: "SN",
-              operator: "wave",
-              customerName: customData.customer_name,
-              customerEmail: customData.customer_email,
-              description: "Paiement",
-              metadata: JSON.stringify({
-                paydunyaToken: paymentData.data.token,
-                receiptUrl: paymentData.data.receipt_url,
-              }),
-            });
-            
-            // Credit user balance
-            await storage.updateUserBalance(customData.user_id, feeInfo.netAmount);
-          }
-        }
-      } else if (paymentData.data?.status === "failed" || paymentData.data?.status === "cancelled") {
-        // Payment failed - do not create transaction, user will see error immediately
-        console.log("Payment failed/cancelled by Paydunya:", paymentData.data);
-      }
-
-      res.json({ success: true });
-    } catch (error: any) {
-      console.error("Webhook error:", error);
-      res.status(500).json({ error: error.message });
     }
   });
 

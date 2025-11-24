@@ -66,6 +66,7 @@ export interface IStorage {
   // Transactions
   getTransaction(id: string): Promise<Transaction | undefined>;
   getTransactions(userId: string, limit?: number): Promise<Transaction[]>;
+  getTransactionByPaydunyaToken(paydunyaToken: string): Promise<Transaction | undefined>;
   createTransaction(transaction: InsertTransaction): Promise<Transaction>;
   updateTransactionStatus(id: string, status: string, paydunyaData?: any): Promise<Transaction | undefined>;
   getUserStats(userId: string): Promise<{
@@ -310,6 +311,16 @@ export class DbStorage implements IStorage {
       .where(eq(schema.transactions.userId, userId))
       .orderBy(desc(schema.transactions.createdAt))
       .limit(limit);
+  }
+
+  async getTransactionByPaydunyaToken(paydunyaToken: string): Promise<Transaction | undefined> {
+    // Direct SQL query on indexed paydunyaToken column - much more efficient
+    const results = await db
+      .select()
+      .from(schema.transactions)
+      .where(eq(schema.transactions.paydunyaToken, paydunyaToken))
+      .limit(1);
+    return results[0];
   }
 
   async createTransaction(transaction: InsertTransaction): Promise<Transaction> {
