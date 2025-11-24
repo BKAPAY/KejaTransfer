@@ -4,25 +4,24 @@
 BKApay est une plateforme moderne de paiement mobile money pour l'Afrique de l'Ouest. Elle permet aux entreprises et particuliers d'accepter des paiements via mobile money (Orange Money, MTN, Moov, Wave, Free Money, T-Money, Wizall, Expresso) dans 6 pays: Bénin, Togo, Côte d'Ivoire, Sénégal, Burkina Faso et Mali.
 
 ## Dernières modifications (24 Novembre 2025)
-- ✅ **NOUVEAU**: Système de frais silencieux par pays
-  * Bénin (BJ): 3% frais entrants et sortants
-  * Autres pays: 6% frais entrants et sortants
-  * Transactions entrantes: frais déduits avant crédit au tableau de bord
-  * Dépôts: affichage du montant NET reçu (sans afficher le %)
-  * Transferts: affichage du total déducté du solde (montant + frais)
-  * Montant exact envoyé au Mobile Money (frais prélevés du solde)
-  * Frais stockés en silence dans l'historique des transactions
-  * Aucun affichage des pourcentages - système complètement discret
+- ✅ **FIXE CRITIQUE**: Bug calcul des frais (divisait par 10000 au lieu de 1000)
+  * Correction: (amount × feePercentage) / 1000 
+  * Bénin 3%: 2000 XOF → 60 XOF de frais → 1940 XOF reçu ✅
+  * Autres pays 6%: 2000 XOF → 120 XOF de frais → 1880 XOF reçu ✅
+- ✅ **NOUVEAU**: Implémentation complète API Paydunya v2 pour retraits
+  * Flux à 2 étapes: get-invoice → submit-invoice
+  * Déduction du solde après succès de la soumission
+  * Support complet des 20+ opérateurs (Orange Money, Wave, Moov, etc.)
+  * **Prérequis**: Compte Paydunya vérifié + API v2 activée dans dashboard
+  * **Status actuel**: Erreur "LIVE Private Key invalid" = compte non vérifié ou clés incorrectes
+  * **Action requise**: Vérifier compte Paydunya et récupérer clés LIVE correctes
+- ✅ Affichage correct des liens complets (pas juste tokens) avec copie fonctionnelle
+- ✅ Système de frais silencieux par pays (3% Bénin, 6% autres)
 - ✅ Système de suspension de comptes
-  * Bouton "Suspendre" pour chaque utilisateur dans la gestion
-  * Bouton "Réactiver" pour les comptes suspendus
-  * Champ `suspended` ajouté à la base de données
-  * Badges visuels "Suspendu" dans l'interface d'administration
-  * Lors de la connexion d'un compte suspendu: "Votre compte a été suspendu. Veuillez contacter le support."
-- ✅ Historique KYC avec recherche par nom, prénom ou email
-- ✅ Modification des liens de paiement (users can create, modify, or delete)
-- ✅ Persistance de session - l'utilisateur reste connecté après actualisation
-- ✅ Détails des transactions cliquables dans l'historique
+- ✅ Historique KYC avec recherche
+- ✅ Modification des liens de paiement
+- ✅ Persistance de session
+- ✅ Détails des transactions cliquables
 
 ## Architecture du projet
 
