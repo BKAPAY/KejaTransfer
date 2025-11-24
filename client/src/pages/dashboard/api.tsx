@@ -2,10 +2,10 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Copy, Eye, EyeOff, Trash2, Key } from "lucide-react";
+import { Plus, Copy, Eye, EyeOff, Trash2, Key, AlertCircle } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import type { ApiKey } from "@shared/schema";
+import type { ApiKey, User } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -20,6 +20,10 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import {
+  Alert,
+  AlertDescription,
+} from "@/components/ui/alert";
 
 const apiKeySchema = z.object({
   name: z.string().min(1, "Le nom de la clé API est requis"),
@@ -33,9 +37,15 @@ export default function ApiPage() {
   const [selectedKeyForExample, setSelectedKeyForExample] = useState<string | null>(null);
   const { toast } = useToast();
 
+  const { data: user } = useQuery<User>({
+    queryKey: ["/api/auth/me"],
+  });
+
   const { data: apiKeys, isLoading } = useQuery<ApiKey[]>({
     queryKey: ["/api/api-keys"],
   });
+
+  const isKycVerified = user?.kycStatus === "verified";
 
   const form = useForm<ApiKeyFormData>({
     resolver: zodResolver(apiKeySchema),
@@ -117,7 +127,11 @@ export default function ApiPage() {
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button data-testid="button-create-api-key">
+            <Button 
+              data-testid="button-create-api-key"
+              disabled={!isKycVerified}
+              title={!isKycVerified ? "Vous devez vérifier votre identité (KYC) pour créer une clé API" : undefined}
+            >
               <Plus className="w-4 h-4 mr-2" />
               Nouvelle clé API
             </Button>
@@ -129,6 +143,14 @@ export default function ApiPage() {
                 Créez une nouvelle clé pour intégrer les paiements dans votre application
               </DialogDescription>
             </DialogHeader>
+            {!isKycVerified ? (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  Vous devez vérifier votre identité (KYC) avant de générer des clés API. Veuillez compléter la vérification d'identité dans vos paramètres.
+                </AlertDescription>
+              </Alert>
+            ) : null}
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                 <FormField

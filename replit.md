@@ -3,25 +3,25 @@
 ## Vue d'ensemble
 BKApay est une plateforme moderne de paiement mobile money pour l'Afrique de l'Ouest. Elle permet aux entreprises et particuliers d'accepter des paiements via mobile money (Orange Money, MTN, Moov, Wave, Free Money, T-Money, Wizall, Expresso) dans 6 pays: Bénin, Togo, Côte d'Ivoire, Sénégal, Burkina Faso et Mali.
 
-## Dernières modifications (24 Novembre 2025)
-- ✅ **FIXE CRITIQUE**: Bug calcul des frais (divisait par 10000 au lieu de 1000)
-  * Correction: (amount × feePercentage) / 1000 
-  * Bénin 3%: 2000 XOF → 60 XOF de frais → 1940 XOF reçu ✅
-  * Autres pays 6%: 2000 XOF → 120 XOF de frais → 1880 XOF reçu ✅
-- ✅ **NOUVEAU**: Implémentation complète API Paydunya v2 pour retraits
-  * Flux à 2 étapes: get-invoice → submit-invoice
-  * Déduction du solde après succès de la soumission
-  * Support complet des 20+ opérateurs (Orange Money, Wave, Moov, etc.)
-  * **Prérequis**: Compte Paydunya vérifié + API v2 activée dans dashboard
-  * **Status actuel**: Erreur "LIVE Private Key invalid" = compte non vérifié ou clés incorrectes
-  * **Action requise**: Vérifier compte Paydunya et récupérer clés LIVE correctes
-- ✅ Affichage correct des liens complets (pas juste tokens) avec copie fonctionnelle
-- ✅ Système de frais silencieux par pays (3% Bénin, 6% autres)
-- ✅ Système de suspension de comptes
-- ✅ Historique KYC avec recherche
-- ✅ Modification des liens de paiement
-- ✅ Persistance de session
-- ✅ Détails des transactions cliquables
+## Dernières modifications (24 Novembre 2025 - Session 2)
+- ✅ **ARCHITECTURE TRANSACTIONS**: Suppression complète du statut "pending"
+  * **Avant**: Transaction créée → "pending" → Paydunya paie → Webhook confirme
+  * **Maintenant**: Paydunya paie → Webhook reçoit "completed" → Transaction créée immédiatement
+  * **Résultat**: Zéro transactions en attente, historique toujours à jour
+  * Statuts disponibles: "completed" (succès), "failed" (erreur)
+  * Webhook crée la transaction avec le statut final directement depuis Paydunya
+  * Soldes déduits immédiatement après Paydunya confirme
+  * Pour dépôts/transferts: Résultats en temps réel
+- ✅ **NOUVEAU**: Vérification KYC obligatoire pour clés API
+  * Route POST `/api/api-keys` vérifie que `kycStatus === "verified"`
+  * Frontend désactive le bouton "Nouvelle clé API" si KYC non complété
+  * Message d'erreur clair: "Vous devez vérifier votre identité (KYC) avant de générer des clés API"
+  * Empêche développeurs de créer des clés sans passer la vérification d'identité
+- ✅ Frais silencieux par pays (3% Bénin, 6% autres) implémentés avec succès
+- ✅ Système de suspension de comptes (empêche toutes actions)
+- ✅ API Paydunya v2 pour retraits avec flux à 2 étapes
+- ✅ Historique KYC avec recherche et filtrage
+- ✅ Persistance de session et détails des transactions cliquables
 
 ## Architecture du projet
 
@@ -49,21 +49,23 @@ BKApay est une plateforme moderne de paiement mobile money pour l'Afrique de l'O
 ### Backend (Express + PostgreSQL)
 - **Authentification**: Sessions avec bcrypt pour le hashing des mots de passe
 - **Vérification comptes suspendus**: Bloquer login, paiements, dépôts, transferts, API
+- **Vérification KYC**: Clés API nécessitent `kycStatus === "verified"`
+- **Flux transactions webhook-driven**: Transactions créées seulement après confirmation Paydunya
 - **API Routes**:
-  - `/api/auth/*` - Inscription, connexion, déconnexion, profil
+  - `/api/auth/*` - Inscription, connexion, déconnexion, profil, changement mot de passe
   - `/api/dashboard/stats` - Statistiques utilisateur
   - `/api/payment-links` - CRUD liens de paiement
   - `/api/merchant-links` - CRUD liens marchands
-  - `/api/api-keys` - CRUD clés API
-  - `/api/transactions` - Historique des transactions
+  - `/api/api-keys` - CRUD clés API (avec vérification KYC)
+  - `/api/transactions` - Historique des transactions (statuts: completed, failed)
   - `/api/payments/process/:token` - Traitement paiements (liens)
   - `/api/merchant-payments/process/:token` - Traitement paiements (marchands)
   - `/api/payments/create` - Paiements via clé API (public, pour développeurs)
-  - `/api/deposits` - Dépôts sur le compte
-  - `/api/transfers` - Transferts/retraits vers mobile money
+  - `/api/deposits` - Dépôts sur le compte (webhook-driven)
+  - `/api/transfers` - Transferts/retraits vers mobile money (immédiat avec déduction)
   - `/api/admin/suspend` - Suspendre un compte
   - `/api/admin/unsuspend` - Réactiver un compte
-  - `/api/webhooks/paydunya` - Webhook pour notifications Paydunya
+  - `/api/webhooks/paydunya` - Webhook pour créer transactions confirmées
 
 ### Base de données (PostgreSQL)
 - **users**: Utilisateurs de la plateforme

@@ -496,6 +496,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/api-keys", requireAuth, async (req: Request, res: Response) => {
     try {
+      // Check if user has completed KYC verification
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) {
+        return res.status(404).json({ error: "Utilisateur non trouvé" });
+      }
+      
+      if (user.kycStatus !== "verified") {
+        return res.status(403).json({ 
+          error: "Vous devez vérifier votre identité (KYC) avant de générer des clés API.",
+          kycStatus: user.kycStatus
+        });
+      }
+
       const validatedData = insertApiKeySchema.parse(req.body);
       const key = await storage.createApiKey({
         ...validatedData,
