@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
 import type { PaymentLink } from "@shared/schema";
 import { COUNTRIES, OPERATORS } from "@shared/schema";
 import logoImage from "@assets/bkapay-logo.png";
@@ -12,7 +13,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { apiRequest } from "@/lib/queryClient";
-import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
+import { useEffect, useState } from "react";
+import { CheckCircle2, Clock } from "lucide-react";
 
 const paymentSchema = z.object({
   customerName: z.string().min(2, "Le nom doit contenir au moins 2 caractères"),
@@ -28,7 +31,10 @@ export default function Pay() {
   const [, params] = useRoute("/pay/:token");
   const token = params?.token;
   const [isLoading, setIsLoading] = useState(false);
-  const [ussdCode, setUssdCode] = useState("");
+  const [paymentInProgress, setPaymentInProgress] = useState(false);
+  const [invoiceToken, setInvoiceToken] = useState<string | null>(null);
+  const [pollingStatus, setPollingStatus] = useState<string | null>(null);
+  const { toast } = useToast();
 
   const { data: paymentLink, isLoading: linkLoading } = useQuery<PaymentLink>({
     queryKey: ["/api/payment-links/public", token],
@@ -49,6 +55,36 @@ export default function Pay() {
   const selectedCountry = form.watch("country");
   const countryOperators = selectedCountry ? OPERATORS[(selectedCountry as keyof typeof OPERATORS) || ("BJ" as const)] || [] : [];
 
+  // Polling for payment status
+  useEffect(() => {
+    if (!paymentInProgress || !invoiceToken) return;
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const result = await apiRequest("POST", "/api/softpay/verify-payment", {
+          invoiceToken,
+        });
+
+        if (result.status === "completed") {
+          setPaymentInProgress(false);
+          setPollingStatus("completed");
+          toast({
+            title: "Paiement confirmé!",
+            description: "Votre paiement a été traité avec succès",
+          });
+          form.reset();
+          setInvoiceToken(null);
+          queryClient.invalidateQueries({ queryKey: ["/api/payment-links"] });
+          clearInterval(pollInterval);
+        }
+      } catch (error) {
+        console.error("Polling error:", error);
+      }
+    }, 3000); // Poll every 3 seconds
+
+    return () => clearInterval(pollInterval);
+  }, [paymentInProgress, invoiceToken, toast, form]);
+
   const paymentMutation = useMutation({
     mutationFn: async (data: PaymentFormData) => {
       const res = await apiRequest("POST", `/api/payments/process/${token}`, {
@@ -61,13 +97,24 @@ export default function Pay() {
       return res.json();
     },
     onSuccess: (data: any) => {
-      if (data?.ussdCode) {
-        setUssdCode(data.ussdCode);
+      if (data?.token) {
+        setInvoiceToken(data.token);
+        setPaymentInProgress(true);
+        setPollingStatus("waiting");
+        toast({
+          title: "Facture créée",
+          description: "Veuillez compléter le paiement sur votre téléphone",
+        });
       }
     },
     onError: (error: any) => {
       console.error("Payment mutation error:", error);
       setIsLoading(false);
+      toast({
+        title: "Erreur",
+        description: error.message || "Erreur lors du paiement",
+        variant: "destructive",
+      });
     },
   });
 
@@ -112,23 +159,36 @@ export default function Pay() {
     );
   }
 
-  if (ussdCode) {
+  if (paymentInProgress) {
+    if (pollingStatus === "completed") {
+      return (
+        <div className="w-full min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center p-4 overflow-hidden">
+          <Card className="w-full max-w-md">
+            <CardHeader className="text-center space-y-2 p-4 sm:p-6">
+              <div className="flex justify-center mb-2">
+                <CheckCircle2 className="w-12 h-12 text-green-500" />
+              </div>
+              <CardTitle>Paiement réussi!</CardTitle>
+              <CardDescription>Votre transaction a été confirmée</CardDescription>
+            </CardHeader>
+          </Card>
+        </div>
+      );
+    }
+
     return (
       <div className="w-full min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center p-4 overflow-hidden">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center space-y-2 p-4 sm:p-6">
             <div className="flex justify-center mb-2">
-              <img src={logoImage} alt="BKApay" className="h-8 sm:h-10 w-auto" />
+              <Clock className="w-12 h-12 text-blue-500 animate-spin" />
             </div>
-            <CardTitle>Code USSD</CardTitle>
-            <CardDescription>Composez ce code sur votre téléphone pour payer</CardDescription>
+            <CardTitle>Paiement en attente</CardTitle>
+            <CardDescription>Veuillez compléter le paiement sur votre téléphone</CardDescription>
           </CardHeader>
           <CardContent className="p-4 sm:p-6 text-center space-y-4">
-            <div className="bg-primary/10 p-6 rounded-lg">
-              <p className="text-3xl font-bold font-mono text-primary">{ussdCode}</p>
-            </div>
             <p className="text-sm text-muted-foreground">
-              Composez le code ci-dessus sur votre téléphone pour finaliser le paiement
+              Vous allez recevoir un SMS sur votre téléphone. Confirmez le paiement directement sur votre mobile.
             </p>
           </CardContent>
         </Card>

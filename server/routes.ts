@@ -663,11 +663,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }),
         });
 
-        // Return USSD code
+        // Return token for SOFTPAY polling (same as deposits)
         res.json({
           success: true,
           transactionId: transactionId,
-          ussdCode: `*${paydunyaResponse.token}#`,
+          token: paydunyaResponse.token,
         });
       } else {
         res.status(400).json({ 
@@ -744,11 +744,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }),
         });
 
-        // Return USSD code
+        // Return token for SOFTPAY polling (same as deposits)
         res.json({
           success: true,
           transactionId: transactionId,
-          ussdCode: `*${paydunyaResponse.token}#`,
+          token: paydunyaResponse.token,
         });
       } else {
         res.status(400).json({ 
