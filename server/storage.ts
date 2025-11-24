@@ -299,8 +299,12 @@ export class DbStorage implements IStorage {
     };
   }
 
+  async getAllUsers(): Promise<User[]> {
+    return db.select().from(schema.users).orderBy(desc(schema.users.createdAt));
+  }
+
   async searchUsers(query: string): Promise<User[]> {
-    const allUsers = await db.select().from(schema.users);
+    const allUsers = await this.getAllUsers();
     const lowerQuery = query.toLowerCase();
     return allUsers.filter(
       (u) =>

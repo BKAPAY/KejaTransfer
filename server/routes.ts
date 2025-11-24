@@ -1004,6 +1004,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/admin/users", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const users = await storage.getAllUsers();
+      res.json(users);
+    } catch (error: any) {
+      console.error("Admin users error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.get("/api/admin/search", requireAdmin, async (req: Request, res: Response) => {
     try {
       const query = req.query.q as string;
