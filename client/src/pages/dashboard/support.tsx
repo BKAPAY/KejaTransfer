@@ -30,7 +30,7 @@ const faqs = [
   },
   {
     question: "Mes fonds sont-ils sécurisés?",
-    answer: "Oui, tous les fonds sont stockés en toute sécurité sur notre plateforme. Nous utilisons le protocole de paiement Paydunya qui garantit la sécurité de chaque transaction."
+    answer: "Oui, vos fonds sont totalement sécurisés. BKApay met en place les mesures de sécurité les plus élevées pour protéger vos transactions et vos données personnelles. Nous respectons les normes internationales en matière de sécurité des paiements."
   },
   {
     question: "Comment modifier mon profil?",
