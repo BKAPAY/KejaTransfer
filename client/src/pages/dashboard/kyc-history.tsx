@@ -2,12 +2,15 @@ import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CheckCircle2, X, ArrowLeft } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { CheckCircle2, X, ArrowLeft, Search } from "lucide-react";
 import type { User } from "@shared/schema";
 import { useLocation } from "wouter";
+import { useState } from "react";
 
 export default function KycHistoryPage() {
   const [, navigate] = useLocation();
+  const [searchQuery, setSearchQuery] = useState("");
 
   const { data: submissions } = useQuery({
     queryKey: ["/api/admin/kyc-submissions"],
@@ -20,6 +23,19 @@ export default function KycHistoryPage() {
   const rejectedSubmissions = (submissions as User[] || []).filter(
     (u: User) => u.kycStatus === "rejected"
   );
+
+  const filterBySearch = (users: User[]): User[] => {
+    if (!searchQuery.trim()) return users;
+    const query = searchQuery.toLowerCase();
+    return users.filter((u: User) => {
+      const fullName = `${u.firstName} ${u.lastName}`.toLowerCase();
+      const email = u.email.toLowerCase();
+      return fullName.includes(query) || email.includes(query);
+    });
+  };
+
+  const filteredApproved = filterBySearch(approvedSubmissions);
+  const filteredRejected = filterBySearch(rejectedSubmissions);
 
   const renderSubmissionCard = (user: User) => (
     <Card key={user.id} className="overflow-hidden" data-testid={`kyc-history-card-${user.id}`}>
@@ -114,42 +130,57 @@ export default function KycHistoryPage() {
         </div>
       </div>
 
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <Input
+          placeholder="Rechercher par nom, prénom ou email..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-10"
+          data-testid="input-search-kyc"
+        />
+      </div>
+
       <Tabs defaultValue="approved" className="w-full">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="approved" data-testid="tab-kyc-approved">
-            Approuvées ({approvedSubmissions.length})
+            Approuvées ({filteredApproved.length})
           </TabsTrigger>
           <TabsTrigger value="rejected" data-testid="tab-kyc-rejected">
-            Rejetées ({rejectedSubmissions.length})
+            Rejetées ({filteredRejected.length})
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="approved" className="space-y-4 mt-4">
-          {approvedSubmissions.length === 0 ? (
+          {filteredApproved.length === 0 ? (
             <Card>
               <CardContent className="pt-6 text-center py-12">
                 <CheckCircle2 className="w-12 h-12 mx-auto mb-3 text-green-600 dark:text-green-400" />
-                <p className="text-muted-foreground">Aucune vérification approuvée</p>
+                <p className="text-muted-foreground">
+                  {searchQuery ? "Aucune vérification approuvée trouvée" : "Aucune vérification approuvée"}
+                </p>
               </CardContent>
             </Card>
           ) : (
             <div className="grid gap-4">
-              {approvedSubmissions.map((user: User) => renderSubmissionCard(user))}
+              {filteredApproved.map((user: User) => renderSubmissionCard(user))}
             </div>
           )}
         </TabsContent>
 
         <TabsContent value="rejected" className="space-y-4 mt-4">
-          {rejectedSubmissions.length === 0 ? (
+          {filteredRejected.length === 0 ? (
             <Card>
               <CardContent className="pt-6 text-center py-12">
                 <X className="w-12 h-12 mx-auto mb-3 text-red-600 dark:text-red-400" />
-                <p className="text-muted-foreground">Aucune vérification rejetée</p>
+                <p className="text-muted-foreground">
+                  {searchQuery ? "Aucune vérification rejetée trouvée" : "Aucune vérification rejetée"}
+                </p>
               </CardContent>
             </Card>
           ) : (
             <div className="grid gap-4">
-              {rejectedSubmissions.map((user: User) => renderSubmissionCard(user))}
+              {filteredRejected.map((user: User) => renderSubmissionCard(user))}
             </div>
           )}
         </TabsContent>
