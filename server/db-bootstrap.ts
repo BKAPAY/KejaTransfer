@@ -1,4 +1,5 @@
 import { readFileSync } from "fs";
+import { createHash } from "crypto";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
@@ -20,6 +21,10 @@ interface MigrationJournal {
   entries: MigrationEntry[];
 }
 
+function computeMigrationHash(sqlContent: string): string {
+  return createHash("sha256").update(sqlContent).digest("hex");
+}
+
 async function bootstrapDatabase() {
   const DATABASE_URL = process.env.DATABASE_URL;
 
@@ -33,13 +38,87 @@ async function bootstrapDatabase() {
   const db = drizzle(client);
 
   try {
-    // Step 1: Ensure drizzle schema exists
+    // Step 1: Read migration journal
+    console.log("📖 Reading migration journal...");
+    const journalPath = "./migrations/meta/_journal.json";
+    const journal: MigrationJournal = JSON.parse(readFileSync(journalPath, "utf-8"));
+    console.log(`✅ Found ${journal.entries.length} migration(s) in journal`);
+
+    // Step 2: Ensure drizzle schema and migrations table exist
     console.log("🔧 Ensuring drizzle schema exists...");
     await client`CREATE SCHEMA IF NOT EXISTS drizzle`;
-    console.log("✅ Drizzle schema ready");
+    
+    await client`
+      CREATE TABLE IF NOT EXISTS drizzle.__drizzle_migrations (
+        id SERIAL PRIMARY KEY,
+        hash text NOT NULL,
+        created_at bigint
+      )
+    `;
+    console.log("✅ Drizzle metadata tables ready");
 
-    // Step 2: Run the Drizzle migrator
-    // Migrator will automatically manage hashes in drizzle.__drizzle_migrations
+    // Step 3: Get currently tracked migrations
+    console.log("🔍 Checking migration tracking...");
+    const appliedMigrations = await client`
+      SELECT hash FROM drizzle.__drizzle_migrations ORDER BY created_at
+    `;
+    const appliedHashes = new Set(appliedMigrations.map((m: any) => m.hash));
+    console.log(`📊 Found ${appliedHashes.size} tracked migration(s) out of ${journal.entries.length} in journal`);
+
+    // Step 4: Reconciliation - backfill all missing migrations if main table exists
+    console.log("🔧 Checking for migrations to reconcile...");
+    const now = Date.now();
+    let reconciledCount = 0;
+    
+    // Check if reconciliation is needed (some migrations missing from tracking)
+    if (appliedHashes.size < journal.entries.length) {
+      // Check if main table exists (indicates migrations were applied but not tracked)
+      let mainTableExists = false;
+      try {
+        await client`SELECT 1 FROM users LIMIT 1`;
+        mainTableExists = true;
+        console.log("⚠️  Main table exists but some migrations not tracked - reconciling...");
+      } catch {
+        console.log("✅ Fresh database - no reconciliation needed");
+      }
+      
+      if (mainTableExists) {
+        // Backfill all missing migration hashes in a transaction
+        await client.begin(async (tx) => {
+          for (let i = 0; i < journal.entries.length; i++) {
+            const entry = journal.entries[i];
+            const sqlPath = `./migrations/${entry.tag}.sql`;
+            
+            try {
+              const sqlContent = readFileSync(sqlPath, "utf-8");
+              const hash = computeMigrationHash(sqlContent);
+              
+              // Check if this migration hash is already tracked
+              if (appliedHashes.has(hash)) {
+                continue; // Already tracked, skip
+              }
+              
+              // Backfill the migration record
+              await tx`
+                INSERT INTO drizzle.__drizzle_migrations (hash, created_at)
+                VALUES (${hash}, ${now + i})
+              `;
+              console.log(`  ✅ Reconciled migration: ${entry.tag}`);
+              reconciledCount++;
+            } catch (err) {
+              console.error(`  ❌ Could not reconcile ${entry.tag}:`, err);
+              throw err; // Rollback transaction on error
+            }
+          }
+        });
+        
+        console.log(`✅ Reconciled ${reconciledCount} migration(s)!`);
+      }
+    } else {
+      console.log("✅ All migrations properly tracked");
+    }
+
+    // Step 5: Run the Drizzle migrator
     console.log("📋 Running Drizzle migrator...");
     await migrate(db, { migrationsFolder: "./migrations" });
     console.log("✅ Migrations completed successfully!");

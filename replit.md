@@ -6,16 +6,26 @@ BKApay est une plateforme moderne de paiement mobile money pour l'Afrique de l'O
 ## Dernières modifications (24 Novembre 2025 - Session 8 MIGRATION AUTOMATIQUE)
 - ✅ **MIGRATION AUTOMATIQUE BASE DE DONNÉES - IMPLEMENTATION COMPLETE**
   * **Script de bootstrap**: `server/db-bootstrap.ts` exécuté automatiquement au démarrage
-  * **Flux de migration automatique**:
-    1. Assure que le schéma drizzle existe
-    2. Exécute le migrator Drizzle qui gère automatiquement les hashes SHA et l'idempotence
-    3. Crée l'admin principal (kpetekoussojuste1@gmail.com, code: 19992025) s'il n'existe pas
-    4. Fail-fast (serveur ne démarre pas) si migration échoue
+  * **Flux de migration automatique avec réconciliation intelligente**:
+    1. Lit le journal des migrations (`migrations/meta/_journal.json`)
+    2. Assure que le schéma drizzle et la table `__drizzle_migrations` existent
+    3. Vérifie le nombre de migrations trackées vs. nombre de migrations dans le journal
+    4. **Réconciliation automatique** (si migrations manquantes):
+       - Détecte si la table principale `users` existe
+       - Calcule les SHA256 de tous les fichiers SQL de migration
+       - Backfill TOUS les hashes manquants dans une transaction
+       - Rollback automatique en cas d'erreur
+    5. Exécute le migrator Drizzle qui skipera les migrations déjà trackées
+    6. Crée l'admin principal (kpetekoussojuste1@gmail.com, code: 19992025) s'il n'existe pas
+    7. Fail-fast (serveur ne démarre pas) si migration échoue
   * **Avantages**:
     - Utilise drizzle-orm (pas drizzle-kit), disponible en production
-    - Synchronisation automatique du schéma dev → production sans intervention manuelle
-    - Idempotent: fonctionne sur base fraîche ET déjà provisionnée
-    - Sécurisé: Drizzle gère les hashes SHA automatiquement
+    - **Gère tous les scénarios**: base fraîche, complètement trackée, partiellement trackée, non trackée
+    - Réconciliation transactionnelle (état cohérent garanti)
+    - Calcule les vrais SHA256 (pas de corruption de bookkeeping)
+    - Synchronisation automatique dev → production sans intervention manuelle
+    - **Pas d'erreur "relation already exists"** lors du déploiement
+    - Sécurisé et robuste avec rollback automatique
   * **Favicon et Meta Tags**: Logo BKApay configuré pour partage social media
   * **Traduction bloquée**: Meta tags pour empêcher traduction automatique des navigateurs
 
