@@ -35,6 +35,9 @@ import Merchant from "@/pages/merchant";
 import ApiPayment from "@/pages/api-payment";
 import PaymentStatus from "@/pages/payment-status";
 import ApiDemo from "@/pages/api-demo";
+import Terms from "@/pages/terms";
+import Privacy from "@/pages/privacy";
+import Cookies from "@/pages/cookies";
 
 function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [location, setLocation] = useLocation();
@@ -121,6 +124,9 @@ function Router() {
       <Route path="/documentation" component={Documentation} />
       <Route path="/signup" component={Signup} />
       <Route path="/login" component={Login} />
+      <Route path="/terms" component={Terms} />
+      <Route path="/privacy" component={Privacy} />
+      <Route path="/cookies" component={Cookies} />
       <Route path="/pay/:token" component={Pay} />
       <Route path="/merchant/:token" component={Merchant} />
       <Route path="/api-payment/:transactionId" component={ApiPayment} />
