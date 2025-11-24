@@ -4,7 +4,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Globe, Wifi, CheckCircle2, XCircle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState } from "react";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { CountryOperatorConfig } from "@shared/schema";
 
@@ -53,6 +53,7 @@ export default function CountryOperatorConfig() {
         title: "Succès",
         description: "Configuration mise à jour",
       });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/country-operator-config"] });
     },
     onError: (error: any) => {
       toast({
