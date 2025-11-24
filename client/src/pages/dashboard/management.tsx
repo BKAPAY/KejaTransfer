@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Users, Shield, Trash2, Plus, Minus, History, Link as LinkIcon, Store, Key, User as UserIcon } from "lucide-react";
+import { Users, Shield, Trash2, Plus, Minus, History, Link as LinkIcon, Store, Key, User as UserIcon, Check, X } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
@@ -164,6 +164,28 @@ export default function Management() {
     },
   });
 
+  const toggleVerificationMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const response = await fetch("/api/admin/toggle-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId }),
+      });
+      if (!response.ok) throw new Error("Failed to toggle verification");
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({ 
+        title: "Succès", 
+        description: data.verified ? "Compte vérifiée" : "Compte dévérifiée" 
+      });
+      refetchUsers();
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible de modifier la vérification", variant: "destructive" });
+    },
+  });
+
   const formatAmount = (amount: number) => {
     return new Intl.NumberFormat("fr-FR", {
       style: "currency",
@@ -238,6 +260,13 @@ export default function Management() {
                             data-testid={`badge-kyc-${user.id}`}
                           >
                             {user.kycStatus === "verified" ? "✓ Vérifiée" : "Non vérifiée"}
+                          </Badge>
+                          <Badge
+                            variant={user.verified ? "default" : "secondary"}
+                            className="text-xs"
+                            data-testid={`badge-verified-${user.id}`}
+                          >
+                            {user.verified ? "✓ Vérifié" : "Non vérifié"}
                           </Badge>
                           {user.isAdmin && (
                             <Badge variant="destructive" className="text-xs" data-testid={`badge-admin-${user.id}`}>
@@ -372,6 +401,29 @@ export default function Management() {
                         >
                           <Shield className="w-4 h-4 mr-1" />
                           Révoquer Admin
+                        </Button>
+                      )}
+                      {user.verified ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => toggleVerificationMutation.mutate(user.id)}
+                          disabled={toggleVerificationMutation.isPending}
+                          data-testid={`button-unverify-${user.id}`}
+                        >
+                          <X className="w-4 h-4 mr-1" />
+                          Dévérifier
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => toggleVerificationMutation.mutate(user.id)}
+                          disabled={toggleVerificationMutation.isPending}
+                          data-testid={`button-verify-${user.id}`}
+                        >
+                          <Check className="w-4 h-4 mr-1" />
+                          Vérifier
                         </Button>
                       )}
                       <Button
