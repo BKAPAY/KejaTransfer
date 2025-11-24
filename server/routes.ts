@@ -687,7 +687,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Votre compte a été suspendu. Veuillez contacter le support." });
       }
 
-      const { amount, country, operator, customerName, customerEmail, customerPhone } = req.body;
+      const { amount, country, operator, phone } = req.body;
 
       if (!amount || amount <= 0) {
         return res.status(400).json({ error: "Montant invalide" });
@@ -707,6 +707,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           type: "deposit",
           country,
           operator,
+          phone,
         },
         actions: {
           callback_url: `${process.env.BASE_URL || 'http://localhost:5000'}/api/webhooks/paydunya`,
