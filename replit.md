@@ -3,27 +3,24 @@
 ## Vue d'ensemble
 BKApay est une plateforme moderne de paiement mobile money pour l'Afrique de l'Ouest. Elle permet aux entreprises et particuliers d'accepter des paiements via mobile money (Orange Money, MTN, Moov, Wave, Free Money, T-Money, Wizall, Expresso) dans 6 pays: Bénin, Togo, Côte d'Ivoire, Sénégal, Burkina Faso et Mali.
 
-## Dernières modifications (24 Novembre 2025 - Session 3)
+## Dernières modifications (24 Novembre 2025 - Session 3 FINAL)
 - ✅ **PAYDUNYA SOFTPAY INTÉGRATION DIRECTE (EMBEDDED)**
-  * **Avant**: Utilisateurs redirigés vers Paydunya pour payer (quittaient BKApay)
-  * **Maintenant**: QR Codes affichés DIRECTEMENT dans BKApay - Paiement embedded sans redirection
-  * **Bénéfices**:
-    - Expérience utilisateur professionnelle - pas de redirection Paydunya
-    - QR Code généré dynamiquement avec la librairie qrcode.js
-    - Utilisateurs scannent le QR avec leur téléphone depuis BKApay
-    - Webhook Paydunya confirme le paiement en temps réel
-    - Interface propre et branding BKApay maintenu
-  * **Pages impactées**:
-    - `/pay/:token` - Paiements par liens de paiement
-    - `/merchant/:token` - Paiements par liens marchands
-  * **Composant nouveau**: `SoftPayQRCode` - Réutilisable pour afficher QR/OTP/statut
-  * **Routes backend**: Inchangées - continuent à créer factures Paydunya
-  * **Clés Paydunya LIVE**: Mises à jour et testées avec succès
-- ✅ Architecture transactions webhook-driven complètement opérationnelle
+  * **QR Codes affichés directement dans BKApay** - Pas de redirection externe
+  * Frontend génère QR Code dynamiquement avec librairie qrcode.js
+  * Utilisateurs scannent le QR avec leur téléphone depuis BKApay
+  * Webhook Paydunya confirme paiement en temps réel
+  * Interface professionnelle maintient branding BKApay
+  * Pages impactées: `/pay/:token` et `/merchant/:token`
+  * Composant réutilisable: `SoftPayQRCode`
+- ✅ **BUGS CORRIGÉS**
+  * Dépôt: Corrigé mapping des champs (accepte `phone` au lieu de `customerPhone`)
+  * Transfert: Formatage correct du numéro téléphone avec code pays Paydunya v2
+  * Types: Ajout `@types/qrcode` pour LSP
+- ✅ Architecture transactions webhook-driven opérationnelle
 - ✅ KYC obligatoire pour clés API et transferts
 - ✅ Frais silencieux par pays (3% Bénin, 6% autres)
 - ✅ Système de suspension de comptes
-- ✅ API Paydunya v2 pour retraits
+- ✅ API Paydunya v2 pour retraits avec formatage téléphone correct
 
 ## Architecture du projet
 
@@ -40,6 +37,8 @@ BKApay est une plateforme moderne de paiement mobile money pour l'Afrique de l'O
   - Gestion des liens marchands
   - Gestion des clés API (KYC required)
   - Historique des transactions
+  - Dépôts via mobile money (fixe)
+  - Transferts/Retraits vers mobile money (flexible)
   - Profil utilisateur
   - Paramètres, Annonces, Support
 
@@ -53,10 +52,10 @@ BKApay est une plateforme moderne de paiement mobile money pour l'Afrique de l'O
 - **Paydunya SoftPay**: QR Codes embedded sans redirection
 - **Webhooks**: Transactions créées post-confirmation Paydunya
 - **Flux paiements**: 
-  1. Utilisateur remplir le formulaire de paiement
+  1. Utilisateur remplit formulaire
   2. Backend crée facture Paydunya
-  3. Frontend affiche QR Code dynamique (pas de redirection)
-  4. Utilisateur scanne et paie via son téléphone
+  3. Frontend affiche QR Code (pas de redirection)
+  4. Utilisateur scanne et paie
   5. Webhook Paydunya confirme → Transaction créée
   6. Statut mis à jour en temps réel
 
@@ -75,7 +74,7 @@ BKApay est une plateforme moderne de paiement mobile money pour l'Afrique de l'O
 - React Hook Form + Zod validation
 - Shadcn UI + Tailwind CSS
 - TanStack Query pour data fetching
-- **qrcode.js** - Génération QR Codes embedded (NOUVEAU)
+- **qrcode.js** - Génération QR Codes embedded
 
 ### Backend
 - Express.js + TypeScript
@@ -86,9 +85,11 @@ BKApay est une plateforme moderne de paiement mobile money pour l'Afrique de l'O
 
 ### Intégration Paydunya
 - **Endpoint factures**: `/api/v1/checkout-invoice/create`
-- **SoftPay QR Codes**: Embedded dans BKApay (NOUVEAU)
+- **SoftPay QR Codes**: Embedded dans BKApay
+- **Withdrawals API v2**: `/api/v2/disburse/get-invoice` + `/api/v2/disburse/submit-invoice`
 - **Webhooks**: `/api/webhooks/paydunya`
 - **Clés LIVE**: Configurées et testées ✅
+- **Formatage téléphone**: Code pays automatiquement ajouté (+229 Bénin, +221 Sénégal, etc.)
 
 ## Opérateurs supportés par pays
 - **Sénégal**: Orange Money, Free Money, Expresso, Wave, Wizall
@@ -134,31 +135,26 @@ BKApay est une plateforme moderne de paiement mobile money pour l'Afrique de l'O
 ### 2. Liens de paiement
 - Montant fixe ou flexible
 - Images optionnelles
-- Statut en temps réel
 - Suivi des paiements
 
 ### 3. API Gateway
 - Clés API publique/privée pour développeurs
 - Paiements entrants: `/api/payments/create`
-- Paiements sortants: Dashboard des transferts
 - Documentation complète
 
 ### 4. Gestion des transactions
 - Historique complet
 - Statuts: completed, failed
 - Filtres par type, pays, opérateur
-- Export possible
 
 ### 5. Frais silencieux
 - Bénin: 3% entrant/sortant
 - Autres pays: 6% entrant/sortant
 - Calculés automatiquement
-- Zéro affichage pourcentages (discret)
 
 ### 6. Suspension de comptes
 - Admin peut suspendre utilisateurs
 - Toutes fonctionnalités désactivées
-- Impossibilité login/paiements/transferts
 
 ## Variables d'environnement
 ```
@@ -171,35 +167,24 @@ PAYDUNYA_TOKEN=XN1wEVW2Er1PkdtZcj9L
 BASE_URL=https://bkapay.com
 ```
 
-## Fichiers modifiés récemment (Session 3)
-- ✅ `client/src/components/softpay-qrcode.tsx` (NOUVEAU) - Composant QR Code embedded
-- ✅ `client/src/pages/pay.tsx` - Intégration QR Code pour paiements
-- ✅ `client/src/pages/merchant.tsx` - Intégration QR Code pour marchands
-- ✅ `server/utils/qrcode.ts` (NOUVEAU) - Utilities Paydunya SoftPay
-- ✅ `package.json` - Ajout `qrcode` library
-
-## Design
-- Couleurs: Vert (#228B22) et Doré accent
-- Police: Inter, DM Sans
-- QR Codes: Vert BKApay sur fond blanc
-- Mode sombre supporté
+## Fichiers modifiés (Session 3)
+- ✅ `client/src/components/softpay-qrcode.tsx` (NOUVEAU)
+- ✅ `client/src/pages/pay.tsx`
+- ✅ `client/src/pages/merchant.tsx`
+- ✅ `client/src/pages/dashboard/deposit.tsx` (correction dépôt)
+- ✅ `server/routes.ts` (correction dépôt, transfert, QR code)
+- ✅ `server/utils/qrcode.ts` (NOUVEAU)
+- ✅ `package.json` - qrcode, @types/qrcode
 
 ## Statuts des fonctionnalités
 - ✅ Authentication & KYC
-- ✅ Paiements embedded (SoftPay QR Code) - NOUVEAU
+- ✅ Paiements embedded (SoftPay QR Code)
 - ✅ Liens de paiement & marchands
 - ✅ Transactions webhook-driven
 - ✅ Frais silencieux
 - ✅ Suspension comptes
 - ✅ API Gateway
 - ✅ Admin Panel
+- ✅ Dépôts et Transferts
 - 📋 SDKs officiels (planifié)
 - 📋 Plugins WooCommerce (planifié)
-
-## Prochaines étapes potentielles
-- OTP inline (alternative QR Code)
-- Charge modal avec spinner
-- Analytics détaillées par opérateur
-- Webhooks pour développeurs
-- SDKs JS, Python, PHP
-- Plugins WordPress/WooCommerce
