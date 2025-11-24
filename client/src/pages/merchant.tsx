@@ -2,8 +2,10 @@ import { useRoute } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import type { MerchantLink } from "@shared/schema";
+import { COUNTRIES, OPERATORS } from "@shared/schema";
 import logoImage from "@assets/bkapay-logo.png";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -11,13 +13,14 @@ import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { apiRequest } from "@/lib/queryClient";
 import { useState } from "react";
-import { detectPhoneCountryAndOperator } from "@shared/phone-utils";
 
 const merchantPaymentSchema = z.object({
   amount: z.number().min(100, "Le montant minimum est de 100 XOF"),
   customerName: z.string().min(2, "Le nom doit contenir au moins 2 caractères"),
   customerEmail: z.string().email("Email invalide"),
+  country: z.string().min(1, "Sélectionnez un pays"),
   customerPhone: z.string().min(8, "Numéro de téléphone invalide"),
+  operator: z.string().min(1, "Sélectionnez un opérateur"),
 });
 
 type MerchantPaymentFormData = z.infer<typeof merchantPaymentSchema>;
@@ -26,7 +29,6 @@ export default function Merchant() {
   const [, params] = useRoute("/merchant/:token");
   const token = params?.token;
   const [isLoading, setIsLoading] = useState(false);
-  const [phoneError, setPhoneError] = useState("");
   const [ussdCode, setUssdCode] = useState("");
 
   const { data: merchantLink, isLoading: linkLoading } = useQuery<MerchantLink>({
@@ -40,35 +42,24 @@ export default function Merchant() {
       amount: undefined as any,
       customerName: "",
       customerEmail: "",
+      country: "",
       customerPhone: "",
+      operator: "",
     },
   });
 
-  const handlePhoneChange = (e: any) => {
-    const phone = e.target.value;
-    form.setValue("customerPhone", phone);
-
-    if (phone.length >= 9) {
-      const detected = detectPhoneCountryAndOperator(phone);
-      if (detected.isValid) {
-        setPhoneError("");
-      } else if (phone.length > 10) {
-        setPhoneError("Numéro de téléphone invalide pour cette région");
-      }
-    }
-  };
+  const selectedCountry = form.watch("country");
+  const countryOperators = selectedCountry ? OPERATORS[(selectedCountry as keyof typeof OPERATORS) || ("BJ" as const)] || [] : [];
 
   const paymentMutation = useMutation({
     mutationFn: async (data: MerchantPaymentFormData) => {
-      const detected = detectPhoneCountryAndOperator(data.customerPhone);
-      if (!detected.isValid) {
-        throw new Error("Impossible de détecter le pays/opérateur du numéro");
-      }
-
       const res = await apiRequest("POST", `/api/merchant-payments/process/${token}`, {
-        ...data,
-        country: detected.country,
-        operator: detected.operator,
+        amount: data.amount,
+        customerName: data.customerName,
+        customerEmail: data.customerEmail,
+        customerPhone: data.customerPhone,
+        country: data.country,
+        operator: data.operator,
       });
       return res.json();
     },
@@ -84,11 +75,6 @@ export default function Merchant() {
   });
 
   const onSubmit = (data: MerchantPaymentFormData) => {
-    const detected = detectPhoneCountryAndOperator(data.customerPhone);
-    if (!detected.isValid) {
-      setPhoneError("Numéro invalide - impossible à détecter automatiquement");
-      return;
-    }
     setIsLoading(true);
     paymentMutation.mutate(data);
   };
@@ -223,19 +209,65 @@ export default function Merchant() {
               />
               <FormField
                 control={form.control}
+                name="country"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs sm:text-sm">Pays</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-country">
+                          <SelectValue placeholder="Sélectionnez un pays" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {COUNTRIES.map((country) => (
+                          <SelectItem key={country.code} value={country.code}>
+                            {country.flag} {country.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
                 name="customerPhone"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-xs sm:text-sm">Numéro de téléphone</FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="+221 77 123 45 67"
+                        placeholder="77 123 45 67"
                         data-testid="input-phone"
                         {...field}
-                        onChange={handlePhoneChange}
                       />
                     </FormControl>
-                    {phoneError && <p className="text-xs text-red-500 mt-1">{phoneError}</p>}
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="operator"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs sm:text-sm">Opérateur</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-operator">
+                          <SelectValue placeholder="Sélectionnez votre opérateur" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {countryOperators.map((op) => (
+                          <SelectItem key={op.code} value={op.code}>
+                            {op.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -246,7 +278,7 @@ export default function Merchant() {
                 disabled={isLoading || paymentMutation.isPending}
                 data-testid="button-pay"
               >
-                {isLoading || paymentMutation.isPending ? "Traitement..." : "Obtenir le code USSD"}
+                {isLoading || paymentMutation.isPending ? "Traitement..." : "Payer maintenant"}
               </Button>
             </form>
           </Form>
