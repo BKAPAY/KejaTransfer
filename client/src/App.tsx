@@ -26,6 +26,7 @@ import Deposit from "@/pages/dashboard/deposit";
 import Transfer from "@/pages/dashboard/transfer";
 import Admin from "@/pages/dashboard/admin";
 import Management from "@/pages/dashboard/management";
+import KycVerification from "@/pages/dashboard/kyc-verification";
 import Pay from "@/pages/pay";
 import Merchant from "@/pages/merchant";
 import ApiPayment from "@/pages/api-payment";
@@ -101,6 +102,7 @@ function Router() {
           <Route path="/dashboard/transfer" component={Transfer} />
           <Route path="/dashboard/admin" component={Admin} />
           <Route path="/dashboard/management" component={Management} />
+          <Route path="/dashboard/kyc-verification" component={KycVerification} />
           <Route component={NotFound} />
         </Switch>
       </DashboardLayout>

@@ -25,13 +25,13 @@ import {
   ApiKeysDialog,
   ProfileDialog,
 } from "./management-details";
-import { KycVerificationModal } from "@/components/kyc-verification-modal";
+import { useLocation } from "wouter";
 
 export default function Management() {
   const [searchQuery, setSearchQuery] = useState("");
   const [fundAmount, setFundAmount] = useState<{ [userId: string]: string }>({});
   const { toast } = useToast();
-  const [kycModalOpen, setKycModalOpen] = useState(false);
+  const [, navigate] = useLocation();
 
   // Dialog states
   const [promoteDialog, setPromoteDialog] = useState<{ open: boolean; userId?: string; userName?: string }>({ open: false });
@@ -235,7 +235,7 @@ export default function Management() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setKycModalOpen(true)}
+            onClick={() => navigate("/dashboard/kyc-verification")}
             data-testid="button-kyc-verification"
           >
             <FileCheck className="w-4 h-4 mr-2" />
@@ -634,9 +634,6 @@ export default function Management() {
       
       {/* API Keys Dialog */}
       {apiKeysViewUserId && <ApiKeysDialog userId={apiKeysViewUserId} onOpenChange={() => setApiKeysViewUserId(null)} />}
-
-      {/* KYC Verification Modal */}
-      <KycVerificationModal open={kycModalOpen} onOpenChange={setKycModalOpen} />
     </div>
   );
 }
