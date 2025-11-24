@@ -816,11 +816,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         formattedPhone = countryCode + phone;
       }
 
-      // Step 1: Get disbursement invoice (without callback - Paydunya validates URL accessibility)
+      // Step 1: Get disbursement invoice
+      // For production: use real callback URL. For development: Paydunya may not be able to validate localhost
+      const callbackUrl = process.env.BASE_URL 
+        ? `${process.env.BASE_URL}/api/webhooks/paydunya`
+        : "https://api.paydunya.com/callback"; // Fallback for development
+      
       const paydunyaData = {
         account_alias: formattedPhone,
         amount: Math.floor(amount),
         withdraw_mode: withdrawMode,
+        callback_url: callbackUrl,
       };
 
       // Step 1: Get disbursement invoice
