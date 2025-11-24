@@ -833,9 +833,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ===== SOFTPAY Routes (No Redirect, No Paydunya UI) =====
+  // ===== SOFTPAY Routes (No Redirect - Using existing v1 API) =====
   
-  // Create SOFTPAY Payment
+  // Create SOFTPAY Payment - Using v1 API (existing endpoint that works)
   app.post("/api/softpay/create-payment", requireAuth, async (req: Request, res: Response) => {
     try {
       const user = await storage.getUser(req.session.userId!);
@@ -849,50 +849,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Montant invalide" });
       }
 
-      // Create SOFTPAY invoice (v2 API)
+      // Create SOFTPAY invoice using existing v1 API (which works)
       const paydunyaData = {
         invoice: {
-          items: [
-            {
-              name: description || "Dépôt BKApay",
-              quantity: 1,
-              unit_price: Math.floor(amount),
-            },
-          ],
           total_amount: Math.floor(amount),
+          description: description || `Dépôt de ${amount} XOF`,
         },
-        customer: {
-          name: user?.firstName + " " + user?.lastName || "Customer",
-          phone_number: phone || user?.phone || "",
+        store: {
+          name: "BKApay",
+        },
+        custom_data: {
+          user_id: req.session.userId!,
+          type: "deposit",
+          country,
+          operator,
+          phone,
+        },
+        actions: {
+          callback_url: `${process.env.BASE_URL || 'https://bkapay.com'}/api/webhooks/paydunya`,
         },
       };
 
       console.log("[SOFTPAY] Creating invoice with data:", paydunyaData);
 
-      // Call Paydunya SOFTPAY API (v2)
-      const response = await fetch("https://app.paydunya.com/api/v2/invoice/create", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "PAYDUNYA-MASTER-KEY": PAYDUNYA_CONFIG.masterKey,
-          "PAYDUNYA-PRIVATE-KEY": PAYDUNYA_CONFIG.privateKey,
-          "PAYDUNYA-TOKEN": PAYDUNYA_CONFIG.token,
-        },
-        body: JSON.stringify(paydunyaData),
-      });
+      const paydunyaResponse = await callPaydunyaAPI("/checkout-invoice/create", paydunyaData);
 
-      const responseText = await response.text();
-      console.log("[SOFTPAY] Response status:", response.status, "Text:", responseText.substring(0, 500));
-
-      let paydunyaResponse;
-      try {
-        paydunyaResponse = JSON.parse(responseText);
-      } catch (e) {
-        console.error("[SOFTPAY] Failed to parse response:", responseText);
-        return res.status(500).json({ error: "Erreur lors de la création de la facture Paydunya" });
-      }
-
-      if (response.ok && paydunyaResponse.response_token) {
+      if (paydunyaResponse.response_code === "00" && paydunyaResponse.token) {
         // Create transaction
         const transactionId = randomUUID();
         await storage.createTransaction({
@@ -907,7 +889,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           operator,
           description: description || `Dépôt de ${amount} XOF`,
           metadata: JSON.stringify({
-            paydunyaToken: paydunyaResponse.response_token,
+            paydunyaToken: paydunyaResponse.token,
             phone,
             softpay: true,
           }),
@@ -916,7 +898,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.json({
           success: true,
           transactionId,
-          token: paydunyaResponse.response_token,
+          token: paydunyaResponse.token,
         });
       } else {
         console.error("[SOFTPAY] Error response:", paydunyaResponse);
@@ -930,7 +912,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Verify SOFTPAY Payment
+  // Verify SOFTPAY Payment - Polling endpoint
   app.post("/api/softpay/verify-payment", async (req: Request, res: Response) => {
     try {
       const { invoiceToken } = req.body;
@@ -941,31 +923,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log("[SOFTPAY] Verifying payment with token:", invoiceToken);
 
-      // Call Paydunya verify API (v2)
-      const response = await fetch(
-        `https://app.paydunya.com/api/v2/invoice/confirm/${invoiceToken}`,
-        {
-          method: "GET",
-          headers: {
-            "PAYDUNYA-MASTER-KEY": PAYDUNYA_CONFIG.masterKey,
-            "PAYDUNYA-PRIVATE-KEY": PAYDUNYA_CONFIG.privateKey,
-            "PAYDUNYA-TOKEN": PAYDUNYA_CONFIG.token,
-          },
-        }
-      );
-
-      const responseText = await response.text();
-      console.log("[SOFTPAY] Verify response status:", response.status, "Text:", responseText.substring(0, 500));
-
-      let paydunyaResponse;
-      try {
-        paydunyaResponse = JSON.parse(responseText);
-      } catch (e) {
-        console.error("[SOFTPAY] Failed to parse verify response:", responseText);
-        return res.status(500).json({ error: "Erreur lors de la vérification du paiement" });
-      }
-
-      res.json(paydunyaResponse);
+      // For SOFTPAY, we just return a pending status
+      // The real verification happens via webhooks from Paydunya
+      res.json({
+        status: "pending",
+        response_code: "01",
+      });
     } catch (error: any) {
       console.error("[SOFTPAY] Verify payment error:", error);
       res.status(500).json({ error: error.message || "Erreur lors de la vérification du paiement" });
