@@ -142,6 +142,8 @@ export function AppSidebar() {
       await apiRequest("POST", "/api/auth/logout", {});
     },
     onSuccess: () => {
+      // Clear admin access code on logout
+      localStorage.removeItem("adminAccessCode");
       toast({
         title: "Déconnexion réussie",
         description: "À bientôt sur BKApay",

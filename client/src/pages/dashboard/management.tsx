@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Users, Shield, Trash2, Plus, Minus, History, Link as LinkIcon, Store, Key, User as UserIcon, Check, X, FileCheck, AlertCircle, Unlock } from "lucide-react";
+import { Users, Shield, Trash2, Plus, Minus, History, Link as LinkIcon, Store, Key, User as UserIcon, Check, X, FileCheck, AlertCircle, Unlock, Lock } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
@@ -25,11 +25,13 @@ import {
   ApiKeysDialog,
   ProfileDialog,
 } from "./management-details";
+import { useLocation } from "wouter";
 
 export default function Management() {
   const [searchQuery, setSearchQuery] = useState("");
   const [fundAmount, setFundAmount] = useState<{ [userId: string]: string }>({});
   const { toast } = useToast();
+  const [, navigate] = useLocation();
 
   // Dialog states
   const [promoteDialog, setPromoteDialog] = useState<{ open: boolean; userId?: string; userName?: string }>({ open: false });
@@ -268,11 +270,30 @@ export default function Management() {
     }).format(amount);
   };
 
+  const handleLockAccess = () => {
+    localStorage.removeItem("adminAccessCode");
+    toast({
+      title: "Accès verrouillé",
+      description: "Vous devrez entrer le code pour accéder à nouveau à cette page",
+    });
+    navigate("/dashboard/admin-access-code");
+  };
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground mb-1">Gestion des Utilisateurs</h1>
-        <p className="text-sm text-muted-foreground">Administrer les utilisateurs de la plateforme</p>
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground mb-1">Gestion des Utilisateurs</h1>
+          <p className="text-sm text-muted-foreground">Administrer les utilisateurs de la plateforme</p>
+        </div>
+        <Button
+          variant="outline"
+          onClick={handleLockAccess}
+          data-testid="button-lock-access"
+        >
+          <Lock className="w-4 h-4 mr-2" />
+          Verrouiller l'accès
+        </Button>
       </div>
 
       <Card>
