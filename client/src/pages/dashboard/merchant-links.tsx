@@ -206,12 +206,12 @@ export default function MerchantLinks() {
                 <div className="space-y-4">
                   <div className="flex items-center gap-2 p-3 bg-muted rounded-md">
                     <code className="flex-1 text-xs sm:text-sm truncate">
-                      {link.token.length > 12 ? `${link.token.substring(0, 4)}...${link.token.substring(link.token.length - 5)}` : link.token}
+                      {`${window.location.origin}/merchant/${link.token}`}
                     </code>
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => copyToClipboard(link.token, true)}
+                      onClick={() => copyToClipboard(link.token, false)}
                       data-testid={`button-copy-${link.id}`}
                     >
                       <Copy className="w-4 h-4" />
