@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Users, Shield, Trash2, Plus, Minus } from "lucide-react";
+import { Users, Shield, Trash2, Plus, Minus, History, Link as LinkIcon, Store, Key, User as UserIcon } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
@@ -15,7 +15,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import type { User } from "@shared/schema";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import type { User, Transaction, PaymentLink, MerchantLink, ApiKey } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Management() {
@@ -29,6 +38,13 @@ export default function Management() {
   const [addFundsDialog, setAddFundsDialog] = useState<{ open: boolean; userId?: string; userName?: string; amount?: number }>({ open: false });
   const [subtractFundsDialog, setSubtractFundsDialog] = useState<{ open: boolean; userId?: string; userName?: string; amount?: number }>({ open: false });
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; userId?: string; userName?: string }>({ open: false });
+  
+  // Details view states
+  const [historyViewUserId, setHistoryViewUserId] = useState<string | null>(null);
+  const [paymentLinksViewUserId, setPaymentLinksViewUserId] = useState<string | null>(null);
+  const [merchantLinksViewUserId, setMerchantLinksViewUserId] = useState<string | null>(null);
+  const [apiKeysViewUserId, setApiKeysViewUserId] = useState<string | null>(null);
+  const [profileViewUserId, setProfileViewUserId] = useState<string | null>(null);
 
   const { data: allUsers, isLoading: usersLoading, refetch: refetchUsers } = useQuery<User[]>({
     queryKey: ["/api/admin/users"],
@@ -286,6 +302,55 @@ export default function Management() {
                       </Button>
                     </div>
 
+                    {/* View Details */}
+                    <div className="flex gap-2 flex-wrap">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setProfileViewUserId(user.id)}
+                        data-testid={`button-view-profile-${user.id}`}
+                      >
+                        <UserIcon className="w-4 h-4 mr-1" />
+                        Profil
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setHistoryViewUserId(user.id)}
+                        data-testid={`button-view-history-${user.id}`}
+                      >
+                        <History className="w-4 h-4 mr-1" />
+                        Historique
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setPaymentLinksViewUserId(user.id)}
+                        data-testid={`button-view-payment-links-${user.id}`}
+                      >
+                        <LinkIcon className="w-4 h-4 mr-1" />
+                        Liens
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setMerchantLinksViewUserId(user.id)}
+                        data-testid={`button-view-merchant-${user.id}`}
+                      >
+                        <Store className="w-4 h-4 mr-1" />
+                        Marchand
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setApiKeysViewUserId(user.id)}
+                        data-testid={`button-view-api-${user.id}`}
+                      >
+                        <Key className="w-4 h-4 mr-1" />
+                        API
+                      </Button>
+                    </div>
+
                     {/* Actions */}
                     <div className="flex gap-2 flex-wrap">
                       {!user.isAdmin ? (
@@ -466,6 +531,240 @@ export default function Management() {
           </div>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Profile Dialog */}
+      {profileViewUserId && <ProfileDialog userId={profileViewUserId} onOpenChange={() => setProfileViewUserId(null)} />}
+      
+      {/* History Dialog */}
+      {historyViewUserId && <HistoryDialog userId={historyViewUserId} onOpenChange={() => setHistoryViewUserId(null)} />}
+      
+      {/* Payment Links Dialog */}
+      {paymentLinksViewUserId && <PaymentLinksDialog userId={paymentLinksViewUserId} onOpenChange={() => setPaymentLinksViewUserId(null)} />}
+      
+      {/* Merchant Links Dialog */}
+      {merchantLinksViewUserId && <MerchantLinksDialog userId={merchantLinksViewUserId} onOpenChange={() => setMerchantLinksViewUserId(null)} />}
+      
+      {/* API Keys Dialog */}
+      {apiKeysViewUserId && <ApiKeysDialog userId={apiKeysViewUserId} onOpenChange={() => setApiKeysViewUserId(null)} />}
     </div>
+  );
+}
+
+// Sub-components for details dialogs
+function ProfileDialog({ userId, onOpenChange }: { userId: string; onOpenChange: () => void }) {
+  const { data: user, isLoading } = useQuery<User>({
+    queryKey: [`/api/admin/user/${userId}/profile`],
+  });
+
+  return (
+    <Dialog open={true} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto" data-testid="dialog-view-profile">
+        <DialogHeader>
+          <DialogTitle>Profil utilisateur</DialogTitle>
+        </DialogHeader>
+        {isLoading ? (
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-10 w-full" />
+            ))}
+          </div>
+        ) : user ? (
+          <div className="space-y-4">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Prénom</label>
+              <div className="p-2 bg-muted rounded-md text-sm mt-1">{user.firstName}</div>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Nom</label>
+              <div className="p-2 bg-muted rounded-md text-sm mt-1">{user.lastName}</div>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Email</label>
+              <div className="p-2 bg-muted rounded-md text-sm mt-1">{user.email}</div>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Solde</label>
+              <div className="p-2 bg-muted rounded-md text-sm mt-1 font-semibold">
+                {new Intl.NumberFormat("fr-FR", { style: "currency", currency: "XOF", minimumFractionDigits: 0 }).format(user.balance)}
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Statut KYC</label>
+              <div className="mt-1">
+                <Badge variant={user.kycStatus === "verified" ? "default" : "secondary"}>
+                  {user.kycStatus === "verified" ? "Vérifiée" : "Non vérifiée"}
+                </Badge>
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function HistoryDialog({ userId, onOpenChange }: { userId: string; onOpenChange: () => void }) {
+  const { data: transactions, isLoading } = useQuery<Transaction[]>({
+    queryKey: [`/api/admin/user/${userId}/transactions`],
+  });
+
+  const getStatusBadge = (status: string) => {
+    const variants: Record<string, "default" | "secondary" | "destructive"> = {
+      completed: "default",
+      pending: "secondary",
+      failed: "destructive",
+      cancelled: "destructive",
+    };
+    return variants[status] || "secondary";
+  };
+
+  const formatAmount = (amount: number) => {
+    return new Intl.NumberFormat("fr-FR", { style: "currency", currency: "XOF", minimumFractionDigits: 0 }).format(amount);
+  };
+
+  return (
+    <Dialog open={true} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto" data-testid="dialog-view-history">
+        <DialogHeader>
+          <DialogTitle>Historique des transactions</DialogTitle>
+        </DialogHeader>
+        {isLoading ? (
+          <div className="space-y-2">
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-10 w-full" />
+            ))}
+          </div>
+        ) : transactions && transactions.length > 0 ? (
+          <ScrollArea className="h-[400px] pr-4">
+            <div className="space-y-2">
+              {transactions.map((tx) => (
+                <div key={tx.id} className="p-3 border rounded-lg">
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold">{formatAmount(tx.amount)}</p>
+                      <p className="text-xs text-muted-foreground">{new Date(tx.createdAt).toLocaleDateString("fr-FR")}</p>
+                    </div>
+                    <Badge variant={getStatusBadge(tx.status)}>{tx.status}</Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+        ) : (
+          <p className="text-sm text-muted-foreground">Aucune transaction</p>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function PaymentLinksDialog({ userId, onOpenChange }: { userId: string; onOpenChange: () => void }) {
+  const { data: links, isLoading } = useQuery<PaymentLink[]>({
+    queryKey: [`/api/admin/user/${userId}/payment-links`],
+  });
+
+  return (
+    <Dialog open={true} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto" data-testid="dialog-view-payment-links">
+        <DialogHeader>
+          <DialogTitle>Liens de paiement</DialogTitle>
+        </DialogHeader>
+        {isLoading ? (
+          <div className="space-y-2">
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-10 w-full" />
+            ))}
+          </div>
+        ) : links && links.length > 0 ? (
+          <ScrollArea className="h-[400px] pr-4">
+            <div className="space-y-2">
+              {links.map((link) => (
+                <div key={link.id} className="p-3 border rounded-lg">
+                  <p className="text-sm font-semibold">{link.productName}</p>
+                  <p className="text-xs text-muted-foreground">{link.description}</p>
+                  <p className="text-sm mt-1">{new Intl.NumberFormat("fr-FR", { style: "currency", currency: "XOF" }).format(link.amount)}</p>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+        ) : (
+          <p className="text-sm text-muted-foreground">Aucun lien de paiement</p>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function MerchantLinksDialog({ userId, onOpenChange }: { userId: string; onOpenChange: () => void }) {
+  const { data: links, isLoading } = useQuery<MerchantLink[]>({
+    queryKey: [`/api/admin/user/${userId}/merchant-links`],
+  });
+
+  return (
+    <Dialog open={true} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto" data-testid="dialog-view-merchant-links">
+        <DialogHeader>
+          <DialogTitle>Liens marchands</DialogTitle>
+        </DialogHeader>
+        {isLoading ? (
+          <div className="space-y-2">
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-10 w-full" />
+            ))}
+          </div>
+        ) : links && links.length > 0 ? (
+          <ScrollArea className="h-[400px] pr-4">
+            <div className="space-y-2">
+              {links.map((link) => (
+                <div key={link.id} className="p-3 border rounded-lg">
+                  <p className="text-sm font-semibold">{link.merchantName}</p>
+                  <p className="text-xs text-muted-foreground">Token: {link.token}</p>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+        ) : (
+          <p className="text-sm text-muted-foreground">Aucun lien marchand</p>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ApiKeysDialog({ userId, onOpenChange }: { userId: string; onOpenChange: () => void }) {
+  const { data: keys, isLoading } = useQuery<ApiKey[]>({
+    queryKey: [`/api/admin/user/${userId}/api-keys`],
+  });
+
+  return (
+    <Dialog open={true} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto" data-testid="dialog-view-api-keys">
+        <DialogHeader>
+          <DialogTitle>Clés API</DialogTitle>
+        </DialogHeader>
+        {isLoading ? (
+          <div className="space-y-2">
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-10 w-full" />
+            ))}
+          </div>
+        ) : keys && keys.length > 0 ? (
+          <ScrollArea className="h-[400px] pr-4">
+            <div className="space-y-2">
+              {keys.map((key) => (
+                <div key={key.id} className="p-3 border rounded-lg">
+                  <p className="text-sm font-semibold">{key.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">Public: {key.publicKey}</p>
+                  <p className="text-xs text-muted-foreground truncate">Privée: {key.privateKey}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{new Date(key.createdAt).toLocaleDateString("fr-FR")}</p>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+        ) : (
+          <p className="text-sm text-muted-foreground">Aucune clé API</p>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }

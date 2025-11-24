@@ -1099,6 +1099,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // User details viewing routes
+  app.get("/api/admin/user/:userId/profile", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const user = await storage.getUser(req.params.userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      res.json(user);
+    } catch (error: any) {
+      console.error("Get user profile error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/admin/user/:userId/transactions", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const transactions = await storage.getTransactions(req.params.userId);
+      res.json(transactions);
+    } catch (error: any) {
+      console.error("Get user transactions error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/admin/user/:userId/payment-links", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const links = await storage.getPaymentLinks(req.params.userId);
+      res.json(links);
+    } catch (error: any) {
+      console.error("Get user payment links error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/admin/user/:userId/merchant-links", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const links = await storage.getMerchantLinks(req.params.userId);
+      res.json(links);
+    } catch (error: any) {
+      console.error("Get user merchant links error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/admin/user/:userId/api-keys", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const keys = await storage.getApiKeys(req.params.userId);
+      res.json(keys);
+    } catch (error: any) {
+      console.error("Get user api keys error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
