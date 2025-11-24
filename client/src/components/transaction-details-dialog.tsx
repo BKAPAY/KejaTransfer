@@ -81,6 +81,12 @@ export function TransactionDetailsDialog({
         </DialogHeader>
 
         <div className="space-y-6">
+          {/* Transaction ID - Highlighted */}
+          <div className="bg-muted p-3 rounded-md border border-border">
+            <label className="text-xs font-medium text-muted-foreground block mb-2">ID Transaction</label>
+            <code className="text-xs font-mono break-all">{transaction.id}</code>
+          </div>
+
           {/* Transaction Details */}
           <div className="space-y-4">
             <h3 className="font-semibold text-lg">Informations de la transaction</h3>
