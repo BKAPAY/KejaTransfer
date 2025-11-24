@@ -108,42 +108,6 @@ export default function ApiPage() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Information Panel */}
-      <Card className="mb-6 bg-primary/5 border-primary/20">
-        <CardHeader>
-          <CardTitle className="text-lg">Comment utiliser vos clés API?</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <h4 className="font-semibold text-sm mb-2">🔑 Clé Publique (pk_live_xxxxx)</h4>
-            <p className="text-sm text-muted-foreground mb-2">
-              À utiliser dans votre frontend ou applications publiques. Utilisez-la pour créer des paiements:
-            </p>
-            <code className="text-xs bg-background p-2 rounded block overflow-x-auto mb-2">
-              {`fetch('https://bkapay.app/api/payments/create', {
-  method: 'POST',
-  body: JSON.stringify({
-    publicKey: 'pk_live_xxxxx',
-    amount: 50000,
-    customerName: 'Jean',
-    ...
-  })
-})`}
-            </code>
-          </div>
-          <div>
-            <h4 className="font-semibold text-sm mb-2">🔒 Clé Privée (sk_live_xxxxx)</h4>
-            <p className="text-sm text-muted-foreground mb-2">
-              À utiliser UNIQUEMENT dans votre backend. Jamais dans le frontend!
-            </p>
-            <code className="text-xs bg-background p-2 rounded block overflow-x-auto">
-              {`Authorization: Bearer sk_live_xxxxx
-X-API-Key: sk_live_xxxxx`}
-            </code>
-          </div>
-        </CardContent>
-      </Card>
-
       <div className="flex items-center justify-between gap-2 flex-wrap mb-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground mb-1">Clés API</h1>
