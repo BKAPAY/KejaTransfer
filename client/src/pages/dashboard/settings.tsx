@@ -266,6 +266,19 @@ export default function Settings() {
                 </div>
               </div>
               <p className="text-sm text-muted-foreground">Veuillez soumettre à nouveau avec des documents conformes</p>
+              <Button 
+                onClick={() => {
+                  setIdFrontData(null);
+                  setIdBackData(null);
+                  setSelfieData(null);
+                  setValidationError(null);
+                }}
+                className="w-full"
+                data-testid="button-resubmit-kyc"
+              >
+                <Camera className="w-4 h-4 mr-2" />
+                Soumettre à nouveau
+              </Button>
             </div>
           ) : (
             <div className="space-y-4">
