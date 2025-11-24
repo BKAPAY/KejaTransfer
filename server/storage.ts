@@ -34,6 +34,8 @@ export interface IStorage {
   approveKyc(userId: string): Promise<User | undefined>;
   rejectKyc(userId: string, reason?: string): Promise<User | undefined>;
   getPendingKycSubmissions(): Promise<User[]>;
+  suspendUser(userId: string): Promise<User | undefined>;
+  unsuspendUser(userId: string): Promise<User | undefined>;
 
   // Payment Links
   getPaymentLinks(userId: string): Promise<PaymentLink[]>;
@@ -143,6 +145,24 @@ export class DbStorage implements IStorage {
       .from(schema.users)
       .where(eq(schema.users.kycStatus, "submitted"))
       .orderBy(desc(schema.users.createdAt));
+  }
+
+  async suspendUser(userId: string): Promise<User | undefined> {
+    const results = await db
+      .update(schema.users)
+      .set({ suspended: true })
+      .where(eq(schema.users.id, userId))
+      .returning();
+    return results[0];
+  }
+
+  async unsuspendUser(userId: string): Promise<User | undefined> {
+    const results = await db
+      .update(schema.users)
+      .set({ suspended: false })
+      .where(eq(schema.users.id, userId))
+      .returning();
+    return results[0];
   }
 
   // Payment Links

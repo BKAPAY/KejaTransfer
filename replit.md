@@ -3,22 +3,21 @@
 ## Vue d'ensemble
 BKApay est une plateforme moderne de paiement mobile money pour l'Afrique de l'Ouest. Elle permet aux entreprises et particuliers d'accepter des paiements via mobile money (Orange Money, MTN, Moov, Wave, Free Money, T-Money, Wizall, Expresso) dans 6 pays: Bénin, Togo, Côte d'Ivoire, Sénégal, Burkina Faso et Mali.
 
-## Dernières modifications (22 Novembre 2025)
-- ✅ Création complète de la plateforme BKApay (MVP achevé)
-- ✅ Implémentation de l'authentération personnalisée (sans Replit Auth)
-- ✅ Configuration complète du frontend avec React, Tailwind CSS et Shadcn UI
-- ✅ Mise en place du backend avec Express, PostgreSQL et intégration Paydunya
-- ✅ Création de toutes les fonctionnalités: liens de paiement, liens marchands, API Gateway
-- ✅ Design professionnel aux couleurs du logo (vert et doré)
-- ✅ Dashboard Analytics avec graphiques détaillés (revenus par date, opérateur, pays, type)
-- ✅ Support multi-devises (XOF, USD, EUR) avec conversion
-- ✅ Migration vers driver postgres-js pour une meilleure stabilité
-- ✅ **CORRECTION**: Persistance de session - l'utilisateur reste connecté après actualisation
-- ✅ **NOUVEAU**: Détails des transactions cliquables dans l'historique (email, téléphone du client)
-- ✅ **NOUVEAU**: Dépôts via Paydunya (formulaire simplifié: montant + pays + opérateur)
-- ✅ **NOUVEAU**: Transferts via API Paydunya Disburse (débits de compte)
-- ✅ **NOUVEAU**: Endpoint public `/api/payments/create` pour intégration par clés API (paiements entrants et sortants)
-- ✅ **NOUVEAU**: Modification des liens de paiement (users can create, modify, or delete)
+## Dernières modifications (24 Novembre 2025)
+- ✅ **NOUVEAU**: Système de suspension de comptes
+  * Bouton "Suspendre" pour chaque utilisateur dans la gestion
+  * Bouton "Réactiver" pour les comptes suspendus
+  * Champ `suspended` ajouté à la base de données
+  * Badges visuels "Suspendu" dans l'interface d'administration
+  * Lors de la connexion d'un compte suspendu: "Votre compte a été suspendu. Veuillez contacter le support."
+  * Les liens de paiement suspendus ne fonctionnent plus
+  * Les liens marchands suspendus ne fonctionnent plus
+  * Les clés API de comptes suspendus ne fonctionnent plus
+  * Les dépôts et transferts sont bloqués pour les comptes suspendus
+- ✅ Historique KYC avec recherche par nom, prénom ou email
+- ✅ Modification des liens de paiement (users can create, modify, or delete)
+- ✅ Persistance de session - l'utilisateur reste connecté après actualisation
+- ✅ Détails des transactions cliquables dans l'historique
 
 ## Architecture du projet
 
@@ -37,8 +36,15 @@ BKApay est une plateforme moderne de paiement mobile money pour l'Afrique de l'O
   - Profil utilisateur
   - Paramètres, Annonces, Documentation, Support
 
+- **Admin Dashboard**:
+  - Gestion des utilisateurs avec suspension/réactivation
+  - Recherche utilisateurs
+  - Gestion KYC (Vérification d'identité)
+  - Historique KYC avec filtrage
+
 ### Backend (Express + PostgreSQL)
 - **Authentification**: Sessions avec bcrypt pour le hashing des mots de passe
+- **Vérification comptes suspendus**: Bloquer login, paiements, dépôts, transferts, API
 - **API Routes**:
   - `/api/auth/*` - Inscription, connexion, déconnexion, profil
   - `/api/dashboard/stats` - Statistiques utilisateur
@@ -51,10 +57,23 @@ BKApay est une plateforme moderne de paiement mobile money pour l'Afrique de l'O
   - `/api/payments/create` - Paiements via clé API (public, pour développeurs)
   - `/api/deposits` - Dépôts sur le compte
   - `/api/transfers` - Transferts/retraits vers mobile money
+  - `/api/admin/suspend` - Suspendre un compte
+  - `/api/admin/unsuspend` - Réactiver un compte
   - `/api/webhooks/paydunya` - Webhook pour notifications Paydunya
 
 ### Base de données (PostgreSQL)
 - **users**: Utilisateurs de la plateforme
+  * `id`: UUID primary key
+  * `firstName`, `lastName`: Nom et prénom
+  * `email`: Email unique
+  * `password`: Hash bcrypt
+  * `balance`: Solde en XOF
+  * `kycStatus`: État KYC (pending, submitted, verified, rejected)
+  * `kycIdFront`, `kycIdBack`, `kycSelfie`: Documents KYC (base64)
+  * `kycRejectionReason`: Raison du rejet KYC
+  * `isAdmin`: Droits administrateur
+  * `suspended`: Compte suspendu (NOUVEAU)
+  * `createdAt`: Date de création
 - **payment_links**: Liens de paiement avec montant fixe
 - **merchant_links**: Liens marchands avec montant flexible
 - **api_keys**: Clés API pour intégration
@@ -123,6 +142,17 @@ L'application utilise l'API Paydunya pour traiter les paiements mobile money:
 - Filtres par type, pays, opérateur
 - Export des données
 
+### 5. Système de suspension (NOUVEAU)
+- Admin peut suspendre/réactiver les comptes
+- Utilisateurs suspendus ne peuvent pas se connecter
+- Toutes les fonctionnalités sont désactivées:
+  * Liens de paiement ne fonctionnent plus
+  * Liens marchands ne fonctionnent plus
+  * Clés API ne fonctionnent plus
+  * Dépôts et transferts bloqués
+- Interface intuitive avec badge "Suspendu"
+- Boutons "Suspendre" et "Réactiver" dans la gestion des utilisateurs
+
 ## Design
 - Couleurs principales: Vert (#228B22 environ) et Doré/Accent (#FFD700 environ)
 - Police: Inter pour le corps, DM Sans pour les titres
@@ -160,7 +190,7 @@ const { redirectUrl } = await response.json();
 window.location.href = redirectUrl;
 ```
 
-## API REST Complète pour Développeurs Tiers (NOUVEAU - 2025)
+## API REST Complète pour Développeurs Tiers
 
 ### Endpoints disponibles
 - ✅ **POST `/api/payments/create`** - Créer un paiement via clé API (public)

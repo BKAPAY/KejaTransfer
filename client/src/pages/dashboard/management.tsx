@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Users, Shield, Trash2, Plus, Minus, History, Link as LinkIcon, Store, Key, User as UserIcon, Check, X, FileCheck } from "lucide-react";
+import { Users, Shield, Trash2, Plus, Minus, History, Link as LinkIcon, Store, Key, User as UserIcon, Check, X, FileCheck, AlertCircle, Unlock } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
@@ -39,6 +39,8 @@ export default function Management() {
   const [addFundsDialog, setAddFundsDialog] = useState<{ open: boolean; userId?: string; userName?: string; amount?: number }>({ open: false });
   const [subtractFundsDialog, setSubtractFundsDialog] = useState<{ open: boolean; userId?: string; userName?: string; amount?: number }>({ open: false });
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; userId?: string; userName?: string }>({ open: false });
+  const [suspendDialog, setSuspendDialog] = useState<{ open: boolean; userId?: string; userName?: string }>({ open: false });
+  const [unsuspendDialog, setUnsuspendDialog] = useState<{ open: boolean; userId?: string; userName?: string }>({ open: false });
   
   // Details view states
   const [historyViewUserId, setHistoryViewUserId] = useState<string | null>(null);
@@ -209,6 +211,46 @@ export default function Management() {
     },
   });
 
+  const suspendUserMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const response = await fetch("/api/admin/suspend", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId }),
+      });
+      if (!response.ok) throw new Error("Failed to suspend user");
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Succès", description: "Compte suspendu" });
+      setSuspendDialog({ open: false });
+      refetchUsers();
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible de suspendre le compte", variant: "destructive" });
+    },
+  });
+
+  const unsuspendUserMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const response = await fetch("/api/admin/unsuspend", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId }),
+      });
+      if (!response.ok) throw new Error("Failed to unsuspend user");
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Succès", description: "Compte réactivé" });
+      setUnsuspendDialog({ open: false });
+      refetchUsers();
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible de réactiver le compte", variant: "destructive" });
+    },
+  });
+
 
   const formatAmount = (amount: number) => {
     return new Intl.NumberFormat("fr-FR", {
@@ -308,6 +350,12 @@ export default function Management() {
                           {user.isAdmin && (
                             <Badge variant="destructive" className="text-xs" data-testid={`badge-admin-${user.id}`}>
                               Admin
+                            </Badge>
+                          )}
+                          {(user as any).suspended && (
+                            <Badge variant="destructive" className="text-xs bg-red-600" data-testid={`badge-suspended-${user.id}`}>
+                              <AlertCircle className="w-3 h-3 mr-1" />
+                              Suspendu
                             </Badge>
                           )}
                         </div>
@@ -438,6 +486,29 @@ export default function Management() {
                         >
                           <Shield className="w-4 h-4 mr-1" />
                           Révoquer Admin
+                        </Button>
+                      )}
+                      {!(user as any).suspended ? (
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => setSuspendDialog({ open: true, userId: user.id, userName: `${user.firstName} ${user.lastName}` })}
+                          disabled={suspendUserMutation.isPending}
+                          data-testid={`button-suspend-${user.id}`}
+                        >
+                          <AlertCircle className="w-4 h-4 mr-1" />
+                          Suspendre
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setUnsuspendDialog({ open: true, userId: user.id, userName: `${user.firstName} ${user.lastName}` })}
+                          disabled={unsuspendUserMutation.isPending}
+                          data-testid={`button-unsuspend-${user.id}`}
+                        >
+                          <Unlock className="w-4 h-4 mr-1" />
+                          Réactiver
                         </Button>
                       )}
                       {user.kycStatus === "submitted" ? (
@@ -626,6 +697,58 @@ export default function Management() {
               className="bg-destructive hover:bg-destructive/90"
             >
               {deleteUserMutation.isPending ? "Suppression en cours..." : "Supprimer"}
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Suspend Dialog */}
+      <AlertDialog open={suspendDialog.open} onOpenChange={(open) => setSuspendDialog({ ...suspendDialog, open })}>
+        <AlertDialogContent data-testid="dialog-suspend">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Suspendre le compte</AlertDialogTitle>
+            <AlertDialogDescription>
+              Êtes-vous sûr de vouloir suspendre le compte de <strong>{suspendDialog.userName}</strong>? Son compte sera verrouillé et il ne pourra plus se connecter ni utiliser la plateforme. Ses liens de paiement, liens marchands et clés API ne fonctionneront plus.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex gap-2">
+            <AlertDialogCancel data-testid="button-cancel-suspend">Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (suspendDialog.userId) {
+                  suspendUserMutation.mutate(suspendDialog.userId);
+                }
+              }}
+              disabled={suspendUserMutation.isPending}
+              data-testid="button-confirm-suspend"
+            >
+              {suspendUserMutation.isPending ? "Suspension en cours..." : "Confirmer"}
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Unsuspend Dialog */}
+      <AlertDialog open={unsuspendDialog.open} onOpenChange={(open) => setUnsuspendDialog({ ...unsuspendDialog, open })}>
+        <AlertDialogContent data-testid="dialog-unsuspend">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Réactiver le compte</AlertDialogTitle>
+            <AlertDialogDescription>
+              Êtes-vous sûr de vouloir réactiver le compte de <strong>{unsuspendDialog.userName}</strong>? Il pourra à nouveau se connecter et utiliser la plateforme normalement.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex gap-2">
+            <AlertDialogCancel data-testid="button-cancel-unsuspend">Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (unsuspendDialog.userId) {
+                  unsuspendUserMutation.mutate(unsuspendDialog.userId);
+                }
+              }}
+              disabled={unsuspendUserMutation.isPending}
+              data-testid="button-confirm-unsuspend"
+            >
+              {unsuspendUserMutation.isPending ? "Réactivation en cours..." : "Confirmer"}
             </AlertDialogAction>
           </div>
         </AlertDialogContent>

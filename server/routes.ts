@@ -164,6 +164,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Email ou mot de passe incorrect" });
       }
 
+      if (user.suspended) {
+        return res.status(403).json({ error: "Votre compte a été suspendu. Veuillez contacter le support." });
+      }
+
       const validPassword = await bcrypt.compare(password, user.password);
       if (!validPassword) {
         return res.status(401).json({ error: "Email ou mot de passe incorrect" });
@@ -450,6 +454,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Lien de paiement non trouvé ou inactif" });
       }
 
+      // Check if user account is suspended
+      const owner = await storage.getUser(paymentLink.userId);
+      if (owner?.suspended) {
+        return res.status(403).json({ error: "Ce lien de paiement n'est plus actif" });
+      }
+
       // Create transaction record
       const transaction = await storage.createTransaction({
         userId: paymentLink.userId,
@@ -525,6 +535,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Lien marchand non trouvé ou inactif" });
       }
 
+      // Check if user account is suspended
+      const owner = await storage.getUser(merchantLink.userId);
+      if (owner?.suspended) {
+        return res.status(403).json({ error: "Ce lien marchand n'est plus actif" });
+      }
+
       // Create transaction record
       const transaction = await storage.createTransaction({
         userId: merchantLink.userId,
@@ -589,6 +605,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ===== Deposit Routes =====
   app.post("/api/deposits", requireAuth, async (req: Request, res: Response) => {
     try {
+      const user = await storage.getUser(req.session.userId!);
+      if (user?.suspended) {
+        return res.status(403).json({ error: "Votre compte a été suspendu. Veuillez contacter le support." });
+      }
+
       const { amount, country, operator, customerName, customerEmail, customerPhone } = req.body;
 
       if (!amount || amount <= 0) {
@@ -658,6 +679,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!user) {
         return res.status(404).json({ error: "Utilisateur non trouvé" });
+      }
+
+      if (user.suspended) {
+        return res.status(403).json({ error: "Votre compte a été suspendu. Veuillez contacter le support." });
       }
 
       if (!amount || amount <= 0) {
@@ -778,6 +803,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const apiKey = await storage.getApiKeyByPublicKey(publicKey);
       if (!apiKey || !apiKey.isActive) {
         return res.status(401).json({ error: "Clé API invalide ou inactive" });
+      }
+
+      // Check if user account is suspended
+      const apiOwner = await storage.getUser(apiKey.userId);
+      if (apiOwner?.suspended) {
+        return res.status(403).json({ error: "Ce compte a été suspendu. Veuillez contacter le support." });
       }
 
       // Create transaction record for the API key owner
@@ -1067,6 +1098,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true });
     } catch (error: any) {
       console.error("Delete user error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/admin/suspend", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { userId } = req.body;
+      if (!userId) {
+        return res.status(400).json({ error: "userId is required" });
+      }
+      const user = await storage.suspendUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      res.json(user);
+    } catch (error: any) {
+      console.error("Suspend user error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/admin/unsuspend", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { userId } = req.body;
+      if (!userId) {
+        return res.status(400).json({ error: "userId is required" });
+      }
+      const user = await storage.unsuspendUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      res.json(user);
+    } catch (error: any) {
+      console.error("Unsuspend user error:", error);
       res.status(500).json({ error: error.message });
     }
   });
