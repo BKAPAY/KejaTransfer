@@ -3,7 +3,22 @@
 ## Vue d'ensemble
 BKApay est une plateforme moderne de paiement mobile money pour l'Afrique de l'Ouest. Elle permet aux entreprises et particuliers d'accepter des paiements via mobile money (Orange Money, MTN, Moov, Wave, Free Money, T-Money, Wizall, Expresso) dans 6 pays: Bénin, Togo, Côte d'Ivoire, Sénégal, Burkina Faso et Mali.
 
-## Dernières modifications (24 Novembre 2025 - Session 7 FOOTER POLICY PAGES)
+## Dernières modifications (24 Novembre 2025 - Session 8 MIGRATION AUTOMATIQUE)
+- ✅ **MIGRATION AUTOMATIQUE BASE DE DONNÉES - IMPLEMENTATION COMPLETE**
+  * **Script de bootstrap**: `server/db-bootstrap.ts` exécuté automatiquement au démarrage
+  * **Flux de migration automatique**:
+    1. Assure que le schéma drizzle existe
+    2. Exécute le migrator Drizzle qui gère automatiquement les hashes SHA et l'idempotence
+    3. Crée l'admin principal (kpetekoussojuste1@gmail.com, code: 19992025) s'il n'existe pas
+    4. Fail-fast (serveur ne démarre pas) si migration échoue
+  * **Avantages**:
+    - Utilise drizzle-orm (pas drizzle-kit), disponible en production
+    - Synchronisation automatique du schéma dev → production sans intervention manuelle
+    - Idempotent: fonctionne sur base fraîche ET déjà provisionnée
+    - Sécurisé: Drizzle gère les hashes SHA automatiquement
+  * **Favicon et Meta Tags**: Logo BKApay configuré pour partage social media
+  * **Traduction bloquée**: Meta tags pour empêcher traduction automatique des navigateurs
+
 - ✅ **DÉPÔTS SOFTPAY SANS REDIRECTION - IMPLEMENTATION COMPLETE**
   * **Endpoint Dépôts**: POST `/api/softpay/create-payment` via Paydunya API v1 (checkout-invoice/create)
   * **Flux de dépôt SOFTPAY**:
