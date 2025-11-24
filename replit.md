@@ -2,6 +2,21 @@
 
 ## Dernières modifications (24 Novembre 2025)
 
+### Session 14 - Protection Admin Principal & Suppression Branding "Paydunya" ✅ PRODUCTION-READY
+**Problème**: Compte admin principal (kpetekoussojuste1@gmail.com) non protégé contre suspension. Mot "Paydunya" visible sur pages frontend.
+**Cause**: Routes `/api/admin/suspend` et `/api/admin/unsuspend` sans vérification isPrimaryAdmin. Références "Paydunya" dans commentaires et labels UI.
+**Solution COMPLÈTE**:
+- **Protection Admin Principal (server/routes.ts)**:
+  - Route `/api/admin/suspend` (lignes 1539-1559): Ajout vérification isPrimaryAdmin bloquant suspension avec erreur 403 "Impossible de suspendre l'administrateur principal"
+  - Route `/api/admin/unsuspend` (lignes 1561-1576): AUCUNE restriction - permet réactivation de tous comptes y compris admin principal (logique correcte: bloquer action destructive, permettre récupération)
+  - Pattern cohérent avec autres protections: delete-user, remove-admin, add-funds, subtract-funds
+- **Suppression Branding "Paydunya"**:
+  - `client/src/pages/api-payment.tsx`: Commentaire "Call the Paydunya API" → "Call payment API"
+  - `client/src/components/transaction-details-dialog.tsx`: "Token Paydunya" → "Token de paiement"
+  - `client/src/components/transaction-details-dialog.tsx`: "Voir le reçu Paydunya" → "Voir le reçu"
+  - Vérification complète: ZÉRO occurrence "Paydunya" dans client/src
+**Résultat**: ✅ Admin principal 100% protégé (suspension impossible, récupération possible). Interface 100% neutre sans mention Paydunya. Validé par architect. **PRODUCTION-READY.**
+
 ### Session 13 - Nettoyage Messages d'Erreur UX Propre ✅ PRODUCTION-READY
 **Problème**: Messages d'erreur affichaient codes HTTP (400, 500) et caractères techniques ()/:{}\ - UX non professionnelle.
 **Cause**: Frontend préfixait erreurs avec code HTTP. Backend exposait error.message bruts et réponses Paydunya non sanitisées.
