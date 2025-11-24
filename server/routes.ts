@@ -6,6 +6,7 @@ import bcrypt from "bcrypt";
 import { z } from "zod";
 import { insertUserSchema, insertPaymentLinkSchema, insertMerchantLinkSchema, insertApiKeySchema } from "@shared/schema";
 import { randomUUID } from "crypto";
+import { calculateIncomingFee, calculateOutgoingFee } from "./utils/fees";
 
 declare module "express-session" {
   interface SessionData {
@@ -484,11 +485,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Ce lien n'existe pas ou a été supprimé" });
       }
 
-      // Create transaction record
+      // Calculate fees silently
+      const feeInfo = calculateIncomingFee(paymentLink.amount, country);
+
+      // Create transaction record with fee info
       const transaction = await storage.createTransaction({
         userId: paymentLink.userId,
         type: "payment_link",
-        amount: paymentLink.amount,
+        amount: feeInfo.netAmount,
+        fee: feeInfo.feeAmount,
+        feePercentage: feeInfo.feePercentage,
         currency: "XOF",
         status: "pending",
         country,
@@ -565,11 +571,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Ce lien n'existe pas ou a été supprimé" });
       }
 
-      // Create transaction record
+      // Calculate fees silently
+      const feeInfo = calculateIncomingFee(amount, country);
+
+      // Create transaction record with fee info
       const transaction = await storage.createTransaction({
         userId: merchantLink.userId,
         type: "merchant_link",
-        amount,
+        amount: feeInfo.netAmount,
+        fee: feeInfo.feeAmount,
+        feePercentage: feeInfo.feePercentage,
         currency: "XOF",
         status: "pending",
         country,
@@ -640,11 +651,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Montant invalide" });
       }
 
-      // Create transaction
+      // Calculate fees silently
+      const feeInfo = calculateIncomingFee(Math.floor(amount), country);
+
+      // Create transaction (store net amount and fees)
       const transaction = await storage.createTransaction({
         userId: req.session.userId!,
         type: "deposit",
-        amount: Math.floor(amount),
+        amount: feeInfo.netAmount,
+        fee: feeInfo.feeAmount,
+        feePercentage: feeInfo.feePercentage,
         currency: "XOF",
         status: "pending",
         country,
@@ -655,7 +671,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         description: `Dépôt de ${amount} XOF`,
       });
 
-      // Create Paydunya invoice
+      // Create Paydunya invoice (send GROSS amount to Paydunya)
       const paydunyaData = {
         invoice: {
           total_amount: Math.floor(amount),
@@ -683,6 +699,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.json({
           success: true,
           redirectUrl: paydunyaResponse.response_text,
+          netAmount: feeInfo.netAmount,
         });
       } else {
         await storage.updateTransactionStatus(transaction.id, "failed");
@@ -713,19 +730,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Montant invalide" });
       }
 
-      if (user.balance < amount) {
-        return res.status(400).json({ error: "Solde insuffisant" });
-      }
-
       if (!phone || !country || !operator) {
         return res.status(400).json({ error: "Informations de transfert incomplètes" });
       }
 
-      // Create transaction
+      // Calculate fees silently for outgoing transfers
+      const feeInfo = calculateOutgoingFee(Math.floor(amount), country);
+
+      if (user.balance < feeInfo.totalDeductedFromBalance) {
+        return res.status(400).json({ 
+          error: "Solde insuffisant", 
+          required: feeInfo.totalDeductedFromBalance,
+          current: user.balance
+        });
+      }
+
+      // Create transaction (amount = gross amount requested, fees stored separately)
       const transaction = await storage.createTransaction({
         userId: req.session.userId!,
         type: "transfer",
         amount: Math.floor(amount),
+        fee: feeInfo.feeAmount,
+        feePercentage: feeInfo.feePercentage,
         currency: "XOF",
         status: "pending",
         country,
@@ -784,8 +810,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const submitResponse = await callPaydunyaAPI("/disburse/submit-invoice", submitData);
 
         if (submitResponse.response_code === "00") {
-          // Update balance and transaction
-          await storage.updateUserBalance(req.session.userId!, -amount);
+          // Update balance (deduct amount + fees)
+          await storage.updateUserBalance(req.session.userId!, -feeInfo.totalDeductedFromBalance);
           await storage.updateTransactionStatus(transaction.id, submitResponse.status || "pending", {
             paydunyaToken: disbursalToken,
           });
@@ -794,6 +820,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             success: true,
             message: "Transfert initialisé avec succès",
             transactionId: transaction.id,
+            totalDeducted: feeInfo.totalDeductedFromBalance,
           });
         } else {
           await storage.updateTransactionStatus(transaction.id, "failed");
@@ -835,11 +862,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Clé API invalide ou inactive" });
       }
 
+      // Calculate fees silently
+      const feeInfo = calculateIncomingFee(Math.floor(amount), country);
+
       // Create transaction record for the API key owner
       const transaction = await storage.createTransaction({
         userId: apiKey.userId,
         type: "api_payment",
-        amount: Math.floor(amount),
+        amount: feeInfo.netAmount,
+        fee: feeInfo.feeAmount,
+        feePercentage: feeInfo.feePercentage,
         currency: "XOF",
         status: "pending",
         country,

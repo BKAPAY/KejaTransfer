@@ -12,6 +12,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { COUNTRIES, OPERATORS } from "@shared/schema";
 import { ArrowDownToLine } from "lucide-react";
+import { calculateIncomingFee } from "@/lib/fees";
 
 const depositSchema = z.object({
   amount: z.number().min(1, "Le montant doit être supérieur à 0"),
@@ -36,8 +37,12 @@ export default function Deposit() {
   });
 
   const selectedCountry = form.watch("country");
+  const amount = form.watch("amount");
   const countryOperators =
     OPERATORS[(selectedCountry as keyof typeof OPERATORS) || ("BJ" as const)] || [];
+
+  // Calculate net amount in real-time
+  const netAmount = selectedCountry && amount ? calculateIncomingFee(Math.floor(amount), selectedCountry).netAmount : 0;
 
   const depositMutation = useMutation({
     mutationFn: async (data: DepositFormData) => {
@@ -175,6 +180,21 @@ export default function Deposit() {
                   </FormItem>
                 )}
               />
+
+              {amount && selectedCountry && netAmount > 0 && (
+                <div className="bg-muted p-3 rounded-md border">
+                  <p className="text-sm text-muted-foreground">
+                    Vous recevrez
+                  </p>
+                  <p className="text-lg font-semibold text-foreground" data-testid="text-net-amount">
+                    {new Intl.NumberFormat("fr-FR", {
+                      style: "currency",
+                      currency: "XOF",
+                      minimumFractionDigits: 0,
+                    }).format(netAmount)}
+                  </p>
+                </div>
+              )}
 
               <Button
                 type="submit"

@@ -14,6 +14,7 @@ import { COUNTRIES, OPERATORS } from "@shared/schema";
 import type { User } from "@shared/schema";
 import { ArrowUpFromLine } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { calculateOutgoingFee } from "@/lib/fees";
 
 const transferSchema = z.object({
   amount: z.number().min(1, "Le montant doit être supérieur à 0"),
@@ -42,8 +43,12 @@ export default function Transfer() {
   });
 
   const selectedCountry = form.watch("country");
+  const amount = form.watch("amount");
   const countryOperators =
     OPERATORS[(selectedCountry as keyof typeof OPERATORS) || ("BJ" as const)] || [];
+
+  // Calculate total deducted in real-time
+  const totalDeducted = selectedCountry && amount ? calculateOutgoingFee(Math.floor(amount), selectedCountry).totalDeductedFromBalance : 0;
 
   const transferMutation = useMutation({
     mutationFn: async (data: TransferFormData) => {
@@ -75,10 +80,11 @@ export default function Transfer() {
       return;
     }
 
-    if (user.balance < data.amount) {
+    const feeInfo = calculateOutgoingFee(data.amount, selectedCountry);
+    if (user.balance < feeInfo.totalDeductedFromBalance) {
       toast({
         title: "Solde insuffisant",
-        description: `Vous avez ${user.balance} XOF. Montant demandé: ${data.amount} XOF`,
+        description: `Vous avez ${user.balance} XOF. Total à déduire: ${feeInfo.totalDeductedFromBalance} XOF`,
         variant: "destructive",
       });
       return;
@@ -210,6 +216,28 @@ export default function Transfer() {
                   </FormItem>
                 )}
               />
+
+              {amount && selectedCountry && totalDeducted > 0 && (
+                <div className="bg-muted p-3 rounded-md border">
+                  <p className="text-sm text-muted-foreground">
+                    Total déducté de votre solde
+                  </p>
+                  <p className="text-lg font-semibold text-foreground" data-testid="text-total-deducted">
+                    {new Intl.NumberFormat("fr-FR", {
+                      style: "currency",
+                      currency: "XOF",
+                      minimumFractionDigits: 0,
+                    }).format(totalDeducted)}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Montant envoyé: {new Intl.NumberFormat("fr-FR", {
+                      style: "currency",
+                      currency: "XOF",
+                      minimumFractionDigits: 0,
+                    }).format(amount)}
+                  </p>
+                </div>
+              )}
 
               <Button
                 type="submit"

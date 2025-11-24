@@ -60,7 +60,9 @@ export const transactions = pgTable("transactions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id),
   type: text("type").notNull(), // "deposit", "transfer", "payment_link", "merchant_link", "api_payment"
-  amount: integer("amount").notNull(), // Amount in XOF
+  amount: integer("amount").notNull(), // Amount in XOF (net amount after fees for incoming, gross for outgoing)
+  fee: integer("fee").notNull().default(0), // Fee amount deducted in XOF
+  feePercentage: integer("fee_percentage").notNull().default(0), // Fee percentage (30 = 3%, 60 = 6%)
   currency: text("currency").notNull().default("XOF"),
   status: text("status").notNull(), // "completed", "pending", "failed", "cancelled"
   country: text("country"), // "BJ", "TG", "CI", "SN", "BF", "ML"

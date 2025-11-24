@@ -4,16 +4,21 @@
 BKApay est une plateforme moderne de paiement mobile money pour l'Afrique de l'Ouest. Elle permet aux entreprises et particuliers d'accepter des paiements via mobile money (Orange Money, MTN, Moov, Wave, Free Money, T-Money, Wizall, Expresso) dans 6 pays: Bénin, Togo, Côte d'Ivoire, Sénégal, Burkina Faso et Mali.
 
 ## Dernières modifications (24 Novembre 2025)
-- ✅ **NOUVEAU**: Système de suspension de comptes
+- ✅ **NOUVEAU**: Système de frais silencieux par pays
+  * Bénin (BJ): 3% frais entrants et sortants
+  * Autres pays: 6% frais entrants et sortants
+  * Transactions entrantes: frais déduits avant crédit au tableau de bord
+  * Dépôts: affichage du montant NET reçu (sans afficher le %)
+  * Transferts: affichage du total déducté du solde (montant + frais)
+  * Montant exact envoyé au Mobile Money (frais prélevés du solde)
+  * Frais stockés en silence dans l'historique des transactions
+  * Aucun affichage des pourcentages - système complètement discret
+- ✅ Système de suspension de comptes
   * Bouton "Suspendre" pour chaque utilisateur dans la gestion
   * Bouton "Réactiver" pour les comptes suspendus
   * Champ `suspended` ajouté à la base de données
   * Badges visuels "Suspendu" dans l'interface d'administration
   * Lors de la connexion d'un compte suspendu: "Votre compte a été suspendu. Veuillez contacter le support."
-  * Les liens de paiement suspendus ne fonctionnent plus
-  * Les liens marchands suspendus ne fonctionnent plus
-  * Les clés API de comptes suspendus ne fonctionnent plus
-  * Les dépôts et transferts sont bloqués pour les comptes suspendus
 - ✅ Historique KYC avec recherche par nom, prénom ou email
 - ✅ Modification des liens de paiement (users can create, modify, or delete)
 - ✅ Persistance de session - l'utilisateur reste connecté après actualisation
@@ -78,6 +83,9 @@ BKApay est une plateforme moderne de paiement mobile money pour l'Afrique de l'O
 - **merchant_links**: Liens marchands avec montant flexible
 - **api_keys**: Clés API pour intégration
 - **transactions**: Historique complet des transactions
+  * `amount`: Montant net reçu (pour entrant) ou brut (pour sortant)
+  * `fee`: Montant des frais en XOF
+  * `feePercentage`: Pourcentage des frais (30 = 3%, 60 = 6%)
 
 ## Intégration Paydunya
 L'application utilise l'API Paydunya pour traiter les paiements mobile money:
@@ -142,7 +150,24 @@ L'application utilise l'API Paydunya pour traiter les paiements mobile money:
 - Filtres par type, pays, opérateur
 - Export des données
 
-### 5. Système de suspension (NOUVEAU)
+### 5. Système de frais silencieux (NOUVEAU)
+- Frais automatiques basés sur le pays d'origine
+  * Bénin: 3% sur les transactions entrantes et sortantes
+  * Autres pays: 6% sur les transactions entrantes et sortantes
+- Pour les transactions entrantes (paiements reçus):
+  * Les frais sont déduits AVANT le crédit au tableau de bord
+  * Exemple: Client envoie 2000 XOF (Bénin) → Utilisateur reçoit 1940 XOF
+- Pour les dépôts:
+  * Affichage du montant NET final sans afficher le pourcentage
+  * "Vous recevrez X XOF"
+- Pour les transferts/retraits:
+  * Affichage du total déducté du solde (montant + frais)
+  * "Total déducté de votre solde: X XOF"
+  * Montant exact envoyé au Mobile Money
+  * Frais prélevés du solde de l'utilisateur
+- Interface complètement discrète: aucun affichage des pourcentages
+
+### 6. Système de suspension
 - Admin peut suspendre/réactiver les comptes
 - Utilisateurs suspendus ne peuvent pas se connecter
 - Toutes les fonctionnalités sont désactivées:
