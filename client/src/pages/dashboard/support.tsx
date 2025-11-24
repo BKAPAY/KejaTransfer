@@ -112,7 +112,7 @@ export default function Support() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Questions Fréquentes</CardTitle>
+          <CardTitle>Foire Aux Questions</CardTitle>
           <CardDescription>Trouvez les réponses à vos questions</CardDescription>
         </CardHeader>
         <CardContent>
