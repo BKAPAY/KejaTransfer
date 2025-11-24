@@ -31,7 +31,6 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   updateUserBalance(id: string, amount: number): Promise<User | undefined>;
   submitKyc(userId: string, kycData: { kycIdFront: string; kycIdBack: string; kycSelfie: string }): Promise<User | undefined>;
-  toggleVerification(userId: string): Promise<User | undefined>;
 
   // Payment Links
   getPaymentLinks(userId: string): Promise<PaymentLink[]>;
@@ -114,16 +113,6 @@ export class DbStorage implements IStorage {
     return results[0];
   }
 
-  async toggleVerification(userId: string): Promise<User | undefined> {
-    const user = await this.getUser(userId);
-    if (!user) return undefined;
-    const results = await db
-      .update(schema.users)
-      .set({ verified: !user.verified })
-      .where(eq(schema.users.id, userId))
-      .returning();
-    return results[0];
-  }
 
   // Payment Links
   async getPaymentLinks(userId: string): Promise<PaymentLink[]> {
@@ -290,7 +279,7 @@ export class DbStorage implements IStorage {
     totalTransfers: number;
   }> {
     const allUsers = await db.select().from(schema.users);
-    const verifiedUsers = allUsers.filter((u) => u.verified === true).length;
+    const verifiedUsers = allUsers.filter((u) => u.kycStatus === "verified").length;
 
     const allTransactions = await db.select().from(schema.transactions);
     const completedDeposits = allTransactions.filter(

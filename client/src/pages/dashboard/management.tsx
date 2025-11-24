@@ -165,34 +165,6 @@ export default function Management() {
     },
   });
 
-  const toggleVerificationMutation = useMutation({
-    mutationFn: async (userId: string) => {
-      const response = await fetch("/api/admin/toggle-verification", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId }),
-      });
-      if (!response.ok) throw new Error("Failed to toggle verification");
-      return response.json();
-    },
-    onSuccess: (data) => {
-      toast({ 
-        title: "Succès", 
-        description: data.verified ? "Compte vérifiée" : "Compte dévérifiée" 
-      });
-      // Store verification event for the user to see congratulations message
-      if (data.verified) {
-        localStorage.setItem(`verified_${data.id}`, new Date().toISOString());
-      }
-      // Invalidate cache and refetch immediately
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/search"] });
-      refetchUsers();
-    },
-    onError: () => {
-      toast({ title: "Erreur", description: "Impossible de modifier la vérification", variant: "destructive" });
-    },
-  });
 
   const formatAmount = (amount: number) => {
     return new Intl.NumberFormat("fr-FR", {
@@ -268,13 +240,6 @@ export default function Management() {
                             data-testid={`badge-kyc-${user.id}`}
                           >
                             {user.kycStatus === "verified" ? "✓ Vérifiée" : "Non vérifiée"}
-                          </Badge>
-                          <Badge
-                            variant={user.verified ? "default" : "secondary"}
-                            className="text-xs"
-                            data-testid={`badge-verified-${user.id}`}
-                          >
-                            {user.verified ? "✓ Vérifié" : "Non vérifié"}
                           </Badge>
                           {user.isAdmin && (
                             <Badge variant="destructive" className="text-xs" data-testid={`badge-admin-${user.id}`}>
@@ -409,29 +374,6 @@ export default function Management() {
                         >
                           <Shield className="w-4 h-4 mr-1" />
                           Révoquer Admin
-                        </Button>
-                      )}
-                      {user.verified ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => toggleVerificationMutation.mutate(user.id)}
-                          disabled={toggleVerificationMutation.isPending}
-                          data-testid={`button-unverify-${user.id}`}
-                        >
-                          <X className="w-4 h-4 mr-1" />
-                          Dévérifier
-                        </Button>
-                      ) : (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => toggleVerificationMutation.mutate(user.id)}
-                          disabled={toggleVerificationMutation.isPending}
-                          data-testid={`button-verify-${user.id}`}
-                        >
-                          <Check className="w-4 h-4 mr-1" />
-                          Vérifier
                         </Button>
                       )}
                       <Button

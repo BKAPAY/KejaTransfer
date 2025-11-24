@@ -194,14 +194,6 @@ export default function Settings() {
   });
 
   const getKycStatusBadge = () => {
-    if (user?.verified) {
-      return (
-        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-green-100 dark:bg-green-950">
-          <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />
-          <span className="text-sm font-medium text-green-700 dark:text-green-300">Vérifié</span>
-        </div>
-      );
-    }
     switch (user?.kycStatus) {
       case "verified":
         return (
@@ -251,7 +243,7 @@ export default function Settings() {
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
-          {user?.verified ? (
+          {user?.kycStatus === "verified" ? (
             <div className="text-center py-8">
               <CheckCircle2 className="w-12 h-12 mx-auto mb-3 text-green-600 dark:text-green-400" />
               <p className="text-base font-medium text-foreground">Félicitations votre compte a été vérifié avec succès</p>
