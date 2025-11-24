@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
-import { CheckCircle2, X, ArrowLeft, Search } from "lucide-react";
+import { CheckCircle2, X, ArrowLeft, Search, Download, Clock } from "lucide-react";
 import type { User } from "@shared/schema";
 import { useLocation } from "wouter";
 import { useState } from "react";
@@ -24,6 +24,10 @@ export default function KycHistoryPage() {
     (u: User) => u.kycStatus === "rejected"
   );
 
+  const pendingSubmissions = (submissions as User[] || []).filter(
+    (u: User) => u.kycStatus === "submitted"
+  );
+
   const filterBySearch = (users: User[]): User[] => {
     if (!searchQuery.trim()) return users;
     const query = searchQuery.toLowerCase();
@@ -36,32 +40,88 @@ export default function KycHistoryPage() {
 
   const filteredApproved = filterBySearch(approvedSubmissions);
   const filteredRejected = filterBySearch(rejectedSubmissions);
+  const filteredPending = filterBySearch(pendingSubmissions);
+
+  const downloadKycPDF = (user: User) => {
+    // Generate a simple text-based KYC record and download as text file
+    const content = `FORMULAIRE DE VÉRIFICATION D'IDENTITÉ (KYC)
+=====================================
+
+Date de traitement: ${new Date().toLocaleDateString("fr-FR", { year: "numeric", month: "long", day: "numeric" })}
+
+INFORMATIONS PERSONNELLES
+----------------------------
+Nom: ${user.lastName}
+Prénom: ${user.firstName}
+Email: ${user.email}
+
+STATUT DE VÉRIFICATION
+------------------------
+Statut: ${user.kycStatus === "verified" ? "APPROUVÉE" : user.kycStatus === "rejected" ? "REJETÉE" : "EN ATTENTE"}
+Date de soumission: ${new Date(user.createdAt).toLocaleDateString("fr-FR", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+
+${user.kycRejectionReason ? `\nRAISON DU REJET\n------------------\n${user.kycRejectionReason}\n` : ""}
+
+DOCUMENTS FOURNIS
+------------------
+- Photo d'identité recto: ${user.kycIdFront ? "✓ Fourni" : "✗ Non fourni"}
+- Photo d'identité verso: ${user.kycIdBack ? "✓ Fourni" : "✗ Non fourni"}
+- Selfie: ${user.kycSelfie ? "✓ Fourni" : "✗ Non fourni"}
+
+Note: Ce document certifie que les documents d'identité ont été soumis et traités conformément aux processus de BKApay.`;
+
+    const element = document.createElement("a");
+    const file = new Blob([content], { type: "text/plain" });
+    element.href = URL.createObjectURL(file);
+    element.download = `KYC_${user.firstName}_${user.lastName}_${new Date().getTime()}.txt`;
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+  };
 
   const renderSubmissionCard = (user: User) => (
     <Card key={user.id} className="overflow-hidden" data-testid={`kyc-history-card-${user.id}`}>
       <CardHeader className="pb-3">
-        <div className="flex items-start justify-between">
-          <div>
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1">
             <CardTitle className="text-lg">
               {user.firstName} {user.lastName}
             </CardTitle>
             <p className="text-sm text-muted-foreground mt-1">{user.email}</p>
             <p className="text-xs text-muted-foreground mt-1">
-              {new Date(user.createdAt).toLocaleDateString("fr-FR")}
+              {new Date(user.createdAt).toLocaleDateString("fr-FR", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })}
             </p>
           </div>
-          {user.kycStatus === "verified" && (
-            <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-green-100 dark:bg-green-950">
-              <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />
-              <span className="text-xs font-medium text-green-700 dark:text-green-300">Approuvée</span>
-            </div>
-          )}
-          {user.kycStatus === "rejected" && (
-            <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-red-100 dark:bg-red-950">
-              <X className="w-4 h-4 text-red-600 dark:text-red-400" />
-              <span className="text-xs font-medium text-red-700 dark:text-red-300">Rejetée</span>
-            </div>
-          )}
+          <div className="flex flex-col gap-2 items-end">
+            {user.kycStatus === "verified" && (
+              <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-green-100 dark:bg-green-950">
+                <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />
+                <span className="text-xs font-medium text-green-700 dark:text-green-300">Approuvée</span>
+              </div>
+            )}
+            {user.kycStatus === "rejected" && (
+              <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-red-100 dark:bg-red-950">
+                <X className="w-4 h-4 text-red-600 dark:text-red-400" />
+                <span className="text-xs font-medium text-red-700 dark:text-red-300">Rejetée</span>
+              </div>
+            )}
+            {user.kycStatus === "submitted" && (
+              <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-yellow-100 dark:bg-yellow-950">
+                <Clock className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
+                <span className="text-xs font-medium text-yellow-700 dark:text-yellow-300">En attente</span>
+              </div>
+            )}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => downloadKycPDF(user)}
+              className="gap-2"
+              data-testid={`button-download-kyc-${user.id}`}
+            >
+              <Download className="w-3 h-3" />
+              Télécharger
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -142,12 +202,15 @@ export default function KycHistoryPage() {
       </div>
 
       <Tabs defaultValue="approved" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="approved" data-testid="tab-kyc-approved">
             Approuvées ({filteredApproved.length})
           </TabsTrigger>
           <TabsTrigger value="rejected" data-testid="tab-kyc-rejected">
             Rejetées ({filteredRejected.length})
+          </TabsTrigger>
+          <TabsTrigger value="pending" data-testid="tab-kyc-pending">
+            En attente ({filteredPending.length})
           </TabsTrigger>
         </TabsList>
 
@@ -181,6 +244,23 @@ export default function KycHistoryPage() {
           ) : (
             <div className="grid gap-4">
               {filteredRejected.map((user: User) => renderSubmissionCard(user))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="pending" className="space-y-4 mt-4">
+          {filteredPending.length === 0 ? (
+            <Card>
+              <CardContent className="pt-6 text-center py-12">
+                <Clock className="w-12 h-12 mx-auto mb-3 text-yellow-600 dark:text-yellow-400" />
+                <p className="text-muted-foreground">
+                  {searchQuery ? "Aucune vérification en attente trouvée" : "Aucune vérification en attente"}
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4">
+              {filteredPending.map((user: User) => renderSubmissionCard(user))}
             </div>
           )}
         </TabsContent>

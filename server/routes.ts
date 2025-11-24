@@ -1665,7 +1665,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/admin/kyc-submissions", requireAdmin, async (req: Request, res: Response) => {
     try {
-      const submissions = await storage.getPendingKycSubmissions();
+      // Get all KYC history (submitted, verified, rejected)
+      const submissions = await storage.getKycHistory();
       res.json(submissions);
     } catch (error: any) {
       console.error("Get KYC submissions error:", error);

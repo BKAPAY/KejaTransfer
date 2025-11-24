@@ -38,6 +38,7 @@ export interface IStorage {
   approveKyc(userId: string): Promise<User | undefined>;
   rejectKyc(userId: string, reason?: string): Promise<User | undefined>;
   getPendingKycSubmissions(): Promise<User[]>;
+  getKycHistory(): Promise<User[]>;
   suspendUser(userId: string): Promise<User | undefined>;
   unsuspendUser(userId: string): Promise<User | undefined>;
 
@@ -163,6 +164,18 @@ export class DbStorage implements IStorage {
       .select()
       .from(schema.users)
       .where(eq(schema.users.kycStatus, "submitted"))
+      .orderBy(desc(schema.users.createdAt));
+  }
+
+  async getKycHistory(): Promise<User[]> {
+    // Return all users with KYC submissions (submitted, verified, or rejected)
+    return db
+      .select()
+      .from(schema.users)
+      .where((c) => {
+        // Use raw SQL to check if kycStatus is not 'pending'
+        return sql`${c.kycStatus} IN ('submitted', 'verified', 'rejected')`;
+      })
       .orderBy(desc(schema.users.createdAt));
   }
 
