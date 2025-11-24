@@ -556,6 +556,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== PSR Endpoint (for Paydunya SDK) =====
+  // GET endpoint that returns token for PSR (Paiement Sans Redirection)
+  app.get("/api/paydunya-api", async (req: Request, res: Response) => {
+    try {
+      const ref = req.query.ref as string;
+      if (!ref) {
+        return res.status(400).json({ error: "ref parameter required" });
+      }
+
+      // Find transaction by ID
+      const transaction = await storage.getTransaction(ref);
+      if (!transaction) {
+        return res.status(404).json({ error: "Transaction not found" });
+      }
+
+      // Get metadata (contains paydunyaToken)
+      let metadata: any = {};
+      if (transaction.metadata) {
+        metadata = JSON.parse(transaction.metadata);
+      }
+
+      if (!metadata.paydunyaToken) {
+        return res.status(400).json({ error: "Token not available" });
+      }
+
+      // Return PSR response format
+      const response: any = {
+        success: true,
+        token: metadata.paydunyaToken,
+      };
+
+      // Add mode if in test environment
+      if (PAYDUNYA_CONFIG.publicKey.includes("test")) {
+        response.mode = "test";
+      }
+
+      res.json(response);
+    } catch (error: any) {
+      console.error("Paydunya API endpoint error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // ===== Payment Processing Routes =====
   
   // Process payment link payment
@@ -601,10 +644,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const paydunyaResponse = await callPaydunyaAPI("/checkout-invoice/create", paydunyaData);
 
       if (paydunyaResponse.response_code === "00") {
-        // Return checkout URL without creating a transaction yet
+        // Create transaction now with the Paydunya token
+        const transactionId = randomUUID();
+        await storage.createTransaction({
+          userId: paymentLink.userId,
+          type: "payment_link",
+          amount: paymentLink.amount,
+          fee: 0,
+          feePercentage: 0,
+          currency: "XOF",
+          status: "pending",
+          country,
+          operator,
+          description: `Paiement - ${paymentLink.productName}`,
+          customerName,
+          customerEmail,
+          customerPhone,
+          metadata: JSON.stringify({
+            paydunyaToken: paydunyaResponse.token,
+            paymentLinkId: paymentLink.id,
+          }),
+        });
+
+        // Return for PSR (no redirectUrl)
         res.json({
           success: true,
-          redirectUrl: paydunyaResponse.response_text,
+          transactionId: transactionId,
           paydunyaToken: paydunyaResponse.token,
         });
       } else {
@@ -663,9 +728,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const paydunyaResponse = await callPaydunyaAPI("/checkout-invoice/create", paydunyaData);
 
       if (paydunyaResponse.response_code === "00") {
+        // Create transaction now with the Paydunya token
+        const transactionId = randomUUID();
+        await storage.createTransaction({
+          userId: merchantLink.userId,
+          type: "merchant_link",
+          amount: amount,
+          fee: 0,
+          feePercentage: 0,
+          currency: "XOF",
+          status: "pending",
+          country,
+          operator,
+          description: `Paiement marchand - ${merchantLink.merchantName}`,
+          customerName,
+          customerEmail,
+          customerPhone,
+          metadata: JSON.stringify({
+            paydunyaToken: paydunyaResponse.token,
+            merchantLinkId: merchantLink.id,
+          }),
+        });
+
+        // Return for PSR (no redirectUrl)
         res.json({
           success: true,
-          redirectUrl: paydunyaResponse.response_text,
+          transactionId: transactionId,
           paydunyaToken: paydunyaResponse.token,
         });
       } else {
@@ -717,9 +805,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const paydunyaResponse = await callPaydunyaAPI("/checkout-invoice/create", paydunyaData);
 
       if (paydunyaResponse.response_code === "00") {
+        // Create transaction now with the Paydunya token
+        const transactionId = randomUUID();
+        await storage.createTransaction({
+          userId: req.session.userId!,
+          type: "deposit",
+          amount: Math.floor(amount),
+          fee: 0,
+          feePercentage: 0,
+          currency: "XOF",
+          status: "pending",
+          country,
+          operator,
+          description: `Dépôt de ${amount} XOF`,
+          metadata: JSON.stringify({
+            paydunyaToken: paydunyaResponse.token,
+            phone,
+          }),
+        });
+        
         res.json({
           success: true,
-          redirectUrl: paydunyaResponse.response_text,
+          transactionId: transactionId,
           paydunyaToken: paydunyaResponse.token,
         });
       } else {

@@ -12,8 +12,15 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { apiRequest } from "@/lib/queryClient";
-import { useState } from "react";
-import { SoftPayQRCode } from "@/components/softpay-qrcode";
+import { useState, useEffect, useRef } from "react";
+
+declare global {
+  interface Window {
+    PayDunya: any;
+  }
+}
+
+declare const jQuery: any;
 
 const paymentSchema = z.object({
   customerName: z.string().min(2, "Le nom doit contenir au moins 2 caractères"),
@@ -30,13 +37,30 @@ export default function Pay() {
   const token = params?.token;
   const [, setLocation] = useLocation();
   const [selectedCountry, setSelectedCountry] = useState("");
-  const [showQRCode, setShowQRCode] = useState(false);
-  const [qrCodeData, setQRCodeData] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const psrLoadedRef = useRef(false);
 
-  const { data: paymentLink, isLoading } = useQuery<PaymentLink>({
+  const { data: paymentLink, isLoading: linkLoading } = useQuery<PaymentLink>({
     queryKey: ["/api/payment-links/public", token],
     enabled: !!token,
   });
+
+  // Load PSR SDK
+  useEffect(() => {
+    if (!psrLoadedRef.current) {
+      const script = document.createElement("script");
+      script.src = "https://paydunya.com/assets/psr/js/psr.paydunya.min.js";
+      script.async = true;
+      document.body.appendChild(script);
+
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = "https://paydunya.com/assets/psr/css/psr.paydunya.min.css";
+      document.head.appendChild(link);
+
+      psrLoadedRef.current = true;
+    }
+  }, []);
 
   const form = useForm<PaymentFormData>({
     resolver: zodResolver(paymentSchema),
@@ -52,32 +76,51 @@ export default function Pay() {
   const paymentMutation = useMutation({
     mutationFn: async (data: PaymentFormData) => {
       const res = await apiRequest("POST", `/api/payments/process/${token}`, data);
-      const jsonData = await res.json();
-      console.log("Payment response:", jsonData);
-      return jsonData;
+      return res.json();
     },
     onSuccess: (data: any) => {
-      console.log("Payment success, data:", data);
-      if (data?.redirectUrl) {
-        // Show QR code instead of redirect
-        setQRCodeData({
-          url: data.redirectUrl,
-          paydunyaToken: data.paydunyaToken,
-          operator: form.getValues("operator"),
-          amount: paymentLink?.amount,
-        });
-        setShowQRCode(true);
-      } else {
-        console.error("No redirectUrl in response:", data);
+      if (data?.transactionId && window.PayDunya) {
+        const btn = document.createElement("button");
+        btn.className = "pay";
+        btn.setAttribute("onclick", "payWithPaydunya(this)");
+        btn.setAttribute("data-ref", data.transactionId);
+        btn.setAttribute("data-fullname", form.getValues("customerName"));
+        btn.setAttribute("data-email", form.getValues("customerEmail"));
+        btn.setAttribute("data-phone", form.getValues("customerPhone"));
+        btn.style.display = "none";
+        document.body.appendChild(btn);
+
+        window.PayDunya.setup({
+          selector: jQuery(btn),
+          url: "/api/paydunya-api",
+          method: "GET",
+          displayMode: window.PayDunya.DISPLAY_IN_POPUP,
+          onSuccess: function (token: string) {
+            console.log("Payment token received:", token);
+          },
+          onTerminate: function (ref: string, token: string, status: string) {
+            console.log("Payment terminated - Ref:", ref, "Status:", status);
+            setLocation(`/status/${ref}`);
+          },
+          onError: function (error: any) {
+            console.error("Payment error:", error);
+            alert("Erreur lors du paiement: " + error.toString());
+            setIsLoading(false);
+          },
+          onClose: function () {
+            console.log("Payment modal closed");
+          },
+        }).requestToken();
       }
     },
     onError: (error: any) => {
       console.error("Payment mutation error:", error);
+      setIsLoading(false);
     },
   });
 
   const onSubmit = (data: PaymentFormData) => {
-    console.log("Form submitted with data:", data);
+    setIsLoading(true);
     paymentMutation.mutate(data);
   };
 
@@ -94,7 +137,7 @@ export default function Pay() {
     ? OPERATORS[selectedCountry as keyof typeof OPERATORS] || []
     : [];
 
-  if (isLoading) {
+  if (linkLoading) {
     return (
       <div className="w-full min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center p-4 overflow-hidden">
         <Card className="w-full max-w-lg">
@@ -114,46 +157,6 @@ export default function Pay() {
             <div className="text-center">
               <img src={logoImage} alt="BKApay" className="h-16 w-auto mx-auto mb-4" />
               <p className="text-muted-foreground">Lien de paiement introuvable ou inactif</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  if (showQRCode && qrCodeData) {
-    return (
-      <div className="w-full min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center p-4 overflow-hidden">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center space-y-2 p-4 sm:p-6">
-            <div className="flex justify-center mb-2">
-              <img src={logoImage} alt="BKApay" className="h-8 sm:h-10 w-auto" />
-            </div>
-            <CardTitle>Paiement Sécurisé</CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 sm:p-6">
-            <SoftPayQRCode
-              paymentUrl={qrCodeData.url}
-              amount={qrCodeData.amount || paymentLink.amount}
-              operator={qrCodeData.operator || ""}
-              status="pending"
-            />
-            <div className="mt-4 flex gap-2">
-              <Button
-                onClick={() => setShowQRCode(false)}
-                variant="outline"
-                className="flex-1"
-                data-testid="button-back-to-form"
-              >
-                Retour
-              </Button>
-              <Button
-                onClick={() => window.open(qrCodeData.url, "_blank")}
-                className="flex-1"
-                data-testid="button-open-payment"
-              >
-                Ouvrir le paiement
-              </Button>
             </div>
           </CardContent>
         </Card>
@@ -200,7 +203,6 @@ export default function Pay() {
                       <Input
                         placeholder="Jean Dupont"
                         data-testid="input-name"
-                        className="text-xs sm:text-sm"
                         {...field}
                       />
                     </FormControl>
@@ -208,17 +210,16 @@ export default function Pay() {
                   </FormItem>
                 )}
               />
-
               <FormField
                 control={form.control}
                 name="customerEmail"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel className="text-xs sm:text-sm">Email</FormLabel>
                     <FormControl>
                       <Input
                         type="email"
-                        placeholder="jean.dupont@example.com"
+                        placeholder="jean@exemple.com"
                         data-testid="input-email"
                         {...field}
                       />
@@ -227,48 +228,15 @@ export default function Pay() {
                   </FormItem>
                 )}
               />
-
-              <FormField
-                control={form.control}
-                name="country"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Pays</FormLabel>
-                    <Select
-                      onValueChange={(value) => {
-                        field.onChange(value);
-                        setSelectedCountry(value);
-                        form.setValue("operator", "");
-                      }}
-                      value={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger data-testid="select-country">
-                          <SelectValue placeholder="Sélectionnez votre pays" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {COUNTRIES.map((country) => (
-                          <SelectItem key={country.code} value={country.code}>
-                            {country.flag} {country.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
               <FormField
                 control={form.control}
                 name="customerPhone"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Numéro de téléphone</FormLabel>
+                    <FormLabel className="text-xs sm:text-sm">Numéro de téléphone</FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="77 123 45 67"
+                        placeholder="+221 77 123 45 67"
                         data-testid="input-phone"
                         {...field}
                       />
@@ -277,27 +245,29 @@ export default function Pay() {
                   </FormItem>
                 )}
               />
-
               <FormField
                 control={form.control}
-                name="operator"
+                name="country"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Opérateur</FormLabel>
+                    <FormLabel className="text-xs sm:text-sm">Pays</FormLabel>
                     <Select
-                      onValueChange={field.onChange}
                       value={field.value}
-                      disabled={!selectedCountry}
+                      onValueChange={(value) => {
+                        field.onChange(value);
+                        setSelectedCountry(value);
+                        form.setValue("operator", "");
+                      }}
                     >
                       <FormControl>
-                        <SelectTrigger data-testid="select-operator">
-                          <SelectValue placeholder="Sélectionnez votre opérateur" />
+                        <SelectTrigger data-testid="select-country">
+                          <SelectValue placeholder="Sélectionner un pays" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {availableOperators.map((operator) => (
-                          <SelectItem key={operator.code} value={operator.code}>
-                            {operator.name}
+                        {COUNTRIES.map((country) => (
+                          <SelectItem key={country.code} value={country.code}>
+                            {country.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -306,23 +276,40 @@ export default function Pay() {
                   </FormItem>
                 )}
               />
-
+              <FormField
+                control={form.control}
+                name="operator"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs sm:text-sm">Opérateur</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-operator">
+                          <SelectValue placeholder="Sélectionner un opérateur" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {availableOperators.map((op) => (
+                          <SelectItem key={op.code} value={op.code}>
+                            {op.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <Button
                 type="submit"
                 className="w-full"
-                size="lg"
-                disabled={paymentMutation.isPending}
+                disabled={isLoading || paymentMutation.isPending}
                 data-testid="button-pay"
               >
-                {paymentMutation.isPending ? "Traitement..." : `Payer ${formatAmount(paymentLink.amount)}`}
+                {isLoading || paymentMutation.isPending ? "Traitement..." : "Procéder au paiement"}
               </Button>
-
             </form>
           </Form>
-
-          <div className="mt-3 sm:mt-4 lg:mt-6 text-center text-xs text-muted-foreground">
-            <p>Paiement sécurisé par BKApay</p>
-          </div>
         </CardContent>
       </Card>
     </div>
