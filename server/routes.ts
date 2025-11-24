@@ -1507,6 +1507,212 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // SOFTPAY for Payment Links - Initialize payment
+  app.post("/api/payment-links/softpay-init/:token", async (req: Request, res: Response) => {
+    try {
+      const { customerName, customerEmail, customerPhone, country, operator } = req.body;
+      const { token } = req.params;
+
+      if (!country || !operator || !customerPhone) {
+        return res.status(400).json({ error: "Informations incomplètes" });
+      }
+
+      // Validate operator BEFORE creating transaction
+      const operatorKey = getOperatorKey(operator, country);
+      if (!operatorKey) {
+        return res.status(400).json({ error: "Opérateur non supporté pour ce pays" });
+      }
+
+      // Get payment link
+      const paymentLink = await storage.getPaymentLinkByToken(token);
+      if (!paymentLink) {
+        return res.status(404).json({ error: "Lien de paiement non trouvé" });
+      }
+
+      // Check if user account is suspended
+      const owner = await storage.getUser(paymentLink.userId);
+      if (owner?.suspended) {
+        return res.status(404).json({ error: "Ce lien n'existe pas" });
+      }
+
+      // Create Paydunya invoice
+      const paydunyaData = {
+        invoice: {
+          total_amount: Math.floor(paymentLink.amount),
+          description: `Paiement - ${paymentLink.productName}`,
+        },
+        store: {
+          name: "BKApay",
+        },
+        custom_data: {
+          type: "payment_link",
+          user_id: paymentLink.userId,
+          customer_name: customerName,
+          customer_email: customerEmail,
+          customer_phone: customerPhone,
+          country,
+          operator,
+        },
+        actions: {
+          callback_url: `${process.env.BASE_URL || 'http://localhost:5000'}/api/webhooks/paydunya`,
+        },
+      };
+
+      const paydunyaResponse = await callPaydunyaAPI("/checkout-invoice/create", paydunyaData);
+
+      if (paydunyaResponse.response_code === "00" && paydunyaResponse.token) {
+        // Calculate fees for INCOMING payment
+        const grossAmount = Math.floor(paymentLink.amount);
+        const feeInfo = calculateIncomingFee(grossAmount, country);
+        
+        // Create transaction
+        const transactionId = randomUUID();
+        await storage.createTransaction({
+          userId: paymentLink.userId,
+          type: "payment_link",
+          amount: feeInfo.grossAmount,
+          fee: feeInfo.feeAmount,
+          feePercentage: feeInfo.feePercentage,
+          currency: "XOF",
+          status: "pending",
+          country,
+          operator,
+          description: `Paiement - ${paymentLink.productName}`,
+          customerName,
+          customerEmail,
+          customerPhone,
+          paydunyaToken: paydunyaResponse.token,
+          metadata: JSON.stringify({
+            paymentLinkId: paymentLink.id,
+          }),
+        });
+
+        // Get operator configuration (already validated above)
+        const ussdInstruction = getUSSDInstruction(operatorKey);
+        const needsOTP = requiresOTP(operatorKey);
+        const twoStep = requiresTwoStep(operatorKey);
+
+        res.json({
+          success: true,
+          transactionId,
+          token: paydunyaResponse.token,
+          ussdInstruction,
+          requiresOTP: needsOTP,
+          requiresTwoStep: twoStep,
+        });
+      } else {
+        res.status(400).json({ error: "Erreur lors de la création de la facture" });
+      }
+    } catch (error: any) {
+      console.error("[PAYMENT_LINK SOFTPAY INIT] Error:", error);
+      res.status(500).json({ error: "Erreur lors de l'initialisation du paiement" });
+    }
+  });
+
+  // SOFTPAY for Payment Links - Confirm payment
+  app.post("/api/payment-links/softpay-confirm", async (req: Request, res: Response) => {
+    try {
+      const { transactionId, token, authorizationCode, country, operator, customerPhone, customerName, customerEmail } = req.body;
+
+      if (!transactionId || !token || !country || !operator || !customerPhone) {
+        return res.status(400).json({ error: "Informations de paiement incomplètes" });
+      }
+
+      // Get transaction by ID
+      const transaction = await storage.getTransaction(transactionId);
+      if (!transaction) {
+        return res.status(404).json({ error: "Transaction non trouvée" });
+      }
+
+      // Parse metadata for Wizall transactionId
+      let metadata: any = {};
+      if (transaction.metadata) {
+        metadata = JSON.parse(transaction.metadata);
+      }
+
+      // Check if this is Wizall two-step flow
+      const operatorKey = getOperatorKey(operator, country);
+      const isTwoStep = operatorKey ? requiresTwoStep(operatorKey) : false;
+
+      if (isTwoStep && operator.toLowerCase() === "wizall" && country.toUpperCase() === "SN") {
+        // WIZALL TWO-STEP: Call /wizall-money-senegal/confirm endpoint
+        if (!metadata.wizallTransactionId) {
+          return res.status(400).json({ error: "Transaction Wizall non initiée" });
+        }
+
+        // Call Wizall confirm helper
+        const confirmResult = await confirmWizallPayment(authorizationCode!, customerPhone, metadata.wizallTransactionId);
+
+        if (confirmResult.success) {
+          res.json({
+            success: true,
+            message: confirmResult.message,
+            transactionId: transaction.id,
+          });
+        } else {
+          res.status(400).json({
+            error: confirmResult.message,
+          });
+        }
+      } else {
+        // STANDARD FLOW
+        const paymentData: SoftpayPaymentData = {
+          customerName: customerName || transaction.customerName || "Client",
+          customerEmail: customerEmail || transaction.customerEmail || "",
+          phoneNumber: customerPhone,
+          invoiceToken: token,
+          authorizationCode,
+        };
+
+        const softpayResult = await callPaydunyaSoftpay(operator, country, paymentData);
+
+        if (softpayResult.success) {
+          // CRITICAL: For two-step flows, transactionId MUST be present
+          if (isTwoStep && !softpayResult.transactionId) {
+            return res.status(502).json({
+              error: "Erreur serveur: TransactionID manquant pour paiement two-step",
+            });
+          }
+
+          // For Wizall first step, store TransactionID
+          if (softpayResult.transactionId && isTwoStep) {
+            const updatedMetadata = {
+              ...metadata,
+              wizallTransactionId: softpayResult.transactionId,
+            };
+            await storage.updateTransactionStatus(transaction.id, "pending", {
+              metadata: JSON.stringify(updatedMetadata),
+            });
+
+            res.json({
+              success: true,
+              message: "Code OTP envoyé par SMS",
+              transactionId: transaction.id,
+              requiresOTP: true,
+              wizallTransactionId: softpayResult.transactionId,
+            });
+          } else {
+            res.json({
+              success: true,
+              message: softpayResult.message,
+              transactionId: transaction.id,
+              fees: softpayResult.fees,
+              currency: softpayResult.currency,
+              redirectUrl: softpayResult.url,
+            });
+          }
+        } else {
+          res.status(400).json({
+            error: softpayResult.message || "Erreur lors du paiement",
+          });
+        }
+      }
+    } catch (error: any) {
+      console.error("[PAYMENT_LINK SOFTPAY CONFIRM] Error:", error);
+      res.status(500).json({ error: "Erreur lors de la confirmation du paiement" });
+    }
+  });
+
   // SOFTPAY for Merchant Links - Initialize payment
   app.post("/api/merchant-links/softpay-init/:token", async (req: Request, res: Response) => {
     try {
@@ -1519,6 +1725,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!country || !operator || !customerPhone) {
         return res.status(400).json({ error: "Pays, opérateur et numéro de téléphone requis" });
+      }
+
+      // Validate operator BEFORE creating transaction
+      const operatorKey = getOperatorKey(operator, country);
+      if (!operatorKey) {
+        return res.status(400).json({ error: "Opérateur non supporté pour ce pays" });
       }
 
       // Get merchant link
@@ -1585,11 +1797,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }),
         });
 
-        // Get operator configuration
-        const operatorKey = getOperatorKey(operator, country);
-        const ussdInstruction = operatorKey ? getUSSDInstruction(operatorKey) : null;
-        const needsOTP = operatorKey ? requiresOTP(operatorKey) : false;
-        const twoStep = operatorKey ? requiresTwoStep(operatorKey) : false;
+        // Get operator configuration (already validated above)
+        const ussdInstruction = getUSSDInstruction(operatorKey);
+        const needsOTP = requiresOTP(operatorKey);
+        const twoStep = requiresTwoStep(operatorKey);
 
         res.json({
           success: true,
@@ -1611,14 +1822,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // SOFTPAY for Merchant Links - Confirm payment
   app.post("/api/merchant-links/softpay-confirm", async (req: Request, res: Response) => {
     try {
-      const { token, authorizationCode, country, operator, customerPhone, customerName, customerEmail } = req.body;
+      const { transactionId, token, authorizationCode, country, operator, customerPhone, customerName, customerEmail } = req.body;
 
-      if (!token || !country || !operator || !customerPhone) {
+      if (!transactionId || !token || !country || !operator || !customerPhone) {
         return res.status(400).json({ error: "Informations de paiement incomplètes" });
       }
 
-      // Get transaction by token
-      const transaction = await storage.getTransactionByPaydunyaToken(token);
+      // Get transaction by ID
+      const transaction = await storage.getTransaction(transactionId);
       if (!transaction) {
         return res.status(404).json({ error: "Transaction non trouvée" });
       }

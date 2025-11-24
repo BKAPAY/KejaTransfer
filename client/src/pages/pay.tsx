@@ -15,7 +15,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState } from "react";
-import { CheckCircle2, Clock } from "lucide-react";
+import { CheckCircle2, Clock, Loader2, AlertCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const paymentSchema = z.object({
   customerName: z.string().min(2, "Le nom doit contenir au moins 2 caractères"),
@@ -30,10 +31,13 @@ type PaymentFormData = z.infer<typeof paymentSchema>;
 export default function Pay() {
   const [, params] = useRoute("/pay/:token");
   const token = params?.token;
-  const [isLoading, setIsLoading] = useState(false);
-  const [paymentInProgress, setPaymentInProgress] = useState(false);
+  const [paymentStage, setPaymentStage] = useState<"form" | "ussd" | "otp" | "polling" | "completed">("form");
   const [invoiceToken, setInvoiceToken] = useState<string | null>(null);
-  const [pollingStatus, setPollingStatus] = useState<string | null>(null);
+  const [transactionId, setTransactionId] = useState<string | null>(null);
+  const [ussdInstruction, setUssdInstruction] = useState<string | null>(null);
+  const [wizallTransactionId, setWizallTransactionId] = useState<string | null>(null);
+  const [authCode, setAuthCode] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
   const { data: paymentLink, isLoading: linkLoading } = useQuery<PaymentLink>({
@@ -55,27 +59,10 @@ export default function Pay() {
   const selectedCountry = form.watch("country");
   const countryOperators = selectedCountry ? OPERATORS[(selectedCountry as keyof typeof OPERATORS) || ("BJ" as const)] || [] : [];
 
-  // Wait for webhook confirmation (payment link payments use webhook, not polling)
-  useEffect(() => {
-    if (!paymentInProgress || !invoiceToken) return;
-
-    // Timeout after 5 minutes if no webhook confirmation
-    const timeout = setTimeout(() => {
-      setPaymentInProgress(false);
-      setPollingStatus("timeout");
-      toast({
-        title: "Paiement en attente",
-        description: "Le paiement n'a pas pu être confirmé. Veuillez vérifier votre solde et réessayer.",
-        variant: "destructive",
-      });
-    }, 5 * 60 * 1000);
-
-    return () => clearTimeout(timeout);
-  }, [paymentInProgress, invoiceToken, toast]);
-
-  const paymentMutation = useMutation({
+  // SOFTPAY INIT mutation
+  const initMutation = useMutation({
     mutationFn: async (data: PaymentFormData) => {
-      const res = await apiRequest("POST", `/api/payments/process/${token}`, {
+      const res = await apiRequest("POST", `/api/payment-links/softpay-init/${token}`, {
         customerName: data.customerName,
         customerEmail: data.customerEmail,
         customerPhone: data.customerPhone,
@@ -85,30 +72,151 @@ export default function Pay() {
       return res.json();
     },
     onSuccess: (data: any) => {
-      if (data?.token) {
+      if (data.transactionId && data.token) {
+        setTransactionId(data.transactionId);
         setInvoiceToken(data.token);
-        setPaymentInProgress(true);
-        setPollingStatus("waiting");
-        toast({
-          title: "Facture créée",
-          description: "Veuillez compléter le paiement sur votre téléphone",
-        });
+        setUssdInstruction(data.ussdInstruction || null);
+        
+        if (data.requiresTwoStep) {
+          // Wizall two-step → go to OTP stage after confirm
+          setPaymentStage("ussd");
+        } else if (data.requiresOTP) {
+          // Direct OTP → go to OTP stage
+          setPaymentStage("otp");
+        } else {
+          // Standard → go to USSD stage
+          setPaymentStage("ussd");
+        }
       }
     },
     onError: (error: any) => {
-      console.error("Payment mutation error:", error);
-      setIsLoading(false);
       toast({
         title: "Erreur",
-        description: error.message || "Erreur lors du paiement",
+        description: error.message || "Erreur lors de l'initialisation du paiement",
         variant: "destructive",
       });
     },
   });
 
-  const onSubmit = (data: PaymentFormData) => {
-    setIsLoading(true);
-    paymentMutation.mutate(data);
+  // SOFTPAY CONFIRM mutation
+  const confirmMutation = useMutation({
+    mutationFn: async ({ authorizationCode }: { authorizationCode?: string }) => {
+      const formData = form.getValues();
+      const payload: any = {
+        token: invoiceToken,
+        transactionId,  // CRITICAL: Include transactionId for backend to find transaction
+        authorizationCode,
+        country: formData.country,
+        operator: formData.operator,
+        customerPhone: formData.customerPhone,
+        customerName: formData.customerName,
+        customerEmail: formData.customerEmail,
+      };
+      
+      // Include wizallTransactionId for Wizall OTP confirmation
+      if (wizallTransactionId && authorizationCode) {
+        payload.wizallTransactionId = wizallTransactionId;
+      }
+      
+      const res = await apiRequest("POST", "/api/payment-links/softpay-confirm", payload);
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      if (data.success) {
+        if (data.requiresOTP && data.wizallTransactionId) {
+          // Wizall first step confirmed → store ID and show OTP input
+          setWizallTransactionId(data.wizallTransactionId);
+          setPaymentStage("otp");
+          toast({
+            title: "Code OTP envoyé",
+            description: "Veuillez entrer le code reçu par SMS",
+          });
+        } else if (data.redirectUrl) {
+          // Wave redirect
+          window.location.href = data.redirectUrl;
+        } else {
+          // Standard success → start polling
+          setPaymentStage("polling");
+        }
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erreur",
+        description: error.message || "Erreur lors de la confirmation du paiement",
+        variant: "destructive",
+      });
+      setPaymentStage("form");
+    },
+  });
+
+  // Polling for payment status
+  useEffect(() => {
+    if (paymentStage !== "polling" || !invoiceToken) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch("/api/softpay/verify-payment", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ invoiceToken }),
+        });
+        const data = await res.json();
+        
+        if (data.status === "completed") {
+          setPaymentStage("completed");
+          clearInterval(interval);
+          toast({
+            title: "Paiement réussi",
+            description: "Votre transaction a été confirmée",
+          });
+        } else if (data.status === "failed") {
+          clearInterval(interval);
+          setPaymentStage("form");
+          toast({
+            title: "Paiement échoué",
+            description: "La transaction n'a pas pu être complétée",
+            variant: "destructive",
+          });
+        }
+      } catch (error) {
+        console.error("Polling error:", error);
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [paymentStage, invoiceToken, toast]);
+
+  const onSubmit = async (data: PaymentFormData) => {
+    initMutation.mutate(data);
+  };
+
+  const handleConfirm = async () => {
+    if (!transactionId || !invoiceToken) {
+      toast({
+        title: "Erreur",
+        description: "Informations de paiement manquantes",
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsSubmitting(true);
+    confirmMutation.mutate({});
+    setIsSubmitting(false);
+  };
+
+  const handleOTPSubmit = async () => {
+    if (!authCode.trim()) {
+      toast({
+        title: "Code requis",
+        description: "Veuillez entrer le code OTP",
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsSubmitting(true);
+    confirmMutation.mutate({ authorizationCode: authCode });
+    setIsSubmitting(false);
   };
 
   const formatAmount = (amount: number) => {
@@ -147,37 +255,125 @@ export default function Pay() {
     );
   }
 
-  if (paymentInProgress) {
-    if (pollingStatus === "completed") {
-      return (
-        <div className="w-full min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center p-4 overflow-hidden">
-          <Card className="w-full max-w-md">
-            <CardHeader className="text-center space-y-2 p-4 sm:p-6">
-              <div className="flex justify-center mb-2">
-                <CheckCircle2 className="w-12 h-12 text-green-500" />
-              </div>
-              <CardTitle>Paiement réussi!</CardTitle>
-              <CardDescription>Votre transaction a été confirmée</CardDescription>
-            </CardHeader>
-          </Card>
-        </div>
-      );
-    }
-
+  // STAGE: Completed
+  if (paymentStage === "completed") {
     return (
       <div className="w-full min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center p-4 overflow-hidden">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center space-y-2 p-4 sm:p-6">
             <div className="flex justify-center mb-2">
-              <Clock className="w-12 h-12 text-blue-500 animate-spin" />
+              <CheckCircle2 className="w-12 h-12 text-green-500" data-testid="icon-success" />
             </div>
-            <CardTitle>Paiement en attente</CardTitle>
-            <CardDescription>Veuillez compléter le paiement sur votre téléphone</CardDescription>
+            <CardTitle>Paiement réussi!</CardTitle>
+            <CardDescription>Votre transaction a été confirmée</CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    );
+  }
+
+  // STAGE: Polling
+  if (paymentStage === "polling") {
+    return (
+      <div className="w-full min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center p-4 overflow-hidden">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center space-y-2 p-4 sm:p-6">
+            <div className="flex justify-center mb-2">
+              <Loader2 className="w-12 h-12 text-primary animate-spin" data-testid="icon-polling" />
+            </div>
+            <CardTitle>Paiement en cours</CardTitle>
+            <CardDescription>Vérification du paiement...</CardDescription>
           </CardHeader>
           <CardContent className="p-4 sm:p-6 text-center space-y-4">
             <p className="text-sm text-muted-foreground">
-              Vous allez recevoir un SMS sur votre téléphone. Confirmez le paiement directement sur votre mobile.
+              Nous vérifions votre paiement. Cela peut prendre quelques secondes.
             </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // STAGE: USSD instructions
+  if (paymentStage === "ussd") {
+    return (
+      <div className="w-full min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center p-4 overflow-hidden">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center space-y-2">
+            <img src={logoImage} alt="BKApay" className="h-10 w-auto mx-auto" />
+            <CardTitle>Instructions de paiement</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {ussdInstruction && (
+              <Alert className="bg-primary/5 border-primary/20">
+                <AlertDescription className="text-sm whitespace-pre-line">
+                  {ussdInstruction}
+                </AlertDescription>
+              </Alert>
+            )}
+            <p className="text-sm text-muted-foreground text-center">
+              Suivez les instructions sur votre téléphone pour compléter le paiement
+            </p>
+            <Button
+              onClick={handleConfirm}
+              disabled={isSubmitting || confirmMutation.isPending}
+              className="w-full"
+              data-testid="button-confirm-ussd"
+            >
+              {isSubmitting || confirmMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Traitement...
+                </>
+              ) : (
+                "J'ai complété le paiement"
+              )}
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // STAGE: OTP input
+  if (paymentStage === "otp") {
+    return (
+      <div className="w-full min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center p-4 overflow-hidden">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center space-y-2">
+            <img src={logoImage} alt="BKApay" className="h-10 w-auto mx-auto" />
+            <CardTitle>Code de confirmation</CardTitle>
+            <CardDescription>Entrez le code OTP reçu par SMS</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <label htmlFor="auth-code" className="block text-sm font-medium mb-2">
+                Code OTP
+              </label>
+              <Input
+                id="auth-code"
+                type="text"
+                value={authCode}
+                onChange={(e) => setAuthCode(e.target.value)}
+                placeholder="Entrez le code"
+                data-testid="input-otp"
+              />
+            </div>
+            <Button
+              onClick={handleOTPSubmit}
+              disabled={isSubmitting || confirmMutation.isPending}
+              className="w-full"
+              data-testid="button-submit-otp"
+            >
+              {isSubmitting || confirmMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Vérification...
+                </>
+              ) : (
+                "Valider le code"
+              )}
+            </Button>
           </CardContent>
         </Card>
       </div>
@@ -307,10 +503,17 @@ export default function Pay() {
               <Button
                 type="submit"
                 className="w-full"
-                disabled={isLoading || paymentMutation.isPending}
+                disabled={initMutation.isPending}
                 data-testid="button-pay"
               >
-                {isLoading || paymentMutation.isPending ? "Traitement..." : "Payer maintenant"}
+                {initMutation.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Initialisation...
+                  </>
+                ) : (
+                  "Payer maintenant"
+                )}
               </Button>
             </form>
           </Form>
