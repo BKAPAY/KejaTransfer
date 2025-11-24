@@ -57,35 +57,23 @@ export default function Merchant() {
   const selectedCountry = form.watch("country");
   const countryOperators = selectedCountry ? OPERATORS[(selectedCountry as keyof typeof OPERATORS) || ("BJ" as const)] || [] : [];
 
-  // Polling for payment status
+  // Wait for webhook confirmation (merchant link payments use webhook, not polling)
   useEffect(() => {
     if (!paymentInProgress || !invoiceToken) return;
 
-    const pollInterval = setInterval(async () => {
-      try {
-        const result = await apiRequest("POST", "/api/softpay/verify-payment", {
-          invoiceToken,
-        });
+    // Timeout after 5 minutes if no webhook confirmation
+    const timeout = setTimeout(() => {
+      setPaymentInProgress(false);
+      setPollingStatus("timeout");
+      toast({
+        title: "Paiement en attente",
+        description: "Le paiement n'a pas pu être confirmé. Veuillez vérifier votre solde et réessayer.",
+        variant: "destructive",
+      });
+    }, 5 * 60 * 1000);
 
-        if (result.status === "completed") {
-          setPaymentInProgress(false);
-          setPollingStatus("completed");
-          toast({
-            title: "Paiement confirmé!",
-            description: "Votre paiement a été traité avec succès",
-          });
-          form.reset();
-          setInvoiceToken(null);
-          queryClient.invalidateQueries({ queryKey: ["/api/merchant-links"] });
-          clearInterval(pollInterval);
-        }
-      } catch (error) {
-        console.error("Polling error:", error);
-      }
-    }, 3000); // Poll every 3 seconds
-
-    return () => clearInterval(pollInterval);
-  }, [paymentInProgress, invoiceToken, toast, form]);
+    return () => clearTimeout(timeout);
+  }, [paymentInProgress, invoiceToken, toast]);
 
   const paymentMutation = useMutation({
     mutationFn: async (data: MerchantPaymentFormData) => {
