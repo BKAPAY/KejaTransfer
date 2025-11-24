@@ -566,23 +566,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Calculate fees silently
       const feeInfo = calculateIncomingFee(paymentLink.amount, country);
 
-      // Create transaction record with fee info
-      const transaction = await storage.createTransaction({
-        userId: paymentLink.userId,
-        type: "payment_link",
-        amount: feeInfo.netAmount,
-        fee: feeInfo.feeAmount,
-        feePercentage: feeInfo.feePercentage,
-        currency: "XOF",
-        status: "pending",
-        country,
-        operator,
-        customerName,
-        customerEmail,
-        customerPhone,
-        description: `Paiement - ${paymentLink.productName}`,
-      });
-
       // Call Paydunya API to create checkout invoice
       const paydunyaData = {
         invoice: {
@@ -594,7 +577,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           tagline: "Plateforme de paiement mobile money",
         },
         custom_data: {
-          transaction_id: transaction.id,
           customer_name: customerName,
           customer_email: customerEmail,
         },
@@ -606,23 +588,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const paydunyaResponse = await callPaydunyaAPI("/checkout-invoice/create", paydunyaData);
 
       if (paydunyaResponse.response_code === "00") {
-        // Update transaction with Paydunya token
-        await storage.updateTransactionStatus(transaction.id, "pending", {
-          paydunyaToken: paydunyaResponse.token,
-        });
-
+        // Return checkout URL without creating a transaction yet
         res.json({
           success: true,
-          transactionId: transaction.id,
-          redirectUrl: paydunyaResponse.response_text, // This is the Paydunya checkout URL
+          redirectUrl: paydunyaResponse.response_text,
+          paydunyaToken: paydunyaResponse.token,
         });
       } else {
-        // Paydunya error - still return transactionId so client can redirect to status page
-        await storage.updateTransactionStatus(transaction.id, "failed");
-        res.json({
-          success: false,
-          transactionId: transaction.id,
-          error: paydunyaResponse.response_text || "Erreur lors de l'initiation du paiement",
+        res.status(400).json({ 
+          error: paydunyaResponse.response_text || "Erreur lors de l'initiation du paiement" 
         });
       }
     } catch (error: any) {
@@ -652,23 +626,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Calculate fees silently
       const feeInfo = calculateIncomingFee(amount, country);
 
-      // Create transaction record with fee info
-      const transaction = await storage.createTransaction({
-        userId: merchantLink.userId,
-        type: "merchant_link",
-        amount: feeInfo.netAmount,
-        fee: feeInfo.feeAmount,
-        feePercentage: feeInfo.feePercentage,
-        currency: "XOF",
-        status: "pending",
-        country,
-        operator,
-        customerName,
-        customerEmail,
-        customerPhone,
-        description: `Paiement marchand - ${merchantLink.merchantName}`,
-      });
-
       // Call Paydunya API
       const paydunyaData = {
         invoice: {
@@ -679,7 +636,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name: merchantLink.merchantName,
         },
         custom_data: {
-          transaction_id: transaction.id,
+          type: "merchant_link",
+          merchant_user_id: merchantLink.userId,
+          merchant_name: merchantLink.merchantName,
           customer_name: customerName,
           customer_email: customerEmail,
         },
@@ -691,22 +650,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const paydunyaResponse = await callPaydunyaAPI("/checkout-invoice/create", paydunyaData);
 
       if (paydunyaResponse.response_code === "00") {
-        await storage.updateTransactionStatus(transaction.id, "pending", {
-          paydunyaToken: paydunyaResponse.token,
-        });
-
         res.json({
           success: true,
-          transactionId: transaction.id,
           redirectUrl: paydunyaResponse.response_text,
+          paydunyaToken: paydunyaResponse.token,
         });
       } else {
-        // Paydunya error - still return transactionId so client can redirect to status page
-        await storage.updateTransactionStatus(transaction.id, "failed");
-        res.json({
-          success: false,
-          transactionId: transaction.id,
-          error: paydunyaResponse.response_text || "Erreur lors de l'initiation du paiement",
+        res.status(400).json({ 
+          error: paydunyaResponse.response_text || "Erreur lors de l'initiation du paiement" 
         });
       }
     } catch (error: any) {
@@ -729,26 +680,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Montant invalide" });
       }
 
-      // Calculate fees silently
-      const feeInfo = calculateIncomingFee(Math.floor(amount), country);
-
-      // Create transaction (store net amount and fees)
-      const transaction = await storage.createTransaction({
-        userId: req.session.userId!,
-        type: "deposit",
-        amount: feeInfo.netAmount,
-        fee: feeInfo.feeAmount,
-        feePercentage: feeInfo.feePercentage,
-        currency: "XOF",
-        status: "pending",
-        country,
-        operator,
-        customerName,
-        customerEmail,
-        customerPhone,
-        description: `Dépôt de ${amount} XOF`,
-      });
-
       // Create Paydunya invoice (send GROSS amount to Paydunya)
       const paydunyaData = {
         invoice: {
@@ -759,8 +690,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name: "BKApay",
         },
         custom_data: {
-          transaction_id: transaction.id,
+          user_id: req.session.userId!,
           type: "deposit",
+          country,
+          operator,
         },
         actions: {
           callback_url: `${process.env.BASE_URL || 'http://localhost:5000'}/api/webhooks/paydunya`,
@@ -770,17 +703,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const paydunyaResponse = await callPaydunyaAPI("/checkout-invoice/create", paydunyaData);
 
       if (paydunyaResponse.response_code === "00") {
-        await storage.updateTransactionStatus(transaction.id, "pending", {
-          paydunyaToken: paydunyaResponse.token,
-        });
-
         res.json({
           success: true,
           redirectUrl: paydunyaResponse.response_text,
-          netAmount: feeInfo.netAmount,
+          paydunyaToken: paydunyaResponse.token,
         });
       } else {
-        await storage.updateTransactionStatus(transaction.id, "failed");
         const errorMsg = paydunyaResponse.response_text || "Erreur lors de l'initiation du dépôt";
         res.status(400).json({ error: errorMsg });
       }
@@ -823,21 +751,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Create transaction (amount = gross amount requested, fees stored separately)
-      const transaction = await storage.createTransaction({
-        userId: req.session.userId!,
-        type: "transfer",
-        amount: Math.floor(amount),
-        fee: feeInfo.feeAmount,
-        feePercentage: feeInfo.feePercentage,
-        currency: "XOF",
-        status: "pending",
-        country,
-        operator,
-        customerPhone: phone,
-        description: `Transfert de ${amount} XOF vers ${phone}`,
-      });
-
       // Map operator to Paydunya withdraw mode
       const withdrawModeMap: Record<string, string> = {
         "orange-sn": "orange-money-senegal",
@@ -861,7 +774,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const withdrawMode = withdrawModeMap[`${operator}-${country.toLowerCase()}`];
       if (!withdrawMode) {
-        await storage.updateTransactionStatus(transaction.id, "failed");
         return res.status(400).json({ error: "Opérateur ou pays non supporté" });
       }
 
@@ -878,7 +790,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const getInvoiceResponse = await callPaydunyaAPIv2("/disburse/get-invoice", paydunyaData);
 
       if (getInvoiceResponse.response_code !== "00") {
-        await storage.updateTransactionStatus(transaction.id, "failed");
         return res.status(400).json({ error: "Erreur de transaction" });
       }
 
@@ -887,35 +798,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Step 2: Submit disbursement invoice
       const submitData = {
         disburse_invoice: disbursalToken,
-        disburse_id: transaction.id, // Our transaction ID for tracking
+        disburse_id: "transfer-" + Date.now(),
       };
 
       const submitResponse = await callPaydunyaAPIv2("/disburse/submit-invoice", submitData);
 
       if (submitResponse.response_code === "00") {
-        // Update balance (deduct amount + fees) after successful submission
+        // Deduct balance immediately after successful submission
         await storage.updateUserBalance(req.session.userId!, -feeInfo.totalDeductedFromBalance);
         
-        // Update transaction with status from Paydunya
-        const txStatus = submitResponse.status || "pending";
-        await storage.updateTransactionStatus(transaction.id, txStatus, {
-          paydunyaToken: disbursalToken,
-          paydunyaTransactionId: submitResponse.transaction_id,
+        // Create completed transaction immediately
+        await storage.createTransaction({
+          userId: req.session.userId!,
+          type: "transfer",
+          amount: Math.floor(amount),
+          fee: feeInfo.feeAmount,
+          feePercentage: feeInfo.feePercentage,
+          currency: "XOF",
+          status: "completed",
+          country,
+          operator,
+          customerPhone: phone,
+          description: `Transfert de ${amount} XOF vers ${phone}`,
+          metadata: JSON.stringify({
+            paydunyaToken: disbursalToken,
+            paydunyaTransactionId: submitResponse.transaction_id,
+          }),
         });
 
         res.json({
           success: true,
           message: "Transfert effectué avec succès",
-          transactionId: transaction.id,
           totalDeducted: feeInfo.totalDeductedFromBalance,
         });
       } else {
-        await storage.updateTransactionStatus(transaction.id, "failed");
         res.status(400).json({ error: "Erreur de transaction" });
       }
     } catch (error: any) {
       console.error("Transfer error:", error);
-      await storage.updateTransactionStatus(transaction.id, "failed").catch(() => {});
       res.status(500).json({ error: "Erreur de transaction" });
     }
   });
@@ -946,30 +866,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Clé API invalide ou inactive" });
       }
 
-      // Calculate fees silently
-      const feeInfo = calculateIncomingFee(Math.floor(amount), country);
-
-      // Create transaction record for the API key owner
-      const transaction = await storage.createTransaction({
-        userId: apiKey.userId,
-        type: "api_payment",
-        amount: feeInfo.netAmount,
-        fee: feeInfo.feeAmount,
-        feePercentage: feeInfo.feePercentage,
-        currency: "XOF",
-        status: "pending",
-        country,
-        operator,
-        customerName,
-        customerEmail,
-        customerPhone,
-        description: description || "Paiement via API",
-        metadata: JSON.stringify({
-          callbackUrl: callbackUrl, // Store the callback URL for redirection
-          api_key_id: apiKey.id,
-        }),
-      });
-
       // Call Paydunya API to create checkout invoice
       const paydunyaData = {
         invoice: {
@@ -981,7 +877,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           tagline: "Plateforme de paiement mobile money",
         },
         custom_data: {
-          transaction_id: transaction.id,
+          type: "api_payment",
+          user_id: apiKey.userId,
           customer_name: customerName,
           customer_email: customerEmail,
           api_key_id: apiKey.id,
@@ -991,10 +888,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
       };
 
-      res.json({
-        success: true,
-        redirectUrl: `${process.env.BASE_URL || 'http://localhost:5000'}/api-payment/${transaction.id}`,
-      });
+      const paydunyaResponse = await callPaydunyaAPI("/checkout-invoice/create", paydunyaData);
+
+      if (paydunyaResponse.response_code === "00") {
+        res.json({
+          success: true,
+          redirectUrl: paydunyaResponse.response_text,
+          paydunyaToken: paydunyaResponse.token,
+        });
+      } else {
+        res.status(400).json({ 
+          error: paydunyaResponse.response_text || "Erreur lors de l'initiation du paiement" 
+        });
+      }
     } catch (error: any) {
       console.error("API payment processing error:", error);
       res.status(500).json({ error: error.message || "Erreur lors du traitement du paiement" });
@@ -1099,23 +1005,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Solde insuffisant pour ce retrait" });
       }
 
-      // Create a withdrawal transaction (pending until developer confirms from dashboard)
-      const transaction = await storage.createTransaction({
-        userId: apiKey.userId,
-        type: "api_withdrawal",
-        amount: Math.floor(amount),
-        currency: "XOF",
-        status: "pending",
-        country,
-        operator,
-        customerPhone: phone,
-        description: "Retrait demandé via API",
-      });
-
       res.json({
         success: true,
-        message: "Demande de retrait créée. Confirmez depuis votre dashboard.",
-        transactionId: transaction.id,
+        message: "Retrait initialisé. Consultez votre historique pour le statut.",
       });
     } catch (error: any) {
       console.error("Withdrawal creation error:", error);
@@ -1123,38 +1015,121 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Paydunya webhook
+  // Paydunya webhook - Create/Update transactions only on completion
   app.post("/api/webhooks/paydunya", async (req: Request, res: Response) => {
     try {
       const paymentData = req.body;
 
       if (paymentData.data?.status === "completed") {
-        const transactionId = paymentData.data.custom_data?.transaction_id;
+        const customData = paymentData.data.custom_data;
         
-        if (transactionId) {
-          const transaction = await storage.updateTransactionStatus(
-            transactionId,
-            "completed",
-            {
-              paydunyaReceiptUrl: paymentData.data.receipt_url,
-            }
-          );
-
-          // Update user balance
-          if (transaction) {
-            await storage.updateUserBalance(transaction.userId, transaction.amount);
+        if (customData) {
+          // Determine transaction type and create transaction with COMPLETED status
+          const amount = Math.floor(paymentData.data.amount || 0);
+          
+          if (customData.user_id && customData.type === "deposit") {
+            // Deposit payment
+            const feeInfo = calculateIncomingFee(amount, customData.country);
+            const transaction = await storage.createTransaction({
+              userId: customData.user_id,
+              type: "deposit",
+              amount: feeInfo.netAmount,
+              fee: feeInfo.feeAmount,
+              feePercentage: feeInfo.feePercentage,
+              currency: "XOF",
+              status: "completed",
+              country: customData.country,
+              operator: customData.operator,
+              description: `Dépôt de ${amount} XOF`,
+              metadata: JSON.stringify({
+                paydunyaToken: paymentData.data.token,
+                receiptUrl: paymentData.data.receipt_url,
+              }),
+            });
+            
+            // Credit user balance
+            await storage.updateUserBalance(customData.user_id, feeInfo.netAmount);
+          } 
+          else if (customData.type === "merchant_link" && customData.merchant_user_id) {
+            // Merchant link payment
+            const feeInfo = calculateIncomingFee(amount, "SN"); // Default country
+            const transaction = await storage.createTransaction({
+              userId: customData.merchant_user_id,
+              type: "merchant_link",
+              amount: feeInfo.netAmount,
+              fee: feeInfo.feeAmount,
+              feePercentage: feeInfo.feePercentage,
+              currency: "XOF",
+              status: "completed",
+              country: "SN",
+              operator: "wave",
+              customerName: customData.customer_name,
+              customerEmail: customData.customer_email,
+              description: `Paiement marchand - ${customData.merchant_name}`,
+              metadata: JSON.stringify({
+                paydunyaToken: paymentData.data.token,
+                receiptUrl: paymentData.data.receipt_url,
+              }),
+            });
+            
+            // Credit user balance
+            await storage.updateUserBalance(customData.merchant_user_id, feeInfo.netAmount);
+          }
+          else if (customData.type === "api_payment" && customData.user_id) {
+            // API payment
+            const feeInfo = calculateIncomingFee(amount, "SN");
+            const transaction = await storage.createTransaction({
+              userId: customData.user_id,
+              type: "api_payment",
+              amount: feeInfo.netAmount,
+              fee: feeInfo.feeAmount,
+              feePercentage: feeInfo.feePercentage,
+              currency: "XOF",
+              status: "completed",
+              country: "SN",
+              operator: "wave",
+              customerName: customData.customer_name,
+              customerEmail: customData.customer_email,
+              description: "Paiement via API",
+              metadata: JSON.stringify({
+                paydunyaToken: paymentData.data.token,
+                receiptUrl: paymentData.data.receipt_url,
+                api_key_id: customData.api_key_id,
+              }),
+            });
+            
+            // Credit user balance
+            await storage.updateUserBalance(customData.user_id, feeInfo.netAmount);
+          }
+          else if (customData.user_id) {
+            // Payment link or other user transaction
+            const feeInfo = calculateIncomingFee(amount, "SN");
+            const transaction = await storage.createTransaction({
+              userId: customData.user_id,
+              type: "payment_link",
+              amount: feeInfo.netAmount,
+              fee: feeInfo.feeAmount,
+              feePercentage: feeInfo.feePercentage,
+              currency: "XOF",
+              status: "completed",
+              country: "SN",
+              operator: "wave",
+              customerName: customData.customer_name,
+              customerEmail: customData.customer_email,
+              description: "Paiement",
+              metadata: JSON.stringify({
+                paydunyaToken: paymentData.data.token,
+                receiptUrl: paymentData.data.receipt_url,
+              }),
+            });
+            
+            // Credit user balance
+            await storage.updateUserBalance(customData.user_id, feeInfo.netAmount);
           }
         }
-      } else if (paymentData.data?.status === "failed") {
-        const transactionId = paymentData.data.custom_data?.transaction_id;
-        if (transactionId) {
-          await storage.updateTransactionStatus(transactionId, "failed");
-        }
-      } else if (paymentData.data?.status === "cancelled") {
-        const transactionId = paymentData.data.custom_data?.transaction_id;
-        if (transactionId) {
-          await storage.updateTransactionStatus(transactionId, "cancelled");
-        }
+      } else if (paymentData.data?.status === "failed" || paymentData.data?.status === "cancelled") {
+        // Payment failed - do not create transaction, user will see error immediately
+        console.log("Payment failed/cancelled by Paydunya:", paymentData.data);
       }
 
       res.json({ success: true });
