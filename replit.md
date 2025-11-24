@@ -2,6 +2,18 @@
 
 ## Dernières modifications (24 Novembre 2025)
 
+### Session 11 - Correction Filtrage Opérateurs & Documentation SMS ✅
+**Problème**: Les opérateurs ne s'affichaient pas dans les formulaires de dépôt, transfert et retrait. SMS de validation Paydunya non fonctionnels.
+**Cause**: Logique de filtrage comparait des objets au lieu des codes d'opérateurs. Requêtes API non parsées. API SOFTPAY manquante.
+**Solution**: 
+- Correction du filtrage: `allCountryOperators.filter(op => (enabledCountriesOperators[selectedCountry] || []).includes(op.code))`
+- Suppression du fallback "BJ" qui empêchait l'affichage initial
+- Ajout du parsing JSON dans les mutations (`res.json()`)
+- Ajout message UX quand aucun opérateur disponible
+- Suppression des placeholders d'exemple (0146447319)
+- Documentation complète du problème SMS Paydunya SOFTPAY
+**Résultat**: ✅ Opérateurs s'affichent correctement. Polling fonctionne. Message d'erreur UX quand config vide. **⚠️ SMS validation nécessite implémentation SOFTPAY API spécifique par opérateur.**
+
 ### Session 10 - Configuration Pays/Opérateurs ✅
 **Problème**: Erreur 500 "db.update(...).returning is not a function" lors de l'activation/désactivation des opérateurs.
 **Cause**: Syntaxe incorrecte Drizzle ORM dans `updateCountryOperatorConfig` et `getCountryOperatorConfig`.
