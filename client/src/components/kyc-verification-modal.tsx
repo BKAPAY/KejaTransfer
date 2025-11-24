@@ -99,7 +99,7 @@ export function KycVerificationModal({
     const options = {
       margin: 10,
       filename: `KYC_${user.email}_${new Date().getTime()}.pdf`,
-      image: { type: "jpeg", quality: 0.98 },
+      image: { type: "png" as const, quality: 0.98 },
       html2canvas: { scale: 2 },
       jsPDF: { orientation: "portrait", unit: "mm", format: "a4" },
     };
@@ -120,13 +120,13 @@ export function KycVerificationModal({
           <div className="space-y-4">
             {isLoading ? (
               <div className="text-center py-8">Chargement...</div>
-            ) : !submissions?.length ? (
+            ) : !submissions || submissions.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 Aucune demande KYC en attente
               </div>
             ) : (
               <div className="grid gap-4">
-                {submissions.map((user: User) => (
+                {(submissions as User[]).map((user: User) => (
                   <Card key={user.id} className="hover-elevate cursor-pointer" onClick={() => setSelectedUser(user)}>
                     <CardHeader className="pb-3">
                       <div className="flex items-center justify-between">
