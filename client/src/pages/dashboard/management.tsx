@@ -71,6 +71,7 @@ export default function Management() {
     mutationFn: async (userId: string) => {
       const response = await fetch("/api/admin/promote", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId }),
       });
@@ -91,6 +92,7 @@ export default function Management() {
     mutationFn: async (userId: string) => {
       const response = await fetch("/api/admin/remove-admin", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId }),
       });
@@ -111,6 +113,7 @@ export default function Management() {
     mutationFn: async (userId: string) => {
       const response = await fetch("/api/admin/delete-user", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId }),
       });
@@ -131,6 +134,7 @@ export default function Management() {
     mutationFn: async ({ userId, amount }: { userId: string; amount: number }) => {
       const response = await fetch("/api/admin/add-funds", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, amount }),
       });
@@ -152,6 +156,7 @@ export default function Management() {
     mutationFn: async ({ userId, amount }: { userId: string; amount: number }) => {
       const response = await fetch("/api/admin/subtract-funds", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, amount }),
       });
@@ -173,6 +178,7 @@ export default function Management() {
     mutationFn: async (userId: string) => {
       const response = await fetch("/api/admin/approve-kyc", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId }),
       });
@@ -194,6 +200,7 @@ export default function Management() {
     mutationFn: async (userId: string) => {
       const response = await fetch("/api/admin/reject-kyc", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId }),
       });
@@ -215,6 +222,7 @@ export default function Management() {
     mutationFn: async (userId: string) => {
       const response = await fetch("/api/admin/suspend", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId }),
       });
@@ -235,6 +243,7 @@ export default function Management() {
     mutationFn: async (userId: string) => {
       const response = await fetch("/api/admin/unsuspend", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId }),
       });
