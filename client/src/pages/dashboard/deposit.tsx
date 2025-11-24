@@ -7,12 +7,15 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useMutation } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { COUNTRIES, OPERATORS } from "@shared/schema";
-import { ArrowDownToLine } from "lucide-react";
+import type { User } from "@shared/schema";
+import { ArrowDownToLine, AlertCircle, Info, CheckCircle2, Clock } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { calculateIncomingFee } from "@/lib/fees";
+import { useState, useEffect } from "react";
 
 const depositSchema = z.object({
   amount: z.number().min(1, "Le montant doit être supérieur à 0"),
@@ -25,6 +28,13 @@ type DepositFormData = z.infer<typeof depositSchema>;
 
 export default function Deposit() {
   const { toast } = useToast();
+  const [paymentInProgress, setPaymentInProgress] = useState(false);
+  const [invoiceToken, setInvoiceToken] = useState<string | null>(null);
+  const [pollingStatus, setPollingStatus] = useState<string | null>(null);
+
+  const { data: user } = useQuery<User>({
+    queryKey: ["/api/auth/me"],
+  });
 
   const form = useForm<DepositFormData>({
     resolver: zodResolver(depositSchema),
@@ -44,29 +54,79 @@ export default function Deposit() {
   // Calculate net amount in real-time
   const netAmount = selectedCountry && amount ? calculateIncomingFee(Math.floor(amount), selectedCountry).netAmount : 0;
 
-  const depositMutation = useMutation({
+  // Create payment mutation
+  const createPaymentMutation = useMutation({
     mutationFn: async (data: DepositFormData) => {
-      return await apiRequest("POST", "/api/deposits", data);
+      return await apiRequest("POST", "/api/softpay/create-payment", {
+        ...data,
+        description: `Dépôt de ${data.amount} XOF`,
+      });
     },
     onSuccess: (response: any) => {
+      setInvoiceToken(response.token);
+      setPaymentInProgress(true);
+      setPollingStatus("waiting");
       toast({
-        title: "Dépôt initié",
-        description: "Vous allez être redirigé vers Paydunya",
+        title: "Facture créée",
+        description: "Veuillez compléter le paiement sur votre téléphone",
       });
-      // Redirect to Paydunya payment page
-      window.location.href = response.redirectUrl;
     },
     onError: (error: any) => {
       toast({
         title: "Erreur",
-        description: error.message || "Erreur lors du dépôt",
+        description: error.message || "Erreur lors de la création de la facture",
         variant: "destructive",
       });
     },
   });
 
+  // Verify payment mutation
+  const verifyPaymentMutation = useMutation({
+    mutationFn: async (token: string) => {
+      return await apiRequest("POST", "/api/softpay/verify-payment", {
+        invoiceToken: token,
+      });
+    },
+  });
+
+  // Poll payment status
+  useEffect(() => {
+    if (!invoiceToken || !paymentInProgress) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const result = await verifyPaymentMutation.mutateAsync(invoiceToken);
+        console.log("[Payment Status]", result);
+
+        if (result.status === "completed" || result.response_code === "00") {
+          setPollingStatus("completed");
+          setPaymentInProgress(false);
+          clearInterval(interval);
+          
+          toast({
+            title: "Paiement réussi",
+            description: "Votre dépôt a été complété",
+          });
+
+          // Refresh user balance and reset form
+          setTimeout(() => {
+            queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+            form.reset();
+            setInvoiceToken(null);
+            setPollingStatus(null);
+          }, 2000);
+        }
+      } catch (error) {
+        console.error("Payment verification error:", error);
+      }
+    }, 5000); // Poll every 5 seconds
+
+    return () => clearInterval(interval);
+  }, [invoiceToken, paymentInProgress]);
+
   const onSubmit = (data: DepositFormData) => {
-    depositMutation.mutate(data);
+    createPaymentMutation.mutate(data);
   };
 
   return (
@@ -81,9 +141,40 @@ export default function Deposit() {
         </p>
       </div>
 
+      {user && (
+        <Alert className="py-2 border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800">
+          <AlertDescription className="text-xs text-blue-900 dark:text-blue-100">
+            <strong>Solde disponible:</strong> {new Intl.NumberFormat("fr-FR", {
+              style: "currency",
+              currency: "XOF",
+              minimumFractionDigits: 0,
+            }).format(user.balance || 0)}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {paymentInProgress && invoiceToken && (
+        <Alert className="border-yellow-200 bg-yellow-50 dark:bg-yellow-950 dark:border-yellow-800">
+          <Clock className="h-4 w-4 text-yellow-600 dark:text-yellow-500" />
+          <AlertDescription className="text-sm text-yellow-900 dark:text-yellow-100 ml-2">
+            <strong>Paiement en cours:</strong> Veuillez compléter le paiement sur votre téléphone (Mobile Money). 
+            Nous vérifierons automatiquement l'état du paiement toutes les 5 secondes.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {pollingStatus === "completed" && (
+        <Alert className="border-green-200 bg-green-50 dark:bg-green-950 dark:border-green-800">
+          <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-500" />
+          <AlertDescription className="text-sm text-green-900 dark:text-green-100 ml-2">
+            <strong>Paiement confirmé!</strong> Votre dépôt a été complété avec succès.
+          </AlertDescription>
+        </Alert>
+      )}
+
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-lg">Détails</CardTitle>
+          <CardTitle className="text-lg">Détails du dépôt</CardTitle>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -99,6 +190,7 @@ export default function Deposit() {
                         type="number"
                         placeholder="10000"
                         data-testid="input-amount"
+                        disabled={paymentInProgress}
                         value={field.value || ""}
                         onChange={(e) => {
                           const val = e.target.value;
@@ -117,7 +209,7 @@ export default function Deposit() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Pays</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
+                    <Select value={field.value} onValueChange={field.onChange} disabled={paymentInProgress}>
                       <FormControl>
                         <SelectTrigger data-testid="select-country">
                           <SelectValue placeholder="Sélectionnez un pays" />
@@ -143,7 +235,7 @@ export default function Deposit() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Opérateur</FormLabel>
-                      <Select value={field.value} onValueChange={field.onChange}>
+                      <Select value={field.value} onValueChange={field.onChange} disabled={paymentInProgress}>
                         <FormControl>
                           <SelectTrigger data-testid="select-operator">
                             <SelectValue placeholder="Sélectionnez un opérateur" />
@@ -173,6 +265,7 @@ export default function Deposit() {
                       <Input
                         placeholder="77123456"
                         data-testid="input-phone"
+                        disabled={paymentInProgress}
                         {...field}
                       />
                     </FormControl>
@@ -199,15 +292,36 @@ export default function Deposit() {
               <Button
                 type="submit"
                 className="w-full"
-                disabled={depositMutation.isPending}
+                disabled={createPaymentMutation.isPending || paymentInProgress}
                 data-testid="button-submit-deposit"
               >
-                {depositMutation.isPending ? "En cours..." : "Confirmer"}
+                {createPaymentMutation.isPending ? (
+                  <>En cours...</>
+                ) : paymentInProgress ? (
+                  <>
+                    <Clock className="h-4 w-4 mr-2" />
+                    Paiement en attente...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                    Créer la facture
+                  </>
+                )}
               </Button>
             </form>
           </Form>
         </CardContent>
       </Card>
+
+      <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800">
+        <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+        <AlertDescription className="text-xs text-blue-900 dark:text-blue-100 ml-2">
+          <strong>Comment ça marche:</strong> Vous n'allez pas être redirigé vers Paydunya. Après avoir créé la facture, 
+          complétez le paiement directement sur votre téléphone via votre porte-monnaie mobile money. 
+          Nous vérifierons automatiquement l'état du paiement.
+        </AlertDescription>
+      </Alert>
     </div>
   );
 }

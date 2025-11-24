@@ -833,6 +833,145 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== SOFTPAY Routes (No Redirect, No Paydunya UI) =====
+  
+  // Create SOFTPAY Payment
+  app.post("/api/softpay/create-payment", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (user?.suspended) {
+        return res.status(403).json({ error: "Votre compte a été suspendu. Veuillez contacter le support." });
+      }
+
+      const { amount, description, country, operator, phone } = req.body;
+
+      if (!amount || amount <= 0) {
+        return res.status(400).json({ error: "Montant invalide" });
+      }
+
+      // Create SOFTPAY invoice (v2 API)
+      const paydunyaData = {
+        invoice: {
+          items: [
+            {
+              name: description || "Dépôt BKApay",
+              quantity: 1,
+              unit_price: Math.floor(amount),
+            },
+          ],
+          total_amount: Math.floor(amount),
+        },
+        customer: {
+          name: user?.firstName + " " + user?.lastName || "Customer",
+          phone_number: phone || user?.phone || "",
+        },
+      };
+
+      console.log("[SOFTPAY] Creating invoice with data:", paydunyaData);
+
+      // Call Paydunya SOFTPAY API (v2)
+      const response = await fetch("https://app.paydunya.com/api/v2/invoice/create", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "PAYDUNYA-MASTER-KEY": PAYDUNYA_CONFIG.masterKey,
+          "PAYDUNYA-PRIVATE-KEY": PAYDUNYA_CONFIG.privateKey,
+          "PAYDUNYA-TOKEN": PAYDUNYA_CONFIG.token,
+        },
+        body: JSON.stringify(paydunyaData),
+      });
+
+      const responseText = await response.text();
+      console.log("[SOFTPAY] Response status:", response.status, "Text:", responseText.substring(0, 500));
+
+      let paydunyaResponse;
+      try {
+        paydunyaResponse = JSON.parse(responseText);
+      } catch (e) {
+        console.error("[SOFTPAY] Failed to parse response:", responseText);
+        return res.status(500).json({ error: "Erreur lors de la création de la facture Paydunya" });
+      }
+
+      if (response.ok && paydunyaResponse.response_token) {
+        // Create transaction
+        const transactionId = randomUUID();
+        await storage.createTransaction({
+          userId: req.session.userId!,
+          type: "deposit",
+          amount: Math.floor(amount),
+          fee: 0,
+          feePercentage: 0,
+          currency: "XOF",
+          status: "pending",
+          country,
+          operator,
+          description: description || `Dépôt de ${amount} XOF`,
+          metadata: JSON.stringify({
+            paydunyaToken: paydunyaResponse.response_token,
+            phone,
+            softpay: true,
+          }),
+        });
+
+        res.json({
+          success: true,
+          transactionId,
+          token: paydunyaResponse.response_token,
+        });
+      } else {
+        console.error("[SOFTPAY] Error response:", paydunyaResponse);
+        res.status(400).json({
+          error: paydunyaResponse.response_text || "Erreur lors de la création de la facture",
+        });
+      }
+    } catch (error: any) {
+      console.error("[SOFTPAY] Create payment error:", error);
+      res.status(500).json({ error: error.message || "Erreur lors du paiement SOFTPAY" });
+    }
+  });
+
+  // Verify SOFTPAY Payment
+  app.post("/api/softpay/verify-payment", async (req: Request, res: Response) => {
+    try {
+      const { invoiceToken } = req.body;
+
+      if (!invoiceToken) {
+        return res.status(400).json({ error: "Token invalide" });
+      }
+
+      console.log("[SOFTPAY] Verifying payment with token:", invoiceToken);
+
+      // Call Paydunya verify API (v2)
+      const response = await fetch(
+        `https://app.paydunya.com/api/v2/invoice/confirm/${invoiceToken}`,
+        {
+          method: "GET",
+          headers: {
+            "PAYDUNYA-MASTER-KEY": PAYDUNYA_CONFIG.masterKey,
+            "PAYDUNYA-PRIVATE-KEY": PAYDUNYA_CONFIG.privateKey,
+            "PAYDUNYA-TOKEN": PAYDUNYA_CONFIG.token,
+          },
+        }
+      );
+
+      const responseText = await response.text();
+      console.log("[SOFTPAY] Verify response status:", response.status, "Text:", responseText.substring(0, 500));
+
+      let paydunyaResponse;
+      try {
+        paydunyaResponse = JSON.parse(responseText);
+      } catch (e) {
+        console.error("[SOFTPAY] Failed to parse verify response:", responseText);
+        return res.status(500).json({ error: "Erreur lors de la vérification du paiement" });
+      }
+
+      res.json(paydunyaResponse);
+    } catch (error: any) {
+      console.error("[SOFTPAY] Verify payment error:", error);
+      res.status(500).json({ error: error.message || "Erreur lors de la vérification du paiement" });
+    }
+  });
+
   // ===== Withdrawal/Transfer Routes =====
   app.post("/api/transfers", requireAuth, async (req: Request, res: Response) => {
     try {
