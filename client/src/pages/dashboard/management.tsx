@@ -165,6 +165,48 @@ export default function Management() {
     },
   });
 
+  const approveKycMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const response = await fetch("/api/admin/approve-kyc", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId }),
+      });
+      if (!response.ok) throw new Error("Failed to approve KYC");
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Succès", description: "KYC approuvée" });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/search"] });
+      refetchUsers();
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible d'approuver la KYC", variant: "destructive" });
+    },
+  });
+
+  const rejectKycMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const response = await fetch("/api/admin/reject-kyc", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId }),
+      });
+      if (!response.ok) throw new Error("Failed to reject KYC");
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Succès", description: "KYC rejetée" });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/search"] });
+      refetchUsers();
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible de rejeter la KYC", variant: "destructive" });
+    },
+  });
+
 
   const formatAmount = (amount: number) => {
     return new Intl.NumberFormat("fr-FR", {
@@ -376,6 +418,41 @@ export default function Management() {
                           Révoquer Admin
                         </Button>
                       )}
+                      {user.kycStatus === "submitted" ? (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="default"
+                            onClick={() => approveKycMutation.mutate(user.id)}
+                            disabled={approveKycMutation.isPending}
+                            data-testid={`button-approve-kyc-${user.id}`}
+                          >
+                            <Check className="w-4 h-4 mr-1" />
+                            Approuver KYC
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => rejectKycMutation.mutate(user.id)}
+                            disabled={rejectKycMutation.isPending}
+                            data-testid={`button-reject-kyc-${user.id}`}
+                          >
+                            <X className="w-4 h-4 mr-1" />
+                            Rejeter KYC
+                          </Button>
+                        </>
+                      ) : user.kycStatus === "verified" ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => rejectKycMutation.mutate(user.id)}
+                          disabled={rejectKycMutation.isPending}
+                          data-testid={`button-unverify-kyc-${user.id}`}
+                        >
+                          <X className="w-4 h-4 mr-1" />
+                          Retirer KYC
+                        </Button>
+                      ) : null}
                       <Button
                         size="sm"
                         variant="destructive"

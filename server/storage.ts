@@ -31,6 +31,8 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   updateUserBalance(id: string, amount: number): Promise<User | undefined>;
   submitKyc(userId: string, kycData: { kycIdFront: string; kycIdBack: string; kycSelfie: string }): Promise<User | undefined>;
+  approveKyc(userId: string): Promise<User | undefined>;
+  rejectKyc(userId: string): Promise<User | undefined>;
 
   // Payment Links
   getPaymentLinks(userId: string): Promise<PaymentLink[]>;
@@ -108,6 +110,24 @@ export class DbStorage implements IStorage {
         kycIdBack: kycData.kycIdBack,
         kycSelfie: kycData.kycSelfie,
       })
+      .where(eq(schema.users.id, userId))
+      .returning();
+    return results[0];
+  }
+
+  async approveKyc(userId: string): Promise<User | undefined> {
+    const results = await db
+      .update(schema.users)
+      .set({ kycStatus: "verified" })
+      .where(eq(schema.users.id, userId))
+      .returning();
+    return results[0];
+  }
+
+  async rejectKyc(userId: string): Promise<User | undefined> {
+    const results = await db
+      .update(schema.users)
+      .set({ kycStatus: "pending" })
       .where(eq(schema.users.id, userId))
       .returning();
     return results[0];
