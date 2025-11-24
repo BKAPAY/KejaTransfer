@@ -1,5 +1,25 @@
 # BKApay - Plateforme de Paiement Mobile Money
 
+## Dernières modifications (24 Novembre 2025)
+
+### Session 10 - Configuration Pays/Opérateurs ✅
+**Problème**: Erreur 500 "db.update(...).returning is not a function" lors de l'activation/désactivation des opérateurs.
+**Cause**: Syntaxe incorrecte Drizzle ORM dans `updateCountryOperatorConfig` et `getCountryOperatorConfig`.
+**Solution**: Correction des méthodes pour utiliser `eq()` et `and()` au lieu de callbacks JavaScript.
+**Résultat**: ✅ Toggles fonctionnent, état persiste, plus d'erreur 500.
+
+### Session 9 - Authentification Production ✅
+**Problème**: Sessions non persistantes en production, déconnexion à l'actualisation.
+**Cause**: MemoryStore par défaut, manque de `trust proxy`, `sameSite: 'strict'` trop restrictif.
+**Solution**: Implémentation connect-pg-simple, activation trust proxy, changement à `sameSite: 'lax'`.
+**Résultat**: ✅ Login fonctionne, sessions persistent, pas de déconnexion intempestive.
+
+### Session 8 - Migration Automatique ✅
+**Problème**: Erreur "relation already exists" lors du déploiement en production.
+**Cause**: Migrations appliquées mais non trackées dans drizzle.__drizzle_migrations.
+**Solution**: Réconciliation transactionnelle avec calcul SHA256 et backfill automatique.
+**Résultat**: ✅ Migrations automatiques, gère tous les scénarios de déploiement.
+
 ## Overview
 BKApay is a modern mobile money payment platform designed for West Africa. It enables businesses and individuals to accept payments via various mobile money services (Orange Money, MTN, Moov, Wave, Free Money, T-Money, Wizall, Expresso) across 6 countries: Benin, Togo, Ivory Coast, Senegal, Burkina Faso, and Mali. The platform aims to streamline mobile money transactions, offering robust features for deposits, withdrawals, payment links, and API integrations.
 

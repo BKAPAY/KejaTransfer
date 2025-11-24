@@ -1,6 +1,6 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { eq, desc, or } from "drizzle-orm";
+import { eq, desc, or, and } from "drizzle-orm";
 import * as schema from "@shared/schema";
 import type {
   User,
@@ -519,8 +519,10 @@ export class DbStorage implements IStorage {
       .select()
       .from(schema.countryOperatorConfig)
       .where(
-        (c) =>
-          c.country === country && c.operator === operator
+        and(
+          eq(schema.countryOperatorConfig.country, country),
+          eq(schema.countryOperatorConfig.operator, operator)
+        )
       )
       .limit(1);
     return results[0];
@@ -531,16 +533,20 @@ export class DbStorage implements IStorage {
     operator: string,
     config: UpdateCountryOperatorConfig
   ): Promise<CountryOperatorConfig | undefined> {
-    const result = await db
+    const results = await db
       .update(schema.countryOperatorConfig)
       .set({
         ...config,
         updatedAt: new Date(),
       })
-      .where((c) => c.country === country && c.operator === operator)
-      .returning()
-      .get();
-    return result;
+      .where(
+        and(
+          eq(schema.countryOperatorConfig.country, country),
+          eq(schema.countryOperatorConfig.operator, operator)
+        )
+      )
+      .returning();
+    return results[0];
   }
 
   async initializeCountryOperatorConfigs(): Promise<void> {
