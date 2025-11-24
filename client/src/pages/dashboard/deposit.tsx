@@ -12,7 +12,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { COUNTRIES, OPERATORS } from "@shared/schema";
 import type { User } from "@shared/schema";
-import { ArrowDownToLine, AlertCircle, Info, CheckCircle2, Clock } from "lucide-react";
+import { ArrowDownToLine, CheckCircle2, Clock } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { calculateIncomingFee } from "@/lib/fees";
 import { useState, useEffect } from "react";
@@ -326,15 +326,6 @@ export default function Deposit() {
           </Form>
         </CardContent>
       </Card>
-
-      <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800">
-        <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-        <AlertDescription className="text-xs text-blue-900 dark:text-blue-100 ml-2">
-          <strong>Comment ça marche:</strong> Vous n'allez pas être redirigé vers Paydunya. Après avoir créé la facture, 
-          complétez le paiement directement sur votre téléphone via votre porte-monnaie mobile money. 
-          Nous vérifierons automatiquement l'état du paiement.
-        </AlertDescription>
-      </Alert>
     </div>
   );
 }

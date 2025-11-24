@@ -12,7 +12,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { COUNTRIES, OPERATORS } from "@shared/schema";
 import type { User } from "@shared/schema";
-import { ArrowUpFromLine, AlertCircle, Info, CheckCircle2 } from "lucide-react";
+import { ArrowUpFromLine, Info, CheckCircle2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { calculateOutgoingFee } from "@/lib/fees";
 
@@ -141,15 +141,6 @@ export default function Withdrawal() {
               currency: "XOF",
               minimumFractionDigits: 0,
             }).format(user.balance || 0)}
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {user && user.kycStatus !== "verified" && (
-        <Alert className="py-2 border-yellow-200 bg-yellow-50 dark:bg-yellow-950 dark:border-yellow-800">
-          <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-500" />
-          <AlertDescription className="text-xs text-yellow-900 dark:text-yellow-100 ml-2">
-            <strong>KYC requis:</strong> Vous devez vérifier votre identité pour faire des retraits. Rendez-vous dans vos paramètres.
           </AlertDescription>
         </Alert>
       )}
@@ -311,12 +302,6 @@ export default function Withdrawal() {
                   </>
                 )}
               </Button>
-
-              {user && user.kycStatus !== "verified" && (
-                <div className="text-xs text-muted-foreground text-center py-2 border-t">
-                  Vérification KYC requise pour les retraits
-                </div>
-              )}
             </form>
           </Form>
         </CardContent>
