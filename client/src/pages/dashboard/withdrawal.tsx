@@ -109,7 +109,7 @@ export default function Withdrawal() {
     if (user.balance < feeInfo.totalDeductedFromBalance) {
       toast({
         title: "Solde insuffisant",
-        description: `Vous avez ${user.balance} XOF. Total à déduire: ${feeInfo.totalDeductedFromBalance} XOF (${data.amount} XOF + ${feeInfo.feeAmount} XOF de frais)`,
+        description: `Vous avez ${user.balance} XOF. Total à déduire: ${feeInfo.totalDeductedFromBalance} XOF`,
         variant: "destructive",
       });
       return;
@@ -270,16 +270,6 @@ export default function Withdrawal() {
                             currency: "XOF",
                             minimumFractionDigits: 0,
                           }).format(amount)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Frais ({feeInfo.feePercentage / 10}%):</span>
-                        <span className="font-medium">
-                          {new Intl.NumberFormat("fr-FR", {
-                            style: "currency",
-                            currency: "XOF",
-                            minimumFractionDigits: 0,
-                          }).format(feeInfo.feeAmount)}
                         </span>
                       </div>
                       <div className="border-t pt-2 flex justify-between font-semibold">
