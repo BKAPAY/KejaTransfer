@@ -84,12 +84,6 @@ const menuItems = [
     testId: "nav-settings",
   },
   {
-    title: "Annonces",
-    url: "/dashboard/announcements",
-    icon: Megaphone,
-    testId: "nav-announcements",
-  },
-  {
     title: "Documentation",
     url: "/dashboard/documentation",
     icon: FileText,

@@ -19,7 +19,6 @@ import ApiPage from "@/pages/dashboard/api";
 import Analytics from "@/pages/dashboard/analytics";
 import History from "@/pages/dashboard/history";
 import Settings from "@/pages/dashboard/settings";
-import Announcements from "@/pages/dashboard/announcements";
 import Documentation from "@/pages/dashboard/documentation";
 import Support from "@/pages/dashboard/support";
 import Deposit from "@/pages/dashboard/deposit";
@@ -96,7 +95,6 @@ function Router() {
           <Route path="/dashboard/analytics" component={Analytics} />
           <Route path="/dashboard/history" component={History} />
           <Route path="/dashboard/settings" component={Settings} />
-          <Route path="/dashboard/announcements" component={Announcements} />
           <Route path="/dashboard/documentation" component={Documentation} />
           <Route path="/dashboard/support" component={Support} />
           <Route path="/dashboard/deposit" component={Deposit} />
