@@ -205,7 +205,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({ success: true, message: "Compte créé avec succès" });
     } catch (error: any) {
-      res.status(400).json({ error: error.message || "Erreur lors de l'inscription" });
+      res.status(400).json({ error: "Erreur lors de l'inscription" });
     }
   });
 
@@ -231,7 +231,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       req.session.userId = user.id;
       res.json({ success: true, user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName } });
     } catch (error: any) {
-      res.status(500).json({ error: error.message || "Erreur lors de la connexion" });
+      res.status(500).json({ error: "Erreur lors de la connexion" });
     }
   });
 
@@ -257,7 +257,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { password, ...userWithoutPassword } = user;
       res.json(userWithoutPassword);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: "Erreur lors de la récupération du profil" });
     }
   });
 
@@ -299,7 +299,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({ success: true, message: "Mot de passe modifié avec succès" });
     } catch (error: any) {
-      res.status(500).json({ error: error.message || "Erreur lors de la modification du mot de passe" });
+      res.status(500).json({ error: "Erreur lors de la modification du mot de passe" });
     }
   });
 
@@ -315,7 +315,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Validate base64 strings aren't too large (limit to 5MB per file)
       const maxSize = 5 * 1024 * 1024;
       if (kycIdFront.length > maxSize || kycIdBack.length > maxSize || kycSelfie.length > maxSize) {
-        return res.status(400).json({ error: "Les fichiers sont trop volumineux (max 5MB par fichier)" });
+        return res.status(400).json({ error: "Les fichiers sont trop volumineux" });
       }
 
       const user = await storage.submitKyc(req.session.userId!, {
@@ -332,7 +332,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(userWithoutPassword);
     } catch (error: any) {
       console.error("KYC submission error:", error);
-      res.status(500).json({ error: error.message || "Erreur lors de la soumission KYC" });
+      res.status(500).json({ error: "Erreur lors de la soumission KYC" });
     }
   });
 
@@ -343,7 +343,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const stats = await storage.getUserStats(req.session.userId!);
       res.json(stats);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: "Erreur lors de la récupération des statistiques" });
     }
   });
 
@@ -352,7 +352,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const analytics = await storage.getAnalytics(req.session.userId!);
       res.json(analytics);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: "Erreur lors de la récupération des analyses" });
     }
   });
 
@@ -363,7 +363,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const links = await storage.getPaymentLinks(req.session.userId!);
       res.json(links);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: "Erreur lors de la récupération des liens" });
     }
   });
 
@@ -387,7 +387,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json(link);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: "Une erreur est survenue" });
     }
   });
 
@@ -400,7 +400,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       res.json(link);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      res.status(400).json({ error: "Données invalides" });
     }
   });
 
@@ -420,7 +420,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       res.json(link);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      res.status(400).json({ error: "Données invalides" });
     }
   });
 
@@ -432,7 +432,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       res.json({ success: true });
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: "Une erreur est survenue" });
     }
   });
 
@@ -443,7 +443,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const links = await storage.getMerchantLinks(req.session.userId!);
       res.json(links);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: "Une erreur est survenue" });
     }
   });
 
@@ -467,7 +467,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json(link);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: "Une erreur est survenue" });
     }
   });
 
@@ -493,7 +493,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       res.json(link);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      res.status(400).json({ error: "Données invalides" });
     }
   });
 
@@ -508,7 +508,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const keys = await storage.getApiKeys(req.session.userId!);
       res.json(keys);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: "Une erreur est survenue" });
     }
   });
 
@@ -522,8 +522,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (user.kycStatus !== "verified") {
         return res.status(403).json({ 
-          error: "Vous devez vérifier votre identité (KYC) avant de générer des clés API.",
-          kycStatus: user.kycStatus
+          error: "Vous devez vérifier votre identité avant de générer des clés API"
         });
       }
 
@@ -534,7 +533,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       res.json(key);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      res.status(400).json({ error: "Données invalides" });
     }
   });
 
@@ -546,7 +545,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       res.json({ success: true });
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: "Une erreur est survenue" });
     }
   });
 
@@ -557,7 +556,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const transactions = await storage.getTransactions(req.session.userId!);
       res.json(transactions);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: "Une erreur est survenue" });
     }
   });
 
@@ -570,7 +569,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       res.json(transaction);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: "Une erreur est survenue" });
     }
   });
 
@@ -580,13 +579,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const ref = req.query.ref as string;
       if (!ref) {
-        return res.status(400).json({ error: "ref parameter required" });
+        return res.status(400).json({ error: "Référence de transaction requise" });
       }
 
       // Find transaction by ID
       const transaction = await storage.getTransaction(ref);
       if (!transaction) {
-        return res.status(404).json({ error: "Transaction not found" });
+        return res.status(404).json({ error: "Transaction non trouvée" });
       }
 
       // Get metadata (contains paydunyaToken)
@@ -596,7 +595,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (!metadata.paydunyaToken) {
-        return res.status(400).json({ error: "Token not available" });
+        return res.status(400).json({ error: "Jeton non disponible" });
       }
 
       // Return PSR response format
@@ -613,7 +612,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(response);
     } catch (error: any) {
       console.error("Paydunya API endpoint error:", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: "Une erreur est survenue" });
     }
   });
 
@@ -708,12 +707,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       } else {
         res.status(400).json({ 
-          error: paydunyaResponse.response_text || "Erreur lors de l'initiation du paiement" 
+          error: "Erreur lors de l'initiation du paiement" 
         });
       }
     } catch (error: any) {
       console.error("Payment processing error:", error);
-      res.status(500).json({ error: error.message || "Erreur lors du traitement du paiement" });
+      res.status(500).json({ error: "Erreur lors du traitement du paiement" });
     }
   });
 
@@ -807,12 +806,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       } else {
         res.status(400).json({ 
-          error: paydunyaResponse.response_text || "Erreur lors de l'initiation du paiement" 
+          error: "Erreur lors de l'initiation du paiement" 
         });
       }
     } catch (error: any) {
       console.error("Merchant payment processing error:", error);
-      res.status(500).json({ error: error.message || "Erreur lors du traitement du paiement" });
+      res.status(500).json({ error: "Erreur lors du traitement du paiement" });
     }
   });
 
@@ -883,12 +882,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           paydunyaToken: paydunyaResponse.token,
         });
       } else {
-        const errorMsg = paydunyaResponse.response_text || "Erreur lors de l'initiation du dépôt";
-        res.status(400).json({ error: errorMsg });
+        res.status(400).json({ error: "Erreur lors de l'initiation du dépôt" });
       }
     } catch (error: any) {
       console.error("Deposit error:", error);
-      res.status(500).json({ error: error.message || "Erreur lors du dépôt" });
+      res.status(500).json({ error: "Erreur lors du dépôt" });
     }
   });
 
@@ -967,12 +965,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         console.error("[SOFTPAY] Error response:", paydunyaResponse);
         res.status(400).json({
-          error: paydunyaResponse.response_text || "Erreur lors de la création de la facture",
+          error: "Erreur lors de la création de la facture",
         });
       }
     } catch (error: any) {
       console.error("[SOFTPAY] Create payment error:", error);
-      res.status(500).json({ error: error.message || "Erreur lors du paiement SOFTPAY" });
+      res.status(500).json({ error: "Erreur lors du paiement SOFTPAY" });
     }
   });
 
@@ -1103,8 +1101,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check KYC verification for transfers
       if (user.kycStatus !== "verified") {
         return res.status(403).json({ 
-          error: "Vous devez vérifier votre identité (KYC) avant de faire des transferts.",
-          kycStatus: user.kycStatus
+          error: "Vous devez vérifier votre identité avant de faire des transferts"
         });
       }
 
@@ -1257,8 +1254,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!validCountries.includes(paymentCountry)) {
         return res.status(400).json({ 
-          error: "Pays invalide", 
-          validCountries: "BJ, TG, CI, SN, BF, ML" 
+          error: "Pays invalide" 
         });
       }
 
@@ -1335,12 +1331,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       } else {
         res.status(400).json({ 
-          error: paydunyaResponse.response_text || "Erreur lors de l'initiation du paiement" 
+          error: "Erreur lors de l'initiation du paiement" 
         });
       }
     } catch (error: any) {
       console.error("API payment processing error:", error);
-      res.status(500).json({ error: error.message || "Erreur lors du traitement du paiement" });
+      res.status(500).json({ error: "Erreur lors du traitement du paiement" });
     }
   });
 
@@ -1407,12 +1403,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.json({
           success: false,
           transactionId: transactionId,
-          error: paydunyaResponse.response_text || "Erreur lors de l'initiation du paiement",
+          error: "Erreur lors de l'initiation du paiement",
         });
       }
     } catch (error: any) {
       console.error("Payment submission error:", error);
-      res.status(500).json({ error: error.message || "Erreur lors de la soumission du paiement" });
+      res.status(500).json({ error: "Erreur lors de la soumission du paiement" });
     }
   });
 
@@ -1427,7 +1423,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (!amount || amount < 500) {
-        return res.status(400).json({ error: "Montant minimum: 500 XOF" });
+        return res.status(400).json({ error: "Montant minimum 500 XOF" });
       }
 
       // Validate private key and get its owner
@@ -1448,7 +1444,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       console.error("Withdrawal creation error:", error);
-      res.status(500).json({ error: error.message || "Erreur lors de la création du retrait" });
+      res.status(500).json({ error: "Erreur lors de la création du retrait" });
     }
   });
 
@@ -1459,7 +1455,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(stats);
     } catch (error: any) {
       console.error("Admin stats error:", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: "Une erreur est survenue" });
     }
   });
 
@@ -1469,7 +1465,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(users);
     } catch (error: any) {
       console.error("Admin users error:", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: "Une erreur est survenue" });
     }
   });
 
@@ -1483,7 +1479,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(results);
     } catch (error: any) {
       console.error("Admin search error:", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: "Une erreur est survenue" });
     }
   });
 
@@ -1492,13 +1488,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId } = req.body;
       if (!userId) {
-        return res.status(400).json({ error: "userId is required" });
+        return res.status(400).json({ error: "Identifiant utilisateur requis" });
       }
       const user = await storage.promoteToAdmin(userId);
       res.json(user);
     } catch (error: any) {
       console.error("Promote error:", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: "Une erreur est survenue" });
     }
   });
 
@@ -1506,7 +1502,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId } = req.body;
       if (!userId) {
-        return res.status(400).json({ error: "userId is required" });
+        return res.status(400).json({ error: "Identifiant utilisateur requis" });
       }
       // Check if target user is primary admin
       const targetUser = await storage.getUser(userId);
@@ -1517,7 +1513,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(user);
     } catch (error: any) {
       console.error("Remove admin error:", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: "Une erreur est survenue" });
     }
   });
 
@@ -1525,7 +1521,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId } = req.body;
       if (!userId) {
-        return res.status(400).json({ error: "userId is required" });
+        return res.status(400).json({ error: "Identifiant utilisateur requis" });
       }
       // Check if target user is primary admin
       const targetUser = await storage.getUser(userId);
@@ -1536,7 +1532,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true });
     } catch (error: any) {
       console.error("Delete user error:", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: "Une erreur est survenue" });
     }
   });
 
@@ -1544,16 +1540,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId } = req.body;
       if (!userId) {
-        return res.status(400).json({ error: "userId is required" });
+        return res.status(400).json({ error: "Identifiant utilisateur requis" });
       }
       const user = await storage.suspendUser(userId);
       if (!user) {
-        return res.status(404).json({ error: "User not found" });
+        return res.status(404).json({ error: "Utilisateur non trouvé" });
       }
       res.json(user);
     } catch (error: any) {
       console.error("Suspend user error:", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: "Une erreur est survenue" });
     }
   });
 
@@ -1561,16 +1557,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId } = req.body;
       if (!userId) {
-        return res.status(400).json({ error: "userId is required" });
+        return res.status(400).json({ error: "Identifiant utilisateur requis" });
       }
       const user = await storage.unsuspendUser(userId);
       if (!user) {
-        return res.status(404).json({ error: "User not found" });
+        return res.status(404).json({ error: "Utilisateur non trouvé" });
       }
       res.json(user);
     } catch (error: any) {
       console.error("Unsuspend user error:", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: "Une erreur est survenue" });
     }
   });
 
@@ -1578,7 +1574,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId, amount } = req.body;
       if (!userId || amount === undefined) {
-        return res.status(400).json({ error: "userId and amount are required" });
+        return res.status(400).json({ error: "Identifiant utilisateur et montant requis" });
       }
       // Check if target user is primary admin
       const targetUser = await storage.getUser(userId);
@@ -1589,7 +1585,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(user);
     } catch (error: any) {
       console.error("Add funds error:", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: "Une erreur est survenue" });
     }
   });
 
@@ -1597,7 +1593,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId, amount } = req.body;
       if (!userId || amount === undefined) {
-        return res.status(400).json({ error: "userId and amount are required" });
+        return res.status(400).json({ error: "Identifiant utilisateur et montant requis" });
       }
       // Check if target user is primary admin
       const targetUser = await storage.getUser(userId);
@@ -1608,7 +1604,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(user);
     } catch (error: any) {
       console.error("Subtract funds error:", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: "Une erreur est survenue" });
     }
   });
 
@@ -1616,7 +1612,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId } = req.body;
       if (!userId) {
-        return res.status(400).json({ error: "userId is required" });
+        return res.status(400).json({ error: "Identifiant utilisateur requis" });
       }
       // Check if target user is primary admin
       const targetUser = await storage.getUser(userId);
@@ -1625,12 +1621,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const user = await storage.approveKyc(userId);
       if (!user) {
-        return res.status(404).json({ error: "User not found" });
+        return res.status(404).json({ error: "Utilisateur non trouvé" });
       }
       res.json(user);
     } catch (error: any) {
       console.error("Approve KYC error:", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: "Une erreur est survenue" });
     }
   });
 
@@ -1638,7 +1634,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId, reason } = req.body;
       if (!userId) {
-        return res.status(400).json({ error: "userId is required" });
+        return res.status(400).json({ error: "Identifiant utilisateur requis" });
       }
       // Check if target user is primary admin
       const targetUser = await storage.getUser(userId);
@@ -1647,12 +1643,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const user = await storage.rejectKyc(userId, reason);
       if (!user) {
-        return res.status(404).json({ error: "User not found" });
+        return res.status(404).json({ error: "Utilisateur non trouvé" });
       }
       res.json(user);
     } catch (error: any) {
       console.error("Reject KYC error:", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: "Une erreur est survenue" });
     }
   });
 
@@ -1663,7 +1659,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(submissions);
     } catch (error: any) {
       console.error("Get KYC submissions error:", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: "Une erreur est survenue" });
     }
   });
 
@@ -1672,12 +1668,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const user = await storage.getUser(req.params.userId);
       if (!user) {
-        return res.status(404).json({ error: "User not found" });
+        return res.status(404).json({ error: "Utilisateur non trouvé" });
       }
       res.json(user);
     } catch (error: any) {
       console.error("Get user profile error:", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: "Une erreur est survenue" });
     }
   });
 
@@ -1687,7 +1683,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(transactions);
     } catch (error: any) {
       console.error("Get user transactions error:", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: "Une erreur est survenue" });
     }
   });
 
@@ -1697,7 +1693,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(links);
     } catch (error: any) {
       console.error("Get user payment links error:", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: "Une erreur est survenue" });
     }
   });
 
@@ -1707,7 +1703,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(links);
     } catch (error: any) {
       console.error("Get user merchant links error:", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: "Une erreur est survenue" });
     }
   });
 
@@ -1717,7 +1713,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(keys);
     } catch (error: any) {
       console.error("Get user api keys error:", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: "Une erreur est survenue" });
     }
   });
 
@@ -1728,7 +1724,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(configs);
     } catch (error: any) {
       console.error("Get country operator configs error:", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: "Une erreur est survenue" });
     }
   });
 
@@ -1743,13 +1739,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       if (!config) {
-        return res.status(404).json({ error: "Configuration not found" });
+        return res.status(404).json({ error: "Configuration non trouvée" });
       }
 
       res.json(config);
     } catch (error: any) {
       console.error("Update country operator config error:", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: "Une erreur est survenue" });
     }
   });
 
@@ -1769,7 +1765,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(result);
     } catch (error: any) {
       console.error("Get deposits config error:", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: "Une erreur est survenue" });
     }
   });
 
@@ -1789,7 +1785,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(result);
     } catch (error: any) {
       console.error("Get withdrawals config error:", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: "Une erreur est survenue" });
     }
   });
 
