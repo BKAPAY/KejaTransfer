@@ -31,10 +31,6 @@ const faqs = [
   {
     question: "Mes fonds sont-ils sécurisés?",
     answer: "Oui, vos fonds sont totalement sécurisés. BKApay met en place les mesures de sécurité les plus élevées pour protéger vos transactions et vos données personnelles. Nous respectons les normes internationales en matière de sécurité des paiements."
-  },
-  {
-    question: "Comment modifier mon profil?",
-    answer: "Cliquez sur 'Profil' dans le menu de gauche, modifiez vos informations personnelles et cliquez sur 'Enregistrer' pour appliquer les changements."
   }
 ];
 
