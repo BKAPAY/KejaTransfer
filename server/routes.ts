@@ -632,11 +632,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         custom_data: {
           customer_name: customerName,
           customer_email: customerEmail,
+          customer_phone: customerPhone,
+          country,
+          operator,
         },
         actions: {
           callback_url: `${process.env.BASE_URL || 'http://localhost:5000'}/api/webhooks/paydunya`,
         },
       };
+
+      console.log("[PAYMENT_LINK] Creating invoice with data:", paydunyaData);
 
       const paydunyaResponse = await callPaydunyaAPI("/checkout-invoice/create", paydunyaData);
 
@@ -702,7 +707,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const paydunyaData = {
         invoice: {
           total_amount: amount,
-          description: `Paiement - ${merchantLink.merchantName}`,
+          description: `Paiement marchand - ${merchantLink.merchantName}`,
         },
         store: {
           name: merchantLink.merchantName,
@@ -713,11 +718,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           merchant_name: merchantLink.merchantName,
           customer_name: customerName,
           customer_email: customerEmail,
+          customer_phone: customerPhone,
+          country,
+          operator,
         },
         actions: {
           callback_url: `${process.env.BASE_URL || 'http://localhost:5000'}/api/webhooks/paydunya`,
         },
       };
+
+      console.log("[MERCHANT_LINK] Creating invoice with data:", paydunyaData);
 
       const paydunyaResponse = await callPaydunyaAPI("/checkout-invoice/create", paydunyaData);
 
