@@ -1099,6 +1099,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/admin/toggle-verification", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { userId } = req.body;
+      if (!userId) {
+        return res.status(400).json({ error: "userId is required" });
+      }
+      const user = await storage.toggleVerification(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      res.json(user);
+    } catch (error: any) {
+      console.error("Toggle verification error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // User details viewing routes
   app.get("/api/admin/user/:userId/profile", requireAdmin, async (req: Request, res: Response) => {
     try {

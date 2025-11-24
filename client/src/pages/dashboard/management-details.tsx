@@ -474,9 +474,11 @@ export function ApiKeysDialog({ userId, onOpenChange }: { userId: string; onOpen
 
 // Profile Dialog Component
 export function ProfileDialog({ userId, onOpenChange }: { userId: string; onOpenChange: () => void }) {
-  const { data: user, isLoading } = useQuery<User>({
+  const { data: user, isLoading, refetch } = useQuery<User>({
     queryKey: [`/api/admin/user/${userId}/profile`],
   });
+  const { toast } = useToast();
+  const [toggling, setToggling] = React.useState(false);
 
   const formatAmount = (amount: number) => {
     return new Intl.NumberFormat("fr-FR", {
@@ -484,6 +486,38 @@ export function ProfileDialog({ userId, onOpenChange }: { userId: string; onOpen
       currency: "XOF",
       minimumFractionDigits: 0,
     }).format(amount);
+  };
+
+  const handleToggleVerification = async () => {
+    if (!user) return;
+    try {
+      setToggling(true);
+      const response = await fetch("/api/admin/toggle-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId }),
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Erreur lors de la modification du statut de vérification");
+      }
+      
+      toast({
+        title: "Succès",
+        description: user.verified ? "Compte dévérifiée" : "Compte vérifiée",
+      });
+      
+      await refetch();
+    } catch (error: any) {
+      toast({
+        title: "Erreur",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setToggling(false);
+    }
   };
 
   return (
@@ -532,6 +566,22 @@ export function ProfileDialog({ userId, onOpenChange }: { userId: string; onOpen
                 <Badge variant={user.isAdmin ? "destructive" : "secondary"}>
                   {user.isAdmin ? "Admin" : "Utilisateur"}
                 </Badge>
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Vérification de compte</label>
+              <div className="mt-2 flex items-center gap-2">
+                <Badge variant={user.verified ? "default" : "secondary"}>
+                  {user.verified ? "Vérifié" : "Non vérifié"}
+                </Badge>
+                <Button 
+                  size="sm" 
+                  onClick={handleToggleVerification}
+                  disabled={toggling}
+                  data-testid="button-toggle-verification"
+                >
+                  {toggling ? "..." : user.verified ? "Dévérifier" : "Vérifier"}
+                </Button>
               </div>
             </div>
           </div>

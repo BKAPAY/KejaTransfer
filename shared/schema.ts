@@ -16,6 +16,7 @@ export const users = pgTable("users", {
   kycIdBack: text("kyc_id_back"), // Base64 encoded or URL
   kycSelfie: text("kyc_selfie"), // Base64 encoded or URL
   isAdmin: boolean("is_admin").notNull().default(false),
+  verified: boolean("verified").notNull().default(false), // Account verified by admin
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
