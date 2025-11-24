@@ -153,22 +153,94 @@ async function callPaydunyaAPIv2(endpoint: string, data: any) {
   }
 }
 
+// Helper function to confirm Wizall two-step payment
+async function confirmWizallPayment(
+  authorizationCode: string,
+  phoneNumber: string,
+  transactionId: string
+): Promise<{ success: boolean; message: string; data?: any }> {
+  try {
+    const confirmResponse = await fetch(`${PAYDUNYA_CONFIG.apiUrl}/softpay/wizall-money-senegal/confirm`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "PAYDUNYA-MASTER-KEY": PAYDUNYA_CONFIG.masterKey,
+        "PAYDUNYA-PRIVATE-KEY": PAYDUNYA_CONFIG.privateKey,
+        "PAYDUNYA-TOKEN": PAYDUNYA_CONFIG.token,
+      },
+      body: JSON.stringify({
+        authorization_code: authorizationCode,
+        phone_number: phoneNumber,
+        transaction_id: transactionId,
+      }),
+    });
+
+    // Gracefully handle non-JSON responses
+    const contentType = confirmResponse.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+      const textBody = await confirmResponse.text();
+      console.error("[WIZALL CONFIRM] Non-JSON response:", textBody.substring(0, 200));
+      return {
+        success: false,
+        message: "Erreur serveur Wizall",
+      };
+    }
+
+    let confirmResult;
+    try {
+      confirmResult = await confirmResponse.json();
+    } catch (parseError) {
+      console.error("[WIZALL CONFIRM] JSON parse error:", parseError);
+      return {
+        success: false,
+        message: "Réponse invalide du serveur Wizall",
+      };
+    }
+
+    if (confirmResult.success) {
+      return {
+        success: true,
+        message: confirmResult.message || "Paiement Wizall confirmé",
+        data: confirmResult.data,
+      };
+    } else {
+      return {
+        success: false,
+        message: confirmResult.message || "Erreur confirmation Wizall",
+        data: confirmResult.data,
+      };
+    }
+  } catch (error) {
+    console.error("[WIZALL CONFIRM] Error:", error);
+    return {
+      success: false,
+      message: "Erreur de connexion au service Wizall",
+    };
+  }
+}
+
 // Helper function to call Paydunya SOFTPAY API (operator-specific OTP endpoints)
 async function callPaydunyaSoftpay(
   operator: string,
   country: string,
   paymentData: SoftpayPaymentData
-): Promise<{ success: boolean; message: string; data?: any; fees?: number; currency?: string; url?: string }> {
+): Promise<{ success: boolean; message: string; data?: any; fees?: number; currency?: string; url?: string; transactionId?: string }> {
   try {
     // Get operator configuration key
     const operatorKey = getOperatorKey(operator, country);
     if (!operatorKey) {
-      throw new Error(`Opérateur non supporté: ${operator} pour ${country}`);
+      return {
+        success: false,
+        message: `Opérateur non supporté pour ce pays`,
+      };
     }
 
     const config = SOFTPAY_OPERATORS[operatorKey];
     if (!config) {
-      throw new Error(`Configuration SOFTPAY introuvable pour: ${operatorKey}`);
+      return {
+        success: false,
+        message: `Configuration introuvable pour cet opérateur`,
+      };
     }
 
     // Build request parameters using operator-specific mapping
@@ -188,13 +260,87 @@ async function callPaydunyaSoftpay(
       body: JSON.stringify(requestData),
     });
 
-    const result = await response.json();
+    // Gracefully handle non-JSON responses
+    const contentType = response.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+      const textBody = await response.text();
+      console.error(`[SOFTPAY] Non-JSON response from ${config.endpoint}:`, textBody.substring(0, 200));
+      return {
+        success: false,
+        message: "Erreur serveur de paiement",
+      };
+    }
+
+    let result;
+    try {
+      result = await response.json();
+    } catch (parseError) {
+      console.error(`[SOFTPAY] JSON parse error for ${config.endpoint}:`, parseError);
+      return {
+        success: false,
+        message: "Réponse invalide du serveur de paiement",
+      };
+    }
+
     console.log(`[SOFTPAY] ${config.endpoint} - Status: ${response.status}`, result);
 
-    return result;
+    // Normalize Paydunya response format to standard format
+    // Paydunya returns: {success: true/false, message: "...", data: {...}, fees: 100, currency: "XOF"}
+    // OR: {response_code: "00", response_text: "...", ...}
+    
+    // Extract TransactionID from multiple possible locations in Paydunya response
+    const extractTransactionId = (result: any): string | undefined => {
+      return (
+        result.TransactionID ||
+        result.transactionid ||
+        result.transaction_id ||
+        result.data?.TransactionID ||
+        result.data?.transactionid ||
+        result.data?.transaction_id
+      );
+    };
+
+    if (result.success === true) {
+      // Already in correct format
+      return {
+        success: true,
+        message: result.message || "Paiement initié avec succès",
+        data: result.data,
+        fees: result.fees,
+        currency: result.currency,
+        url: result.url,
+        transactionId: extractTransactionId(result),
+      };
+    } else if (result.success === false) {
+      return {
+        success: false,
+        message: result.message || "Erreur lors du paiement",
+        data: result.data,
+      };
+    } else if (result.response_code === "00") {
+      // Old format - convert to new format
+      return {
+        success: true,
+        message: result.response_text || result.message || "Paiement initié avec succès",
+        data: result.data,
+        fees: result.fees,
+        currency: result.currency,
+        transactionId: extractTransactionId(result),
+      };
+    } else {
+      // Error response
+      return {
+        success: false,
+        message: result.response_text || result.message || "Erreur lors du paiement",
+        data: result.data,
+      };
+    }
   } catch (error) {
     console.error(`[SOFTPAY Error] ${operator}-${country}:`, error);
-    throw error;
+    return {
+      success: false,
+      message: "Erreur de connexion au service de paiement",
+    };
   }
 }
 
@@ -1060,40 +1206,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Transaction non trouvée" });
       }
 
-      // Parse metadata to get customer info
+      // Parse metadata to get customer info and Wizall transactionId if exists
       let metadata: any = {};
       if (transaction.metadata) {
         metadata = JSON.parse(transaction.metadata);
       }
 
-      // Build payment data for SOFTPAY call
-      const paymentData: SoftpayPaymentData = {
-        customerName: customerName || metadata.customerName || `${user!.firstName} ${user!.lastName}`,
-        customerEmail: customerEmail || metadata.customerEmail || user!.email,
-        phoneNumber: phone,
-        invoiceToken: token,
-        authorizationCode,
-      };
+      // Check if this is Wizall two-step flow
+      const operatorKey = getOperatorKey(operator, country);
+      const isTwoStep = operatorKey ? requiresTwoStep(operatorKey) : false;
 
-      console.log("[SOFTPAY CONFIRM] Calling SOFTPAY endpoint for:", operator, country);
+      if (isTwoStep && operator.toLowerCase() === "wizall" && country.toUpperCase() === "SN") {
+        // WIZALL TWO-STEP: Call /wizall-money-senegal/confirm endpoint
+        console.log("[SOFTPAY WIZALL CONFIRM] Confirming Wizall payment with OTP");
 
-      // Call operator-specific SOFTPAY endpoint
-      const softpayResult = await callPaydunyaSoftpay(operator, country, paymentData);
+        if (!metadata.wizallTransactionId) {
+          return res.status(400).json({ error: "Transaction Wizall non initiée. Veuillez réessayer." });
+        }
 
-      if (softpayResult.success) {
-        // Payment initiated successfully - webhook will confirm
-        res.json({
-          success: true,
-          message: softpayResult.message,
-          transactionId: transaction.id,
-          fees: softpayResult.fees,
-          currency: softpayResult.currency,
-          redirectUrl: softpayResult.url, // For Wave operators
-        });
+        // Call Wizall confirm helper
+        const confirmResult = await confirmWizallPayment(authorizationCode!, phone, metadata.wizallTransactionId);
+
+        if (confirmResult.success) {
+          res.json({
+            success: true,
+            message: confirmResult.message,
+            transactionId: transaction.id,
+          });
+        } else {
+          res.status(400).json({
+            error: confirmResult.message,
+          });
+        }
       } else {
-        res.status(400).json({
-          error: softpayResult.message || "Erreur lors du paiement",
-        });
+        // STANDARD FLOW: Call operator-specific SOFTPAY endpoint
+        const paymentData: SoftpayPaymentData = {
+          customerName: customerName || metadata.customerName || `${user!.firstName} ${user!.lastName}`,
+          customerEmail: customerEmail || metadata.customerEmail || user!.email,
+          phoneNumber: phone,
+          invoiceToken: token,
+          authorizationCode,
+        };
+
+        console.log("[SOFTPAY CONFIRM] Calling SOFTPAY endpoint for:", operator, country);
+
+        const softpayResult = await callPaydunyaSoftpay(operator, country, paymentData);
+
+        if (softpayResult.success) {
+          // For Wizall first step, store the TransactionID in metadata
+          if (softpayResult.transactionId && isTwoStep) {
+            // Update transaction metadata with Wizall TransactionID
+            const updatedMetadata = {
+              ...metadata,
+              wizallTransactionId: softpayResult.transactionId,
+            };
+            await storage.updateTransactionStatus(transaction.id, "pending", {
+              metadata: JSON.stringify(updatedMetadata),
+            });
+
+            // Return message asking for OTP
+            res.json({
+              success: true,
+              message: "Code OTP envoyé. Veuillez entrer le code reçu par SMS.",
+              transactionId: transaction.id,
+              requiresOTP: true,
+              wizallTransactionId: softpayResult.transactionId,
+            });
+          } else {
+            // Payment initiated successfully - webhook will confirm
+            res.json({
+              success: true,
+              message: softpayResult.message,
+              transactionId: transaction.id,
+              fees: softpayResult.fees,
+              currency: softpayResult.currency,
+              redirectUrl: softpayResult.url, // For Wave operators
+            });
+          }
+        } else {
+          res.status(400).json({
+            error: softpayResult.message || "Erreur lors du paiement",
+          });
+        }
       }
     } catch (error: any) {
       console.error("[SOFTPAY CONFIRM] Error:", error);
@@ -1213,31 +1407,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Transaction non trouvée" });
       }
 
-      // Build payment data for SOFTPAY call
-      const paymentData: SoftpayPaymentData = {
-        customerName: customerName || transaction.customerName || "Client",
-        customerEmail: customerEmail || transaction.customerEmail || "",
-        phoneNumber: customerPhone,
-        invoiceToken: token,
-        authorizationCode,
-      };
+      // Parse metadata for Wizall transactionId
+      let metadata: any = {};
+      if (transaction.metadata) {
+        metadata = JSON.parse(transaction.metadata);
+      }
 
-      // Call operator-specific SOFTPAY endpoint
-      const softpayResult = await callPaydunyaSoftpay(operator, country, paymentData);
+      // Check if this is Wizall two-step flow
+      const operatorKey = getOperatorKey(operator, country);
+      const isTwoStep = operatorKey ? requiresTwoStep(operatorKey) : false;
 
-      if (softpayResult.success) {
-        res.json({
-          success: true,
-          message: softpayResult.message,
-          transactionId: transaction.id,
-          fees: softpayResult.fees,
-          currency: softpayResult.currency,
-          redirectUrl: softpayResult.url,
-        });
+      if (isTwoStep && operator.toLowerCase() === "wizall" && country.toUpperCase() === "SN") {
+        // WIZALL TWO-STEP: Call /wizall-money-senegal/confirm endpoint
+        if (!metadata.wizallTransactionId) {
+          return res.status(400).json({ error: "Transaction Wizall non initiée" });
+        }
+
+        // Call Wizall confirm helper
+        const confirmResult = await confirmWizallPayment(authorizationCode!, customerPhone, metadata.wizallTransactionId);
+
+        if (confirmResult.success) {
+          res.json({
+            success: true,
+            message: confirmResult.message,
+            transactionId: transaction.id,
+          });
+        } else {
+          res.status(400).json({
+            error: confirmResult.message,
+          });
+        }
       } else {
-        res.status(400).json({
-          error: softpayResult.message || "Erreur lors du paiement",
-        });
+        // STANDARD FLOW
+        const paymentData: SoftpayPaymentData = {
+          customerName: customerName || transaction.customerName || "Client",
+          customerEmail: customerEmail || transaction.customerEmail || "",
+          phoneNumber: customerPhone,
+          invoiceToken: token,
+          authorizationCode,
+        };
+
+        const softpayResult = await callPaydunyaSoftpay(operator, country, paymentData);
+
+        if (softpayResult.success) {
+          // For Wizall first step, store TransactionID
+          if (softpayResult.transactionId && isTwoStep) {
+            const updatedMetadata = {
+              ...metadata,
+              wizallTransactionId: softpayResult.transactionId,
+            };
+            await storage.updateTransactionStatus(transaction.id, "pending", {
+              metadata: JSON.stringify(updatedMetadata),
+            });
+
+            res.json({
+              success: true,
+              message: "Code OTP envoyé par SMS",
+              transactionId: transaction.id,
+              requiresOTP: true,
+              wizallTransactionId: softpayResult.transactionId,
+            });
+          } else {
+            res.json({
+              success: true,
+              message: softpayResult.message,
+              transactionId: transaction.id,
+              fees: softpayResult.fees,
+              currency: softpayResult.currency,
+              redirectUrl: softpayResult.url,
+            });
+          }
+        } else {
+          res.status(400).json({
+            error: softpayResult.message || "Erreur lors du paiement",
+          });
+        }
       }
     } catch (error: any) {
       console.error("[PAYMENT_LINK SOFTPAY CONFIRM] Error:", error);
@@ -1361,31 +1605,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Transaction non trouvée" });
       }
 
-      // Build payment data for SOFTPAY call
-      const paymentData: SoftpayPaymentData = {
-        customerName: customerName || transaction.customerName || "Client",
-        customerEmail: customerEmail || transaction.customerEmail || "",
-        phoneNumber: customerPhone,
-        invoiceToken: token,
-        authorizationCode,
-      };
+      // Parse metadata for Wizall transactionId
+      let metadata: any = {};
+      if (transaction.metadata) {
+        metadata = JSON.parse(transaction.metadata);
+      }
 
-      // Call operator-specific SOFTPAY endpoint
-      const softpayResult = await callPaydunyaSoftpay(operator, country, paymentData);
+      // Check if this is Wizall two-step flow
+      const operatorKey = getOperatorKey(operator, country);
+      const isTwoStep = operatorKey ? requiresTwoStep(operatorKey) : false;
 
-      if (softpayResult.success) {
-        res.json({
-          success: true,
-          message: softpayResult.message,
-          transactionId: transaction.id,
-          fees: softpayResult.fees,
-          currency: softpayResult.currency,
-          redirectUrl: softpayResult.url,
-        });
+      if (isTwoStep && operator.toLowerCase() === "wizall" && country.toUpperCase() === "SN") {
+        // WIZALL TWO-STEP: Call /wizall-money-senegal/confirm endpoint
+        if (!metadata.wizallTransactionId) {
+          return res.status(400).json({ error: "Transaction Wizall non initiée" });
+        }
+
+        // Call Wizall confirm helper
+        const confirmResult = await confirmWizallPayment(authorizationCode!, customerPhone, metadata.wizallTransactionId);
+
+        if (confirmResult.success) {
+          res.json({
+            success: true,
+            message: confirmResult.message,
+            transactionId: transaction.id,
+          });
+        } else {
+          res.status(400).json({
+            error: confirmResult.message,
+          });
+        }
       } else {
-        res.status(400).json({
-          error: softpayResult.message || "Erreur lors du paiement",
-        });
+        // STANDARD FLOW
+        const paymentData: SoftpayPaymentData = {
+          customerName: customerName || transaction.customerName || "Client",
+          customerEmail: customerEmail || transaction.customerEmail || "",
+          phoneNumber: customerPhone,
+          invoiceToken: token,
+          authorizationCode,
+        };
+
+        const softpayResult = await callPaydunyaSoftpay(operator, country, paymentData);
+
+        if (softpayResult.success) {
+          // For Wizall first step, store TransactionID
+          if (softpayResult.transactionId && isTwoStep) {
+            const updatedMetadata = {
+              ...metadata,
+              wizallTransactionId: softpayResult.transactionId,
+            };
+            await storage.updateTransactionStatus(transaction.id, "pending", {
+              metadata: JSON.stringify(updatedMetadata),
+            });
+
+            res.json({
+              success: true,
+              message: "Code OTP envoyé par SMS",
+              transactionId: transaction.id,
+              requiresOTP: true,
+              wizallTransactionId: softpayResult.transactionId,
+            });
+          } else {
+            res.json({
+              success: true,
+              message: softpayResult.message,
+              transactionId: transaction.id,
+              fees: softpayResult.fees,
+              currency: softpayResult.currency,
+              redirectUrl: softpayResult.url,
+            });
+          }
+        } else {
+          res.status(400).json({
+            error: softpayResult.message || "Erreur lors du paiement",
+          });
+        }
       }
     } catch (error: any) {
       console.error("[MERCHANT_LINK SOFTPAY CONFIRM] Error:", error);

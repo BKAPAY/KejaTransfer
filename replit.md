@@ -2,6 +2,30 @@
 
 ## Dernières modifications (24 Novembre 2025)
 
+### Session 15 - Implémentation Complète SOFTPAY OTP avec 19 Opérateurs 🚧 EN COURS
+**Problème CRITIQUE**: Paiements ne fonctionnent pas - le système utilisait seulement `/checkout-invoice/create` sans appeler les endpoints SOFTPAY operator-specific requis par la documentation Paydunya.
+**Cause**: Implémentation incomplète - manquait les 19 endpoints SOFTPAY OTP (Orange Money SN/CI/BF/ML, Free Money SN, Wizall SN, Wave SN/CI, MTN CI/BJ, Moov CI/BF/BJ/TG/ML, T-Money TG, Expresso SN, Paydunya wallet).
+**Solution BACKEND (COMPLÈTE)**:
+- **Module server/paydunya-softpay.ts**: Mapping complet des 19 opérateurs vers endpoints spécifiques avec paramètres corrects (customer_name, authorization_code, invoice_token, etc.)
+- **Fonction callPaydunyaSoftpay()** dans routes.ts: 
+  - Appel endpoints operator-specific avec normalisation réponses Paydunya
+  - Gère `{success: true}` ET `{response_code: "00"}` formats
+  - Retourne transactionId pour Wizall two-step
+- **Flux Init/Confirm pour 4 sources**:
+  - Dépôts: `/api/softpay/init-payment` → `/api/softpay/confirm-payment`
+  - Payment Links: `/api/payments/softpay-init/:token` → `/api/payments/softpay-confirm`
+  - Merchant Links: `/api/merchant-links/softpay-init/:token` → `/api/merchant-links/softpay-confirm`
+  - API Gateway: `/api/payments/create` (init) → `/api/payments/confirm-softpay` (confirm)
+- **Instructions USSD**: Chaque init retourne `ussdInstruction`, `requiresOTP`, `requiresTwoStep` selon opérateur
+- **Wizall Two-Step**: Stocke TransactionID dans metadata après premier appel, puis appelle `/wizall-money-senegal/confirm` avec OTP
+- **Cas spéciaux gérés**: Wave (redirectUrl), Wizall (2-step avec confirm endpoint), Moov CI (popup 30s timeout)
+**Frontend TODO**:
+- Mettre à jour deposit.tsx pour afficher instructions USSD et input OTP conditionnel
+- Créer pages publiques pour payment links/merchant links avec flux SOFTPAY
+- Gérer Wizall two-step UI (afficher TransactionID, demander OTP)
+- Gérer Wave redirect vers URL externe
+**Résultat ACTUEL**: ✅ Backend 100% implémenté avec 19 opérateurs. Frontend à compléter. **Testing requis avec vrais numéros africains.**
+
 ### Session 14 - Protection Admin Principal & Suppression Branding "Paydunya" ✅ PRODUCTION-READY
 **Problème**: Compte admin principal (kpetekoussojuste1@gmail.com) non protégé contre suspension. Mot "Paydunya" visible sur pages frontend.
 **Cause**: Routes `/api/admin/suspend` et `/api/admin/unsuspend` sans vérification isPrimaryAdmin. Références "Paydunya" dans commentaires et labels UI.

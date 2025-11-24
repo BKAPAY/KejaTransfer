@@ -9,7 +9,7 @@
 // Operator codes mapping
 export type OperatorCode = 
   | "orange_sn" | "free_sn" | "expresso_sn" | "wave_sn" | "wizall_sn"
-  | "orange_ml" | "moov_ml"
+  | "orange_ml" | "moov_ml" | "mtn_ml"
   | "mtn_bj" | "moov_bj"
   | "tmoney_tg" | "moov_tg"
   | "orange_ci" | "mtn_ci" | "moov_ci" | "wave_ci"
@@ -132,6 +132,20 @@ export const SOFTPAY_OPERATORS: Record<string, SoftpayOperatorConfig> = {
       moov_ml_email: data.customerEmail,
       moov_ml_phone_number: data.phoneNumber,
       moov_ml_customer_address: data.customerAddress || "Mali",
+      payment_token: data.invoiceToken
+    })
+  },
+
+  "mtn_ml": {
+    endpoint: "/softpay/mtn-mali",
+    requiresOTP: false,
+    requiresTwoStep: false,
+    ussdInstruction: "Vous recevrez un SMS. Validez le paiement après réception.",
+    parameterMapping: (data) => ({
+      mtn_mali_customer_fullname: data.customerName,
+      mtn_mali_email: data.customerEmail,
+      mtn_mali_phone_number: data.phoneNumber,
+      mtn_mali_wallet_provider: "MTNMALI",
       payment_token: data.invoiceToken
     })
   },
@@ -307,6 +321,7 @@ export function getOperatorKey(operator: string, country: string): string | null
     // Mali
     "orange-ml": "orange_ml",
     "moov-ml": "moov_ml",
+    "mtn-ml": "mtn_ml",
     
     // Benin
     "mtn-bj": "mtn_bj",
@@ -326,8 +341,13 @@ export function getOperatorKey(operator: string, country: string): string | null
     "orange-bf": "orange_bf",
     "moov-bf": "moov_bf",
     
-    // Paydunya
-    "paydunya": "paydunya"
+    // Paydunya wallet (country-independent, works everywhere)
+    "paydunya-sn": "paydunya",
+    "paydunya-ml": "paydunya",
+    "paydunya-bj": "paydunya",
+    "paydunya-tg": "paydunya",
+    "paydunya-ci": "paydunya",
+    "paydunya-bf": "paydunya",
   };
 
   const key = `${operator.toLowerCase()}-${country.toLowerCase()}`;
