@@ -99,6 +99,11 @@ export default function Home() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem asChild>
+                  <Link href="/documentation" data-testid="menu-documentation">
+                    Documentation
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
                   <Link href="/login" data-testid="menu-login">
                     Se connecter
                   </Link>
