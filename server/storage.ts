@@ -323,6 +323,15 @@ export class DbStorage implements IStorage {
     return results[0];
   }
 
+  async removeAdminPrivilege(userId: string): Promise<User | undefined> {
+    const results = await db
+      .update(schema.users)
+      .set({ isAdmin: false })
+      .where(eq(schema.users.id, userId))
+      .returning();
+    return results[0];
+  }
+
   async deleteUser(userId: string): Promise<boolean> {
     const result = await db.delete(schema.users).where(eq(schema.users.id, userId));
     return true;

@@ -1043,6 +1043,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/admin/remove-admin", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { userId } = req.body;
+      if (!userId) {
+        return res.status(400).json({ error: "userId is required" });
+      }
+      const user = await storage.removeAdminPrivilege(userId);
+      res.json(user);
+    } catch (error: any) {
+      console.error("Remove admin error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.post("/api/admin/delete-user", requireAdmin, async (req: Request, res: Response) => {
     try {
       const { userId } = req.body;

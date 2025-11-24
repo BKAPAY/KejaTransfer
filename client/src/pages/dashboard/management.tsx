@@ -52,6 +52,25 @@ export default function Management() {
     },
   });
 
+  const removeAdminMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const response = await fetch("/api/admin/remove-admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId }),
+      });
+      if (!response.ok) throw new Error("Failed to remove admin privilege");
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Succès", description: "Droits administrateur révoqués" });
+      refetchUsers();
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible de révoquer les droits", variant: "destructive" });
+    },
+  });
+
   const deleteUserMutation = useMutation({
     mutationFn: async (userId: string) => {
       const response = await fetch("/api/admin/delete-user", {
@@ -249,7 +268,7 @@ export default function Management() {
 
                     {/* Actions */}
                     <div className="flex gap-2 flex-wrap">
-                      {!user.isAdmin && (
+                      {!user.isAdmin ? (
                         <Button
                           size="sm"
                           variant="outline"
@@ -259,6 +278,17 @@ export default function Management() {
                         >
                           <Shield className="w-4 h-4 mr-1" />
                           Promouvoir Admin
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => removeAdminMutation.mutate(user.id)}
+                          disabled={removeAdminMutation.isPending}
+                          data-testid={`button-remove-admin-${user.id}`}
+                        >
+                          <Shield className="w-4 h-4 mr-1" />
+                          Révoquer Admin
                         </Button>
                       )}
                       <Button
