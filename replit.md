@@ -24,7 +24,13 @@ The frontend utilizes React 18 with TypeScript, styled with Shadcn UI and Tailwi
 - **Database**: PostgreSQL storing `users`, `payment_links`, `merchant_links`, `api_keys`, and `transactions` (with statuses: pending, completed, failed).
 - **Authentication**: Persistent sessions managed using `connect-pg-simple` for PostgreSQL, `app.set("trust proxy", 1)` for production environments, and `sameSite: 'lax'` for cookies.
 - **Automatic Database Migrations**: A `db-bootstrap.ts` script handles automatic Drizzle ORM migrations on startup, including intelligent reconciliation for tracking existing migrations, SHA256 hash verification, and transactional backfilling.
-- **Payment Flows (SOFTPAY Deposits)**: Utilizes Paydunya API v1 for creating invoices. The backend implements specific logic for 19 SOFTPAY operators (Orange Money, MTN, Moov, Wave, Free Money, Wizall, Expresso, T-Money, Paydunya wallet) with robust error handling, transaction ID extraction, and USSD instructions. Frontend polls for payment status.
+- **Payment Flows (SOFTPAY)**: Complete production-ready implementation across ALL payment entry points (dashboard deposits, payment links, merchant links, API gateway) supporting 19 SOFTPAY operators with unified flow architecture:
+  - **Init Flow**: Validates operator/country combination, creates Paydunya invoice, stores transaction with `paydunyaToken` for webhook lookup, returns USSD instructions and flow requirements (OTP, two-step)
+  - **Confirm Flow**: Retrieves transaction by `transactionId`, handles standard/OTP/Wizall two-step flows, stores Wizall transactionId in metadata for OTP confirmation
+  - **Guards & Validation**: Pre-transaction operator validation via `getOperatorKey()`, HTTP 502 for missing Wizall transactionIds, frontend guards prevent premature confirmations
+  - **Message Sanitization**: Wizall messages stripped of HTML/special chars with 200-char limit for professional UX
+  - **Frontend Stages**: form → init → ussd → (otp for Wizall/direct OTP operators) → polling → completed
+  - **Supported Operators**: Orange (SN/ML/BF/CI), MTN (BJ/ML/CI), Moov (BJ/TG/ML/BF/CI), Wave (SN/CI), Free (SN), Wizall (SN), Expresso (SN), T-Money (TG), Paydunya Wallet (all countries)
 - **Withdrawal/Transfer Flows**: Implemented using Paydunya v2 Disburse API, requiring KYC validation and balance checks.
 - **Embedded PSR Payments**: Integrates Paydunya's PSR SDK for direct payment modals.
 - **Silent Fees**: Automatic calculation of transaction fees (3% for Benin, 6% for other countries).
