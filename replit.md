@@ -2,6 +2,19 @@
 
 ## Dernières modifications (24 Novembre 2025)
 
+### Session 12 - Refonte Complète Système Frais & Webhook paydunyaToken ✅ PRODUCTION-READY
+**Problème**: Logique de frais incohérente entre INCOMING/OUTGOING. Webhook cherchait transactions via scan metadata fragile. API Gateway ne créait pas de transaction pending.
+**Cause**: Confusion BRUT/NET dans différents endpoints. Lookup webhook via parsing JSON metadata. Pas de validation stricte des paramètres API Gateway.
+**Solution MAJEURE**: 
+- **server/utils/fees.ts**: Documentation exhaustive INCOMING (client paie BRUT→crédite NET) vs OUTGOING (user demande NET→débite NET+frais)
+- **Tous endpoints INCOMING**: Stockent BRUT dans `transaction.amount`, calculent frais, créditent NET au solde
+- **storage.ts**: Nouvelle méthode `getTransactionByPaydunyaToken()` avec requête SQL directe sur colonne `paydunyaToken` (plus de scan metadata)
+- **Tous createTransaction**: Token stocké dans colonne dédiée `paydunyaToken` au lieu de metadata JSON
+- **API Gateway `/api/payments/create`**: Crée transaction pending AVANT retour client + validation stricte pays
+- **Webhook**: Lookup déterministe via `getTransactionByPaydunyaToken()`, crédite NET (gross-fee), plus de création transaction
+- **7 flux complets**: deposits, SOFTPAY, payment links, merchant links, API gateway, transfers - TOUS avec paydunyaToken persisté
+**Résultat**: ✅ Système robuste et déterministe validé par architect. Webhook trouve transactions instantanément via colonne indexée. Aucune dépendance sur custom_data fragile. **PRODUCTION-READY avec garanties complètes.**
+
 ### Session 11 - Correction Filtrage Opérateurs & Documentation SMS ✅
 **Problème**: Les opérateurs ne s'affichaient pas dans les formulaires de dépôt, transfert et retrait. SMS de validation Paydunya non fonctionnels.
 **Cause**: Logique de filtrage comparait des objets au lieu des codes d'opérateurs. Requêtes API non parsées. API SOFTPAY manquante.
