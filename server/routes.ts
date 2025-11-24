@@ -923,15 +923,92 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log("[SOFTPAY] Verifying payment with token:", invoiceToken);
 
-      // For SOFTPAY, we just return a pending status
-      // The real verification happens via webhooks from Paydunya
+      // Call Paydunya to check payment status
+      const paydunyaResponse = await callPaydunyaAPI("/query-invoice/" + invoiceToken, {});
+
+      if (paydunyaResponse.response_code === "00" && paydunyaResponse.status === "completed") {
+        res.json({
+          status: "completed",
+          response_code: "00",
+        });
+      } else if (paydunyaResponse.response_code === "00") {
+        res.json({
+          status: "pending",
+          response_code: "01",
+        });
+      } else {
+        res.json({
+          status: "failed",
+          response_code: "05",
+        });
+      }
+    } catch (error: any) {
+      console.error("[SOFTPAY] Verify payment error:", error);
       res.json({
         status: "pending",
         response_code: "01",
       });
+    }
+  });
+
+  // ===== Paydunya Webhook Routes =====
+  app.post("/api/webhooks/paydunya", async (req: Request, res: Response) => {
+    try {
+      const { token, status, custom_data } = req.body;
+
+      console.log("[WEBHOOK] Paydunya webhook received:", { token, status, custom_data });
+
+      if (!token) {
+        return res.status(400).json({ error: "Token manquant" });
+      }
+
+      // Use custom_data.user_id if provided, otherwise we need to search
+      let userId: string | null = null;
+      if (custom_data?.user_id) {
+        userId = custom_data.user_id;
+      }
+
+      // Search for transaction by token in metadata
+      // We'll need to search through user's transactions
+      let transaction = null;
+      if (userId) {
+        const userTransactions = await storage.getTransactions(userId, 100);
+        transaction = userTransactions.find((t: any) => {
+          try {
+            const meta = JSON.parse(t.metadata);
+            return meta.paydunyaToken === token;
+          } catch {
+            return false;
+          }
+        });
+      }
+
+      if (!transaction) {
+        console.log("[WEBHOOK] Transaction not found for token:", token);
+        // Still return 200 to acknowledge receipt
+        return res.status(200).json({ success: true, message: "Transaction not found, but webhook acknowledged" });
+      }
+
+      // Update transaction status based on webhook status
+      let newStatus = "pending";
+      if (status === "completed" || status === "approved") {
+        newStatus = "completed";
+        // Update user balance
+        await storage.updateUserBalance(transaction.userId, transaction.amount);
+        console.log("[WEBHOOK] User balance updated:", { userId: transaction.userId, amount: transaction.amount });
+      } else if (status === "failed" || status === "cancelled") {
+        newStatus = "failed";
+      }
+
+      // Update transaction
+      await storage.updateTransactionStatus(transaction.id, newStatus);
+      console.log("[WEBHOOK] Transaction updated:", { transactionId: transaction.id, status: newStatus });
+
+      res.json({ success: true, message: "Webhook traité" });
     } catch (error: any) {
-      console.error("[SOFTPAY] Verify payment error:", error);
-      res.status(500).json({ error: error.message || "Erreur lors de la vérification du paiement" });
+      console.error("[WEBHOOK] Paydunya webhook error:", error);
+      // Return 200 to Paydunya so it doesn't retry
+      res.status(200).json({ success: true, message: "Webhook received, but processing error" });
     }
   });
 

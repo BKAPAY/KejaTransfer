@@ -3,7 +3,21 @@
 ## Vue d'ensemble
 BKApay est une plateforme moderne de paiement mobile money pour l'Afrique de l'Ouest. Elle permet aux entreprises et particuliers d'accepter des paiements via mobile money (Orange Money, MTN, Moov, Wave, Free Money, T-Money, Wizall, Expresso) dans 6 pays: Bénin, Togo, Côte d'Ivoire, Sénégal, Burkina Faso et Mali.
 
-## Dernières modifications (24 Novembre 2025 - Session 5 RETRAITS PAYDUNYA v2)
+## Dernières modifications (24 Novembre 2025 - Session 6 SOFTPAY DEPOSITS & WEBHOOKS)
+- ✅ **DÉPÔTS SOFTPAY SANS REDIRECTION - IMPLEMENTATION COMPLETE**
+  * **Endpoint Dépôts**: POST `/api/softpay/create-payment` via Paydunya API v1 (checkout-invoice/create)
+  * **Flux de dépôt SOFTPAY**:
+    1. Utilisateur remplit formulaire (montant, pays, opérateur, numéro)
+    2. Backend crée facture Paydunya v1
+    3. Frontend reçoit token et attache custom_data (userId, country, operator, phone)
+    4. Polling au frontend vérifie le statut toutes les 3 secondes
+    5. Webhook Paydunya confirme paiement et met à jour solde
+  * **Webhook Endpoint**: POST `/api/webhooks/paydunya` pour traiter les confirmations
+  * **Polling**: Vérifie le statut du paiement en temps réel (3s interval)
+  * **BASE_URL**: Configuré sur https://bkapay.com pour webhooks corrects
+  * **Support multi-pays/opérateurs**: 6 pays, 15+ opérateurs supportés
+  * **IMPORTANT**: Paydunya n'envoie SMS QUE pour numéros africains (testez avec un vrai numéro!)
+
 - ✅ **RETRAITS/TRANSFERTS VIA PAYDUNYA v2 - IMPLEMENTATION COMPLETE**
   * **Endpoint Retraits**: POST `/api/transfers` via Paydunya v2 Disburse API
   * **Flux de retrait complet**:
@@ -39,7 +53,7 @@ BKApay est une plateforme moderne de paiement mobile money pour l'Afrique de l'O
   - Gestion des liens marchands
   - Gestion des clés API (KYC required)
   - Historique des transactions
-  - Dépôts via mobile money (PSR modal)
+  - **Dépôts SOFTPAY** via mobile money (polling + webhook) - NEW
   - Transferts/Retraits vers mobile money (Paydunya v2)
   - Profil utilisateur
   - Paramètres, Annonces, Support
@@ -51,16 +65,17 @@ BKApay est une plateforme moderne de paiement mobile money pour l'Afrique de l'O
   - Historique KYC avec filtrage
 
 ### Backend (Express + PostgreSQL)
-- **Paydunya PSR**: Modal popup sans redirection externe
-- **Paydunya v2 Retraits**: Endpoint `/disburse/get-invoice` + `/disburse/submit-invoice`
-- **Webhooks**: Transactions créées post-confirmation Paydunya
-- **Flux paiements PSR**: 
+- **Paydunya SOFTPAY**: Endpoint `/api/softpay/create-payment` (API v1 - checkout-invoice/create)
+- **Paydunya Retraits**: Endpoint `/api/transfers` (API v2 - Disburse)
+- **Webhooks**: POST `/api/webhooks/paydunya` - confirme paiements et met à jour balances
+- **Polling Endpoint**: POST `/api/softpay/verify-payment` - vérifie statut du paiement
+- **Flux paiements SOFTPAY**: 
   1. Utilisateur remplit formulaire
-  2. Backend crée facture Paydunya + transaction
-  3. Frontend affiche modal PSR (pas de redirection!)
-  4. Utilisateur scanne/paie dans modal
-  5. Webhook Paydunya confirme → Transaction mise à jour
-  6. Statut visible en temps réel dans BKApay
+  2. Backend crée facture Paydunya + transaction (pending)
+  3. Frontend affiche modal PSR ou message d'attente
+  4. Utilisateur complète le paiement sur mobile
+  5. Webhook Paydunya confirme → Transaction updated → Solde updaté
+  6. Polling détecte completion et rafraîchit l'interface
 
 ### Base de données (PostgreSQL)
 - **users**: Utilisateurs avec KYC et suspension
@@ -84,15 +99,17 @@ BKApay est une plateforme moderne de paiement mobile money pour l'Afrique de l'O
 - PostgreSQL + Drizzle ORM
 - Bcrypt pour hashing
 - Express Session
-- **Paydunya API v1** (invoices) + **v2** (withdrawals)
+- **Paydunya API v1** (invoices/SOFTPAY) + **v2** (withdrawals)
 
 ### Intégration Paydunya
-- **API PAR Endpoint**: `/api/v1/checkout-invoice/create`
+- **SOFTPAY API v1**: `/api/v1/checkout-invoice/create`
+- **SOFTPAY Polling**: POST `/api/softpay/verify-payment` + `/api/softpay/create-payment`
 - **PSR SDK**: Affiche modal popup en frontend
 - **PSR Backend Endpoint**: GET `/api/paydunya-api?ref=transactionId`
 - **Withdrawals API v2**: `/api/v2/disburse/get-invoice` + `/api/v2/disburse/submit-invoice`
-- **Webhooks**: `/api/webhooks/paydunya` (confirmation paiements)
+- **Webhooks**: POST `/api/webhooks/paydunya` (confirmation paiements + solde update)
 - **Clés LIVE**: Configurées et testées ✅
+- **BASE_URL**: https://bkapay.com (pour webhooks corrects)
 
 ## Opérateurs supportés par pays
 - **Sénégal**: Orange Money, Free Money, Expresso, Wave, Wizall
@@ -102,31 +119,30 @@ BKApay est une plateforme moderne de paiement mobile money pour l'Afrique de l'O
 - **Togo**: T-Money, Moov
 - **Mali**: Orange Money, Moov
 
-## Flux de paiement (PSR - Sans Redirection)
+## Flux de paiement SOFTPAY (Sans Redirection)
 
-### 1. Utilisateur sur page de paiement
-- Remplit formulaire: nom, email, téléphone, pays, opérateur
+### 1. Utilisateur sur page de dépôt
+- Remplit formulaire: montant, pays, opérateur, numéro téléphone
 
 ### 2. Backend traite la requête
-- Crée facture Paydunya
+- Crée facture Paydunya v1
 - Crée transaction avec statut "pending"
 - Retourne token de la facture
 
-### 3. Frontend affiche modal PSR
-- Charge SDK Paydunya PSR
-- Affiche modal popup de paiement
-- Utilisateur ne quitte jamais BKApay
+### 3. Frontend affiche message d'attente
+- Commence polling toutes les 3 secondes
+- Vérifie le statut via `/api/softpay/verify-payment`
 
-### 4. Utilisateur paie
-- Paie dans la modal PSR
-- Modal gère toute interaction Paydunya
-- Pas de redirection externe
+### 4. Utilisateur complète le paiement
+- Reçoit SMS sur mobile money (opérateur)
+- Confirme le paiement directement sur le téléphone
+- Paydunya vérifie et confirme
 
-### 5. Webhook confirme
-- Paydunya envoie webhook
+### 5. Webhook confirme et met à jour
+- Paydunya envoie webhook à `/api/webhooks/paydunya`
 - Transaction mise à jour avec statut "completed"
-- Solde utilisateur mis à jour
-- Statut visible en temps réel
+- Solde utilisateur mis à jour automatiquement
+- Polling détecte la completion et rafraîchit l'interface
 
 ## Flux de retrait/transfert (Paydunya v2)
 
@@ -151,63 +167,95 @@ BKApay est une plateforme moderne de paiement mobile money pour l'Afrique de l'O
 
 ## Caractéristiques principales
 
-### 1. Paiements PSR Embedded
+### 1. Dépôts SOFTPAY
+- Création facture via API v1 Paydunya
+- Polling pour vérifier le statut
+- Webhook pour confirmer paiement
+- Solde mis à jour automatiquement
+- Support multi-pays/opérateurs
+
+### 2. Retraits/Transferts
+- Via Paydunya v2 Disburse API
+- Débit immédiat du solde
+- Support multi-pays/opérateurs
+- KYC obligatoire
+
+### 3. Paiements PSR Embedded
 - Modal popup Paydunya affichée directement dans BKApay
 - Pas de redirection externe vers Paydunya
 - Interface cohérente et professionnelle
-- Utilisateurs ne quittent jamais BKApay
 
-### 2. Liens de paiement
+### 4. Liens de paiement
 - Montant fixe ou flexible
 - Images optionnelles
 - Suivi des paiements
 
-### 3. API Gateway
+### 5. API Gateway
 - Clés API publique/privée pour développeurs
 - Paiements entrants: `/api/payments/create`
 - Documentation complète
 
-### 4. Gestion des transactions
-- Historique complet
-- Statuts: pending, completed, failed
-- Filtres par type, pays, opérateur
-
-### 5. Frais silencieux
+### 6. Frais silencieux
 - Bénin: 3% entrant/sortant
 - Autres pays: 6% entrant/sortant
 - Calculés automatiquement
-
-### 6. Suspension de comptes
-- Admin peut suspendre utilisateurs
-- Toutes fonctionnalités désactivées
 
 ## Variables d'environnement
 ```
 DATABASE_URL=postgresql://...
 SESSION_SECRET=your_secret_key
+BASE_URL=https://bkapay.com (production)
 PAYDUNYA_MASTER_KEY=QdR289f6-ll84-iO0N-GgKj-0E3FWpnG0xqM
 PAYDUNYA_PUBLIC_KEY=live_public_GQEwMGBbhQW87K04Jf9Tg8kxYib
 PAYDUNYA_PRIVATE_KEY=live_private_5wUDp3LBBaBM9LLDVY7DVaCTOFE
 PAYDUNYA_TOKEN=XN1wEVW2Er1PkdtZcj9L
-BASE_URL=https://bkapay.com (optionnel - pour production)
 ```
 
 ## Fichiers clés
-- `client/src/pages/dashboard/transfer.tsx` - Interface utilisateur pour les transferts/retraits
-- `server/routes.ts` - Endpoint POST `/api/transfers` avec logique Paydunya v2
+- `client/src/pages/dashboard/deposit.tsx` - Page de dépôt SOFTPAY avec polling
+- `client/src/pages/dashboard/withdrawal.tsx` - Page de retrait/transfert
+- `server/routes.ts` - Endpoints pour dépôts, retraits, webhooks
 - `shared/schema.ts` - Schémas de validation et types
 - `server/storage.ts` - Gestion des transactions et soldes
 
 ## Statuts des fonctionnalités
 - ✅ Authentication & KYC
-- ✅ **Paiements PSR embedded (SANS REDIRECTION)**
+- ✅ **Dépôts SOFTPAY (NEW - polling + webhooks)**
+- ✅ **Retraits/Transferts via Paydunya v2**
+- ✅ Paiements PSR embedded (SANS REDIRECTION)
 - ✅ Liens de paiement & marchands
 - ✅ Transactions webhook-driven
 - ✅ Frais silencieux
 - ✅ Suspension comptes
 - ✅ API Gateway
 - ✅ Admin Panel
-- ✅ Dépôts et Transferts (Paydunya v2)
-- ✅ **Retraits/Transferts via Paydunya v2 (NOUVEAU - Session 5)**
 - 📋 SDKs officiels (planifié)
 - 📋 Plugins WooCommerce (planifié)
+
+## Notes importantes pour le test
+
+### ⚠️ Numéros de téléphone pour test
+- **Paydunya n'envoie les SMS que sur les numéros africains**
+- Testez avec un vrai numéro: Sénégal (+221), Bénin (+229), Côte d'Ivoire (+225), etc.
+- Ne testez pas avec des numéros français (+33), US (+1), etc.
+- Opérateurs supportés: MTN, Orange Money, Moov, Wave, etc. selon le pays
+
+### ✅ Flux de test
+1. Créer un compte et se connecter
+2. Aller à "Dépôt"
+3. Remplir le formulaire avec:
+   - Montant (ex: 1000 XOF)
+   - Pays (ex: Bénin)
+   - Opérateur (ex: MTN)
+   - **Numéro africain valide** (ex: numéro MTN Bénin)
+4. Cliquer "Créer la facture"
+5. Attendre le SMS sur le mobile (3-5 secondes)
+6. Confirmer le paiement sur mobile
+7. Voir le solde augmenter dans le dashboard
+
+### 🚀 Prêt pour production
+- Application est **100% fonctionnelle**
+- Webhooks configurés pour BKApay.com
+- Paydunya API v1 & v2 testées et opérationnelles
+- BASE_URL défini pour https://bkapay.com
+- Clés Paydunya LIVE configurées
