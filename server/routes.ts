@@ -837,8 +837,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (getInvoiceResponse.response_code !== "00") {
         await storage.updateTransactionStatus(transaction.id, "failed");
-        const errorMsg = getInvoiceResponse.response_text || "Erreur lors de la création de l'invoice";
-        return res.status(400).json({ error: errorMsg });
+        return res.status(400).json({ error: "Erreur de transaction" });
       }
 
       const disbursalToken = getInvoiceResponse.disburse_token;
@@ -870,12 +869,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       } else {
         await storage.updateTransactionStatus(transaction.id, "failed");
-        const errorMsg = submitResponse.response_text || "Erreur lors de la soumission du transfert";
-        res.status(400).json({ error: errorMsg });
+        res.status(400).json({ error: "Erreur de transaction" });
       }
     } catch (error: any) {
       console.error("Transfer error:", error);
-      res.status(500).json({ error: error.message || "Erreur lors du transfert" });
+      await storage.updateTransactionStatus(transaction.id, "failed").catch(() => {});
+      res.status(500).json({ error: "Erreur de transaction" });
     }
   });
 
