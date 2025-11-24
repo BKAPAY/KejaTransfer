@@ -12,11 +12,15 @@ BKApay est une plateforme moderne de paiement mobile money pour l'Afrique de l'O
   * Webhook crée la transaction avec le statut final directement depuis Paydunya
   * Soldes déduits immédiatement après Paydunya confirme
   * Pour dépôts/transferts: Résultats en temps réel
-- ✅ **NOUVEAU**: Vérification KYC obligatoire pour clés API
-  * Route POST `/api/api-keys` vérifie que `kycStatus === "verified"`
-  * Frontend désactive le bouton "Nouvelle clé API" si KYC non complété
-  * Message d'erreur clair: "Vous devez vérifier votre identité (KYC) avant de générer des clés API"
-  * Empêche développeurs de créer des clés sans passer la vérification d'identité
+- ✅ **NOUVEAU**: Vérification KYC obligatoire pour clés API et transferts
+  * **Clés API**: Route POST `/api/api-keys` vérifie que `kycStatus === "verified"`
+    - Frontend désactive le bouton "Nouvelle clé API" si KYC non complété
+    - Message d'erreur clair: "Vous devez vérifier votre identité (KYC) avant de générer des clés API"
+  * **Transferts**: Route POST `/api/transfers` vérifie que `kycStatus === "verified"`
+    - Utilisateur remplit son formulaire tranquillement
+    - Au clic "Effectuer le transfert", affiche notification toast si KYC incomplet
+    - Message clair: "Vous devez vérifier votre identité (KYC) avant de faire des transferts"
+  * Empêche utilisateurs et développeurs d'utiliser ces fonctionnalités sans passer la vérification d'identité
 - ✅ Frais silencieux par pays (3% Bénin, 6% autres) implémentés avec succès
 - ✅ Système de suspension de comptes (empêche toutes actions)
 - ✅ API Paydunya v2 pour retraits avec flux à 2 étapes

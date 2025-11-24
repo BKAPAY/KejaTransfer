@@ -116,26 +116,15 @@ export default function Transfer() {
       </div>
 
       {user && (
-        <>
-          <Alert className="py-2">
-            <AlertDescription className="text-xs">
-              <strong>Solde:</strong> {new Intl.NumberFormat("fr-FR", {
-                style: "currency",
-                currency: "XOF",
-                minimumFractionDigits: 0,
-              }).format(user.balance || 0)}
-            </AlertDescription>
-          </Alert>
-          
-          {user.kycStatus !== "verified" && (
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                Vous devez vérifier votre identité (KYC) avant de faire des transferts. Complétez la vérification dans vos paramètres.
-              </AlertDescription>
-            </Alert>
-          )}
-        </>
+        <Alert className="py-2">
+          <AlertDescription className="text-xs">
+            <strong>Solde:</strong> {new Intl.NumberFormat("fr-FR", {
+              style: "currency",
+              currency: "XOF",
+              minimumFractionDigits: 0,
+            }).format(user.balance || 0)}
+          </AlertDescription>
+        </Alert>
       )}
 
       <Card>
@@ -263,9 +252,8 @@ export default function Transfer() {
               <Button
                 type="submit"
                 className="w-full"
-                disabled={transferMutation.isPending || user?.kycStatus !== "verified"}
+                disabled={transferMutation.isPending}
                 data-testid="button-submit-transfer"
-                title={user?.kycStatus !== "verified" ? "Vous devez vérifier votre identité (KYC) avant de faire des transferts" : undefined}
               >
                 {transferMutation.isPending ? "En cours..." : "Effectuer le transfert"}
               </Button>
