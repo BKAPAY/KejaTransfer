@@ -601,7 +601,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ===== Payment Processing Routes =====
   
-  // Process payment link payment
+  // Process payment link payment - USSD VERSION
   app.post("/api/payments/process/:token", async (req: Request, res: Response) => {
     try {
       const { customerName, customerEmail, customerPhone, country, operator } = req.body;
@@ -618,9 +618,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (owner?.suspended) {
         return res.status(404).json({ error: "Ce lien n'existe pas ou a été supprimé" });
       }
-
-      // Calculate fees silently
-      const feeInfo = calculateIncomingFee(paymentLink.amount, country);
 
       // Call Paydunya API to create checkout invoice
       const paydunyaData = {
@@ -666,11 +663,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }),
         });
 
-        // Return for PSR (no redirectUrl)
+        // Return USSD code
         res.json({
           success: true,
           transactionId: transactionId,
-          paydunyaToken: paydunyaResponse.token,
+          ussdCode: `*${paydunyaResponse.token}#`,
         });
       } else {
         res.status(400).json({ 
@@ -683,7 +680,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Process merchant link payment
+  // Process merchant link payment - USSD VERSION
   app.post("/api/merchant-payments/process/:token", async (req: Request, res: Response) => {
     try {
       const { amount, customerName, customerEmail, customerPhone, country, operator } = req.body;
@@ -700,9 +697,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (owner?.suspended) {
         return res.status(404).json({ error: "Ce lien n'existe pas ou a été supprimé" });
       }
-
-      // Calculate fees silently
-      const feeInfo = calculateIncomingFee(amount, country);
 
       // Call Paydunya API
       const paydunyaData = {
@@ -750,11 +744,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }),
         });
 
-        // Return for PSR (no redirectUrl)
+        // Return USSD code
         res.json({
           success: true,
           transactionId: transactionId,
-          paydunyaToken: paydunyaResponse.token,
+          ussdCode: `*${paydunyaResponse.token}#`,
         });
       } else {
         res.status(400).json({ 

@@ -1,4 +1,4 @@
-import { useRoute, useLocation } from "wouter";
+import { useRoute } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,16 +10,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { apiRequest } from "@/lib/queryClient";
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { detectPhoneCountryAndOperator } from "@shared/phone-utils";
-
-declare global {
-  interface Window {
-    PayDunya: any;
-  }
-}
-
-declare const jQuery: any;
 
 const paymentSchema = z.object({
   customerName: z.string().min(2, "Le nom doit contenir au moins 2 caractères"),
@@ -32,32 +24,14 @@ type PaymentFormData = z.infer<typeof paymentSchema>;
 export default function Pay() {
   const [, params] = useRoute("/pay/:token");
   const token = params?.token;
-  const [, setLocation] = useLocation();
   const [isLoading, setIsLoading] = useState(false);
-  const psrLoadedRef = useRef(false);
   const [phoneError, setPhoneError] = useState("");
+  const [ussdCode, setUssdCode] = useState("");
 
   const { data: paymentLink, isLoading: linkLoading } = useQuery<PaymentLink>({
     queryKey: ["/api/payment-links/public", token],
     enabled: !!token,
   });
-
-  // Load PSR SDK
-  useEffect(() => {
-    if (!psrLoadedRef.current) {
-      const script = document.createElement("script");
-      script.src = "https://paydunya.com/assets/psr/js/psr.paydunya.min.js";
-      script.async = true;
-      document.body.appendChild(script);
-
-      const link = document.createElement("link");
-      link.rel = "stylesheet";
-      link.href = "https://paydunya.com/assets/psr/css/psr.paydunya.min.css";
-      document.head.appendChild(link);
-
-      psrLoadedRef.current = true;
-    }
-  }, []);
 
   const form = useForm<PaymentFormData>({
     resolver: zodResolver(paymentSchema),
@@ -68,7 +42,6 @@ export default function Pay() {
     },
   });
 
-  // Auto-detect country and operator when phone changes
   const handlePhoneChange = (e: any) => {
     const phone = e.target.value;
     form.setValue("customerPhone", phone);
@@ -85,7 +58,6 @@ export default function Pay() {
 
   const paymentMutation = useMutation({
     mutationFn: async (data: PaymentFormData) => {
-      // Auto-detect country and operator
       const detected = detectPhoneCountryAndOperator(data.customerPhone);
       if (!detected.isValid) {
         throw new Error("Impossible de détecter le pays/opérateur du numéro");
@@ -99,38 +71,8 @@ export default function Pay() {
       return res.json();
     },
     onSuccess: (data: any) => {
-      if (data?.transactionId && window.PayDunya) {
-        const btn = document.createElement("button");
-        btn.className = "pay";
-        btn.setAttribute("onclick", "payWithPaydunya(this)");
-        btn.setAttribute("data-ref", data.transactionId);
-        btn.setAttribute("data-fullname", form.getValues("customerName"));
-        btn.setAttribute("data-email", form.getValues("customerEmail"));
-        btn.setAttribute("data-phone", form.getValues("customerPhone"));
-        btn.style.display = "none";
-        document.body.appendChild(btn);
-
-        window.PayDunya.setup({
-          selector: jQuery(btn),
-          url: "/api/paydunya-api",
-          method: "GET",
-          displayMode: window.PayDunya.DISPLAY_IN_POPUP,
-          onSuccess: function (token: string) {
-            console.log("Payment token received:", token);
-          },
-          onTerminate: function (ref: string, token: string, status: string) {
-            console.log("Payment terminated - Ref:", ref, "Status:", status);
-            setLocation(`/status/${ref}`);
-          },
-          onError: function (error: any) {
-            console.error("Payment error:", error);
-            alert("Erreur lors du paiement: " + error.toString());
-            setIsLoading(false);
-          },
-          onClose: function () {
-            console.log("Payment modal closed");
-          },
-        }).requestToken();
+      if (data?.ussdCode) {
+        setUssdCode(data.ussdCode);
       }
     },
     onError: (error: any) => {
@@ -140,7 +82,6 @@ export default function Pay() {
   });
 
   const onSubmit = (data: PaymentFormData) => {
-    // Validate phone detection
     const detected = detectPhoneCountryAndOperator(data.customerPhone);
     if (!detected.isValid) {
       setPhoneError("Numéro invalide - impossible à détecter automatiquement");
@@ -186,6 +127,30 @@ export default function Pay() {
     );
   }
 
+  if (ussdCode) {
+    return (
+      <div className="w-full min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center p-4 overflow-hidden">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center space-y-2 p-4 sm:p-6">
+            <div className="flex justify-center mb-2">
+              <img src={logoImage} alt="BKApay" className="h-8 sm:h-10 w-auto" />
+            </div>
+            <CardTitle>Code USSD</CardTitle>
+            <CardDescription>Composez ce code sur votre téléphone pour payer</CardDescription>
+          </CardHeader>
+          <CardContent className="p-4 sm:p-6 text-center space-y-4">
+            <div className="bg-primary/10 p-6 rounded-lg">
+              <p className="text-3xl font-bold font-mono text-primary">{ussdCode}</p>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Composez le code ci-dessus sur votre téléphone pour finaliser le paiement
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center p-4 overflow-hidden">
       <Card className="w-full max-w-xs sm:max-w-sm md:max-w-lg">
@@ -193,22 +158,13 @@ export default function Pay() {
           <div className="flex justify-center mb-1 sm:mb-2">
             <img src={logoImage} alt="BKApay" className="h-8 sm:h-10 lg:h-12 w-auto" />
           </div>
-          {paymentLink.imageUrl && (
-            <div className="flex justify-center mb-2 sm:mb-3">
-              <img
-                src={paymentLink.imageUrl}
-                alt={paymentLink.productName}
-                className="max-h-24 sm:max-h-32 lg:max-h-48 w-auto rounded-md object-cover"
-              />
-            </div>
-          )}
           <div>
             <CardTitle className="text-sm sm:text-lg lg:text-2xl mb-1 sm:mb-2">{paymentLink.productName}</CardTitle>
             {paymentLink.description && (
-              <CardDescription className="text-xs sm:text-sm lg:text-base">{paymentLink.description}</CardDescription>
+              <CardDescription className="text-xs sm:text-sm">{paymentLink.description}</CardDescription>
             )}
           </div>
-          <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-primary">
+          <div className="text-lg sm:text-xl lg:text-2xl font-bold pt-2">
             {formatAmount(paymentLink.amount)}
           </div>
         </CardHeader>
@@ -275,7 +231,7 @@ export default function Pay() {
                 disabled={isLoading || paymentMutation.isPending}
                 data-testid="button-pay"
               >
-                {isLoading || paymentMutation.isPending ? "Traitement..." : "Procéder au paiement"}
+                {isLoading || paymentMutation.isPending ? "Traitement..." : "Obtenir le code USSD"}
               </Button>
             </form>
           </Form>
