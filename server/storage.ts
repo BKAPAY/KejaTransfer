@@ -30,6 +30,7 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUserBalance(id: string, amount: number): Promise<User | undefined>;
+  updateUserPassword(id: string, hashedPassword: string): Promise<User | undefined>;
   submitKyc(userId: string, kycData: { kycIdFront: string; kycIdBack: string; kycSelfie: string }): Promise<User | undefined>;
   approveKyc(userId: string): Promise<User | undefined>;
   rejectKyc(userId: string, reason?: string): Promise<User | undefined>;
@@ -99,6 +100,15 @@ export class DbStorage implements IStorage {
     const results = await db
       .update(schema.users)
       .set({ balance: newBalance })
+      .where(eq(schema.users.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async updateUserPassword(id: string, hashedPassword: string): Promise<User | undefined> {
+    const results = await db
+      .update(schema.users)
+      .set({ password: hashedPassword })
       .where(eq(schema.users.id, id))
       .returning();
     return results[0];

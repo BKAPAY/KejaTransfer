@@ -4,11 +4,14 @@ import { useQuery } from "@tanstack/react-query";
 import type { User } from "@shared/schema";
 import { Skeleton } from "@/components/ui/skeleton";
 import { User as UserIcon, Mail, Calendar, Lock } from "lucide-react";
+import { useState } from "react";
+import { ChangePasswordDialog } from "@/components/change-password-dialog";
 
 export default function Profile() {
   const { data: user, isLoading } = useQuery<User>({
     queryKey: ["/api/auth/me"],
   });
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
 
   return (
     <div className="space-y-4">
@@ -87,6 +90,7 @@ export default function Profile() {
                   variant="outline" 
                   size="sm"
                   className="w-full"
+                  onClick={() => setChangePasswordOpen(true)}
                   data-testid="button-change-password"
                 >
                   <Lock className="w-4 h-4 mr-2" />
@@ -97,6 +101,11 @@ export default function Profile() {
           ) : null}
         </CardContent>
       </Card>
+
+      <ChangePasswordDialog 
+        open={changePasswordOpen} 
+        onOpenChange={setChangePasswordOpen} 
+      />
     </div>
   );
 }

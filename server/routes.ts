@@ -243,6 +243,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Change password
+  app.post("/api/auth/change-password", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { currentPassword, newPassword, confirmPassword } = req.body;
+
+      // Validate inputs
+      if (!currentPassword || !newPassword || !confirmPassword) {
+        return res.status(400).json({ error: "Tous les champs sont requis" });
+      }
+
+      if (newPassword !== confirmPassword) {
+        return res.status(400).json({ error: "Les nouveaux mots de passe ne correspondent pas" });
+      }
+
+      if (newPassword.length < 8) {
+        return res.status(400).json({ error: "Le nouveau mot de passe doit contenir au moins 8 caractères" });
+      }
+
+      // Get user
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) {
+        return res.status(404).json({ error: "Utilisateur non trouvé" });
+      }
+
+      // Verify current password
+      const validPassword = await bcrypt.compare(currentPassword, user.password);
+      if (!validPassword) {
+        return res.status(401).json({ error: "Le mot de passe actuel est incorrect" });
+      }
+
+      // Hash new password
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+      // Update password in storage
+      await storage.updateUserPassword(req.session.userId!, hashedPassword);
+
+      res.json({ success: true, message: "Mot de passe modifié avec succès" });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || "Erreur lors de la modification du mot de passe" });
+    }
+  });
+
   // KYC Submit
   app.post("/api/kyc/submit", requireAuth, async (req: Request, res: Response) => {
     try {
