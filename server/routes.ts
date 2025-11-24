@@ -276,6 +276,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!link) {
         return res.status(404).json({ error: "Lien non trouvé" });
       }
+
+      // Check if owner account is suspended
+      const owner = await storage.getUser(link.userId);
+      if (owner?.suspended) {
+        return res.status(404).json({ error: "Lien non trouvé" });
+      }
+
       res.json(link);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -344,6 +351,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!link) {
         return res.status(404).json({ error: "Lien non trouvé" });
       }
+
+      // Check if owner account is suspended
+      const owner = await storage.getUser(link.userId);
+      if (owner?.suspended) {
+        return res.status(404).json({ error: "Lien non trouvé" });
+      }
+
       res.json(link);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -457,7 +471,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check if user account is suspended
       const owner = await storage.getUser(paymentLink.userId);
       if (owner?.suspended) {
-        return res.status(403).json({ error: "Ce lien de paiement n'est plus actif" });
+        return res.status(404).json({ error: "Ce lien n'existe pas ou a été supprimé" });
       }
 
       // Create transaction record
@@ -538,7 +552,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check if user account is suspended
       const owner = await storage.getUser(merchantLink.userId);
       if (owner?.suspended) {
-        return res.status(403).json({ error: "Ce lien marchand n'est plus actif" });
+        return res.status(404).json({ error: "Ce lien n'existe pas ou a été supprimé" });
       }
 
       // Create transaction record
@@ -808,7 +822,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check if user account is suspended
       const apiOwner = await storage.getUser(apiKey.userId);
       if (apiOwner?.suspended) {
-        return res.status(403).json({ error: "Ce compte a été suspendu. Veuillez contacter le support." });
+        return res.status(401).json({ error: "Clé API invalide ou inactive" });
       }
 
       // Create transaction record for the API key owner
