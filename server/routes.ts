@@ -832,28 +832,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
         callback_url: callbackUrl,
       };
 
-      const paydunyaResponse = await callPaydunyaAPIv2("/disburse/get-invoice", paydunyaData);
+      // Step 1: Get disbursement invoice
+      const getInvoiceResponse = await callPaydunyaAPIv2("/disburse/get-invoice", paydunyaData);
 
-      if (paydunyaResponse.status === "success" || paydunyaResponse.response_code === "00") {
-        const disbursalToken = paydunyaResponse.token;
+      if (getInvoiceResponse.response_code !== "00") {
+        await storage.updateTransactionStatus(transaction.id, "failed");
+        const errorMsg = getInvoiceResponse.response_text || "Erreur lors de la création de l'invoice";
+        return res.status(400).json({ error: errorMsg });
+      }
 
-        // Update balance (deduct amount + fees) immediately
+      const disbursalToken = getInvoiceResponse.disburse_token;
+
+      // Step 2: Submit disbursement invoice
+      const submitData = {
+        disburse_invoice: disbursalToken,
+        disburse_id: transaction.id, // Our transaction ID for tracking
+      };
+
+      const submitResponse = await callPaydunyaAPIv2("/disburse/submit-invoice", submitData);
+
+      if (submitResponse.response_code === "00") {
+        // Update balance (deduct amount + fees) after successful submission
         await storage.updateUserBalance(req.session.userId!, -feeInfo.totalDeductedFromBalance);
         
-        // Update transaction as pending (will be updated via webhook)
-        await storage.updateTransactionStatus(transaction.id, "pending", {
+        // Update transaction with status from Paydunya
+        const txStatus = submitResponse.status || "pending";
+        await storage.updateTransactionStatus(transaction.id, txStatus, {
           paydunyaToken: disbursalToken,
+          paydunyaTransactionId: submitResponse.transaction_id,
         });
 
         res.json({
           success: true,
-          message: "Transfert initialisé avec succès",
+          message: "Transfert effectué avec succès",
           transactionId: transaction.id,
           totalDeducted: feeInfo.totalDeductedFromBalance,
         });
       } else {
         await storage.updateTransactionStatus(transaction.id, "failed");
-        const errorMsg = paydunyaResponse.error || paydunyaResponse.response_text || "Erreur lors de l'initiation du transfert";
+        const errorMsg = submitResponse.response_text || "Erreur lors de la soumission du transfert";
         res.status(400).json({ error: errorMsg });
       }
     } catch (error: any) {
