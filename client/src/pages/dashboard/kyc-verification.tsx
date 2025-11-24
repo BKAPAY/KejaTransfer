@@ -69,17 +69,38 @@ export default function KycVerificationPage() {
     const element = document.createElement("div");
     element.innerHTML = `
       <div style="font-family: Arial, sans-serif; padding: 20px;">
-        <h1>Vérification KYC</h1>
-        <p><strong>Utilisateur:</strong> ${user.firstName} ${user.lastName}</p>
-        <p><strong>Email:</strong> ${user.email}</p>
-        <p><strong>Statut:</strong> ${user.kycStatus}</p>
-        <p><strong>Date de soumission:</strong> ${new Date(user.createdAt).toLocaleDateString("fr-FR")}</p>
-        ${user.kycRejectionReason ? `<p><strong>Raison de rejet:</strong> ${user.kycRejectionReason}</p>` : ""}
-        <br/>
-        <h2>Documents</h2>
-        ${user.kycIdFront ? `<p><strong>Pièce d'identité (Recto):</strong> Fournie</p>` : ""}
-        ${user.kycIdBack ? `<p><strong>Pièce d'identité (Verso):</strong> Fournie</p>` : ""}
-        ${user.kycSelfie ? `<p><strong>Selfie:</strong> Fourni</p>` : ""}
+        <h1 style="font-size: 24px; margin-bottom: 20px; border-bottom: 2px solid #228B22; padding-bottom: 10px;">Vérification KYC</h1>
+        
+        <div style="margin-bottom: 20px;">
+          <p style="margin: 5px 0;"><strong>Utilisateur:</strong> ${user.firstName} ${user.lastName}</p>
+          <p style="margin: 5px 0;"><strong>Email:</strong> ${user.email}</p>
+          <p style="margin: 5px 0;"><strong>Statut:</strong> ${user.kycStatus}</p>
+          <p style="margin: 5px 0;"><strong>Date de soumission:</strong> ${new Date(user.createdAt).toLocaleDateString("fr-FR")}</p>
+          ${user.kycRejectionReason ? `<p style="margin: 5px 0; color: #d32f2f;"><strong>Raison de rejet:</strong> ${user.kycRejectionReason}</p>` : ""}
+        </div>
+        
+        <h2 style="font-size: 18px; margin-top: 30px; margin-bottom: 15px; border-bottom: 1px solid #ddd; padding-bottom: 5px;">Documents fournis</h2>
+        
+        ${user.kycIdFront ? `
+          <div style="margin-bottom: 25px; page-break-inside: avoid;">
+            <p style="font-weight: bold; margin-bottom: 8px;">Pièce d'identité (Recto)</p>
+            <img src="${user.kycIdFront}" style="max-width: 100%; height: auto; border: 1px solid #ddd; border-radius: 4px;" />
+          </div>
+        ` : ""}
+        
+        ${user.kycIdBack ? `
+          <div style="margin-bottom: 25px; page-break-inside: avoid;">
+            <p style="font-weight: bold; margin-bottom: 8px;">Pièce d'identité (Verso)</p>
+            <img src="${user.kycIdBack}" style="max-width: 100%; height: auto; border: 1px solid #ddd; border-radius: 4px;" />
+          </div>
+        ` : ""}
+        
+        ${user.kycSelfie ? `
+          <div style="margin-bottom: 25px; page-break-inside: avoid;">
+            <p style="font-weight: bold; margin-bottom: 8px;">Selfie</p>
+            <img src="${user.kycSelfie}" style="max-width: 100%; height: auto; border: 1px solid #ddd; border-radius: 4px;" />
+          </div>
+        ` : ""}
       </div>
     `;
     
@@ -87,7 +108,7 @@ export default function KycVerificationPage() {
       margin: 10,
       filename: `KYC_${user.email}_${new Date().getTime()}.pdf`,
       image: { type: "png" as const, quality: 0.98 },
-      html2canvas: { scale: 2 },
+      html2canvas: { scale: 2, useCORS: true, allowTaint: true },
       jsPDF: { orientation: "portrait" as const, unit: "mm", format: "a4" },
     };
     html2pdf().set(options).from(element).save();
