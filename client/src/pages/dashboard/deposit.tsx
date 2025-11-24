@@ -55,9 +55,11 @@ export default function Deposit() {
   const amount = form.watch("amount");
   
   // Filter operators based on admin configuration
-  const allCountryOperators =
-    OPERATORS[(selectedCountry as keyof typeof OPERATORS) || ("BJ" as const)] || [];
-  const countryOperators = enabledCountriesOperators 
+  const allCountryOperators = selectedCountry
+    ? (OPERATORS[selectedCountry as keyof typeof OPERATORS] || [])
+    : [];
+  
+  const countryOperators = enabledCountriesOperators && selectedCountry
     ? allCountryOperators.filter(op => (enabledCountriesOperators[selectedCountry] || []).includes(op.code))
     : allCountryOperators;
 
@@ -67,10 +69,11 @@ export default function Deposit() {
   // Create payment mutation
   const createPaymentMutation = useMutation({
     mutationFn: async (data: DepositFormData) => {
-      return await apiRequest("POST", "/api/softpay/create-payment", {
+      const res = await apiRequest("POST", "/api/softpay/create-payment", {
         ...data,
         description: `Dépôt de ${data.amount} XOF`,
       });
+      return res.json();
     },
     onSuccess: (response: any) => {
       setInvoiceToken(response.token);
@@ -239,20 +242,26 @@ export default function Deposit() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Opérateur</FormLabel>
-                      <Select value={field.value} onValueChange={field.onChange} disabled={paymentInProgress}>
-                        <FormControl>
-                          <SelectTrigger data-testid="select-operator">
-                            <SelectValue placeholder="Sélectionnez un opérateur" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {countryOperators.map((op) => (
-                            <SelectItem key={op.code} value={op.code}>
-                              {op.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      {countryOperators.length === 0 ? (
+                        <div className="text-sm text-muted-foreground p-3 bg-muted rounded-md">
+                          Aucun opérateur disponible pour ce pays. Contactez l'administrateur.
+                        </div>
+                      ) : (
+                        <Select value={field.value} onValueChange={field.onChange} disabled={paymentInProgress}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-operator">
+                              <SelectValue placeholder="Sélectionnez un opérateur" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {countryOperators.map((op) => (
+                              <SelectItem key={op.code} value={op.code}>
+                                {op.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
                       <FormMessage />
                     </FormItem>
                   )}
