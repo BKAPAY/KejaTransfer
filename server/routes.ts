@@ -9,6 +9,14 @@ import { z } from "zod";
 import { insertUserSchema, insertPaymentLinkSchema, insertMerchantLinkSchema, insertApiKeySchema } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { calculateIncomingFee, calculateOutgoingFee } from "./utils/fees";
+import { 
+  SOFTPAY_OPERATORS, 
+  getOperatorKey, 
+  requiresOTP, 
+  requiresTwoStep, 
+  getUSSDInstruction,
+  type SoftpayPaymentData 
+} from "./paydunya-softpay";
 
 declare module "express-session" {
   interface SessionData {
@@ -141,6 +149,51 @@ async function callPaydunyaAPIv2(endpoint: string, data: any) {
     }
   } catch (error) {
     console.error(`[Paydunya APIv2 Error] ${endpoint}:`, error);
+    throw error;
+  }
+}
+
+// Helper function to call Paydunya SOFTPAY API (operator-specific OTP endpoints)
+async function callPaydunyaSoftpay(
+  operator: string,
+  country: string,
+  paymentData: SoftpayPaymentData
+): Promise<{ success: boolean; message: string; data?: any; fees?: number; currency?: string; url?: string }> {
+  try {
+    // Get operator configuration key
+    const operatorKey = getOperatorKey(operator, country);
+    if (!operatorKey) {
+      throw new Error(`Opérateur non supporté: ${operator} pour ${country}`);
+    }
+
+    const config = SOFTPAY_OPERATORS[operatorKey];
+    if (!config) {
+      throw new Error(`Configuration SOFTPAY introuvable pour: ${operatorKey}`);
+    }
+
+    // Build request parameters using operator-specific mapping
+    const requestData = config.parameterMapping(paymentData);
+
+    console.log(`[SOFTPAY] Calling ${config.endpoint} for ${operatorKey}`, requestData);
+
+    // Call the operator-specific SOFTPAY endpoint
+    const response = await fetch(`${PAYDUNYA_CONFIG.apiUrl}${config.endpoint}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "PAYDUNYA-MASTER-KEY": PAYDUNYA_CONFIG.masterKey,
+        "PAYDUNYA-PRIVATE-KEY": PAYDUNYA_CONFIG.privateKey,
+        "PAYDUNYA-TOKEN": PAYDUNYA_CONFIG.token,
+      },
+      body: JSON.stringify(requestData),
+    });
+
+    const result = await response.json();
+    console.log(`[SOFTPAY] ${config.endpoint} - Status: ${response.status}`, result);
+
+    return result;
+  } catch (error) {
+    console.error(`[SOFTPAY Error] ${operator}-${country}:`, error);
     throw error;
   }
 }
@@ -890,23 +943,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ===== SOFTPAY Routes (No Redirect - Using existing v1 API) =====
+  // ===== SOFTPAY Routes (OTP-Based Operator-Specific Endpoints) =====
   
-  // Create SOFTPAY Payment - Using v1 API (existing endpoint that works)
-  app.post("/api/softpay/create-payment", requireAuth, async (req: Request, res: Response) => {
+  // Step 1: Initialize SOFTPAY Payment - Create invoice and return token + USSD instructions
+  app.post("/api/softpay/init-payment", requireAuth, async (req: Request, res: Response) => {
     try {
       const user = await storage.getUser(req.session.userId!);
       if (user?.suspended) {
         return res.status(403).json({ error: "Votre compte a été suspendu. Veuillez contacter le support." });
       }
 
-      const { amount, description, country, operator, phone } = req.body;
+      const { amount, description, country, operator, phone, customerName, customerEmail } = req.body;
 
       if (!amount || amount <= 0) {
         return res.status(400).json({ error: "Montant invalide" });
       }
 
-      // Create SOFTPAY invoice using existing v1 API (which works)
+      if (!country || !operator || !phone) {
+        return res.status(400).json({ error: "Pays, opérateur et numéro de téléphone requis" });
+      }
+
+      // Create Paydunya invoice to get token
       const paydunyaData = {
         invoice: {
           total_amount: Math.floor(amount),
@@ -927,7 +984,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
       };
 
-      console.log("[SOFTPAY] Creating invoice with data:", paydunyaData);
+      console.log("[SOFTPAY INIT] Creating invoice:", paydunyaData);
 
       const paydunyaResponse = await callPaydunyaAPI("/checkout-invoice/create", paydunyaData);
 
@@ -937,40 +994,402 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const feeInfo = calculateIncomingFee(grossAmount, country);
         
         // Create transaction with GROSS amount (what client pays)
-        // Balance will be credited with NET amount when webhook confirms
         const transactionId = randomUUID();
         await storage.createTransaction({
           userId: req.session.userId!,
           type: "deposit",
-          amount: feeInfo.grossAmount, // Store GROSS amount (e.g., 2000)
-          fee: feeInfo.feeAmount, // Store fee (e.g., 60)
-          feePercentage: feeInfo.feePercentage, // Store percentage (30 or 60)
+          amount: feeInfo.grossAmount,
+          fee: feeInfo.feeAmount,
+          feePercentage: feeInfo.feePercentage,
           currency: "XOF",
           status: "pending",
           country,
           operator,
           description: description || `Dépôt de ${grossAmount} XOF`,
-          paydunyaToken: paydunyaResponse.token, // Store in dedicated column
+          paydunyaToken: paydunyaResponse.token,
           metadata: JSON.stringify({
             phone,
-            softpay: true,
+            customerName: customerName || `${user!.firstName} ${user!.lastName}`,
+            customerEmail: customerEmail || user!.email,
           }),
         });
+
+        // Get operator configuration for USSD instructions
+        const operatorKey = getOperatorKey(operator, country);
+        const ussdInstruction = operatorKey ? getUSSDInstruction(operatorKey) : null;
+        const needsOTP = operatorKey ? requiresOTP(operatorKey) : false;
+        const twoStep = operatorKey ? requiresTwoStep(operatorKey) : false;
 
         res.json({
           success: true,
           transactionId,
           token: paydunyaResponse.token,
+          ussdInstruction,
+          requiresOTP: needsOTP,
+          requiresTwoStep: twoStep,
         });
       } else {
-        console.error("[SOFTPAY] Error response:", paydunyaResponse);
+        console.error("[SOFTPAY INIT] Error response:", paydunyaResponse);
         res.status(400).json({
           error: "Erreur lors de la création de la facture",
         });
       }
     } catch (error: any) {
-      console.error("[SOFTPAY] Create payment error:", error);
-      res.status(500).json({ error: "Erreur lors du paiement SOFTPAY" });
+      console.error("[SOFTPAY INIT] Error:", error);
+      res.status(500).json({ error: "Erreur lors de l'initialisation du paiement" });
+    }
+  });
+
+  // Step 2: Confirm SOFTPAY Payment - Call operator-specific endpoint with OTP
+  app.post("/api/softpay/confirm-payment", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (user?.suspended) {
+        return res.status(403).json({ error: "Votre compte a été suspendu. Veuillez contacter le support." });
+      }
+
+      const { token, authorizationCode, country, operator, phone, customerName, customerEmail } = req.body;
+
+      if (!token || !country || !operator || !phone) {
+        return res.status(400).json({ error: "Informations de paiement incomplètes" });
+      }
+
+      // Get transaction by token
+      const transaction = await storage.getTransactionByPaydunyaToken(token);
+      if (!transaction) {
+        return res.status(404).json({ error: "Transaction non trouvée" });
+      }
+
+      // Parse metadata to get customer info
+      let metadata: any = {};
+      if (transaction.metadata) {
+        metadata = JSON.parse(transaction.metadata);
+      }
+
+      // Build payment data for SOFTPAY call
+      const paymentData: SoftpayPaymentData = {
+        customerName: customerName || metadata.customerName || `${user!.firstName} ${user!.lastName}`,
+        customerEmail: customerEmail || metadata.customerEmail || user!.email,
+        phoneNumber: phone,
+        invoiceToken: token,
+        authorizationCode,
+      };
+
+      console.log("[SOFTPAY CONFIRM] Calling SOFTPAY endpoint for:", operator, country);
+
+      // Call operator-specific SOFTPAY endpoint
+      const softpayResult = await callPaydunyaSoftpay(operator, country, paymentData);
+
+      if (softpayResult.success) {
+        // Payment initiated successfully - webhook will confirm
+        res.json({
+          success: true,
+          message: softpayResult.message,
+          transactionId: transaction.id,
+          fees: softpayResult.fees,
+          currency: softpayResult.currency,
+          redirectUrl: softpayResult.url, // For Wave operators
+        });
+      } else {
+        res.status(400).json({
+          error: softpayResult.message || "Erreur lors du paiement",
+        });
+      }
+    } catch (error: any) {
+      console.error("[SOFTPAY CONFIRM] Error:", error);
+      res.status(500).json({ error: "Erreur lors de la confirmation du paiement" });
+    }
+  });
+
+  // SOFTPAY for Payment Links - Initialize payment
+  app.post("/api/payments/softpay-init/:token", async (req: Request, res: Response) => {
+    try {
+      const { customerName, customerEmail, customerPhone, country, operator } = req.body;
+      const { token } = req.params;
+
+      if (!country || !operator || !customerPhone) {
+        return res.status(400).json({ error: "Pays, opérateur et numéro de téléphone requis" });
+      }
+
+      // Get payment link
+      const paymentLink = await storage.getPaymentLinkByToken(token);
+      if (!paymentLink || !paymentLink.isActive) {
+        return res.status(404).json({ error: "Lien de paiement non trouvé ou inactif" });
+      }
+
+      // Check if user account is suspended
+      const owner = await storage.getUser(paymentLink.userId);
+      if (owner?.suspended) {
+        return res.status(404).json({ error: "Ce lien n'existe pas ou a été supprimé" });
+      }
+
+      // Create Paydunya invoice
+      const paydunyaData = {
+        invoice: {
+          total_amount: paymentLink.amount,
+          description: `Paiement - ${paymentLink.productName}`,
+        },
+        store: {
+          name: "BKApay",
+        },
+        custom_data: {
+          type: "payment_link",
+          user_id: paymentLink.userId,
+          customer_name: customerName,
+          customer_email: customerEmail,
+          customer_phone: customerPhone,
+          country,
+          operator,
+        },
+        actions: {
+          callback_url: `${process.env.BASE_URL || 'http://localhost:5000'}/api/webhooks/paydunya`,
+        },
+      };
+
+      const paydunyaResponse = await callPaydunyaAPI("/checkout-invoice/create", paydunyaData);
+
+      if (paydunyaResponse.response_code === "00" && paydunyaResponse.token) {
+        // Calculate fees for INCOMING payment
+        const grossAmount = paymentLink.amount;
+        const feeInfo = calculateIncomingFee(grossAmount, country);
+        
+        // Create transaction
+        const transactionId = randomUUID();
+        await storage.createTransaction({
+          userId: paymentLink.userId,
+          type: "payment_link",
+          amount: feeInfo.grossAmount,
+          fee: feeInfo.feeAmount,
+          feePercentage: feeInfo.feePercentage,
+          currency: "XOF",
+          status: "pending",
+          country,
+          operator,
+          description: `Paiement - ${paymentLink.productName}`,
+          customerName,
+          customerEmail,
+          customerPhone,
+          paydunyaToken: paydunyaResponse.token,
+          metadata: JSON.stringify({
+            paymentLinkId: paymentLink.id,
+          }),
+        });
+
+        // Get operator configuration for USSD instructions
+        const operatorKey = getOperatorKey(operator, country);
+        const ussdInstruction = operatorKey ? getUSSDInstruction(operatorKey) : null;
+        const needsOTP = operatorKey ? requiresOTP(operatorKey) : false;
+        const twoStep = operatorKey ? requiresTwoStep(operatorKey) : false;
+
+        res.json({
+          success: true,
+          transactionId,
+          token: paydunyaResponse.token,
+          ussdInstruction,
+          requiresOTP: needsOTP,
+          requiresTwoStep: twoStep,
+        });
+      } else {
+        res.status(400).json({ error: "Erreur lors de la création de la facture" });
+      }
+    } catch (error: any) {
+      console.error("[PAYMENT_LINK SOFTPAY INIT] Error:", error);
+      res.status(500).json({ error: "Erreur lors de l'initialisation du paiement" });
+    }
+  });
+
+  // SOFTPAY for Payment Links - Confirm payment with OTP
+  app.post("/api/payments/softpay-confirm", async (req: Request, res: Response) => {
+    try {
+      const { token, authorizationCode, country, operator, customerPhone, customerName, customerEmail } = req.body;
+
+      if (!token || !country || !operator || !customerPhone) {
+        return res.status(400).json({ error: "Informations de paiement incomplètes" });
+      }
+
+      // Get transaction by token
+      const transaction = await storage.getTransactionByPaydunyaToken(token);
+      if (!transaction) {
+        return res.status(404).json({ error: "Transaction non trouvée" });
+      }
+
+      // Build payment data for SOFTPAY call
+      const paymentData: SoftpayPaymentData = {
+        customerName: customerName || transaction.customerName || "Client",
+        customerEmail: customerEmail || transaction.customerEmail || "",
+        phoneNumber: customerPhone,
+        invoiceToken: token,
+        authorizationCode,
+      };
+
+      // Call operator-specific SOFTPAY endpoint
+      const softpayResult = await callPaydunyaSoftpay(operator, country, paymentData);
+
+      if (softpayResult.success) {
+        res.json({
+          success: true,
+          message: softpayResult.message,
+          transactionId: transaction.id,
+          fees: softpayResult.fees,
+          currency: softpayResult.currency,
+          redirectUrl: softpayResult.url,
+        });
+      } else {
+        res.status(400).json({
+          error: softpayResult.message || "Erreur lors du paiement",
+        });
+      }
+    } catch (error: any) {
+      console.error("[PAYMENT_LINK SOFTPAY CONFIRM] Error:", error);
+      res.status(500).json({ error: "Erreur lors de la confirmation du paiement" });
+    }
+  });
+
+  // SOFTPAY for Merchant Links - Initialize payment
+  app.post("/api/merchant-links/softpay-init/:token", async (req: Request, res: Response) => {
+    try {
+      const { amount, customerName, customerEmail, customerPhone, country, operator } = req.body;
+      const { token } = req.params;
+
+      if (!amount || amount <= 0) {
+        return res.status(400).json({ error: "Montant invalide" });
+      }
+
+      if (!country || !operator || !customerPhone) {
+        return res.status(400).json({ error: "Pays, opérateur et numéro de téléphone requis" });
+      }
+
+      // Get merchant link
+      const merchantLink = await storage.getMerchantLinkByToken(token);
+      if (!merchantLink) {
+        return res.status(404).json({ error: "Lien marchand non trouvé" });
+      }
+
+      // Check if user account is suspended
+      const owner = await storage.getUser(merchantLink.userId);
+      if (owner?.suspended) {
+        return res.status(404).json({ error: "Ce lien n'existe pas" });
+      }
+
+      // Create Paydunya invoice
+      const paydunyaData = {
+        invoice: {
+          total_amount: Math.floor(amount),
+          description: `Paiement marchand - ${merchantLink.merchantName}`,
+        },
+        store: {
+          name: "BKApay",
+        },
+        custom_data: {
+          type: "merchant_link",
+          user_id: merchantLink.userId,
+          customer_name: customerName,
+          customer_email: customerEmail,
+          customer_phone: customerPhone,
+          country,
+          operator,
+        },
+        actions: {
+          callback_url: `${process.env.BASE_URL || 'http://localhost:5000'}/api/webhooks/paydunya`,
+        },
+      };
+
+      const paydunyaResponse = await callPaydunyaAPI("/checkout-invoice/create", paydunyaData);
+
+      if (paydunyaResponse.response_code === "00" && paydunyaResponse.token) {
+        // Calculate fees for INCOMING payment
+        const grossAmount = Math.floor(amount);
+        const feeInfo = calculateIncomingFee(grossAmount, country);
+        
+        // Create transaction
+        const transactionId = randomUUID();
+        await storage.createTransaction({
+          userId: merchantLink.userId,
+          type: "merchant_link",
+          amount: feeInfo.grossAmount,
+          fee: feeInfo.feeAmount,
+          feePercentage: feeInfo.feePercentage,
+          currency: "XOF",
+          status: "pending",
+          country,
+          operator,
+          description: `Paiement marchand - ${merchantLink.merchantName}`,
+          customerName,
+          customerEmail,
+          customerPhone,
+          paydunyaToken: paydunyaResponse.token,
+          metadata: JSON.stringify({
+            merchantLinkId: merchantLink.id,
+          }),
+        });
+
+        // Get operator configuration
+        const operatorKey = getOperatorKey(operator, country);
+        const ussdInstruction = operatorKey ? getUSSDInstruction(operatorKey) : null;
+        const needsOTP = operatorKey ? requiresOTP(operatorKey) : false;
+        const twoStep = operatorKey ? requiresTwoStep(operatorKey) : false;
+
+        res.json({
+          success: true,
+          transactionId,
+          token: paydunyaResponse.token,
+          ussdInstruction,
+          requiresOTP: needsOTP,
+          requiresTwoStep: twoStep,
+        });
+      } else {
+        res.status(400).json({ error: "Erreur lors de la création de la facture" });
+      }
+    } catch (error: any) {
+      console.error("[MERCHANT_LINK SOFTPAY INIT] Error:", error);
+      res.status(500).json({ error: "Erreur lors de l'initialisation du paiement" });
+    }
+  });
+
+  // SOFTPAY for Merchant Links - Confirm payment
+  app.post("/api/merchant-links/softpay-confirm", async (req: Request, res: Response) => {
+    try {
+      const { token, authorizationCode, country, operator, customerPhone, customerName, customerEmail } = req.body;
+
+      if (!token || !country || !operator || !customerPhone) {
+        return res.status(400).json({ error: "Informations de paiement incomplètes" });
+      }
+
+      // Get transaction by token
+      const transaction = await storage.getTransactionByPaydunyaToken(token);
+      if (!transaction) {
+        return res.status(404).json({ error: "Transaction non trouvée" });
+      }
+
+      // Build payment data for SOFTPAY call
+      const paymentData: SoftpayPaymentData = {
+        customerName: customerName || transaction.customerName || "Client",
+        customerEmail: customerEmail || transaction.customerEmail || "",
+        phoneNumber: customerPhone,
+        invoiceToken: token,
+        authorizationCode,
+      };
+
+      // Call operator-specific SOFTPAY endpoint
+      const softpayResult = await callPaydunyaSoftpay(operator, country, paymentData);
+
+      if (softpayResult.success) {
+        res.json({
+          success: true,
+          message: softpayResult.message,
+          transactionId: transaction.id,
+          fees: softpayResult.fees,
+          currency: softpayResult.currency,
+          redirectUrl: softpayResult.url,
+        });
+      } else {
+        res.status(400).json({
+          error: softpayResult.message || "Erreur lors du paiement",
+        });
+      }
+    } catch (error: any) {
+      console.error("[MERCHANT_LINK SOFTPAY CONFIRM] Error:", error);
+      res.status(500).json({ error: "Erreur lors de la confirmation du paiement" });
     }
   });
 
@@ -1323,11 +1742,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }),
         });
         
+        // Get operator configuration for USSD instructions
+        const operatorKey = getOperatorKey(operator || "wave", paymentCountry);
+        const ussdInstruction = operatorKey ? getUSSDInstruction(operatorKey) : null;
+        const needsOTP = operatorKey ? requiresOTP(operatorKey) : false;
+        const twoStep = operatorKey ? requiresTwoStep(operatorKey) : false;
+
         res.json({
           success: true,
           transactionId,
+          token: paydunyaResponse.token,
           redirectUrl: paydunyaResponse.response_text,
-          paydunyaToken: paydunyaResponse.token,
+          ussdInstruction,
+          requiresOTP: needsOTP,
+          requiresTwoStep: twoStep,
         });
       } else {
         res.status(400).json({ 
@@ -1337,6 +1765,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("API payment processing error:", error);
       res.status(500).json({ error: "Erreur lors du traitement du paiement" });
+    }
+  });
+
+  // SOFTPAY for API Gateway - Confirm payment with OTP
+  app.post("/api/payments/confirm-softpay", async (req: Request, res: Response) => {
+    try {
+      const { publicKey, token, authorizationCode, country, operator, customerPhone, customerName, customerEmail } = req.body;
+
+      if (!publicKey) {
+        return res.status(400).json({ error: "Clé API publique requise" });
+      }
+
+      if (!token || !country || !operator || !customerPhone) {
+        return res.status(400).json({ error: "Informations de paiement incomplètes" });
+      }
+
+      // Validate API key
+      const apiKey = await storage.getApiKeyByPublicKey(publicKey);
+      if (!apiKey || !apiKey.isActive) {
+        return res.status(401).json({ error: "Clé API invalide ou inactive" });
+      }
+
+      // Get transaction by token
+      const transaction = await storage.getTransactionByPaydunyaToken(token);
+      if (!transaction) {
+        return res.status(404).json({ error: "Transaction non trouvée" });
+      }
+
+      // Verify transaction belongs to API key owner
+      if (transaction.userId !== apiKey.userId) {
+        return res.status(403).json({ error: "Transaction non autorisée" });
+      }
+
+      // Build payment data for SOFTPAY call
+      const paymentData: SoftpayPaymentData = {
+        customerName: customerName || transaction.customerName || "Client",
+        customerEmail: customerEmail || transaction.customerEmail || "",
+        phoneNumber: customerPhone,
+        invoiceToken: token,
+        authorizationCode,
+      };
+
+      // Call operator-specific SOFTPAY endpoint
+      const softpayResult = await callPaydunyaSoftpay(operator, country, paymentData);
+
+      if (softpayResult.success) {
+        res.json({
+          success: true,
+          message: softpayResult.message,
+          transactionId: transaction.id,
+          fees: softpayResult.fees,
+          currency: softpayResult.currency,
+          redirectUrl: softpayResult.url,
+        });
+      } else {
+        res.status(400).json({
+          error: softpayResult.message || "Erreur lors du paiement",
+        });
+      }
+    } catch (error: any) {
+      console.error("[API SOFTPAY CONFIRM] Error:", error);
+      res.status(500).json({ error: "Erreur lors de la confirmation du paiement" });
     }
   });
 
