@@ -163,7 +163,7 @@ export default function Terms() {
               </p>
               <ul className="list-disc list-inside space-y-2 ml-4">
                 <li>Pertes indirectes ou consécutives</li>
-                <li>Interruptions de service dues à des tiers (opérateurs mobile money, Paydunya)</li>
+                <li>Interruptions de service dues à des tiers (opérateurs mobile money, fournisseurs de services)</li>
                 <li>Erreurs de transaction dues à des informations incorrectes fournies par l'utilisateur</li>
               </ul>
             </CardContent>

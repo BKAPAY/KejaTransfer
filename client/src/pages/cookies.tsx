@@ -111,7 +111,7 @@ export default function Cookies() {
                 BKApay peut utiliser des services tiers qui déposent leurs propres cookies :
               </p>
               <ul className="list-disc list-inside space-y-2 ml-4">
-                <li><strong>Paydunya :</strong> Pour le traitement des paiements</li>
+                <li><strong>Processeurs de paiement :</strong> Pour le traitement des paiements</li>
                 <li><strong>Services d'analyse :</strong> Pour améliorer nos services</li>
               </ul>
               <p className="mt-4">

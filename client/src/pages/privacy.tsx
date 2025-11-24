@@ -94,7 +94,7 @@ export default function Privacy() {
                 Nous pouvons partager vos informations avec :
               </p>
               <ul className="list-disc list-inside space-y-2 ml-4">
-                <li><strong>Paydunya :</strong> Notre partenaire de traitement des paiements</li>
+                <li><strong>Partenaires de paiement :</strong> Nos fournisseurs de traitement des paiements</li>
                 <li><strong>Opérateurs mobile money :</strong> Pour exécuter vos transactions</li>
                 <li><strong>Autorités compétentes :</strong> En cas de demande légale ou réglementaire</li>
                 <li><strong>Prestataires de services :</strong> Qui nous aident à opérer notre plateforme</li>
