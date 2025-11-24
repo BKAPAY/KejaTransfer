@@ -6,14 +6,29 @@ import { Users, Shield, Trash2, Plus, Minus } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import type { User } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient } from "@/lib/queryClient";
 
 export default function Management() {
   const [searchQuery, setSearchQuery] = useState("");
   const [fundAmount, setFundAmount] = useState<{ [userId: string]: string }>({});
   const { toast } = useToast();
+
+  // Dialog states
+  const [promoteDialog, setPromoteDialog] = useState<{ open: boolean; userId?: string; userName?: string }>({ open: false });
+  const [removeAdminDialog, setRemoveAdminDialog] = useState<{ open: boolean; userId?: string; userName?: string }>({ open: false });
+  const [addFundsDialog, setAddFundsDialog] = useState<{ open: boolean; userId?: string; userName?: string; amount?: number }>({ open: false });
+  const [subtractFundsDialog, setSubtractFundsDialog] = useState<{ open: boolean; userId?: string; userName?: string; amount?: number }>({ open: false });
+  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; userId?: string; userName?: string }>({ open: false });
 
   const { data: allUsers, isLoading: usersLoading, refetch: refetchUsers } = useQuery<User[]>({
     queryKey: ["/api/admin/users"],
@@ -45,6 +60,7 @@ export default function Management() {
     },
     onSuccess: () => {
       toast({ title: "Succès", description: "Utilisateur promu en administrateur" });
+      setPromoteDialog({ open: false });
       refetchUsers();
     },
     onError: () => {
@@ -64,6 +80,7 @@ export default function Management() {
     },
     onSuccess: () => {
       toast({ title: "Succès", description: "Droits administrateur révoqués" });
+      setRemoveAdminDialog({ open: false });
       refetchUsers();
     },
     onError: () => {
@@ -83,6 +100,7 @@ export default function Management() {
     },
     onSuccess: () => {
       toast({ title: "Succès", description: "Utilisateur supprimé" });
+      setDeleteDialog({ open: false });
       refetchUsers();
     },
     onError: () => {
@@ -102,6 +120,7 @@ export default function Management() {
     },
     onSuccess: () => {
       toast({ title: "Succès", description: "Fonds ajoutés avec succès" });
+      setAddFundsDialog({ open: false });
       setFundAmount({});
       refetchUsers();
     },
@@ -122,6 +141,7 @@ export default function Management() {
     },
     onSuccess: () => {
       toast({ title: "Succès", description: "Fonds retirés avec succès" });
+      setSubtractFundsDialog({ open: false });
       setFundAmount({});
       refetchUsers();
     },
@@ -240,7 +260,7 @@ export default function Management() {
                         onClick={() => {
                           const amount = parseInt(fundAmount[user.id] || "0");
                           if (amount > 0) {
-                            addFundsMutation.mutate({ userId: user.id, amount });
+                            setAddFundsDialog({ open: true, userId: user.id, userName: `${user.firstName} ${user.lastName}`, amount });
                           }
                         }}
                         disabled={!fundAmount[user.id] || parseInt(fundAmount[user.id]) <= 0 || addFundsMutation.isPending}
@@ -255,7 +275,7 @@ export default function Management() {
                         onClick={() => {
                           const amount = parseInt(fundAmount[user.id] || "0");
                           if (amount > 0) {
-                            subtractFundsMutation.mutate({ userId: user.id, amount });
+                            setSubtractFundsDialog({ open: true, userId: user.id, userName: `${user.firstName} ${user.lastName}`, amount });
                           }
                         }}
                         disabled={!fundAmount[user.id] || parseInt(fundAmount[user.id]) <= 0 || subtractFundsMutation.isPending}
@@ -272,7 +292,7 @@ export default function Management() {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => promoteUserMutation.mutate(user.id)}
+                          onClick={() => setPromoteDialog({ open: true, userId: user.id, userName: `${user.firstName} ${user.lastName}` })}
                           disabled={promoteUserMutation.isPending}
                           data-testid={`button-promote-${user.id}`}
                         >
@@ -283,7 +303,7 @@ export default function Management() {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => removeAdminMutation.mutate(user.id)}
+                          onClick={() => setRemoveAdminDialog({ open: true, userId: user.id, userName: `${user.firstName} ${user.lastName}` })}
                           disabled={removeAdminMutation.isPending}
                           data-testid={`button-remove-admin-${user.id}`}
                         >
@@ -294,11 +314,7 @@ export default function Management() {
                       <Button
                         size="sm"
                         variant="destructive"
-                        onClick={() => {
-                          if (confirm("Êtes-vous sûr de vouloir supprimer cet utilisateur?")) {
-                            deleteUserMutation.mutate(user.id);
-                          }
-                        }}
+                        onClick={() => setDeleteDialog({ open: true, userId: user.id, userName: `${user.firstName} ${user.lastName}` })}
                         disabled={deleteUserMutation.isPending}
                         data-testid={`button-delete-${user.id}`}
                       >
@@ -319,6 +335,137 @@ export default function Management() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Promotion Dialog */}
+      <AlertDialog open={promoteDialog.open} onOpenChange={(open) => setPromoteDialog({ ...promoteDialog, open })}>
+        <AlertDialogContent data-testid="dialog-promote">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Promouvoir en administrateur</AlertDialogTitle>
+            <AlertDialogDescription>
+              Êtes-vous sûr de vouloir promouvoir <strong>{promoteDialog.userName}</strong> en administrateur? Cet utilisateur aura accès à tous les panneaux d'administration.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex gap-2">
+            <AlertDialogCancel data-testid="button-cancel-promote">Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (promoteDialog.userId) {
+                  promoteUserMutation.mutate(promoteDialog.userId);
+                }
+              }}
+              disabled={promoteUserMutation.isPending}
+              data-testid="button-confirm-promote"
+            >
+              {promoteUserMutation.isPending ? "Promotion en cours..." : "Confirmer"}
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Remove Admin Dialog */}
+      <AlertDialog open={removeAdminDialog.open} onOpenChange={(open) => setRemoveAdminDialog({ ...removeAdminDialog, open })}>
+        <AlertDialogContent data-testid="dialog-remove-admin">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Révoquer les droits administrateur</AlertDialogTitle>
+            <AlertDialogDescription>
+              Êtes-vous sûr de vouloir révoquer les droits administrateur de <strong>{removeAdminDialog.userName}</strong>? Il ne pourra plus accéder aux panneaux d'administration.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex gap-2">
+            <AlertDialogCancel data-testid="button-cancel-remove-admin">Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (removeAdminDialog.userId) {
+                  removeAdminMutation.mutate(removeAdminDialog.userId);
+                }
+              }}
+              disabled={removeAdminMutation.isPending}
+              data-testid="button-confirm-remove-admin"
+            >
+              {removeAdminMutation.isPending ? "Révocation en cours..." : "Confirmer"}
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Add Funds Dialog */}
+      <AlertDialog open={addFundsDialog.open} onOpenChange={(open) => setAddFundsDialog({ ...addFundsDialog, open })}>
+        <AlertDialogContent data-testid="dialog-add-funds">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Ajouter des fonds</AlertDialogTitle>
+            <AlertDialogDescription>
+              Êtes-vous sûr de vouloir ajouter <strong>{formatAmount(addFundsDialog.amount || 0)}</strong> au compte de <strong>{addFundsDialog.userName}</strong>?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex gap-2">
+            <AlertDialogCancel data-testid="button-cancel-add-funds">Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (addFundsDialog.userId && addFundsDialog.amount) {
+                  addFundsMutation.mutate({ userId: addFundsDialog.userId, amount: addFundsDialog.amount });
+                }
+              }}
+              disabled={addFundsMutation.isPending}
+              data-testid="button-confirm-add-funds"
+            >
+              {addFundsMutation.isPending ? "Ajout en cours..." : "Confirmer"}
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Subtract Funds Dialog */}
+      <AlertDialog open={subtractFundsDialog.open} onOpenChange={(open) => setSubtractFundsDialog({ ...subtractFundsDialog, open })}>
+        <AlertDialogContent data-testid="dialog-subtract-funds">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Retirer des fonds</AlertDialogTitle>
+            <AlertDialogDescription>
+              Êtes-vous sûr de vouloir retirer <strong>{formatAmount(subtractFundsDialog.amount || 0)}</strong> du compte de <strong>{subtractFundsDialog.userName}</strong>?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex gap-2">
+            <AlertDialogCancel data-testid="button-cancel-subtract-funds">Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (subtractFundsDialog.userId && subtractFundsDialog.amount) {
+                  subtractFundsMutation.mutate({ userId: subtractFundsDialog.userId, amount: subtractFundsDialog.amount });
+                }
+              }}
+              disabled={subtractFundsMutation.isPending}
+              data-testid="button-confirm-subtract-funds"
+            >
+              {subtractFundsMutation.isPending ? "Retrait en cours..." : "Confirmer"}
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete User Dialog */}
+      <AlertDialog open={deleteDialog.open} onOpenChange={(open) => setDeleteDialog({ ...deleteDialog, open })}>
+        <AlertDialogContent data-testid="dialog-delete">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer l'utilisateur</AlertDialogTitle>
+            <AlertDialogDescription>
+              Êtes-vous sûr de vouloir supprimer <strong>{deleteDialog.userName}</strong>? Cette action est irréversible et toutes les données associées seront perdues.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex gap-2">
+            <AlertDialogCancel data-testid="button-cancel-delete">Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleteDialog.userId) {
+                  deleteUserMutation.mutate(deleteDialog.userId);
+                }
+              }}
+              disabled={deleteUserMutation.isPending}
+              data-testid="button-confirm-delete"
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {deleteUserMutation.isPending ? "Suppression en cours..." : "Supprimer"}
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
