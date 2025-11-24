@@ -232,15 +232,26 @@ export default function Management() {
             <Users className="w-5 h-5" />
             Utilisateurs
           </CardTitle>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => navigate("/dashboard/kyc-verification")}
-            data-testid="button-kyc-verification"
-          >
-            <FileCheck className="w-4 h-4 mr-2" />
-            KYC
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate("/dashboard/kyc-verification")}
+              data-testid="button-kyc-verification"
+            >
+              <FileCheck className="w-4 h-4 mr-2" />
+              En attente
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate("/dashboard/kyc-history")}
+              data-testid="button-kyc-history"
+            >
+              <FileCheck className="w-4 h-4 mr-2" />
+              Historique
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex gap-2">
