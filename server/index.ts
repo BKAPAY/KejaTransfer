@@ -1,6 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { runAutoMigration } from "./auto-migrate";
 
 const app = express();
 
@@ -48,6 +49,15 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Run automatic database migration in production
+  if (app.get("env") === "production") {
+    log("🔄 Running automatic database migration for production...");
+    const migrationSuccess = await runAutoMigration();
+    if (!migrationSuccess) {
+      log("⚠️  Migration failed, but continuing server startup...");
+    }
+  }
+
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
