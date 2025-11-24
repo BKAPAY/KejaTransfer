@@ -15,6 +15,7 @@ export default function Settings() {
   const [idFrontData, setIdFrontData] = useState<string | null>(null);
   const [idBackData, setIdBackData] = useState<string | null>(null);
   const [selfieData, setSelfieData] = useState<string | null>(null);
+  const [isResubmitting, setIsResubmitting] = useState(false);
   
   const [activeCamera, setActiveCamera] = useState<"front" | "back" | "selfie" | null>(null);
   const [isValidating, setIsValidating] = useState(false);
@@ -182,6 +183,7 @@ export default function Settings() {
       setIdFrontData(null);
       setIdBackData(null);
       setSelfieData(null);
+      setIsResubmitting(false);
       queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
     },
     onError: (error: any) => {
@@ -254,7 +256,7 @@ export default function Settings() {
               <p className="text-sm font-medium text-foreground">Vérification en cours</p>
               <p className="text-xs text-muted-foreground mt-1">Nous vérifions vos documents...</p>
             </div>
-          ) : user?.kycRejectionReason ? (
+          ) : user?.kycRejectionReason && !isResubmitting ? (
             <div className="space-y-4">
               <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-lg p-4">
                 <div className="flex gap-3">
@@ -268,6 +270,7 @@ export default function Settings() {
               <p className="text-sm text-muted-foreground">Veuillez soumettre à nouveau avec des documents conformes</p>
               <Button 
                 onClick={() => {
+                  setIsResubmitting(true);
                   setIdFrontData(null);
                   setIdBackData(null);
                   setSelfieData(null);
