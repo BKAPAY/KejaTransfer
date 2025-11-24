@@ -16,6 +16,7 @@ export function HistoryDialog({ userId, onOpenChange }: { userId: string; onOpen
   const { data: transactions, isLoading } = useQuery<Transaction[]>({
     queryKey: [`/api/admin/user/${userId}/transactions`],
   });
+  const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
   const { toast } = useToast();
 
   const getStatusBadge = (status: string) => {
@@ -58,6 +59,10 @@ export function HistoryDialog({ userId, onOpenChange }: { userId: string; onOpen
     }).format(amount);
   };
 
+  if (selectedTx) {
+    return <TransactionDetailDialog transaction={selectedTx} onOpenChange={() => setSelectedTx(null)} />;
+  }
+
   return (
     <Dialog open={true} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[80vh]">
@@ -74,7 +79,12 @@ export function HistoryDialog({ userId, onOpenChange }: { userId: string; onOpen
           <ScrollArea className="h-[400px]">
             <div className="space-y-2 pr-4">
               {transactions.map((tx) => (
-                <Card key={tx.id} className="p-4">
+                <Card
+                  key={tx.id}
+                  className="p-4 cursor-pointer hover-elevate"
+                  onClick={() => setSelectedTx(tx)}
+                  data-testid={`transaction-card-${tx.id}`}
+                >
                   <div className="flex items-center justify-between gap-4 flex-wrap">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -99,6 +109,136 @@ export function HistoryDialog({ userId, onOpenChange }: { userId: string; onOpen
         ) : (
           <p className="text-center py-8 text-muted-foreground">Aucune transaction</p>
         )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Transaction Detail Dialog Component
+function TransactionDetailDialog({ transaction, onOpenChange }: { transaction: Transaction; onOpenChange: () => void }) {
+  const getStatusBadge = (status: string) => {
+    const variants: Record<string, "default" | "secondary" | "destructive"> = {
+      completed: "default",
+      pending: "secondary",
+      failed: "destructive",
+      cancelled: "destructive",
+    };
+    return variants[status] || "secondary";
+  };
+
+  const getStatusText = (status: string) => {
+    const texts: Record<string, string> = {
+      completed: "Complété",
+      pending: "En attente",
+      failed: "Échoué",
+      cancelled: "Annulé",
+    };
+    return texts[status] || status;
+  };
+
+  const getTypeText = (type: string) => {
+    const types: Record<string, string> = {
+      deposit: "Dépôt",
+      transfer: "Transfert",
+      payment_link: "Lien de paiement",
+      merchant_link: "Lien marchand",
+      api_payment: "Paiement API",
+    };
+    return types[type] || type;
+  };
+
+  const formatAmount = (amount: number) => {
+    return new Intl.NumberFormat("fr-FR", {
+      style: "currency",
+      currency: "XOF",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  };
+
+  return (
+    <Dialog open={true} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md" data-testid="dialog-transaction-detail">
+        <DialogHeader>
+          <DialogTitle>Détails de la transaction</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div>
+            <label className="text-xs font-medium text-muted-foreground">ID Transaction</label>
+            <div className="p-2 bg-muted rounded-md text-xs font-mono mt-1 truncate">{transaction.id}</div>
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-muted-foreground">Type</label>
+            <div className="mt-2">
+              <Badge variant="outline">{getTypeText(transaction.type)}</Badge>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-muted-foreground">Statut</label>
+            <div className="mt-2">
+              <Badge variant={getStatusBadge(transaction.status)}>
+                {getStatusText(transaction.status)}
+              </Badge>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-muted-foreground">Montant</label>
+            <div className="p-2 bg-muted rounded-md text-lg font-semibold mt-1">
+              {formatAmount(transaction.amount)}
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-muted-foreground">Date</label>
+            <div className="p-2 bg-muted rounded-md text-sm mt-1">
+              {new Date(transaction.createdAt).toLocaleDateString("fr-FR", {
+                weekday: "long",
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              })}{" "}
+              à {new Date(transaction.createdAt).toLocaleTimeString("fr-FR")}
+            </div>
+          </div>
+
+          {transaction.description && (
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Description</label>
+              <div className="p-2 bg-muted rounded-md text-sm mt-1">{transaction.description}</div>
+            </div>
+          )}
+
+          {transaction.customerEmail && (
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Email Client</label>
+              <div className="p-2 bg-muted rounded-md text-sm mt-1 truncate">{transaction.customerEmail}</div>
+            </div>
+          )}
+
+          {transaction.customerPhone && (
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Téléphone Client</label>
+              <div className="p-2 bg-muted rounded-md text-sm mt-1">{transaction.customerPhone}</div>
+            </div>
+          )}
+
+          {transaction.operator && (
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Opérateur</label>
+              <div className="p-2 bg-muted rounded-md text-sm mt-1 uppercase">{transaction.operator}</div>
+            </div>
+          )}
+
+          {transaction.country && (
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Pays</label>
+              <div className="p-2 bg-muted rounded-md text-sm mt-1 uppercase">{transaction.country}</div>
+            </div>
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   );
@@ -142,9 +282,9 @@ export function PaymentLinksDialog({ userId, onOpenChange }: { userId: string; o
               {links.map((link) => (
                 <Card key={link.id} className="overflow-hidden">
                   <div className="md:flex">
-                    {link.image && (
+                    {link.imageUrl && (
                       <img
-                        src={link.image}
+                        src={link.imageUrl}
                         alt={link.productName}
                         className="w-full md:w-40 h-40 object-cover"
                       />
