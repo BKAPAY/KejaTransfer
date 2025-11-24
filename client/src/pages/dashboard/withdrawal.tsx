@@ -63,9 +63,10 @@ export default function Withdrawal() {
 
   const withdrawalMutation = useMutation({
     mutationFn: async (data: WithdrawalFormData) => {
-      return await apiRequest("POST", "/api/transfers", data);
+      const res = await apiRequest("POST", "/api/transfers", data);
+      return res.json();
     },
-    onSuccess: (response) => {
+    onSuccess: (response: any) => {
       toast({
         title: "Retrait effectué",
         description: `Retrait de ${amount} XOF approuvé. Le montant de ${response.totalDeducted || totalDeducted} XOF a été débité de votre solde.`,

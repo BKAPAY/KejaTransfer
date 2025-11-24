@@ -64,38 +64,6 @@ export default function Deposit() {
   // Calculate net amount in real-time
   const netAmount = selectedCountry && amount ? calculateIncomingFee(Math.floor(amount), selectedCountry).netAmount : 0;
 
-  // Polling for payment status
-  useEffect(() => {
-    if (!paymentInProgress || !invoiceToken) return;
-
-    const pollInterval = setInterval(async () => {
-      try {
-        const result = await apiRequest("POST", "/api/softpay/verify-payment", {
-          invoiceToken,
-        });
-
-        if (result.status === "completed") {
-          setPaymentInProgress(false);
-          setPollingStatus("completed");
-          toast({
-            title: "Paiement confirmé!",
-            description: "Vos fonds ont été ajoutés à votre solde",
-          });
-          form.reset();
-          setInvoiceToken(null);
-          // Invalidate queries to refresh balance
-          queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
-          queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
-          clearInterval(pollInterval);
-        }
-      } catch (error) {
-        console.error("Polling error:", error);
-      }
-    }, 3000); // Poll every 3 seconds
-
-    return () => clearInterval(pollInterval);
-  }, [paymentInProgress, invoiceToken, toast, form, queryClient]);
-
   // Create payment mutation
   const createPaymentMutation = useMutation({
     mutationFn: async (data: DepositFormData) => {
@@ -122,22 +90,16 @@ export default function Deposit() {
     },
   });
 
-  // Verify payment mutation
-  const verifyPaymentMutation = useMutation({
-    mutationFn: async (token: string) => {
-      return await apiRequest("POST", "/api/softpay/verify-payment", {
-        invoiceToken: token,
-      });
-    },
-  });
-
   // Poll payment status
   useEffect(() => {
     if (!invoiceToken || !paymentInProgress) return;
 
     const interval = setInterval(async () => {
       try {
-        const result = await verifyPaymentMutation.mutateAsync(invoiceToken);
+        const res = await apiRequest("POST", "/api/softpay/verify-payment", {
+          invoiceToken,
+        });
+        const result = await res.json();
         console.log("[Payment Status]", result);
 
         if (result.status === "completed" || result.response_code === "00") {
@@ -165,7 +127,7 @@ export default function Deposit() {
     }, 5000); // Poll every 5 seconds
 
     return () => clearInterval(interval);
-  }, [invoiceToken, paymentInProgress]);
+  }, [invoiceToken, paymentInProgress, toast, form]);
 
   const onSubmit = (data: DepositFormData) => {
     createPaymentMutation.mutate(data);
