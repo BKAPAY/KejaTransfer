@@ -2,6 +2,8 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import session from "express-session";
+import connectPg from "connect-pg-simple";
+import pg from "pg";
 import bcrypt from "bcrypt";
 import { z } from "zod";
 import { insertUserSchema, insertPaymentLinkSchema, insertMerchantLinkSchema, insertApiKeySchema } from "@shared/schema";
@@ -149,15 +151,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.error("ERREUR: SESSION_SECRET doit être configuré dans les variables d'environnement");
   }
 
+  // Enable trust proxy for production (behind reverse proxy)
+  if (process.env.NODE_ENV === "production") {
+    app.set("trust proxy", 1);
+  }
+
+  // Configure PostgreSQL session store
+  const PgStore = connectPg(session);
+  const pgPool = new pg.Pool({
+    connectionString: process.env.DATABASE_URL,
+  });
+
   app.use(
     session({
+      store: new PgStore({
+        pool: pgPool,
+        tableName: "session", // Table will be created automatically
+        createTableIfMissing: true,
+      }),
       secret: process.env.SESSION_SECRET!,
       resave: false,
       saveUninitialized: false,
       cookie: {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
+        sameSite: "lax", // Changed from "strict" to "lax" for better compatibility
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       },
     })
