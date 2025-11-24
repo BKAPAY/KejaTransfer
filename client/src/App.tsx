@@ -25,6 +25,7 @@ import Support from "@/pages/dashboard/support";
 import Deposit from "@/pages/dashboard/deposit";
 import Transfer from "@/pages/dashboard/transfer";
 import Admin from "@/pages/dashboard/admin";
+import Management from "@/pages/dashboard/management";
 import Pay from "@/pages/pay";
 import Merchant from "@/pages/merchant";
 import ApiPayment from "@/pages/api-payment";
@@ -99,6 +100,7 @@ function Router() {
           <Route path="/dashboard/deposit" component={Deposit} />
           <Route path="/dashboard/transfer" component={Transfer} />
           <Route path="/dashboard/admin" component={Admin} />
+          <Route path="/dashboard/management" component={Management} />
           <Route component={NotFound} />
         </Switch>
       </DashboardLayout>

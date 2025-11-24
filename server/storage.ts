@@ -314,6 +314,28 @@ export class DbStorage implements IStorage {
     );
   }
 
+  async promoteToAdmin(userId: string): Promise<User | undefined> {
+    const results = await db
+      .update(schema.users)
+      .set({ isAdmin: true })
+      .where(eq(schema.users.id, userId))
+      .returning();
+    return results[0];
+  }
+
+  async deleteUser(userId: string): Promise<boolean> {
+    const result = await db.delete(schema.users).where(eq(schema.users.id, userId));
+    return true;
+  }
+
+  async addFundsToUser(userId: string, amount: number): Promise<User | undefined> {
+    return this.updateUserBalance(userId, amount);
+  }
+
+  async subtractFundsFromUser(userId: string, amount: number): Promise<User | undefined> {
+    return this.updateUserBalance(userId, -amount);
+  }
+
   async getAnalytics(userId: string): Promise<{
     revenueByDate: { date: string; amount: number }[];
     revenueByOperator: { operator: string; amount: number; count: number }[];

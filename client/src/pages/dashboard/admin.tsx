@@ -2,14 +2,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
-import { Users, UserCheck, TrendingDown, TrendingUp, Search } from "lucide-react";
+import { Users, UserCheck, TrendingDown, TrendingUp, Search, Settings } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
+import { useLocation } from "wouter";
 import type { User } from "@shared/schema";
 
 export default function Admin() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [, setLocation] = useLocation();
 
   const { data: stats, isLoading: statsLoading } = useQuery<{
     totalUsers: number;
@@ -50,9 +52,19 @@ export default function Admin() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground mb-1">Panneau Administrateur</h1>
-        <p className="text-sm text-muted-foreground">Gestion et surveillance de la plateforme</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground mb-1">Panneau Administrateur</h1>
+          <p className="text-sm text-muted-foreground">Gestion et surveillance de la plateforme</p>
+        </div>
+        <Button
+          onClick={() => setLocation("/dashboard/management")}
+          data-testid="button-management"
+          className="gap-2"
+        >
+          <Settings className="w-4 h-4" />
+          Gestionnaire
+        </Button>
       </div>
 
       {/* Stats Cards */}

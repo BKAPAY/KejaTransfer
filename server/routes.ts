@@ -1028,6 +1028,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Management routes
+  app.post("/api/admin/promote", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { userId } = req.body;
+      if (!userId) {
+        return res.status(400).json({ error: "userId is required" });
+      }
+      const user = await storage.promoteToAdmin(userId);
+      res.json(user);
+    } catch (error: any) {
+      console.error("Promote error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/admin/delete-user", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { userId } = req.body;
+      if (!userId) {
+        return res.status(400).json({ error: "userId is required" });
+      }
+      await storage.deleteUser(userId);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Delete user error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/admin/add-funds", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { userId, amount } = req.body;
+      if (!userId || amount === undefined) {
+        return res.status(400).json({ error: "userId and amount are required" });
+      }
+      const user = await storage.addFundsToUser(userId, amount);
+      res.json(user);
+    } catch (error: any) {
+      console.error("Add funds error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/admin/subtract-funds", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { userId, amount } = req.body;
+      if (!userId || amount === undefined) {
+        return res.status(400).json({ error: "userId and amount are required" });
+      }
+      const user = await storage.subtractFundsFromUser(userId, amount);
+      res.json(user);
+    } catch (error: any) {
+      console.error("Subtract funds error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
