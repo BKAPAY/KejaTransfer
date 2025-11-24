@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import type { User } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
+import { queryClient } from "@/lib/queryClient";
 import {
   HistoryDialog,
   PaymentLinksDialog,
@@ -183,10 +184,10 @@ export default function Management() {
       if (data.verified) {
         localStorage.setItem(`verified_${data.id}`, new Date().toISOString());
       }
-      // Refetch after a small delay to ensure database is updated
-      setTimeout(() => {
-        refetchUsers();
-      }, 500);
+      // Invalidate cache and refetch immediately
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/search"] });
+      refetchUsers();
     },
     onError: () => {
       toast({ title: "Erreur", description: "Impossible de modifier la vérification", variant: "destructive" });
