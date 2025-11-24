@@ -3,21 +3,21 @@
 ## Vue d'ensemble
 BKApay est une plateforme moderne de paiement mobile money pour l'Afrique de l'Ouest. Elle permet aux entreprises et particuliers d'accepter des paiements via mobile money (Orange Money, MTN, Moov, Wave, Free Money, T-Money, Wizall, Expresso) dans 6 pays: Bénin, Togo, Côte d'Ivoire, Sénégal, Burkina Faso et Mali.
 
-## Dernières modifications (24 Novembre 2025 - Session 4 PSR IMPLEMENTATION)
-- ✅ **PAYDUNYA PSR (PAIEMENT SANS REDIRECTION) - IMPLEMENTATION COMPLETE**
-  * **Endpoint PSR**: GET `/api/paydunya-api?ref=...` retourne `{success: true, token: "..."}`
-  * **SDK Paydunya PSR chargé**: Popup/modal sans redirection externe
-  * **Flux PSR complet**:
-    1. Utilisateur remplit formulaire
-    2. Backend crée invoice checkout Paydunya + transaction
-    3. Frontend charge SDK PSR Paydunya
-    4. Frontend affiche modal de paiement (SANS REDIRECTION)
-    5. Utilisateur paie dans le modal
-    6. Webhook confirme et crée/met à jour transaction
-  * **Utilisateur reste sur BKApay**: Interface cohérente, pas de redirection
-  * **Pages modifiées**: `/pay/:token`, `/merchant/:token`, `/api/deposits`
-  * **Librairie PSR jQuery Paydunya**: Intégrée dynamiquement
+## Dernières modifications (24 Novembre 2025 - Session 5 RETRAITS PAYDUNYA v2)
+- ✅ **RETRAITS/TRANSFERTS VIA PAYDUNYA v2 - IMPLEMENTATION COMPLETE**
+  * **Endpoint Retraits**: POST `/api/transfers` via Paydunya v2 Disburse API
+  * **Flux de retrait complet**:
+    1. Utilisateur remplit formulaire (montant, pays, opérateur, numéro)
+    2. Backend crée invoice de déboursement via Paydunya v2
+    3. Backend soumet l'invoice pour exécution
+    4. Solde utilisateur débité immédiatement après succès
+    5. Transaction créée avec statut "completed"
+  * **Clés Paydunya LIVE mises à jour**: Nouvelle configuration active
+  * **Page Transfer**: Interface complète avec calcul des frais en temps réel
+  * **KYC obligatoire**: Vérification requise avant transferts
+  * **Support multi-pays/opérateurs**: 6 pays, 17 opérateurs supportés
 
+- ✅ **PAYDUNYA PSR (PAIEMENT SANS REDIRECTION)** 
 - ✅ **TRANSACTIONS WEBHOOK-DRIVEN OPERATIONAL**
 - ✅ **KYC OBLIGATOIRE POUR TRANSFERTS**
 - ✅ **FRAIS SILENCIEUX PAR PAYS** (3% Bénin, 6% autres)
@@ -40,7 +40,7 @@ BKApay est une plateforme moderne de paiement mobile money pour l'Afrique de l'O
   - Gestion des clés API (KYC required)
   - Historique des transactions
   - Dépôts via mobile money (PSR modal)
-  - Transferts/Retraits vers mobile money
+  - Transferts/Retraits vers mobile money (Paydunya v2)
   - Profil utilisateur
   - Paramètres, Annonces, Support
 
@@ -52,6 +52,7 @@ BKApay est une plateforme moderne de paiement mobile money pour l'Afrique de l'O
 
 ### Backend (Express + PostgreSQL)
 - **Paydunya PSR**: Modal popup sans redirection externe
+- **Paydunya v2 Retraits**: Endpoint `/disburse/get-invoice` + `/disburse/submit-invoice`
 - **Webhooks**: Transactions créées post-confirmation Paydunya
 - **Flux paiements PSR**: 
   1. Utilisateur remplit formulaire
@@ -127,9 +128,30 @@ BKApay est une plateforme moderne de paiement mobile money pour l'Afrique de l'O
 - Solde utilisateur mis à jour
 - Statut visible en temps réel
 
+## Flux de retrait/transfert (Paydunya v2)
+
+### 1. Utilisateur sur page de transfert
+- Remplit formulaire: montant, pays, opérateur, numéro téléphone
+- Solde affiché avec calcul des frais en temps réel
+
+### 2. Validation
+- Vérification KYC obligatoire
+- Vérification du solde (montant + frais)
+- Validation du numéro de téléphone
+
+### 3. Backend traite le retrait
+- Étape 1: Crée invoice de déboursement via `/disburse/get-invoice`
+- Étape 2: Soumet l'invoice via `/disburse/submit-invoice`
+- Retour: Status success/pending/failed
+
+### 4. Balance mise à jour
+- Solde débité immédiatement après succès
+- Transaction créée avec statut "completed"
+- Historique visible dans les transactions
+
 ## Caractéristiques principales
 
-### 1. Paiements PSR Embedded (NOUVEAU)
+### 1. Paiements PSR Embedded
 - Modal popup Paydunya affichée directement dans BKApay
 - Pas de redirection externe vers Paydunya
 - Interface cohérente et professionnelle
@@ -170,22 +192,22 @@ PAYDUNYA_TOKEN=XN1wEVW2Er1PkdtZcj9L
 BASE_URL=https://bkapay.com (optionnel - pour production)
 ```
 
-## Fichiers modifiés (Session 4)
-- ✅ `server/routes.ts` - PSR endpoint + transactions côté PSR
-- ✅ `client/src/pages/pay.tsx` - SDK PSR + modal (pas QR code)
-- ✅ `client/src/pages/merchant.tsx` - SDK PSR + modal
-- ✅ `server/routes.ts` - Deposit PSR support
+## Fichiers clés
+- `client/src/pages/dashboard/transfer.tsx` - Interface utilisateur pour les transferts/retraits
+- `server/routes.ts` - Endpoint POST `/api/transfers` avec logique Paydunya v2
+- `shared/schema.ts` - Schémas de validation et types
+- `server/storage.ts` - Gestion des transactions et soldes
 
 ## Statuts des fonctionnalités
 - ✅ Authentication & KYC
-- ✅ **Paiements PSR embedded (SANS REDIRECTION)** ← NOUVEAU
+- ✅ **Paiements PSR embedded (SANS REDIRECTION)**
 - ✅ Liens de paiement & marchands
 - ✅ Transactions webhook-driven
 - ✅ Frais silencieux
 - ✅ Suspension comptes
 - ✅ API Gateway
 - ✅ Admin Panel
-- ✅ Dépôts et Transferts (PSR pour dépôts)
-- 📋 Retraits via Paydunya v2 (blocage URL callback en dev)
+- ✅ Dépôts et Transferts (Paydunya v2)
+- ✅ **Retraits/Transferts via Paydunya v2 (NOUVEAU - Session 5)**
 - 📋 SDKs officiels (planifié)
 - 📋 Plugins WooCommerce (planifié)

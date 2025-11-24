@@ -101,6 +101,15 @@ export default function Dashboard() {
             <ArrowUpFromLine className="h-4 w-4" />
             Transfert
           </Button>
+          <Button 
+            data-testid="button-withdrawal"
+            variant="outline"
+            className="flex-1 flex items-center justify-center gap-2"
+            onClick={() => setLocation("/dashboard/withdrawal")}
+          >
+            <ArrowUpFromLine className="h-4 w-4" />
+            Retrait
+          </Button>
         </div>
       </div>
 

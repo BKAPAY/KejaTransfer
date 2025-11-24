@@ -25,6 +25,8 @@ import {
   LogOut,
   TrendingUp,
   Shield,
+  ArrowDownToLine,
+  ArrowUpFromLine,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import type { User as UserType } from "@shared/schema";
@@ -70,6 +72,24 @@ const menuItems = [
     url: "/dashboard/analytics",
     icon: TrendingUp,
     testId: "nav-analytics",
+  },
+  {
+    title: "Dépôt",
+    url: "/dashboard/deposit",
+    icon: ArrowDownToLine,
+    testId: "nav-deposit",
+  },
+  {
+    title: "Transfert",
+    url: "/dashboard/transfer",
+    icon: ArrowUpFromLine,
+    testId: "nav-transfer",
+  },
+  {
+    title: "Retrait",
+    url: "/dashboard/withdrawal",
+    icon: ArrowUpFromLine,
+    testId: "nav-withdrawal",
   },
   {
     title: "Historique",

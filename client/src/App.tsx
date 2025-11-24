@@ -23,6 +23,7 @@ import Documentation from "@/pages/dashboard/documentation";
 import Support from "@/pages/dashboard/support";
 import Deposit from "@/pages/dashboard/deposit";
 import Transfer from "@/pages/dashboard/transfer";
+import Withdrawal from "@/pages/dashboard/withdrawal";
 import Admin from "@/pages/dashboard/admin";
 import Management from "@/pages/dashboard/management";
 import KycVerification from "@/pages/dashboard/kyc-verification";
@@ -99,6 +100,7 @@ function Router() {
           <Route path="/dashboard/support" component={Support} />
           <Route path="/dashboard/deposit" component={Deposit} />
           <Route path="/dashboard/transfer" component={Transfer} />
+          <Route path="/dashboard/withdrawal" component={Withdrawal} />
           <Route path="/dashboard/admin" component={Admin} />
           <Route path="/dashboard/management" component={Management} />
           <Route path="/dashboard/kyc-verification" component={KycVerification} />
