@@ -142,7 +142,7 @@ export function TransactionDetailsDialog({
 
               {transaction.paydunyaToken && (
                 <div className="space-y-1 col-span-2">
-                  <p className="text-xs text-muted-foreground">Token Paydunya</p>
+                  <p className="text-xs text-muted-foreground">Token de paiement</p>
                   <div className="flex items-center gap-2">
                     <p className="text-xs font-mono bg-muted p-2 rounded flex-1 truncate">
                       {transaction.paydunyaToken}
@@ -235,7 +235,7 @@ export function TransactionDetailsDialog({
                 data-testid="link-receipt"
               >
                 <Button variant="outline" className="gap-2">
-                  Voir le reçu Paydunya
+                  Voir le reçu
                 </Button>
               </a>
             </div>

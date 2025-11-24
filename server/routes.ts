@@ -1542,6 +1542,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!userId) {
         return res.status(400).json({ error: "Identifiant utilisateur requis" });
       }
+      // Check if target user is primary admin
+      const targetUser = await storage.getUser(userId);
+      if (targetUser?.isPrimaryAdmin) {
+        return res.status(403).json({ error: "Impossible de suspendre l'administrateur principal" });
+      }
       const user = await storage.suspendUser(userId);
       if (!user) {
         return res.status(404).json({ error: "Utilisateur non trouvé" });

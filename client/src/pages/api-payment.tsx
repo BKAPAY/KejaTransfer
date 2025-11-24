@@ -32,7 +32,7 @@ export default function ApiPayment() {
 
     setIsLoading(true);
     try {
-      // Call the Paydunya API to get payment URL
+      // Call payment API to get payment URL
       const response = await fetch("/api/payments/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
