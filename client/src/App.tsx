@@ -110,6 +110,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
+      <Route path="/documentation" component={Documentation} />
       <Route path="/signup" component={Signup} />
       <Route path="/login" component={Login} />
       <Route path="/pay/:token" component={Pay} />
