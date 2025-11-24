@@ -2,10 +2,8 @@ import { useRoute, useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import type { PaymentLink } from "@shared/schema";
-import { COUNTRIES, OPERATORS } from "@shared/schema";
 import logoImage from "@assets/bkapay-logo.png";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -13,6 +11,7 @@ import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { apiRequest } from "@/lib/queryClient";
 import { useState, useEffect, useRef } from "react";
+import { detectPhoneCountryAndOperator } from "@shared/phone-utils";
 
 declare global {
   interface Window {
@@ -26,8 +25,6 @@ const paymentSchema = z.object({
   customerName: z.string().min(2, "Le nom doit contenir au moins 2 caractères"),
   customerEmail: z.string().email("Email invalide"),
   customerPhone: z.string().min(8, "Numéro de téléphone invalide"),
-  country: z.string().min(1, "Veuillez sélectionner un pays"),
-  operator: z.string().min(1, "Veuillez sélectionner un opérateur"),
 });
 
 type PaymentFormData = z.infer<typeof paymentSchema>;
@@ -36,9 +33,9 @@ export default function Pay() {
   const [, params] = useRoute("/pay/:token");
   const token = params?.token;
   const [, setLocation] = useLocation();
-  const [selectedCountry, setSelectedCountry] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const psrLoadedRef = useRef(false);
+  const [phoneError, setPhoneError] = useState("");
 
   const { data: paymentLink, isLoading: linkLoading } = useQuery<PaymentLink>({
     queryKey: ["/api/payment-links/public", token],
@@ -68,14 +65,37 @@ export default function Pay() {
       customerName: "",
       customerEmail: "",
       customerPhone: "",
-      country: "",
-      operator: "",
     },
   });
 
+  // Auto-detect country and operator when phone changes
+  const handlePhoneChange = (e: any) => {
+    const phone = e.target.value;
+    form.setValue("customerPhone", phone);
+
+    if (phone.length >= 9) {
+      const detected = detectPhoneCountryAndOperator(phone);
+      if (detected.isValid) {
+        setPhoneError("");
+      } else if (phone.length > 10) {
+        setPhoneError("Numéro de téléphone invalide pour cette région");
+      }
+    }
+  };
+
   const paymentMutation = useMutation({
     mutationFn: async (data: PaymentFormData) => {
-      const res = await apiRequest("POST", `/api/payments/process/${token}`, data);
+      // Auto-detect country and operator
+      const detected = detectPhoneCountryAndOperator(data.customerPhone);
+      if (!detected.isValid) {
+        throw new Error("Impossible de détecter le pays/opérateur du numéro");
+      }
+
+      const res = await apiRequest("POST", `/api/payments/process/${token}`, {
+        ...data,
+        country: detected.country,
+        operator: detected.operator,
+      });
       return res.json();
     },
     onSuccess: (data: any) => {
@@ -120,6 +140,12 @@ export default function Pay() {
   });
 
   const onSubmit = (data: PaymentFormData) => {
+    // Validate phone detection
+    const detected = detectPhoneCountryAndOperator(data.customerPhone);
+    if (!detected.isValid) {
+      setPhoneError("Numéro invalide - impossible à détecter automatiquement");
+      return;
+    }
     setIsLoading(true);
     paymentMutation.mutate(data);
   };
@@ -132,10 +158,6 @@ export default function Pay() {
       maximumFractionDigits: 0,
     }).format(amount);
   };
-
-  const availableOperators = selectedCountry
-    ? OPERATORS[selectedCountry as keyof typeof OPERATORS] || []
-    : [];
 
   if (linkLoading) {
     return (
@@ -239,63 +261,10 @@ export default function Pay() {
                         placeholder="+221 77 123 45 67"
                         data-testid="input-phone"
                         {...field}
+                        onChange={handlePhoneChange}
                       />
                     </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="country"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs sm:text-sm">Pays</FormLabel>
-                    <Select
-                      value={field.value}
-                      onValueChange={(value) => {
-                        field.onChange(value);
-                        setSelectedCountry(value);
-                        form.setValue("operator", "");
-                      }}
-                    >
-                      <FormControl>
-                        <SelectTrigger data-testid="select-country">
-                          <SelectValue placeholder="Sélectionner un pays" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {COUNTRIES.map((country) => (
-                          <SelectItem key={country.code} value={country.code}>
-                            {country.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="operator"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs sm:text-sm">Opérateur</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-operator">
-                          <SelectValue placeholder="Sélectionner un opérateur" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {availableOperators.map((op) => (
-                          <SelectItem key={op.code} value={op.code}>
-                            {op.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    {phoneError && <p className="text-xs text-red-500 mt-1">{phoneError}</p>}
                     <FormMessage />
                   </FormItem>
                 )}
