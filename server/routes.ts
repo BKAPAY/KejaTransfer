@@ -153,6 +153,17 @@ async function callPaydunyaAPIv2(endpoint: string, data: any) {
   }
 }
 
+// Sanitize message helper (strip HTML, cap length, fallback to generic)
+function sanitizePaymentMessage(msg: string | undefined, fallback: string = "Erreur de paiement"): string {
+  if (!msg) return fallback;
+  // Strip HTML tags
+  const withoutHtml = msg.replace(/<[^>]*>/g, "");
+  // Cap length at 200 chars
+  const capped = withoutHtml.substring(0, 200);
+  // Return sanitized or fallback
+  return capped.trim() || fallback;
+}
+
 // Helper function to confirm Wizall two-step payment
 async function confirmWizallPayment(
   authorizationCode: string,
@@ -182,7 +193,7 @@ async function confirmWizallPayment(
       console.error("[WIZALL CONFIRM] Non-JSON response:", textBody.substring(0, 200));
       return {
         success: false,
-        message: "Erreur serveur Wizall",
+        message: sanitizePaymentMessage(undefined, "Erreur serveur Wizall"),
       };
     }
 
@@ -193,31 +204,20 @@ async function confirmWizallPayment(
       console.error("[WIZALL CONFIRM] JSON parse error:", parseError);
       return {
         success: false,
-        message: "Réponse invalide du serveur Wizall",
+        message: sanitizePaymentMessage(undefined, "Réponse invalide du serveur Wizall"),
       };
     }
-
-    // Sanitize message (strip HTML, cap length, fallback to generic)
-    const sanitizeMessage = (msg: string | undefined): string => {
-      if (!msg) return "Erreur confirmation Wizall";
-      // Strip HTML tags
-      const withoutHtml = msg.replace(/<[^>]*>/g, "");
-      // Cap length at 200 chars
-      const capped = withoutHtml.substring(0, 200);
-      // Return sanitized or fallback
-      return capped.trim() || "Erreur confirmation Wizall";
-    };
 
     if (confirmResult.success) {
       return {
         success: true,
-        message: sanitizeMessage(confirmResult.message) || "Paiement Wizall confirmé",
+        message: sanitizePaymentMessage(confirmResult.message, "Paiement Wizall confirmé"),
         data: confirmResult.data,
       };
     } else {
       return {
         success: false,
-        message: sanitizeMessage(confirmResult.message),
+        message: sanitizePaymentMessage(confirmResult.message, "Erreur confirmation Wizall"),
         data: confirmResult.data,
       };
     }
@@ -225,7 +225,7 @@ async function confirmWizallPayment(
     console.error("[WIZALL CONFIRM] Error:", error);
     return {
       success: false,
-      message: "Erreur de connexion au service Wizall",
+      message: sanitizePaymentMessage(undefined, "Erreur de connexion au service Wizall"),
     };
   }
 }
@@ -1461,6 +1461,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const softpayResult = await callPaydunyaSoftpay(operator, country, paymentData);
 
         if (softpayResult.success) {
+          // CRITICAL: For two-step flows, transactionId MUST be present
+          if (isTwoStep && !softpayResult.transactionId) {
+            return res.status(502).json({
+              error: "Erreur serveur: TransactionID manquant pour paiement two-step",
+            });
+          }
+
           // For Wizall first step, store TransactionID
           if (softpayResult.transactionId && isTwoStep) {
             const updatedMetadata = {
@@ -1659,6 +1666,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const softpayResult = await callPaydunyaSoftpay(operator, country, paymentData);
 
         if (softpayResult.success) {
+          // CRITICAL: For two-step flows, transactionId MUST be present
+          if (isTwoStep && !softpayResult.transactionId) {
+            return res.status(502).json({
+              error: "Erreur serveur: TransactionID manquant pour paiement two-step",
+            });
+          }
+
           // For Wizall first step, store TransactionID
           if (softpayResult.transactionId && isTwoStep) {
             const updatedMetadata = {
@@ -2147,6 +2161,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const softpayResult = await callPaydunyaSoftpay(operator, country, paymentData);
 
         if (softpayResult.success) {
+          // CRITICAL: For two-step flows, transactionId MUST be present
+          if (isTwoStep && !softpayResult.transactionId) {
+            return res.status(502).json({
+              error: "Erreur serveur: TransactionID manquant pour paiement two-step",
+            });
+          }
+
           // For Wizall first step, store TransactionID
           if (softpayResult.transactionId && isTwoStep) {
             const updatedMetadata = {
