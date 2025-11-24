@@ -2,6 +2,16 @@
 
 ## Dernières modifications (24 Novembre 2025)
 
+### Session 13 - Nettoyage Messages d'Erreur UX Propre ✅ PRODUCTION-READY
+**Problème**: Messages d'erreur affichaient codes HTTP (400, 500) et caractères techniques ()/:{}\ - UX non professionnelle.
+**Cause**: Frontend préfixait erreurs avec code HTTP. Backend exposait error.message bruts et réponses Paydunya non sanitisées.
+**Solution COMPLÈTE**:
+- **Frontend (queryClient.ts)**: Fonction `sanitizeErrorMessage()` supprime activement codes HTTP, patterns techniques (Error:, TypeError:), et caractères interdits ()/:{}\ 
+- **Backend (routes.ts)**: 50+ changements - Traduction anglais→français, suppression caractères spéciaux, élimination complète error.message, sanitisation réponses Paydunya
+- **Messages nettoyés**: "Les fichiers sont trop volumineux" sans (max 5MB), "Montant minimum 500 XOF" sans :, "Vous devez vérifier votre identité" sans (KYC)
+- **Double protection**: Backend propre + Frontend sanitise activement au cas où
+**Résultat**: ✅ Messages 100% français, sans codes techniques, sans caractères spéciaux. UX professionnelle validée par architect. **PRODUCTION-READY.**
+
 ### Session 12 - Refonte Complète Système Frais & Webhook paydunyaToken ✅ PRODUCTION-READY
 **Problème**: Logique de frais incohérente entre INCOMING/OUTGOING. Webhook cherchait transactions via scan metadata fragile. API Gateway ne créait pas de transaction pending.
 **Cause**: Confusion BRUT/NET dans différents endpoints. Lookup webhook via parsing JSON metadata. Pas de validation stricte des paramètres API Gateway.
