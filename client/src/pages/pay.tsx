@@ -13,6 +13,7 @@ import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { apiRequest } from "@/lib/queryClient";
 import { useState } from "react";
+import { SoftPayQRCode } from "@/components/softpay-qrcode";
 
 const paymentSchema = z.object({
   customerName: z.string().min(2, "Le nom doit contenir au moins 2 caractères"),
@@ -29,6 +30,8 @@ export default function Pay() {
   const token = params?.token;
   const [, setLocation] = useLocation();
   const [selectedCountry, setSelectedCountry] = useState("");
+  const [showQRCode, setShowQRCode] = useState(false);
+  const [qrCodeData, setQRCodeData] = useState<any>(null);
 
   const { data: paymentLink, isLoading } = useQuery<PaymentLink>({
     queryKey: ["/api/payment-links/public", token],
@@ -55,11 +58,17 @@ export default function Pay() {
     },
     onSuccess: (data: any) => {
       console.log("Payment success, data:", data);
-      if (data?.transactionId) {
-        console.log("Redirecting to:", `/payment-status/${data.transactionId}`);
-        window.location.href = `/payment-status/${data.transactionId}`;
+      if (data?.redirectUrl) {
+        // Show QR code instead of redirect
+        setQRCodeData({
+          url: data.redirectUrl,
+          paydunyaToken: data.paydunyaToken,
+          operator: form.getValues("operator"),
+          amount: paymentLink?.amount,
+        });
+        setShowQRCode(true);
       } else {
-        console.error("No transactionId in response:", data);
+        console.error("No redirectUrl in response:", data);
       }
     },
     onError: (error: any) => {
@@ -105,6 +114,46 @@ export default function Pay() {
             <div className="text-center">
               <img src={logoImage} alt="BKApay" className="h-16 w-auto mx-auto mb-4" />
               <p className="text-muted-foreground">Lien de paiement introuvable ou inactif</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (showQRCode && qrCodeData) {
+    return (
+      <div className="w-full min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center p-4 overflow-hidden">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center space-y-2 p-4 sm:p-6">
+            <div className="flex justify-center mb-2">
+              <img src={logoImage} alt="BKApay" className="h-8 sm:h-10 w-auto" />
+            </div>
+            <CardTitle>Paiement Sécurisé</CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 sm:p-6">
+            <SoftPayQRCode
+              paymentUrl={qrCodeData.url}
+              amount={qrCodeData.amount || paymentLink.amount}
+              operator={qrCodeData.operator || ""}
+              status="pending"
+            />
+            <div className="mt-4 flex gap-2">
+              <Button
+                onClick={() => setShowQRCode(false)}
+                variant="outline"
+                className="flex-1"
+                data-testid="button-back-to-form"
+              >
+                Retour
+              </Button>
+              <Button
+                onClick={() => window.open(qrCodeData.url, "_blank")}
+                className="flex-1"
+                data-testid="button-open-payment"
+              >
+                Ouvrir le paiement
+              </Button>
             </div>
           </CardContent>
         </Card>
