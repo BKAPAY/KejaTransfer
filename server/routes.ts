@@ -84,7 +84,7 @@ if (!PAYDUNYA_CONFIG.masterKey || !PAYDUNYA_CONFIG.publicKey || !PAYDUNYA_CONFIG
   console.error("Veuillez définir: PAYDUNYA_MASTER_KEY, PAYDUNYA_PUBLIC_KEY, PAYDUNYA_PRIVATE_KEY, PAYDUNYA_TOKEN");
 }
 
-// Helper function to call Paydunya API
+// Helper function to call Paydunya API (v1)
 async function callPaydunyaAPI(endpoint: string, data: any) {
   try {
     const response = await fetch(`${PAYDUNYA_CONFIG.apiUrl}${endpoint}`, {
@@ -103,6 +103,42 @@ async function callPaydunyaAPI(endpoint: string, data: any) {
     return result;
   } catch (error) {
     console.error(`[Paydunya API Error] ${endpoint}:`, error);
+    throw error;
+  }
+}
+
+// Helper function to call Paydunya API v2 (for disbursements/withdrawals)
+async function callPaydunyaAPIv2(endpoint: string, data: any) {
+  try {
+    const url = `https://app.paydunya.com/api/v2${endpoint}`;
+    console.log(`[Paydunya APIv2] Calling: ${url}`);
+    console.log(`[Paydunya APIv2] Data:`, data);
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "PAYDUNYA-MASTER-KEY": PAYDUNYA_CONFIG.masterKey,
+        "PAYDUNYA-PRIVATE-KEY": PAYDUNYA_CONFIG.privateKey,
+        "PAYDUNYA-TOKEN": PAYDUNYA_CONFIG.token,
+      },
+      body: JSON.stringify(data),
+    });
+
+    // Read response text first to handle both JSON and HTML errors
+    const responseText = await response.text();
+    console.log(`[Paydunya APIv2] Response Status: ${response.status}, Text: ${responseText.substring(0, 500)}`);
+
+    try {
+      const result = JSON.parse(responseText);
+      return result;
+    } catch (e) {
+      // If response is HTML, likely an error from Paydunya
+      console.error(`[Paydunya APIv2] Received non-JSON response:`, responseText.substring(0, 500));
+      throw new Error(`Paydunya API error: ${responseText.substring(0, 200)}`);
+    }
+  } catch (error) {
+    console.error(`[Paydunya APIv2 Error] ${endpoint}:`, error);
     throw error;
   }
 }
@@ -796,39 +832,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         callback_url: callbackUrl,
       };
 
-      const paydunyaResponse = await callPaydunyaAPI("/disburse/get-invoice", paydunyaData);
+      const paydunyaResponse = await callPaydunyaAPIv2("/disburse/get-invoice", paydunyaData);
 
-      if (paydunyaResponse.response_code === "00") {
-        const disbursalToken = paydunyaResponse.disburse_token;
+      if (paydunyaResponse.status === "success" || paydunyaResponse.response_code === "00") {
+        const disbursalToken = paydunyaResponse.token;
 
-        // Submit the disbursal
-        const submitData = {
-          disburse_invoice: disbursalToken,
-          disburse_id: transaction.id,
-        };
+        // Update balance (deduct amount + fees) immediately
+        await storage.updateUserBalance(req.session.userId!, -feeInfo.totalDeductedFromBalance);
+        
+        // Update transaction as pending (will be updated via webhook)
+        await storage.updateTransactionStatus(transaction.id, "pending", {
+          paydunyaToken: disbursalToken,
+        });
 
-        const submitResponse = await callPaydunyaAPI("/disburse/submit-invoice", submitData);
-
-        if (submitResponse.response_code === "00") {
-          // Update balance (deduct amount + fees)
-          await storage.updateUserBalance(req.session.userId!, -feeInfo.totalDeductedFromBalance);
-          await storage.updateTransactionStatus(transaction.id, submitResponse.status || "pending", {
-            paydunyaToken: disbursalToken,
-          });
-
-          res.json({
-            success: true,
-            message: "Transfert initialisé avec succès",
-            transactionId: transaction.id,
-            totalDeducted: feeInfo.totalDeductedFromBalance,
-          });
-        } else {
-          await storage.updateTransactionStatus(transaction.id, "failed");
-          res.status(400).json({ error: "Erreur lors de la soumission du transfert" });
-        }
+        res.json({
+          success: true,
+          message: "Transfert initialisé avec succès",
+          transactionId: transaction.id,
+          totalDeducted: feeInfo.totalDeductedFromBalance,
+        });
       } else {
         await storage.updateTransactionStatus(transaction.id, "failed");
-        res.status(400).json({ error: "Erreur lors de l'initiation du transfert" });
+        const errorMsg = paydunyaResponse.error || paydunyaResponse.response_text || "Erreur lors de l'initiation du transfert";
+        res.status(400).json({ error: errorMsg });
       }
     } catch (error: any) {
       console.error("Transfer error:", error);
