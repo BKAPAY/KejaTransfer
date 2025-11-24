@@ -193,26 +193,15 @@ export default function Settings() {
     },
   });
 
-  useEffect(() => {
-    // Check if user was recently verified by admin
-    if (user?.verified && user?.id) {
-      const verificationTime = localStorage.getItem(`verified_${user.id}`);
-      if (verificationTime) {
-        const verifiedAt = new Date(verificationTime).getTime();
-        const now = new Date().getTime();
-        // Show congratulations message for 1 hour after verification
-        if (now - verifiedAt < 3600000) {
-          toast({
-            title: "Félicitations!",
-            description: "Votre compte a été vérifié avec succès par l'administration",
-          });
-          localStorage.removeItem(`verified_${user.id}`);
-        }
-      }
-    }
-  }, [user?.verified, user?.id, toast]);
-
   const getKycStatusBadge = () => {
+    if (user?.verified) {
+      return (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-green-100 dark:bg-green-950">
+          <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />
+          <span className="text-sm font-medium text-green-700 dark:text-green-300">Vérifié</span>
+        </div>
+      );
+    }
     switch (user?.kycStatus) {
       case "verified":
         return (
@@ -245,23 +234,6 @@ export default function Settings() {
     }
   };
 
-  const getAccountVerificationBadge = () => {
-    if (user?.verified) {
-      return (
-        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-green-100 dark:bg-green-950">
-          <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />
-          <span className="text-sm font-medium text-green-700 dark:text-green-300">Compte vérifié</span>
-        </div>
-      );
-    }
-    return (
-      <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-100 dark:bg-amber-950">
-        <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-        <span className="text-sm font-medium text-amber-700 dark:text-amber-300">Compte non vérifié</span>
-      </div>
-    );
-  };
-
   return (
     <div className="space-y-6">
       <div>
@@ -269,35 +241,20 @@ export default function Settings() {
         <p className="text-sm text-muted-foreground">Configurez votre compte</p>
       </div>
 
-      {/* Account Verification Status Card */}
-      <Card className="border-l-4 border-l-blue-500">
-        <CardContent className="pt-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-semibold text-sm mb-1">Statut de vérification du compte</h3>
-              <p className="text-xs text-muted-foreground">Votre compte peut être vérifié par l'administration de la plateforme</p>
-            </div>
-            {getAccountVerificationBadge()}
-          </div>
-        </CardContent>
-      </Card>
-
       <Card>
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle className="text-lg">Vérification d'identité (KYC)</CardTitle>
-              <CardDescription className="text-xs">Vérifiez votre identité pour accéder à toutes les fonctionnalités</CardDescription>
+              <CardTitle className="text-lg">Vérification de compte</CardTitle>
             </div>
             {getKycStatusBadge()}
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
-          {user?.kycStatus === "verified" ? (
-            <div className="text-center py-4">
-              <CheckCircle2 className="w-12 h-12 mx-auto mb-2 text-green-600 dark:text-green-400" />
-              <p className="text-sm font-medium text-foreground">Votre compte est vérifié</p>
-              <p className="text-xs text-muted-foreground mt-1">Vous pouvez utiliser toutes les fonctionnalités</p>
+          {user?.verified ? (
+            <div className="text-center py-8">
+              <CheckCircle2 className="w-12 h-12 mx-auto mb-3 text-green-600 dark:text-green-400" />
+              <p className="text-base font-medium text-foreground">Félicitations votre compte a été vérifié avec succès</p>
             </div>
           ) : user?.kycStatus === "submitted" ? (
             <div className="text-center py-4">
