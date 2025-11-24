@@ -3,112 +3,92 @@
 ## Vue d'ensemble
 BKApay est une plateforme moderne de paiement mobile money pour l'Afrique de l'Ouest. Elle permet aux entreprises et particuliers d'accepter des paiements via mobile money (Orange Money, MTN, Moov, Wave, Free Money, T-Money, Wizall, Expresso) dans 6 pays: Bénin, Togo, Côte d'Ivoire, Sénégal, Burkina Faso et Mali.
 
-## Dernières modifications (24 Novembre 2025 - Session 2)
-- ✅ **ARCHITECTURE TRANSACTIONS**: Suppression complète du statut "pending"
-  * **Avant**: Transaction créée → "pending" → Paydunya paie → Webhook confirme
-  * **Maintenant**: Paydunya paie → Webhook reçoit "completed" → Transaction créée immédiatement
-  * **Résultat**: Zéro transactions en attente, historique toujours à jour
-  * Statuts disponibles: "completed" (succès), "failed" (erreur)
-  * Webhook crée la transaction avec le statut final directement depuis Paydunya
-  * Soldes déduits immédiatement après Paydunya confirme
-  * Pour dépôts/transferts: Résultats en temps réel
-- ✅ **NOUVEAU**: Vérification KYC obligatoire pour clés API et transferts
-  * **Clés API**: Route POST `/api/api-keys` vérifie que `kycStatus === "verified"`
-    - Frontend désactive le bouton "Nouvelle clé API" si KYC non complété
-    - Message d'erreur clair: "Vous devez vérifier votre identité (KYC) avant de générer des clés API"
-  * **Transferts**: Route POST `/api/transfers` vérifie que `kycStatus === "verified"`
-    - Utilisateur remplit son formulaire tranquillement
-    - Au clic "Effectuer le transfert", affiche notification toast si KYC incomplet
-    - Message clair: "Vous devez vérifier votre identité (KYC) avant de faire des transferts"
-  * Empêche utilisateurs et développeurs d'utiliser ces fonctionnalités sans passer la vérification d'identité
-- ✅ Frais silencieux par pays (3% Bénin, 6% autres) implémentés avec succès
-- ✅ Système de suspension de comptes (empêche toutes actions)
-- ✅ API Paydunya v2 pour retraits avec flux à 2 étapes
-- ✅ Historique KYC avec recherche et filtrage
-- ✅ Persistance de session et détails des transactions cliquables
+## Dernières modifications (24 Novembre 2025 - Session 3)
+- ✅ **PAYDUNYA SOFTPAY INTÉGRATION DIRECTE (EMBEDDED)**
+  * **Avant**: Utilisateurs redirigés vers Paydunya pour payer (quittaient BKApay)
+  * **Maintenant**: QR Codes affichés DIRECTEMENT dans BKApay - Paiement embedded sans redirection
+  * **Bénéfices**:
+    - Expérience utilisateur professionnelle - pas de redirection Paydunya
+    - QR Code généré dynamiquement avec la librairie qrcode.js
+    - Utilisateurs scannent le QR avec leur téléphone depuis BKApay
+    - Webhook Paydunya confirme le paiement en temps réel
+    - Interface propre et branding BKApay maintenu
+  * **Pages impactées**:
+    - `/pay/:token` - Paiements par liens de paiement
+    - `/merchant/:token` - Paiements par liens marchands
+  * **Composant nouveau**: `SoftPayQRCode` - Réutilisable pour afficher QR/OTP/statut
+  * **Routes backend**: Inchangées - continuent à créer factures Paydunya
+  * **Clés Paydunya LIVE**: Mises à jour et testées avec succès
+- ✅ Architecture transactions webhook-driven complètement opérationnelle
+- ✅ KYC obligatoire pour clés API et transferts
+- ✅ Frais silencieux par pays (3% Bénin, 6% autres)
+- ✅ Système de suspension de comptes
+- ✅ API Paydunya v2 pour retraits
 
 ## Architecture du projet
 
 ### Frontend (React + TypeScript)
 - **Pages publiques**:
-  - Page d'accueil avec hero section et présentation
-  - Inscription/Connexion utilisateur
-  - Pages de paiement public (liens de paiement et liens marchands)
+  - Page d'accueil avec hero section
+  - Inscription/Connexion
+  - Pages de paiement public avec QR Code embedded (NOUVEAU)
+  - Statut de paiement en temps réel
 
 - **Dashboard (authentifié)**:
-  - Vue d'ensemble avec statistiques en XOF
+  - Vue d'ensemble avec statistiques
   - Gestion des liens de paiement
   - Gestion des liens marchands
-  - Gestion des clés API
+  - Gestion des clés API (KYC required)
   - Historique des transactions
   - Profil utilisateur
-  - Paramètres, Annonces, Documentation, Support
+  - Paramètres, Annonces, Support
 
 - **Admin Dashboard**:
-  - Gestion des utilisateurs avec suspension/réactivation
-  - Recherche utilisateurs
-  - Gestion KYC (Vérification d'identité)
+  - Gestion utilisateurs
+  - Suspension/réactivation
+  - Gestion KYC
   - Historique KYC avec filtrage
 
 ### Backend (Express + PostgreSQL)
-- **Authentification**: Sessions avec bcrypt pour le hashing des mots de passe
-- **Vérification comptes suspendus**: Bloquer login, paiements, dépôts, transferts, API
-- **Vérification KYC**: Clés API nécessitent `kycStatus === "verified"`
-- **Flux transactions webhook-driven**: Transactions créées seulement après confirmation Paydunya
-- **API Routes**:
-  - `/api/auth/*` - Inscription, connexion, déconnexion, profil, changement mot de passe
-  - `/api/dashboard/stats` - Statistiques utilisateur
-  - `/api/payment-links` - CRUD liens de paiement
-  - `/api/merchant-links` - CRUD liens marchands
-  - `/api/api-keys` - CRUD clés API (avec vérification KYC)
-  - `/api/transactions` - Historique des transactions (statuts: completed, failed)
-  - `/api/payments/process/:token` - Traitement paiements (liens)
-  - `/api/merchant-payments/process/:token` - Traitement paiements (marchands)
-  - `/api/payments/create` - Paiements via clé API (public, pour développeurs)
-  - `/api/deposits` - Dépôts sur le compte (webhook-driven)
-  - `/api/transfers` - Transferts/retraits vers mobile money (immédiat avec déduction)
-  - `/api/admin/suspend` - Suspendre un compte
-  - `/api/admin/unsuspend` - Réactiver un compte
-  - `/api/webhooks/paydunya` - Webhook pour créer transactions confirmées
+- **Paydunya SoftPay**: QR Codes embedded sans redirection
+- **Webhooks**: Transactions créées post-confirmation Paydunya
+- **Flux paiements**: 
+  1. Utilisateur remplir le formulaire de paiement
+  2. Backend crée facture Paydunya
+  3. Frontend affiche QR Code dynamique (pas de redirection)
+  4. Utilisateur scanne et paie via son téléphone
+  5. Webhook Paydunya confirme → Transaction créée
+  6. Statut mis à jour en temps réel
 
 ### Base de données (PostgreSQL)
-- **users**: Utilisateurs de la plateforme
-  * `id`: UUID primary key
-  * `firstName`, `lastName`: Nom et prénom
-  * `email`: Email unique
-  * `password`: Hash bcrypt
-  * `balance`: Solde en XOF
-  * `kycStatus`: État KYC (pending, submitted, verified, rejected)
-  * `kycIdFront`, `kycIdBack`, `kycSelfie`: Documents KYC (base64)
-  * `kycRejectionReason`: Raison du rejet KYC
-  * `isAdmin`: Droits administrateur
-  * `suspended`: Compte suspendu (NOUVEAU)
-  * `createdAt`: Date de création
-- **payment_links**: Liens de paiement avec montant fixe
-- **merchant_links**: Liens marchands avec montant flexible
-- **api_keys**: Clés API pour intégration
-- **transactions**: Historique complet des transactions
-  * `amount`: Montant net reçu (pour entrant) ou brut (pour sortant)
-  * `fee`: Montant des frais en XOF
-  * `feePercentage`: Pourcentage des frais (30 = 3%, 60 = 6%)
+- **users**: Utilisateurs avec KYC et suspension
+- **payment_links**: Liens avec montant fixe
+- **merchant_links**: Liens marchands flexibles
+- **api_keys**: Clés pour développeurs
+- **transactions**: Historique (statuts: completed, failed)
 
-## Intégration Paydunya
-L'application utilise l'API Paydunya pour traiter les paiements mobile money:
+## Technologies
 
-### Clés API Paydunya (configuration)
-- Clé Principale: Tz2P2cx3-hYKE-Jvh2-9aTw-Jvo3n9OWptIE
-- Clé Publique: live_public_dS2oPIQXEEVyG4XXxwv6qsiX3ze
-- Clé Privée: live_private_2ZXWJvCMlCwfjZ1KK5W7kuVkpCj
-- Token: QyQQLjXhF3hhoAZLFknk
+### Frontend
+- React 18 + TypeScript
+- Wouter pour routing
+- React Hook Form + Zod validation
+- Shadcn UI + Tailwind CSS
+- TanStack Query pour data fetching
+- **qrcode.js** - Génération QR Codes embedded (NOUVEAU)
 
-### Flux de paiement
-1. L'utilisateur crée un lien de paiement ou lien marchand
-2. Le client remplit le formulaire de paiement
-3. L'app appelle l'API Paydunya pour créer une invoice
-4. Le client est redirigé vers la page de paiement Paydunya
-5. Paydunya traite le paiement via mobile money
-6. Webhook notifie KEJAtransfer du résultat
-7. La transaction et le solde sont mis à jour
+### Backend
+- Express.js + TypeScript
+- PostgreSQL + Drizzle ORM
+- Bcrypt pour hashing
+- Express Session
+- Paydunya API v1 & v2
+
+### Intégration Paydunya
+- **Endpoint factures**: `/api/v1/checkout-invoice/create`
+- **SoftPay QR Codes**: Embedded dans BKApay (NOUVEAU)
+- **Webhooks**: `/api/webhooks/paydunya`
+- **Clés LIVE**: Configurées et testées ✅
 
 ## Opérateurs supportés par pays
 - **Sénégal**: Orange Money, Free Money, Expresso, Wave, Wizall
@@ -118,144 +98,108 @@ L'application utilise l'API Paydunya pour traiter les paiements mobile money:
 - **Togo**: T-Money, Moov
 - **Mali**: Orange Money, Moov
 
-## Variables d'environnement
-- `DATABASE_URL`: URL de connexion PostgreSQL
-- `SESSION_SECRET`: Secret pour les sessions
-- `PAYDUNYA_MASTER_KEY`: Clé principale Paydunya
-- `PAYDUNYA_PUBLIC_KEY`: Clé publique Paydunya
-- `PAYDUNYA_PRIVATE_KEY`: Clé privée Paydunya
-- `PAYDUNYA_TOKEN`: Token Paydunya
-- `BASE_URL`: URL de base de l'application (pour webhooks)
+## Flux de paiement (Embedded SoftPay)
 
-## Fonctionnalités principales
+### 1. Utilisateur sur page de paiement
+- Remplit formulaire: nom, email, téléphone, pays, opérateur
 
-### 1. Liens de paiement
-- Créer des liens avec montant fixe pour produits/services
-- Upload d'image optionnel
-- Partage facile du lien
+### 2. Backend traite la requête
+- Crée facture Paydunya
+- Retourne URL de paiement Paydunya
+
+### 3. Frontend affiche QR Code
+- Génère QR Code avec URL de paiement
+- Affiche dans card professionnelle BKApay
+- Aucune redirection Paydunya
+
+### 4. Utilisateur scanne et paie
+- Scanne QR avec son téléphone
+- Paie via son opérateur mobile
+- Reste dans sa session Paydunya
+
+### 5. Webhook confirme
+- Paydunya envoie webhook
+- Transaction créée avec statut "completed" ou "failed"
+- Solde utilisateur mis à jour
+- Statut visible en temps réel dans BKApay
+
+## Caractéristiques principales
+
+### 1. Paiements Embedded (NOUVEAU)
+- QR Codes générés et affichés directement dans BKApay
+- Pas de redirection externe
+- Interface cohérente et professionnelle
+- Utilisateurs ne quittent jamais BKApay
+
+### 2. Liens de paiement
+- Montant fixe ou flexible
+- Images optionnelles
+- Statut en temps réel
 - Suivi des paiements
 
-### 2. Liens marchands
-- Lien unique par marchand
-- Montant défini par le client
-- Parfait pour donations, pourboires, etc.
-
 ### 3. API Gateway
-- Génération de clés API (publique/privée) pour développeurs
-- **Paiements entrants**: Endpoint public `/api/payments/create` pour intégrer collecte de paiements
-  - Les revenus vont directement au dashboard du développeur
-  - Pas besoin de gérer directement Paydunya
-- **Paiements sortants**: Les développeurs peuvent faire des transferts/retraits depuis leur dashboard
-- Redirection vers interface de paiement Paydunya
-- Webhook pour notifications des paiements
+- Clés API publique/privée pour développeurs
+- Paiements entrants: `/api/payments/create`
+- Paiements sortants: Dashboard des transferts
+- Documentation complète
 
 ### 4. Gestion des transactions
 - Historique complet
-- Statuts: completed, pending, failed, cancelled
+- Statuts: completed, failed
 - Filtres par type, pays, opérateur
-- Export des données
+- Export possible
 
-### 5. Système de frais silencieux (NOUVEAU)
-- Frais automatiques basés sur le pays d'origine
-  * Bénin: 3% sur les transactions entrantes et sortantes
-  * Autres pays: 6% sur les transactions entrantes et sortantes
-- Pour les transactions entrantes (paiements reçus):
-  * Les frais sont déduits AVANT le crédit au tableau de bord
-  * Exemple: Client envoie 2000 XOF (Bénin) → Utilisateur reçoit 1940 XOF
-- Pour les dépôts:
-  * Affichage du montant NET final sans afficher le pourcentage
-  * "Vous recevrez X XOF"
-- Pour les transferts/retraits:
-  * Affichage du total déducté du solde (montant + frais)
-  * "Total déducté de votre solde: X XOF"
-  * Montant exact envoyé au Mobile Money
-  * Frais prélevés du solde de l'utilisateur
-- Interface complètement discrète: aucun affichage des pourcentages
+### 5. Frais silencieux
+- Bénin: 3% entrant/sortant
+- Autres pays: 6% entrant/sortant
+- Calculés automatiquement
+- Zéro affichage pourcentages (discret)
 
-### 6. Système de suspension
-- Admin peut suspendre/réactiver les comptes
-- Utilisateurs suspendus ne peuvent pas se connecter
-- Toutes les fonctionnalités sont désactivées:
-  * Liens de paiement ne fonctionnent plus
-  * Liens marchands ne fonctionnent plus
-  * Clés API ne fonctionnent plus
-  * Dépôts et transferts bloqués
-- Interface intuitive avec badge "Suspendu"
-- Boutons "Suspendre" et "Réactiver" dans la gestion des utilisateurs
+### 6. Suspension de comptes
+- Admin peut suspendre utilisateurs
+- Toutes fonctionnalités désactivées
+- Impossibilité login/paiements/transferts
 
-## Design
-- Couleurs principales: Vert (#228B22 environ) et Doré/Accent (#FFD700 environ)
-- Police: Inter pour le corps, DM Sans pour les titres
-- Design responsive mobile-first
-- Composants Shadcn UI
-- Mode sombre supporté
-
-## Système de clés API (Paiements entrants et sortants)
-
-### Flux complet des paiements via clés API:
-1. **Développeur crée une clé API** sur KEJAtransfer (génère publicKey et privateKey)
-2. **Intègre sur son site** en appelant `/api/payments/create` avec sa publicKey
-3. **Clients du développeur payent** → funds vont au dashboard du développeur
-4. **Développeur fait un retrait** depuis sa page Transferts → prélève sur son dashboard et envoie aux clients finaux via mobile money
-
-### Exemple d'intégration:
-```javascript
-// Sur le site du développeur
-const response = await fetch('https://keja.app/api/payments/create', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    publicKey: 'pk_live_xxxxx',
-    amount: 50000,
-    description: 'Achat produit',
-    customerName: 'Jean',
-    customerEmail: 'jean@example.com',
-    customerPhone: '+221781234567',
-    country: 'SN',
-    operator: 'orange'
-  })
-});
-const { redirectUrl } = await response.json();
-// Rediriger client vers Paydunya
-window.location.href = redirectUrl;
+## Variables d'environnement
+```
+DATABASE_URL=postgresql://...
+SESSION_SECRET=your_secret_key
+PAYDUNYA_MASTER_KEY=QdR289f6-ll84-iO0N-GgKj-0E3FWpnG0xqM
+PAYDUNYA_PUBLIC_KEY=live_public_GQEwMGBbhQW87K04Jf9Tg8kxYib
+PAYDUNYA_PRIVATE_KEY=live_private_5wUDp3LBBaBM9LLDVY7DVaCTOFE
+PAYDUNYA_TOKEN=XN1wEVW2Er1PkdtZcj9L
+BASE_URL=https://bkapay.com
 ```
 
-## API REST Complète pour Développeurs Tiers
+## Fichiers modifiés récemment (Session 3)
+- ✅ `client/src/components/softpay-qrcode.tsx` (NOUVEAU) - Composant QR Code embedded
+- ✅ `client/src/pages/pay.tsx` - Intégration QR Code pour paiements
+- ✅ `client/src/pages/merchant.tsx` - Intégration QR Code pour marchands
+- ✅ `server/utils/qrcode.ts` (NOUVEAU) - Utilities Paydunya SoftPay
+- ✅ `package.json` - Ajout `qrcode` library
 
-### Endpoints disponibles
-- ✅ **POST `/api/payments/create`** - Créer un paiement via clé API (public)
-- ✅ **GET `/api/transactions`** - Historique des transactions
-- ✅ **GET `/api/dashboard/stats`** - Statistiques en temps réel
-- ✅ **GET/POST `/api/payment-links`** - Gestion des liens de paiement
-- ✅ **GET/POST `/api/merchant-links`** - Gestion des liens marchands
-- ✅ **GET/POST `/api/api-keys`** - Gestion des clés API
-- ✅ **POST `/api/deposits`** - Créer un dépôt
-- ✅ **POST `/api/transfers`** - Créer un transfert/retrait
-- ✅ **POST `/api/webhooks/paydunya`** - Webhooks signés pour notifications
+## Design
+- Couleurs: Vert (#228B22) et Doré accent
+- Police: Inter, DM Sans
+- QR Codes: Vert BKApay sur fond blanc
+- Mode sombre supporté
 
-### Authentification API
-- Clés API publiques/privées pour développeurs
-- Bearer token authentication
-- Rate limiting: 10 requêtes/sec par clé
-- Webhooks signés (HMAC-SHA256)
-
-### Documentation
-- `API_DOCUMENTATION.md` - Documentation complète
-- `API_QUICK_START.md` - Guide de démarrage rapide
-- `SDK_INTEGRATION_EXAMPLES.md` - Exemples d'intégration (JS, Python, PHP, React, Vue)
-- `API_STATUS.md` - Statut et disponibilité
-
-### Features futures
-- SDK JavaScript officiel
-- SDK Python officiel
-- SDK PHP officiel
-- Plugin WooCommerce
-- Plugin Prestashop
-- Support Stripe Connect
-- API GraphQL
+## Statuts des fonctionnalités
+- ✅ Authentication & KYC
+- ✅ Paiements embedded (SoftPay QR Code) - NOUVEAU
+- ✅ Liens de paiement & marchands
+- ✅ Transactions webhook-driven
+- ✅ Frais silencieux
+- ✅ Suspension comptes
+- ✅ API Gateway
+- ✅ Admin Panel
+- 📋 SDKs officiels (planifié)
+- 📋 Plugins WooCommerce (planifié)
 
 ## Prochaines étapes potentielles
-- Implémenter les SDKs officiels
-- Ajouter les plugins de paiement
-- Support API GraphQL
-- Application mobile
+- OTP inline (alternative QR Code)
+- Charge modal avec spinner
+- Analytics détaillées par opérateur
+- Webhooks pour développeurs
+- SDKs JS, Python, PHP
+- Plugins WordPress/WooCommerce
