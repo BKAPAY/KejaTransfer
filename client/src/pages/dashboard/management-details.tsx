@@ -158,87 +158,105 @@ function TransactionDetailDialog({ transaction, onOpenChange }: { transaction: T
 
   return (
     <Dialog open={true} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md" data-testid="dialog-transaction-detail">
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto" data-testid="dialog-transaction-detail">
         <DialogHeader>
           <DialogTitle>Détails de la transaction</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4">
-          <div>
-            <label className="text-xs font-medium text-muted-foreground">ID Transaction</label>
-            <div className="p-2 bg-muted rounded-md text-xs font-mono mt-1 truncate">{transaction.id}</div>
+        <ScrollArea className="pr-4">
+          <div className="space-y-5">
+            {/* ID Transaction - Highlighted */}
+            <div className="bg-muted p-3 rounded-md border border-border">
+              <label className="text-xs font-medium text-muted-foreground block mb-2">ID Transaction</label>
+              <code className="text-xs font-mono break-all">{transaction.id}</code>
+            </div>
+
+            {/* Transaction Info Section */}
+            <div className="space-y-3">
+              <h3 className="font-semibold text-sm">Informations de la transaction</h3>
+              
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Type</label>
+                <div className="mt-1">
+                  <Badge variant="outline">{getTypeText(transaction.type)}</Badge>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Statut</label>
+                <div className="mt-1">
+                  <Badge variant={getStatusBadge(transaction.status)}>
+                    {getStatusText(transaction.status)}
+                  </Badge>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Montant</label>
+                <div className="p-2 bg-muted rounded-md text-lg font-semibold mt-1">
+                  {formatAmount(transaction.amount)}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Date et heure</label>
+                <div className="p-2 bg-muted rounded-md text-sm mt-1">
+                  {new Date(transaction.createdAt).toLocaleDateString("fr-FR", {
+                    weekday: "long",
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  })}{" "}
+                  à {new Date(transaction.createdAt).toLocaleTimeString("fr-FR")}
+                </div>
+              </div>
+
+              {transaction.description && (
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Description</label>
+                  <div className="p-2 bg-muted rounded-md text-sm mt-1">{transaction.description}</div>
+                </div>
+              )}
+            </div>
+
+            {/* Transaction Details */}
+            <div className="space-y-3">
+              {transaction.operator && (
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Opérateur</label>
+                  <div className="p-2 bg-muted rounded-md text-sm mt-1 uppercase font-semibold">{transaction.operator}</div>
+                </div>
+              )}
+
+              {transaction.country && (
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Pays</label>
+                  <div className="p-2 bg-muted rounded-md text-sm mt-1 uppercase font-semibold">{transaction.country}</div>
+                </div>
+              )}
+            </div>
+
+            {/* Client Info Section */}
+            {(transaction.customerEmail || transaction.customerPhone) && (
+              <div className="space-y-3">
+                <h3 className="font-semibold text-sm">Informations du client</h3>
+                
+                {transaction.customerEmail && (
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground">Email</label>
+                    <div className="p-2 bg-muted rounded-md text-sm mt-1 break-all">{transaction.customerEmail}</div>
+                  </div>
+                )}
+
+                {transaction.customerPhone && (
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground">Téléphone</label>
+                    <div className="p-2 bg-muted rounded-md text-sm mt-1">{transaction.customerPhone}</div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
-
-          <div>
-            <label className="text-xs font-medium text-muted-foreground">Type</label>
-            <div className="mt-2">
-              <Badge variant="outline">{getTypeText(transaction.type)}</Badge>
-            </div>
-          </div>
-
-          <div>
-            <label className="text-xs font-medium text-muted-foreground">Statut</label>
-            <div className="mt-2">
-              <Badge variant={getStatusBadge(transaction.status)}>
-                {getStatusText(transaction.status)}
-              </Badge>
-            </div>
-          </div>
-
-          <div>
-            <label className="text-xs font-medium text-muted-foreground">Montant</label>
-            <div className="p-2 bg-muted rounded-md text-lg font-semibold mt-1">
-              {formatAmount(transaction.amount)}
-            </div>
-          </div>
-
-          <div>
-            <label className="text-xs font-medium text-muted-foreground">Date</label>
-            <div className="p-2 bg-muted rounded-md text-sm mt-1">
-              {new Date(transaction.createdAt).toLocaleDateString("fr-FR", {
-                weekday: "long",
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              })}{" "}
-              à {new Date(transaction.createdAt).toLocaleTimeString("fr-FR")}
-            </div>
-          </div>
-
-          {transaction.description && (
-            <div>
-              <label className="text-xs font-medium text-muted-foreground">Description</label>
-              <div className="p-2 bg-muted rounded-md text-sm mt-1">{transaction.description}</div>
-            </div>
-          )}
-
-          {transaction.customerEmail && (
-            <div>
-              <label className="text-xs font-medium text-muted-foreground">Email Client</label>
-              <div className="p-2 bg-muted rounded-md text-sm mt-1 truncate">{transaction.customerEmail}</div>
-            </div>
-          )}
-
-          {transaction.customerPhone && (
-            <div>
-              <label className="text-xs font-medium text-muted-foreground">Téléphone Client</label>
-              <div className="p-2 bg-muted rounded-md text-sm mt-1">{transaction.customerPhone}</div>
-            </div>
-          )}
-
-          {transaction.operator && (
-            <div>
-              <label className="text-xs font-medium text-muted-foreground">Opérateur</label>
-              <div className="p-2 bg-muted rounded-md text-sm mt-1 uppercase">{transaction.operator}</div>
-            </div>
-          )}
-
-          {transaction.country && (
-            <div>
-              <label className="text-xs font-medium text-muted-foreground">Pays</label>
-              <div className="p-2 bg-muted rounded-md text-sm mt-1 uppercase">{transaction.country}</div>
-            </div>
-          )}
-        </div>
+        </ScrollArea>
       </DialogContent>
     </Dialog>
   );
