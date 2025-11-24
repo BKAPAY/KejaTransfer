@@ -745,6 +745,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Votre compte a été suspendu. Veuillez contacter le support." });
       }
 
+      // Check KYC verification for transfers
+      if (user.kycStatus !== "verified") {
+        return res.status(403).json({ 
+          error: "Vous devez vérifier votre identité (KYC) avant de faire des transferts.",
+          kycStatus: user.kycStatus
+        });
+      }
+
       if (!amount || amount <= 0) {
         return res.status(400).json({ error: "Montant invalide" });
       }

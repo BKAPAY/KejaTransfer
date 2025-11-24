@@ -12,7 +12,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { COUNTRIES, OPERATORS } from "@shared/schema";
 import type { User } from "@shared/schema";
-import { ArrowUpFromLine } from "lucide-react";
+import { ArrowUpFromLine, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { calculateOutgoingFee } from "@/lib/fees";
 
@@ -80,6 +80,16 @@ export default function Transfer() {
       return;
     }
 
+    // Check KYC verification
+    if (user.kycStatus !== "verified") {
+      toast({
+        title: "Vérification KYC requise",
+        description: "Vous devez vérifier votre identité (KYC) avant de faire des transferts. Veuillez compléter la vérification dans vos paramètres.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const feeInfo = calculateOutgoingFee(data.amount, selectedCountry);
     if (user.balance < feeInfo.totalDeductedFromBalance) {
       toast({
@@ -106,15 +116,26 @@ export default function Transfer() {
       </div>
 
       {user && (
-        <Alert className="py-2">
-          <AlertDescription className="text-xs">
-            <strong>Solde:</strong> {new Intl.NumberFormat("fr-FR", {
-              style: "currency",
-              currency: "XOF",
-              minimumFractionDigits: 0,
-            }).format(user.balance || 0)}
-          </AlertDescription>
-        </Alert>
+        <>
+          <Alert className="py-2">
+            <AlertDescription className="text-xs">
+              <strong>Solde:</strong> {new Intl.NumberFormat("fr-FR", {
+                style: "currency",
+                currency: "XOF",
+                minimumFractionDigits: 0,
+              }).format(user.balance || 0)}
+            </AlertDescription>
+          </Alert>
+          
+          {user.kycStatus !== "verified" && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Vous devez vérifier votre identité (KYC) avant de faire des transferts. Complétez la vérification dans vos paramètres.
+              </AlertDescription>
+            </Alert>
+          )}
+        </>
       )}
 
       <Card>
@@ -242,8 +263,9 @@ export default function Transfer() {
               <Button
                 type="submit"
                 className="w-full"
-                disabled={transferMutation.isPending}
+                disabled={transferMutation.isPending || user?.kycStatus !== "verified"}
                 data-testid="button-submit-transfer"
+                title={user?.kycStatus !== "verified" ? "Vous devez vérifier votre identité (KYC) avant de faire des transferts" : undefined}
               >
                 {transferMutation.isPending ? "En cours..." : "Effectuer le transfert"}
               </Button>
