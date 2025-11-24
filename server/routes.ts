@@ -799,10 +799,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Opérateur ou pays non supporté" });
       }
 
+      // Country phone codes
+      const countryPhoneCodes: Record<string, string> = {
+        "SN": "+221",
+        "CI": "+225",
+        "BF": "+226",
+        "BJ": "+229",
+        "TG": "+228",
+        "ML": "+223",
+      };
+
+      // Format phone number: add country code if not present
+      let formattedPhone = phone;
+      const countryCode = countryPhoneCodes[country.toUpperCase()];
+      if (countryCode && !phone.startsWith("+")) {
+        formattedPhone = countryCode + phone;
+      }
+
       // Initiate withdrawal with Paydunya
       const callbackUrl = `${process.env.BASE_URL || 'http://localhost:5000'}/api/webhooks/paydunya`;
       const paydunyaData = {
-        account_alias: phone.replace(/^[+\d]{1,3}/, ""), // Remove country code if present
+        account_alias: formattedPhone,
         amount: Math.floor(amount),
         withdraw_mode: withdrawMode,
         callback_url: callbackUrl,
