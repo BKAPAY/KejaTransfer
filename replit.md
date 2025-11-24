@@ -3,7 +3,7 @@
 ## Vue d'ensemble
 BKApay est une plateforme moderne de paiement mobile money pour l'Afrique de l'Ouest. Elle permet aux entreprises et particuliers d'accepter des paiements via mobile money (Orange Money, MTN, Moov, Wave, Free Money, T-Money, Wizall, Expresso) dans 6 pays: Bénin, Togo, Côte d'Ivoire, Sénégal, Burkina Faso et Mali.
 
-## Dernières modifications (24 Novembre 2025 - Session 6 SOFTPAY DEPOSITS & WEBHOOKS)
+## Dernières modifications (24 Novembre 2025 - Session 7 FOOTER POLICY PAGES)
 - ✅ **DÉPÔTS SOFTPAY SANS REDIRECTION - IMPLEMENTATION COMPLETE**
   * **Endpoint Dépôts**: POST `/api/softpay/create-payment` via Paydunya API v1 (checkout-invoice/create)
   * **Flux de dépôt SOFTPAY**:
@@ -31,6 +31,14 @@ BKApay est une plateforme moderne de paiement mobile money pour l'Afrique de l'O
   * **KYC obligatoire**: Vérification requise avant transferts
   * **Support multi-pays/opérateurs**: 6 pays, 17 opérateurs supportés
 
+- ✅ **PAGES DE POLITIQUE - IMPLEMENTATION COMPLETE** (SESSION 7)
+  * **Page Conditions**: `/terms` - Conditions Générales d'Utilisation complètes
+  * **Page Confidentialité**: `/privacy` - Politique de confidentialité détaillée
+  * **Page Cookies**: `/cookies` - Politique de gestion des cookies
+  * **Footer configuré**: Liens cliquables vers les 3 pages de politique
+  * **Navigation**: Bouton "Retour" pour revenir à l'accueil depuis chaque page
+  * **Design cohérent**: Layout professionnel avec Cards shadcn, sticky header
+
 - ✅ **PAYDUNYA PSR (PAIEMENT SANS REDIRECTION)** 
 - ✅ **TRANSACTIONS WEBHOOK-DRIVEN OPERATIONAL**
 - ✅ **KYC OBLIGATOIRE POUR TRANSFERTS**
@@ -46,6 +54,11 @@ BKApay est une plateforme moderne de paiement mobile money pour l'Afrique de l'O
   - Inscription/Connexion
   - Pages de paiement public avec PSR modal embedded (NOUVEAU - sans redirection)
   - Statut de paiement en temps réel
+  - **Pages de politique** (NEW):
+    * Conditions Générales d'Utilisation (/terms)
+    * Politique de Confidentialité (/privacy)
+    * Politique de Cookies (/cookies)
+    * Liens cliquables dans le footer de la page d'accueil
 
 - **Dashboard (authentifié)**:
   - Vue d'ensemble avec statistiques
