@@ -42,10 +42,19 @@ export default function Transfer() {
     },
   });
 
+  const { data: enabledCountriesOperators } = useQuery<Record<string, string[]>>({
+    queryKey: ["/api/countries-operators/withdrawals"],
+  });
+
   const selectedCountry = form.watch("country");
   const amount = form.watch("amount");
-  const countryOperators =
+  
+  // Filter operators based on admin configuration
+  const allCountryOperators =
     OPERATORS[(selectedCountry as keyof typeof OPERATORS) || ("BJ" as const)] || [];
+  const countryOperators = enabledCountriesOperators 
+    ? allCountryOperators.filter(op => (enabledCountriesOperators[selectedCountry] || []).includes(op.code))
+    : allCountryOperators;
 
   // Calculate total deducted in real-time
   const totalDeducted = selectedCountry && amount ? calculateOutgoingFee(Math.floor(amount), selectedCountry).totalDeductedFromBalance : 0;

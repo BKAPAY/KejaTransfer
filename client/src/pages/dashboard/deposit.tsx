@@ -58,7 +58,7 @@ export default function Deposit() {
   const allCountryOperators =
     OPERATORS[(selectedCountry as keyof typeof OPERATORS) || ("BJ" as const)] || [];
   const countryOperators = enabledCountriesOperators 
-    ? (enabledCountriesOperators[selectedCountry] || []).filter(op => allCountryOperators.includes(op))
+    ? allCountryOperators.filter(op => (enabledCountriesOperators[selectedCountry] || []).includes(op.code))
     : allCountryOperators;
 
   // Calculate net amount in real-time
