@@ -1118,17 +1118,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/admin/reject-kyc", requireAdmin, async (req: Request, res: Response) => {
     try {
-      const { userId } = req.body;
+      const { userId, reason } = req.body;
       if (!userId) {
         return res.status(400).json({ error: "userId is required" });
       }
-      const user = await storage.rejectKyc(userId);
+      const user = await storage.rejectKyc(userId, reason);
       if (!user) {
         return res.status(404).json({ error: "User not found" });
       }
       res.json(user);
     } catch (error: any) {
       console.error("Reject KYC error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/admin/kyc-submissions", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const submissions = await storage.getPendingKycSubmissions();
+      res.json(submissions);
+    } catch (error: any) {
+      console.error("Get KYC submissions error:", error);
       res.status(500).json({ error: error.message });
     }
   });

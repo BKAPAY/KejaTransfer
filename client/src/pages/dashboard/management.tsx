@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Users, Shield, Trash2, Plus, Minus, History, Link as LinkIcon, Store, Key, User as UserIcon, Check, X } from "lucide-react";
+import { Users, Shield, Trash2, Plus, Minus, History, Link as LinkIcon, Store, Key, User as UserIcon, Check, X, FileCheck } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
@@ -25,11 +25,13 @@ import {
   ApiKeysDialog,
   ProfileDialog,
 } from "./management-details";
+import { KycVerificationModal } from "@/components/kyc-verification-modal";
 
 export default function Management() {
   const [searchQuery, setSearchQuery] = useState("");
   const [fundAmount, setFundAmount] = useState<{ [userId: string]: string }>({});
   const { toast } = useToast();
+  const [kycModalOpen, setKycModalOpen] = useState(false);
 
   // Dialog states
   const [promoteDialog, setPromoteDialog] = useState<{ open: boolean; userId?: string; userName?: string }>({ open: false });
@@ -230,6 +232,15 @@ export default function Management() {
             <Users className="w-5 h-5" />
             Utilisateurs
           </CardTitle>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setKycModalOpen(true)}
+            data-testid="button-kyc-verification"
+          >
+            <FileCheck className="w-4 h-4 mr-2" />
+            KYC
+          </Button>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex gap-2">
@@ -623,6 +634,9 @@ export default function Management() {
       
       {/* API Keys Dialog */}
       {apiKeysViewUserId && <ApiKeysDialog userId={apiKeysViewUserId} onOpenChange={() => setApiKeysViewUserId(null)} />}
+
+      {/* KYC Verification Modal */}
+      <KycVerificationModal open={kycModalOpen} onOpenChange={setKycModalOpen} />
     </div>
   );
 }

@@ -15,6 +15,7 @@ export const users = pgTable("users", {
   kycIdFront: text("kyc_id_front"), // Base64 encoded or URL
   kycIdBack: text("kyc_id_back"), // Base64 encoded or URL
   kycSelfie: text("kyc_selfie"), // Base64 encoded or URL
+  kycRejectionReason: text("kyc_rejection_reason"), // Reason for KYC rejection
   isAdmin: boolean("is_admin").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });

@@ -254,6 +254,19 @@ export default function Settings() {
               <p className="text-sm font-medium text-foreground">Vérification en cours</p>
               <p className="text-xs text-muted-foreground mt-1">Nous vérifions vos documents...</p>
             </div>
+          ) : user?.kycRejectionReason ? (
+            <div className="space-y-4">
+              <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-lg p-4">
+                <div className="flex gap-3">
+                  <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-red-700 dark:text-red-300 mb-1">Vérification rejetée</p>
+                    <p className="text-sm text-red-600 dark:text-red-400">{user.kycRejectionReason}</p>
+                  </div>
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground">Veuillez soumettre à nouveau avec des documents conformes</p>
+            </div>
           ) : (
             <div className="space-y-4">
               {activeCamera ? (

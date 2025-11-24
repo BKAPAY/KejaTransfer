@@ -32,7 +32,8 @@ export interface IStorage {
   updateUserBalance(id: string, amount: number): Promise<User | undefined>;
   submitKyc(userId: string, kycData: { kycIdFront: string; kycIdBack: string; kycSelfie: string }): Promise<User | undefined>;
   approveKyc(userId: string): Promise<User | undefined>;
-  rejectKyc(userId: string): Promise<User | undefined>;
+  rejectKyc(userId: string, reason?: string): Promise<User | undefined>;
+  getPendingKycSubmissions(): Promise<User[]>;
 
   // Payment Links
   getPaymentLinks(userId: string): Promise<PaymentLink[]>;
@@ -124,15 +125,25 @@ export class DbStorage implements IStorage {
     return results[0];
   }
 
-  async rejectKyc(userId: string): Promise<User | undefined> {
+  async rejectKyc(userId: string, reason?: string): Promise<User | undefined> {
     const results = await db
       .update(schema.users)
-      .set({ kycStatus: "pending" })
+      .set({ 
+        kycStatus: "pending",
+        kycRejectionReason: reason || null,
+      })
       .where(eq(schema.users.id, userId))
       .returning();
     return results[0];
   }
 
+  async getPendingKycSubmissions(): Promise<User[]> {
+    return db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.kycStatus, "submitted"))
+      .orderBy(desc(schema.users.createdAt));
+  }
 
   // Payment Links
   async getPaymentLinks(userId: string): Promise<PaymentLink[]> {
