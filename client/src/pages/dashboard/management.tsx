@@ -179,7 +179,14 @@ export default function Management() {
         title: "Succès", 
         description: data.verified ? "Compte vérifiée" : "Compte dévérifiée" 
       });
-      refetchUsers();
+      // Store verification event for the user to see congratulations message
+      if (data.verified) {
+        localStorage.setItem(`verified_${data.id}`, new Date().toISOString());
+      }
+      // Refetch after a small delay to ensure database is updated
+      setTimeout(() => {
+        refetchUsers();
+      }, 500);
     },
     onError: () => {
       toast({ title: "Erreur", description: "Impossible de modifier la vérification", variant: "destructive" });
