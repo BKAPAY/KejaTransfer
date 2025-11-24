@@ -3,6 +3,30 @@
 ## Vue d'ensemble
 BKApay est une plateforme moderne de paiement mobile money pour l'Afrique de l'Ouest. Elle permet aux entreprises et particuliers d'accepter des paiements via mobile money (Orange Money, MTN, Moov, Wave, Free Money, T-Money, Wizall, Expresso) dans 6 pays: Bénin, Togo, Côte d'Ivoire, Sénégal, Burkina Faso et Mali.
 
+## Dernières modifications (24 Novembre 2025 - Session 9 AUTHENTIFICATION PRODUCTION)
+- ✅ **AUTHENTIFICATION PERSISTANTE - PROBLÈME PRODUCTION RÉSOLU**
+  * **Problème identifié**: Sessions ne persistaient pas en production, utilisateur déconnecté à l'actualisation
+  * **Cause racine**:
+    - MemoryStore par défaut (non persistant)
+    - Manque de `trust proxy` (cookies sécurisés rejetés derrière reverse proxy)
+    - `sameSite: 'strict'` trop restrictif (bloquait navigation)
+  * **Solution implémentée**:
+    1. **PostgreSQL Session Store**: Remplacement de MemoryStore par connect-pg-simple
+       - Table `session` créée automatiquement
+       - Sessions persistées dans PostgreSQL
+       - Survit aux redémarrages et actualisations
+    2. **Trust Proxy**: `app.set("trust proxy", 1)` activé en production
+       - Cookies sécurisés fonctionnent derrière reverse proxy
+    3. **Cookie SameSite**: Changé de "strict" à "lax"
+       - Permet navigation normale
+       - Maintient protection CSRF
+  * **Résultats**:
+    - ✅ Login fonctionne en production
+    - ✅ Sessions persistent après actualisation
+    - ✅ Redirection vers dashboard opérationnelle
+    - ✅ Pas de déconnexion intempestive
+  * **Tests confirmés**: Login → Actualisation → Session maintenue
+
 ## Dernières modifications (24 Novembre 2025 - Session 8 MIGRATION AUTOMATIQUE)
 - ✅ **MIGRATION AUTOMATIQUE BASE DE DONNÉES - IMPLEMENTATION COMPLETE**
   * **Script de bootstrap**: `server/db-bootstrap.ts` exécuté automatiquement au démarrage
