@@ -607,6 +607,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { customerName, customerEmail, customerPhone, country, operator } = req.body;
       const { token } = req.params;
 
+      console.log("[PAYMENT_LINK] Received request with:", {
+        customerName,
+        customerEmail,
+        customerPhone,
+        country,
+        operator,
+      });
+
       // Get payment link
       const paymentLink = await storage.getPaymentLinkByToken(token);
       if (!paymentLink || !paymentLink.isActive) {
@@ -690,6 +698,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { amount, customerName, customerEmail, customerPhone, country, operator } = req.body;
       const { token } = req.params;
+
+      console.log("[MERCHANT_LINK] Received request with:", {
+        amount,
+        customerName,
+        customerEmail,
+        customerPhone,
+        country,
+        operator,
+      });
 
       // Get merchant link
       const merchantLink = await storage.getMerchantLinkByToken(token);

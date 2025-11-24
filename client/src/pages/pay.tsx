@@ -271,7 +271,7 @@ export default function Pay() {
                     <FormLabel className="text-xs sm:text-sm">Numéro de téléphone</FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="77 123 45 67"
+                        placeholder={selectedCountry === "BJ" ? "0146447319" : selectedCountry === "SN" ? "771234567" : "01 46 44 73 19"}
                         data-testid="input-phone"
                         {...field}
                       />
