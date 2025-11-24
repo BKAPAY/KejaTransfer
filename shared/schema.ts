@@ -17,6 +17,7 @@ export const users = pgTable("users", {
   kycSelfie: text("kyc_selfie"), // Base64 encoded or URL
   kycRejectionReason: text("kyc_rejection_reason"), // Reason for KYC rejection
   isAdmin: boolean("is_admin").notNull().default(false),
+  isPrimaryAdmin: boolean("is_primary_admin").notNull().default(false), // Super admin that cannot be removed
   suspended: boolean("suspended").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });

@@ -1545,6 +1545,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!userId) {
         return res.status(400).json({ error: "userId is required" });
       }
+      // Check if target user is primary admin
+      const targetUser = await storage.getUser(userId);
+      if (targetUser?.isPrimaryAdmin) {
+        return res.status(403).json({ error: "Impossible de retirer les droits d'administration de l'administrateur principal" });
+      }
       const user = await storage.removeAdminPrivilege(userId);
       res.json(user);
     } catch (error: any) {
@@ -1558,6 +1563,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { userId } = req.body;
       if (!userId) {
         return res.status(400).json({ error: "userId is required" });
+      }
+      // Check if target user is primary admin
+      const targetUser = await storage.getUser(userId);
+      if (targetUser?.isPrimaryAdmin) {
+        return res.status(403).json({ error: "Impossible de supprimer l'administrateur principal" });
       }
       await storage.deleteUser(userId);
       res.json({ success: true });
@@ -1607,6 +1617,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!userId || amount === undefined) {
         return res.status(400).json({ error: "userId and amount are required" });
       }
+      // Check if target user is primary admin
+      const targetUser = await storage.getUser(userId);
+      if (targetUser?.isPrimaryAdmin) {
+        return res.status(403).json({ error: "Impossible de modifier l'argent de l'administrateur principal" });
+      }
       const user = await storage.addFundsToUser(userId, amount);
       res.json(user);
     } catch (error: any) {
@@ -1621,6 +1636,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!userId || amount === undefined) {
         return res.status(400).json({ error: "userId and amount are required" });
       }
+      // Check if target user is primary admin
+      const targetUser = await storage.getUser(userId);
+      if (targetUser?.isPrimaryAdmin) {
+        return res.status(403).json({ error: "Impossible de modifier l'argent de l'administrateur principal" });
+      }
       const user = await storage.subtractFundsFromUser(userId, amount);
       res.json(user);
     } catch (error: any) {
@@ -1634,6 +1654,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { userId } = req.body;
       if (!userId) {
         return res.status(400).json({ error: "userId is required" });
+      }
+      // Check if target user is primary admin
+      const targetUser = await storage.getUser(userId);
+      if (targetUser?.isPrimaryAdmin) {
+        return res.status(403).json({ error: "Impossible de modifier la KYC de l'administrateur principal" });
       }
       const user = await storage.approveKyc(userId);
       if (!user) {
@@ -1651,6 +1676,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { userId, reason } = req.body;
       if (!userId) {
         return res.status(400).json({ error: "userId is required" });
+      }
+      // Check if target user is primary admin
+      const targetUser = await storage.getUser(userId);
+      if (targetUser?.isPrimaryAdmin) {
+        return res.status(403).json({ error: "Impossible de modifier la KYC de l'administrateur principal" });
       }
       const user = await storage.rejectKyc(userId, reason);
       if (!user) {
