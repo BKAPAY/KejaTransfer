@@ -94,7 +94,7 @@ export default function Dashboard() {
           </Button>
           <Button 
             data-testid="button-transfer"
-            variant="outline"
+            variant="accent"
             className="flex-1 flex items-center justify-center gap-2"
             onClick={() => setLocation("/dashboard/transfer")}
           >
@@ -103,7 +103,7 @@ export default function Dashboard() {
           </Button>
           <Button 
             data-testid="button-withdrawal"
-            variant="outline"
+            variant="accent"
             className="flex-1 flex items-center justify-center gap-2"
             onClick={() => setLocation("/dashboard/withdrawal")}
           >

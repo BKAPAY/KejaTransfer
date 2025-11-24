@@ -19,6 +19,8 @@ const buttonVariants = cva(
           // Inherits the current text color.
           " border [border-color:var(--button-outline)]  shadow-xs active:shadow-none ",
         secondary: "border bg-secondary text-secondary-foreground border border-secondary-border ",
+        accent:
+          "bg-accent text-accent-foreground border border-accent-border",
         // Add a transparent border so that when someone toggles a border on later, it doesn't shift layout/size.
         ghost: "border border-transparent",
       },
