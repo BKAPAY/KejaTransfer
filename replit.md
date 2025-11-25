@@ -33,7 +33,7 @@ The frontend utilizes React 18 with TypeScript, styled with Shadcn UI and Tailwi
   - **Supported Operators**: Orange (SN/ML/BF/CI), MTN (BJ/ML/CI), Moov (BJ/TG/ML/BF/CI), Wave (SN/CI), Free (SN), Wizall (SN), Expresso (SN), T-Money (TG), Paydunya Wallet (all countries)
 - **Withdrawal/Transfer Flows**: Implemented using Paydunya v2 Disburse API, requiring KYC validation and balance checks.
 - **Embedded PSR Payments**: Integrates Paydunya's PSR SDK for direct payment modals.
-- **Silent Fees**: Automatic calculation of transaction fees (3% for Benin, 6% for other countries).
+- **Silent Fees**: Automatic calculation of transaction fees - UNIFORM 6% for ALL countries and operators.
 - **Account Suspension**: System for suspending and reactivating user accounts with primary admin protection.
 - **API Gateway**: Provides public/private API keys for developers to integrate with BKApay for incoming payments, including pending transaction creation and strict country validation.
 - **Fee System**: Robust and deterministic fee calculation logic distinguishing between INCOMING (client pays gross, credited net) and OUTGOING (user requests net, debited net+fees) transactions.
