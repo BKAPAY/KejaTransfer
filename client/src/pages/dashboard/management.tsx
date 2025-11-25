@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Users, Shield, Trash2, Plus, Minus, History, Link as LinkIcon, Store, Key, User as UserIcon, Check, X, FileCheck, AlertCircle, Unlock, Lock } from "lucide-react";
+import { Users, Shield, Trash2, Plus, Minus, History, Link as LinkIcon, Store, Key, User as UserIcon, Check, X, FileCheck, AlertCircle, Unlock, Lock, Clock, CheckCircle, XCircle, ArrowDownLeft, ArrowUpRight, Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
@@ -15,9 +15,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import type { User } from "@shared/schema";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import type { User, Transaction } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   HistoryDialog,
   PaymentLinksDialog,
@@ -26,6 +32,8 @@ import {
   ProfileDialog,
 } from "./management-details";
 import { useLocation } from "wouter";
+
+type PendingTransaction = Transaction & { user?: User };
 
 export default function Management() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -41,6 +49,7 @@ export default function Management() {
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; userId?: string; userName?: string }>({ open: false });
   const [suspendDialog, setSuspendDialog] = useState<{ open: boolean; userId?: string; userName?: string }>({ open: false });
   const [unsuspendDialog, setUnsuspendDialog] = useState<{ open: boolean; userId?: string; userName?: string }>({ open: false });
+  const [pendingTransactionsDialog, setPendingTransactionsDialog] = useState(false);
   
   // Details view states
   const [historyViewUserId, setHistoryViewUserId] = useState<string | null>(null);
@@ -51,6 +60,54 @@ export default function Management() {
 
   const { data: allUsers, isLoading: usersLoading, refetch: refetchUsers } = useQuery<User[]>({
     queryKey: ["/api/admin/users"],
+  });
+
+  const { data: pendingTransactions, isLoading: pendingLoading } = useQuery<PendingTransaction[]>({
+    queryKey: ["/api/admin/pending-transactions"],
+    refetchInterval: 10000,
+  });
+
+  const validateTransactionMutation = useMutation({
+    mutationFn: async (transactionId: string) => {
+      return apiRequest("POST", "/api/admin/validate-transaction", { transactionId });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Transaction validée",
+        description: "La transaction a été validée avec succès.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+    },
+    onError: () => {
+      toast({
+        title: "Erreur",
+        description: "Impossible de valider la transaction.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const rejectTransactionMutation = useMutation({
+    mutationFn: async (transactionId: string) => {
+      return apiRequest("POST", "/api/admin/reject-transaction", { transactionId });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Transaction rejetée",
+        description: "La transaction a été marquée comme échouée.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+    },
+    onError: () => {
+      toast({
+        title: "Erreur",
+        description: "Impossible de rejeter la transaction.",
+        variant: "destructive",
+      });
+    },
   });
 
   const { data: searchResults, isLoading: searchLoading } = useQuery<User[]>({
@@ -302,7 +359,22 @@ export default function Management() {
             <Users className="w-5 h-5" />
             Utilisateurs
           </CardTitle>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPendingTransactionsDialog(true)}
+              data-testid="button-pending-transactions"
+              className="relative"
+            >
+              <Clock className="w-4 h-4 mr-2" />
+              Transactions
+              {pendingTransactions && pendingTransactions.length > 0 && (
+                <Badge variant="destructive" className="ml-2 h-5 px-1.5 text-xs">
+                  {pendingTransactions.length}
+                </Badge>
+              )}
+            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -310,7 +382,7 @@ export default function Management() {
               data-testid="button-kyc-verification"
             >
               <FileCheck className="w-4 h-4 mr-2" />
-              En attente
+              KYC
             </Button>
             <Button
               variant="outline"
@@ -318,7 +390,7 @@ export default function Management() {
               onClick={() => navigate("/dashboard/kyc-history")}
               data-testid="button-kyc-history"
             >
-              <FileCheck className="w-4 h-4 mr-2" />
+              <History className="w-4 h-4 mr-2" />
               Historique
             </Button>
           </div>
@@ -781,6 +853,151 @@ export default function Management() {
           </div>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Pending Transactions Dialog */}
+      <Dialog open={pendingTransactionsDialog} onOpenChange={setPendingTransactionsDialog}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" data-testid="dialog-pending-transactions">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Clock className="w-5 h-5 text-orange-500" />
+              Transactions en Attente
+              {pendingTransactions && pendingTransactions.length > 0 && (
+                <Badge variant="destructive" className="ml-2">
+                  {pendingTransactions.length}
+                </Badge>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {pendingLoading ? (
+              <div className="space-y-2">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="flex items-center gap-4">
+                    <Skeleton className="h-10 w-10 rounded-full" />
+                    <div className="flex-1 space-y-1">
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-3 w-24" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : pendingTransactions && pendingTransactions.length > 0 ? (
+              <div className="border rounded-lg divide-y max-h-[60vh] overflow-y-auto">
+                {pendingTransactions.map((tx) => {
+                  const isIncoming = ["deposit", "payment_link", "merchant_link", "api_payment"].includes(tx.type);
+                  const isWithdrawal = tx.type === "withdrawal";
+                  const typeLabels: Record<string, string> = {
+                    deposit: "Dépôt",
+                    payment_link: "Lien de paiement",
+                    merchant_link: "Lien marchand",
+                    api_payment: "Paiement API",
+                    withdrawal: "Retrait",
+                    transfer: "Transfert",
+                  };
+                  
+                  return (
+                    <div
+                      key={tx.id}
+                      className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-muted/50"
+                      data-testid={`pending-tx-${tx.id}`}
+                    >
+                      <div className="flex items-start gap-3 flex-1 min-w-0">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                          isIncoming ? "bg-green-100 dark:bg-green-900" : "bg-orange-100 dark:bg-orange-900"
+                        }`}>
+                          {isIncoming ? (
+                            <ArrowDownLeft className="w-5 h-5 text-green-600 dark:text-green-400" />
+                          ) : (
+                            <ArrowUpRight className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap mb-1">
+                            <span className="font-semibold text-sm">
+                              {formatAmount(tx.amount)}
+                            </span>
+                            <Badge variant="secondary" className="text-xs">
+                              {typeLabels[tx.type] || tx.type}
+                            </Badge>
+                            {tx.country && (
+                              <Badge variant="outline" className="text-xs">
+                                {tx.country}
+                              </Badge>
+                            )}
+                            {tx.operator && (
+                              <Badge variant="outline" className="text-xs">
+                                {tx.operator}
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground truncate">
+                            {tx.user ? `${tx.user.firstName} ${tx.user.lastName}` : "Utilisateur inconnu"}
+                          </p>
+                          {tx.customerName && (
+                            <p className="text-xs text-muted-foreground">
+                              Client: {tx.customerName} {tx.customerPhone && `- ${tx.customerPhone}`}
+                            </p>
+                          )}
+                          {isWithdrawal && (
+                            <p className="text-xs text-muted-foreground">
+                              Frais: {formatAmount(tx.fee)} | Total déduit: {formatAmount(tx.amount + tx.fee)}
+                            </p>
+                          )}
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(tx.createdAt).toLocaleDateString("fr-FR", {
+                              day: "2-digit",
+                              month: "2-digit",
+                              year: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 flex-shrink-0">
+                        <Button
+                          size="sm"
+                          variant="default"
+                          onClick={() => validateTransactionMutation.mutate(tx.id)}
+                          disabled={validateTransactionMutation.isPending || rejectTransactionMutation.isPending}
+                          data-testid={`button-validate-${tx.id}`}
+                          className="bg-green-600 hover:bg-green-700"
+                        >
+                          {validateTransactionMutation.isPending ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <CheckCircle className="w-4 h-4" />
+                          )}
+                          <span className="ml-1">Valider</span>
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => rejectTransactionMutation.mutate(tx.id)}
+                          disabled={validateTransactionMutation.isPending || rejectTransactionMutation.isPending}
+                          data-testid={`button-reject-${tx.id}`}
+                        >
+                          {rejectTransactionMutation.isPending ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <XCircle className="w-4 h-4" />
+                          )}
+                          <span className="ml-1">Rejeter</span>
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <Clock className="w-12 h-12 mx-auto text-muted-foreground/50 mb-2" />
+                <p className="text-muted-foreground">Aucune transaction en attente</p>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Profile Dialog */}
       {profileViewUserId && <ProfileDialog userId={profileViewUserId} onOpenChange={() => setProfileViewUserId(null)} />}

@@ -1,24 +1,19 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { Users, UserCheck, TrendingDown, TrendingUp, Search, Settings, Globe, Clock, CheckCircle, XCircle, ArrowDownLeft, ArrowUpRight, Loader2 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Users, UserCheck, TrendingDown, TrendingUp, Search, Settings, Globe } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
 import { useLocation } from "wouter";
-import type { User, Transaction } from "@shared/schema";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
-
-type PendingTransaction = Transaction & { user?: User };
+import type { User } from "@shared/schema";
 
 export default function Admin() {
   const [searchQuery, setSearchQuery] = useState("");
   const [, setLocation] = useLocation();
-  const { toast } = useToast();
 
-  const { data: stats, isLoading: statsLoading, refetch: refetchStats } = useQuery<{
+  const { data: stats, isLoading: statsLoading } = useQuery<{
     totalUsers: number;
     verifiedUsers: number;
     totalDeposits: number;
@@ -30,52 +25,6 @@ export default function Admin() {
 
   const { data: allUsers, isLoading: usersLoading } = useQuery<User[]>({
     queryKey: ["/api/admin/users"],
-  });
-
-  const { data: pendingTransactions, isLoading: pendingLoading, refetch: refetchPending } = useQuery<PendingTransaction[]>({
-    queryKey: ["/api/admin/pending-transactions"],
-    refetchInterval: 10000,
-  });
-
-  const validateMutation = useMutation({
-    mutationFn: async (transactionId: string) => {
-      return apiRequest("POST", "/api/admin/validate-transaction", { transactionId });
-    },
-    onSuccess: () => {
-      toast({
-        title: "Transaction validée",
-        description: "Le solde de l'utilisateur a été crédité.",
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
-    },
-    onError: () => {
-      toast({
-        title: "Erreur",
-        description: "Impossible de valider la transaction.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const rejectMutation = useMutation({
-    mutationFn: async (transactionId: string) => {
-      return apiRequest("POST", "/api/admin/reject-transaction", { transactionId });
-    },
-    onSuccess: () => {
-      toast({
-        title: "Transaction rejetée",
-        description: "La transaction a été marquée comme échouée.",
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-transactions"] });
-    },
-    onError: () => {
-      toast({
-        title: "Erreur",
-        description: "Impossible de rejeter la transaction.",
-        variant: "destructive",
-      });
-    },
   });
 
   const { data: searchResults, isLoading: searchLoading } = useQuery<User[]>({
@@ -214,138 +163,6 @@ export default function Admin() {
           </CardContent>
         </Card>
       </div>
-
-      {/* Transactions en attente */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2">
-            <Clock className="w-5 h-5 text-orange-500" />
-            Transactions en Attente
-            {pendingTransactions && pendingTransactions.length > 0 && (
-              <Badge variant="destructive" className="ml-2">
-                {pendingTransactions.length}
-              </Badge>
-            )}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {pendingLoading ? (
-            <div className="space-y-2">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="flex items-center gap-4">
-                  <Skeleton className="h-10 w-10 rounded-full" />
-                  <div className="flex-1 space-y-1">
-                    <Skeleton className="h-4 w-32" />
-                    <Skeleton className="h-3 w-24" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : pendingTransactions && pendingTransactions.length > 0 ? (
-            <div className="border rounded-lg divide-y max-h-[400px] overflow-y-auto">
-              {pendingTransactions.map((tx) => {
-                const isIncoming = ["deposit", "payment_link", "merchant_link", "api_payment"].includes(tx.type);
-                const typeLabels: Record<string, string> = {
-                  deposit: "Dépôt",
-                  payment_link: "Lien de paiement",
-                  merchant_link: "Lien marchand",
-                  api_payment: "Paiement API",
-                  withdrawal: "Retrait",
-                  transfer: "Transfert",
-                };
-                
-                return (
-                  <div
-                    key={tx.id}
-                    className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-muted/50"
-                    data-testid={`pending-tx-${tx.id}`}
-                  >
-                    <div className="flex items-start gap-3 flex-1 min-w-0">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-                        isIncoming ? "bg-green-100 dark:bg-green-900" : "bg-orange-100 dark:bg-orange-900"
-                      }`}>
-                        {isIncoming ? (
-                          <ArrowDownLeft className="w-5 h-5 text-green-600 dark:text-green-400" />
-                        ) : (
-                          <ArrowUpRight className="w-5 h-5 text-orange-600 dark:text-orange-400" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap mb-1">
-                          <span className="font-semibold text-sm">
-                            {formatAmount(tx.amount)}
-                          </span>
-                          <Badge variant="secondary" className="text-xs">
-                            {typeLabels[tx.type] || tx.type}
-                          </Badge>
-                          {tx.country && (
-                            <Badge variant="outline" className="text-xs">
-                              {tx.country}
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="text-sm text-muted-foreground truncate">
-                          {tx.user ? `${tx.user.firstName} ${tx.user.lastName}` : "Utilisateur inconnu"}
-                        </p>
-                        {tx.customerName && (
-                          <p className="text-xs text-muted-foreground">
-                            Client: {tx.customerName}
-                          </p>
-                        )}
-                        <p className="text-xs text-muted-foreground">
-                          {new Date(tx.createdAt).toLocaleDateString("fr-FR", {
-                            day: "2-digit",
-                            month: "2-digit",
-                            year: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex gap-2 flex-shrink-0">
-                      <Button
-                        size="sm"
-                        variant="default"
-                        onClick={() => validateMutation.mutate(tx.id)}
-                        disabled={validateMutation.isPending || rejectMutation.isPending}
-                        data-testid={`button-validate-${tx.id}`}
-                        className="bg-green-600 hover:bg-green-700"
-                      >
-                        {validateMutation.isPending ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <CheckCircle className="w-4 h-4" />
-                        )}
-                        <span className="ml-1 hidden sm:inline">Valider</span>
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={() => rejectMutation.mutate(tx.id)}
-                        disabled={validateMutation.isPending || rejectMutation.isPending}
-                        data-testid={`button-reject-${tx.id}`}
-                      >
-                        {rejectMutation.isPending ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <XCircle className="w-4 h-4" />
-                        )}
-                        <span className="ml-1 hidden sm:inline">Rejeter</span>
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <Clock className="w-12 h-12 mx-auto text-muted-foreground/50 mb-2" />
-              <p className="text-muted-foreground">Aucune transaction en attente</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
 
       {/* Recherche d'utilisateurs */}
       <Card>
