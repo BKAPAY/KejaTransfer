@@ -33,7 +33,7 @@ type PaymentFormData = z.infer<typeof paymentSchema>;
 const ORANGE_INSTRUCTIONS: Record<string, string> = {
   SN: "Composez #144#391*VOTRE CODE PIN ORANGE MONEY# pour obtenir votre code de paiement",
   CI: "Composez #144*82# puis choisissez l'option 2 pour obtenir votre code de paiement",
-  BF: "Composez *555*6# sur votre téléphone pour compléter le paiement",
+  BF: "Composez *555*6# sur votre téléphone pour obtenir votre code OTP",
 };
 
 // Clé pour stocker l'état du paiement
