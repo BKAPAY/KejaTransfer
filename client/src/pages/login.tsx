@@ -110,11 +110,13 @@ export default function Login() {
               />
 
               <div className="text-sm">
-                <Link href="/forgot-password">
-                  <span className="text-primary hover:underline" data-testid="link-forgot-password">
-                    Mot de passe oublié ?
-                  </span>
-                </Link>
+                <span 
+                  className="text-primary cursor-default" 
+                  data-testid="link-forgot-password"
+                  onClick={(e) => e.preventDefault()}
+                >
+                  Mot de passe oublié ?
+                </span>
               </div>
 
               <Button

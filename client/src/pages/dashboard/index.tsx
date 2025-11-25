@@ -95,15 +95,6 @@ export default function Dashboard() {
             Dépôt
           </Button>
           <Button 
-            data-testid="button-transfer"
-            variant="accent"
-            className="flex-1 flex items-center justify-center gap-2"
-            onClick={() => setLocation("/dashboard/transfer")}
-          >
-            <ArrowUpFromLine className="h-4 w-4" />
-            Transfert
-          </Button>
-          <Button 
             data-testid="button-withdrawal"
             variant="accent"
             className="flex-1 flex items-center justify-center gap-2"
