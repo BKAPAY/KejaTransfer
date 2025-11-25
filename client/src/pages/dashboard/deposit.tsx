@@ -17,6 +17,13 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { calculateIncomingFee } from "@/lib/fees";
 import { useState, useEffect } from "react";
 
+// Instructions USSD Orange par pays
+const ORANGE_INSTRUCTIONS: Record<string, string> = {
+  SN: "Composez #144#391*VOTRE CODE PIN ORANGE MONEY# pour obtenir votre code de paiement",
+  CI: "Composez #144*82# puis choisissez l'option 2 pour obtenir votre code de paiement",
+  BF: "Composez *555*6# sur votre téléphone pour obtenir votre code OTP",
+};
+
 const depositSchema = z.object({
   amount: z.number().min(1, "Le montant doit être supérieur à 0"),
   country: z.string().min(1, "Sélectionnez un pays"),
@@ -388,6 +395,16 @@ export default function Deposit() {
                     </FormItem>
                   )}
                 />
+
+                {selectedOperator?.toLowerCase().includes("orange") && selectedCountry && ORANGE_INSTRUCTIONS[selectedCountry] && (
+                  <Alert className="border-orange-200 bg-orange-50 dark:bg-orange-950 dark:border-orange-800">
+                    <Info className="h-4 w-4 text-orange-600 dark:text-orange-500" />
+                    <AlertDescription className="text-sm text-orange-900 dark:text-orange-100 ml-2">
+                      <strong>Instructions Orange Money:</strong>
+                      <p className="mt-1 font-mono text-xs">{ORANGE_INSTRUCTIONS[selectedCountry]}</p>
+                    </AlertDescription>
+                  </Alert>
+                )}
 
                 {amount && selectedCountry && netAmount > 0 && (
                   <div className="bg-muted p-3 rounded-md border">

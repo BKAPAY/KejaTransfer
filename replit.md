@@ -31,6 +31,11 @@ The frontend utilizes React 18 with TypeScript, styled with Shadcn UI and Tailwi
   - **Message Sanitization**: Wizall messages stripped of HTML/special chars with 200-char limit for professional UX
   - **Frontend Stages**: form → init → ussd → (otp for Wizall/direct OTP operators) → polling → completed
   - **Supported Operators**: Orange (SN/ML/BF/CI), MTN (BJ/ML/CI), Moov (BJ/TG/ML/BF/CI), Wave (SN/CI), Free (SN), Wizall (SN), Expresso (SN), T-Money (TG), Paydunya Wallet (all countries)
+  - **Orange Money OTP Flows (ALL countries require OTP)**:
+    - Senegal (SN): USSD #144#391*PIN# → OTP code → Confirm
+    - Côte d'Ivoire (CI): USSD #144*82# option 2 → OTP code → Confirm
+    - Burkina Faso (BF): USSD *555*6# → OTP code → Confirm
+  - **Orange Money Instructions**: Displayed in all payment entry points (deposit.tsx, pay.tsx, merchant.tsx) with country-specific USSD codes
 - **Withdrawal Flows**: Implemented using Paydunya v2 Disburse API (get-invoice → submit-invoice). Features include KYC validation, balance checks, proper phone number sanitization (strips international prefixes, validates country-specific lengths), and immediate balance deduction on success. Transfer functionality has been removed - only withdrawals are supported.
 - **Embedded PSR Payments**: Integrates Paydunya's PSR SDK for direct payment modals.
 - **Silent Fees**: Automatic calculation of transaction fees - UNIFORM 6% for ALL countries and operators.
