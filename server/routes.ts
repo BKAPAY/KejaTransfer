@@ -153,6 +153,38 @@ async function callPaydunyaAPIv2(endpoint: string, data: any) {
   }
 }
 
+// Helper function to call Paydunya API v2 GET (for invoice status check)
+async function callPaydunyaAPIv2Get(endpoint: string) {
+  try {
+    const url = `https://app.paydunya.com/api/v2${endpoint}`;
+    console.log(`[Paydunya APIv2 GET] Calling: ${url}`);
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        "PAYDUNYA-MASTER-KEY": PAYDUNYA_CONFIG.masterKey,
+        "PAYDUNYA-PRIVATE-KEY": PAYDUNYA_CONFIG.privateKey,
+        "PAYDUNYA-TOKEN": PAYDUNYA_CONFIG.token,
+      },
+    });
+
+    const responseText = await response.text();
+    console.log(`[Paydunya APIv2 GET] Response Status: ${response.status}, Text: ${responseText.substring(0, 500)}`);
+
+    try {
+      const result = JSON.parse(responseText);
+      return result;
+    } catch (e) {
+      console.error(`[Paydunya APIv2 GET] Received non-JSON response:`, responseText.substring(0, 500));
+      throw new Error(`Paydunya API error: ${responseText.substring(0, 200)}`);
+    }
+  } catch (error) {
+    console.error(`[Paydunya APIv2 GET Error] ${endpoint}:`, error);
+    throw error;
+  }
+}
+
 // Sanitize message helper (strip HTML, cap length, fallback to generic)
 function sanitizePaymentMessage(msg: string | undefined, fallback: string = "Erreur de paiement"): string {
   if (!msg) return fallback;
@@ -1923,7 +1955,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Verify SOFTPAY Payment - Polling endpoint
+  // Verify SOFTPAY Payment - Polling endpoint (uses Paydunya API v2)
   app.post("/api/softpay/verify-payment", async (req: Request, res: Response) => {
     try {
       const { invoiceToken } = req.body;
@@ -1934,20 +1966,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log("[SOFTPAY] Verifying payment with token:", invoiceToken);
 
-      // Call Paydunya to check payment status
-      const paydunyaResponse = await callPaydunyaAPI("/query-invoice/" + invoiceToken, {});
+      // Call Paydunya API v2 to check payment status (GET /invoice/confirm/:token)
+      const paydunyaResponse = await callPaydunyaAPIv2Get("/invoice/confirm/" + invoiceToken);
 
-      if (paydunyaResponse.response_code === "00" && paydunyaResponse.status === "completed") {
+      // v2 response format: { status: "completed" | "pending" | "cancelled", ... }
+      if (paydunyaResponse.status === "completed") {
         res.json({
           status: "completed",
           response_code: "00",
         });
-      } else if (paydunyaResponse.response_code === "00") {
+      } else if (paydunyaResponse.status === "pending") {
         res.json({
           status: "pending",
           response_code: "01",
         });
       } else {
+        // cancelled or other status
         res.json({
           status: "failed",
           response_code: "05",
@@ -1955,6 +1989,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     } catch (error: any) {
       console.error("[SOFTPAY] Verify payment error:", error);
+      // On error, return pending to continue polling
       res.json({
         status: "pending",
         response_code: "01",
