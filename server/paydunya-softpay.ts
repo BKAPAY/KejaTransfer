@@ -44,7 +44,7 @@ export const SOFTPAY_OPERATORS: Record<string, SoftpayOperatorConfig> = {
     endpoint: "/softpay/new-orange-money-senegal",
     requiresOTP: true,
     requiresTwoStep: false,
-    ussdInstruction: "Composez #144#391*[VOTRE_CODE_PIN]# pour générer votre code de paiement Orange Money",
+    ussdInstruction: "Composez #144#391*VOTRE CODE PIN ORANGE MONEY# pour obtenir votre code de paiement",
     parameterMapping: (data) => ({
       customer_name: data.customerName,
       customer_email: data.customerEmail,
@@ -211,7 +211,7 @@ export const SOFTPAY_OPERATORS: Record<string, SoftpayOperatorConfig> = {
     endpoint: "/softpay/orange-money-ci",
     requiresOTP: true,
     requiresTwoStep: false,
-    ussdInstruction: "Composez #144*82# puis option 2 pour obtenir votre code de paiement Orange Money",
+    ussdInstruction: "Composez #144*82# puis choisissez l'option 2 pour obtenir votre code de paiement",
     parameterMapping: (data) => ({
       orange_money_ci_customer_fullname: data.customerName,
       orange_money_ci_email: data.customerEmail,
@@ -264,14 +264,13 @@ export const SOFTPAY_OPERATORS: Record<string, SoftpayOperatorConfig> = {
   // BURKINA FASO OPERATORS
   "orange_bf": {
     endpoint: "/softpay/orange-money-burkina",
-    requiresOTP: true,
+    requiresOTP: false,
     requiresTwoStep: false,
-    ussdInstruction: "Générez votre code OTP Orange Money et entrez-le pour confirmer",
+    ussdInstruction: "Composez *555*6# sur votre téléphone pour compléter le paiement",
     parameterMapping: (data) => ({
       name_bf: data.customerName,
       email_bf: data.customerEmail,
       phone_bf: data.phoneNumber,
-      otp_code: data.authorizationCode,
       payment_token: data.invoiceToken
     })
   },

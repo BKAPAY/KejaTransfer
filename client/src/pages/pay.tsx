@@ -29,6 +29,51 @@ const paymentSchema = z.object({
 
 type PaymentFormData = z.infer<typeof paymentSchema>;
 
+// Instructions USSD Orange par pays
+const ORANGE_INSTRUCTIONS: Record<string, string> = {
+  SN: "Composez #144#391*VOTRE CODE PIN ORANGE MONEY# pour obtenir votre code de paiement",
+  CI: "Composez #144*82# puis choisissez l'option 2 pour obtenir votre code de paiement",
+  BF: "Composez *555*6# sur votre téléphone pour compléter le paiement",
+};
+
+// Clé pour stocker l'état du paiement
+function getPaymentStateKey(token: string): string {
+  return `payment_state_${token}`;
+}
+
+interface PaymentState {
+  stage: "form" | "ussd" | "otp" | "polling" | "completed" | "failed";
+  invoiceToken: string | null;
+  transactionId: string | null;
+  ussdInstruction: string | null;
+  wizallTransactionId: string | null;
+  country: string;
+  operator: string;
+  customerName: string;
+  customerEmail: string;
+  customerPhone: string;
+}
+
+function savePaymentState(token: string, state: PaymentState): void {
+  localStorage.setItem(getPaymentStateKey(token), JSON.stringify(state));
+}
+
+function loadPaymentState(token: string): PaymentState | null {
+  const stored = localStorage.getItem(getPaymentStateKey(token));
+  if (stored) {
+    try {
+      return JSON.parse(stored);
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+function clearPaymentState(token: string): void {
+  localStorage.removeItem(getPaymentStateKey(token));
+}
+
 export default function Pay() {
   const [, params] = useRoute("/pay/:token");
   const token = params?.token;
@@ -39,6 +84,8 @@ export default function Pay() {
   const [wizallTransactionId, setWizallTransactionId] = useState<string | null>(null);
   const [authCode, setAuthCode] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [savedCountry, setSavedCountry] = useState<string>("");
+  const [savedOperator, setSavedOperator] = useState<string>("");
   const { toast } = useToast();
 
   const { data: paymentLink, isLoading: linkLoading } = useQuery<PaymentLink>({
@@ -57,6 +104,32 @@ export default function Pay() {
     },
   });
 
+  // Restaurer l'état du paiement au chargement
+  useEffect(() => {
+    if (!token) return;
+    
+    const savedState = loadPaymentState(token);
+    if (savedState && savedState.stage !== "form" && savedState.stage !== "completed" && savedState.stage !== "failed") {
+      // Restaurer l'état sauvegardé
+      setPaymentStage(savedState.stage);
+      setInvoiceToken(savedState.invoiceToken);
+      setTransactionId(savedState.transactionId);
+      setUssdInstruction(savedState.ussdInstruction);
+      setWizallTransactionId(savedState.wizallTransactionId);
+      setSavedCountry(savedState.country);
+      setSavedOperator(savedState.operator);
+      
+      // Restaurer les valeurs du formulaire pour confirmation
+      form.reset({
+        customerName: savedState.customerName,
+        customerEmail: savedState.customerEmail,
+        customerPhone: savedState.customerPhone,
+        country: savedState.country,
+        operator: savedState.operator,
+      });
+    }
+  }, [token, form]);
+
   const selectedCountry = form.watch("country");
   const countryOperators = selectedCountry ? OPERATORS[(selectedCountry as keyof typeof OPERATORS) || ("BJ" as const)] || [] : [];
 
@@ -67,6 +140,7 @@ export default function Pay() {
     enabled: paymentStage === "polling",
     onCompleted: () => {
       setPaymentStage("completed");
+      if (token) clearPaymentState(token);
       toast({
         title: "Paiement réussi",
         description: "Votre transaction a été confirmée",
@@ -74,6 +148,7 @@ export default function Pay() {
     },
     onFailed: () => {
       setPaymentStage("failed");
+      if (token) clearPaymentState(token);
       toast({
         title: "Paiement échoué",
         description: "La transaction n'a pas pu être complétée",
@@ -82,6 +157,7 @@ export default function Pay() {
     },
     onExpired: () => {
       setPaymentStage("failed");
+      if (token) clearPaymentState(token);
       toast({
         title: "Délai expiré",
         description: "Le temps de validation a expiré",
@@ -104,21 +180,42 @@ export default function Pay() {
     },
     onSuccess: (data: any) => {
       if (data.transactionId && data.token) {
+        const formData = form.getValues();
         setTransactionId(data.transactionId);
         setInvoiceToken(data.token);
         setUssdInstruction(data.ussdInstruction || data.message || null);
+        setSavedCountry(formData.country);
+        setSavedOperator(formData.operator);
+        
+        let newStage: "ussd" | "otp" | "polling" = "polling";
         
         if (data.requiresTwoStep) {
-          setPaymentStage("ussd");
+          newStage = "ussd";
         } else if (data.requiresOTP) {
-          setPaymentStage("otp");
+          newStage = "otp";
         } else {
-          // Non-OTP operators - go directly to polling (SOFTPAY was already called)
           countdown.startCountdown();
-          setPaymentStage("polling");
           toast({
             title: "Paiement initié",
             description: "Veuillez valider le paiement sur votre téléphone",
+          });
+        }
+        
+        setPaymentStage(newStage);
+        
+        // Sauvegarder l'état pour persistance
+        if (token) {
+          savePaymentState(token, {
+            stage: newStage,
+            invoiceToken: data.token,
+            transactionId: data.transactionId,
+            ussdInstruction: data.ussdInstruction || data.message || null,
+            wizallTransactionId: null,
+            country: formData.country,
+            operator: formData.operator,
+            customerName: formData.customerName,
+            customerEmail: formData.customerEmail,
+            customerPhone: formData.customerPhone,
           });
         }
       }
@@ -136,12 +233,14 @@ export default function Pay() {
   const confirmMutation = useMutation({
     mutationFn: async ({ authorizationCode }: { authorizationCode?: string }) => {
       const formData = form.getValues();
+      const country = formData.country || savedCountry;
+      const operator = formData.operator || savedOperator;
       const payload: any = {
         token: invoiceToken,
         transactionId,
         authorizationCode,
-        country: formData.country,
-        operator: formData.operator,
+        country,
+        operator,
         customerPhone: formData.customerPhone,
         customerName: formData.customerName,
         customerEmail: formData.customerEmail,
@@ -159,15 +258,40 @@ export default function Pay() {
         if (data.requiresOTP && data.wizallTransactionId) {
           setWizallTransactionId(data.wizallTransactionId);
           setPaymentStage("otp");
+          
+          // Mettre à jour l'état sauvegardé
+          if (token) {
+            const currentState = loadPaymentState(token);
+            if (currentState) {
+              savePaymentState(token, {
+                ...currentState,
+                stage: "otp",
+                wizallTransactionId: data.wizallTransactionId,
+              });
+            }
+          }
+          
           toast({
             title: "Code OTP envoyé",
             description: "Veuillez entrer le code reçu par SMS",
           });
         } else if (data.redirectUrl) {
+          if (token) clearPaymentState(token);
           window.location.href = data.redirectUrl;
         } else {
           countdown.startCountdown();
           setPaymentStage("polling");
+          
+          // Mettre à jour l'état sauvegardé
+          if (token) {
+            const currentState = loadPaymentState(token);
+            if (currentState) {
+              savePaymentState(token, {
+                ...currentState,
+                stage: "polling",
+              });
+            }
+          }
         }
       }
     },
@@ -178,6 +302,7 @@ export default function Pay() {
         variant: "destructive",
       });
       setPaymentStage("form");
+      if (token) clearPaymentState(token);
     },
   });
 
@@ -395,25 +520,45 @@ export default function Pay() {
 
   // STAGE: OTP input
   if (paymentStage === "otp") {
+    const currentCountry = form.getValues("country") || savedCountry;
+    const currentOperator = form.getValues("operator") || savedOperator;
+    const isOrangeOperator = currentOperator.toLowerCase().includes("orange");
+    const orangeInstruction = isOrangeOperator && currentCountry ? ORANGE_INSTRUCTIONS[currentCountry] : null;
+    
     return (
       <div className="w-full min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center p-4 overflow-hidden">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center space-y-2">
             <img src={logoImage} alt="BKApay" className="h-10 w-auto mx-auto" />
             <CardTitle>Code de confirmation</CardTitle>
-            <CardDescription>Entrez le code OTP reçu par SMS</CardDescription>
+            <CardDescription>
+              {isOrangeOperator 
+                ? "Générez votre code de paiement Orange Money" 
+                : "Entrez le code OTP reçu par SMS"}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Instructions Orange Money */}
+            {orangeInstruction && (
+              <Alert className="bg-orange-50 dark:bg-orange-950 border-orange-200 dark:border-orange-800">
+                <AlertCircle className="h-4 w-4 text-orange-600" />
+                <AlertDescription className="text-sm text-orange-800 dark:text-orange-200">
+                  <strong>Instructions :</strong><br/>
+                  {orangeInstruction}
+                </AlertDescription>
+              </Alert>
+            )}
+            
             <div>
               <label htmlFor="auth-code" className="block text-sm font-medium mb-2">
-                Code OTP
+                Code de paiement
               </label>
               <Input
                 id="auth-code"
                 type="text"
                 value={authCode}
                 onChange={(e) => setAuthCode(e.target.value)}
-                placeholder="Entrez le code"
+                placeholder="Entrez le code obtenu"
                 data-testid="input-otp"
               />
             </div>

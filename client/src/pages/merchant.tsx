@@ -30,6 +30,52 @@ const merchantPaymentSchema = z.object({
 
 type MerchantPaymentFormData = z.infer<typeof merchantPaymentSchema>;
 
+// Instructions USSD Orange par pays
+const ORANGE_INSTRUCTIONS: Record<string, string> = {
+  SN: "Composez #144#391*VOTRE CODE PIN ORANGE MONEY# pour obtenir votre code de paiement",
+  CI: "Composez #144*82# puis choisissez l'option 2 pour obtenir votre code de paiement",
+  BF: "Composez *555*6# sur votre téléphone pour compléter le paiement",
+};
+
+// Clé pour stocker l'état du paiement
+function getMerchantPaymentStateKey(token: string): string {
+  return `merchant_payment_state_${token}`;
+}
+
+interface MerchantPaymentState {
+  stage: "form" | "ussd" | "otp" | "polling" | "completed" | "failed";
+  invoiceToken: string | null;
+  transactionId: string | null;
+  ussdInstruction: string | null;
+  wizallTransactionId: string | null;
+  paidAmount: number;
+  country: string;
+  operator: string;
+  customerName: string;
+  customerEmail: string;
+  customerPhone: string;
+}
+
+function saveMerchantPaymentState(token: string, state: MerchantPaymentState): void {
+  localStorage.setItem(getMerchantPaymentStateKey(token), JSON.stringify(state));
+}
+
+function loadMerchantPaymentState(token: string): MerchantPaymentState | null {
+  const stored = localStorage.getItem(getMerchantPaymentStateKey(token));
+  if (stored) {
+    try {
+      return JSON.parse(stored);
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+function clearMerchantPaymentState(token: string): void {
+  localStorage.removeItem(getMerchantPaymentStateKey(token));
+}
+
 export default function Merchant() {
   const [, params] = useRoute("/merchant/:token");
   const token = params?.token;
@@ -41,6 +87,8 @@ export default function Merchant() {
   const [authCode, setAuthCode] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [paidAmount, setPaidAmount] = useState<number>(0);
+  const [savedCountry, setSavedCountry] = useState<string>("");
+  const [savedOperator, setSavedOperator] = useState<string>("");
   const { toast } = useToast();
 
   const { data: merchantLink, isLoading: linkLoading } = useQuery<MerchantLink>({
@@ -60,6 +108,33 @@ export default function Merchant() {
     },
   });
 
+  // Restaurer l'état du paiement au chargement
+  useEffect(() => {
+    if (!token) return;
+    
+    const savedState = loadMerchantPaymentState(token);
+    if (savedState && savedState.stage !== "form" && savedState.stage !== "completed" && savedState.stage !== "failed") {
+      setPaymentStage(savedState.stage);
+      setInvoiceToken(savedState.invoiceToken);
+      setTransactionId(savedState.transactionId);
+      setUssdInstruction(savedState.ussdInstruction);
+      setWizallTransactionId(savedState.wizallTransactionId);
+      setPaidAmount(savedState.paidAmount);
+      setSavedCountry(savedState.country);
+      setSavedOperator(savedState.operator);
+      
+      // Restaurer les valeurs du formulaire pour confirmation
+      form.reset({
+        amount: savedState.paidAmount,
+        customerName: savedState.customerName,
+        customerEmail: savedState.customerEmail,
+        customerPhone: savedState.customerPhone,
+        country: savedState.country,
+        operator: savedState.operator,
+      });
+    }
+  }, [token, form]);
+
   const selectedCountry = form.watch("country");
   const countryOperators = selectedCountry ? OPERATORS[(selectedCountry as keyof typeof OPERATORS) || ("BJ" as const)] || [] : [];
 
@@ -70,6 +145,7 @@ export default function Merchant() {
     enabled: paymentStage === "polling",
     onCompleted: () => {
       setPaymentStage("completed");
+      if (token) clearMerchantPaymentState(token);
       toast({
         title: "Paiement réussi",
         description: "Votre transaction a été confirmée",
@@ -77,6 +153,7 @@ export default function Merchant() {
     },
     onFailed: () => {
       setPaymentStage("failed");
+      if (token) clearMerchantPaymentState(token);
       toast({
         title: "Paiement échoué",
         description: "La transaction n'a pas pu être complétée",
@@ -85,6 +162,7 @@ export default function Merchant() {
     },
     onExpired: () => {
       setPaymentStage("failed");
+      if (token) clearMerchantPaymentState(token);
       toast({
         title: "Délai expiré",
         description: "Le temps de validation a expiré",
@@ -108,22 +186,44 @@ export default function Merchant() {
     },
     onSuccess: (data: any) => {
       if (data.transactionId && data.token) {
+        const formData = form.getValues();
         setTransactionId(data.transactionId);
         setInvoiceToken(data.token);
         setUssdInstruction(data.ussdInstruction || data.message || null);
-        setPaidAmount(form.getValues("amount"));
+        setPaidAmount(formData.amount);
+        setSavedCountry(formData.country);
+        setSavedOperator(formData.operator);
+        
+        let newStage: "ussd" | "otp" | "polling" = "polling";
         
         if (data.requiresTwoStep) {
-          setPaymentStage("ussd");
+          newStage = "ussd";
         } else if (data.requiresOTP) {
-          setPaymentStage("otp");
+          newStage = "otp";
         } else {
-          // Non-OTP operators - go directly to polling (SOFTPAY was already called)
           countdown.startCountdown();
-          setPaymentStage("polling");
           toast({
             title: "Paiement initié",
             description: "Veuillez valider le paiement sur votre téléphone",
+          });
+        }
+        
+        setPaymentStage(newStage);
+        
+        // Sauvegarder l'état pour persistance
+        if (token) {
+          saveMerchantPaymentState(token, {
+            stage: newStage,
+            invoiceToken: data.token,
+            transactionId: data.transactionId,
+            ussdInstruction: data.ussdInstruction || data.message || null,
+            wizallTransactionId: null,
+            paidAmount: formData.amount,
+            country: formData.country,
+            operator: formData.operator,
+            customerName: formData.customerName,
+            customerEmail: formData.customerEmail,
+            customerPhone: formData.customerPhone,
           });
         }
       }
@@ -141,12 +241,14 @@ export default function Merchant() {
   const confirmMutation = useMutation({
     mutationFn: async ({ authorizationCode }: { authorizationCode?: string }) => {
       const formData = form.getValues();
+      const country = formData.country || savedCountry;
+      const operator = formData.operator || savedOperator;
       const payload: any = {
         token: invoiceToken,
         transactionId,
         authorizationCode,
-        country: formData.country,
-        operator: formData.operator,
+        country,
+        operator,
         customerPhone: formData.customerPhone,
         customerName: formData.customerName,
         customerEmail: formData.customerEmail,
@@ -164,15 +266,38 @@ export default function Merchant() {
         if (data.requiresOTP && data.wizallTransactionId) {
           setWizallTransactionId(data.wizallTransactionId);
           setPaymentStage("otp");
+          
+          if (token) {
+            const currentState = loadMerchantPaymentState(token);
+            if (currentState) {
+              saveMerchantPaymentState(token, {
+                ...currentState,
+                stage: "otp",
+                wizallTransactionId: data.wizallTransactionId,
+              });
+            }
+          }
+          
           toast({
             title: "Code OTP envoyé",
             description: "Veuillez entrer le code reçu par SMS",
           });
         } else if (data.redirectUrl) {
+          if (token) clearMerchantPaymentState(token);
           window.location.href = data.redirectUrl;
         } else {
           countdown.startCountdown();
           setPaymentStage("polling");
+          
+          if (token) {
+            const currentState = loadMerchantPaymentState(token);
+            if (currentState) {
+              saveMerchantPaymentState(token, {
+                ...currentState,
+                stage: "polling",
+              });
+            }
+          }
         }
       }
     },
@@ -183,6 +308,7 @@ export default function Merchant() {
         variant: "destructive",
       });
       setPaymentStage("form");
+      if (token) clearMerchantPaymentState(token);
     },
   });
 
@@ -400,25 +526,45 @@ export default function Merchant() {
 
   // STAGE: OTP input
   if (paymentStage === "otp") {
+    const currentCountry = form.getValues("country") || savedCountry;
+    const currentOperator = form.getValues("operator") || savedOperator;
+    const isOrangeOperator = currentOperator.toLowerCase().includes("orange");
+    const orangeInstruction = isOrangeOperator && currentCountry ? ORANGE_INSTRUCTIONS[currentCountry] : null;
+    
     return (
       <div className="w-full min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center p-4 overflow-hidden">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center space-y-2">
             <img src={logoImage} alt="BKApay" className="h-10 w-auto mx-auto" />
             <CardTitle>Code de confirmation</CardTitle>
-            <CardDescription>Entrez le code OTP reçu par SMS</CardDescription>
+            <CardDescription>
+              {isOrangeOperator 
+                ? "Générez votre code de paiement Orange Money" 
+                : "Entrez le code OTP reçu par SMS"}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Instructions Orange Money */}
+            {orangeInstruction && (
+              <Alert className="bg-orange-50 dark:bg-orange-950 border-orange-200 dark:border-orange-800">
+                <AlertCircle className="h-4 w-4 text-orange-600" />
+                <AlertDescription className="text-sm text-orange-800 dark:text-orange-200">
+                  <strong>Instructions :</strong><br/>
+                  {orangeInstruction}
+                </AlertDescription>
+              </Alert>
+            )}
+            
             <div>
               <label htmlFor="auth-code" className="block text-sm font-medium mb-2">
-                Code OTP
+                Code de paiement
               </label>
               <Input
                 id="auth-code"
                 type="text"
                 value={authCode}
                 onChange={(e) => setAuthCode(e.target.value)}
-                placeholder="Entrez le code"
+                placeholder="Entrez le code obtenu"
                 data-testid="input-otp"
               />
             </div>
