@@ -445,6 +445,16 @@ export default function Pay() {
           <div className="flex justify-center mb-1 sm:mb-2">
             <img src={logoImage} alt="BKApay" className="h-8 sm:h-10 lg:h-12 w-auto" />
           </div>
+          {/* Image du produit - affichage centré et visible */}
+          {paymentLink.imageUrl && (
+            <div className="flex justify-center py-2">
+              <img
+                src={paymentLink.imageUrl}
+                alt={paymentLink.productName}
+                className="w-32 h-32 sm:w-40 sm:h-40 object-contain rounded-lg border bg-muted"
+              />
+            </div>
+          )}
           <div>
             <CardTitle className="text-sm sm:text-lg lg:text-2xl mb-1 sm:mb-2">{paymentLink.productName}</CardTitle>
             {paymentLink.description && (
