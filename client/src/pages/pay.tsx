@@ -15,7 +15,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState } from "react";
-import { CheckCircle2, Clock, Loader2, AlertCircle, XCircle } from "lucide-react";
+import { CheckCircle2, Clock, Loader2, AlertCircle, XCircle, RefreshCw } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { usePaymentCountdown } from "@/hooks/use-payment-countdown";
 
@@ -93,6 +93,11 @@ export default function Pay() {
     enabled: !!token,
   });
 
+  // Récupérer les opérateurs activés par l'admin
+  const { data: enabledCountriesOperators, isLoading: isLoadingOperators } = useQuery<Record<string, string[]>>({
+    queryKey: ["/api/countries-operators/deposits"],
+  });
+
   const form = useForm<PaymentFormData>({
     resolver: zodResolver(paymentSchema),
     defaultValues: {
@@ -131,7 +136,41 @@ export default function Pay() {
   }, [token, form]);
 
   const selectedCountry = form.watch("country");
-  const countryOperators = selectedCountry ? OPERATORS[(selectedCountry as keyof typeof OPERATORS) || ("BJ" as const)] || [] : [];
+  
+  // Filtrer les opérateurs selon la configuration admin
+  const allCountryOperators = selectedCountry
+    ? (OPERATORS[selectedCountry as keyof typeof OPERATORS] || [])
+    : [];
+  
+  // Logique de filtrage:
+  // - Pendant le chargement: désactiver le select mais ne pas montrer d'alerte
+  // - Si l'admin a configuré des opérateurs pour ce pays: filtrer selon la config
+  // - Si l'admin n'a PAS de config pour ce pays: montrer tous les opérateurs (défaut = tous activés)
+  const hasAdminConfig = enabledCountriesOperators && selectedCountry && enabledCountriesOperators[selectedCountry] !== undefined;
+  
+  const countryOperators = isLoadingOperators 
+    ? allCountryOperators // Montrer tous pendant le chargement (mais select désactivé)
+    : hasAdminConfig
+      ? allCountryOperators.filter(op => (enabledCountriesOperators[selectedCountry] || []).includes(op.code))
+      : allCountryOperators; // Pas de config admin = tous les opérateurs activés par défaut
+  
+  // Déterminer si aucun opérateur n'est disponible (seulement après le chargement ET si l'admin a explicitement tout désactivé)
+  const noOperatorsAvailable = !isLoadingOperators && hasAdminConfig && countryOperators.length === 0;
+
+  // Fonction pour recommencer un nouveau paiement
+  const handleNewPayment = () => {
+    if (token) clearPaymentState(token);
+    setPaymentStage("form");
+    setInvoiceToken(null);
+    setTransactionId(null);
+    setUssdInstruction(null);
+    setWizallTransactionId(null);
+    setAuthCode("");
+    setSavedCountry("");
+    setSavedOperator("");
+    form.reset();
+    countdown.resetCountdown();
+  };
 
   // Payment countdown hook with persistent timer
   const countdown = usePaymentCountdown({
@@ -428,6 +467,16 @@ export default function Pay() {
                 <span className="font-semibold text-foreground">{formatAmount(paymentLink.amount)}</span>
               </div>
             </div>
+
+            <Button
+              onClick={handleNewPayment}
+              variant="outline"
+              className="w-full"
+              data-testid="button-new-payment-failed"
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Réessayer le paiement
+            </Button>
           </CardContent>
         </Card>
       </div>
@@ -470,6 +519,17 @@ export default function Pay() {
               <p className="text-xs text-muted-foreground">
                 Ne fermez pas cette page
               </p>
+
+              <Button
+                onClick={handleNewPayment}
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground"
+                data-testid="button-new-payment-polling"
+              >
+                <RefreshCw className="w-3 h-3 mr-1" />
+                Recommencer un nouveau paiement
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -511,6 +571,17 @@ export default function Pay() {
               ) : (
                 "J'ai complété le paiement"
               )}
+            </Button>
+            
+            <Button
+              onClick={handleNewPayment}
+              variant="ghost"
+              size="sm"
+              className="w-full text-muted-foreground"
+              data-testid="button-new-payment-ussd"
+            >
+              <RefreshCw className="w-3 h-3 mr-1" />
+              Recommencer un nouveau paiement
             </Button>
           </CardContent>
         </Card>
@@ -576,6 +647,17 @@ export default function Pay() {
               ) : (
                 "Valider le code"
               )}
+            </Button>
+            
+            <Button
+              onClick={handleNewPayment}
+              variant="ghost"
+              size="sm"
+              className="w-full text-muted-foreground"
+              data-testid="button-new-payment-otp"
+            >
+              <RefreshCw className="w-3 h-3 mr-1" />
+              Recommencer un nouveau paiement
             </Button>
           </CardContent>
         </Card>
@@ -695,20 +777,33 @@ export default function Pay() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-xs sm:text-sm">Opérateur</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-operator">
-                          <SelectValue placeholder="Sélectionnez votre opérateur" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {countryOperators.map((op) => (
-                          <SelectItem key={op.code} value={op.code}>
-                            {op.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    {noOperatorsAvailable ? (
+                      <Alert className="bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800">
+                        <AlertCircle className="h-4 w-4 text-amber-600" />
+                        <AlertDescription className="text-sm text-amber-800 dark:text-amber-200">
+                          Aucun opérateur n'est disponible pour ce pays actuellement. Veuillez choisir un autre pays.
+                        </AlertDescription>
+                      </Alert>
+                    ) : (
+                      <Select 
+                        value={field.value} 
+                        onValueChange={field.onChange}
+                        disabled={isLoadingOperators}
+                      >
+                        <FormControl>
+                          <SelectTrigger data-testid="select-operator">
+                            <SelectValue placeholder={isLoadingOperators ? "Chargement..." : "Sélectionnez votre opérateur"} />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {countryOperators.map((op) => (
+                            <SelectItem key={op.code} value={op.code}>
+                              {op.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
@@ -716,7 +811,7 @@ export default function Pay() {
               <Button
                 type="submit"
                 className="w-full"
-                disabled={initMutation.isPending}
+                disabled={initMutation.isPending || isLoadingOperators || noOperatorsAvailable}
                 data-testid="button-pay"
               >
                 {initMutation.isPending ? (

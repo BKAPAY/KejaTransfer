@@ -1666,6 +1666,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Opérateur non supporté pour ce pays" });
       }
 
+      // Check if operator is enabled by admin
+      // Default behavior: if no config exists for this operator, treat as enabled (all operators enabled by default)
+      const configs = await storage.getCountryOperatorConfigs();
+      const operatorConfig = configs.find(c => c.country === country && c.operator === operator);
+      // Only reject if config exists AND incomingEnabled is explicitly false
+      if (operatorConfig && !operatorConfig.incomingEnabled) {
+        return res.status(400).json({ error: "Cet opérateur n'est pas disponible actuellement" });
+      }
+
       // Get payment link
       const paymentLink = await storage.getPaymentLinkByToken(token);
       if (!paymentLink) {
@@ -1928,6 +1937,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const operatorKey = getOperatorKey(operator, country);
       if (!operatorKey) {
         return res.status(400).json({ error: "Opérateur non supporté pour ce pays" });
+      }
+
+      // Check if operator is enabled by admin
+      // Default behavior: if no config exists for this operator, treat as enabled (all operators enabled by default)
+      const configs = await storage.getCountryOperatorConfigs();
+      const operatorConfig = configs.find(c => c.country === country && c.operator === operator);
+      // Only reject if config exists AND incomingEnabled is explicitly false
+      if (operatorConfig && !operatorConfig.incomingEnabled) {
+        return res.status(400).json({ error: "Cet opérateur n'est pas disponible actuellement" });
       }
 
       // Get merchant link
