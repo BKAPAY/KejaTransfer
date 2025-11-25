@@ -119,7 +119,7 @@ export default function MerchantLinks() {
               {merchantLinks && merchantLinks.length > 0 ? "Lien créé" : "Créer mon lien"}
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Créer un lien marchand</DialogTitle>
               <DialogDescription>
@@ -127,7 +127,7 @@ export default function MerchantLinks() {
               </DialogDescription>
             </DialogHeader>
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pb-4">
                 <FormField
                   control={form.control}
                   name="merchantName"

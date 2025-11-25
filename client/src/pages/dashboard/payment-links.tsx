@@ -278,7 +278,7 @@ export default function PaymentLinks() {
               Nouveau lien
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{editingId ? "Modifier le lien de paiement" : "Créer un lien de paiement"}</DialogTitle>
               <DialogDescription>
@@ -286,7 +286,7 @@ export default function PaymentLinks() {
               </DialogDescription>
             </DialogHeader>
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pb-4">
                 <FormField
                   control={form.control}
                   name="productName"
@@ -449,6 +449,9 @@ export default function PaymentLinks() {
                         {link.isActive ? "Actif" : "Inactif"}
                       </Badge>
                     </div>
+                    {link.description && (
+                      <p className="text-sm text-muted-foreground">{link.description}</p>
+                    )}
                   </div>
                   <div className="text-right">
                     <p className="text-2xl font-bold">
@@ -459,6 +462,16 @@ export default function PaymentLinks() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
+                  {/* Image du produit - affichage agrandi */}
+                  {link.imageUrl && (
+                    <div className="flex justify-center">
+                      <img
+                        src={link.imageUrl}
+                        alt={link.productName}
+                        className="max-w-full w-auto h-48 sm:h-56 md:h-64 object-contain rounded-lg border bg-muted"
+                      />
+                    </div>
+                  )}
                   <div className="flex items-center gap-2 p-3 bg-muted rounded-md">
                     <code className="flex-1 text-sm truncate">
                       {`${window.location.origin}/pay/${link.token}`}
@@ -482,7 +495,7 @@ export default function PaymentLinks() {
                       </a>
                     </Button>
                   </div>
-                  <div className="flex justify-end gap-2">
+                  <div className="flex justify-end gap-2 flex-wrap">
                     <Button
                       variant="outline"
                       size="sm"
