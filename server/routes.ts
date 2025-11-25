@@ -1254,8 +1254,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           paydunyaToken: paydunyaResponse.token,
           metadata: JSON.stringify({
             phone,
-            customerName: customerName || `${user!.firstName} ${user!.lastName}`,
-            customerEmail: customerEmail || user!.email,
+            customerName: effectiveCustomerName,
+            customerEmail: effectiveCustomerEmail,
           }),
         });
 
@@ -1265,6 +1265,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const needsOTP = operatorKey ? requiresOTP(operatorKey) : false;
         const twoStep = operatorKey ? requiresTwoStep(operatorKey) : false;
 
+        // CRITICAL FIX: For operators that DO NOT require OTP, call SOFTPAY endpoint immediately!
+        // This triggers the SMS to be sent to the customer's phone
+        if (!needsOTP && !twoStep && operatorKey) {
+          console.log(`[SOFTPAY INIT] Operator ${operatorKey} does NOT require OTP - calling SOFTPAY endpoint immediately`);
+          
+          const paymentData: SoftpayPaymentData = {
+            customerName: effectiveCustomerName,
+            customerEmail: effectiveCustomerEmail,
+            phoneNumber: phone,
+            invoiceToken: paydunyaResponse.token,
+          };
+
+          const softpayResult = await callPaydunyaSoftpay(operator, country, paymentData);
+          
+          console.log(`[SOFTPAY INIT] SOFTPAY result for ${operatorKey}:`, softpayResult);
+
+          if (softpayResult.success) {
+            // For Wave, return redirect URL
+            if (softpayResult.url) {
+              return res.json({
+                success: true,
+                transactionId,
+                token: paydunyaResponse.token,
+                ussdInstruction: softpayResult.message,
+                requiresOTP: false,
+                requiresTwoStep: false,
+                redirectUrl: softpayResult.url,
+              });
+            }
+
+            // Payment initiated - customer should receive SMS
+            return res.json({
+              success: true,
+              transactionId,
+              token: paydunyaResponse.token,
+              ussdInstruction: softpayResult.message || ussdInstruction,
+              requiresOTP: false,
+              requiresTwoStep: false,
+              message: softpayResult.message,
+            });
+          } else {
+            // SOFTPAY call failed - return error
+            console.error(`[SOFTPAY INIT] SOFTPAY call failed:`, softpayResult.message);
+            return res.status(400).json({
+              error: softpayResult.message || "Erreur lors de l'envoi du paiement",
+            });
+          }
+        }
+
+        // For operators that require OTP, just return the token and wait for confirm step
         res.json({
           success: true,
           transactionId,
