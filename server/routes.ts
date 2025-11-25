@@ -2175,6 +2175,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Verify SOFTPAY Payment - Polling endpoint (uses checkout-invoice/confirm GET API)
+  // Also updates transaction status and user balance when payment is completed
   app.post("/api/softpay/verify-payment", async (req: Request, res: Response) => {
     try {
       const { invoiceToken } = req.body;
@@ -2195,6 +2196,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const invoiceStatus = paydunyaResponse.invoice?.status || paydunyaResponse.status;
       
       if (paydunyaResponse.response_code === "00" && invoiceStatus === "completed") {
+        // CRITICAL: Update transaction status and user balance
+        const transaction = await storage.getTransactionByPaydunyaToken(invoiceToken);
+        
+        if (transaction && transaction.status === "pending") {
+          console.log("[SOFTPAY] Payment completed - updating transaction and balance:", {
+            transactionId: transaction.id,
+            userId: transaction.userId,
+            grossAmount: transaction.amount,
+            fee: transaction.fee,
+          });
+          
+          // Update transaction status to completed
+          await storage.updateTransactionStatus(transaction.id, "completed");
+          
+          // Calculate and credit NET amount (GROSS - 6% fee)
+          const netAmount = transaction.amount - (transaction.fee || 0);
+          await storage.updateUserBalance(transaction.userId, netAmount);
+          
+          console.log("[SOFTPAY] Balance credited with NET:", { 
+            userId: transaction.userId, 
+            grossAmount: transaction.amount, 
+            fee: transaction.fee,
+            netCredited: netAmount 
+          });
+        }
+        
         res.json({
           status: "completed",
           response_code: "00",
@@ -2206,8 +2233,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           response_code: "01",
         });
       } else if (invoiceStatus === "canceled" || invoiceStatus === "fail" || invoiceStatus === "failed") {
+        // Update transaction to failed
+        const transaction = await storage.getTransactionByPaydunyaToken(invoiceToken);
+        if (transaction && transaction.status === "pending") {
+          await storage.updateTransactionStatus(transaction.id, "failed");
+          console.log("[SOFTPAY] Transaction marked as failed:", transaction.id);
+        }
+        
         res.json({
-          status: invoiceStatus,
+          status: "failed",
           response_code: "05",
         });
       } else {

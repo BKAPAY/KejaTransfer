@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { queryClient } from "@/lib/queryClient";
 
 const COUNTDOWN_DURATION = 5 * 60; // 5 minutes in seconds
 const POLL_INTERVAL = 1000; // 1 second
@@ -149,6 +150,10 @@ export function usePaymentCountdown({
         if (data.status === "completed" || data.response_code === "00") {
           setStatus("completed");
           clearStartTime(storageKey);
+          // Invalider le cache pour mettre à jour l'historique et le solde immédiatement
+          queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
           onCompleted?.();
           if (pollRef.current) {
             clearInterval(pollRef.current);
@@ -156,6 +161,9 @@ export function usePaymentCountdown({
         } else if (data.status === "failed") {
           setStatus("failed");
           clearStartTime(storageKey);
+          // Invalider le cache pour mettre à jour l'historique
+          queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
           onFailed?.();
           if (pollRef.current) {
             clearInterval(pollRef.current);

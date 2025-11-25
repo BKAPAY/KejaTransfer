@@ -1,8 +1,7 @@
 /**
  * BKApay Fee Calculation System
  * 
- * Benin (BJ): 3% transaction fee
- * All other countries: 6% transaction fee
+ * UNIVERSAL FEE: 6% for ALL countries and operators
  * 
  * CRITICAL LOGIC:
  * 
@@ -10,30 +9,31 @@
  * - Client pays GROSS amount (e.g., 2000 XOF) to Paydunya
  * - Paydunya validates GROSS amount (SMS confirms 2000)
  * - Transaction records GROSS amount (2000)
- * - User receives NET amount (1940 for Benin 3%)
+ * - BKApay takes 6% fee (120 XOF)
+ * - User receives NET amount (1880 XOF)
  * - History displays: "Dépôt de 2000 XOF"
- * - Balance credited: 1940 XOF
+ * - Balance credited: 1880 XOF
  * 
  * OUTGOING PAYMENTS (withdrawals, transfers):
  * - User requests NET amount (e.g., 2000 XOF)
- * - Balance debited: NET + fee (2060 for Benin)
+ * - Balance debited: NET + fee (2120 for 6%)
  * - Paydunya receives NET amount (2000)
  * - Transaction records NET amount (2000)
  * - History displays: "Retrait de 2000 XOF"
  */
 
 export function getFeePercentage(country?: string): number {
-  // Return as whole number (30 = 3%, 60 = 6%)
-  if (country === "BJ") return 30; // 3%
-  return 60; // 6% for all other countries
+  // UNIFORM 6% fee for ALL countries and operators
+  // Return as whole number (60 = 6%)
+  return 60;
 }
 
 /**
  * Calculate fees for INCOMING payments (deposits, payment links, etc.)
  * 
  * @param grossAmount - The GROSS amount the client pays (e.g., 2000)
- * @param country - Country code (BJ = 3%, others = 6%)
- * @returns {grossAmount: 2000, feeAmount: 60, netAmount: 1940}
+ * @param country - Country code (ignored - 6% for all)
+ * @returns {grossAmount: 2000, feeAmount: 120, netAmount: 1880}
  * 
  * Usage:
  * - Store grossAmount in transaction.amount
@@ -62,11 +62,11 @@ export function calculateIncomingFee(grossAmount: number, country?: string): {
  * Calculate fees for OUTGOING payments (withdrawals, transfers)
  * 
  * @param netAmount - The NET amount user wants to send (e.g., 2000)
- * @param country - Country code (BJ = 3%, others = 6%)
- * @returns {netAmount: 2000, feeAmount: 60, totalDeductedFromBalance: 2060}
+ * @param country - Country code (ignored - 6% for all)
+ * @returns {netAmount: 2000, feeAmount: 120, totalDeductedFromBalance: 2120}
  * 
  * Usage:
- * - Debit totalDeductedFromBalance from user balance (2060)
+ * - Debit totalDeductedFromBalance from user balance (2120)
  * - Send netAmount to Paydunya (2000)
  * - Store netAmount in transaction.amount (2000)
  * - Display netAmount in transaction history (2000)

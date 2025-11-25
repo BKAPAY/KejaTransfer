@@ -13,6 +13,7 @@ export default function History() {
 
   const { data: transactions, isLoading } = useQuery<Transaction[]>({
     queryKey: ["/api/transactions"],
+    refetchInterval: 3000, // Rafraîchir toutes les 3 secondes pour les statuts en temps réel
   });
 
   const handleTransactionClick = (transaction: Transaction) => {

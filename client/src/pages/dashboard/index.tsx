@@ -11,6 +11,7 @@ export default function Dashboard() {
   const [, setLocation] = useLocation();
   const { data: user, isLoading: userLoading } = useQuery<User>({
     queryKey: ["/api/auth/me"],
+    refetchInterval: 5000, // Rafraîchir toutes les 5 secondes
   });
 
   const { data: stats, isLoading: statsLoading } = useQuery<{
@@ -20,6 +21,7 @@ export default function Dashboard() {
     recentTransactions: Transaction[];
   }>({
     queryKey: ["/api/dashboard/stats"],
+    refetchInterval: 3000, // Rafraîchir toutes les 3 secondes pour le solde en temps réel
   });
 
   const formatAmount = (amount: number) => {
