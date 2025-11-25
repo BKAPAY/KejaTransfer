@@ -2332,8 +2332,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ===== Withdrawal/Transfer Routes =====
-  app.post("/api/transfers", requireAuth, async (req: Request, res: Response) => {
+  // ===== Withdrawal Routes (Paydunya Disburse API v2) =====
+  // Documentation: https://developers.paydunya.com/doc/EN/api_deboursement
+  app.post("/api/withdrawals", requireAuth, async (req: Request, res: Response) => {
     try {
       const { amount, phone, country, operator } = req.body;
       const user = await storage.getUser(req.session.userId!);
@@ -2346,10 +2347,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Votre compte a été suspendu. Veuillez contacter le support." });
       }
 
-      // Check KYC verification for transfers
+      // Check KYC verification for withdrawals
       if (user.kycStatus !== "verified") {
         return res.status(403).json({ 
-          error: "Vous devez vérifier votre identité avant de faire des transferts"
+          error: "Vous devez vérifier votre identité avant de faire des retraits"
         });
       }
 
@@ -2357,11 +2358,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Montant invalide" });
       }
 
-      if (!phone || !country || !operator) {
-        return res.status(400).json({ error: "Informations de transfert incomplètes" });
+      const minAmount = 500;
+      if (amount < minAmount) {
+        return res.status(400).json({ error: `Le montant minimum est de ${minAmount} XOF` });
       }
 
-      // Calculate fees silently for outgoing transfers
+      if (!phone || !country || !operator) {
+        return res.status(400).json({ error: "Informations de retrait incomplètes" });
+      }
+
+      // Calculate fees silently for outgoing withdrawals (6% for all countries)
       const feeInfo = calculateOutgoingFee(Math.floor(amount), country);
 
       if (user.balance < feeInfo.totalDeductedFromBalance) {
@@ -2372,87 +2378,144 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Map operator to Paydunya withdraw mode
+      // Map operator to Paydunya withdraw_mode (exact values from documentation)
       const withdrawModeMap: Record<string, string> = {
+        // Senegal
         "orange-sn": "orange-money-senegal",
         "free-sn": "free-money-senegal",
         "expresso-sn": "expresso-senegal",
         "wave-sn": "wave-senegal",
         "wizall-sn": "wizall-senegal",
+        // Ivory Coast
         "orange-ci": "orange-money-ci",
         "mtn-ci": "mtn-ci",
         "moov-ci": "moov-ci",
         "wave-ci": "wave-ci",
+        // Burkina Faso
         "orange-bf": "orange-money-burkina",
         "moov-bf": "moov-burkina-faso",
+        // Benin
         "moov-bj": "moov-benin",
         "mtn-bj": "mtn-benin",
+        // Togo
         "tmoney-tg": "t-money-togo",
         "moov-tg": "moov-togo",
+        // Mali
         "orange-ml": "orange-money-mali",
         "moov-ml": "moov-mali",
       };
 
       const withdrawMode = withdrawModeMap[`${operator}-${country.toLowerCase()}`];
       if (!withdrawMode) {
-        return res.status(400).json({ error: "Opérateur ou pays non supporté" });
+        return res.status(400).json({ error: "Opérateur ou pays non supporté pour les retraits" });
       }
 
-      // Country phone codes
-      const countryPhoneCodes: Record<string, string> = {
-        "SN": "+221",
-        "CI": "+225",
-        "BF": "+226",
-        "BJ": "+229",
-        "TG": "+228",
-        "ML": "+223",
-      };
-
-      // Format phone number: add country code if not present
-      let formattedPhone = phone;
-      const countryCode = countryPhoneCodes[country.toUpperCase()];
-      if (countryCode && !phone.startsWith("+")) {
-        formattedPhone = countryCode + phone;
-      }
-
-      // Step 1: Get disbursement invoice
-      // For production: use real callback URL. For development: Paydunya may not be able to validate localhost
-      const callbackUrl = process.env.BASE_URL 
-        ? `${process.env.BASE_URL}/api/webhooks/paydunya`
-        : "https://api.paydunya.com/callback"; // Fallback for development
+      // IMPORTANT: Paydunya requires phone WITHOUT country code prefix
+      // Example: "771234567" for Senegal, "96123456" for Benin
+      // The phone should be the local subscriber number only
       
-      const paydunyaData = {
-        account_alias: formattedPhone,
-        amount: Math.floor(amount),
+      // Step 1: Remove only whitespace, dashes, dots (keep digits and +)
+      let cleanPhone = phone.replace(/[\s\-\.]+/g, "");
+      
+      // Step 2: Validate format - must be digits only (with optional + at start)
+      if (!/^\+?\d+$/.test(cleanPhone)) {
+        return res.status(400).json({ error: "Le numéro de téléphone doit contenir uniquement des chiffres" });
+      }
+      
+      // Step 3: Country-specific phone info (code and expected local length)
+      const countryPhoneInfo: Record<string, { code: string, localLength: number[] }> = {
+        "SN": { code: "221", localLength: [9] },      // Senegal: 9 digits (77XXXXXXX)
+        "CI": { code: "225", localLength: [10] },     // Ivory Coast: 10 digits
+        "BF": { code: "226", localLength: [8] },      // Burkina: 8 digits
+        "BJ": { code: "229", localLength: [8, 10] },  // Benin: 8 or 10 digits (with leading 0)
+        "TG": { code: "228", localLength: [8] },      // Togo: 8 digits
+        "ML": { code: "223", localLength: [8] },      // Mali: 8 digits
+      };
+      
+      const phoneInfo = countryPhoneInfo[country.toUpperCase()];
+      if (!phoneInfo) {
+        return res.status(400).json({ error: "Pays non supporté" });
+      }
+      
+      // Step 4: Strip international prefix if present
+      // Order matters: check +CODE first, then 00CODE, then just CODE at start
+      const internationalPrefixes = [
+        `+${phoneInfo.code}`,
+        `00${phoneInfo.code}`,
+      ];
+      
+      for (const prefix of internationalPrefixes) {
+        if (cleanPhone.startsWith(prefix)) {
+          cleanPhone = cleanPhone.substring(prefix.length);
+          break;
+        }
+      }
+      
+      // Also handle case where user just typed the country code without + or 00
+      // But only if the resulting number would be valid length
+      if (cleanPhone.startsWith(phoneInfo.code)) {
+        const withoutCode = cleanPhone.substring(phoneInfo.code.length);
+        if (phoneInfo.localLength.includes(withoutCode.length)) {
+          cleanPhone = withoutCode;
+        }
+      }
+      
+      // Step 5: Validate local number length
+      if (!phoneInfo.localLength.includes(cleanPhone.length)) {
+        return res.status(400).json({ 
+          error: `Numéro invalide pour ${country}. Le numéro local doit avoir ${phoneInfo.localLength.join(' ou ')} chiffres.` 
+        });
+      }
+
+      console.log(`[Withdrawal] Original phone: ${phone}, Cleaned phone: ${cleanPhone}, Country: ${country}`);
+
+      // Callback URL for Paydunya notifications
+      const callbackUrl = process.env.BASE_URL 
+        ? `${process.env.BASE_URL}/api/webhooks/paydunya-disburse`
+        : "https://bkapay.com/api/webhooks/paydunya-disburse";
+      
+      // Step 1: Create disbursement invoice (get-invoice)
+      const getInvoiceData = {
+        account_alias: cleanPhone, // Phone WITHOUT country code
+        amount: Math.floor(amount), // Integer, no decimals
         withdraw_mode: withdrawMode,
         callback_url: callbackUrl,
       };
 
-      // Step 1: Get disbursement invoice
-      const getInvoiceResponse = await callPaydunyaAPIv2("/disburse/get-invoice", paydunyaData);
+      console.log("[Withdrawal] Creating disburse invoice:", getInvoiceData);
+      const getInvoiceResponse = await callPaydunyaAPIv2("/disburse/get-invoice", getInvoiceData);
+      console.log("[Withdrawal] Get-invoice response:", getInvoiceResponse);
 
       if (getInvoiceResponse.response_code !== "00") {
-        return res.status(400).json({ error: "Erreur de transaction" });
+        const errorMessage = getInvoiceResponse.response_text || "Erreur lors de la création du retrait";
+        console.error("[Withdrawal] Get-invoice failed:", getInvoiceResponse);
+        return res.status(400).json({ error: errorMessage });
       }
 
-      const disbursalToken = getInvoiceResponse.disburse_token;
+      const disburseToken = getInvoiceResponse.disburse_token;
+      if (!disburseToken) {
+        console.error("[Withdrawal] No disburse_token in response:", getInvoiceResponse);
+        return res.status(400).json({ error: "Erreur: Token de retrait non reçu" });
+      }
 
-      // Step 2: Submit disbursement invoice
+      // Step 2: Submit disbursement invoice (submit-invoice)
       const submitData = {
-        disburse_invoice: disbursalToken,
-        disburse_id: "transfer-" + Date.now(),
+        disburse_invoice: disburseToken,
+        disburse_id: `withdrawal-${user.id.substring(0, 8)}-${Date.now()}`,
       };
 
+      console.log("[Withdrawal] Submitting disburse invoice:", submitData);
       const submitResponse = await callPaydunyaAPIv2("/disburse/submit-invoice", submitData);
+      console.log("[Withdrawal] Submit-invoice response:", submitResponse);
 
       if (submitResponse.response_code === "00") {
-        // Deduct balance immediately after successful submission
+        // Success - Deduct balance immediately
         await storage.updateUserBalance(req.session.userId!, -feeInfo.totalDeductedFromBalance);
         
-        // Create completed transaction immediately
+        // Create transaction record
         await storage.createTransaction({
           userId: req.session.userId!,
-          type: "transfer",
+          type: "withdrawal",
           amount: Math.floor(amount),
           fee: feeInfo.feeAmount,
           feePercentage: feeInfo.feePercentage,
@@ -2460,25 +2523,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
           status: "completed",
           country,
           operator,
-          customerPhone: phone,
-          description: `Transfert de ${amount} XOF vers ${phone}`,
-          paydunyaToken: disbursalToken, // Store in dedicated column
+          customerPhone: cleanPhone,
+          description: `Retrait de ${amount} XOF vers ${cleanPhone}`,
+          paydunyaToken: disburseToken,
           metadata: JSON.stringify({
             paydunyaTransactionId: submitResponse.transaction_id,
+            disburseId: submitData.disburse_id,
           }),
         });
 
+        console.log("[Withdrawal] Success - Balance deducted:", feeInfo.totalDeductedFromBalance);
+
         res.json({
           success: true,
-          message: "Transfert effectué avec succès",
+          message: "Retrait effectué avec succès",
           totalDeducted: feeInfo.totalDeductedFromBalance,
+          amountSent: Math.floor(amount),
+          fee: feeInfo.feeAmount,
         });
       } else {
-        res.status(400).json({ error: "Erreur de transaction" });
+        // Submission failed
+        const errorMessage = submitResponse.response_text || "Erreur lors du traitement du retrait";
+        console.error("[Withdrawal] Submit-invoice failed:", submitResponse);
+        return res.status(400).json({ error: errorMessage });
       }
     } catch (error: any) {
-      console.error("Transfer error:", error);
-      res.status(500).json({ error: "Erreur de transaction" });
+      console.error("[Withdrawal] Error:", error);
+      res.status(500).json({ error: "Erreur lors du traitement du retrait" });
     }
   });
 

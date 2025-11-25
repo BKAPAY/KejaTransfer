@@ -81,12 +81,6 @@ const menuItems = [
     testId: "nav-deposit",
   },
   {
-    title: "Transfert",
-    url: "/dashboard/transfer",
-    icon: ArrowUpFromLine,
-    testId: "nav-transfer",
-  },
-  {
     title: "Retrait",
     url: "/dashboard/withdrawal",
     icon: ArrowUpFromLine,

@@ -65,7 +65,7 @@ export default function Withdrawal() {
 
   const withdrawalMutation = useMutation({
     mutationFn: async (data: WithdrawalFormData) => {
-      const res = await apiRequest("POST", "/api/transfers", data);
+      const res = await apiRequest("POST", "/api/withdrawals", data);
       return res.json();
     },
     onSuccess: (response: any) => {
