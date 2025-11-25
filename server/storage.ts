@@ -373,7 +373,7 @@ export class DbStorage implements IStorage {
     totalUsers: number;
     verifiedUsers: number;
     totalDeposits: number;
-    totalTransfers: number;
+    totalWithdrawals: number;
   }> {
     const allUsers = await db.select().from(schema.users);
     const verifiedUsers = allUsers.filter((u) => u.kycStatus === "verified").length;
@@ -384,16 +384,16 @@ export class DbStorage implements IStorage {
         t.status === "completed" &&
         ["deposit", "payment_link", "merchant_link", "api_payment"].includes(t.type)
     );
-    const completedTransfers = allTransactions.filter((t) => t.status === "completed" && t.type === "transfer");
+    const completedWithdrawals = allTransactions.filter((t) => t.status === "completed" && t.type === "withdrawal");
 
     const totalDeposits = completedDeposits.reduce((sum, t) => sum + t.amount, 0);
-    const totalTransfers = completedTransfers.reduce((sum, t) => sum + t.amount, 0);
+    const totalWithdrawals = completedWithdrawals.reduce((sum, t) => sum + t.amount, 0);
 
     return {
       totalUsers: allUsers.length,
       verifiedUsers,
       totalDeposits,
-      totalTransfers,
+      totalWithdrawals,
     };
   }
 

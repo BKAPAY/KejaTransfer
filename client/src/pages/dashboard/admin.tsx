@@ -13,13 +13,14 @@ export default function Admin() {
   const [searchQuery, setSearchQuery] = useState("");
   const [, setLocation] = useLocation();
 
-  const { data: stats, isLoading: statsLoading } = useQuery<{
+  const { data: stats, isLoading: statsLoading, refetch: refetchStats } = useQuery<{
     totalUsers: number;
     verifiedUsers: number;
     totalDeposits: number;
-    totalTransfers: number;
+    totalWithdrawals: number;
   }>({
     queryKey: ["/api/admin/stats"],
+    refetchInterval: 5000,
   });
 
   const { data: allUsers, isLoading: usersLoading } = useQuery<User[]>({
@@ -153,8 +154,8 @@ export default function Admin() {
               <Skeleton className="h-8 w-24" />
             ) : (
               <>
-                <div className="text-2xl font-bold" data-testid="stat-total-transfers">
-                  {formatAmount(stats?.totalTransfers || 0)}
+                <div className="text-2xl font-bold" data-testid="stat-total-withdrawals">
+                  {formatAmount(stats?.totalWithdrawals || 0)}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">Argent sortant</p>
               </>
