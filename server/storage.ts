@@ -67,6 +67,7 @@ export interface IStorage {
   getTransaction(id: string): Promise<Transaction | undefined>;
   getTransactions(userId: string, limit?: number): Promise<Transaction[]>;
   getTransactionByPaydunyaToken(paydunyaToken: string): Promise<Transaction | undefined>;
+  getAllPendingTransactions(): Promise<(Transaction & { user?: User })[]>;
   createTransaction(transaction: InsertTransaction): Promise<Transaction>;
   updateTransactionStatus(id: string, status: string, paydunyaData?: any): Promise<Transaction | undefined>;
   getUserStats(userId: string): Promise<{
@@ -321,6 +322,24 @@ export class DbStorage implements IStorage {
       .where(eq(schema.transactions.paydunyaToken, paydunyaToken))
       .limit(1);
     return results[0];
+  }
+
+  async getAllPendingTransactions(): Promise<(Transaction & { user?: User })[]> {
+    const pendingTransactions = await db
+      .select()
+      .from(schema.transactions)
+      .where(eq(schema.transactions.status, "pending"))
+      .orderBy(desc(schema.transactions.createdAt));
+    
+    // Fetch user info for each transaction
+    const transactionsWithUsers = await Promise.all(
+      pendingTransactions.map(async (tx) => {
+        const user = await this.getUser(tx.userId);
+        return { ...tx, user };
+      })
+    );
+    
+    return transactionsWithUsers;
   }
 
   async createTransaction(transaction: InsertTransaction): Promise<Transaction> {

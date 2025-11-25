@@ -3209,6 +3209,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== Pending Transactions Management =====
+  app.get("/api/admin/pending-transactions", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const transactions = await storage.getAllPendingTransactions();
+      res.json(transactions);
+    } catch (error: any) {
+      console.error("Get pending transactions error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
+  app.post("/api/admin/validate-transaction", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { transactionId } = req.body;
+      if (!transactionId) {
+        return res.status(400).json({ error: "Identifiant de transaction requis" });
+      }
+
+      const transaction = await storage.getTransaction(transactionId);
+      if (!transaction) {
+        return res.status(404).json({ error: "Transaction non trouvée" });
+      }
+
+      if (transaction.status !== "pending") {
+        return res.status(400).json({ error: "Cette transaction n'est pas en attente" });
+      }
+
+      // Update transaction status to completed
+      await storage.updateTransactionStatus(transactionId, "completed");
+
+      // If it's an incoming payment, credit the user's balance
+      const incomingTypes = ["deposit", "payment_link", "merchant_link", "api_payment"];
+      if (incomingTypes.includes(transaction.type)) {
+        await storage.updateUserBalance(transaction.userId, transaction.amount);
+      }
+
+      res.json({ success: true, message: "Transaction validée avec succès" });
+    } catch (error: any) {
+      console.error("Validate transaction error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
+  app.post("/api/admin/reject-transaction", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { transactionId } = req.body;
+      if (!transactionId) {
+        return res.status(400).json({ error: "Identifiant de transaction requis" });
+      }
+
+      const transaction = await storage.getTransaction(transactionId);
+      if (!transaction) {
+        return res.status(404).json({ error: "Transaction non trouvée" });
+      }
+
+      if (transaction.status !== "pending") {
+        return res.status(400).json({ error: "Cette transaction n'est pas en attente" });
+      }
+
+      // Update transaction status to failed
+      await storage.updateTransactionStatus(transactionId, "failed");
+
+      res.json({ success: true, message: "Transaction rejetée" });
+    } catch (error: any) {
+      console.error("Reject transaction error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
   // ===== Country/Operator Config Routes =====
   app.get("/api/admin/country-operator-config", requireAdmin, async (req: Request, res: Response) => {
     try {
