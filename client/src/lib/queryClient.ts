@@ -10,8 +10,13 @@ function sanitizeErrorMessage(message: string): string {
   // Remove technical patterns like "Error: ", "TypeError: ", etc.
   cleaned = cleaned.replace(/^(Error|TypeError|ReferenceError|SyntaxError):\s*/i, '');
   
+  // Replace technical API terms with user-friendly messages
+  if (cleaned.includes("EMAIL/CODE OTP") || cleaned.includes("EMAIL CODE OTP")) {
+    cleaned = "Les informations de paiement sont incorrectes. Veuillez vérifier votre numéro de téléphone et réessayer.";
+  }
+  
   // Remove forbidden special characters ()/:{}\ 
-  cleaned = cleaned.replace(/[()/:{}\\]/g, ' ');
+  cleaned = cleaned.replace(/[(){}\\]/g, ' ');
   
   // Clean up multiple spaces created by character removal
   cleaned = cleaned.replace(/\s+/g, ' ').trim();
@@ -27,20 +32,25 @@ function sanitizeErrorMessage(message: string): string {
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = await res.text();
+    let errorMessage = "";
     
     // Try to parse JSON error message
     try {
       const json = JSON.parse(text);
       if (json.error) {
         // Extract and sanitize clean error message
-        throw new Error(sanitizeErrorMessage(json.error));
+        errorMessage = sanitizeErrorMessage(json.error);
       }
     } catch {
-      // Not JSON, sanitize text before using
+      // Not JSON, will use fallback
     }
     
-    // Fallback: sanitize response text or use generic message
-    throw new Error(sanitizeErrorMessage(text || res.statusText));
+    // Use parsed error message or fallback to sanitized text
+    if (!errorMessage) {
+      errorMessage = sanitizeErrorMessage(text || res.statusText);
+    }
+    
+    throw new Error(errorMessage);
   }
 }
 
