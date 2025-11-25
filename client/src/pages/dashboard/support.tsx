@@ -101,7 +101,7 @@ export default function Support() {
             <p className="text-muted-foreground">Lun-Ven 9h-18h</p>
             <Button variant="outline" size="sm" className="w-full" data-testid="button-phone">
               <Phone className="w-3 h-3 mr-1" />
-              +229 97 12 34 56
+              +229 01 46 44 73 19
             </Button>
           </CardContent>
         </Card>
