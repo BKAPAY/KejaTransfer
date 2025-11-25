@@ -451,6 +451,7 @@ export default function Merchant() {
             <img src={logoImage} alt="BKApay" className="h-8 sm:h-10 lg:h-12 w-auto" />
           </div>
           <div>
+            <p className="text-xs sm:text-sm text-muted-foreground mb-1">Envoyer de l'argent à</p>
             <CardTitle className="text-sm sm:text-lg lg:text-2xl mb-1 sm:mb-2">{merchantLink.merchantName}</CardTitle>
           </div>
         </CardHeader>
@@ -594,6 +595,19 @@ export default function Merchant() {
             </form>
           </Form>
         </CardContent>
+        {/* Footer sécurisé */}
+        <div className="border-t px-4 py-3 text-center">
+          <p className="text-xs sm:text-sm text-muted-foreground">
+            Paiement sécurisé avec{" "}
+            <a 
+              href="/" 
+              className="text-primary font-semibold hover:underline"
+              data-testid="link-bkapay-home"
+            >
+              BKApay
+            </a>
+          </p>
+        </div>
       </Card>
     </div>
   );

@@ -586,6 +586,19 @@ export default function Pay() {
             </form>
           </Form>
         </CardContent>
+        {/* Footer sécurisé */}
+        <div className="border-t px-4 py-3 text-center">
+          <p className="text-xs sm:text-sm text-muted-foreground">
+            Paiement sécurisé avec{" "}
+            <a 
+              href="/" 
+              className="text-primary font-semibold hover:underline"
+              data-testid="link-bkapay-home"
+            >
+              BKApay
+            </a>
+          </p>
+        </div>
       </Card>
     </div>
   );
