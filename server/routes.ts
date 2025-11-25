@@ -94,7 +94,7 @@ if (!PAYDUNYA_CONFIG.masterKey || !PAYDUNYA_CONFIG.publicKey || !PAYDUNYA_CONFIG
   console.error("Veuillez définir: PAYDUNYA_MASTER_KEY, PAYDUNYA_PUBLIC_KEY, PAYDUNYA_PRIVATE_KEY, PAYDUNYA_TOKEN");
 }
 
-// Helper function to call Paydunya API (v1)
+// Helper function to call Paydunya API (v1) - POST requests
 async function callPaydunyaAPI(endpoint: string, data: any) {
   try {
     const response = await fetch(`${PAYDUNYA_CONFIG.apiUrl}${endpoint}`, {
@@ -113,6 +113,38 @@ async function callPaydunyaAPI(endpoint: string, data: any) {
     return result;
   } catch (error) {
     console.error(`[Paydunya API Error] ${endpoint}:`, error);
+    throw error;
+  }
+}
+
+// Helper function to call Paydunya API (v1) - GET requests (for status checks)
+async function callPaydunyaAPIGet(endpoint: string) {
+  try {
+    const url = `${PAYDUNYA_CONFIG.apiUrl}${endpoint}`;
+    console.log(`[Paydunya API GET] Calling: ${url}`);
+    
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        "PAYDUNYA-MASTER-KEY": PAYDUNYA_CONFIG.masterKey,
+        "PAYDUNYA-PRIVATE-KEY": PAYDUNYA_CONFIG.privateKey,
+        "PAYDUNYA-TOKEN": PAYDUNYA_CONFIG.token,
+      },
+    });
+
+    const responseText = await response.text();
+    console.log(`[Paydunya API GET] ${endpoint} - Status: ${response.status}, Response: ${responseText.substring(0, 500)}`);
+    
+    try {
+      const result = JSON.parse(responseText);
+      return result;
+    } catch (e) {
+      console.error(`[Paydunya API GET] Received non-JSON response:`, responseText.substring(0, 500));
+      throw new Error(`Paydunya API error: ${responseText.substring(0, 200)}`);
+    }
+  } catch (error) {
+    console.error(`[Paydunya API GET Error] ${endpoint}:`, error);
     throw error;
   }
 }
@@ -1955,7 +1987,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Verify SOFTPAY Payment - Polling endpoint (uses DMP check-status API)
+  // Verify SOFTPAY Payment - Polling endpoint (uses checkout-invoice/confirm GET API)
   app.post("/api/softpay/verify-payment", async (req: Request, res: Response) => {
     try {
       const { invoiceToken } = req.body;
@@ -1966,37 +1998,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log("[SOFTPAY] Verifying payment with token:", invoiceToken);
 
-      // Call Paydunya DMP API to check payment status
-      // Endpoint: POST /api/v1/dmp-api/check-status with token
-      const paydunyaResponse = await callPaydunyaAPI("/dmp-api/check-status", {
-        token: invoiceToken
-      });
+      // Call Paydunya checkout-invoice/confirm API (GET request)
+      // Endpoint: GET /api/v1/checkout-invoice/confirm/[token]
+      const paydunyaResponse = await callPaydunyaAPIGet("/checkout-invoice/confirm/" + invoiceToken);
 
-      console.log("[SOFTPAY] Check-status response:", JSON.stringify(paydunyaResponse));
+      console.log("[SOFTPAY] Confirm response:", JSON.stringify(paydunyaResponse));
 
-      // Response format: { response_code: "00", status: "completed|pending|failed|cancelled", ... }
-      if (paydunyaResponse.response_code === "00" && paydunyaResponse.status === "completed") {
+      // Response format: { response_code: "00", invoice: { status: "completed|pending|canceled|fail" }, ... }
+      const invoiceStatus = paydunyaResponse.invoice?.status || paydunyaResponse.status;
+      
+      if (paydunyaResponse.response_code === "00" && invoiceStatus === "completed") {
         res.json({
           status: "completed",
           response_code: "00",
         });
       } else if (paydunyaResponse.response_code === "00" && 
-                 (paydunyaResponse.status === "pending" || !paydunyaResponse.status)) {
+                 (invoiceStatus === "pending" || !invoiceStatus)) {
         res.json({
           status: "pending",
           response_code: "01",
         });
-      } else if (paydunyaResponse.response_code === "4004") {
-        // Transaction not found - keep polling
+      } else if (invoiceStatus === "canceled" || invoiceStatus === "fail" || invoiceStatus === "failed") {
         res.json({
-          status: "pending",
-          response_code: "01",
+          status: invoiceStatus,
+          response_code: "05",
         });
       } else {
-        // cancelled, failed or other status
+        // Unknown status - keep polling
         res.json({
-          status: paydunyaResponse.status || "failed",
-          response_code: "05",
+          status: "pending",
+          response_code: "01",
         });
       }
     } catch (error: any) {
