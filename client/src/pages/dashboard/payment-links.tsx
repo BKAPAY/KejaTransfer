@@ -462,13 +462,13 @@ export default function PaymentLinks() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {/* Image du produit - affichage agrandi */}
+                  {/* Image du produit - affichage compact */}
                   {link.imageUrl && (
-                    <div className="flex justify-center">
+                    <div className="flex justify-start">
                       <img
                         src={link.imageUrl}
                         alt={link.productName}
-                        className="max-w-full w-auto h-48 sm:h-56 md:h-64 object-contain rounded-lg border bg-muted"
+                        className="w-16 h-16 object-cover rounded-md border bg-muted"
                       />
                     </div>
                   )}
