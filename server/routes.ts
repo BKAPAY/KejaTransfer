@@ -1955,7 +1955,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Verify SOFTPAY Payment - Polling endpoint (uses Paydunya API v2)
+  // Verify SOFTPAY Payment - Polling endpoint (uses DMP check-status API)
   app.post("/api/softpay/verify-payment", async (req: Request, res: Response) => {
     try {
       const { invoiceToken } = req.body;
@@ -1966,24 +1966,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log("[SOFTPAY] Verifying payment with token:", invoiceToken);
 
-      // Call Paydunya API v2 to check payment status (GET /invoice/confirm/:token)
-      const paydunyaResponse = await callPaydunyaAPIv2Get("/invoice/confirm/" + invoiceToken);
+      // Call Paydunya DMP API to check payment status
+      // Endpoint: POST /api/v1/dmp-api/check-status with token
+      const paydunyaResponse = await callPaydunyaAPI("/dmp-api/check-status", {
+        token: invoiceToken
+      });
 
-      // v2 response format: { status: "completed" | "pending" | "cancelled", ... }
-      if (paydunyaResponse.status === "completed") {
+      console.log("[SOFTPAY] Check-status response:", JSON.stringify(paydunyaResponse));
+
+      // Response format: { response_code: "00", status: "completed|pending|failed|cancelled", ... }
+      if (paydunyaResponse.response_code === "00" && paydunyaResponse.status === "completed") {
         res.json({
           status: "completed",
           response_code: "00",
         });
-      } else if (paydunyaResponse.status === "pending") {
+      } else if (paydunyaResponse.response_code === "00" && 
+                 (paydunyaResponse.status === "pending" || !paydunyaResponse.status)) {
+        res.json({
+          status: "pending",
+          response_code: "01",
+        });
+      } else if (paydunyaResponse.response_code === "4004") {
+        // Transaction not found - keep polling
         res.json({
           status: "pending",
           response_code: "01",
         });
       } else {
-        // cancelled or other status
+        // cancelled, failed or other status
         res.json({
-          status: "failed",
+          status: paydunyaResponse.status || "failed",
           response_code: "05",
         });
       }
