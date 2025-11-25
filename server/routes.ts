@@ -3271,6 +3271,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Update transaction status to failed
       await storage.updateTransactionStatus(transactionId, "failed");
 
+      // If it's a withdrawal, refund the amount back to user's balance
+      if (transaction.type === "withdrawal") {
+        // The amount stored is net (what user receives), we need to refund gross (amount + fee)
+        const refundAmount = transaction.amount + transaction.fee;
+        await storage.updateUserBalance(transaction.userId, refundAmount);
+      }
+
       res.json({ success: true, message: "Transaction rejetée" });
     } catch (error: any) {
       console.error("Reject transaction error:", error);
