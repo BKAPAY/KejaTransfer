@@ -1740,6 +1740,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const needsOTP = requiresOTP(operatorKey);
         const twoStep = requiresTwoStep(operatorKey);
 
+        // CRITICAL FIX: For operators that DO NOT require OTP, call SOFTPAY endpoint immediately!
+        if (!needsOTP && !twoStep && operatorKey) {
+          console.log(`[PAYMENT_LINK SOFTPAY INIT] Operator ${operatorKey} does NOT require OTP - calling SOFTPAY endpoint immediately`);
+          
+          const paymentData: SoftpayPaymentData = {
+            customerName: customerName || "Client",
+            customerEmail: customerEmail || "",
+            phoneNumber: customerPhone,
+            invoiceToken: paydunyaResponse.token,
+          };
+
+          const softpayResult = await callPaydunyaSoftpay(operator, country, paymentData);
+          
+          console.log(`[PAYMENT_LINK SOFTPAY INIT] SOFTPAY result for ${operatorKey}:`, softpayResult);
+
+          if (softpayResult.success) {
+            // For Wave, return redirect URL
+            if (softpayResult.url) {
+              return res.json({
+                success: true,
+                transactionId,
+                token: paydunyaResponse.token,
+                ussdInstruction: softpayResult.message,
+                requiresOTP: false,
+                requiresTwoStep: false,
+                redirectUrl: softpayResult.url,
+              });
+            }
+
+            // Payment initiated - customer should receive SMS
+            return res.json({
+              success: true,
+              transactionId,
+              token: paydunyaResponse.token,
+              ussdInstruction: softpayResult.message || ussdInstruction,
+              requiresOTP: false,
+              requiresTwoStep: false,
+              message: softpayResult.message,
+            });
+          } else {
+            // SOFTPAY call failed - return error
+            console.error(`[PAYMENT_LINK SOFTPAY INIT] SOFTPAY call failed:`, softpayResult.message);
+            return res.status(400).json({
+              error: softpayResult.message || "Erreur lors de l'envoi du paiement",
+            });
+          }
+        }
+
+        // For operators that require OTP, just return the token and wait for confirm step
         res.json({
           success: true,
           transactionId,
@@ -1955,6 +2004,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const needsOTP = requiresOTP(operatorKey);
         const twoStep = requiresTwoStep(operatorKey);
 
+        // CRITICAL FIX: For operators that DO NOT require OTP, call SOFTPAY endpoint immediately!
+        if (!needsOTP && !twoStep && operatorKey) {
+          console.log(`[MERCHANT_LINK SOFTPAY INIT] Operator ${operatorKey} does NOT require OTP - calling SOFTPAY endpoint immediately`);
+          
+          const paymentData: SoftpayPaymentData = {
+            customerName: customerName || "Client",
+            customerEmail: customerEmail || "",
+            phoneNumber: customerPhone,
+            invoiceToken: paydunyaResponse.token,
+          };
+
+          const softpayResult = await callPaydunyaSoftpay(operator, country, paymentData);
+          
+          console.log(`[MERCHANT_LINK SOFTPAY INIT] SOFTPAY result for ${operatorKey}:`, softpayResult);
+
+          if (softpayResult.success) {
+            // For Wave, return redirect URL
+            if (softpayResult.url) {
+              return res.json({
+                success: true,
+                transactionId,
+                token: paydunyaResponse.token,
+                ussdInstruction: softpayResult.message,
+                requiresOTP: false,
+                requiresTwoStep: false,
+                redirectUrl: softpayResult.url,
+              });
+            }
+
+            // Payment initiated - customer should receive SMS
+            return res.json({
+              success: true,
+              transactionId,
+              token: paydunyaResponse.token,
+              ussdInstruction: softpayResult.message || ussdInstruction,
+              requiresOTP: false,
+              requiresTwoStep: false,
+              message: softpayResult.message,
+            });
+          } else {
+            // SOFTPAY call failed - return error
+            console.error(`[MERCHANT_LINK SOFTPAY INIT] SOFTPAY call failed:`, softpayResult.message);
+            return res.status(400).json({
+              error: softpayResult.message || "Erreur lors de l'envoi du paiement",
+            });
+          }
+        }
+
+        // For operators that require OTP, just return the token and wait for confirm step
         res.json({
           success: true,
           transactionId,
@@ -2645,7 +2743,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Update transaction with Paydunya token
         await storage.updateTransactionStatus(transactionId, "pending", {
           paydunyaToken: paydunyaResponse.token,
+          country,
+          operator,
         });
+
+        // CRITICAL FIX: Call SOFTPAY endpoint immediately for operators that don't require OTP
+        const operatorKey = getOperatorKey(operator, country);
+        if (operatorKey) {
+          const needsOTP = requiresOTP(operatorKey);
+          const twoStep = requiresTwoStep(operatorKey);
+
+          if (!needsOTP && !twoStep) {
+            console.log(`[API PAYMENTS SUBMIT] Operator ${operatorKey} does NOT require OTP - calling SOFTPAY endpoint immediately`);
+            
+            const paymentData: SoftpayPaymentData = {
+              customerName: transaction.customerName || "Client",
+              customerEmail: transaction.customerEmail || "",
+              phoneNumber: transaction.customerPhone || "",
+              invoiceToken: paydunyaResponse.token,
+            };
+
+            const softpayResult = await callPaydunyaSoftpay(operator, country, paymentData);
+            
+            console.log(`[API PAYMENTS SUBMIT] SOFTPAY result for ${operatorKey}:`, softpayResult);
+
+            if (!softpayResult.success) {
+              console.error(`[API PAYMENTS SUBMIT] SOFTPAY call failed:`, softpayResult.message);
+              // Continue anyway - let the status page handle it
+            }
+          }
+        }
 
         res.json({
           success: true,

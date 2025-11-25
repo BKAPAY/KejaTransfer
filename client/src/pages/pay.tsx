@@ -15,8 +15,9 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState } from "react";
-import { CheckCircle2, Clock, Loader2, AlertCircle } from "lucide-react";
+import { CheckCircle2, Clock, Loader2, AlertCircle, XCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { usePaymentCountdown } from "@/hooks/use-payment-countdown";
 
 const paymentSchema = z.object({
   customerName: z.string().min(2, "Le nom doit contenir au moins 2 caractères"),
@@ -31,7 +32,7 @@ type PaymentFormData = z.infer<typeof paymentSchema>;
 export default function Pay() {
   const [, params] = useRoute("/pay/:token");
   const token = params?.token;
-  const [paymentStage, setPaymentStage] = useState<"form" | "ussd" | "otp" | "polling" | "completed">("form");
+  const [paymentStage, setPaymentStage] = useState<"form" | "ussd" | "otp" | "polling" | "completed" | "failed">("form");
   const [invoiceToken, setInvoiceToken] = useState<string | null>(null);
   const [transactionId, setTransactionId] = useState<string | null>(null);
   const [ussdInstruction, setUssdInstruction] = useState<string | null>(null);
@@ -59,6 +60,36 @@ export default function Pay() {
   const selectedCountry = form.watch("country");
   const countryOperators = selectedCountry ? OPERATORS[(selectedCountry as keyof typeof OPERATORS) || ("BJ" as const)] || [] : [];
 
+  // Payment countdown hook with persistent timer
+  const countdown = usePaymentCountdown({
+    invoiceToken,
+    transactionId,
+    enabled: paymentStage === "polling",
+    onCompleted: () => {
+      setPaymentStage("completed");
+      toast({
+        title: "Paiement réussi",
+        description: "Votre transaction a été confirmée",
+      });
+    },
+    onFailed: () => {
+      setPaymentStage("failed");
+      toast({
+        title: "Paiement échoué",
+        description: "La transaction n'a pas pu être complétée",
+        variant: "destructive",
+      });
+    },
+    onExpired: () => {
+      setPaymentStage("failed");
+      toast({
+        title: "Délai expiré",
+        description: "Le temps de validation a expiré",
+        variant: "destructive",
+      });
+    },
+  });
+
   // SOFTPAY INIT mutation
   const initMutation = useMutation({
     mutationFn: async (data: PaymentFormData) => {
@@ -75,17 +106,20 @@ export default function Pay() {
       if (data.transactionId && data.token) {
         setTransactionId(data.transactionId);
         setInvoiceToken(data.token);
-        setUssdInstruction(data.ussdInstruction || null);
+        setUssdInstruction(data.ussdInstruction || data.message || null);
         
         if (data.requiresTwoStep) {
-          // Wizall two-step → go to OTP stage after confirm
           setPaymentStage("ussd");
         } else if (data.requiresOTP) {
-          // Direct OTP → go to OTP stage
           setPaymentStage("otp");
         } else {
-          // Standard → go to USSD stage
-          setPaymentStage("ussd");
+          // Non-OTP operators - go directly to polling (SOFTPAY was already called)
+          countdown.startCountdown();
+          setPaymentStage("polling");
+          toast({
+            title: "Paiement initié",
+            description: "Veuillez valider le paiement sur votre téléphone",
+          });
         }
       }
     },
@@ -104,7 +138,7 @@ export default function Pay() {
       const formData = form.getValues();
       const payload: any = {
         token: invoiceToken,
-        transactionId,  // CRITICAL: Include transactionId for backend to find transaction
+        transactionId,
         authorizationCode,
         country: formData.country,
         operator: formData.operator,
@@ -113,7 +147,6 @@ export default function Pay() {
         customerEmail: formData.customerEmail,
       };
       
-      // Include wizallTransactionId for Wizall OTP confirmation
       if (wizallTransactionId && authorizationCode) {
         payload.wizallTransactionId = wizallTransactionId;
       }
@@ -124,7 +157,6 @@ export default function Pay() {
     onSuccess: (data: any) => {
       if (data.success) {
         if (data.requiresOTP && data.wizallTransactionId) {
-          // Wizall first step confirmed → store ID and show OTP input
           setWizallTransactionId(data.wizallTransactionId);
           setPaymentStage("otp");
           toast({
@@ -132,10 +164,9 @@ export default function Pay() {
             description: "Veuillez entrer le code reçu par SMS",
           });
         } else if (data.redirectUrl) {
-          // Wave redirect
           window.location.href = data.redirectUrl;
         } else {
-          // Standard success → start polling
+          countdown.startCountdown();
           setPaymentStage("polling");
         }
       }
@@ -149,43 +180,6 @@ export default function Pay() {
       setPaymentStage("form");
     },
   });
-
-  // Polling for payment status
-  useEffect(() => {
-    if (paymentStage !== "polling" || !invoiceToken) return;
-
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch("/api/softpay/verify-payment", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ invoiceToken }),
-        });
-        const data = await res.json();
-        
-        if (data.status === "completed") {
-          setPaymentStage("completed");
-          clearInterval(interval);
-          toast({
-            title: "Paiement réussi",
-            description: "Votre transaction a été confirmée",
-          });
-        } else if (data.status === "failed") {
-          clearInterval(interval);
-          setPaymentStage("form");
-          toast({
-            title: "Paiement échoué",
-            description: "La transaction n'a pas pu être complétée",
-            variant: "destructive",
-          });
-        }
-      } catch (error) {
-        console.error("Polling error:", error);
-      }
-    }, 3000);
-
-    return () => clearInterval(interval);
-  }, [paymentStage, invoiceToken, toast]);
 
   const onSubmit = async (data: PaymentFormData) => {
     initMutation.mutate(data);
@@ -255,39 +249,103 @@ export default function Pay() {
     );
   }
 
-  // STAGE: Completed
+  // STAGE: Completed - Show success logo only
   if (paymentStage === "completed") {
     return (
       <div className="w-full min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center p-4 overflow-hidden">
         <Card className="w-full max-w-md">
-          <CardHeader className="text-center space-y-2 p-4 sm:p-6">
-            <div className="flex justify-center mb-2">
-              <CheckCircle2 className="w-12 h-12 text-green-500" data-testid="icon-success" />
+          <CardContent className="pt-8 pb-8 flex flex-col items-center text-center space-y-6">
+            <img src={logoImage} alt="BKApay" className="h-10 w-auto" />
+            
+            <div className="w-24 h-24 rounded-full bg-green-100 dark:bg-green-950 flex items-center justify-center">
+              <CheckCircle2 className="w-16 h-16 text-green-600 dark:text-green-400" data-testid="icon-success" />
             </div>
-            <CardTitle>Paiement réussi!</CardTitle>
-            <CardDescription>Votre transaction a été confirmée</CardDescription>
-          </CardHeader>
+            
+            <div className="space-y-2">
+              <h2 className="text-2xl font-bold text-green-600 dark:text-green-400">Paiement Réussi</h2>
+              <p className="text-sm text-muted-foreground">Votre transaction a été confirmée avec succès</p>
+            </div>
+
+            <div className="w-full bg-muted rounded-lg p-4 space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Montant</span>
+                <span className="font-semibold text-foreground">{formatAmount(paymentLink.amount)}</span>
+              </div>
+            </div>
+          </CardContent>
         </Card>
       </div>
     );
   }
 
-  // STAGE: Polling
+  // STAGE: Failed - Show error logo only
+  if (paymentStage === "failed") {
+    return (
+      <div className="w-full min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center p-4 overflow-hidden">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-8 pb-8 flex flex-col items-center text-center space-y-6">
+            <img src={logoImage} alt="BKApay" className="h-10 w-auto" />
+            
+            <div className="w-24 h-24 rounded-full bg-red-100 dark:bg-red-950 flex items-center justify-center">
+              <XCircle className="w-16 h-16 text-red-600 dark:text-red-400" data-testid="icon-failed" />
+            </div>
+            
+            <div className="space-y-2">
+              <h2 className="text-2xl font-bold text-red-600 dark:text-red-400">Paiement Échoué</h2>
+              <p className="text-sm text-muted-foreground">
+                {countdown.isExpired ? "Le délai de validation a expiré" : "La transaction n'a pas pu être complétée"}
+              </p>
+            </div>
+
+            <div className="w-full bg-muted rounded-lg p-4 space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Montant</span>
+                <span className="font-semibold text-foreground">{formatAmount(paymentLink.amount)}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // STAGE: Polling with countdown
   if (paymentStage === "polling") {
     return (
       <div className="w-full min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center p-4 overflow-hidden">
         <Card className="w-full max-w-md">
-          <CardHeader className="text-center space-y-2 p-4 sm:p-6">
-            <div className="flex justify-center mb-2">
-              <Loader2 className="w-12 h-12 text-primary animate-spin" data-testid="icon-polling" />
+          <CardContent className="pt-8 pb-8 flex flex-col items-center text-center space-y-6">
+            <img src={logoImage} alt="BKApay" className="h-10 w-auto" />
+            
+            <div className="space-y-4">
+              <Loader2 className="w-16 h-16 text-primary animate-spin mx-auto" data-testid="icon-polling" />
+              
+              <div className="space-y-2">
+                <h2 className="text-xl font-bold text-foreground">Paiement en cours</h2>
+                <p className="text-sm text-muted-foreground">
+                  Veuillez valider le paiement sur votre téléphone
+                </p>
+              </div>
+
+              {/* Countdown Timer */}
+              <div className="bg-primary/10 rounded-lg p-4">
+                <p className="text-sm text-muted-foreground mb-1">Temps restant</p>
+                <p className="text-3xl font-mono font-bold text-primary" data-testid="text-countdown">
+                  {countdown.formattedTime}
+                </p>
+              </div>
+
+              {ussdInstruction && (
+                <div className="text-left bg-muted rounded-lg p-3">
+                  <p className="text-xs text-muted-foreground mb-1">Instructions:</p>
+                  <p className="text-sm text-foreground whitespace-pre-line">{ussdInstruction}</p>
+                </div>
+              )}
+
+              <p className="text-xs text-muted-foreground">
+                Ne fermez pas cette page
+              </p>
             </div>
-            <CardTitle>Paiement en cours</CardTitle>
-            <CardDescription>Vérification du paiement...</CardDescription>
-          </CardHeader>
-          <CardContent className="p-4 sm:p-6 text-center space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Nous vérifions votre paiement. Cela peut prendre quelques secondes.
-            </p>
           </CardContent>
         </Card>
       </div>
