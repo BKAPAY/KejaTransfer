@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Mail, Phone, ChevronDown } from "lucide-react";
+import { Mail, Phone, ChevronDown, Users } from "lucide-react";
+import { SiWhatsapp } from "react-icons/si";
 import { useState } from "react";
 
 const faqs = [
@@ -66,7 +67,7 @@ export default function Support() {
         <p className="text-sm text-muted-foreground">Nous sommes là pour vous aider</p>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-4">
+      <div className="grid md:grid-cols-3 gap-4">
         <Card className="hover-elevate">
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2 mb-1">
@@ -101,6 +102,31 @@ export default function Support() {
             <Button variant="outline" size="sm" className="w-full" data-testid="button-phone">
               <Phone className="w-3 h-3 mr-1" />
               +229 97 12 34 56
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card className="hover-elevate">
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-8 h-8 rounded-md bg-green-500/10 flex items-center justify-center flex-shrink-0">
+                <SiWhatsapp className="w-4 h-4 text-green-600" />
+              </div>
+              <CardTitle className="text-sm">Communauté</CardTitle>
+            </div>
+            <CardDescription className="text-xs">Rejoignez notre groupe</CardDescription>
+          </CardHeader>
+          <CardContent className="text-xs space-y-2">
+            <p className="text-muted-foreground">Échangez avec la communauté</p>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="w-full bg-green-50 hover:bg-green-100 border-green-200 text-green-700 dark:bg-green-950 dark:hover:bg-green-900 dark:border-green-800 dark:text-green-400" 
+              data-testid="button-whatsapp-community"
+              onClick={() => window.open("https://chat.whatsapp.com/DRe55FMRXCt87VxNvjF1EF", "_blank")}
+            >
+              <SiWhatsapp className="w-3 h-3 mr-1" />
+              Rejoindre le groupe
             </Button>
           </CardContent>
         </Card>
