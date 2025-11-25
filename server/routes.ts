@@ -918,11 +918,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Ce lien n'existe pas ou a été supprimé" });
       }
 
-      // Call Paydunya API to create checkout invoice
+      // Call Paydunya API to create checkout invoice with customer info
       const paydunyaData = {
         invoice: {
           total_amount: paymentLink.amount,
           description: `Paiement - ${paymentLink.productName}`,
+          customer: {
+            name: customerName || "Client",
+            email: customerEmail || "",
+            phone: customerPhone,
+          },
         },
         store: {
           name: "BKApay",
@@ -1017,11 +1022,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Ce lien n'existe pas ou a été supprimé" });
       }
 
-      // Call Paydunya API
+      // Call Paydunya API with customer info
       const paydunyaData = {
         invoice: {
           total_amount: amount,
           description: `Paiement marchand - ${merchantLink.merchantName}`,
+          customer: {
+            name: customerName || "Client",
+            email: customerEmail || "",
+            phone: customerPhone,
+          },
         },
         store: {
           name: merchantLink.merchantName,
@@ -1108,6 +1118,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         invoice: {
           total_amount: Math.floor(amount),
           description: `Dépôt de ${amount} XOF sur BKApay`,
+          customer: {
+            name: `${user!.firstName} ${user!.lastName}`,
+            email: user!.email,
+            phone: phone,
+          },
         },
         store: {
           name: "BKApay",
@@ -1185,10 +1200,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Create Paydunya invoice to get token
+      // Include customer info in invoice for pre-filling payment page
+      const effectiveCustomerName = customerName || `${user!.firstName} ${user!.lastName}`;
+      const effectiveCustomerEmail = customerEmail || user!.email;
+      
       const paydunyaData = {
         invoice: {
           total_amount: Math.floor(amount),
           description: description || `Dépôt de ${amount} XOF`,
+          customer: {
+            name: effectiveCustomerName,
+            email: effectiveCustomerEmail,
+            phone: phone,
+          },
         },
         store: {
           name: "BKApay",
@@ -1392,11 +1416,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Ce lien n'existe pas ou a été supprimé" });
       }
 
-      // Create Paydunya invoice
+      // Create Paydunya invoice with customer info
       const paydunyaData = {
         invoice: {
           total_amount: paymentLink.amount,
           description: `Paiement - ${paymentLink.productName}`,
+          customer: {
+            name: customerName || "Client",
+            email: customerEmail || "",
+            phone: customerPhone,
+          },
         },
         store: {
           name: "BKApay",
@@ -1599,11 +1628,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Ce lien n'existe pas" });
       }
 
-      // Create Paydunya invoice
+      // Create Paydunya invoice with customer info
       const paydunyaData = {
         invoice: {
           total_amount: Math.floor(paymentLink.amount),
           description: `Paiement - ${paymentLink.productName}`,
+          customer: {
+            name: customerName || "Client",
+            email: customerEmail || "",
+            phone: customerPhone,
+          },
         },
         store: {
           name: "BKApay",
@@ -1809,11 +1843,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Ce lien n'existe pas" });
       }
 
-      // Create Paydunya invoice
+      // Create Paydunya invoice with customer info
       const paydunyaData = {
         invoice: {
           total_amount: Math.floor(amount),
           description: `Paiement marchand - ${merchantLink.merchantName}`,
+          customer: {
+            name: customerName || "Client",
+            email: customerEmail || "",
+            phone: customerPhone,
+          },
         },
         store: {
           name: "BKApay",
@@ -2301,11 +2340,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const grossAmount = Math.floor(amount);
       const feeInfo = calculateIncomingFee(grossAmount, paymentCountry);
       
-      // Call Paydunya API to create checkout invoice
+      // Call Paydunya API to create checkout invoice with customer info
       const paydunyaData = {
         invoice: {
           total_amount: grossAmount,
           description: description || "Paiement via API BKApay",
+          customer: {
+            name: customerName || "Client",
+            email: customerEmail || "",
+            phone: customerPhone || "",
+          },
         },
         store: {
           name: "BKApay",
@@ -2517,11 +2561,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Update transaction with country and operator
       await storage.updateTransactionStatus(transactionId, "pending");
 
-      // Call Paydunya API to create checkout invoice
+      // Call Paydunya API to create checkout invoice with customer info
       const paydunyaData = {
         invoice: {
           total_amount: transaction.amount,
           description: transaction.description || "Paiement via BKApay",
+          customer: {
+            name: transaction.customerName || "Client",
+            email: transaction.customerEmail || "",
+            phone: transaction.customerPhone || "",
+          },
         },
         store: {
           name: "BKApay",
