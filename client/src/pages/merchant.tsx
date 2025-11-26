@@ -15,7 +15,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState } from "react";
-import { CheckCircle2, Clock, Loader2, AlertCircle, XCircle, RefreshCw } from "lucide-react";
+import { CheckCircle2, Clock, Loader2, AlertCircle, XCircle, RefreshCw, ExternalLink } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { usePaymentCountdown } from "@/hooks/use-payment-countdown";
 
@@ -43,11 +43,12 @@ function getMerchantPaymentStateKey(token: string): string {
 }
 
 interface MerchantPaymentState {
-  stage: "form" | "ussd" | "otp" | "polling" | "completed" | "failed";
+  stage: "form" | "ussd" | "otp" | "polling" | "completed" | "failed" | "redirect";
   invoiceToken: string | null;
   transactionId: string | null;
   ussdInstruction: string | null;
   wizallTransactionId: string | null;
+  redirectUrl: string | null;
   paidAmount: number;
   country: string;
   operator: string;
@@ -79,11 +80,12 @@ function clearMerchantPaymentState(token: string): void {
 export default function Merchant() {
   const [, params] = useRoute("/merchant/:token");
   const token = params?.token;
-  const [paymentStage, setPaymentStage] = useState<"form" | "ussd" | "otp" | "polling" | "completed" | "failed">("form");
+  const [paymentStage, setPaymentStage] = useState<"form" | "ussd" | "otp" | "polling" | "completed" | "failed" | "redirect">("form");
   const [invoiceToken, setInvoiceToken] = useState<string | null>(null);
   const [transactionId, setTransactionId] = useState<string | null>(null);
   const [ussdInstruction, setUssdInstruction] = useState<string | null>(null);
   const [wizallTransactionId, setWizallTransactionId] = useState<string | null>(null);
+  const [redirectUrl, setRedirectUrl] = useState<string | null>(null);
   const [authCode, setAuthCode] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [paidAmount, setPaidAmount] = useState<number>(0);
@@ -124,6 +126,7 @@ export default function Merchant() {
       setTransactionId(savedState.transactionId);
       setUssdInstruction(savedState.ussdInstruction);
       setWizallTransactionId(savedState.wizallTransactionId);
+      setRedirectUrl(savedState.redirectUrl);
       setPaidAmount(savedState.paidAmount);
       setSavedCountry(savedState.country);
       setSavedOperator(savedState.operator);
@@ -170,6 +173,7 @@ export default function Merchant() {
     setTransactionId(null);
     setUssdInstruction(null);
     setWizallTransactionId(null);
+    setRedirectUrl(null);
     setAuthCode("");
     setPaidAmount(0);
     setSavedCountry("");
@@ -234,9 +238,17 @@ export default function Merchant() {
         setSavedCountry(formData.country);
         setSavedOperator(formData.operator);
         
-        let newStage: "ussd" | "otp" | "polling" = "polling";
+        let newStage: "ussd" | "otp" | "polling" | "redirect" = "polling";
         
-        if (data.requiresTwoStep) {
+        // Wave et autres opérateurs avec redirection
+        if (data.redirectUrl) {
+          setRedirectUrl(data.redirectUrl);
+          newStage = "redirect";
+          toast({
+            title: "Redirection Wave",
+            description: "Cliquez sur le bouton pour compléter le paiement via Wave",
+          });
+        } else if (data.requiresTwoStep) {
           newStage = "ussd";
         } else if (data.requiresOTP) {
           newStage = "otp";
@@ -258,6 +270,7 @@ export default function Merchant() {
             transactionId: data.transactionId,
             ussdInstruction: data.ussdInstruction || data.message || null,
             wizallTransactionId: null,
+            redirectUrl: data.redirectUrl || null,
             paidAmount: formData.amount,
             country: formData.country,
             operator: formData.operator,
@@ -544,6 +557,80 @@ export default function Merchant() {
     );
   }
 
+  // STAGE: Wave Redirect - Bouton pour aller à Wave
+  if (paymentStage === "redirect" && redirectUrl) {
+    const handleWaveRedirect = () => {
+      countdown.startCountdown();
+      setPaymentStage("polling");
+      
+      if (token) {
+        const currentState = loadMerchantPaymentState(token);
+        if (currentState) {
+          saveMerchantPaymentState(token, {
+            ...currentState,
+            stage: "polling",
+          });
+        }
+      }
+      
+      window.open(redirectUrl, "_blank");
+    };
+    
+    return (
+      <div className="w-full min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center p-4 overflow-hidden">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center space-y-2">
+            <img src={logoImage} alt="BKApay" className="h-10 w-auto mx-auto" />
+            <CardTitle>Paiement Wave</CardTitle>
+            <CardDescription>
+              Cliquez sur le bouton ci-dessous pour compléter votre paiement via Wave
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Alert className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+              <AlertCircle className="h-4 w-4 text-blue-600" />
+              <AlertDescription className="text-sm text-blue-800 dark:text-blue-200">
+                Vous serez redirigé vers Wave pour finaliser le paiement de manière sécurisée.
+              </AlertDescription>
+            </Alert>
+            
+            <div className="text-center p-4 bg-muted rounded-lg">
+              <p className="text-sm text-muted-foreground">Montant à payer</p>
+              <p className="text-2xl font-bold text-primary">
+                {paidAmount.toLocaleString()} FCFA
+              </p>
+            </div>
+            
+            <Button
+              onClick={handleWaveRedirect}
+              className="w-full bg-blue-600 hover:bg-blue-700"
+              size="lg"
+              data-testid="button-wave-redirect"
+            >
+              <ExternalLink className="w-5 h-5 mr-2" />
+              Aller à Wave pour payer
+            </Button>
+            
+            <p className="text-xs text-muted-foreground text-center">
+              Après le paiement, revenez sur cette page pour confirmer
+            </p>
+            
+            <Button
+              onClick={handleNewPayment}
+              variant="ghost"
+              size="sm"
+              className="w-full text-muted-foreground"
+              data-testid="button-new-payment-redirect"
+            >
+              <RefreshCw className="w-3 h-3 mr-1" />
+              Recommencer un nouveau paiement
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   // STAGE: USSD instructions
   if (paymentStage === "ussd") {
     return (
@@ -822,7 +909,7 @@ export default function Merchant() {
               <Button
                 type="submit"
                 className="w-full"
-                disabled={initMutation.isPending || isLoadingOperators || noOperatorsAvailable}
+                disabled={initMutation.isPending || isLoadingOperators || Boolean(noOperatorsAvailable)}
                 data-testid="button-pay"
               >
                 {initMutation.isPending ? (

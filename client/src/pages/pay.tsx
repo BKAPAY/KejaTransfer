@@ -900,7 +900,7 @@ export default function Pay() {
               <Button
                 type="submit"
                 className="w-full"
-                disabled={initMutation.isPending || isLoadingOperators || noOperatorsAvailable}
+                disabled={initMutation.isPending || isLoadingOperators || Boolean(noOperatorsAvailable)}
                 data-testid="button-pay"
               >
                 {initMutation.isPending ? (

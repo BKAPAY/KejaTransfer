@@ -35,7 +35,7 @@ type DepositFormData = z.infer<typeof depositSchema>;
 
 export default function Deposit() {
   const { toast } = useToast();
-  const [paymentStep, setPaymentStep] = useState<"form" | "otp" | "wizall-second" | "polling">("form");
+  const [paymentStep, setPaymentStep] = useState<"form" | "otp" | "wizall-second" | "polling" | "redirect">("form");
   const [paymentData, setPaymentData] = useState<{
     transactionId?: string;
     token?: string;
@@ -97,14 +97,13 @@ export default function Deposit() {
     onSuccess: (response: any) => {
       setPaymentData(response);
       
-      // Handle Wave redirect
+      // Handle Wave redirect - Show redirect stage with button
       if (response.redirectUrl) {
+        setPaymentStep("redirect");
         toast({
-          title: "Redirection",
-          description: "Vous allez être redirigé vers Wave",
+          title: "Paiement Wave",
+          description: "Cliquez sur le bouton pour compléter le paiement via Wave",
         });
-        window.open(response.redirectUrl, "_blank");
-        setPaymentStep("polling");
         return;
       }
 
@@ -268,6 +267,56 @@ export default function Deposit() {
             }).format(user.balance || 0)}
           </AlertDescription>
         </Alert>
+      )}
+
+      {paymentStep === "redirect" && paymentData.redirectUrl && (
+        <Card>
+          <CardHeader className="pb-2 text-center">
+            <CardTitle className="text-lg">Paiement Wave</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800">
+              <Info className="h-4 w-4 text-blue-600" />
+              <AlertDescription className="text-sm text-blue-900 dark:text-blue-100 ml-2">
+                Cliquez sur le bouton ci-dessous pour être redirigé vers Wave et compléter votre paiement de manière sécurisée.
+              </AlertDescription>
+            </Alert>
+            
+            <div className="text-center p-4 bg-muted rounded-lg">
+              <p className="text-sm text-muted-foreground">Montant à déposer</p>
+              <p className="text-2xl font-bold text-primary">
+                {amount?.toLocaleString()} FCFA
+              </p>
+            </div>
+            
+            <Button
+              onClick={() => {
+                window.open(paymentData.redirectUrl, "_blank");
+                setPaymentStep("polling");
+              }}
+              className="w-full bg-blue-600 hover:bg-blue-700"
+              size="lg"
+              data-testid="button-wave-redirect"
+            >
+              <ExternalLink className="w-5 h-5 mr-2" />
+              Aller à Wave pour payer
+            </Button>
+            
+            <p className="text-xs text-muted-foreground text-center">
+              Après le paiement, revenez sur cette page. La vérification sera automatique.
+            </p>
+            
+            <Button
+              onClick={handleBackToForm}
+              variant="ghost"
+              size="sm"
+              className="w-full text-muted-foreground"
+              data-testid="button-back-deposit"
+            >
+              Annuler et recommencer
+            </Button>
+          </CardContent>
+        </Card>
       )}
 
       {paymentStep === "polling" && (
