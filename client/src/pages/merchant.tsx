@@ -150,20 +150,20 @@ export default function Merchant() {
     ? (OPERATORS[selectedCountry as keyof typeof OPERATORS] || [])
     : [];
   
-  // Logique de filtrage:
-  // - Pendant le chargement: désactiver le select mais ne pas montrer d'alerte
-  // - Si l'admin a configuré des opérateurs pour ce pays: filtrer selon la config
-  // - Si l'admin n'a PAS de config pour ce pays: montrer tous les opérateurs (défaut = tous activés)
-  const hasAdminConfig = enabledCountriesOperators && selectedCountry && enabledCountriesOperators[selectedCountry] !== undefined;
+  // Logique de filtrage stricte:
+  // - Pendant le chargement: montrer tous (select désactivé)
+  // - Une fois chargé: utiliser UNIQUEMENT les opérateurs retournés par l'API
+  // - Si le pays n'est pas dans la réponse ou liste vide: aucun opérateur disponible
+  const enabledOperatorsForCountry = enabledCountriesOperators && selectedCountry 
+    ? (enabledCountriesOperators[selectedCountry] || [])
+    : [];
   
   const countryOperators = isLoadingOperators 
-    ? allCountryOperators // Montrer tous pendant le chargement (mais select désactivé)
-    : hasAdminConfig
-      ? allCountryOperators.filter(op => (enabledCountriesOperators[selectedCountry] || []).includes(op.code))
-      : allCountryOperators; // Pas de config admin = tous les opérateurs activés par défaut
+    ? allCountryOperators
+    : allCountryOperators.filter(op => enabledOperatorsForCountry.includes(op.code));
   
-  // Déterminer si aucun opérateur n'est disponible (seulement après le chargement ET si l'admin a explicitement tout désactivé)
-  const noOperatorsAvailable = !isLoadingOperators && hasAdminConfig && countryOperators.length === 0;
+  // Déterminer si aucun opérateur n'est disponible (après chargement)
+  const noOperatorsAvailable = !isLoadingOperators && selectedCountry && countryOperators.length === 0;
 
   // Fonction pour recommencer un nouveau paiement
   const handleNewPayment = () => {

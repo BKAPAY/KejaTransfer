@@ -102,15 +102,19 @@ export default function ApiPay() {
     ? (OPERATORS[country as keyof typeof OPERATORS] || [])
     : [];
   
-  const hasAdminConfig = Boolean(enabledCountriesOperators && country && enabledCountriesOperators[country] !== undefined);
+  // Logique de filtrage stricte:
+  // - Pendant le chargement: montrer tous (select désactivé)
+  // - Une fois chargé: utiliser UNIQUEMENT les opérateurs retournés par l'API
+  // - Si le pays n'est pas dans la réponse ou liste vide: aucun opérateur disponible
+  const enabledOperatorsForCountry = enabledCountriesOperators && country 
+    ? (enabledCountriesOperators[country] || [])
+    : [];
   
   const countryOperators = isLoadingOperators 
     ? allCountryOperators
-    : hasAdminConfig && enabledCountriesOperators
-      ? allCountryOperators.filter(op => (enabledCountriesOperators[country] || []).includes(op.code))
-      : allCountryOperators;
+    : allCountryOperators.filter(op => enabledOperatorsForCountry.includes(op.code));
   
-  const noOperatorsAvailable = !isLoadingOperators && hasAdminConfig && countryOperators.length === 0;
+  const noOperatorsAvailable = !isLoadingOperators && country && countryOperators.length === 0;
 
   const [shouldStartCountdown, setShouldStartCountdown] = useState(false);
 
