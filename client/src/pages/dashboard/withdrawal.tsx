@@ -21,6 +21,10 @@ const withdrawalSchema = z.object({
   country: z.string().min(1, "Sélectionnez un pays"),
   operator: z.string().min(1, "Sélectionnez un opérateur"),
   phone: z.string().min(7, "Numéro de téléphone invalide").regex(/^\d+$/, "Le numéro doit contenir uniquement des chiffres"),
+  phoneConfirm: z.string().min(7, "Confirmez le numéro de téléphone"),
+}).refine((data) => data.phone === data.phoneConfirm, {
+  message: "Numéro incorrect - les numéros ne correspondent pas",
+  path: ["phoneConfirm"],
 });
 
 type WithdrawalFormData = z.infer<typeof withdrawalSchema>;
@@ -44,6 +48,7 @@ export default function Withdrawal() {
       country: "",
       operator: "",
       phone: "",
+      phoneConfirm: "",
     },
   });
 
@@ -251,6 +256,28 @@ export default function Withdrawal() {
                     </FormControl>
                     <p className="text-xs text-muted-foreground mt-1">
                       Exemple pour Sénégal: 771234567 (sans le +221)
+                    </p>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="phoneConfirm"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Confirmer le numéro de téléphone</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="771234567"
+                        data-testid="input-withdrawal-phone-confirm"
+                        inputMode="numeric"
+                        {...field}
+                      />
+                    </FormControl>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Saisissez à nouveau le numéro pour confirmer
                     </p>
                     <FormMessage />
                   </FormItem>
