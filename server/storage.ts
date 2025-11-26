@@ -70,6 +70,7 @@ export interface IStorage {
   getAllPendingTransactions(): Promise<(Transaction & { user?: User })[]>;
   createTransaction(transaction: InsertTransaction): Promise<Transaction>;
   updateTransactionStatus(id: string, status: string, paydunyaData?: any): Promise<Transaction | undefined>;
+  updateTransactionMetadata(id: string, metadata: string): Promise<Transaction | undefined>;
   getUserStats(userId: string): Promise<{
     totalBalance: number;
     totalDeposits: number;
@@ -358,6 +359,15 @@ export class DbStorage implements IStorage {
     const results = await db
       .update(schema.transactions)
       .set(updateData)
+      .where(eq(schema.transactions.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async updateTransactionMetadata(id: string, metadata: string): Promise<Transaction | undefined> {
+    const results = await db
+      .update(schema.transactions)
+      .set({ metadata })
       .where(eq(schema.transactions.id, id))
       .returning();
     return results[0];

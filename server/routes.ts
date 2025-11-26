@@ -869,8 +869,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Pays non supporte" });
       }
 
-      // Get operator key for SOFTPAY
-      const operatorKey = getOperatorKey(country, operator);
+      // Get operator key for SOFTPAY (IMPORTANT: operator first, then country)
+      const operatorKey = getOperatorKey(operator, country);
       if (!operatorKey) {
         return res.status(400).json({ error: "Operateur non supporte pour ce pays" });
       }
@@ -947,41 +947,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }),
       });
 
-      // Initialize SOFTPAY payment
-      const softpayData: SoftpayPaymentData = {
-        invoiceToken: paydunyaToken,
-        phoneNumber: sanitizedPhone,
-        customerName,
-        customerEmail,
-      };
+      // Check if OTP or two-step is required
+      const needsOTP = requiresOTP(operatorKey);
+      const needsTwoStep = requiresTwoStep(operatorKey);
+      const ussdInstruction = getUSSDInstruction(operatorKey);
 
-      // Get operator config and call appropriate endpoint
-      const operatorConfig = SOFTPAY_OPERATORS[operatorKey];
-      if (!operatorConfig) {
-        await storage.updateTransactionStatus(transaction.id, "failed");
-        return res.status(500).json({ error: "Configuration operateur non trouvee" });
+      // For operators that DO NOT require OTP, call SOFTPAY endpoint immediately
+      if (!needsOTP && !needsTwoStep) {
+        console.log(`[API-PAY INIT] Operator ${operatorKey} does NOT require OTP - calling SOFTPAY endpoint immediately`);
+        
+        const paymentData: SoftpayPaymentData = {
+          customerName,
+          customerEmail,
+          phoneNumber: sanitizedPhone,
+          invoiceToken: paydunyaToken,
+        };
+
+        const softpayResult = await callPaydunyaSoftpay(operator, country, paymentData);
+        
+        console.log(`[API-PAY INIT] SOFTPAY result for ${operatorKey}:`, softpayResult);
+
+        if (softpayResult.success) {
+          // For Wave, return redirect URL
+          if (softpayResult.url) {
+            return res.json({
+              success: true,
+              transactionId: transaction.id,
+              token: paydunyaToken,
+              ussdInstruction: softpayResult.message,
+              requiresOTP: false,
+              requiresTwoStep: false,
+              redirectUrl: softpayResult.url,
+            });
+          }
+
+          // Payment initiated - customer should receive SMS
+          return res.json({
+            success: true,
+            transactionId: transaction.id,
+            token: paydunyaToken,
+            ussdInstruction: softpayResult.message || ussdInstruction,
+            requiresOTP: false,
+            requiresTwoStep: false,
+            message: softpayResult.message,
+          });
+        } else {
+          // SOFTPAY call failed - return error
+          console.error(`[API-PAY INIT] SOFTPAY call failed:`, softpayResult.message);
+          await storage.updateTransactionStatus(transaction.id, "failed");
+          return res.status(400).json({
+            error: softpayResult.message || "Erreur lors de l'envoi du paiement",
+          });
+        }
       }
 
-      const softpayParams = operatorConfig.parameterMapping(softpayData);
-      const softpayResult = await callPaydunyaAPI(operatorConfig.endpoint, softpayParams);
-
-      if (softpayResult.response_code !== "00") {
-        await storage.updateTransactionStatus(transaction.id, "failed");
-        return res.status(500).json({ error: "Erreur lors de l'initialisation du paiement" });
-      }
-
-      // Check if OTP is required
-      const needsOtp = requiresOTP(operatorKey);
-      const ussdCode = getUSSDInstruction(operatorKey);
-
+      // For operators that require OTP, return token and wait for confirm step
       res.json({
         success: true,
         transactionId: transaction.id,
-        requiresOtp: needsOtp,
-        ussdCode,
-        message: needsOtp 
-          ? `Composez ${ussdCode} puis entrez le code OTP recu`
-          : "Paiement en cours de traitement",
+        token: paydunyaToken,
+        ussdInstruction,
+        requiresOTP: needsOTP,
+        requiresTwoStep: needsTwoStep,
       });
     } catch (error: any) {
       console.error("API Pay init error:", error);
@@ -992,14 +1019,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Confirm API payment with OTP
   app.post("/api/api-pay/confirm", async (req: Request, res: Response) => {
     try {
-      const { transactionId, otpCode } = req.body;
+      const { transactionId, token, authorizationCode, country, operator, customerPhone, customerName, customerEmail, wizallTransactionId } = req.body;
 
-      if (!transactionId || !otpCode) {
-        return res.status(400).json({ error: "Transaction ID et code OTP requis" });
+      // Get transaction by ID or token
+      let transaction = null;
+      if (transactionId) {
+        transaction = await storage.getTransaction(transactionId);
+      } else if (token) {
+        transaction = await storage.getTransactionByPaydunyaToken(token);
       }
-
-      // Get transaction
-      const transaction = await storage.getTransaction(transactionId);
+      
       if (!transaction) {
         return res.status(404).json({ error: "Transaction non trouvee" });
       }
@@ -1008,40 +1037,101 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Cette transaction n'est plus en attente" });
       }
 
-      // Get operator key from metadata (stored during init)
-      let operatorKey: string | null = null;
+      // Get metadata
+      let metadata: any = {};
       if (transaction.metadata) {
         try {
-          const metadata = JSON.parse(transaction.metadata as string);
-          operatorKey = metadata.operatorKey || null;
-        } catch (e) {
-          // Fallback to recalculating
-        }
+          metadata = JSON.parse(transaction.metadata as string);
+        } catch (e) {}
       }
 
-      // Fallback: recalculate operator key if not in metadata
-      if (!operatorKey) {
-        operatorKey = getOperatorKey(
-          transaction.country || "SN",
-          transaction.operator || "orange"
-        );
-      }
+      // Get operator key
+      const txCountry = country || transaction.country || "SN";
+      const txOperator = operator || transaction.operator || "orange";
+      const operatorKey = metadata.operatorKey || getOperatorKey(txOperator, txCountry);
 
       if (!operatorKey) {
         return res.status(400).json({ error: "Operateur non valide" });
       }
 
       // Get phone from transaction
-      const phone = (transaction.customerPhone || "").replace(/\s+/g, "").replace(/[^0-9]/g, "");
+      const phone = (customerPhone || transaction.customerPhone || "").replace(/\s+/g, "").replace(/[^0-9]/g, "");
+
+      // Check if this is Wizall two-step flow
+      const isTwoStep = requiresTwoStep(operatorKey);
+
+      if (isTwoStep && txOperator.toLowerCase() === "wizall" && txCountry.toUpperCase() === "SN") {
+        // WIZALL TWO-STEP FLOW
+        console.log("[API-PAY WIZALL] Processing Wizall payment");
+
+        if (!authorizationCode && !wizallTransactionId) {
+          // First step: initiate Wizall payment
+          const paymentData: SoftpayPaymentData = {
+            customerName: customerName || transaction.customerName || "",
+            customerEmail: customerEmail || transaction.customerEmail || "",
+            phoneNumber: phone,
+            invoiceToken: transaction.paydunyaToken!,
+          };
+
+          const softpayResult = await callPaydunyaSoftpay(txOperator, txCountry, paymentData);
+          console.log("[API-PAY WIZALL] Init result:", softpayResult);
+
+          if (softpayResult.success) {
+            // Update metadata with Wizall transactionId
+            const newMetadata = { ...metadata, wizallTransactionId: softpayResult.transactionId };
+            await storage.updateTransactionMetadata(transaction.id, JSON.stringify(newMetadata));
+
+            // Sanitize message
+            let msg = softpayResult.message || "Un code OTP vous a ete envoye par SMS";
+            msg = msg.replace(/<[^>]*>/g, "").replace(/[^\w\s.,!?'-]/g, "").substring(0, 200);
+
+            return res.json({
+              success: true,
+              requiresOTP: true,
+              wizallTransactionId: softpayResult.transactionId,
+              message: msg,
+            });
+          } else {
+            return res.status(400).json({
+              error: softpayResult.message || "Erreur lors de l'initialisation Wizall",
+            });
+          }
+        } else {
+          // Second step: confirm with OTP
+          const wizTxId = wizallTransactionId || metadata.wizallTransactionId;
+          if (!wizTxId) {
+            return res.status(502).json({ error: "Transaction Wizall non initiee. Veuillez recommencer." });
+          }
+
+          const confirmResult = await confirmWizallPayment(authorizationCode!, phone, wizTxId);
+
+          if (confirmResult.success) {
+            return res.json({
+              success: true,
+              message: confirmResult.message,
+              transactionId: transaction.id,
+            });
+          } else {
+            return res.status(400).json({
+              error: confirmResult.message || "Erreur lors de la confirmation Wizall",
+            });
+          }
+        }
+      }
+
+      // Standard OTP flow (Orange, etc.)
+      if (!authorizationCode) {
+        return res.status(400).json({ error: "Code OTP requis" });
+      }
 
       // Call SOFTPAY OTP confirm
       const confirmData = {
         invoice_token: transaction.paydunyaToken,
         payment_token: operatorKey,
         phone_number: phone,
-        otp_code: otpCode,
-        customer_name: transaction.customerName,
-        customer_email: transaction.customerEmail,
+        otp_code: authorizationCode,
+        customer_name: customerName || transaction.customerName,
+        customer_email: customerEmail || transaction.customerEmail,
       };
 
       const confirmResult = await callPaydunyaAPI("/softpay/v2/otp-confirm", confirmData);
@@ -1060,7 +1150,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         success: true,
         message: "Paiement en cours de verification",
-        transactionId,
+        transactionId: transaction.id,
       });
     } catch (error: any) {
       console.error("API Pay confirm error:", error);
