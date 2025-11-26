@@ -101,7 +101,7 @@ export function KycVerificationModal({
       filename: `KYC_${user.email}_${new Date().getTime()}.pdf`,
       image: { type: "png" as const, quality: 0.98 },
       html2canvas: { scale: 2 },
-      jsPDF: { orientation: "portrait", unit: "mm", format: "a4" },
+      jsPDF: { orientation: "portrait" as const, unit: "mm", format: "a4" },
     };
     html2pdf().set(options).from(element).save();
   };
@@ -120,7 +120,7 @@ export function KycVerificationModal({
           <div className="space-y-4">
             {isLoading ? (
               <div className="text-center py-8">Chargement...</div>
-            ) : !submissions || submissions.length === 0 ? (
+            ) : !submissions || (submissions as any[]).length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 Aucune demande KYC en attente
               </div>
