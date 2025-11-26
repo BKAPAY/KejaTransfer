@@ -497,7 +497,17 @@ export class DbStorage implements IStorage {
   }
 
   async deleteUser(userId: string): Promise<boolean> {
-    const result = await db.delete(schema.users).where(eq(schema.users.id, userId));
+    // Must delete related data first due to foreign key constraints
+    // 1. Delete transactions
+    await db.delete(schema.transactions).where(eq(schema.transactions.userId, userId));
+    // 2. Delete payment links
+    await db.delete(schema.paymentLinks).where(eq(schema.paymentLinks.userId, userId));
+    // 3. Delete merchant links
+    await db.delete(schema.merchantLinks).where(eq(schema.merchantLinks.userId, userId));
+    // 4. Delete API keys
+    await db.delete(schema.apiKeys).where(eq(schema.apiKeys.userId, userId));
+    // 5. Finally delete the user
+    await db.delete(schema.users).where(eq(schema.users.id, userId));
     return true;
   }
 
