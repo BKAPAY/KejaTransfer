@@ -321,7 +321,8 @@ async function callPaydunyaSoftpay(
     // Build request parameters using operator-specific mapping
     const requestData = config.parameterMapping(paymentData);
 
-    console.log(`[SOFTPAY] Calling ${config.endpoint} for ${operatorKey}`, requestData);
+    // Log without sensitive data (OTP codes, passwords, tokens)
+    console.log(`[SOFTPAY] Calling ${config.endpoint} for ${operatorKey} - phone: ${paymentData.phoneNumber?.slice(-4) || 'N/A'}`);
 
     // Call the operator-specific SOFTPAY endpoint
     const response = await fetch(`${PAYDUNYA_CONFIG.apiUrl}${config.endpoint}`, {
@@ -357,7 +358,8 @@ async function callPaydunyaSoftpay(
       };
     }
 
-    console.log(`[SOFTPAY] ${config.endpoint} - Status: ${response.status}`, result);
+    // Log response status without exposing full result (may contain sensitive data)
+    console.log(`[SOFTPAY] ${config.endpoint} - Status: ${response.status}, success: ${result.success ?? result.response_code}`);
 
     // Normalize Paydunya response format to standard format
     // Paydunya returns: {success: true/false, message: "...", data: {...}, fees: 100, currency: "XOF"}
