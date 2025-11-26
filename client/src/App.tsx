@@ -34,6 +34,7 @@ import Merchant from "@/pages/merchant";
 import ApiPayment from "@/pages/api-payment";
 import PaymentStatus from "@/pages/payment-status";
 import ApiDemo from "@/pages/api-demo";
+import ApiPay from "@/pages/api-pay";
 import Terms from "@/pages/terms";
 import Privacy from "@/pages/privacy";
 import Cookies from "@/pages/cookies";
@@ -130,6 +131,7 @@ function Router() {
       <Route path="/api-payment/:transactionId" component={ApiPayment} />
       <Route path="/payment-status/:transactionId" component={PaymentStatus} />
       <Route path="/demo/api-payment" component={ApiDemo} />
+      <Route path="/api-pay/:key" component={ApiPay} />
       <Route component={NotFound} />
     </Switch>
   );

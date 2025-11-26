@@ -50,6 +50,7 @@ export const apiKeys = pgTable("api_keys", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id),
   name: text("name").notNull(),
+  siteName: text("site_name").notNull().default("Mon Site"), // Nom du site qui sera affiché "Payer à [siteName]"
   publicKey: text("public_key").notNull().unique(),
   privateKey: text("private_key").notNull().unique(),
   isActive: boolean("is_active").notNull().default(true),

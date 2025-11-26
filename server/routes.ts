@@ -823,6 +823,264 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== API Pay Routes (Redirect-based API payments) =====
+  
+  // Get API key info by public key (for payment page)
+  app.get("/api/api-key-info/:publicKey", async (req: Request, res: Response) => {
+    try {
+      const apiKey = await storage.getApiKeyByPublicKey(req.params.publicKey);
+      if (!apiKey) {
+        return res.status(404).json({ error: "Cle API non trouvee" });
+      }
+      res.json({
+        siteName: (apiKey as any).siteName || apiKey.name,
+        isActive: apiKey.isActive,
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
+  // Initialize API payment
+  app.post("/api/api-pay/init", async (req: Request, res: Response) => {
+    try {
+      const { publicKey, amount, description, customerName, customerEmail, customerPhone, country, operator, callbackUrl } = req.body;
+
+      // Validate required fields
+      if (!publicKey || !customerName || !customerEmail || !customerPhone || !country || !operator) {
+        return res.status(400).json({ error: "Tous les champs sont requis" });
+      }
+
+      // Validate amount strictly
+      const numAmount = Number(amount);
+      if (!numAmount || numAmount < 100 || isNaN(numAmount)) {
+        return res.status(400).json({ error: "Le montant minimum est de 100 XOF" });
+      }
+
+      // Get API key
+      const apiKey = await storage.getApiKeyByPublicKey(publicKey);
+      if (!apiKey || !apiKey.isActive) {
+        return res.status(401).json({ error: "Cle API invalide ou desactivee" });
+      }
+
+      // Validate country
+      const validCountries = ["SN", "CI", "BF", "BJ", "TG", "ML"];
+      if (!validCountries.includes(country)) {
+        return res.status(400).json({ error: "Pays non supporte" });
+      }
+
+      // Get operator key for SOFTPAY
+      const operatorKey = getOperatorKey(country, operator);
+      if (!operatorKey) {
+        return res.status(400).json({ error: "Operateur non supporte pour ce pays" });
+      }
+
+      // Calculate fee (6% uniform)
+      const fee = Math.round(numAmount * 0.06);
+      const netAmount = numAmount - fee;
+
+      // Sanitize phone number
+      let sanitizedPhone = customerPhone.replace(/\s+/g, "").replace(/[^0-9+]/g, "");
+      if (sanitizedPhone.startsWith("+")) {
+        sanitizedPhone = sanitizedPhone.substring(1);
+      }
+      const countryPrefixes: Record<string, string> = {
+        "SN": "221", "CI": "225", "BF": "226", "BJ": "229", "TG": "228", "ML": "223"
+      };
+      const prefix = countryPrefixes[country];
+      if (sanitizedPhone.startsWith(prefix)) {
+        sanitizedPhone = sanitizedPhone.substring(prefix.length);
+      }
+
+      // Create Paydunya invoice
+      const invoiceData = {
+        invoice: {
+          total_amount: numAmount,
+          description: description || `Paiement a ${(apiKey as any).siteName || apiKey.name}`,
+        },
+        store: {
+          name: "BKApay",
+          tagline: "Paiement Mobile Money",
+          website_url: "https://bkapay.com",
+        },
+        actions: {
+          callback_url: `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/paydunya`,
+          return_url: `${process.env.BASE_URL || "https://bkapay.com"}/payment-status`,
+        },
+        custom_data: {
+          userId: apiKey.userId,
+          type: "api_payment",
+          apiKeyId: apiKey.id,
+        },
+      };
+
+      const invoiceResult = await callPaydunyaAPI("/checkout-invoice/create", invoiceData);
+      
+      if (invoiceResult.response_code !== "00") {
+        return res.status(500).json({ error: "Erreur lors de la creation du paiement" });
+      }
+
+      const paydunyaToken = invoiceResult.token;
+
+      // Create pending transaction - store GROSS amount for webhook consistency
+      const transaction = await storage.createTransaction({
+        userId: apiKey.userId,
+        type: "api_payment",
+        amount: numAmount, // Store GROSS amount
+        fee,
+        feePercentage: 6,
+        currency: "XOF",
+        status: "pending",
+        country,
+        operator,
+        customerName,
+        customerEmail,
+        customerPhone: sanitizedPhone,
+        description: description || `Paiement via ${(apiKey as any).siteName || apiKey.name}`,
+        paydunyaToken,
+        metadata: JSON.stringify({
+          siteName: (apiKey as any).siteName || apiKey.name,
+          apiKeyId: apiKey.id,
+          netAmount, // Store NET for reference
+          operatorKey,
+          callbackUrl: callbackUrl || null,
+        }),
+      });
+
+      // Initialize SOFTPAY payment
+      const softpayData: SoftpayPaymentData = {
+        invoiceToken: paydunyaToken,
+        phoneNumber: sanitizedPhone,
+        customerName,
+        customerEmail,
+      };
+
+      // Get operator config and call appropriate endpoint
+      const operatorConfig = SOFTPAY_OPERATORS[operatorKey];
+      if (!operatorConfig) {
+        await storage.updateTransactionStatus(transaction.id, "failed");
+        return res.status(500).json({ error: "Configuration operateur non trouvee" });
+      }
+
+      const softpayParams = operatorConfig.parameterMapping(softpayData);
+      const softpayResult = await callPaydunyaAPI(operatorConfig.endpoint, softpayParams);
+
+      if (softpayResult.response_code !== "00") {
+        await storage.updateTransactionStatus(transaction.id, "failed");
+        return res.status(500).json({ error: "Erreur lors de l'initialisation du paiement" });
+      }
+
+      // Check if OTP is required
+      const needsOtp = requiresOTP(operatorKey);
+      const ussdCode = getUSSDInstruction(operatorKey);
+
+      res.json({
+        success: true,
+        transactionId: transaction.id,
+        requiresOtp: needsOtp,
+        ussdCode,
+        message: needsOtp 
+          ? `Composez ${ussdCode} puis entrez le code OTP recu`
+          : "Paiement en cours de traitement",
+      });
+    } catch (error: any) {
+      console.error("API Pay init error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
+  // Confirm API payment with OTP
+  app.post("/api/api-pay/confirm", async (req: Request, res: Response) => {
+    try {
+      const { transactionId, otpCode } = req.body;
+
+      if (!transactionId || !otpCode) {
+        return res.status(400).json({ error: "Transaction ID et code OTP requis" });
+      }
+
+      // Get transaction
+      const transaction = await storage.getTransaction(transactionId);
+      if (!transaction) {
+        return res.status(404).json({ error: "Transaction non trouvee" });
+      }
+
+      if (transaction.status !== "pending") {
+        return res.status(400).json({ error: "Cette transaction n'est plus en attente" });
+      }
+
+      // Get operator key from metadata (stored during init)
+      let operatorKey: string | null = null;
+      if (transaction.metadata) {
+        try {
+          const metadata = JSON.parse(transaction.metadata as string);
+          operatorKey = metadata.operatorKey || null;
+        } catch (e) {
+          // Fallback to recalculating
+        }
+      }
+
+      // Fallback: recalculate operator key if not in metadata
+      if (!operatorKey) {
+        operatorKey = getOperatorKey(
+          transaction.country || "SN",
+          transaction.operator || "orange"
+        );
+      }
+
+      if (!operatorKey) {
+        return res.status(400).json({ error: "Operateur non valide" });
+      }
+
+      // Get phone from transaction
+      const phone = (transaction.customerPhone || "").replace(/\s+/g, "").replace(/[^0-9]/g, "");
+
+      // Call SOFTPAY OTP confirm
+      const confirmData = {
+        invoice_token: transaction.paydunyaToken,
+        payment_token: operatorKey,
+        phone_number: phone,
+        otp_code: otpCode,
+        customer_name: transaction.customerName,
+        customer_email: transaction.customerEmail,
+      };
+
+      const confirmResult = await callPaydunyaAPI("/softpay/v2/otp-confirm", confirmData);
+
+      if (confirmResult.response_code !== "00") {
+        let errorMsg = "Code OTP invalide ou expire";
+        if (confirmResult.response_text) {
+          errorMsg = confirmResult.response_text
+            .replace(/<[^>]*>/g, "")
+            .replace(/[^\w\s.,!?-]/g, "")
+            .substring(0, 200);
+        }
+        return res.status(400).json({ error: errorMsg });
+      }
+
+      res.json({
+        success: true,
+        message: "Paiement en cours de verification",
+        transactionId,
+      });
+    } catch (error: any) {
+      console.error("API Pay confirm error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
+  // Get transaction status (for polling)
+  app.get("/api/transactions/:id/status", async (req: Request, res: Response) => {
+    try {
+      const transaction = await storage.getTransaction(req.params.id);
+      if (!transaction) {
+        return res.status(404).json({ error: "Transaction non trouvee" });
+      }
+      res.json({ status: transaction.status });
+    } catch (error: any) {
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
   // ===== Transactions Routes =====
   
   app.get("/api/transactions", requireAuth, async (req: Request, res: Response) => {
