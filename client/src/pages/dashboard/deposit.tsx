@@ -134,15 +134,25 @@ export default function Deposit() {
 
   // CONFIRM: Submit OTP
   const confirmPaymentMutation = useMutation({
-    mutationFn: async ({ transactionId, token, authorizationCode }: { 
+    mutationFn: async ({ transactionId, token, authorizationCode, country, operator, phone, customerName, customerEmail }: { 
       transactionId: string; 
       token: string; 
       authorizationCode: string;
+      country: string;
+      operator: string;
+      phone: string;
+      customerName: string;
+      customerEmail: string;
     }) => {
       const res = await apiRequest("POST", "/api/softpay/confirm-payment", {
         transactionId,
         token,
         authorizationCode,
+        country,
+        operator,
+        phone,
+        customerName,
+        customerEmail,
       });
       return res.json();
     },
@@ -231,10 +241,16 @@ export default function Deposit() {
       return;
     }
 
+    const formValues = form.getValues();
     confirmPaymentMutation.mutate({
       transactionId: paymentData.transactionId,
       token: paymentData.token,
       authorizationCode: otp,
+      country: formValues.country,
+      operator: formValues.operator,
+      phone: formValues.phone,
+      customerName: `${user?.firstName || ''} ${user?.lastName || ''}`.trim(),
+      customerEmail: user?.email || '',
     });
   };
 
