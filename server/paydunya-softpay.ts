@@ -20,6 +20,7 @@ export interface SoftpayOperatorConfig {
   endpoint: string;
   requiresOTP: boolean;
   requiresTwoStep: boolean;
+  requiresRedirect?: boolean; // For Wave and similar operators that return redirect URL
   ussdInstruction?: string;
   parameterMapping: (data: SoftpayPaymentData) => any;
 }
@@ -85,7 +86,8 @@ export const SOFTPAY_OPERATORS: Record<string, SoftpayOperatorConfig> = {
     endpoint: "/softpay/wave-senegal",
     requiresOTP: false,
     requiresTwoStep: false,
-    ussdInstruction: "Vous serez redirigé vers Wave pour compléter le paiement",
+    requiresRedirect: true,
+    ussdInstruction: "Cliquez sur le bouton pour aller à Wave et compléter le paiement",
     parameterMapping: (data) => ({
       wave_senegal_fullName: data.customerName,
       wave_senegal_email: data.customerEmail,
@@ -252,7 +254,8 @@ export const SOFTPAY_OPERATORS: Record<string, SoftpayOperatorConfig> = {
     endpoint: "/softpay/wave-ci",
     requiresOTP: false,
     requiresTwoStep: false,
-    ussdInstruction: "Vous serez redirigé vers Wave pour compléter le paiement",
+    requiresRedirect: true,
+    ussdInstruction: "Cliquez sur le bouton pour aller à Wave et compléter le paiement",
     parameterMapping: (data) => ({
       wave_ci_fullName: data.customerName,
       wave_ci_email: data.customerEmail,
@@ -376,4 +379,12 @@ export function requiresTwoStep(operatorKey: string): boolean {
 export function getUSSDInstruction(operatorKey: string): string | null {
   const config = SOFTPAY_OPERATORS[operatorKey];
   return config?.ussdInstruction || null;
+}
+
+/**
+ * Check if operator requires redirect (Wave, etc)
+ */
+export function requiresRedirect(operatorKey: string): boolean {
+  const config = SOFTPAY_OPERATORS[operatorKey];
+  return config?.requiresRedirect || false;
 }
