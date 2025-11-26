@@ -2358,31 +2358,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.getUser(req.session.userId!);
 
       if (!user) {
-        return res.status(404).json({ error: "Utilisateur non trouvé" });
+        return res.status(404).json({ error: "Retrait échoué" });
       }
 
       if (user.suspended) {
-        return res.status(403).json({ error: "Votre compte a été suspendu. Veuillez contacter le support." });
+        return res.status(403).json({ error: "Retrait échoué" });
       }
 
       // Check KYC verification for withdrawals
       if (user.kycStatus !== "verified") {
         return res.status(403).json({ 
-          error: "Vous devez vérifier votre identité avant de faire des retraits"
+          error: "Retrait échoué"
         });
       }
 
       if (!amount || amount <= 0) {
-        return res.status(400).json({ error: "Montant invalide" });
+        return res.status(400).json({ error: "Retrait échoué" });
       }
 
       const minAmount = 500;
       if (amount < minAmount) {
-        return res.status(400).json({ error: `Le montant minimum est de ${minAmount} XOF` });
+        return res.status(400).json({ error: "Retrait échoué" });
       }
 
       if (!phone || !country || !operator) {
-        return res.status(400).json({ error: "Informations de retrait incomplètes" });
+        return res.status(400).json({ error: "Retrait échoué" });
       }
 
       // Calculate fees silently for outgoing withdrawals (6% for all countries)
@@ -2390,9 +2390,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (user.balance < feeInfo.totalDeductedFromBalance) {
         return res.status(400).json({ 
-          error: "Solde insuffisant", 
-          required: feeInfo.totalDeductedFromBalance,
-          current: user.balance
+          error: "Retrait échoué"
         });
       }
 
@@ -2425,7 +2423,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const withdrawMode = withdrawModeMap[`${operator}-${country.toLowerCase()}`];
       if (!withdrawMode) {
-        return res.status(400).json({ error: "Opérateur ou pays non supporté pour les retraits" });
+        return res.status(400).json({ error: "Retrait échoué" });
       }
 
       // IMPORTANT: Paydunya requires phone WITHOUT country code prefix
@@ -2437,7 +2435,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Step 2: Validate format - must be digits only (with optional + at start)
       if (!/^\+?\d+$/.test(cleanPhone)) {
-        return res.status(400).json({ error: "Le numéro de téléphone doit contenir uniquement des chiffres" });
+        return res.status(400).json({ error: "Retrait échoué" });
       }
       
       // Step 3: Country-specific phone info (code and expected local length)
@@ -2452,7 +2450,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const phoneInfo = countryPhoneInfo[country.toUpperCase()];
       if (!phoneInfo) {
-        return res.status(400).json({ error: "Pays non supporté" });
+        return res.status(400).json({ error: "Retrait échoué" });
       }
       
       // Step 4: Strip international prefix if present
@@ -2481,7 +2479,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Step 5: Validate local number length
       if (!phoneInfo.localLength.includes(cleanPhone.length)) {
         return res.status(400).json({ 
-          error: `Numéro invalide pour ${country}. Le numéro local doit avoir ${phoneInfo.localLength.join(' ou ')} chiffres.` 
+          error: "Retrait échoué"
         });
       }
 
@@ -2505,15 +2503,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("[Withdrawal] Get-invoice response:", getInvoiceResponse);
 
       if (getInvoiceResponse.response_code !== "00") {
-        const errorMessage = getInvoiceResponse.response_text || "Erreur lors de la création du retrait";
         console.error("[Withdrawal] Get-invoice failed:", getInvoiceResponse);
-        return res.status(400).json({ error: errorMessage });
+        return res.status(400).json({ error: "Retrait échoué" });
       }
 
       const disburseToken = getInvoiceResponse.disburse_token;
       if (!disburseToken) {
         console.error("[Withdrawal] No disburse_token in response:", getInvoiceResponse);
-        return res.status(400).json({ error: "Erreur: Token de retrait non reçu" });
+        return res.status(400).json({ error: "Retrait échoué" });
       }
 
       // Step 2: Submit disbursement invoice (submit-invoice)
@@ -2561,13 +2558,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       } else {
         // Submission failed
-        const errorMessage = submitResponse.response_text || "Erreur lors du traitement du retrait";
         console.error("[Withdrawal] Submit-invoice failed:", submitResponse);
-        return res.status(400).json({ error: errorMessage });
+        return res.status(400).json({ error: "Retrait échoué" });
       }
     } catch (error: any) {
       console.error("[Withdrawal] Error:", error);
-      res.status(500).json({ error: "Erreur lors du traitement du retrait" });
+      res.status(500).json({ error: "Retrait échoué" });
     }
   });
 
@@ -2924,23 +2920,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { privateKey, amount, country, operator, phone } = req.body;
 
       if (!privateKey) {
-        return res.status(400).json({ error: "Clé API privée requise" });
+        return res.status(400).json({ error: "Retrait échoué" });
       }
 
       if (!amount || amount < 500) {
-        return res.status(400).json({ error: "Montant minimum 500 XOF" });
+        return res.status(400).json({ error: "Retrait échoué" });
       }
 
       // Validate private key and get its owner
       const apiKey = await storage.getApiKeyByPrivateKey(privateKey);
       if (!apiKey || !apiKey.isActive) {
-        return res.status(401).json({ error: "Clé API invalide ou inactive" });
+        return res.status(401).json({ error: "Retrait échoué" });
       }
 
       // Get the developer's balance
       const user = await storage.getUserById(apiKey.userId);
       if (!user || user.balance < amount) {
-        return res.status(400).json({ error: "Solde insuffisant pour ce retrait" });
+        return res.status(400).json({ error: "Retrait échoué" });
       }
 
       res.json({
@@ -2949,7 +2945,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       console.error("Withdrawal creation error:", error);
-      res.status(500).json({ error: "Erreur lors de la création du retrait" });
+      res.status(500).json({ error: "Retrait échoué" });
     }
   });
 

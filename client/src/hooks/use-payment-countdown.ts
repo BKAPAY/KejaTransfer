@@ -76,6 +76,22 @@ export function usePaymentCountdown({
 
   const storageKey = getStorageKey(invoiceToken, transactionId);
 
+  // Initialize remaining time from localStorage on mount (before enabled is true)
+  useEffect(() => {
+    if (!storageKey) return;
+    
+    const existingStartTime = getStartTime(storageKey);
+    if (existingStartTime) {
+      const remaining = calculateRemainingTime(existingStartTime);
+      setRemainingTime(remaining);
+      
+      // If already expired, set status
+      if (remaining <= 0) {
+        setStatus("expired");
+      }
+    }
+  }, [storageKey]);
+
   const startCountdown = useCallback(() => {
     if (!storageKey) return;
 
