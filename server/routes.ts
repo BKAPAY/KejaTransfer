@@ -2557,16 +2557,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log("[SOFTPAY VERIFY] Paydunya response:", JSON.stringify(paydunyaResponse));
 
-      // STRICT VALIDATION: Must have invoice object with valid status
-      // Paydunya returns { response_code: "00", response_text: "...", invoice: { status: "completed|pending|..." } }
+      // STRICT VALIDATION: Paydunya returns status at ROOT level OR in invoice object
+      // Format: { response_code: "00", status: "completed", invoice: {...} }
+      // The status field at root level indicates payment completion
       const hasValidInvoice = paydunyaResponse.invoice && typeof paydunyaResponse.invoice === 'object';
-      const invoiceStatus = paydunyaResponse.invoice?.status;
+      // Check status at ROOT level first (Paydunya's actual format), then fallback to invoice.status
+      const paymentStatus = paydunyaResponse.status || paydunyaResponse.invoice?.status;
       const responseText = paydunyaResponse.response_text || '';
       
       // Log validation details for debugging
       console.log("[SOFTPAY VERIFY] Validation:", {
         hasValidInvoice,
-        invoiceStatus,
+        rootStatus: paydunyaResponse.status,
+        invoiceStatus: paydunyaResponse.invoice?.status,
+        paymentStatus,
         responseCode: paydunyaResponse.response_code,
         responseText: responseText.substring(0, 100),
       });
@@ -2574,14 +2578,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // ONLY mark as completed if ALL conditions are met:
       // 1. response_code is "00"
       // 2. invoice object exists
-      // 3. invoice.status is explicitly "completed"
-      if (paydunyaResponse.response_code === "00" && hasValidInvoice && invoiceStatus === "completed") {
+      // 3. status (at root or in invoice) is explicitly "completed"
+      if (paydunyaResponse.response_code === "00" && hasValidInvoice && paymentStatus === "completed") {
         const transaction = await storage.getTransactionByPaydunyaToken(invoiceToken);
         
         if (transaction) {
           console.log("[SOFTPAY VERIFY] CONFIRMED by Paydunya - finalizing transaction:", {
             transactionId: transaction.id,
-            paydunyaInvoiceStatus: invoiceStatus,
+            paydunyaStatus: paymentStatus,
             paydunyaAmount: paydunyaResponse.invoice?.total_amount,
           });
           
@@ -2603,15 +2607,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           status: "completed",
           response_code: "00",
         });
-      } else if (invoiceStatus === "canceled" || invoiceStatus === "cancelled" || 
-                 invoiceStatus === "fail" || invoiceStatus === "failed") {
+      } else if (paymentStatus === "canceled" || paymentStatus === "cancelled" || 
+                 paymentStatus === "fail" || paymentStatus === "failed") {
         // Paydunya explicitly says payment failed/cancelled
         const transaction = await storage.getTransactionByPaydunyaToken(invoiceToken);
         if (transaction && transaction.status === "pending") {
           await storage.updateTransactionStatus(transaction.id, "failed");
           console.log("[SOFTPAY VERIFY] Transaction marked as failed:", {
             transactionId: transaction.id,
-            paydunyaStatus: invoiceStatus,
+            paydunyaStatus: paymentStatus,
           });
         }
         
@@ -2623,7 +2627,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Payment still pending or invalid response - keep polling
         // This covers: no invoice object, pending status, unknown status
         console.log("[SOFTPAY VERIFY] Payment still pending or awaiting confirmation:", {
-          invoiceStatus,
+          paymentStatus,
           hasValidInvoice,
           responseCode: paydunyaResponse.response_code,
         });

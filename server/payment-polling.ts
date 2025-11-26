@@ -89,21 +89,25 @@ async function processTransaction(transaction: Transaction & { user?: User }): P
     return;
   }
 
-  // STRICT VALIDATION: Must have invoice object with completed status
+  // STRICT VALIDATION: Paydunya returns status at ROOT level OR in invoice object
+  // Format: { response_code: "00", status: "completed", invoice: {...} }
   const hasValidInvoice = paydunyaStatus.invoice && typeof paydunyaStatus.invoice === 'object';
-  const invoiceStatus = paydunyaStatus.invoice?.status;
+  // Check status at ROOT level first (Paydunya's actual format), then fallback to invoice.status
+  const paymentStatus = paydunyaStatus.status || paydunyaStatus.invoice?.status;
 
   console.log(`[PaymentPolling] Transaction ${transaction.id} - Paydunya validation:`, {
     hasValidInvoice,
-    invoiceStatus,
+    rootStatus: paydunyaStatus.status,
+    invoiceStatus: paydunyaStatus.invoice?.status,
+    paymentStatus,
     responseCode: paydunyaStatus.response_code,
   });
 
   // ONLY finalize if ALL conditions are met:
   // 1. response_code is "00"
   // 2. invoice object exists
-  // 3. invoice.status is explicitly "completed"
-  if (paydunyaStatus.response_code === "00" && hasValidInvoice && invoiceStatus === "completed") {
+  // 3. status (at root or in invoice) is explicitly "completed"
+  if (paydunyaStatus.response_code === "00" && hasValidInvoice && paymentStatus === "completed") {
     const invoiceData = paydunyaStatus.invoice as any;
     const result = await storage.finalizeIncomingTransaction(transaction.id, {
       paydunyaReceiptUrl: invoiceData?.receipt_url || `https://paydunya.com/receipt/${transaction.paydunyaToken}`,
@@ -114,15 +118,15 @@ async function processTransaction(transaction: Transaction & { user?: User }): P
     } else {
       console.log(`[PaymentPolling] Transaction ${transaction.id} already processed - skipping`);
     }
-  } else if (invoiceStatus === "cancelled" || invoiceStatus === "canceled" || invoiceStatus === "failed" || invoiceStatus === "fail") {
+  } else if (paymentStatus === "cancelled" || paymentStatus === "canceled" || paymentStatus === "failed" || paymentStatus === "fail") {
     console.log(`[PaymentPolling] Transaction ${transaction.id} failed/cancelled by Paydunya - marking as failed`);
     await storage.updateTransactionStatus(transaction.id, "failed");
   } else {
     if (hasPaymentExpired(transaction)) {
-      console.log(`[PaymentPolling] Transaction ${transaction.id} expired with pending Paydunya status "${invoiceStatus}" - marking as failed`);
+      console.log(`[PaymentPolling] Transaction ${transaction.id} expired with pending Paydunya status "${paymentStatus}" - marking as failed`);
       await storage.updateTransactionStatus(transaction.id, "failed");
     } else {
-      console.log(`[PaymentPolling] Transaction ${transaction.id} still pending (Paydunya status: ${invoiceStatus})`);
+      console.log(`[PaymentPolling] Transaction ${transaction.id} still pending (Paydunya status: ${paymentStatus})`);
     }
   }
 }
