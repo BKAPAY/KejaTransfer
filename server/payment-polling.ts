@@ -132,10 +132,12 @@ async function pollPendingPayments(): Promise<void> {
     const pendingTransactions = await storage.getAllPendingTransactions();
 
     if (pendingTransactions.length === 0) {
+      console.log(`[PaymentPolling] Cycle check - no pending transactions found`);
       return;
     }
 
-    console.log(`[PaymentPolling] Processing ${pendingTransactions.length} pending transactions`);
+    console.log(`[PaymentPolling] Processing ${pendingTransactions.length} pending transactions:`, 
+      pendingTransactions.map(t => ({ id: t.id, token: t.paydunyaToken?.substring(0,8) + '...', amount: t.amount })));
 
     for (const transaction of pendingTransactions) {
       try {
