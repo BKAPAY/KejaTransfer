@@ -216,7 +216,7 @@ export default function Withdrawal() {
                       <FormLabel>Opérateur/Porte-monnaie</FormLabel>
                       {countryOperators.length === 0 ? (
                         <div className="text-sm text-muted-foreground p-3 bg-muted rounded-md">
-                          Aucun opérateur disponible pour ce pays. Contactez l'administrateur.
+                          Aucun opérateur disponible pour ce pays
                         </div>
                       ) : (
                         <Select value={field.value} onValueChange={field.onChange}>

@@ -106,7 +106,7 @@ export default function ApiPay() {
   
   const countryOperators = isLoadingOperators 
     ? allCountryOperators
-    : hasAdminConfig
+    : hasAdminConfig && enabledCountriesOperators
       ? allCountryOperators.filter(op => (enabledCountriesOperators[country] || []).includes(op.code))
       : allCountryOperators;
   
@@ -882,7 +882,7 @@ export default function ApiPay() {
                 <Alert className="bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800">
                   <AlertCircle className="h-4 w-4 text-amber-600" />
                   <AlertDescription className="text-sm text-amber-800 dark:text-amber-200">
-                    Aucun operateur n'est disponible pour ce pays actuellement. Veuillez choisir un autre pays.
+                    Aucun opérateur disponible pour ce pays
                   </AlertDescription>
                 </Alert>
               ) : (
