@@ -106,7 +106,10 @@ function Router() {
             {(params) => <DocumentationVersion version={params.version} />}
           </Route>
           <Route path="/dashboard/documentation">
-            {() => <DocumentationVersion version={CURRENT_VERSION} />}
+            {() => {
+              window.location.replace(`/dashboard/documentation/${CURRENT_VERSION}`);
+              return null;
+            }}
           </Route>
           <Route path="/dashboard/support" component={Support} />
           <Route path="/dashboard/deposit" component={Deposit} />
@@ -130,7 +133,10 @@ function Router() {
         {(params) => <DocumentationVersion version={params.version} />}
       </Route>
       <Route path="/documentation">
-        {() => <DocumentationVersion version={CURRENT_VERSION} />}
+        {() => {
+          window.location.replace(`/documentation/${CURRENT_VERSION}`);
+          return null;
+        }}
       </Route>
       <Route path="/signup" component={Signup} />
       <Route path="/login" component={Login} />
