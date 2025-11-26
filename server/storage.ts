@@ -71,6 +71,7 @@ export interface IStorage {
   createTransaction(transaction: InsertTransaction): Promise<Transaction>;
   updateTransactionStatus(id: string, status: string, paydunyaData?: any): Promise<Transaction | undefined>;
   updateTransactionMetadata(id: string, metadata: string): Promise<Transaction | undefined>;
+  finalizeIncomingTransaction(id: string, extras?: { paydunyaReceiptUrl?: string }): Promise<{ transaction: Transaction; credited: boolean } | null>;
   getUserStats(userId: string): Promise<{
     totalBalance: number;
     totalDeposits: number;
@@ -371,6 +372,42 @@ export class DbStorage implements IStorage {
       .where(eq(schema.transactions.id, id))
       .returning();
     return results[0];
+  }
+
+  async finalizeIncomingTransaction(id: string, extras?: { paydunyaReceiptUrl?: string }): Promise<{ transaction: Transaction; credited: boolean } | null> {
+    const updateData: any = { status: "completed" };
+    if (extras?.paydunyaReceiptUrl) {
+      updateData.paydunyaReceiptUrl = extras.paydunyaReceiptUrl;
+    }
+    
+    const results = await db
+      .update(schema.transactions)
+      .set(updateData)
+      .where(and(
+        eq(schema.transactions.id, id),
+        eq(schema.transactions.status, "pending")
+      ))
+      .returning();
+    
+    if (results.length === 0) {
+      return null;
+    }
+    
+    const transaction = results[0];
+    const netAmount = transaction.amount - (transaction.fee || 0);
+    
+    const user = await this.getUser(transaction.userId);
+    if (user) {
+      await db
+        .update(schema.users)
+        .set({ balance: user.balance + netAmount })
+        .where(eq(schema.users.id, transaction.userId));
+      
+      console.log(`[Storage] Finalized transaction ${id}: credited ${netAmount} to user ${transaction.userId}`);
+      return { transaction, credited: true };
+    }
+    
+    return { transaction, credited: false };
   }
 
   async getUserStats(userId: string): Promise<{

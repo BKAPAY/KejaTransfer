@@ -70,26 +70,6 @@ function hasPaymentExpired(transaction: Transaction): boolean {
   return age >= PAYMENT_TIMEOUT_MS;
 }
 
-async function creditUserBalance(userId: string, amount: number): Promise<boolean> {
-  try {
-    const user = await storage.getUser(userId);
-    if (!user) {
-      console.error(`[PaymentPolling] User ${userId} not found for crediting`);
-      return false;
-    }
-
-    const result = await storage.updateUserBalance(userId, amount);
-    if (result) {
-      console.log(`[PaymentPolling] Credited ${amount} XOF to user ${userId}. New balance: ${result.balance}`);
-      return true;
-    }
-    return false;
-  } catch (error) {
-    console.error(`[PaymentPolling] Error crediting user ${userId}:`, error);
-    return false;
-  }
-}
-
 async function processTransaction(transaction: Transaction & { user?: User }): Promise<void> {
   if (!transaction.paydunyaToken) {
     if (hasPaymentExpired(transaction)) {
@@ -112,23 +92,14 @@ async function processTransaction(transaction: Transaction & { user?: User }): P
   const invoiceStatus = paydunyaStatus.status || paydunyaStatus.invoice?.status;
 
   if (invoiceStatus === "completed" || paydunyaStatus.response_code === "00") {
-    const currentTransaction = await storage.getTransaction(transaction.id);
-    if (!currentTransaction || currentTransaction.status !== "pending") {
-      console.log(`[PaymentPolling] Transaction ${transaction.id} already processed (status: ${currentTransaction?.status}) - skipping`);
-      return;
-    }
-
-    console.log(`[PaymentPolling] Transaction ${transaction.id} confirmed by Paydunya - marking as completed`);
-
-    await storage.updateTransactionStatus(transaction.id, "completed", {
+    const result = await storage.finalizeIncomingTransaction(transaction.id, {
       paydunyaReceiptUrl: paydunyaStatus.invoice?.total_amount ? `https://paydunya.com/receipt/${transaction.paydunyaToken}` : undefined,
     });
 
-    const credited = await creditUserBalance(transaction.userId, transaction.amount);
-    if (credited) {
-      console.log(`[PaymentPolling] Successfully processed payment for transaction ${transaction.id}`);
+    if (result) {
+      console.log(`[PaymentPolling] Transaction ${transaction.id} finalized: credited=${result.credited}`);
     } else {
-      console.log(`[PaymentPolling] Transaction ${transaction.id} completed but balance credit failed`);
+      console.log(`[PaymentPolling] Transaction ${transaction.id} already processed - skipping`);
     }
   } else if (invoiceStatus === "cancelled" || invoiceStatus === "failed" || paydunyaStatus.response_code === "01") {
     console.log(`[PaymentPolling] Transaction ${transaction.id} failed/cancelled by Paydunya - marking as failed`);

@@ -2667,28 +2667,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Update transaction status based on webhook status
-      let newStatus = "pending";
       if (webhookStatus === "completed" || webhookStatus === "approved") {
-        newStatus = "completed";
-        
-        // For INCOMING transactions: credit NET amount (GROSS - fee)
-        // Transaction stores: amount = GROSS, fee = fee amount
-        const netAmount = transaction.amount - (transaction.fee || 0);
-        
-        await storage.updateUserBalance(transaction.userId, netAmount);
-        console.log("[WEBHOOK] User balance credited with NET:", { 
-          userId: transaction.userId, 
-          grossAmount: transaction.amount, 
-          fee: transaction.fee,
-          netCredited: netAmount 
+        const result = await storage.finalizeIncomingTransaction(transaction.id, {
+          paydunyaReceiptUrl: receiptUrl || `https://paydunya.com/receipt/${webhookToken}`,
         });
+        
+        if (result) {
+          console.log("[WEBHOOK] Transaction finalized:", { 
+            transactionId: transaction.id, 
+            credited: result.credited,
+            netAmount: result.transaction.amount - (result.transaction.fee || 0)
+          });
+        } else {
+          console.log("[WEBHOOK] Transaction already processed (not pending):", { transactionId: transaction.id });
+        }
       } else if (webhookStatus === "failed" || webhookStatus === "cancelled") {
-        newStatus = "failed";
+        await storage.updateTransactionStatus(transaction.id, "failed");
+        console.log("[WEBHOOK] Transaction marked as failed:", { transactionId: transaction.id });
       }
-
-      // Update transaction
-      await storage.updateTransactionStatus(transaction.id, newStatus);
-      console.log("[WEBHOOK] Transaction updated:", { transactionId: transaction.id, status: newStatus });
 
       res.json({ success: true, message: "Webhook traité" });
     } catch (error: any) {
