@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { bootstrapDatabase } from "./db-bootstrap";
+import { startPaymentPolling, stopPaymentPolling } from "./payment-polling";
 
 const app = express();
 
@@ -88,5 +89,21 @@ app.use((req, res, next) => {
     reusePort: true,
   }, () => {
     log(`serving on port ${port}`);
+    
+    // Start background payment polling after server is ready
+    startPaymentPolling();
+  });
+
+  // Graceful shutdown
+  process.on("SIGTERM", () => {
+    log("Received SIGTERM, stopping payment polling...");
+    stopPaymentPolling();
+    process.exit(0);
+  });
+
+  process.on("SIGINT", () => {
+    log("Received SIGINT, stopping payment polling...");
+    stopPaymentPolling();
+    process.exit(0);
   });
 })();
