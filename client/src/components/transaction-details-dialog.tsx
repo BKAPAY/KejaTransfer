@@ -223,23 +223,6 @@ export function TransactionDetailsDialog({
             </div>
           )}
 
-          {/* Receipt Link */}
-          {transaction.paydunyaReceiptUrl && (
-            <div className="space-y-4 border-t pt-4">
-              <h3 className="font-semibold text-lg">Reçu</h3>
-              <a
-                href={transaction.paydunyaReceiptUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-block"
-                data-testid="link-receipt"
-              >
-                <Button variant="outline" className="gap-2">
-                  Voir le reçu
-                </Button>
-              </a>
-            </div>
-          )}
         </div>
       </DialogContent>
     </Dialog>
