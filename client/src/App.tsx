@@ -19,7 +19,6 @@ import ApiPage from "@/pages/dashboard/api";
 import Analytics from "@/pages/dashboard/analytics";
 import History from "@/pages/dashboard/history";
 import Settings from "@/pages/dashboard/settings";
-import Documentation from "@/pages/dashboard/documentation";
 import Support from "@/pages/dashboard/support";
 import Deposit from "@/pages/dashboard/deposit";
 import Withdrawal from "@/pages/dashboard/withdrawal";
@@ -38,6 +37,8 @@ import ApiPay from "@/pages/api-pay";
 import Terms from "@/pages/terms";
 import Privacy from "@/pages/privacy";
 import Cookies from "@/pages/cookies";
+import DocumentationVersion from "@/pages/documentation-version";
+import { CURRENT_VERSION } from "@/lib/doc-versions";
 
 function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [location, setLocation] = useLocation();
@@ -101,7 +102,12 @@ function Router() {
           <Route path="/dashboard/analytics" component={Analytics} />
           <Route path="/dashboard/history" component={History} />
           <Route path="/dashboard/settings" component={Settings} />
-          <Route path="/dashboard/documentation" component={Documentation} />
+          <Route path="/dashboard/documentation/:version">
+            {(params) => <DocumentationVersion version={params.version} />}
+          </Route>
+          <Route path="/dashboard/documentation">
+            {() => <DocumentationVersion version={CURRENT_VERSION} />}
+          </Route>
           <Route path="/dashboard/support" component={Support} />
           <Route path="/dashboard/deposit" component={Deposit} />
           <Route path="/dashboard/withdrawal" component={Withdrawal} />
@@ -120,7 +126,12 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
-      <Route path="/documentation" component={Documentation} />
+      <Route path="/documentation/:version">
+        {(params) => <DocumentationVersion version={params.version} />}
+      </Route>
+      <Route path="/documentation">
+        {() => <DocumentationVersion version={CURRENT_VERSION} />}
+      </Route>
       <Route path="/signup" component={Signup} />
       <Route path="/login" component={Login} />
       <Route path="/terms" component={Terms} />
