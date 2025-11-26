@@ -2,23 +2,49 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useQuery } from "@tanstack/react-query";
 import type { Transaction } from "@shared/schema";
-import { History as HistoryIcon } from "lucide-react";
+import { History as HistoryIcon, Search, X } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TransactionDetailsDialog } from "@/components/transaction-details-dialog";
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 export default function History() {
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const { data: transactions, isLoading } = useQuery<Transaction[]>({
     queryKey: ["/api/transactions"],
-    refetchInterval: 3000, // Rafraîchir toutes les 3 secondes pour les statuts en temps réel
+    refetchInterval: 3000,
   });
+
+  const filteredTransactions = useMemo(() => {
+    if (!transactions) return [];
+    if (!searchQuery.trim()) return transactions;
+
+    const query = searchQuery.toLowerCase().trim();
+    
+    return transactions.filter((transaction) => {
+      const customerName = (transaction.customerName || "").toLowerCase();
+      const customerEmail = (transaction.customerEmail || "").toLowerCase();
+      const customerPhone = (transaction.customerPhone || "").toLowerCase();
+      
+      return (
+        customerName.includes(query) ||
+        customerEmail.includes(query) ||
+        customerPhone.includes(query)
+      );
+    });
+  }, [transactions, searchQuery]);
 
   const handleTransactionClick = (transaction: Transaction) => {
     setSelectedTransaction(transaction);
     setDialogOpen(true);
+  };
+
+  const clearSearch = () => {
+    setSearchQuery("");
   };
 
   const formatAmount = (amount: number) => {
@@ -42,17 +68,18 @@ export default function History() {
 
   const getStatusText = (status: string) => {
     const texts: Record<string, string> = {
-      completed: "Complété",
+      completed: "Complete",
       pending: "En attente",
-      failed: "Échoué",
-      cancelled: "Annulé",
+      failed: "Echoue",
+      cancelled: "Annule",
     };
     return texts[status] || status;
   };
 
   const getTypeText = (type: string) => {
     const types: Record<string, string> = {
-      deposit: "Dépôt",
+      deposit: "Depot",
+      withdrawal: "Retrait",
       transfer: "Transfert",
       payment_link: "Lien de paiement",
       merchant_link: "Lien marchand",
@@ -72,7 +99,35 @@ export default function History() {
 
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-lg">Transactions</CardTitle>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <CardTitle className="text-lg">Transactions</CardTitle>
+            <div className="relative w-full sm:w-80">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Rechercher par nom, email ou telephone..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 pr-9"
+                data-testid="input-search-transactions"
+              />
+              {searchQuery && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
+                  onClick={clearSearch}
+                  data-testid="button-clear-search"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+          </div>
+          {searchQuery && (
+            <p className="text-xs text-muted-foreground mt-2">
+              {filteredTransactions.length} resultat(s) pour "{searchQuery}"
+            </p>
+          )}
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -88,9 +143,9 @@ export default function History() {
                 </div>
               ))}
             </div>
-          ) : transactions && transactions.length > 0 ? (
+          ) : filteredTransactions.length > 0 ? (
             <div className="space-y-1">
-              {transactions.map((transaction) => (
+              {filteredTransactions.map((transaction) => (
                 <div
                   key={transaction.id}
                   className="flex items-center justify-between gap-4 py-4 border-b last:border-0 hover-elevate rounded-md px-3 cursor-pointer"
@@ -116,10 +171,12 @@ export default function History() {
                           minute: "2-digit",
                         })}
                       </span>
-                      {transaction.customerName && <span>• {transaction.customerName}</span>}
-                      {transaction.country && <span>• {transaction.country}</span>}
+                      {transaction.customerName && <span>{transaction.customerName}</span>}
+                      {transaction.customerEmail && <span>{transaction.customerEmail}</span>}
+                      {transaction.customerPhone && <span>{transaction.customerPhone}</span>}
+                      {transaction.country && <span>{transaction.country}</span>}
                       {transaction.operator && (
-                        <span className="capitalize">• {transaction.operator}</span>
+                        <span className="capitalize">{transaction.operator}</span>
                       )}
                     </div>
                   </div>
@@ -131,6 +188,14 @@ export default function History() {
                   </div>
                 </div>
               ))}
+            </div>
+          ) : searchQuery ? (
+            <div className="text-center py-12">
+              <Search className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+              <p className="text-muted-foreground">Aucune transaction trouvee pour "{searchQuery}"</p>
+              <Button variant="ghost" onClick={clearSearch} className="mt-2">
+                Effacer la recherche
+              </Button>
             </div>
           ) : (
             <div className="text-center py-12">
