@@ -2541,7 +2541,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Verify SOFTPAY Payment - Polling endpoint (uses checkout-invoice/confirm GET API)
-  // Also updates transaction status and user balance when payment is completed
+  // CRITICAL SECURITY: Only mark transactions complete after STRICT Paydunya validation
   app.post("/api/softpay/verify-payment", async (req: Request, res: Response) => {
     try {
       const { invoiceToken } = req.body;
@@ -2550,60 +2550,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Token invalide" });
       }
 
-      console.log("[SOFTPAY] Verifying payment with token:", invoiceToken);
+      console.log("[SOFTPAY VERIFY] Checking payment status for token:", invoiceToken);
 
       // Call Paydunya checkout-invoice/confirm API (GET request)
-      // Endpoint: GET /api/v1/checkout-invoice/confirm/[token]
       const paydunyaResponse = await callPaydunyaAPIGet("/checkout-invoice/confirm/" + invoiceToken);
 
-      console.log("[SOFTPAY] Confirm response:", JSON.stringify(paydunyaResponse));
+      console.log("[SOFTPAY VERIFY] Paydunya response:", JSON.stringify(paydunyaResponse));
 
-      // Response format: { response_code: "00", invoice: { status: "completed|pending|canceled|fail" }, ... }
-      const invoiceStatus = paydunyaResponse.invoice?.status || paydunyaResponse.status;
+      // STRICT VALIDATION: Must have invoice object with valid status
+      // Paydunya returns { response_code: "00", response_text: "...", invoice: { status: "completed|pending|..." } }
+      const hasValidInvoice = paydunyaResponse.invoice && typeof paydunyaResponse.invoice === 'object';
+      const invoiceStatus = paydunyaResponse.invoice?.status;
+      const responseText = paydunyaResponse.response_text || '';
       
-      if (paydunyaResponse.response_code === "00" && invoiceStatus === "completed") {
-        // CRITICAL: Update transaction status and user balance
+      // Log validation details for debugging
+      console.log("[SOFTPAY VERIFY] Validation:", {
+        hasValidInvoice,
+        invoiceStatus,
+        responseCode: paydunyaResponse.response_code,
+        responseText: responseText.substring(0, 100),
+      });
+      
+      // ONLY mark as completed if ALL conditions are met:
+      // 1. response_code is "00"
+      // 2. invoice object exists
+      // 3. invoice.status is explicitly "completed"
+      if (paydunyaResponse.response_code === "00" && hasValidInvoice && invoiceStatus === "completed") {
         const transaction = await storage.getTransactionByPaydunyaToken(invoiceToken);
         
-        if (transaction && transaction.status === "pending") {
-          console.log("[SOFTPAY] Payment completed - updating transaction and balance:", {
+        if (transaction) {
+          console.log("[SOFTPAY VERIFY] CONFIRMED by Paydunya - finalizing transaction:", {
             transactionId: transaction.id,
-            userId: transaction.userId,
-            grossAmount: transaction.amount,
-            fee: transaction.fee,
+            paydunyaInvoiceStatus: invoiceStatus,
+            paydunyaAmount: paydunyaResponse.invoice?.total_amount,
           });
           
-          // Update transaction status to completed
-          await storage.updateTransactionStatus(transaction.id, "completed");
-          
-          // Calculate and credit NET amount (GROSS - 6% fee)
-          const netAmount = transaction.amount - (transaction.fee || 0);
-          await storage.updateUserBalance(transaction.userId, netAmount);
-          
-          console.log("[SOFTPAY] Balance credited with NET:", { 
-            userId: transaction.userId, 
-            grossAmount: transaction.amount, 
-            fee: transaction.fee,
-            netCredited: netAmount 
+          const result = await storage.finalizeIncomingTransaction(transaction.id, {
+            paydunyaReceiptUrl: paydunyaResponse.invoice?.receipt_url || `https://paydunya.com/receipt/${invoiceToken}`,
           });
+          
+          if (result) {
+            console.log("[SOFTPAY VERIFY] Transaction finalized successfully:", {
+              transactionId: transaction.id,
+              credited: result.credited,
+            });
+          } else {
+            console.log("[SOFTPAY VERIFY] Transaction already processed:", transaction.id);
+          }
         }
         
         res.json({
           status: "completed",
           response_code: "00",
         });
-      } else if (paydunyaResponse.response_code === "00" && 
-                 (invoiceStatus === "pending" || !invoiceStatus)) {
-        res.json({
-          status: "pending",
-          response_code: "01",
-        });
-      } else if (invoiceStatus === "canceled" || invoiceStatus === "fail" || invoiceStatus === "failed") {
-        // Update transaction to failed
+      } else if (invoiceStatus === "canceled" || invoiceStatus === "cancelled" || 
+                 invoiceStatus === "fail" || invoiceStatus === "failed") {
+        // Paydunya explicitly says payment failed/cancelled
         const transaction = await storage.getTransactionByPaydunyaToken(invoiceToken);
         if (transaction && transaction.status === "pending") {
           await storage.updateTransactionStatus(transaction.id, "failed");
-          console.log("[SOFTPAY] Transaction marked as failed:", transaction.id);
+          console.log("[SOFTPAY VERIFY] Transaction marked as failed:", {
+            transactionId: transaction.id,
+            paydunyaStatus: invoiceStatus,
+          });
         }
         
         res.json({
@@ -2611,15 +2620,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           response_code: "05",
         });
       } else {
-        // Unknown status - keep polling
+        // Payment still pending or invalid response - keep polling
+        // This covers: no invoice object, pending status, unknown status
+        console.log("[SOFTPAY VERIFY] Payment still pending or awaiting confirmation:", {
+          invoiceStatus,
+          hasValidInvoice,
+          responseCode: paydunyaResponse.response_code,
+        });
+        
         res.json({
           status: "pending",
           response_code: "01",
         });
       }
     } catch (error: any) {
-      console.error("[SOFTPAY] Verify payment error:", error);
-      // On error, return pending to continue polling
+      console.error("[SOFTPAY VERIFY] Error:", error);
+      // On error, return pending to continue polling (don't fail prematurely)
       res.json({
         status: "pending",
         response_code: "01",

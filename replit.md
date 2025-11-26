@@ -43,6 +43,12 @@ The frontend utilizes React 18 with TypeScript, styled with Shadcn UI and Tailwi
 - **API Gateway**: Provides public/private API keys for developers to integrate with BKApay for incoming payments, including pending transaction creation and strict country validation.
 - **Fee System**: Robust and deterministic fee calculation logic distinguishing between INCOMING (client pays gross, credited net) and OUTGOING (user requests net, debited net+fees) transactions.
 - **Webhook Processing**: Uses a dedicated `paydunyaToken` column for deterministic transaction lookup, eliminating fragile metadata parsing.
+- **Transaction Security (CRITICAL)**: 
+  - Transactions are created as "pending" and ONLY marked "completed" after strict Paydunya confirmation
+  - Atomic `finalizeIncomingTransaction` function prevents duplicate balance credits from webhook/polling race conditions
+  - Strict validation requires ALL conditions: response_code "00" + invoice object exists + invoice.status === "completed"
+  - Payment verification endpoint and background polling use identical strict validation logic
+  - No transactions are finalized without explicit Paydunya confirmation of payment receipt
 - **Operator Filtering**: Corrected logic for displaying operators based on country selection.
 - **Versioned Documentation**: API documentation is now versioned with URLs like `/documentation/v1.2`. The system supports multiple versions, shows deprecation notices for old versions, and displays changelog for the current version. Invalid version URLs show a user-friendly error page with available versions.
 

@@ -89,19 +89,32 @@ async function processTransaction(transaction: Transaction & { user?: User }): P
     return;
   }
 
-  const invoiceStatus = paydunyaStatus.status || paydunyaStatus.invoice?.status;
+  // STRICT VALIDATION: Must have invoice object with completed status
+  const hasValidInvoice = paydunyaStatus.invoice && typeof paydunyaStatus.invoice === 'object';
+  const invoiceStatus = paydunyaStatus.invoice?.status;
 
-  if (invoiceStatus === "completed" || paydunyaStatus.response_code === "00") {
+  console.log(`[PaymentPolling] Transaction ${transaction.id} - Paydunya validation:`, {
+    hasValidInvoice,
+    invoiceStatus,
+    responseCode: paydunyaStatus.response_code,
+  });
+
+  // ONLY finalize if ALL conditions are met:
+  // 1. response_code is "00"
+  // 2. invoice object exists
+  // 3. invoice.status is explicitly "completed"
+  if (paydunyaStatus.response_code === "00" && hasValidInvoice && invoiceStatus === "completed") {
+    const invoiceData = paydunyaStatus.invoice as any;
     const result = await storage.finalizeIncomingTransaction(transaction.id, {
-      paydunyaReceiptUrl: paydunyaStatus.invoice?.total_amount ? `https://paydunya.com/receipt/${transaction.paydunyaToken}` : undefined,
+      paydunyaReceiptUrl: invoiceData?.receipt_url || `https://paydunya.com/receipt/${transaction.paydunyaToken}`,
     });
 
     if (result) {
-      console.log(`[PaymentPolling] Transaction ${transaction.id} finalized: credited=${result.credited}`);
+      console.log(`[PaymentPolling] Transaction ${transaction.id} CONFIRMED by Paydunya - finalized: credited=${result.credited}`);
     } else {
       console.log(`[PaymentPolling] Transaction ${transaction.id} already processed - skipping`);
     }
-  } else if (invoiceStatus === "cancelled" || invoiceStatus === "failed" || paydunyaStatus.response_code === "01") {
+  } else if (invoiceStatus === "cancelled" || invoiceStatus === "canceled" || invoiceStatus === "failed" || invoiceStatus === "fail") {
     console.log(`[PaymentPolling] Transaction ${transaction.id} failed/cancelled by Paydunya - marking as failed`);
     await storage.updateTransactionStatus(transaction.id, "failed");
   } else {
