@@ -37,7 +37,7 @@ interface PaymentState {
 const ORANGE_INSTRUCTIONS: Record<string, string> = {
   SN: "Composez #144#391*VOTRE CODE PIN ORANGE MONEY# pour obtenir votre code de paiement",
   CI: "Composez #144*82# puis choisissez l'option 2 pour obtenir votre code de paiement",
-  BF: "Composez *555*6# sur votre telephone pour obtenir votre code OTP",
+  BF: "Un popup s'ouvrira automatiquement sur votre telephone. Entrez votre code PIN Orange Money pour confirmer.",
 };
 
 function getPaymentStateKey(key: string): string {
