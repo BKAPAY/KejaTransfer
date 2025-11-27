@@ -15,7 +15,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState } from "react";
-import { CheckCircle2, Clock, Loader2, AlertCircle, XCircle, RefreshCw, ExternalLink } from "lucide-react";
+import { CheckCircle2, Clock, Loader2, AlertCircle, XCircle, RefreshCw, ExternalLink, Copy, Check } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { usePaymentCountdown } from "@/hooks/use-payment-countdown";
 
@@ -88,7 +88,18 @@ export default function Pay() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [savedCountry, setSavedCountry] = useState<string>("");
   const [savedOperator, setSavedOperator] = useState<string>("");
+  const [copiedUssd, setCopiedUssd] = useState(false);
   const { toast } = useToast();
+
+  const copyUssdCode = (code: string) => {
+    navigator.clipboard.writeText(code);
+    setCopiedUssd(true);
+    setTimeout(() => setCopiedUssd(false), 2000);
+    toast({
+      title: "Code copié",
+      description: "Le code USSD a été copié dans le presse-papiers",
+    });
+  };
 
   const { data: paymentLink, isLoading: linkLoading } = useQuery<PaymentLink>({
     queryKey: ["/api/payment-links/public", token],
@@ -703,8 +714,28 @@ export default function Pay() {
               <Alert className="bg-orange-50 dark:bg-orange-950 border-orange-200 dark:border-orange-800">
                 <AlertCircle className="h-4 w-4 text-orange-600" />
                 <AlertDescription className="text-sm text-orange-800 dark:text-orange-200">
-                  <strong>Instructions :</strong><br/>
-                  {orangeInstruction.replace("{MONTANT}", String(paymentLink?.amount || 0))}
+                  <strong>Instructions :</strong>
+                  {currentCountry === "BF" && paymentLink?.amount ? (
+                    <div className="mt-2 flex items-center gap-2">
+                      <div className="flex-1 bg-white dark:bg-gray-900 border border-orange-300 dark:border-orange-700 rounded-md px-3 py-2">
+                        <code className="text-base font-bold text-orange-700 dark:text-orange-400">
+                          *144*4*6*{paymentLink.amount}#
+                        </code>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => copyUssdCode(`*144*4*6*${paymentLink.amount}#`)}
+                        className="border-orange-300 hover:bg-orange-100 dark:hover:bg-orange-900"
+                        data-testid="button-copy-ussd"
+                      >
+                        {copiedUssd ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                  ) : (
+                    <p className="mt-1">{orangeInstruction}</p>
+                  )}
                 </AlertDescription>
               </Alert>
             )}

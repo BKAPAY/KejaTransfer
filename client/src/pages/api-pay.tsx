@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { AlertCircle, Loader2, CheckCircle2, Phone, Mail, User, Globe, XCircle, RefreshCw, ExternalLink } from "lucide-react";
+import { AlertCircle, Loader2, CheckCircle2, Phone, Mail, User, Globe, XCircle, RefreshCw, ExternalLink, Copy, Check } from "lucide-react";
 import { OPERATORS } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -88,6 +88,17 @@ export default function ApiPay() {
   const [customerPhone, setCustomerPhone] = useState("");
   const [country, setCountry] = useState("");
   const [operator, setOperator] = useState("");
+  const [copiedUssd, setCopiedUssd] = useState(false);
+
+  const copyUssdCode = (code: string) => {
+    navigator.clipboard.writeText(code);
+    setCopiedUssd(true);
+    setTimeout(() => setCopiedUssd(false), 2000);
+    toast({
+      title: "Code copié",
+      description: "Le code USSD a été copié dans le presse-papiers",
+    });
+  };
 
   const { data: apiKeyInfo, isLoading: isLoadingKey, error: keyError } = useQuery<ApiKeyInfo>({
     queryKey: [`/api/api-key-info/${key}`],
@@ -681,7 +692,28 @@ export default function ApiPay() {
               <Alert className="bg-orange-50 dark:bg-orange-950 border-orange-200 dark:border-orange-800">
                 <AlertCircle className="h-4 w-4 text-orange-600" />
                 <AlertDescription className="text-sm text-orange-800 dark:text-orange-200">
-                  {ORANGE_INSTRUCTIONS[country].replace("{MONTANT}", String(amount || 0))}
+                  <strong>Instructions :</strong>
+                  {country === "BF" && amount ? (
+                    <div className="mt-2 flex items-center gap-2">
+                      <div className="flex-1 bg-white dark:bg-gray-900 border border-orange-300 dark:border-orange-700 rounded-md px-3 py-2">
+                        <code className="text-base font-bold text-orange-700 dark:text-orange-400">
+                          *144*4*6*{amount}#
+                        </code>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => copyUssdCode(`*144*4*6*${amount}#`)}
+                        className="border-orange-300 hover:bg-orange-100 dark:hover:bg-orange-900"
+                        data-testid="button-copy-ussd"
+                      >
+                        {copiedUssd ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                  ) : (
+                    <p className="mt-1">{ORANGE_INSTRUCTIONS[country]}</p>
+                  )}
                 </AlertDescription>
               </Alert>
             )}
