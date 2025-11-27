@@ -37,7 +37,7 @@ interface PaymentState {
 const ORANGE_INSTRUCTIONS: Record<string, string> = {
   SN: "Composez #144#391*VOTRE CODE PIN ORANGE MONEY# pour obtenir votre code de paiement",
   CI: "Composez #144*82# puis choisissez l'option 2 pour obtenir votre code de paiement",
-  BF: "Un popup s'ouvrira automatiquement sur votre telephone. Entrez votre code PIN Orange Money pour confirmer.",
+  BF: "Composez *144*4*6*{MONTANT}# pour obtenir votre code OTP",
 };
 
 function getPaymentStateKey(key: string): string {
@@ -681,7 +681,7 @@ export default function ApiPay() {
               <Alert className="bg-orange-50 dark:bg-orange-950 border-orange-200 dark:border-orange-800">
                 <AlertCircle className="h-4 w-4 text-orange-600" />
                 <AlertDescription className="text-sm text-orange-800 dark:text-orange-200">
-                  {ORANGE_INSTRUCTIONS[country]}
+                  {ORANGE_INSTRUCTIONS[country].replace("{MONTANT}", String(amount || 0))}
                 </AlertDescription>
               </Alert>
             )}

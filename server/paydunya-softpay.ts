@@ -256,13 +256,14 @@ export const SOFTPAY_OPERATORS: Record<string, SoftpayOperatorConfig> = {
   // BURKINA FASO OPERATORS
   "orange_bf": {
     endpoint: "/softpay/orange-money-burkina",
-    requiresOTP: false,
+    requiresOTP: true,
     requiresTwoStep: false,
-    ussdInstruction: "Un popup s'ouvrira automatiquement sur votre téléphone. Entrez votre code PIN Orange Money pour confirmer.",
+    ussdInstruction: "Composez *144*4*6*MONTANT# pour obtenir votre code OTP",
     parameterMapping: (data) => ({
       name_bf: data.customerName,
       email_bf: data.customerEmail,
       phone_bf: data.phoneNumber,
+      otp_code: data.authorizationCode,
       payment_token: data.invoiceToken
     })
   },

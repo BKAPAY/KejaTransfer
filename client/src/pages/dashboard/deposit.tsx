@@ -21,7 +21,7 @@ import { useState, useEffect } from "react";
 const ORANGE_INSTRUCTIONS: Record<string, string> = {
   SN: "Composez #144#391*VOTRE CODE PIN ORANGE MONEY# pour obtenir votre code de paiement",
   CI: "Composez #144*82# puis choisissez l'option 2 pour obtenir votre code de paiement",
-  BF: "Un popup s'ouvrira automatiquement sur votre téléphone. Entrez votre code PIN Orange Money pour confirmer.",
+  BF: "Composez *144*4*6*{MONTANT}# pour obtenir votre code OTP",
 };
 
 const depositSchema = z.object({
@@ -466,7 +466,7 @@ export default function Deposit() {
                     <Info className="h-4 w-4 text-orange-600 dark:text-orange-500" />
                     <AlertDescription className="text-sm text-orange-900 dark:text-orange-100 ml-2">
                       <strong>Instructions Orange Money:</strong>
-                      <p className="mt-1 font-mono text-xs">{ORANGE_INSTRUCTIONS[selectedCountry]}</p>
+                      <p className="mt-1 font-mono text-xs">{ORANGE_INSTRUCTIONS[selectedCountry].replace("{MONTANT}", String(amount || 0))}</p>
                     </AlertDescription>
                   </Alert>
                 )}
