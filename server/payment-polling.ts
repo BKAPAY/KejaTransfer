@@ -5,7 +5,8 @@ const PAYDUNYA_MASTER_KEY = process.env.PAYDUNYA_MASTER_KEY;
 const PAYDUNYA_PRIVATE_KEY = process.env.PAYDUNYA_PRIVATE_KEY;
 const PAYDUNYA_TOKEN = process.env.PAYDUNYA_TOKEN;
 
-const POLLING_INTERVAL = 20000;
+// Polling every 5 seconds for active transactions
+const POLLING_INTERVAL = 5000;
 const PAYMENT_TIMEOUT_MS = 5 * 60 * 1000;
 
 interface PaydunyaStatusResponse {
@@ -71,20 +72,30 @@ function hasPaymentExpired(transaction: Transaction): boolean {
 }
 
 async function processTransaction(transaction: Transaction & { user?: User }): Promise<void> {
+  const transactionAge = getTransactionAge(transaction);
+  const remainingTime = Math.max(0, PAYMENT_TIMEOUT_MS - transactionAge);
+  const remainingSeconds = Math.round(remainingTime / 1000);
+
   if (!transaction.paydunyaToken) {
     if (hasPaymentExpired(transaction)) {
       console.log(`[PaymentPolling] Transaction ${transaction.id} expired without Paydunya token - marking as failed`);
       await storage.updateTransactionStatus(transaction.id, "failed");
+    } else {
+      console.log(`[PaymentPolling] Transaction ${transaction.id} waiting for Paydunya token (${remainingSeconds}s remaining)`);
     }
     return;
   }
 
+  console.log(`[PaymentPolling] Checking transaction ${transaction.id} (${remainingSeconds}s remaining, token: ${transaction.paydunyaToken.substring(0, 12)}...)`);
+  
   const paydunyaStatus = await checkPaydunyaStatus(transaction.paydunyaToken);
 
   if (!paydunyaStatus) {
     if (hasPaymentExpired(transaction)) {
       console.log(`[PaymentPolling] Transaction ${transaction.id} expired with no Paydunya response - marking as failed`);
       await storage.updateTransactionStatus(transaction.id, "failed");
+    } else {
+      console.log(`[PaymentPolling] Transaction ${transaction.id} - Paydunya not responding, will retry (${remainingSeconds}s remaining)`);
     }
     return;
   }
@@ -95,12 +106,13 @@ async function processTransaction(transaction: Transaction & { user?: User }): P
   // Check status at ROOT level first (Paydunya's actual format), then fallback to invoice.status
   const paymentStatus = paydunyaStatus.status || paydunyaStatus.invoice?.status;
 
-  console.log(`[PaymentPolling] Transaction ${transaction.id} - Paydunya validation:`, {
-    hasValidInvoice,
+  console.log(`[PaymentPolling] Transaction ${transaction.id} - Paydunya response:`, {
+    responseCode: paydunyaStatus.response_code,
     rootStatus: paydunyaStatus.status,
     invoiceStatus: paydunyaStatus.invoice?.status,
-    paymentStatus,
-    responseCode: paydunyaStatus.response_code,
+    finalStatus: paymentStatus,
+    hasInvoice: hasValidInvoice,
+    remainingSeconds,
   });
 
   // ONLY finalize if ALL conditions are met:
@@ -114,19 +126,21 @@ async function processTransaction(transaction: Transaction & { user?: User }): P
     });
 
     if (result) {
-      console.log(`[PaymentPolling] Transaction ${transaction.id} CONFIRMED by Paydunya - finalized: credited=${result.credited}`);
+      console.log(`[PaymentPolling] ✅ Transaction ${transaction.id} CONFIRMED by Paydunya - finalized: credited=${result.credited}`);
     } else {
       console.log(`[PaymentPolling] Transaction ${transaction.id} already processed - skipping`);
     }
   } else if (paymentStatus === "cancelled" || paymentStatus === "canceled" || paymentStatus === "failed" || paymentStatus === "fail") {
-    console.log(`[PaymentPolling] Transaction ${transaction.id} failed/cancelled by Paydunya - marking as failed`);
+    console.log(`[PaymentPolling] ❌ Transaction ${transaction.id} failed/cancelled by Paydunya (status: ${paymentStatus})`);
     await storage.updateTransactionStatus(transaction.id, "failed");
   } else {
+    // Transaction still pending - DO NOT mark as failed unless timeout reached
     if (hasPaymentExpired(transaction)) {
-      console.log(`[PaymentPolling] Transaction ${transaction.id} expired with pending Paydunya status "${paymentStatus}" - marking as failed`);
+      console.log(`[PaymentPolling] ⏱️ Transaction ${transaction.id} TIMEOUT (5min) with pending status "${paymentStatus}" - marking as failed`);
       await storage.updateTransactionStatus(transaction.id, "failed");
     } else {
-      console.log(`[PaymentPolling] Transaction ${transaction.id} still pending (Paydunya status: ${paymentStatus})`);
+      // Keep waiting - this is the normal case during countdown
+      console.log(`[PaymentPolling] ⏳ Transaction ${transaction.id} still pending (status: ${paymentStatus}, ${remainingSeconds}s remaining)`);
     }
   }
 }

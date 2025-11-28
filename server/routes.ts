@@ -7,6 +7,7 @@ import pg from "pg";
 import bcrypt from "bcrypt";
 import { z } from "zod";
 import { insertUserSchema, insertPaymentLinkSchema, insertMerchantLinkSchema, insertApiKeySchema } from "@shared/schema";
+import { validatePhoneOperator } from "@shared/phone-utils";
 import { randomUUID } from "crypto";
 import { calculateIncomingFee, calculateOutgoingFee } from "./utils/fees";
 import { 
@@ -1160,14 +1161,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get transaction status (for polling)
+  // Get transaction status (for polling) - also forces Paydunya check if pending
   app.get("/api/transactions/:id/status", async (req: Request, res: Response) => {
     try {
       const transaction = await storage.getTransaction(req.params.id);
       if (!transaction) {
         return res.status(404).json({ error: "Transaction non trouvee" });
       }
-      res.json({ status: transaction.status });
+
+      // If transaction is pending and has a Paydunya token, check with Paydunya directly
+      if (transaction.status === "pending" && transaction.paydunyaToken) {
+        try {
+          const paydunyaResponse = await fetch(
+            `https://app.paydunya.com/api/v1/checkout-invoice/confirm/${transaction.paydunyaToken}`,
+            {
+              method: "GET",
+              headers: {
+                "Content-Type": "application/json",
+                "PAYDUNYA-MASTER-KEY": process.env.PAYDUNYA_MASTER_KEY || "",
+                "PAYDUNYA-PRIVATE-KEY": process.env.PAYDUNYA_PRIVATE_KEY || "",
+                "PAYDUNYA-TOKEN": process.env.PAYDUNYA_TOKEN || "",
+              },
+            }
+          );
+
+          if (paydunyaResponse.ok) {
+            const data = await paydunyaResponse.json();
+            
+            // Check status at ROOT level first (Paydunya's actual format)
+            const paymentStatus = data.status || data.invoice?.status;
+            const hasValidInvoice = data.invoice && typeof data.invoice === "object";
+
+            console.log(`[TransactionStatus] Real-time check for ${transaction.id}:`, {
+              responseCode: data.response_code,
+              rootStatus: data.status,
+              invoiceStatus: data.invoice?.status,
+              finalStatus: paymentStatus,
+            });
+
+            // ONLY finalize if ALL conditions are met
+            if (data.response_code === "00" && hasValidInvoice && paymentStatus === "completed") {
+              const result = await storage.finalizeIncomingTransaction(transaction.id, {
+                paydunyaReceiptUrl: data.invoice?.receipt_url || `https://paydunya.com/receipt/${transaction.paydunyaToken}`,
+              });
+              
+              console.log(`[TransactionStatus] ✅ Transaction ${transaction.id} CONFIRMED - finalized: ${result ? 'new' : 'already processed'}`);
+              return res.json({ 
+                status: "completed",
+                message: "Paiement confirmé"
+              });
+            } else if (paymentStatus === "cancelled" || paymentStatus === "canceled" || paymentStatus === "failed") {
+              await storage.updateTransactionStatus(transaction.id, "failed");
+              return res.json({ 
+                status: "failed",
+                message: "Paiement échoué ou annulé"
+              });
+            }
+          }
+        } catch (checkError) {
+          console.log(`[TransactionStatus] Error checking Paydunya for ${transaction.id}:`, checkError);
+          // Continue with cached status
+        }
+      }
+
+      // Refresh transaction from database to get latest status
+      const freshTransaction = await storage.getTransaction(req.params.id);
+      res.json({ status: freshTransaction?.status || transaction.status });
     } catch (error: any) {
       res.status(500).json({ error: "Une erreur est survenue" });
     }
@@ -2849,7 +2908,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      console.log(`[Withdrawal] Original phone: ${phone}, Cleaned phone: ${cleanPhone}, Country: ${country}`);
+      // Step 6: Validate phone number matches selected operator
+      // This prevents users from selecting wrong operator (e.g., Moov but using MTN number)
+      const operatorValidation = validatePhoneOperator(cleanPhone, operator, country);
+      console.log(`[Withdrawal] Operator validation:`, operatorValidation);
+      
+      if (!operatorValidation.isValid) {
+        console.log(`[Withdrawal] Operator mismatch: expected ${operatorValidation.expectedOperator}, detected ${operatorValidation.detectedOperator}`);
+        return res.status(400).json({ 
+          error: operatorValidation.message
+        });
+      }
+
+      console.log(`[Withdrawal] Original phone: ${phone}, Cleaned phone: ${cleanPhone}, Country: ${country}, Operator: ${operator}`);
 
       // Callback URL for Paydunya notifications
       const callbackUrl = process.env.BASE_URL 
