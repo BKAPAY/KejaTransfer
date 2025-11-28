@@ -34,7 +34,7 @@ The frontend utilizes React 18 with TypeScript, styled with Shadcn UI and Tailwi
   - **Orange Money OTP Flows (ALL countries require OTP)**:
     - Senegal (SN): USSD #144#391*PIN# → OTP code → Confirm
     - Côte d'Ivoire (CI): USSD #144*82# option 2 → OTP code → Confirm
-    - Burkina Faso (BF): USSD *144*4*6*MONTANT# → OTP code → Confirm (montant dynamique affiché)
+    - Burkina Faso (BF): USSD #144#391*PIN# → OTP code → Confirm (même code que SN)
   - **Orange Money Instructions**: Displayed in all payment entry points (deposit.tsx, pay.tsx, merchant.tsx) with country-specific USSD codes
 - **Withdrawal Flows**: Implemented using Paydunya v2 Disburse API (get-invoice → submit-invoice). Features include KYC validation, balance checks, proper phone number sanitization (strips international prefixes, validates country-specific lengths), and immediate balance deduction on success. Transfer functionality has been removed - only withdrawals are supported.
 - **Embedded PSR Payments**: Integrates Paydunya's PSR SDK for direct payment modals.

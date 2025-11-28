@@ -21,7 +21,7 @@ import { useState, useEffect } from "react";
 const ORANGE_INSTRUCTIONS: Record<string, string> = {
   SN: "Composez #144#391*VOTRE CODE PIN ORANGE MONEY# pour obtenir votre code de paiement",
   CI: "Composez #144*82# puis choisissez l'option 2 pour obtenir votre code de paiement",
-  BF: "Composez *144*4*6*{MONTANT}# pour obtenir votre code OTP",
+  BF: "Composez #144#391*VOTRE CODE PIN ORANGE MONEY# pour obtenir votre code de paiement",
 };
 
 const depositSchema = z.object({
@@ -477,27 +477,26 @@ export default function Deposit() {
                     <Info className="h-4 w-4 text-orange-600 dark:text-orange-500" />
                     <AlertDescription className="text-sm text-orange-900 dark:text-orange-100 ml-2">
                       <strong>Instructions Orange Money:</strong>
-                      {selectedCountry === "BF" && amount ? (
-                        <div className="mt-2 flex items-center gap-2">
-                          <div className="flex-1 bg-white dark:bg-gray-900 border border-orange-300 dark:border-orange-700 rounded-md px-3 py-2">
-                            <code className="text-base font-bold text-orange-700 dark:text-orange-400">
-                              *144*4*6*{amount}#
-                            </code>
-                          </div>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => copyUssdCode(`*144*4*6*${amount}#`)}
-                            className="border-orange-300 hover:bg-orange-100 dark:hover:bg-orange-900"
-                            data-testid="button-copy-ussd"
-                          >
-                            {copiedUssd ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
-                          </Button>
+                      <div className="mt-2 flex items-center gap-2">
+                        <div className="flex-1 bg-white dark:bg-gray-900 border border-orange-300 dark:border-orange-700 rounded-md px-3 py-2">
+                          <code className="text-base font-bold text-orange-700 dark:text-orange-400">
+                            #144#391*PIN#
+                          </code>
                         </div>
-                      ) : (
-                        <p className="mt-1 font-mono text-xs">{ORANGE_INSTRUCTIONS[selectedCountry]}</p>
-                      )}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => copyUssdCode("#144#391*PIN#")}
+                          className="border-orange-300 hover:bg-orange-100 dark:hover:bg-orange-900"
+                          data-testid="button-copy-ussd"
+                        >
+                          {copiedUssd ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                      <p className="mt-2 text-xs text-orange-700 dark:text-orange-400">
+                        Remplacez PIN par votre code secret Orange Money
+                      </p>
                     </AlertDescription>
                   </Alert>
                 )}
