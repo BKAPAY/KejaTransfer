@@ -3,7 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
-import { CheckCircle2, X, ArrowLeft, Search, Download, Clock } from "lucide-react";
+import { CheckCircle2, X, ArrowLeft, Search, Download, Clock, BadgeCheck } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import type { User } from "@shared/schema";
 import { useLocation } from "wouter";
 import { useState } from "react";
@@ -84,9 +85,17 @@ Note: Ce document certifie que les documents d'identité ont été soumis et tra
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1">
-            <CardTitle className="text-lg">
-              {user.firstName} {user.lastName}
-            </CardTitle>
+            <div className="flex items-center gap-2 flex-wrap">
+              <CardTitle className="text-lg">
+                {user.firstName} {user.lastName}
+              </CardTitle>
+              {user.kycStatus === "verified" && (
+                <Badge variant="default" className="bg-green-600 hover:bg-green-600 gap-1">
+                  <BadgeCheck className="w-3 h-3" />
+                  Vérifié
+                </Badge>
+              )}
+            </div>
             <p className="text-sm text-muted-foreground mt-1">{user.email}</p>
             <p className="text-xs text-muted-foreground mt-1">
               {new Date(user.createdAt).toLocaleDateString("fr-FR", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })}

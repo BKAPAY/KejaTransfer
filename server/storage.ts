@@ -470,12 +470,35 @@ export class DbStorage implements IStorage {
   async searchUsers(query: string): Promise<User[]> {
     const allUsers = await this.getAllUsers();
     const lowerQuery = query.toLowerCase();
-    return allUsers.filter(
+    
+    // First, filter users by name/email
+    const matchedByUserInfo = allUsers.filter(
       (u) =>
         u.email.toLowerCase().includes(lowerQuery) ||
         u.firstName.toLowerCase().includes(lowerQuery) ||
         u.lastName.toLowerCase().includes(lowerQuery)
     );
+    
+    // Also search by transaction token (paydunyaToken or transaction ID)
+    const allTransactions = await db.select().from(schema.transactions);
+    const matchingTransactions = allTransactions.filter(
+      (t) =>
+        (t.paydunyaToken && t.paydunyaToken.toLowerCase().includes(lowerQuery)) ||
+        t.id.toLowerCase().includes(lowerQuery)
+    );
+    
+    // Get user IDs from matching transactions
+    const userIdsFromTransactions = new Set(matchingTransactions.map(t => t.userId));
+    
+    // Find users who have matching transactions
+    const matchedByTransaction = allUsers.filter(u => userIdsFromTransactions.has(u.id));
+    
+    // Combine results, avoiding duplicates
+    const resultMap = new Map<string, typeof allUsers[0]>();
+    matchedByUserInfo.forEach(u => resultMap.set(u.id, u));
+    matchedByTransaction.forEach(u => resultMap.set(u.id, u));
+    
+    return Array.from(resultMap.values());
   }
 
   async promoteToAdmin(userId: string): Promise<User | undefined> {

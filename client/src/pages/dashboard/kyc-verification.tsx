@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { CheckCircle2, X, Download, FileText, ArrowLeft } from "lucide-react";
+import { CheckCircle2, X, Download, FileText, ArrowLeft, Search, BadgeCheck } from "lucide-react";
 import type { User } from "@shared/schema";
 import html2pdf from "html2pdf.js";
 import { queryClient } from "@/lib/queryClient";
@@ -15,10 +16,23 @@ export default function KycVerificationPage() {
   const { toast } = useToast();
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
 
   const { data: submissions, isLoading, refetch } = useQuery({
     queryKey: ["/api/admin/kyc-submissions"],
   });
+
+  const filteredSubmissions = useMemo(() => {
+    if (!submissions) return [];
+    if (!searchQuery.trim()) return submissions as User[];
+    
+    const query = searchQuery.toLowerCase().trim();
+    return (submissions as User[]).filter((user: User) => {
+      const fullName = `${user.firstName} ${user.lastName}`.toLowerCase();
+      const email = user.email.toLowerCase();
+      return fullName.includes(query) || email.includes(query);
+    });
+  }, [submissions, searchQuery]);
 
   const approveMutation = useMutation({
     mutationFn: async (userId: string) => {
@@ -134,18 +148,31 @@ export default function KycVerificationPage() {
 
       {!selectedUser ? (
         <div className="space-y-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Rechercher par email ou nom..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+              data-testid="input-search-kyc-verification"
+            />
+          </div>
+          
           {isLoading ? (
             <div className="text-center py-12">Chargement...</div>
-          ) : !submissions || (submissions as User[]).length === 0 ? (
+          ) : filteredSubmissions.length === 0 ? (
             <Card>
               <CardContent className="pt-6 text-center py-12">
                 <FileText className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
-                <p className="text-muted-foreground">Aucune demande KYC en attente</p>
+                <p className="text-muted-foreground">
+                  {searchQuery ? `Aucune demande trouvée pour "${searchQuery}"` : "Aucune demande KYC en attente"}
+                </p>
               </CardContent>
             </Card>
           ) : (
             <div className="grid gap-4">
-              {(submissions as User[]).map((user: User) => (
+              {filteredSubmissions.map((user: User) => (
                 <Card
                   key={user.id}
                   className="hover-elevate cursor-pointer"

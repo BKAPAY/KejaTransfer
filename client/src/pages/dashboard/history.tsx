@@ -29,11 +29,15 @@ export default function History() {
       const customerName = (transaction.customerName || "").toLowerCase();
       const customerEmail = (transaction.customerEmail || "").toLowerCase();
       const customerPhone = (transaction.customerPhone || "").toLowerCase();
+      const paydunyaToken = (transaction.paydunyaToken || "").toLowerCase();
+      const txId = transaction.id.toLowerCase();
       
       return (
         customerName.includes(query) ||
         customerEmail.includes(query) ||
-        customerPhone.includes(query)
+        customerPhone.includes(query) ||
+        paydunyaToken.includes(query) ||
+        txId.includes(query)
       );
     });
   }, [transactions, searchQuery]);
@@ -104,7 +108,7 @@ export default function History() {
             <div className="relative w-full sm:w-80">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Rechercher par nom, email ou telephone..."
+                placeholder="Rechercher par token, nom, email ou telephone..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9 pr-9"

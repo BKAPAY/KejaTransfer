@@ -398,7 +398,7 @@ export default function Management() {
         <CardContent className="space-y-4">
           <div className="flex gap-2">
             <Input
-              placeholder="Rechercher par email, nom ou prénom..."
+              placeholder="Rechercher par token, email, nom ou prénom..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               data-testid="input-search-users"

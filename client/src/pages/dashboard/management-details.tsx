@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Copy, Eye, EyeOff } from "lucide-react";
+import { Copy, Eye, EyeOff, Search, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import type { User, Transaction, PaymentLink, MerchantLink, ApiKey } from "@shared/schema";
@@ -17,6 +17,7 @@ export function HistoryDialog({ userId, onOpenChange }: { userId: string; onOpen
     queryKey: [`/api/admin/user/${userId}/transactions`],
   });
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
 
   const getStatusBadge = (status: string) => {
@@ -42,6 +43,7 @@ export function HistoryDialog({ userId, onOpenChange }: { userId: string; onOpen
   const getTypeText = (type: string) => {
     const types: Record<string, string> = {
       deposit: "Dépôt",
+      withdrawal: "Retrait",
       transfer: "Transfert",
       payment_link: "Lien de paiement",
       merchant_link: "Lien marchand",
@@ -59,6 +61,29 @@ export function HistoryDialog({ userId, onOpenChange }: { userId: string; onOpen
     }).format(amount);
   };
 
+  const filteredTransactions = React.useMemo(() => {
+    if (!transactions) return [];
+    if (!searchQuery.trim()) return transactions;
+
+    const query = searchQuery.toLowerCase().trim();
+    
+    return transactions.filter((tx) => {
+      const customerName = (tx.customerName || "").toLowerCase();
+      const customerEmail = (tx.customerEmail || "").toLowerCase();
+      const customerPhone = (tx.customerPhone || "").toLowerCase();
+      const paydunyaToken = (tx.paydunyaToken || "").toLowerCase();
+      const txId = tx.id.toLowerCase();
+      
+      return (
+        customerName.includes(query) ||
+        customerEmail.includes(query) ||
+        customerPhone.includes(query) ||
+        paydunyaToken.includes(query) ||
+        txId.includes(query)
+      );
+    });
+  }, [transactions, searchQuery]);
+
   if (selectedTx) {
     return <TransactionDetailDialog transaction={selectedTx} onOpenChange={() => setSelectedTx(null)} />;
   }
@@ -69,43 +94,97 @@ export function HistoryDialog({ userId, onOpenChange }: { userId: string; onOpen
         <DialogHeader>
           <DialogTitle>Historique des transactions</DialogTitle>
         </DialogHeader>
+        
+        <div className="relative mb-4">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Rechercher par token, nom, email, téléphone..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-9 pr-9 h-10 rounded-md border border-input bg-background text-sm"
+            data-testid="input-search-admin-transactions"
+          />
+          {searchQuery && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
+              onClick={() => setSearchQuery("")}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+        
+        {searchQuery && (
+          <p className="text-xs text-muted-foreground mb-2">
+            {filteredTransactions.length} résultat(s) pour "{searchQuery}"
+          </p>
+        )}
+
         {isLoading ? (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
               <Skeleton key={i} className="h-20 w-full" />
             ))}
           </div>
-        ) : transactions && transactions.length > 0 ? (
+        ) : filteredTransactions.length > 0 ? (
           <ScrollArea className="h-[400px]">
-            <div className="space-y-2 pr-4">
-              {transactions.map((tx) => (
-                <Card
+            <div className="space-y-1 pr-4">
+              {filteredTransactions.map((tx) => (
+                <div
                   key={tx.id}
-                  className="p-4 cursor-pointer hover-elevate"
+                  className="flex items-center justify-between gap-4 py-4 border-b last:border-0 hover-elevate rounded-md px-3 cursor-pointer"
                   onClick={() => setSelectedTx(tx)}
                   data-testid={`transaction-card-${tx.id}`}
                 >
-                  <div className="flex items-center justify-between gap-4 flex-wrap">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <h4 className="font-semibold text-sm">{getTypeText(tx.type)}</h4>
-                        <Badge variant={getStatusBadge(tx.status)} className="text-xs">
-                          {getStatusText(tx.status)}
-                        </Badge>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(tx.createdAt).toLocaleDateString("fr-FR")} à {new Date(tx.createdAt).toLocaleTimeString("fr-FR")}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <p className="font-medium text-sm">
+                        {tx.description || getTypeText(tx.type)}
                       </p>
-                      {tx.description && <p className="text-sm text-muted-foreground mt-1">{tx.description}</p>}
+                      <Badge variant={getStatusBadge(tx.status)} className="text-xs">
+                        {getStatusText(tx.status)}
+                      </Badge>
                     </div>
-                    <div className="text-right">
-                      <p className="font-semibold text-sm">{formatAmount(tx.amount)}</p>
+                    <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+                      <span>
+                        {new Date(tx.createdAt).toLocaleDateString("fr-FR", {
+                          year: "numeric",
+                          month: "short",
+                          day: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                      {tx.customerName && <span>{tx.customerName}</span>}
+                      {tx.customerEmail && <span>{tx.customerEmail}</span>}
+                      {tx.customerPhone && <span>{tx.customerPhone}</span>}
+                      {tx.country && <span>{tx.country}</span>}
+                      {tx.operator && (
+                        <span className="capitalize">{tx.operator}</span>
+                      )}
                     </div>
                   </div>
-                </Card>
+                  <div className="text-right">
+                    <p className="font-semibold">
+                      {formatAmount(tx.amount)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">{tx.currency}</p>
+                  </div>
+                </div>
               ))}
             </div>
           </ScrollArea>
+        ) : searchQuery ? (
+          <div className="text-center py-8">
+            <Search className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+            <p className="text-muted-foreground">Aucune transaction trouvée pour "{searchQuery}"</p>
+            <Button variant="ghost" onClick={() => setSearchQuery("")} className="mt-2">
+              Effacer la recherche
+            </Button>
+          </div>
         ) : (
           <p className="text-center py-8 text-muted-foreground">Aucune transaction</p>
         )}
