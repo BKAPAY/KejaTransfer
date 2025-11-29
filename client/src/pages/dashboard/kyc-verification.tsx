@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckCircle2, X, Download, FileText, ArrowLeft, Search, BadgeCheck } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import type { User } from "@shared/schema";
 import html2pdf from "html2pdf.js";
 import { queryClient } from "@/lib/queryClient";
@@ -182,9 +183,17 @@ export default function KycVerificationPage() {
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
                       <div>
-                        <CardTitle className="text-lg">
-                          {user.firstName} {user.lastName}
-                        </CardTitle>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <CardTitle className="text-lg">
+                            {user.firstName} {user.lastName}
+                          </CardTitle>
+                          {user.kycStatus === "verified" && (
+                            <Badge variant="default" className="bg-green-600 hover:bg-green-600 gap-1">
+                              <BadgeCheck className="w-3 h-3" />
+                              Approuvé
+                            </Badge>
+                          )}
+                        </div>
                         <CardDescription>{user.email}</CardDescription>
                       </div>
                       <Button
@@ -215,9 +224,17 @@ export default function KycVerificationPage() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle>
-                    {selectedUser.firstName} {selectedUser.lastName}
-                  </CardTitle>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <CardTitle>
+                      {selectedUser.firstName} {selectedUser.lastName}
+                    </CardTitle>
+                    {selectedUser.kycStatus === "verified" && (
+                      <Badge variant="default" className="bg-green-600 hover:bg-green-600 gap-1">
+                        <BadgeCheck className="w-3 h-3" />
+                        Approuvé
+                      </Badge>
+                    )}
+                  </div>
                   <CardDescription>{selectedUser.email}</CardDescription>
                 </div>
                 <Button
