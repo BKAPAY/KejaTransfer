@@ -7,7 +7,7 @@ const PAYDUNYA_TOKEN = process.env.PAYDUNYA_TOKEN;
 
 // Polling every 5 seconds for active transactions
 const POLLING_INTERVAL = 5000;
-const PAYMENT_TIMEOUT_MS = 5 * 60 * 1000;
+const PAYMENT_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes timeout
 
 interface PaydunyaStatusResponse {
   response_code: string;
@@ -136,7 +136,7 @@ async function processTransaction(transaction: Transaction & { user?: User }): P
   } else {
     // Transaction still pending - DO NOT mark as failed unless timeout reached
     if (hasPaymentExpired(transaction)) {
-      console.log(`[PaymentPolling] ⏱️ Transaction ${transaction.id} TIMEOUT (5min) with pending status "${paymentStatus}" - marking as failed`);
+      console.log(`[PaymentPolling] ⏱️ Transaction ${transaction.id} TIMEOUT (10min) with pending status "${paymentStatus}" - marking as failed`);
       await storage.updateTransactionStatus(transaction.id, "failed");
     } else {
       // Keep waiting - this is the normal case during countdown

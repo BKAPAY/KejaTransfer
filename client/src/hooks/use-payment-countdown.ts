@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { queryClient } from "@/lib/queryClient";
 
-const COUNTDOWN_DURATION = 5 * 60; // 5 minutes in seconds
+const COUNTDOWN_DURATION = 10 * 60; // 10 minutes in seconds
 const POLL_INTERVAL = 1000; // 1 second
 
 interface PaymentCountdownState {
