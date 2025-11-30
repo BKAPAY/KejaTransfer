@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
 import { useLocation } from "wouter";
 import type { User } from "@shared/schema";
+import { apiRequest } from "@/lib/queryClient";
 
 export default function Admin() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -20,27 +21,29 @@ export default function Admin() {
     totalWithdrawals: number;
   }>({
     queryKey: ["/api/admin/stats"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/admin/stats");
+      return response.json();
+    },
     refetchInterval: 5000,
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 
   const { data: allUsers, isLoading: usersLoading } = useQuery<User[]>({
     queryKey: ["/api/admin/users"],
     queryFn: async () => {
-      const response = await fetch("/api/admin/users", {
-        credentials: "include",
-      });
-      if (!response.ok) throw new Error("Failed to fetch users");
+      const response = await apiRequest("GET", "/api/admin/users");
       return response.json();
     },
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 
   const { data: searchResults, isLoading: searchLoading } = useQuery<User[]>({
     queryKey: ["/api/admin/search", searchQuery],
     queryFn: async () => {
-      const response = await fetch(`/api/admin/search?q=${encodeURIComponent(searchQuery)}`, {
-        credentials: "include",
-      });
-      if (!response.ok) throw new Error("Failed to search users");
+      const response = await apiRequest("GET", `/api/admin/search?q=${encodeURIComponent(searchQuery)}`);
       return response.json();
     },
     enabled: searchQuery.length > 0,
