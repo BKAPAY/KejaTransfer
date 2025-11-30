@@ -30,17 +30,16 @@ export default function Admin() {
   const { data: searchResults, isLoading: searchLoading } = useQuery<User[]>({
     queryKey: ["/api/admin/search", searchQuery],
     queryFn: async () => {
-      if (!searchQuery) return allUsers || [];
       const response = await fetch(`/api/admin/search?q=${encodeURIComponent(searchQuery)}`);
       if (!response.ok) throw new Error("Failed to search users");
       return response.json();
     },
-    enabled: true,
+    enabled: searchQuery.length > 0,
   });
 
   // Display filtered results if searching, otherwise show all users
   const displayedUsers = searchQuery.length > 0 ? searchResults : allUsers;
-  const isLoading = searchQuery.length > 0 ? searchLoading : usersLoading;
+  const isLoading = usersLoading || (searchQuery.length > 0 && searchLoading);
 
   const formatAmount = (amount: number) => {
     return new Intl.NumberFormat("fr-FR", {
