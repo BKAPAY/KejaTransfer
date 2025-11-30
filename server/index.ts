@@ -6,6 +6,12 @@ import { startPaymentPolling, stopPaymentPolling } from "./payment-polling";
 
 const app = express();
 
+// CRITICAL: Enable trust proxy BEFORE any session middleware
+// This ensures Express correctly detects HTTPS behind Replit's reverse proxy
+if (process.env.NODE_ENV === "production") {
+  app.set("trust proxy", 1);
+}
+
 declare module 'http' {
   interface IncomingMessage {
     rawBody: unknown
