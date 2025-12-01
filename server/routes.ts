@@ -428,7 +428,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.error("ERREUR: SESSION_SECRET doit être configuré dans les variables d'environnement");
   }
 
-  // Note: trust proxy is now set in index.ts BEFORE routes are registered
+  // Enable trust proxy for production (behind reverse proxy)
+  if (process.env.NODE_ENV === "production") {
+    app.set("trust proxy", 1);
+  }
 
   // Configure PostgreSQL session store
   const PgStore = connectPg(session);
@@ -449,7 +452,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       cookie: {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+        sameSite: "lax", // Changed from "strict" to "lax" for better compatibility
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       },
     })

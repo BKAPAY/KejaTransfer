@@ -76,18 +76,8 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    // Build URL from queryKey - ensure it starts with / for absolute path
-    let url = queryKey.join("/");
-    if (!url.startsWith("/")) {
-      url = "/" + url;
-    }
-    
-    const res = await fetch(url, {
-      method: "GET",
+    const res = await fetch(queryKey.join("/") as string, {
       credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-      },
     });
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {
