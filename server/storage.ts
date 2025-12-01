@@ -84,6 +84,14 @@ export interface IStorage {
   getCountryOperatorConfig(country: string, operator: string): Promise<CountryOperatorConfig | undefined>;
   updateCountryOperatorConfig(country: string, operator: string, config: UpdateCountryOperatorConfig): Promise<CountryOperatorConfig | undefined>;
   initializeCountryOperatorConfigs(): Promise<void>;
+  
+  // Diagnostic
+  getDiagnosticData(): Promise<{
+    users: User[];
+    pendingKyc: User[];
+    allTransactions: Transaction[];
+    stats: { totalUsers: number; verifiedUsers: number; totalDeposits: number; totalWithdrawals: number };
+  }>;
 }
 
 export class DbStorage implements IStorage {
@@ -493,12 +501,53 @@ export class DbStorage implements IStorage {
     // Find users who have matching transactions
     const matchedByTransaction = allUsers.filter(u => userIdsFromTransactions.has(u.id));
     
+    // Also search by payment link tokens
+    const allPaymentLinks = await db.select().from(schema.paymentLinks);
+    const matchingPaymentLinks = allPaymentLinks.filter(
+      (pl) => pl.token.toLowerCase().includes(lowerQuery)
+    );
+    const userIdsFromPaymentLinks = new Set(matchingPaymentLinks.map(pl => pl.userId));
+    const matchedByPaymentLink = allUsers.filter(u => userIdsFromPaymentLinks.has(u.id));
+    
+    // Also search by merchant link tokens
+    const allMerchantLinks = await db.select().from(schema.merchantLinks);
+    const matchingMerchantLinks = allMerchantLinks.filter(
+      (ml) => ml.token.toLowerCase().includes(lowerQuery)
+    );
+    const userIdsFromMerchantLinks = new Set(matchingMerchantLinks.map(ml => ml.userId));
+    const matchedByMerchantLink = allUsers.filter(u => userIdsFromMerchantLinks.has(u.id));
+    
+    // Also search by API keys
+    const allApiKeys = await db.select().from(schema.apiKeys);
+    const matchingApiKeys = allApiKeys.filter(
+      (ak) => ak.publicKey.toLowerCase().includes(lowerQuery) || ak.privateKey.toLowerCase().includes(lowerQuery)
+    );
+    const userIdsFromApiKeys = new Set(matchingApiKeys.map(ak => ak.userId));
+    const matchedByApiKey = allUsers.filter(u => userIdsFromApiKeys.has(u.id));
+    
     // Combine results, avoiding duplicates
     const resultMap = new Map<string, typeof allUsers[0]>();
     matchedByUserInfo.forEach(u => resultMap.set(u.id, u));
     matchedByTransaction.forEach(u => resultMap.set(u.id, u));
+    matchedByPaymentLink.forEach(u => resultMap.set(u.id, u));
+    matchedByMerchantLink.forEach(u => resultMap.set(u.id, u));
+    matchedByApiKey.forEach(u => resultMap.set(u.id, u));
     
     return Array.from(resultMap.values());
+  }
+  
+  async getDiagnosticData(): Promise<{
+    users: User[];
+    pendingKyc: User[];
+    allTransactions: Transaction[];
+    stats: { totalUsers: number; verifiedUsers: number; totalDeposits: number; totalWithdrawals: number };
+  }> {
+    const users = await this.getAllUsers(); // Already sorted by balance desc
+    const pendingKyc = users.filter(u => u.kycStatus === "submitted");
+    const allTransactions = await db.select().from(schema.transactions).orderBy(desc(schema.transactions.createdAt));
+    const stats = await this.getAdminStats();
+    
+    return { users, pendingKyc, allTransactions, stats };
   }
 
   async promoteToAdmin(userId: string): Promise<User | undefined> {

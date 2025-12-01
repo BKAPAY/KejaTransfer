@@ -3511,6 +3511,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Advanced diagnostic endpoint with full data
+  app.get("/api/admin/diagnostic-advanced", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      res.set({
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      });
+      
+      const diagnosticData = await storage.getDiagnosticData();
+      
+      console.log("[Advanced Diagnostic] Fetched", diagnosticData.users.length, "users,", 
+                  diagnosticData.pendingKyc.length, "pending KYC,",
+                  diagnosticData.allTransactions.length, "transactions");
+      
+      res.json({
+        success: true,
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV || "unknown",
+        users: diagnosticData.users.map(u => ({
+          id: u.id,
+          email: u.email,
+          firstName: u.firstName,
+          lastName: u.lastName,
+          balance: u.balance,
+          kycStatus: u.kycStatus,
+          isAdmin: u.isAdmin,
+          isPrimaryAdmin: u.isPrimaryAdmin,
+          suspended: u.suspended,
+          createdAt: u.createdAt
+        })),
+        pendingKyc: diagnosticData.pendingKyc.map(u => ({
+          id: u.id,
+          email: u.email,
+          firstName: u.firstName,
+          lastName: u.lastName,
+          kycStatus: u.kycStatus,
+          kycIdFront: u.kycIdFront,
+          kycIdBack: u.kycIdBack,
+          kycSelfie: u.kycSelfie,
+          createdAt: u.createdAt
+        })),
+        transactions: diagnosticData.allTransactions.map(t => ({
+          id: t.id,
+          userId: t.userId,
+          type: t.type,
+          amount: t.amount,
+          fee: t.fee,
+          status: t.status,
+          country: t.country,
+          operator: t.operator,
+          customerName: t.customerName,
+          customerPhone: t.customerPhone,
+          description: t.description,
+          paydunyaToken: t.paydunyaToken,
+          createdAt: t.createdAt
+        })),
+        stats: diagnosticData.stats,
+        message: `Diagnostic avancé: ${diagnosticData.users.length} utilisateur(s), ${diagnosticData.pendingKyc.length} KYC en attente, ${diagnosticData.allTransactions.length} transaction(s)`
+      });
+    } catch (error: any) {
+      console.error("Advanced diagnostic error:", error);
+      res.status(500).json({
+        success: false,
+        error: "Erreur lors du diagnostic avancé",
+        message: error.message
+      });
+    }
+  });
+
   // Management routes
   app.post("/api/admin/promote", requireAdmin, async (req: Request, res: Response) => {
     try {

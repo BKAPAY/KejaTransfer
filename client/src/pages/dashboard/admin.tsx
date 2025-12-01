@@ -165,14 +165,13 @@ export default function Admin() {
         </div>
         <div className="flex gap-2 flex-wrap">
           <Button
-            onClick={handleDiagnostic}
-            disabled={isDiagnosing}
-            data-testid="button-diagnostic"
+            onClick={() => setLocation("/dashboard/diagnostic")}
+            data-testid="button-diagnostic-advanced"
             className="gap-2"
             variant="destructive"
           >
-            <AlertCircle className={`w-4 h-4 ${isDiagnosing ? "animate-pulse" : ""}`} />
-            {isDiagnosing ? "Diagnostic..." : "Diagnostic BD"}
+            <Database className="w-4 h-4" />
+            Diagnostic Avancé
           </Button>
           <Button
             onClick={handleSyncDatabase}
@@ -181,7 +180,6 @@ export default function Admin() {
             className="gap-2"
             variant="default"
           >
-            <Database className={`w-4 h-4 ${isSyncing ? "animate-pulse" : ""}`} />
             <RefreshCw className={`w-4 h-4 ${isSyncing ? "animate-spin" : ""}`} />
             {isSyncing ? "Synchronisation..." : "Synchroniser BD"}
           </Button>
