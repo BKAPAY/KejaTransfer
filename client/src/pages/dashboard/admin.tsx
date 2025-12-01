@@ -12,6 +12,7 @@ import type { User } from "@shared/schema";
 
 export default function Admin() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [activeTab, setActiveTab] = useState<"search" | "all">("all");
   const [, setLocation] = useLocation();
 
   const { data: stats, isLoading: statsLoading } = useQuery<{
@@ -24,19 +25,19 @@ export default function Admin() {
     refetchInterval: 5000,
   });
 
-  const { data: allUsers, isLoading: usersLoading } = useQuery<User[]>({
+  const { data: allUsers = [], isLoading: usersLoading } = useQuery<User[]>({
     queryKey: ["/api/admin/users"],
   });
 
-  const { data: searchResults, isLoading: searchLoading } = useQuery<User[]>({
+  const { data: searchResults = [], isLoading: searchLoading } = useQuery<User[]>({
     queryKey: ["/api/admin/search", searchQuery],
     queryFn: async () => {
-      if (!searchQuery) return allUsers || [];
+      if (!searchQuery) return [];
       const response = await fetch(`/api/admin/search?q=${encodeURIComponent(searchQuery)}`);
       if (!response.ok) throw new Error("Failed to search users");
       return response.json();
     },
-    enabled: true,
+    enabled: searchQuery.length > 0,
   });
 
   // Display filtered results if searching, otherwise show all users
@@ -165,31 +166,57 @@ export default function Admin() {
         </Card>
       </div>
 
-      {/* Recherche d'utilisateurs */}
+      {/* Gestion des utilisateurs - Onglets */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2">
-            <Search className="w-5 h-5" />
-            Rechercher Utilisateurs
-          </CardTitle>
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <CardTitle className="flex items-center gap-2">
+              <Users className="w-5 h-5" />
+              Gestion des Utilisateurs
+            </CardTitle>
+            <div className="flex gap-2">
+              <Button
+                variant={activeTab === "all" ? "default" : "outline"}
+                size="sm"
+                onClick={() => {
+                  setActiveTab("all");
+                  setSearchQuery("");
+                }}
+                data-testid="button-tab-all-users"
+              >
+                Tous les Utilisateurs ({allUsers.length})
+              </Button>
+              <Button
+                variant={activeTab === "search" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setActiveTab("search")}
+                data-testid="button-tab-search-users"
+              >
+                <Search className="w-4 h-4 mr-2" />
+                Rechercher
+              </Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex gap-2">
-            <Input
-              placeholder="Rechercher par token, email, nom ou prénom..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              data-testid="input-search-users"
-            />
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => setSearchQuery("")}
-              data-testid="button-clear-search"
-            >
-              Réinitialiser
-            </Button>
-          </div>
+          {activeTab === "search" && (
+            <div className="flex gap-2">
+              <Input
+                placeholder="Rechercher par token, email, nom ou prénom..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                data-testid="input-search-users"
+              />
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setSearchQuery("")}
+                data-testid="button-clear-search"
+              >
+                Réinitialiser
+              </Button>
+            </div>
+          )}
 
           {/* Liste des utilisateurs */}
           {isLoading ? (
