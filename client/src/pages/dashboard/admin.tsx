@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Users, UserCheck, TrendingDown, TrendingUp, Search, Settings, Globe } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useState } from "react";
 import { useLocation } from "wouter";
 import type { User } from "@shared/schema";
@@ -191,21 +192,21 @@ export default function Admin() {
           </div>
 
           {/* Liste des utilisateurs */}
-          <div className="space-y-3">
-            {isLoading ? (
-              <div className="space-y-2">
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <div key={i} className="flex items-center gap-4">
-                    <Skeleton className="h-10 w-10 rounded-full" />
-                    <div className="flex-1 space-y-1">
-                      <Skeleton className="h-4 w-32" />
-                      <Skeleton className="h-3 w-24" />
-                    </div>
+          {isLoading ? (
+            <div className="space-y-2">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="flex items-center gap-4">
+                  <Skeleton className="h-10 w-10 rounded-full" />
+                  <div className="flex-1 space-y-1">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-3 w-24" />
                   </div>
-                ))}
-              </div>
-            ) : displayedUsers && displayedUsers.length > 0 ? (
-              <div className="border rounded-lg divide-y">
+                </div>
+              ))}
+            </div>
+          ) : displayedUsers && displayedUsers.length > 0 ? (
+            <ScrollArea className="h-[600px] border rounded-lg">
+              <div className="divide-y pr-4">
                 {displayedUsers.map((user) => (
                   <div
                     key={user.id}
@@ -246,14 +247,14 @@ export default function Admin() {
                   </div>
                 ))}
               </div>
-            ) : (
-              <div className="text-center py-8">
-                <p className="text-muted-foreground">
-                  {searchQuery ? "Aucun utilisateur trouvé" : "Aucun utilisateur sur la plateforme"}
-                </p>
-              </div>
-            )}
-          </div>
+            </ScrollArea>
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">
+                {searchQuery ? "Aucun utilisateur trouvé" : "Aucun utilisateur sur la plateforme"}
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
