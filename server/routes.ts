@@ -3386,10 +3386,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Admin routes
+  // Admin routes - with no-cache headers to ensure fresh data
   app.get("/api/admin/stats", requireAdmin, async (req: Request, res: Response) => {
     try {
+      res.set({
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      });
       const stats = await storage.getAdminStats();
+      console.log("[Admin Stats] Fetched:", JSON.stringify(stats));
       res.json(stats);
     } catch (error: any) {
       console.error("Admin stats error:", error);
@@ -3399,7 +3405,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/admin/users", requireAdmin, async (req: Request, res: Response) => {
     try {
+      res.set({
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      });
       const users = await storage.getAllUsers();
+      console.log("[Admin Users] Fetched", users.length, "users from database");
       res.json(users);
     } catch (error: any) {
       console.error("Admin users error:", error);
@@ -3409,6 +3421,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/admin/search", requireAdmin, async (req: Request, res: Response) => {
     try {
+      res.set({
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      });
       const query = req.query.q as string;
       if (!query || query.length === 0) {
         return res.json([]);
@@ -3418,6 +3435,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Admin search error:", error);
       res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
+  // Force sync endpoint - returns all data in one call like the diagnostic
+  app.get("/api/admin/force-sync", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      res.set({
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      });
+      
+      const users = await storage.getAllUsers();
+      const stats = await storage.getAdminStats();
+      
+      console.log("[Force Sync] Fetched", users.length, "users and stats from database");
+      
+      res.json({
+        success: true,
+        timestamp: new Date().toISOString(),
+        users: users,
+        stats: stats,
+        message: `Synchronisation réussie. ${users.length} utilisateur(s) chargé(s).`
+      });
+    } catch (error: any) {
+      console.error("Force sync error:", error);
+      res.status(500).json({ 
+        success: false,
+        error: "Erreur de synchronisation",
+        message: error.message 
+      });
     }
   });
 

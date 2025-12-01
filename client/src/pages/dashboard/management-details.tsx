@@ -584,7 +584,7 @@ export function ProfileDialog({ userId, onOpenChange }: { userId: string; onOpen
       
       toast({
         title: "Succès",
-        description: user.verified ? "Compte dévérifiée" : "Compte vérifiée",
+        description: user.kycStatus === "verified" ? "Compte dévérifié" : "Compte vérifié",
       });
       
       await refetch();
@@ -650,8 +650,8 @@ export function ProfileDialog({ userId, onOpenChange }: { userId: string; onOpen
             <div>
               <label className="text-xs font-medium text-muted-foreground">Vérification de compte</label>
               <div className="mt-2 flex items-center gap-2">
-                <Badge variant={user.verified ? "default" : "secondary"}>
-                  {user.verified ? "Vérifié" : "Non vérifié"}
+                <Badge variant={user.kycStatus === "verified" ? "default" : "secondary"}>
+                  {user.kycStatus === "verified" ? "Vérifié" : "Non vérifié"}
                 </Badge>
                 <Button 
                   size="sm" 
@@ -659,7 +659,7 @@ export function ProfileDialog({ userId, onOpenChange }: { userId: string; onOpen
                   disabled={toggling}
                   data-testid="button-toggle-verification"
                 >
-                  {toggling ? "..." : user.verified ? "Dévérifier" : "Vérifier"}
+                  {toggling ? "..." : user.kycStatus === "verified" ? "Dévérifier" : "Vérifier"}
                 </Button>
               </div>
             </div>

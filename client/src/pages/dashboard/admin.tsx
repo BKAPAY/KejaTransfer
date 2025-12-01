@@ -51,21 +51,37 @@ export default function Admin() {
   const handleSyncDatabase = async () => {
     setIsSyncing(true);
     try {
-      await queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
-      await queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
-      await queryClient.invalidateQueries({ queryKey: ["/api/admin/search"] });
-      
-      await queryClient.refetchQueries({ queryKey: ["/api/admin/users"] });
-      await queryClient.refetchQueries({ queryKey: ["/api/admin/stats"] });
-      
-      toast({
-        title: "Synchronisation réussie",
-        description: "Les données ont été rechargées depuis la base de données",
+      // Use the force-sync endpoint to get fresh data directly from DB
+      const response = await fetch("/api/admin/force-sync", {
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
       });
-    } catch (error) {
+      
+      if (!response.ok) throw new Error("Sync failed");
+      
+      const syncData = await response.json();
+      
+      if (syncData.success) {
+        // Update the query cache with the fresh data
+        queryClient.setQueryData(["/api/admin/users"], syncData.users);
+        queryClient.setQueryData(["/api/admin/stats"], syncData.stats);
+        
+        // Also invalidate to ensure future fetches get fresh data
+        await queryClient.invalidateQueries({ queryKey: ["/api/admin/search"] });
+        
+        toast({
+          title: "Synchronisation réussie",
+          description: syncData.message,
+        });
+      } else {
+        throw new Error(syncData.message || "Sync failed");
+      }
+    } catch (error: any) {
       toast({
         title: "Erreur de synchronisation",
-        description: "Impossible de recharger les données",
+        description: error.message || "Impossible de recharger les données",
         variant: "destructive",
       });
     } finally {
