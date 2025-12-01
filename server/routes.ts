@@ -3421,6 +3421,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Database diagnostic endpoint for admin
+  app.get("/api/admin/database-diagnostic", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const users = await storage.getAllUsers();
+      const stats = await storage.getAdminStats();
+      
+      const diagnostic = {
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV || "unknown",
+        database: {
+          connected: true,
+          usersCount: users.length,
+          usersDetails: users.map(u => ({
+            id: u.id,
+            email: u.email,
+            firstName: u.firstName,
+            lastName: u.lastName,
+            isAdmin: u.isAdmin,
+            kycStatus: u.kycStatus,
+            createdAt: u.createdAt
+          }))
+        },
+        stats: stats,
+        message: `Base de données connectée. ${users.length} utilisateur(s) trouvé(s).`
+      };
+      
+      console.log("[Diagnostic] Database check:", diagnostic.message);
+      res.json(diagnostic);
+    } catch (error: any) {
+      console.error("Database diagnostic error:", error);
+      res.status(500).json({
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV || "unknown",
+        database: {
+          connected: false,
+          error: error.message
+        },
+        message: "Erreur de connexion à la base de données"
+      });
+    }
+  });
+
   // Management routes
   app.post("/api/admin/promote", requireAdmin, async (req: Request, res: Response) => {
     try {

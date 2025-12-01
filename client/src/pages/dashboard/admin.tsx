@@ -3,7 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
-import { Users, UserCheck, TrendingDown, TrendingUp, Search, Settings, Globe, RefreshCw, Database } from "lucide-react";
+import { Users, UserCheck, TrendingDown, TrendingUp, Search, Settings, Globe, RefreshCw, Database, AlertCircle, CheckCircle2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -12,10 +12,39 @@ import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import type { User } from "@shared/schema";
 
+interface DiagnosticResult {
+  timestamp: string;
+  environment: string;
+  database: {
+    connected: boolean;
+    usersCount?: number;
+    usersDetails?: Array<{
+      id: string;
+      email: string;
+      firstName: string;
+      lastName: string;
+      isAdmin: boolean;
+      kycStatus: string;
+      createdAt: string;
+    }>;
+    error?: string;
+  };
+  stats?: {
+    totalUsers: number;
+    verifiedUsers: number;
+    totalDeposits: number;
+    totalWithdrawals: number;
+  };
+  message: string;
+}
+
 export default function Admin() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"search" | "all">("all");
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isDiagnosing, setIsDiagnosing] = useState(false);
+  const [diagnosticResult, setDiagnosticResult] = useState<DiagnosticResult | null>(null);
+  const [showDiagnostic, setShowDiagnostic] = useState(false);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
@@ -41,6 +70,35 @@ export default function Admin() {
       });
     } finally {
       setIsSyncing(false);
+    }
+  };
+
+  const handleDiagnostic = async () => {
+    setIsDiagnosing(true);
+    setShowDiagnostic(true);
+    try {
+      const response = await fetch("/api/admin/database-diagnostic");
+      if (!response.ok) throw new Error("Diagnostic failed");
+      const result = await response.json();
+      setDiagnosticResult(result);
+      toast({
+        title: "Diagnostic terminé",
+        description: result.message,
+      });
+    } catch (error) {
+      toast({
+        title: "Erreur de diagnostic",
+        description: "Impossible d'exécuter le diagnostic",
+        variant: "destructive",
+      });
+      setDiagnosticResult({
+        timestamp: new Date().toISOString(),
+        environment: "unknown",
+        database: { connected: false, error: "Erreur de connexion" },
+        message: "Erreur lors du diagnostic"
+      });
+    } finally {
+      setIsDiagnosing(false);
     }
   };
 
@@ -90,6 +148,16 @@ export default function Admin() {
           <p className="text-sm text-muted-foreground">Gestion et surveillance de la plateforme</p>
         </div>
         <div className="flex gap-2 flex-wrap">
+          <Button
+            onClick={handleDiagnostic}
+            disabled={isDiagnosing}
+            data-testid="button-diagnostic"
+            className="gap-2"
+            variant="destructive"
+          >
+            <AlertCircle className={`w-4 h-4 ${isDiagnosing ? "animate-pulse" : ""}`} />
+            {isDiagnosing ? "Diagnostic..." : "Diagnostic BD"}
+          </Button>
           <Button
             onClick={handleSyncDatabase}
             disabled={isSyncing}
@@ -206,6 +274,93 @@ export default function Admin() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Diagnostic de Base de Données */}
+      {showDiagnostic && (
+        <Card className="border-2 border-orange-500">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <CardTitle className="flex items-center gap-2">
+                {diagnosticResult?.database.connected ? (
+                  <CheckCircle2 className="w-5 h-5 text-green-600" />
+                ) : (
+                  <AlertCircle className="w-5 h-5 text-red-600" />
+                )}
+                Diagnostic de la Base de Données
+              </CardTitle>
+              <Button variant="ghost" size="sm" onClick={() => setShowDiagnostic(false)}>
+                Fermer
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {isDiagnosing ? (
+              <div className="flex items-center gap-2">
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                <span>Exécution du diagnostic...</span>
+              </div>
+            ) : diagnosticResult ? (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="font-medium">Environnement:</span>{" "}
+                    <Badge variant={diagnosticResult.environment === "production" ? "destructive" : "secondary"}>
+                      {diagnosticResult.environment}
+                    </Badge>
+                  </div>
+                  <div>
+                    <span className="font-medium">Connexion:</span>{" "}
+                    <Badge variant={diagnosticResult.database.connected ? "default" : "destructive"}>
+                      {diagnosticResult.database.connected ? "Connectée" : "Erreur"}
+                    </Badge>
+                  </div>
+                  <div>
+                    <span className="font-medium">Timestamp:</span>{" "}
+                    {new Date(diagnosticResult.timestamp).toLocaleString("fr-FR")}
+                  </div>
+                  <div>
+                    <span className="font-medium">Utilisateurs dans BD:</span>{" "}
+                    <span className="text-xl font-bold text-primary">{diagnosticResult.database.usersCount || 0}</span>
+                  </div>
+                </div>
+                
+                <div className="p-3 bg-muted rounded-lg">
+                  <p className="font-medium mb-2">{diagnosticResult.message}</p>
+                  {diagnosticResult.database.error && (
+                    <p className="text-red-600 text-sm">Erreur: {diagnosticResult.database.error}</p>
+                  )}
+                </div>
+
+                {diagnosticResult.database.usersDetails && diagnosticResult.database.usersDetails.length > 0 && (
+                  <div>
+                    <h4 className="font-medium mb-2">Utilisateurs trouvés dans la base de données:</h4>
+                    <ScrollArea className="h-[200px] border rounded-lg">
+                      <div className="divide-y">
+                        {diagnosticResult.database.usersDetails.map((user, index) => (
+                          <div key={user.id} className="p-3 flex items-center justify-between gap-4">
+                            <div>
+                              <p className="font-medium">{user.firstName} {user.lastName}</p>
+                              <p className="text-sm text-muted-foreground">{user.email}</p>
+                            </div>
+                            <div className="flex gap-2">
+                              <Badge variant={user.kycStatus === "verified" ? "default" : "secondary"}>
+                                {user.kycStatus === "verified" ? "Vérifié" : "Non vérifié"}
+                              </Badge>
+                              {user.isAdmin && <Badge variant="destructive">Admin</Badge>}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-muted-foreground">Cliquez sur "Diagnostic BD" pour analyser la base de données.</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Gestion des utilisateurs - Onglets */}
       <Card>
