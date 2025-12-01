@@ -2,18 +2,47 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
-import { Users, UserCheck, TrendingDown, TrendingUp, Search, Settings, Globe } from "lucide-react";
+import { queryClient } from "@/lib/queryClient";
+import { Users, UserCheck, TrendingDown, TrendingUp, Search, Settings, Globe, RefreshCw, Database } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useState } from "react";
 import { useLocation } from "wouter";
+import { useToast } from "@/hooks/use-toast";
 import type { User } from "@shared/schema";
 
 export default function Admin() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"search" | "all">("all");
+  const [isSyncing, setIsSyncing] = useState(false);
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
+
+  const handleSyncDatabase = async () => {
+    setIsSyncing(true);
+    try {
+      await queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/admin/search"] });
+      
+      await queryClient.refetchQueries({ queryKey: ["/api/admin/users"] });
+      await queryClient.refetchQueries({ queryKey: ["/api/admin/stats"] });
+      
+      toast({
+        title: "Synchronisation réussie",
+        description: "Les données ont été rechargées depuis la base de données",
+      });
+    } catch (error) {
+      toast({
+        title: "Erreur de synchronisation",
+        description: "Impossible de recharger les données",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const { data: stats, isLoading: statsLoading } = useQuery<{
     totalUsers: number;
@@ -60,7 +89,18 @@ export default function Admin() {
           <h1 className="text-2xl font-bold text-foreground mb-1">Panneau Administrateur</h1>
           <p className="text-sm text-muted-foreground">Gestion et surveillance de la plateforme</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <Button
+            onClick={handleSyncDatabase}
+            disabled={isSyncing}
+            data-testid="button-sync-database"
+            className="gap-2"
+            variant="default"
+          >
+            <Database className={`w-4 h-4 ${isSyncing ? "animate-pulse" : ""}`} />
+            <RefreshCw className={`w-4 h-4 ${isSyncing ? "animate-spin" : ""}`} />
+            {isSyncing ? "Synchronisation..." : "Synchroniser BD"}
+          </Button>
           <Button
             onClick={() => setLocation("/dashboard/country-operator-config")}
             data-testid="button-country-operator-config"
@@ -74,6 +114,7 @@ export default function Admin() {
             onClick={() => setLocation("/dashboard/management")}
             data-testid="button-management"
             className="gap-2"
+            variant="outline"
           >
             <Settings className="w-4 h-4" />
             Gestionnaire
