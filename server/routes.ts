@@ -580,19 +580,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // KYC Submit
+  // KYC Submit - No file size or type restrictions
   app.post("/api/kyc/submit", requireAuth, async (req: Request, res: Response) => {
     try {
       const { kycIdFront, kycIdBack, kycSelfie } = req.body;
 
       if (!kycIdFront || !kycIdBack || !kycSelfie) {
         return res.status(400).json({ error: "Tous les documents sont requis" });
-      }
-
-      // Validate base64 strings aren't too large (limit to 5MB per file)
-      const maxSize = 5 * 1024 * 1024;
-      if (kycIdFront.length > maxSize || kycIdBack.length > maxSize || kycSelfie.length > maxSize) {
-        return res.status(400).json({ error: "Les fichiers sont trop volumineux" });
       }
 
       const user = await storage.submitKyc(req.session.userId!, {

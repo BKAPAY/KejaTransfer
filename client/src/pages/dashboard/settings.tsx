@@ -24,35 +24,6 @@ export default function Settings() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const allowedTypes = [
-      "image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp", "image/bmp", "image/tiff",
-      "application/pdf",
-      "image/heic", "image/heif"
-    ];
-    
-    const isAllowedType = allowedTypes.includes(file.type) || 
-                          file.type.startsWith("image/") || 
-                          file.name.toLowerCase().endsWith(".heic") ||
-                          file.name.toLowerCase().endsWith(".heif");
-
-    if (!isAllowedType) {
-      toast({
-        title: "Erreur",
-        description: "Format de fichier non supporté. Utilisez une image (JPG, PNG, etc.) ou un PDF.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (file.size > 10 * 1024 * 1024) {
-      toast({
-        title: "Erreur",
-        description: "Le fichier ne doit pas depasser 10 Mo",
-        variant: "destructive",
-      });
-      return;
-    }
-
     const reader = new FileReader();
     reader.onload = (event) => {
       const fileData = event.target?.result as string;
