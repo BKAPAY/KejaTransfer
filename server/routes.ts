@@ -3524,6 +3524,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log("[Advanced Diagnostic] Fetched", diagnosticData.users.length, "users,", 
                   diagnosticData.pendingKyc.length, "pending KYC,",
+                  diagnosticData.verifiedKyc.length, "verified KYC,",
                   diagnosticData.allTransactions.length, "transactions");
       
       res.json({
@@ -3553,6 +3554,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           kycSelfie: u.kycSelfie,
           createdAt: u.createdAt
         })),
+        verifiedKyc: diagnosticData.verifiedKyc.map(u => ({
+          id: u.id,
+          email: u.email,
+          firstName: u.firstName,
+          lastName: u.lastName,
+          kycStatus: u.kycStatus,
+          kycIdFront: u.kycIdFront,
+          kycIdBack: u.kycIdBack,
+          kycSelfie: u.kycSelfie,
+          createdAt: u.createdAt
+        })),
         transactions: diagnosticData.allTransactions.map(t => ({
           id: t.id,
           userId: t.userId,
@@ -3569,7 +3581,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           createdAt: t.createdAt
         })),
         stats: diagnosticData.stats,
-        message: `Diagnostic avancé: ${diagnosticData.users.length} utilisateur(s), ${diagnosticData.pendingKyc.length} KYC en attente, ${diagnosticData.allTransactions.length} transaction(s)`
+        message: `Diagnostic avancé: ${diagnosticData.users.length} utilisateur(s), ${diagnosticData.pendingKyc.length} KYC en attente, ${diagnosticData.verifiedKyc.length} KYC vérifiés, ${diagnosticData.allTransactions.length} transaction(s)`
       });
     } catch (error: any) {
       console.error("Advanced diagnostic error:", error);

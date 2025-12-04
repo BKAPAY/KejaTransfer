@@ -24,19 +24,30 @@ export default function Settings() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith("image/")) {
+    const allowedTypes = [
+      "image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp", "image/bmp", "image/tiff",
+      "application/pdf",
+      "image/heic", "image/heif"
+    ];
+    
+    const isAllowedType = allowedTypes.includes(file.type) || 
+                          file.type.startsWith("image/") || 
+                          file.name.toLowerCase().endsWith(".heic") ||
+                          file.name.toLowerCase().endsWith(".heif");
+
+    if (!isAllowedType) {
       toast({
         title: "Erreur",
-        description: "Veuillez sélectionner une image",
+        description: "Format de fichier non supporté. Utilisez une image (JPG, PNG, etc.) ou un PDF.",
         variant: "destructive",
       });
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
+    if (file.size > 10 * 1024 * 1024) {
       toast({
         title: "Erreur",
-        description: "L'image ne doit pas dépasser 5 Mo",
+        description: "Le fichier ne doit pas depasser 10 Mo",
         variant: "destructive",
       });
       return;
@@ -44,10 +55,10 @@ export default function Settings() {
 
     const reader = new FileReader();
     reader.onload = (event) => {
-      const imageData = event.target?.result as string;
-      if (type === "front") setIdFrontData(imageData);
-      else if (type === "back") setIdBackData(imageData);
-      else if (type === "selfie") setSelfieData(imageData);
+      const fileData = event.target?.result as string;
+      if (type === "front") setIdFrontData(fileData);
+      else if (type === "back") setIdBackData(fileData);
+      else if (type === "selfie") setSelfieData(fileData);
     };
     reader.readAsDataURL(file);
   };

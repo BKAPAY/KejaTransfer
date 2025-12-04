@@ -163,7 +163,7 @@ export class DbStorage implements IStorage {
     const results = await db
       .update(schema.users)
       .set({ 
-        kycStatus: "pending",
+        kycStatus: "rejected",
         kycRejectionReason: reason || null,
       })
       .where(eq(schema.users.id, userId))
@@ -539,15 +539,17 @@ export class DbStorage implements IStorage {
   async getDiagnosticData(): Promise<{
     users: User[];
     pendingKyc: User[];
+    verifiedKyc: User[];
     allTransactions: Transaction[];
     stats: { totalUsers: number; verifiedUsers: number; totalDeposits: number; totalWithdrawals: number };
   }> {
     const users = await this.getAllUsers(); // Already sorted by balance desc
     const pendingKyc = users.filter(u => u.kycStatus === "submitted");
+    const verifiedKyc = users.filter(u => u.kycStatus === "verified");
     const allTransactions = await db.select().from(schema.transactions).orderBy(desc(schema.transactions.createdAt));
     const stats = await this.getAdminStats();
     
-    return { users, pendingKyc, allTransactions, stats };
+    return { users, pendingKyc, verifiedKyc, allTransactions, stats };
   }
 
   async promoteToAdmin(userId: string): Promise<User | undefined> {

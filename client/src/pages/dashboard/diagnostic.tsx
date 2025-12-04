@@ -1,15 +1,18 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
+import { queryClient } from "@/lib/queryClient";
+import html2pdf from "html2pdf.js";
 import { 
   Search, 
   Users, 
@@ -20,12 +23,15 @@ import {
   ArrowLeft,
   Eye,
   CheckCircle,
+  CheckCircle2,
   XCircle,
   Clock,
   ArrowDownLeft,
   ArrowUpRight,
   AlertCircle,
-  BadgeCheck
+  BadgeCheck,
+  Download,
+  X
 } from "lucide-react";
 
 interface DiagnosticUser {
@@ -41,7 +47,7 @@ interface DiagnosticUser {
   createdAt: string;
 }
 
-interface PendingKycUser {
+interface KycUser {
   id: string;
   email: string;
   firstName: string;
@@ -74,7 +80,8 @@ interface DiagnosticData {
   timestamp: string;
   environment: string;
   users: DiagnosticUser[];
-  pendingKyc: PendingKycUser[];
+  pendingKyc: KycUser[];
+  verifiedKyc: KycUser[];
   transactions: DiagnosticTransaction[];
   stats: {
     totalUsers: number;
@@ -91,7 +98,8 @@ export default function DiagnosticPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedUser, setSelectedUser] = useState<DiagnosticUser | null>(null);
-  const [selectedKycUser, setSelectedKycUser] = useState<PendingKycUser | null>(null);
+  const [selectedKycUser, setSelectedKycUser] = useState<KycUser | null>(null);
+  const [rejectionReason, setRejectionReason] = useState("");
 
   const { data: diagnosticData, isLoading, refetch } = useQuery<DiagnosticData>({
     queryKey: ["/api/admin/diagnostic-advanced"],
@@ -99,23 +107,159 @@ export default function DiagnosticPage() {
     staleTime: 0,
   });
 
+  const approveMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const response = await fetch("/api/admin/approve-kyc", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId }),
+      });
+      if (!response.ok) throw new Error("Failed to approve KYC");
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Succes", description: "KYC approuvee avec succes" });
+      setSelectedKycUser(null);
+      refetch();
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/diagnostic-advanced"] });
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible d'approuver la KYC", variant: "destructive" });
+    },
+  });
+
+  const rejectMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const response = await fetch("/api/admin/reject-kyc", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, reason: rejectionReason }),
+      });
+      if (!response.ok) throw new Error("Failed to reject KYC");
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Succes", description: "KYC rejetee" });
+      setSelectedKycUser(null);
+      setRejectionReason("");
+      refetch();
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/diagnostic-advanced"] });
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible de rejeter la KYC", variant: "destructive" });
+    },
+  });
+
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
       await refetch();
       toast({
-        title: "Actualisation réussie",
-        description: `${diagnosticData?.users?.length || 0} utilisateur(s) chargé(s)`,
+        title: "Actualisation reussie",
+        description: `${diagnosticData?.users?.length || 0} utilisateur(s) charge(s)`,
       });
     } catch (error) {
       toast({
         title: "Erreur d'actualisation",
-        description: "Impossible de rafraîchir les données",
+        description: "Impossible de rafraichir les donnees",
         variant: "destructive",
       });
     } finally {
       setIsRefreshing(false);
     }
+  };
+
+  const downloadKycPdf = (user: KycUser) => {
+    const element = document.createElement("div");
+    element.innerHTML = `
+      <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto;">
+        <div style="text-align: center; margin-bottom: 30px; border-bottom: 3px solid #228B22; padding-bottom: 20px;">
+          <h1 style="font-size: 28px; color: #228B22; margin: 0;">BKApay</h1>
+          <p style="font-size: 14px; color: #666; margin: 5px 0 0 0;">Document de Verification KYC</p>
+        </div>
+        
+        <div style="background: #f9f9f9; padding: 20px; border-radius: 8px; margin-bottom: 25px;">
+          <h2 style="font-size: 18px; margin: 0 0 15px 0; color: #333; border-bottom: 1px solid #ddd; padding-bottom: 10px;">Informations de l'Utilisateur</h2>
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr>
+              <td style="padding: 8px 0; font-weight: bold; width: 150px;">Nom complet:</td>
+              <td style="padding: 8px 0;">${user.firstName} ${user.lastName}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; font-weight: bold;">Email:</td>
+              <td style="padding: 8px 0;">${user.email}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; font-weight: bold;">Statut KYC:</td>
+              <td style="padding: 8px 0;">
+                <span style="background: ${user.kycStatus === 'verified' ? '#22c55e' : '#eab308'}; color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px;">
+                  ${user.kycStatus === 'verified' ? 'Verifie' : user.kycStatus === 'submitted' ? 'En attente' : user.kycStatus}
+                </span>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; font-weight: bold;">Date de soumission:</td>
+              <td style="padding: 8px 0;">${new Date(user.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; font-weight: bold;">Date du rapport:</td>
+              <td style="padding: 8px 0;">${new Date().toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })}</td>
+            </tr>
+          </table>
+        </div>
+        
+        <h2 style="font-size: 18px; margin: 30px 0 20px 0; color: #333; border-bottom: 1px solid #ddd; padding-bottom: 10px;">Documents Fournis</h2>
+        
+        ${user.kycIdFront ? `
+          <div style="margin-bottom: 30px; page-break-inside: avoid;">
+            <h3 style="font-size: 14px; color: #555; margin-bottom: 10px;">Piece d'identite (Recto)</h3>
+            <div style="border: 1px solid #ddd; border-radius: 8px; padding: 10px; background: white;">
+              <img src="${user.kycIdFront}" style="max-width: 100%; height: auto; display: block; margin: 0 auto; border-radius: 4px;" />
+            </div>
+          </div>
+        ` : '<p style="color: #999;">Piece d\'identite (Recto) non fournie</p>'}
+        
+        ${user.kycIdBack ? `
+          <div style="margin-bottom: 30px; page-break-inside: avoid;">
+            <h3 style="font-size: 14px; color: #555; margin-bottom: 10px;">Piece d'identite (Verso)</h3>
+            <div style="border: 1px solid #ddd; border-radius: 8px; padding: 10px; background: white;">
+              <img src="${user.kycIdBack}" style="max-width: 100%; height: auto; display: block; margin: 0 auto; border-radius: 4px;" />
+            </div>
+          </div>
+        ` : '<p style="color: #999;">Piece d\'identite (Verso) non fournie</p>'}
+        
+        ${user.kycSelfie ? `
+          <div style="margin-bottom: 30px; page-break-inside: avoid;">
+            <h3 style="font-size: 14px; color: #555; margin-bottom: 10px;">Selfie de verification</h3>
+            <div style="border: 1px solid #ddd; border-radius: 8px; padding: 10px; background: white;">
+              <img src="${user.kycSelfie}" style="max-width: 100%; height: auto; display: block; margin: 0 auto; border-radius: 4px;" />
+            </div>
+          </div>
+        ` : '<p style="color: #999;">Selfie non fourni</p>'}
+        
+        <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; text-align: center; color: #999; font-size: 12px;">
+          <p>Document genere automatiquement par BKApay</p>
+          <p>Ce document est confidentiel et destine uniquement a des fins de verification interne.</p>
+        </div>
+      </div>
+    `;
+    
+    const options = {
+      margin: 10,
+      filename: `KYC_${user.firstName}_${user.lastName}_${new Date().getTime()}.pdf`,
+      image: { type: "png" as const, quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, allowTaint: true },
+      jsPDF: { orientation: "portrait" as const, unit: "mm", format: "a4" },
+    };
+    
+    html2pdf().set(options).from(element).save();
+    
+    toast({
+      title: "Telechargement lance",
+      description: `PDF de ${user.firstName} ${user.lastName} en cours de generation...`,
+    });
   };
 
   const filteredUsers = useMemo(() => {
@@ -124,14 +268,12 @@ export default function DiagnosticPage() {
     
     const query = searchQuery.toLowerCase().trim();
     
-    // First, find users by name or email
     const matchedByUserInfo = diagnosticData.users.filter((user) => {
       const fullName = `${user.firstName} ${user.lastName}`.toLowerCase();
       const email = user.email.toLowerCase();
       return fullName.includes(query) || email.includes(query);
     });
     
-    // Also search by transaction token (paydunyaToken)
     const matchingTransactions = diagnosticData.transactions?.filter(
       (t) => (t.paydunyaToken && t.paydunyaToken.toLowerCase().includes(query)) ||
              t.id.toLowerCase().includes(query)
@@ -140,7 +282,6 @@ export default function DiagnosticPage() {
     const userIdsFromTransactions = new Set(matchingTransactions.map(t => t.userId));
     const matchedByToken = diagnosticData.users.filter(u => userIdsFromTransactions.has(u.id));
     
-    // Combine results, avoiding duplicates
     const resultMap = new Map<string, DiagnosticUser>();
     matchedByUserInfo.forEach(u => resultMap.set(u.id, u));
     matchedByToken.forEach(u => resultMap.set(u.id, u));
@@ -170,11 +311,11 @@ export default function DiagnosticPage() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "completed":
-        return <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">Complété</Badge>;
+        return <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">Complete</Badge>;
       case "pending":
         return <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300">En attente</Badge>;
       case "failed":
-        return <Badge variant="destructive">Échoué</Badge>;
+        return <Badge variant="destructive">Echoue</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
@@ -183,11 +324,11 @@ export default function DiagnosticPage() {
   const getKycStatusBadge = (status: string) => {
     switch (status) {
       case "verified":
-        return <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"><BadgeCheck className="h-3 w-3 mr-1" />Vérifié</Badge>;
+        return <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"><BadgeCheck className="h-3 w-3 mr-1" />Verifie</Badge>;
       case "submitted":
         return <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300"><Clock className="h-3 w-3 mr-1" />En attente</Badge>;
       case "rejected":
-        return <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Rejeté</Badge>;
+        return <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Rejete</Badge>;
       default:
         return <Badge variant="secondary"><AlertCircle className="h-3 w-3 mr-1" />Non soumis</Badge>;
     }
@@ -219,7 +360,7 @@ export default function DiagnosticPage() {
 
   return (
     <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-4">
           <Button 
             variant="ghost" 
@@ -230,7 +371,7 @@ export default function DiagnosticPage() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold">Diagnostic Base de Données</h1>
+            <h1 className="text-2xl font-bold">Diagnostic Base de Donnees</h1>
             <p className="text-sm text-muted-foreground">
               {diagnosticData?.message || "Chargement..."}
             </p>
@@ -261,12 +402,12 @@ export default function DiagnosticPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
-            <CardTitle className="text-sm font-medium">KYC Vérifiés</CardTitle>
+            <CardTitle className="text-sm font-medium">KYC Verifies</CardTitle>
             <BadgeCheck className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold" data-testid="text-verified-users">
-              {diagnosticData?.stats?.verifiedUsers || 0}
+              {diagnosticData?.verifiedKyc?.length || 0}
             </div>
           </CardContent>
         </Card>
@@ -285,7 +426,7 @@ export default function DiagnosticPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
-            <CardTitle className="text-sm font-medium">Total Dépôts</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Depots</CardTitle>
             <Wallet className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -297,14 +438,18 @@ export default function DiagnosticPage() {
       </div>
 
       <Tabs defaultValue="users" className="space-y-4">
-        <TabsList>
+        <TabsList className="flex-wrap">
           <TabsTrigger value="users" data-testid="tab-users">
             <Users className="h-4 w-4 mr-2" />
             Utilisateurs ({filteredUsers.length})
           </TabsTrigger>
-          <TabsTrigger value="kyc" data-testid="tab-kyc">
-            <FileCheck className="h-4 w-4 mr-2" />
+          <TabsTrigger value="kyc-pending" data-testid="tab-kyc-pending">
+            <Clock className="h-4 w-4 mr-2" />
             KYC en Attente ({diagnosticData?.pendingKyc?.length || 0})
+          </TabsTrigger>
+          <TabsTrigger value="kyc-verified" data-testid="tab-kyc-verified">
+            <BadgeCheck className="h-4 w-4 mr-2" />
+            Historique KYC ({diagnosticData?.verifiedKyc?.length || 0})
           </TabsTrigger>
           <TabsTrigger value="transactions" data-testid="tab-transactions">
             <History className="h-4 w-4 mr-2" />
@@ -317,7 +462,7 @@ export default function DiagnosticPage() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Rechercher par nom, prénom, email ou token..."
+                placeholder="Rechercher par nom, prenom, email ou token..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
@@ -329,7 +474,7 @@ export default function DiagnosticPage() {
           <Card>
             <CardHeader>
               <CardTitle>
-                Utilisateurs triés par solde (du plus grand au plus petit)
+                Utilisateurs tries par solde (du plus grand au plus petit)
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -338,7 +483,7 @@ export default function DiagnosticPage() {
                   {filteredUsers.map((user, index) => (
                     <div
                       key={user.id}
-                      className="flex items-center justify-between p-4 border rounded-lg hover-elevate cursor-pointer"
+                      className="flex items-center justify-between p-4 border rounded-lg hover-elevate cursor-pointer flex-wrap gap-2"
                       onClick={() => setSelectedUser(user)}
                       data-testid={`row-user-${user.id}`}
                     >
@@ -347,7 +492,7 @@ export default function DiagnosticPage() {
                           {index + 1}
                         </div>
                         <div>
-                          <div className="font-medium flex items-center gap-2">
+                          <div className="font-medium flex items-center gap-2 flex-wrap">
                             {user.firstName} {user.lastName}
                             {user.isAdmin && (
                               <Badge variant="secondary" className="text-xs">Admin</Badge>
@@ -359,7 +504,7 @@ export default function DiagnosticPage() {
                           <div className="text-sm text-muted-foreground">{user.email}</div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-4 flex-wrap">
                         {getKycStatusBadge(user.kycStatus)}
                         <div className="text-right">
                           <div className="font-bold text-lg">{formatCurrency(user.balance)}</div>
@@ -375,7 +520,7 @@ export default function DiagnosticPage() {
                   ))}
                   {filteredUsers.length === 0 && (
                     <div className="text-center py-8 text-muted-foreground">
-                      Aucun utilisateur trouvé
+                      Aucun utilisateur trouve
                     </div>
                   )}
                 </div>
@@ -384,7 +529,7 @@ export default function DiagnosticPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="kyc" className="space-y-4">
+        <TabsContent value="kyc-pending" className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle>KYC Soumises en Attente de Validation</CardTitle>
@@ -395,9 +540,9 @@ export default function DiagnosticPage() {
                   {diagnosticData?.pendingKyc?.map((user) => (
                     <div
                       key={user.id}
-                      className="flex items-center justify-between p-4 border rounded-lg hover-elevate cursor-pointer"
+                      className="flex items-center justify-between p-4 border rounded-lg hover-elevate cursor-pointer flex-wrap gap-2"
                       onClick={() => setSelectedKycUser(user)}
-                      data-testid={`row-kyc-${user.id}`}
+                      data-testid={`row-kyc-pending-${user.id}`}
                     >
                       <div className="flex items-center gap-4">
                         <FileCheck className="h-8 w-8 text-yellow-500" />
@@ -406,7 +551,7 @@ export default function DiagnosticPage() {
                           <div className="text-sm text-muted-foreground">{user.email}</div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-4 flex-wrap">
                         <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300">
                           <Clock className="h-3 w-3 mr-1" />
                           En attente
@@ -414,7 +559,19 @@ export default function DiagnosticPage() {
                         <div className="text-sm text-muted-foreground">
                           Soumis le {formatDate(user.createdAt)}
                         </div>
-                        <Button size="icon" variant="ghost" data-testid={`button-view-kyc-${user.id}`}>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            downloadKycPdf(user);
+                          }}
+                          data-testid={`button-download-pdf-pending-${user.id}`}
+                        >
+                          <Download className="h-4 w-4 mr-1" />
+                          PDF
+                        </Button>
+                        <Button size="icon" variant="ghost" data-testid={`button-view-kyc-pending-${user.id}`}>
                           <Eye className="h-4 w-4" />
                         </Button>
                       </div>
@@ -424,6 +581,66 @@ export default function DiagnosticPage() {
                     <div className="text-center py-8 text-muted-foreground">
                       <CheckCircle className="h-12 w-12 mx-auto mb-4 text-green-500" />
                       <p>Aucune KYC en attente de validation</p>
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="kyc-verified" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Historique des KYC Verifiees</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ScrollArea className="h-[500px]">
+                <div className="space-y-2">
+                  {diagnosticData?.verifiedKyc?.map((user) => (
+                    <div
+                      key={user.id}
+                      className="flex items-center justify-between p-4 border rounded-lg hover-elevate cursor-pointer flex-wrap gap-2"
+                      onClick={() => setSelectedKycUser(user)}
+                      data-testid={`row-kyc-verified-${user.id}`}
+                    >
+                      <div className="flex items-center gap-4">
+                        <BadgeCheck className="h-8 w-8 text-green-500" />
+                        <div>
+                          <div className="font-medium">{user.firstName} {user.lastName}</div>
+                          <div className="text-sm text-muted-foreground">{user.email}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4 flex-wrap">
+                        <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">
+                          <CheckCircle2 className="h-3 w-3 mr-1" />
+                          Verifie
+                        </Badge>
+                        <div className="text-sm text-muted-foreground">
+                          Inscrit le {formatDate(user.createdAt)}
+                        </div>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            downloadKycPdf(user);
+                          }}
+                          data-testid={`button-download-pdf-verified-${user.id}`}
+                        >
+                          <Download className="h-4 w-4 mr-1" />
+                          PDF
+                        </Button>
+                        <Button size="icon" variant="ghost" data-testid={`button-view-kyc-verified-${user.id}`}>
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  {(!diagnosticData?.verifiedKyc || diagnosticData.verifiedKyc.length === 0) && (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <AlertCircle className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                      <p>Aucun utilisateur verifie pour le moment</p>
                     </div>
                   )}
                 </div>
@@ -443,14 +660,14 @@ export default function DiagnosticPage() {
                   {diagnosticData?.transactions?.map((transaction) => (
                     <div
                       key={transaction.id}
-                      className="flex items-center justify-between p-4 border rounded-lg"
+                      className="flex items-center justify-between p-4 border rounded-lg flex-wrap gap-2"
                       data-testid={`row-transaction-${transaction.id}`}
                     >
                       <div className="flex items-center gap-4">
                         {getTransactionIcon(transaction.type)}
                         <div>
                           <div className="font-medium capitalize">
-                            {transaction.type === "deposit" && "Dépôt"}
+                            {transaction.type === "deposit" && "Depot"}
                             {transaction.type === "withdrawal" && "Retrait"}
                             {transaction.type === "payment_link" && "Lien de paiement"}
                             {transaction.type === "merchant_link" && "Lien marchand"}
@@ -458,12 +675,17 @@ export default function DiagnosticPage() {
                           </div>
                           <div className="text-sm text-muted-foreground">
                             {transaction.customerName || "Client anonyme"} 
-                            {transaction.operator && ` • ${transaction.operator.toUpperCase()}`}
+                            {transaction.operator && ` - ${transaction.operator.toUpperCase()}`}
                             {transaction.country && ` (${transaction.country})`}
                           </div>
+                          {transaction.paydunyaToken && (
+                            <div className="text-xs text-muted-foreground font-mono">
+                              Token: {transaction.paydunyaToken.substring(0, 20)}...
+                            </div>
+                          )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-4 flex-wrap">
                         {getStatusBadge(transaction.status)}
                         <div className="text-right">
                           <div className={`font-bold ${transaction.type === "withdrawal" ? "text-red-600" : "text-green-600"}`}>
@@ -483,7 +705,7 @@ export default function DiagnosticPage() {
                   ))}
                   {(!diagnosticData?.transactions || diagnosticData.transactions.length === 0) && (
                     <div className="text-center py-8 text-muted-foreground">
-                      Aucune transaction trouvée
+                      Aucune transaction trouvee
                     </div>
                   )}
                 </div>
@@ -497,7 +719,7 @@ export default function DiagnosticPage() {
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              Détails de {selectedUser?.firstName} {selectedUser?.lastName}
+              Details de {selectedUser?.firstName} {selectedUser?.lastName}
             </DialogTitle>
           </DialogHeader>
           {selectedUser && (
@@ -529,12 +751,12 @@ export default function DiagnosticPage() {
                 <ScrollArea className="h-64">
                   <div className="space-y-2">
                     {getUserTransactions(selectedUser.id).map((t) => (
-                      <div key={t.id} className="flex items-center justify-between p-3 border rounded-lg text-sm">
+                      <div key={t.id} className="flex items-center justify-between p-3 border rounded-lg text-sm flex-wrap gap-2">
                         <div className="flex items-center gap-3">
                           {getTransactionIcon(t.type)}
                           <div>
                             <div className="font-medium capitalize">
-                              {t.type === "deposit" && "Dépôt"}
+                              {t.type === "deposit" && "Depot"}
                               {t.type === "withdrawal" && "Retrait"}
                               {t.type === "payment_link" && "Lien de paiement"}
                               {t.type === "merchant_link" && "Lien marchand"}
@@ -545,7 +767,7 @@ export default function DiagnosticPage() {
                             </div>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           {getStatusBadge(t.status)}
                           <span className={`font-bold ${t.type === "withdrawal" ? "text-red-600" : "text-green-600"}`}>
                             {t.type === "withdrawal" ? "-" : "+"}{formatCurrency(t.amount)}
@@ -566,19 +788,23 @@ export default function DiagnosticPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!selectedKycUser} onOpenChange={() => setSelectedKycUser(null)}>
-        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+      <Dialog open={!!selectedKycUser} onOpenChange={() => { setSelectedKycUser(null); setRejectionReason(""); }}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              Documents KYC de {selectedKycUser?.firstName} {selectedKycUser?.lastName}
+              Verification KYC - {selectedKycUser?.firstName} {selectedKycUser?.lastName}
             </DialogTitle>
           </DialogHeader>
           {selectedKycUser && (
             <div className="space-y-6">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-4 p-4 bg-muted/30 rounded-lg">
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Email</label>
                   <p className="font-medium">{selectedKycUser.email}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Statut</label>
+                  <div className="mt-1">{getKycStatusBadge(selectedKycUser.kycStatus)}</div>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Date de soumission</label>
@@ -586,47 +812,99 @@ export default function DiagnosticPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {selectedKycUser.kycIdFront && (
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground block mb-2">Pièce d'identité (Recto)</label>
-                    <img 
-                      src={selectedKycUser.kycIdFront} 
-                      alt="ID Front" 
-                      className="w-full rounded-lg border"
-                    />
-                  </div>
-                )}
-                {selectedKycUser.kycIdBack && (
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground block mb-2">Pièce d'identité (Verso)</label>
-                    <img 
-                      src={selectedKycUser.kycIdBack} 
-                      alt="ID Back" 
-                      className="w-full rounded-lg border"
-                    />
-                  </div>
-                )}
-                {selectedKycUser.kycSelfie && (
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground block mb-2">Selfie</label>
-                    <img 
-                      src={selectedKycUser.kycSelfie} 
-                      alt="Selfie" 
-                      className="w-full rounded-lg border"
-                    />
-                  </div>
-                )}
+              <div>
+                <h3 className="font-semibold mb-4">Documents fournis</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {selectedKycUser.kycIdFront && (
+                    <div className="border rounded-lg p-4">
+                      <p className="text-sm font-medium mb-3">Piece d'identite (Recto)</p>
+                      <img
+                        src={selectedKycUser.kycIdFront}
+                        alt="ID Front"
+                        className="w-full h-48 object-contain rounded bg-muted"
+                      />
+                    </div>
+                  )}
+                  {selectedKycUser.kycIdBack && (
+                    <div className="border rounded-lg p-4">
+                      <p className="text-sm font-medium mb-3">Piece d'identite (Verso)</p>
+                      <img
+                        src={selectedKycUser.kycIdBack}
+                        alt="ID Back"
+                        className="w-full h-48 object-contain rounded bg-muted"
+                      />
+                    </div>
+                  )}
+                  {selectedKycUser.kycSelfie && (
+                    <div className="border rounded-lg p-4">
+                      <p className="text-sm font-medium mb-3">Selfie</p>
+                      <img
+                        src={selectedKycUser.kycSelfie}
+                        alt="Selfie"
+                        className="w-full h-48 object-contain rounded bg-muted"
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
 
-              <div className="flex justify-end gap-2">
-                <Button 
-                  variant="outline" 
-                  onClick={() => navigate("/dashboard/kyc-verification")}
-                  data-testid="button-go-to-kyc"
+              {selectedKycUser.kycStatus === "submitted" && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Raison de rejet (optionnel)</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Textarea
+                      placeholder="Expliquez pourquoi vous rejetez cette demande KYC..."
+                      value={rejectionReason}
+                      onChange={(e) => setRejectionReason(e.target.value)}
+                      className="min-h-24"
+                      data-testid="textarea-rejection-reason"
+                    />
+                  </CardContent>
+                </Card>
+              )}
+
+              <div className="flex gap-3 flex-wrap">
+                <Button
+                  variant="outline"
+                  onClick={() => { setSelectedKycUser(null); setRejectionReason(""); }}
+                  data-testid="button-close-kyc-modal"
                 >
-                  Aller à la vérification KYC
+                  Fermer
                 </Button>
+                
+                <Button
+                  variant="outline"
+                  onClick={() => downloadKycPdf(selectedKycUser)}
+                  data-testid="button-download-kyc-pdf"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Telecharger PDF
+                </Button>
+
+                {selectedKycUser.kycStatus === "submitted" && (
+                  <>
+                    <Button
+                      variant="default"
+                      onClick={() => approveMutation.mutate(selectedKycUser.id)}
+                      disabled={approveMutation.isPending}
+                      data-testid="button-approve-kyc"
+                    >
+                      <CheckCircle2 className="h-4 w-4 mr-2" />
+                      {approveMutation.isPending ? "Validation..." : "Valider KYC"}
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      onClick={() => rejectMutation.mutate(selectedKycUser.id)}
+                      disabled={rejectMutation.isPending || !rejectionReason.trim()}
+                      data-testid="button-reject-kyc"
+                    >
+                      <X className="h-4 w-4 mr-2" />
+                      {rejectMutation.isPending ? "Rejet..." : "Rejeter KYC"}
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
           )}
