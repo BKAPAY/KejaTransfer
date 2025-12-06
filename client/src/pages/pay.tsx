@@ -33,8 +33,28 @@ type PaymentFormData = z.infer<typeof paymentSchema>;
 const ORANGE_INSTRUCTIONS: Record<string, string> = {
   SN: "Composez #144#391*VOTRE CODE PIN ORANGE MONEY# pour obtenir votre code de paiement",
   CI: "Composez #144*82# puis choisissez l'option 2 pour obtenir votre code de paiement",
-  BF: "Composez #144#391*VOTRE CODE PIN ORANGE MONEY# pour obtenir votre code de paiement",
+  BF: "Composez *144*4*6# pour obtenir votre code de paiement",
 };
+
+const ORANGE_USSD_CODES: Record<string, string> = {
+  SN: "#144#391*PIN#",
+  CI: "#144*82#",
+  BF: "*144*4*6#",
+};
+
+const ORANGE_USSD_HINTS: Record<string, string> = {
+  SN: "Remplacez PIN par votre code secret Orange Money",
+  CI: "Choisissez l'option 2 pour obtenir votre code",
+  BF: "Suivez les instructions pour obtenir votre code",
+};
+
+function getOrangeUssdCode(country: string): string {
+  return ORANGE_USSD_CODES[country] || "#144#391*PIN#";
+}
+
+function getOrangeUssdHint(country: string): string {
+  return ORANGE_USSD_HINTS[country] || "Suivez les instructions pour obtenir votre code";
+}
 
 // Clé pour stocker l'état du paiement
 function getPaymentStateKey(token: string): string {
@@ -718,14 +738,14 @@ export default function Pay() {
                   <div className="mt-2 flex items-center gap-2">
                     <div className="flex-1 bg-white dark:bg-gray-900 border border-orange-300 dark:border-orange-700 rounded-md px-3 py-2">
                       <code className="text-base font-bold text-orange-700 dark:text-orange-400">
-                        {currentCountry === "CI" ? "#144*82#" : "#144#391*PIN#"}
+                        {getOrangeUssdCode(currentCountry)}
                       </code>
                     </div>
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() => copyUssdCode(currentCountry === "CI" ? "#144*82#" : "#144#391*PIN#")}
+                      onClick={() => copyUssdCode(getOrangeUssdCode(currentCountry))}
                       className="border-orange-300 hover:bg-orange-100 dark:hover:bg-orange-900"
                       data-testid="button-copy-ussd"
                     >
@@ -733,9 +753,7 @@ export default function Pay() {
                     </Button>
                   </div>
                   <p className="mt-2 text-xs text-orange-700 dark:text-orange-400">
-                    {currentCountry === "CI" 
-                      ? "Choisissez l'option 2 pour obtenir votre code" 
-                      : "Remplacez PIN par votre code secret Orange Money"}
+                    {getOrangeUssdHint(currentCountry)}
                   </p>
                 </AlertDescription>
               </Alert>
