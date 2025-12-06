@@ -60,6 +60,8 @@ export const apiKeys = pgTable("api_keys", {
   siteName: text("site_name").notNull().default("Mon Site"), // Nom du site qui sera affiché "Payer à [siteName]"
   publicKey: text("public_key").notNull().unique(),
   privateKey: text("private_key").notNull().unique(),
+  callbackUrl: text("callback_url"), // URL to receive payment notifications for auto activation
+  callbackSecret: text("callback_secret"), // HMAC secret for signing callbacks
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
