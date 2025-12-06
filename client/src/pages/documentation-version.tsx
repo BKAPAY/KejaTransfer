@@ -560,6 +560,27 @@ echo json_encode(['received' => true]);
             </div>
 
             <div className="space-y-3">
+              <h4 className="font-semibold">Exemple d'URL de Webhook</h4>
+              <p className="text-sm text-muted-foreground">
+                Voici des exemples d'URLs que vous pouvez configurer dans l'interface "Cles API":
+              </p>
+              <div className="bg-muted p-4 rounded-lg space-y-2">
+                <code className="block text-sm font-mono text-primary">
+                  https://votresite.com/api/webhook/bkapay
+                </code>
+                <code className="block text-sm font-mono text-primary">
+                  https://monapp.com/webhooks/paiement
+                </code>
+                <code className="block text-sm font-mono text-primary">
+                  https://api.monservice.com/callbacks/bkapay
+                </code>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                L'URL doit etre en HTTPS et accessible publiquement. BKApay enverra une requete POST a cette URL a chaque paiement.
+              </p>
+            </div>
+
+            <div className="space-y-3">
               <h4 className="font-semibold">Payload du webhook</h4>
               <div className="bg-gray-950 dark:bg-gray-900 text-gray-100 p-4 rounded font-mono text-xs overflow-x-auto">
                 <pre>{webhookPayloadExample}</pre>
