@@ -1,8 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Copy, Code, Globe, ExternalLink } from "lucide-react";
+import { Copy, Code, Globe, ExternalLink, Webhook } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function Documentation() {
   const { toast } = useToast();
@@ -85,15 +86,102 @@ if (status === "success") {
   console.log("Paiement echoue");
 }`;
 
+  const webhookExample = `// Webhook BKApay - Activation automatique d'abonnement
+// Ce code recoit les notifications de paiement reussi
+
+// Node.js / Express
+const crypto = require('crypto');
+
+app.post('/api/webhook/bkapay', express.json(), (req, res) => {
+  const signature = req.headers['x-bkapay-signature'];
+  const secret = process.env.BKAPAY_CALLBACK_SECRET; // Votre secret de callback
+  
+  // Verifier la signature
+  const expectedSignature = crypto
+    .createHmac('sha256', secret)
+    .update(JSON.stringify(req.body))
+    .digest('hex');
+  
+  if (signature !== expectedSignature) {
+    return res.status(401).json({ error: 'Signature invalide' });
+  }
+  
+  const { event, transactionId, amount, status, customerEmail } = req.body;
+  
+  if (event === 'payment.completed' && status === 'completed') {
+    // Activer l'abonnement de l'utilisateur
+    activerAbonnement(customerEmail, transactionId);
+    console.log('Abonnement active pour:', customerEmail);
+  }
+  
+  res.json({ received: true });
+});`;
+
+  const webhookPhpExample = `<?php
+// Webhook BKApay - PHP
+// Recevoir les notifications de paiement
+
+$payload = file_get_contents('php://input');
+$signature = $_SERVER['HTTP_X_BKAPAY_SIGNATURE'] ?? '';
+$secret = getenv('BKAPAY_CALLBACK_SECRET');
+
+// Verifier la signature
+$expectedSignature = hash_hmac('sha256', $payload, $secret);
+
+if (!hash_equals($expectedSignature, $signature)) {
+    http_response_code(401);
+    echo json_encode(['error' => 'Signature invalide']);
+    exit;
+}
+
+$data = json_decode($payload, true);
+
+if ($data['event'] === 'payment.completed' && $data['status'] === 'completed') {
+    // Activer l'abonnement
+    $userId = $data['customerEmail'];
+    $transactionId = $data['transactionId'];
+    activerAbonnement($userId, $transactionId);
+}
+
+echo json_encode(['received' => true]);
+?>`;
+
+  const webhookPayloadExample = `{
+  "event": "payment.completed",
+  "transactionId": "abc123-def456",
+  "externalReference": "order_12345",
+  "amount": 5000,
+  "fee": 300,
+  "netAmount": 4700,
+  "currency": "XOF",
+  "status": "completed",
+  "customerName": "Jean Dupont",
+  "customerEmail": "jean@example.com",
+  "customerPhone": "771234567",
+  "country": "SN",
+  "operator": "orange",
+  "description": "Abonnement Premium",
+  "timestamp": "2024-01-15T10:30:00.000Z"
+}`;
+
   return (
     <div className="space-y-6 max-w-4xl">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-foreground mb-2" data-testid="text-doc-title">
-          Documentation API BKApay
-        </h1>
-        <p className="text-sm text-muted-foreground">
+        <div className="flex items-center gap-3 flex-wrap">
+          <h1 className="text-3xl font-bold text-foreground" data-testid="text-doc-title">
+            Documentation API BKApay
+          </h1>
+          <Badge variant="default" className="text-xs">v1.3</Badge>
+        </div>
+        <p className="text-sm text-muted-foreground mt-2">
           Integrez facilement les paiements mobile money dans votre application
         </p>
+        <Alert className="mt-4 border-green-200 bg-green-50 dark:bg-green-950 dark:border-green-800">
+          <Webhook className="h-4 w-4 text-green-600" />
+          <AlertDescription className="text-green-800 dark:text-green-200 text-sm">
+            <strong>Nouveau v1.3:</strong> Webhooks pour activation automatique d'abonnements
+          </AlertDescription>
+        </Alert>
       </div>
 
       <Card className="border-primary/20 bg-primary/5">
@@ -296,6 +384,114 @@ if (status === "success") {
             <Copy className="w-4 h-4 mr-2" />
             Copier
           </Button>
+        </CardContent>
+      </Card>
+
+      <Card className="border-green-200 dark:border-green-800">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2">
+            <Webhook className="w-5 h-5 text-green-600" />
+            Webhooks - Activation automatique
+            <Badge variant="default" className="text-xs">Nouveau v1.3</Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <p className="text-sm text-muted-foreground">
+            Configurez un webhook pour recevoir une notification automatique quand un paiement est complete.
+            Ideal pour activer automatiquement les abonnements ou comptes utilisateurs.
+          </p>
+
+          <div className="space-y-4">
+            <h4 className="font-semibold">Configuration</h4>
+            <div className="space-y-2 text-sm">
+              <p><span className="font-semibold">1.</span> Allez dans "Cles API" de votre tableau de bord</p>
+              <p><span className="font-semibold">2.</span> Cliquez sur "Configurer un callback" sur votre cle API</p>
+              <p><span className="font-semibold">3.</span> Entrez l'URL de votre endpoint webhook</p>
+              <p><span className="font-semibold">4.</span> Copiez le secret genere pour verifier les signatures</p>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <h4 className="font-semibold">Payload du webhook</h4>
+            <div className="bg-gray-950 dark:bg-gray-900 text-gray-100 p-4 rounded font-mono text-xs overflow-x-auto">
+              <pre>{webhookPayloadExample}</pre>
+            </div>
+            <Button 
+              onClick={() => copyCode(webhookPayloadExample)} 
+              variant="outline" 
+              size="sm" 
+              className="w-full"
+              data-testid="button-copy-webhook-payload"
+            >
+              <Copy className="w-4 h-4 mr-2" />
+              Copier
+            </Button>
+          </div>
+
+          <div className="space-y-3">
+            <h4 className="font-semibold">Headers envoyes</h4>
+            <div className="grid gap-2 text-sm">
+              <div className="flex gap-2">
+                <Badge variant="outline">X-BKApay-Signature</Badge>
+                <span className="text-muted-foreground">Signature HMAC-SHA256 du payload</span>
+              </div>
+              <div className="flex gap-2">
+                <Badge variant="outline">X-BKApay-Event</Badge>
+                <span className="text-muted-foreground">"payment.completed" ou "payment.failed"</span>
+              </div>
+              <div className="flex gap-2">
+                <Badge variant="outline">X-BKApay-Timestamp</Badge>
+                <span className="text-muted-foreground">Horodatage ISO de l'envoi</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 mb-3">
+              <Badge>Node.js / Express</Badge>
+              <span className="text-sm text-muted-foreground">Verification et activation</span>
+            </div>
+            <div className="bg-gray-950 dark:bg-gray-900 text-gray-100 p-4 rounded font-mono text-xs overflow-x-auto">
+              <pre>{webhookExample}</pre>
+            </div>
+            <Button 
+              onClick={() => copyCode(webhookExample)} 
+              variant="outline" 
+              size="sm" 
+              className="w-full"
+              data-testid="button-copy-webhook-js"
+            >
+              <Copy className="w-4 h-4 mr-2" />
+              Copier
+            </Button>
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 mb-3">
+              <Badge>PHP</Badge>
+              <span className="text-sm text-muted-foreground">Verification et activation</span>
+            </div>
+            <div className="bg-gray-950 dark:bg-gray-900 text-gray-100 p-4 rounded font-mono text-xs overflow-x-auto">
+              <pre>{webhookPhpExample}</pre>
+            </div>
+            <Button 
+              onClick={() => copyCode(webhookPhpExample)} 
+              variant="outline" 
+              size="sm" 
+              className="w-full"
+              data-testid="button-copy-webhook-php"
+            >
+              <Copy className="w-4 h-4 mr-2" />
+              Copier
+            </Button>
+          </div>
+
+          <Alert className="border-amber-200 bg-amber-50 dark:bg-amber-950 dark:border-amber-800">
+            <AlertDescription className="text-amber-800 dark:text-amber-200 text-sm">
+              <strong>Securite:</strong> Verifiez toujours la signature avant de traiter le webhook.
+              Ne faites jamais confiance aux donnees sans verification.
+            </AlertDescription>
+          </Alert>
         </CardContent>
       </Card>
 

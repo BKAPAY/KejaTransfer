@@ -2,12 +2,13 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Copy, Eye, EyeOff, Trash2, Key, AlertCircle, ExternalLink } from "lucide-react";
+import { Plus, Copy, Eye, EyeOff, Trash2, Key, AlertCircle, ExternalLink, Webhook, RefreshCw, Check, X } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { ApiKey, User } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import {
   Dialog,
   DialogContent,
@@ -36,6 +37,8 @@ type ApiKeyFormData = z.infer<typeof apiKeySchema>;
 export default function ApiPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [visibleKeys, setVisibleKeys] = useState<Record<string, boolean>>({});
+  const [editingCallback, setEditingCallback] = useState<string | null>(null);
+  const [callbackUrls, setCallbackUrls] = useState<Record<string, string>>({});
   const { toast } = useToast();
 
   const { data: user } = useQuery<User>({
@@ -93,6 +96,49 @@ export default function ApiPage() {
       toast({
         title: "Erreur",
         description: error.message || "Erreur lors de la suppression",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const callbackMutation = useMutation({
+    mutationFn: async ({ id, callbackUrl }: { id: string; callbackUrl: string }) => {
+      const res = await apiRequest("PATCH", `/api/api-keys/${id}/callback`, { callbackUrl });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/api-keys"] });
+      setEditingCallback(null);
+      toast({
+        title: "Callback configure",
+        description: "L'URL de callback a ete configuree avec succes",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erreur",
+        description: error.message || "Erreur lors de la configuration du callback",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const regenerateSecretMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("POST", `/api/api-keys/${id}/regenerate-secret`, {});
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/api-keys"] });
+      toast({
+        title: "Secret regenere",
+        description: "Le secret de callback a ete regenere. Mettez a jour votre serveur.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erreur",
+        description: error.message || "Erreur lors de la regeneration",
         variant: "destructive",
       });
     },
@@ -316,6 +362,165 @@ export default function ApiPage() {
                   <p className="text-xs text-muted-foreground mt-2">
                     Remplacez MONTANT et DESCRIPTION par les valeurs reelles
                   </p>
+                </div>
+
+                <Separator className="my-4" />
+
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Webhook className="w-4 h-4 text-muted-foreground" />
+                    <label className="text-sm font-medium">URL de Callback (Webhook)</label>
+                    <Badge variant="outline" className="text-xs">Abonnements</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Recevez une notification automatique quand un paiement est complete. Ideal pour activer automatiquement les abonnements.
+                  </p>
+                  
+                  {editingCallback === apiKey.id ? (
+                    <div className="space-y-3">
+                      <Input
+                        placeholder="https://votre-site.com/api/webhook/bkapay"
+                        value={callbackUrls[apiKey.id] ?? (apiKey as any).callbackUrl ?? ""}
+                        onChange={(e) => setCallbackUrls(prev => ({ ...prev, [apiKey.id]: e.target.value }))}
+                        data-testid={`input-callback-url-${apiKey.id}`}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        L'URL doit utiliser HTTPS pour la securite
+                      </p>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            const url = callbackUrls[apiKey.id] ?? (apiKey as any).callbackUrl ?? "";
+                            callbackMutation.mutate({ id: apiKey.id, callbackUrl: url });
+                          }}
+                          disabled={callbackMutation.isPending}
+                          data-testid={`button-save-callback-${apiKey.id}`}
+                        >
+                          <Check className="w-4 h-4 mr-1" />
+                          {callbackMutation.isPending ? "..." : "Enregistrer"}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            setEditingCallback(null);
+                            setCallbackUrls(prev => {
+                              const copy = { ...prev };
+                              delete copy[apiKey.id];
+                              return copy;
+                            });
+                          }}
+                          data-testid={`button-cancel-callback-${apiKey.id}`}
+                        >
+                          <X className="w-4 h-4 mr-1" />
+                          Annuler
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {(apiKey as any).callbackUrl ? (
+                        <>
+                          <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-md">
+                            <code className="flex-1 text-xs font-mono truncate text-green-700 dark:text-green-300">
+                              {(apiKey as any).callbackUrl}
+                            </code>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => copyToClipboard((apiKey as any).callbackUrl, "URL de callback")}
+                              data-testid={`button-copy-callback-${apiKey.id}`}
+                            >
+                              <Copy className="w-4 h-4" />
+                            </Button>
+                          </div>
+                          
+                          {(apiKey as any).callbackSecret && (
+                            <div>
+                              <div className="flex items-center gap-2 mb-1">
+                                <label className="text-xs font-medium text-muted-foreground">Secret de signature</label>
+                              </div>
+                              <div className="flex items-center gap-2 p-2 bg-muted rounded-md">
+                                <code className="flex-1 text-xs font-mono truncate">
+                                  {visibleKeys[apiKey.id + '-secret'] 
+                                    ? (apiKey as any).callbackSecret 
+                                    : maskKey((apiKey as any).callbackSecret)}
+                                </code>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => toggleKeyVisibility(apiKey.id + '-secret')}
+                                  data-testid={`button-toggle-secret-${apiKey.id}`}
+                                >
+                                  {visibleKeys[apiKey.id + '-secret'] ? (
+                                    <EyeOff className="w-3 h-3" />
+                                  ) : (
+                                    <Eye className="w-3 h-3" />
+                                  )}
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => copyToClipboard((apiKey as any).callbackSecret, "Secret")}
+                                  data-testid={`button-copy-secret-${apiKey.id}`}
+                                >
+                                  <Copy className="w-3 h-3" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => regenerateSecretMutation.mutate(apiKey.id)}
+                                  disabled={regenerateSecretMutation.isPending}
+                                  title="Regenerer le secret"
+                                  data-testid={`button-regenerate-secret-${apiKey.id}`}
+                                >
+                                  <RefreshCw className="w-3 h-3" />
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                          
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setCallbackUrls(prev => ({ ...prev, [apiKey.id]: (apiKey as any).callbackUrl || "" }));
+                                setEditingCallback(apiKey.id);
+                              }}
+                              data-testid={`button-edit-callback-${apiKey.id}`}
+                            >
+                              Modifier
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                if (confirm("Etes-vous sur de vouloir supprimer cette URL de callback? Les notifications de paiement ne seront plus envoyees.")) {
+                                  callbackMutation.mutate({ id: apiKey.id, callbackUrl: "" });
+                                }
+                              }}
+                              disabled={callbackMutation.isPending}
+                              data-testid={`button-remove-callback-${apiKey.id}`}
+                            >
+                              Supprimer le callback
+                            </Button>
+                          </div>
+                        </>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setEditingCallback(apiKey.id)}
+                          data-testid={`button-add-callback-${apiKey.id}`}
+                        >
+                          <Webhook className="w-4 h-4 mr-2" />
+                          Configurer un callback
+                        </Button>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex justify-end pt-2">

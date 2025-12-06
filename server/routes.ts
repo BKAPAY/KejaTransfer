@@ -10,6 +10,7 @@ import { insertUserSchema, insertPaymentLinkSchema, insertMerchantLinkSchema, in
 import { validatePhoneOperator } from "@shared/phone-utils";
 import { randomUUID } from "crypto";
 import { calculateIncomingFee, calculateOutgoingFee } from "./utils/fees";
+import { sendPaymentCallback } from "./utils/callback";
 import { 
   SOFTPAY_OPERATORS, 
   getOperatorKey, 
@@ -820,6 +821,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Configure callback URL for automatic subscription/activation
+  app.patch("/api/api-keys/:id/callback", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { callbackUrl } = req.body;
+      const keyId = req.params.id;
+      const userId = req.session.userId!;
+
+      // Validate URL if provided (HTTPS required for security)
+      if (callbackUrl && callbackUrl.trim() !== "") {
+        try {
+          const url = new URL(callbackUrl);
+          // Only allow HTTPS for production security
+          if (url.protocol !== 'https:' && !url.hostname.includes('localhost') && !url.hostname.includes('127.0.0.1')) {
+            return res.status(400).json({ error: "L'URL doit utiliser HTTPS pour la securite" });
+          }
+          if (!['http:', 'https:'].includes(url.protocol)) {
+            return res.status(400).json({ error: "L'URL doit commencer par http:// ou https://" });
+          }
+          // Block internal/private IPs to prevent SSRF
+          const blockedHosts = ['localhost', '127.0.0.1', '0.0.0.0', '10.', '192.168.', '172.16.'];
+          if (blockedHosts.some(h => url.hostname.startsWith(h) || url.hostname === h.slice(0,-1))) {
+            // Allow localhost only in development
+            if (process.env.NODE_ENV !== 'development') {
+              return res.status(400).json({ error: "Les adresses locales ne sont pas autorisees en production" });
+            }
+          }
+        } catch {
+          return res.status(400).json({ error: "URL invalide" });
+        }
+      }
+
+      const updatedKey = await storage.updateApiKeyCallback(keyId, userId, callbackUrl || null);
+      if (!updatedKey) {
+        return res.status(404).json({ error: "Clé API non trouvée ou vous n'êtes pas le propriétaire" });
+      }
+
+      res.json({ 
+        success: true, 
+        callbackUrl: updatedKey.callbackUrl,
+        callbackSecret: updatedKey.callbackSecret,
+        message: callbackUrl ? "URL de callback configurée avec succès" : "URL de callback supprimée"
+      });
+    } catch (error: any) {
+      console.error("Error updating callback URL:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
+  // Regenerate callback secret
+  app.post("/api/api-keys/:id/regenerate-secret", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const keyId = req.params.id;
+      const userId = req.session.userId!;
+
+      const updatedKey = await storage.regenerateApiKeyCallbackSecret(keyId, userId);
+      if (!updatedKey) {
+        return res.status(404).json({ error: "Clé API non trouvée" });
+      }
+
+      res.json({ 
+        success: true, 
+        callbackSecret: updatedKey.callbackSecret,
+        message: "Secret de callback régénéré avec succès"
+      });
+    } catch (error: any) {
+      console.error("Error regenerating callback secret:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
   // ===== API Pay Routes (Redirect-based API payments) =====
   
   // Get API key info by public key (for payment page)
@@ -938,6 +1009,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         metadata: JSON.stringify({
           siteName: (apiKey as any).siteName || apiKey.name,
           apiKeyId: apiKey.id,
+          apiKeyPublicKey: publicKey, // Store for callback lookup
           netAmount, // Store NET for reference
           operatorKey,
           callbackUrl: callbackUrl || null,
@@ -2753,12 +2825,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
             credited: result.credited,
             netAmount: result.transaction.amount - (result.transaction.fee || 0)
           });
+          
+          // Send callback for API payments
+          if (result.transaction.type === "api_payment") {
+            try {
+              // Get API key from transaction metadata to find callback URL
+              let apiKeyPublicKey: string | undefined;
+              if (result.transaction.metadata) {
+                try {
+                  const metadata = JSON.parse(result.transaction.metadata);
+                  apiKeyPublicKey = metadata.apiKeyPublicKey;
+                } catch (e) {}
+              }
+              
+              if (apiKeyPublicKey) {
+                const apiKey = await storage.getApiKeyByPublicKey(apiKeyPublicKey);
+                if (apiKey && apiKey.callbackUrl) {
+                  sendPaymentCallback(result.transaction, apiKey, 'payment.completed')
+                    .then(callbackResult => {
+                      console.log("[WEBHOOK] Callback sent:", callbackResult);
+                    })
+                    .catch(err => {
+                      console.error("[WEBHOOK] Callback error:", err);
+                    });
+                }
+              }
+            } catch (callbackError) {
+              console.error("[WEBHOOK] Error processing callback:", callbackError);
+            }
+          }
         } else {
           console.log("[WEBHOOK] Transaction already processed (not pending):", { transactionId: transaction.id });
         }
       } else if (webhookStatus === "failed" || webhookStatus === "cancelled") {
         await storage.updateTransactionStatus(transaction.id, "failed");
         console.log("[WEBHOOK] Transaction marked as failed:", { transactionId: transaction.id });
+        
+        // Send failed callback for API payments
+        if (transaction.type === "api_payment") {
+          try {
+            let apiKeyPublicKey: string | undefined;
+            if (transaction.metadata) {
+              try {
+                const metadata = JSON.parse(transaction.metadata);
+                apiKeyPublicKey = metadata.apiKeyPublicKey;
+              } catch (e) {}
+            }
+            
+            if (apiKeyPublicKey) {
+              const apiKey = await storage.getApiKeyByPublicKey(apiKeyPublicKey);
+              if (apiKey && apiKey.callbackUrl) {
+                const updatedTx = await storage.getTransaction(transaction.id);
+                if (updatedTx) {
+                  sendPaymentCallback(updatedTx, apiKey, 'payment.failed')
+                    .then(callbackResult => {
+                      console.log("[WEBHOOK] Failed callback sent:", callbackResult);
+                    })
+                    .catch(err => {
+                      console.error("[WEBHOOK] Failed callback error:", err);
+                    });
+                }
+              }
+            }
+          } catch (callbackError) {
+            console.error("[WEBHOOK] Error processing failed callback:", callbackError);
+          }
+        }
       }
 
       res.json({ success: true, message: "Webhook traité" });

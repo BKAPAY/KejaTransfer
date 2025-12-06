@@ -62,6 +62,8 @@ export interface IStorage {
   getApiKeyByPrivateKey(privateKey: string): Promise<ApiKey | undefined>;
   createApiKey(key: InsertApiKey & { userId: string }): Promise<ApiKey>;
   deleteApiKey(id: string, userId: string): Promise<boolean>;
+  updateApiKeyCallback(id: string, userId: string, callbackUrl: string | null): Promise<ApiKey | undefined>;
+  regenerateApiKeyCallbackSecret(id: string, userId: string): Promise<ApiKey | undefined>;
 
   // Transactions
   getTransaction(id: string): Promise<Transaction | undefined>;
@@ -307,6 +309,55 @@ export class DbStorage implements IStorage {
       .where(eq(schema.apiKeys.id, id))
       .returning();
     return results.length > 0 && results[0].userId === userId;
+  }
+
+  async updateApiKeyCallback(id: string, userId: string, callbackUrl: string | null): Promise<ApiKey | undefined> {
+    // Generate new secret if setting a callback URL for the first time
+    const existing = await db.select().from(schema.apiKeys)
+      .where(eq(schema.apiKeys.id, id))
+      .limit(1);
+    
+    if (!existing[0] || existing[0].userId !== userId) {
+      return undefined;
+    }
+
+    const updateData: any = { callbackUrl };
+    
+    // Generate secret if setting callback URL and no secret exists
+    if (callbackUrl && !existing[0].callbackSecret) {
+      updateData.callbackSecret = `cs_${randomUUID().replace(/-/g, '')}`;
+    }
+    
+    // Clear secret if removing callback URL
+    if (!callbackUrl) {
+      updateData.callbackSecret = null;
+    }
+
+    const results = await db
+      .update(schema.apiKeys)
+      .set(updateData)
+      .where(eq(schema.apiKeys.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async regenerateApiKeyCallbackSecret(id: string, userId: string): Promise<ApiKey | undefined> {
+    const existing = await db.select().from(schema.apiKeys)
+      .where(eq(schema.apiKeys.id, id))
+      .limit(1);
+    
+    if (!existing[0] || existing[0].userId !== userId) {
+      return undefined;
+    }
+
+    const newSecret = `cs_${randomUUID().replace(/-/g, '')}`;
+    
+    const results = await db
+      .update(schema.apiKeys)
+      .set({ callbackSecret: newSecret })
+      .where(eq(schema.apiKeys.id, id))
+      .returning();
+    return results[0];
   }
 
   // Transactions
