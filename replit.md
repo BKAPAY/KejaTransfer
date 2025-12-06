@@ -40,7 +40,7 @@ The frontend utilizes React 18 with TypeScript, styled with Shadcn UI and Tailwi
 - **Embedded PSR Payments**: Integrates Paydunya's PSR SDK for direct payment modals.
 - **Silent Fees**: Automatic calculation of transaction fees - UNIFORM 6% for ALL countries and operators.
 - **Account Suspension**: System for suspending and reactivating user accounts with primary admin protection.
-- **API Gateway**: Provides public/private API keys for developers to integrate with BKApay for incoming payments, including pending transaction creation and strict country validation.
+- **API Gateway v1.3**: Provides public/private API keys for developers to integrate with BKApay for incoming payments, including pending transaction creation, strict country validation, and automatic webhook/callback notifications for subscription/account activation.
 - **Fee System**: Robust and deterministic fee calculation logic distinguishing between INCOMING (client pays gross, credited net) and OUTGOING (user requests net, debited net+fees) transactions.
 - **Webhook Processing**: Uses a dedicated `paydunyaToken` column for deterministic transaction lookup, eliminating fragile metadata parsing.
 - **Payment Timeout**: 10 minutes for both frontend countdown and backend polling before marking transactions as failed.
