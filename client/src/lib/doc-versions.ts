@@ -6,14 +6,26 @@ export interface DocVersion {
   changelog?: string[];
 }
 
-export const CURRENT_VERSION = "v1.2";
+export const CURRENT_VERSION = "v1.3";
 
 export const DOC_VERSIONS: DocVersion[] = [
   {
-    version: "v1.2",
-    releaseDate: "2025-11-26",
+    version: "v1.3",
+    releaseDate: "2025-12-06",
     isLatest: true,
     isDeprecated: false,
+    changelog: [
+      "Webhooks pour activation automatique d'abonnements",
+      "Notifications POST signees HMAC-SHA256",
+      "Configuration du callback URL dans le dashboard",
+      "Exemples de code Node.js et PHP pour webhooks"
+    ]
+  },
+  {
+    version: "v1.2",
+    releaseDate: "2025-11-26",
+    isLatest: false,
+    isDeprecated: true,
     changelog: [
       "Ajout du parametre callback pour les redirections",
       "Montant minimum de 100 XOF",
