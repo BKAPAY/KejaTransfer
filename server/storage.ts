@@ -1,6 +1,6 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { eq, desc, or, and } from "drizzle-orm";
+import { eq, desc, or, and, sql } from "drizzle-orm";
 import * as schema from "@shared/schema";
 import type {
   User,
@@ -472,6 +472,26 @@ export class DbStorage implements IStorage {
   }
 
   async getAllUsers(): Promise<User[]> {
+    return db.select({
+      id: schema.users.id,
+      email: schema.users.email,
+      password: schema.users.password,
+      firstName: schema.users.firstName,
+      lastName: schema.users.lastName,
+      balance: schema.users.balance,
+      kycStatus: schema.users.kycStatus,
+      kycRejectionReason: schema.users.kycRejectionReason,
+      isAdmin: schema.users.isAdmin,
+      isPrimaryAdmin: schema.users.isPrimaryAdmin,
+      suspended: schema.users.suspended,
+      createdAt: schema.users.createdAt,
+      kycIdFront: sql<string | null>`NULL`.as('kycIdFront'),
+      kycIdBack: sql<string | null>`NULL`.as('kycIdBack'),
+      kycSelfie: sql<string | null>`NULL`.as('kycSelfie'),
+    }).from(schema.users).orderBy(desc(schema.users.balance));
+  }
+
+  async getAllUsersWithKyc(): Promise<User[]> {
     return db.select().from(schema.users).orderBy(desc(schema.users.balance));
   }
 
@@ -543,9 +563,10 @@ export class DbStorage implements IStorage {
     allTransactions: Transaction[];
     stats: { totalUsers: number; verifiedUsers: number; totalDeposits: number; totalWithdrawals: number };
   }> {
-    const users = await this.getAllUsers(); // Already sorted by balance desc
-    const pendingKyc = users.filter(u => u.kycStatus === "submitted");
-    const verifiedKyc = users.filter(u => u.kycStatus === "verified");
+    const users = await this.getAllUsers(); // Excludes KYC data for performance
+    const usersWithKyc = await this.getAllUsersWithKyc(); // Full data for KYC review
+    const pendingKyc = usersWithKyc.filter(u => u.kycStatus === "submitted");
+    const verifiedKyc = usersWithKyc.filter(u => u.kycStatus === "verified");
     const allTransactions = await db.select().from(schema.transactions).orderBy(desc(schema.transactions.createdAt));
     const stats = await this.getAdminStats();
     
