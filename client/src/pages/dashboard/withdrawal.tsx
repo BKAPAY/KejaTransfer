@@ -288,7 +288,7 @@ export default function Withdrawal() {
                 <div className="bg-muted p-4 rounded-md border space-y-3">
                   <div className="flex items-start gap-3">
                     <Info className="h-4 w-4 mt-0.5 text-muted-foreground flex-shrink-0" />
-                    <div className="text-sm space-y-2">
+                    <div className="text-sm space-y-2 w-full">
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Montant à envoyer:</span>
                         <span className="font-medium">
@@ -297,6 +297,16 @@ export default function Withdrawal() {
                             currency: "XOF",
                             minimumFractionDigits: 0,
                           }).format(amount)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Frais (6%):</span>
+                        <span className="font-medium text-orange-600 dark:text-orange-400" data-testid="text-fee-amount">
+                          {new Intl.NumberFormat("fr-FR", {
+                            style: "currency",
+                            currency: "XOF",
+                            minimumFractionDigits: 0,
+                          }).format(feeInfo.feeAmount)}
                         </span>
                       </div>
                       <div className="border-t pt-2 flex justify-between font-semibold">

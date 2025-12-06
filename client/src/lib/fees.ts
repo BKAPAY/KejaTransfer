@@ -1,10 +1,9 @@
-// Calculate transaction fees silently based on country
-// Benin (BJ): 3%, All other countries: 6%
+// Calculate transaction fees - UNIFORM 6% for ALL countries and operators
 
 export function getFeePercentage(country?: string): number {
-  // Return as whole number (30 = 3%, 60 = 6%)
-  if (country === "BJ") return 30; // 3%
-  return 60; // 6% for all other countries
+  // Return as whole number (60 = 6%)
+  // UNIFORM 6% fee for all countries including Benin
+  return 60; // 6% for all countries
 }
 
 export function calculateIncomingFee(grossAmount: number, country?: string): {
