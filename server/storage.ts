@@ -38,7 +38,7 @@ export interface IStorage {
   approveKyc(userId: string): Promise<User | undefined>;
   rejectKyc(userId: string, reason?: string): Promise<User | undefined>;
   getPendingKycSubmissions(): Promise<User[]>;
-  getKycHistory(): Promise<User[]>;
+  getKycHistory(): Promise<Partial<User>[]>;
   suspendUser(userId: string): Promise<User | undefined>;
   unsuspendUser(userId: string): Promise<User | undefined>;
 
@@ -181,10 +181,21 @@ export class DbStorage implements IStorage {
       .orderBy(desc(schema.users.createdAt));
   }
 
-  async getKycHistory(): Promise<User[]> {
-    // Return all users with KYC submissions (submitted, verified, or rejected)
+  async getKycHistory(): Promise<Partial<User>[]> {
+    // Return all users with KYC submissions WITHOUT loading heavy base64 images
     return db
-      .select()
+      .select({
+        id: schema.users.id,
+        email: schema.users.email,
+        firstName: schema.users.firstName,
+        lastName: schema.users.lastName,
+        kycStatus: schema.users.kycStatus,
+        kycRejectionReason: schema.users.kycRejectionReason,
+        createdAt: schema.users.createdAt,
+        balance: schema.users.balance,
+        isAdmin: schema.users.isAdmin,
+        suspended: schema.users.suspended,
+      })
       .from(schema.users)
       .where(
         or(
