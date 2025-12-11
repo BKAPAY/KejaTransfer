@@ -1,6 +1,6 @@
 import { storage } from "./storage";
 import type { Transaction, User } from "@shared/schema";
-import { getTransactionStatus as getFedaPayTransactionStatus } from "./fedapay";
+import { getTransactionStatus as getFedaPayTransactionStatus, getPayoutStatus as getFedaPayPayoutStatus } from "./fedapay";
 
 const PAYDUNYA_MASTER_KEY = process.env.PAYDUNYA_MASTER_KEY;
 const PAYDUNYA_PRIVATE_KEY = process.env.PAYDUNYA_PRIVATE_KEY;
@@ -118,6 +118,69 @@ async function processFedaPayTransaction(transaction: Transaction & { user?: Use
   }
 }
 
+async function processFedaPayPayout(transaction: Transaction & { user?: User }, metadata: any): Promise<boolean> {
+  const fedapayPayoutId = metadata.fedapayPayoutId;
+  const transactionAge = getTransactionAge(transaction);
+  const remainingTime = Math.max(0, PAYMENT_TIMEOUT_MS - transactionAge);
+  const remainingSeconds = Math.round(remainingTime / 1000);
+
+  console.log(`[PaymentPolling] Checking FedaPay payout ${transaction.id} (payoutId: ${fedapayPayoutId}, ${remainingSeconds}s remaining)`);
+
+  try {
+    const payoutStatus = await getFedaPayPayoutStatus(fedapayPayoutId);
+    
+    console.log(`[PaymentPolling] FedaPay payout ${transaction.id} - status:`, payoutStatus.status);
+
+    if (payoutStatus.status === "sent" || payoutStatus.status === "approved") {
+      await storage.updateTransactionStatus(transaction.id, "completed");
+      console.log(`[PaymentPolling] ✅ FedaPay payout ${transaction.id} COMPLETED`);
+      return true;
+    } else if (payoutStatus.status === "declined" || payoutStatus.status === "canceled" || payoutStatus.status === "failed") {
+      console.log(`[PaymentPolling] ❌ FedaPay payout ${transaction.id} failed (status: ${payoutStatus.status})`);
+      await storage.updateTransactionStatus(transaction.id, "failed");
+      
+      // Refund the balance
+      const deductedAmount = metadata.deductedFromBalance;
+      if (deductedAmount) {
+        await storage.updateUserBalance(transaction.userId, deductedAmount);
+        console.log(`[PaymentPolling] Refunded ${deductedAmount} to user ${transaction.userId}`);
+      }
+      return true;
+    } else {
+      // Still pending
+      if (hasPaymentExpired(transaction)) {
+        console.log(`[PaymentPolling] ⏱️ FedaPay payout ${transaction.id} TIMEOUT (10min) - marking as failed`);
+        await storage.updateTransactionStatus(transaction.id, "failed");
+        
+        // Refund the balance
+        const deductedAmount = metadata.deductedFromBalance;
+        if (deductedAmount) {
+          await storage.updateUserBalance(transaction.userId, deductedAmount);
+          console.log(`[PaymentPolling] Refunded ${deductedAmount} to user ${transaction.userId}`);
+        }
+        return true;
+      }
+      console.log(`[PaymentPolling] ⏳ FedaPay payout ${transaction.id} still pending (${remainingSeconds}s remaining)`);
+      return false;
+    }
+  } catch (error) {
+    console.error(`[PaymentPolling] Error checking FedaPay payout ${transaction.id}:`, error);
+    if (hasPaymentExpired(transaction)) {
+      console.log(`[PaymentPolling] ⏱️ FedaPay payout ${transaction.id} expired with error - marking as failed`);
+      await storage.updateTransactionStatus(transaction.id, "failed");
+      
+      // Refund the balance
+      const deductedAmount = metadata.deductedFromBalance;
+      if (deductedAmount) {
+        await storage.updateUserBalance(transaction.userId, deductedAmount);
+        console.log(`[PaymentPolling] Refunded ${deductedAmount} to user ${transaction.userId}`);
+      }
+      return true;
+    }
+    return false;
+  }
+}
+
 async function processPaydunyaTransaction(transaction: Transaction & { user?: User }): Promise<void> {
   const transactionAge = getTransactionAge(transaction);
   const remainingTime = Math.max(0, PAYMENT_TIMEOUT_MS - transactionAge);
@@ -200,19 +263,7 @@ async function processTransaction(transaction: Transaction & { user?: User }): P
 
   // Check if this is a FedaPay payout (withdrawal)
   if (metadata.fedapayPayoutId) {
-    // Payouts are handled differently - they complete immediately or fail
-    // We just check the status
-    const transactionAge = getTransactionAge(transaction);
-    if (transactionAge >= PAYMENT_TIMEOUT_MS) {
-      console.log(`[PaymentPolling] FedaPay payout ${transaction.id} timed out - marking as failed`);
-      await storage.updateTransactionStatus(transaction.id, "failed");
-      // Refund the balance
-      const deductedAmount = metadata.deductedFromBalance;
-      if (deductedAmount) {
-        await storage.updateUserBalance(transaction.userId, deductedAmount);
-        console.log(`[PaymentPolling] Refunded ${deductedAmount} to user ${transaction.userId}`);
-      }
-    }
+    await processFedaPayPayout(transaction, metadata);
     return;
   }
 
