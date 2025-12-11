@@ -14,8 +14,15 @@ import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { CheckCircle2, Clock, Loader2, AlertCircle, XCircle, RefreshCw, ExternalLink, Copy, Check } from "lucide-react";
+
+interface ConversionData {
+  convertedAmount: number;
+  targetCurrency: string;
+  conversionRate: number;
+  isLoading: boolean;
+}
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { usePaymentCountdown } from "@/hooks/use-payment-countdown";
 
@@ -112,6 +119,7 @@ export default function Merchant() {
   const [savedCountry, setSavedCountry] = useState<string>("");
   const [savedOperator, setSavedOperator] = useState<string>("");
   const [copiedUssd, setCopiedUssd] = useState(false);
+  const [conversionData, setConversionData] = useState<ConversionData | null>(null);
   const { toast } = useToast();
 
   const copyUssdCode = (code: string) => {
@@ -195,6 +203,55 @@ export default function Merchant() {
   
   // Déterminer si aucun opérateur n'est disponible (après chargement)
   const noOperatorsAvailable = !isLoadingOperators && selectedCountry && countryOperators.length === 0;
+
+  // Watch amount for currency conversion
+  const watchedAmount = form.watch("amount");
+
+  // Guinea currency conversion (XOF -> GNF)
+  const isGuinea = selectedCountry?.toLowerCase() === "gn";
+  
+  const fetchConversion = useCallback(async (amountToConvert: number) => {
+    if (!amountToConvert || amountToConvert <= 0) {
+      setConversionData(null);
+      return;
+    }
+
+    setConversionData(prev => prev ? { ...prev, isLoading: true } : { convertedAmount: 0, targetCurrency: "GNF", conversionRate: 0, isLoading: true });
+
+    try {
+      const res = await fetch("/api/convert-currency", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: amountToConvert, fromCurrency: "XOF", toCurrency: "GNF" }),
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        setConversionData({
+          convertedAmount: data.convertedAmount,
+          targetCurrency: data.targetCurrency,
+          conversionRate: data.conversionRate,
+          isLoading: false,
+        });
+      } else {
+        setConversionData(null);
+      }
+    } catch (error) {
+      console.error("Currency conversion error:", error);
+      setConversionData(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isGuinea && watchedAmount && watchedAmount > 0) {
+      const debounceTimer = setTimeout(() => {
+        fetchConversion(watchedAmount);
+      }, 500);
+      return () => clearTimeout(debounceTimer);
+    } else {
+      setConversionData(null);
+    }
+  }, [isGuinea, watchedAmount, fetchConversion]);
 
   // Fonction pour recommencer un nouveau paiement
   const handleNewPayment = () => {
@@ -945,6 +1002,30 @@ export default function Merchant() {
                   </FormItem>
                 )}
               />
+              
+              {isGuinea && conversionData && (
+                <div className="bg-green-50 dark:bg-green-950 p-3 rounded-md border border-green-200 dark:border-green-800">
+                  <p className="text-xs sm:text-sm text-green-700 dark:text-green-300 font-medium">
+                    Montant en Franc Guineen (GNF)
+                  </p>
+                  {conversionData.isLoading ? (
+                    <div className="flex items-center gap-2 mt-1">
+                      <Loader2 className="h-4 w-4 animate-spin text-green-600" />
+                      <span className="text-sm text-green-600">Conversion en cours...</span>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-base sm:text-lg font-bold text-green-800 dark:text-green-200" data-testid="text-converted-amount">
+                        {new Intl.NumberFormat("fr-FR").format(conversionData.convertedAmount)} GNF
+                      </p>
+                      <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                        Taux: 1 XOF = {conversionData.conversionRate.toFixed(4)} GNF
+                      </p>
+                    </>
+                  )}
+                </div>
+              )}
+              
               <Button
                 type="submit"
                 className="w-full"
