@@ -31,9 +31,9 @@ export const FEDAPAY_COLLECT_OPERATORS: Record<string, FedaPayOperator> = {
 export const FEDAPAY_PAYOUT_OPERATORS: Record<string, FedaPayOperator> = {
   mtn_bj: { code: "mtn_open", name: "MTN", countries: ["bj"] },
   moov_bj: { code: "moov", name: "Moov", countries: ["bj"] },
-  celtiis_bj: { code: "celtiis", name: "Celtiis", countries: ["bj"] },
+  celtiis_bj: { code: "sbin", name: "Celtiis", countries: ["bj"] },
   moov_tg: { code: "moov_tg", name: "Moov", countries: ["tg"] },
-  togocom_tg: { code: "togocom", name: "TogoCom", countries: ["tg"] },
+  togocom_tg: { code: "togocel", name: "TogoCom", countries: ["tg"] },
   mtn_ci: { code: "mtn_ci", name: "MTN", countries: ["ci"] },
   moov_ci: { code: "moov_ci", name: "Moov", countries: ["ci"] },
   wave_ci: { code: "wave_ci", name: "Wave", countries: ["ci"] },
@@ -41,7 +41,7 @@ export const FEDAPAY_PAYOUT_OPERATORS: Record<string, FedaPayOperator> = {
   wave_sn: { code: "wave_sn", name: "Wave", countries: ["sn"] },
   orange_sn: { code: "orange_sn", name: "Orange", countries: ["sn"] },
   moov_bf: { code: "moov_bf", name: "Moov", countries: ["bf"] },
-  orange_bf: { code: "orange_bf", name: "Orange", countries: ["bf"] },
+  orange_bf: { code: "orange-bf", name: "Orange", countries: ["bf"] },
   mtn_gn: { code: "mtn_open_gn", name: "MTN Guinea", countries: ["gn"] },
 };
 
@@ -212,19 +212,32 @@ export async function createPayout(params: CreatePayoutParams): Promise<PayoutRe
       return { success: false, error: `Operateur ${params.operator} non supporte pour les retraits vers ${params.country}` };
     }
 
+    // Clean and format phone number for FedaPay payout (needs full international format with +)
     let sanitizedPhone = params.customerPhone.replace(/\s+/g, "").replace(/[^0-9+]/g, "");
-    if (sanitizedPhone.startsWith("+")) {
-      sanitizedPhone = sanitizedPhone.substring(1);
-    }
+    
     const countryPrefixes: Record<string, string> = {
       "bj": "229", "tg": "228", "ci": "225", "sn": "221", "gn": "224", "ne": "227", "bf": "226"
     };
     const prefix = countryPrefixes[params.country.toLowerCase()];
-    if (prefix && sanitizedPhone.startsWith(prefix)) {
-      sanitizedPhone = sanitizedPhone.substring(prefix.length);
+    
+    // Remove + if present for processing
+    if (sanitizedPhone.startsWith("+")) {
+      sanitizedPhone = sanitizedPhone.substring(1);
     }
+    
+    // Add country prefix if not present
+    if (prefix && !sanitizedPhone.startsWith(prefix)) {
+      // Remove leading 0 if present (local format)
+      if (sanitizedPhone.startsWith("0")) {
+        sanitizedPhone = sanitizedPhone.substring(1);
+      }
+      sanitizedPhone = prefix + sanitizedPhone;
+    }
+    
+    // Add + for international format (required by FedaPay payouts)
+    const fullPhoneNumber = "+" + sanitizedPhone;
 
-    console.log(`[FedaPay Payout] Creating payout: ${params.amount} XOF, ${params.operator}/${params.country}, phone: ${sanitizedPhone.slice(-4)}`);
+    console.log(`[FedaPay Payout] Creating payout: ${params.amount} XOF, ${operatorCode}/${params.country}, phone: ${fullPhoneNumber.slice(-4)}`);
 
     const payout = await Payout.create({
       amount: params.amount,
@@ -235,7 +248,7 @@ export async function createPayout(params: CreatePayoutParams): Promise<PayoutRe
         lastname: params.customerLastName,
         email: params.customerEmail,
         phone_number: {
-          number: sanitizedPhone,
+          number: fullPhoneNumber,
           country: params.country.toLowerCase(),
         },
       },
