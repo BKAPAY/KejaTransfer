@@ -14,18 +14,19 @@ const COUNTRIES: Record<string, { name: string; code: string }> = {
   CI: { name: "Côte d'Ivoire", code: "CI" },
   SN: { name: "Sénégal", code: "SN" },
   BF: { name: "Burkina Faso", code: "BF" },
-  ML: { name: "Mali", code: "ML" },
+  GN: { name: "Guinée", code: "GN" },
+  NE: { name: "Niger", code: "NE" },
 };
 
 const OPERATORS: Record<string, string> = {
-  orange: "Orange",
   mtn: "MTN",
   moov: "Moov",
+  celtiis: "Celtiis",
+  togocom: "TogoCom",
+  orange: "Orange",
   wave: "Wave",
-  free: "Free",
-  tmoney: "T-Money",
-  wizall: "Wizall",
-  expresso: "Expresso",
+  free: "Free Sénégal",
+  airtel: "Airtel Niger",
 };
 
 export default function CountryOperatorConfig() {
