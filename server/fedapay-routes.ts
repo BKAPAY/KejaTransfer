@@ -136,8 +136,7 @@ export async function handleFedaPayWithdrawal(
 
     await storage.updateUserBalance(userId, -feeInfo.totalDeductedFromBalance);
 
-    const transactionId = randomUUID();
-    await storage.createTransaction({
+    const tx = await storage.createTransaction({
       userId: userId,
       type: "withdrawal",
       amount: netAmount,
@@ -159,7 +158,7 @@ export async function handleFedaPayWithdrawal(
 
     return {
       success: true,
-      transactionId: transactionId,
+      transactionId: tx.id,
       message: result.message || "Retrait initie avec succes",
     };
   } catch (error: any) {
@@ -209,8 +208,7 @@ export async function handlePaymentLinkPayment(
       return { success: false, error: result.error || "Erreur lors du paiement" };
     }
 
-    const transactionId = randomUUID();
-    await storage.createTransaction({
+    const tx = await storage.createTransaction({
       userId: paymentLink.userId,
       type: "payment_link",
       amount: feeInfo.grossAmount,
@@ -233,7 +231,7 @@ export async function handlePaymentLinkPayment(
 
     return {
       success: true,
-      transactionId: transactionId,
+      transactionId: tx.id,
       message: result.message || "Paiement initie. Veuillez valider sur votre telephone.",
     };
   } catch (error: any) {
@@ -284,8 +282,7 @@ export async function handleMerchantLinkPayment(
       return { success: false, error: result.error || "Erreur lors du paiement" };
     }
 
-    const transactionId = randomUUID();
-    await storage.createTransaction({
+    const tx = await storage.createTransaction({
       userId: merchantLink.userId,
       type: "merchant_link",
       amount: feeInfo.grossAmount,
@@ -308,7 +305,7 @@ export async function handleMerchantLinkPayment(
 
     return {
       success: true,
-      transactionId: transactionId,
+      transactionId: tx.id,
       message: result.message || "Paiement initie. Veuillez valider sur votre telephone.",
     };
   } catch (error: any) {
@@ -366,8 +363,7 @@ export async function handleApiPayment(
       return { success: false, error: result.error || "Erreur lors du paiement" };
     }
 
-    const transactionId = randomUUID();
-    await storage.createTransaction({
+    const tx = await storage.createTransaction({
       userId: apiKey.userId,
       type: "api_payment",
       amount: feeInfo.grossAmount,
@@ -391,7 +387,7 @@ export async function handleApiPayment(
 
     return {
       success: true,
-      transactionId: transactionId,
+      transactionId: tx.id,
       message: result.message || "Paiement initie. Veuillez valider sur votre telephone.",
     };
   } catch (error: any) {
