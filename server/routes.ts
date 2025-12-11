@@ -2708,19 +2708,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/softpay/verify-payment", async (req: Request, res: Response) => {
     try {
       const { invoiceToken, transactionId } = req.body;
+      
+      console.log("[VERIFY] Request received:", { invoiceToken, transactionId });
 
-      // If transactionId is provided, check if it's a FedaPay transaction
-      if (transactionId) {
-        const transaction = await storage.getTransaction(transactionId);
+      // Check by transactionId first (FedaPay or DB status check)
+      const txId = transactionId || invoiceToken; // Both might contain the BKApay transaction ID
+      if (txId) {
+        const transaction = await storage.getTransaction(txId);
+        console.log("[VERIFY] Transaction lookup:", { txId, found: !!transaction, status: transaction?.status });
+        
         if (transaction) {
           let metadata: any = {};
           try {
             metadata = JSON.parse(transaction.metadata || "{}");
           } catch (e) {}
+          
+          console.log("[VERIFY] Transaction metadata:", { fedapayTransactionId: metadata.fedapayTransactionId });
 
           // If it's a FedaPay transaction, verify via FedaPay API
           if (metadata.fedapayTransactionId) {
-            console.log("[VERIFY] Checking FedaPay transaction:", transactionId, "fedapayId:", metadata.fedapayTransactionId);
+            console.log("[VERIFY] Checking FedaPay transaction:", txId, "fedapayId:", metadata.fedapayTransactionId);
             
             const fedapayStatus = await getTransactionStatus(metadata.fedapayTransactionId);
             console.log("[VERIFY] FedaPay status:", fedapayStatus.status);
@@ -2747,21 +2754,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
           
-          // Check DB status for non-FedaPay transactions
+          // Check DB status for non-FedaPay transactions (pending in DB)
           if (transaction.status === "completed") {
             return res.json({ status: "completed", response_code: "00" });
           } else if (transaction.status === "failed") {
             return res.json({ status: "failed", response_code: "05" });
           }
+          
+          // Transaction exists but is still pending and has no FedaPay ID
+          // Return pending (no need to check Paydunya with a BKApay UUID)
+          console.log("[VERIFY] Transaction pending, no FedaPay ID, returning pending");
+          return res.json({ status: "pending", response_code: "01" });
         }
       }
 
-      // Fallback to Paydunya verification if invoiceToken provided
-      if (!invoiceToken) {
-        return res.status(400).json({ error: "Token invalide" });
+      // Fallback to Paydunya verification only for actual Paydunya tokens
+      // Paydunya tokens are NOT UUIDs, they are different format
+      if (!invoiceToken || invoiceToken.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+        console.log("[VERIFY] No valid Paydunya token, returning pending");
+        return res.json({ status: "pending", response_code: "01" });
       }
 
-      console.log("[SOFTPAY VERIFY] Checking payment status for token:", invoiceToken);
+      console.log("[SOFTPAY VERIFY] Checking payment status for Paydunya token:", invoiceToken);
 
       // Call Paydunya checkout-invoice/confirm API (GET request)
       const paydunyaResponse = await callPaydunyaAPIGet("/checkout-invoice/confirm/" + invoiceToken);
