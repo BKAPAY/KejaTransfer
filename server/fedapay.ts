@@ -260,7 +260,19 @@ export async function createPayout(params: CreatePayoutParams): Promise<PayoutRe
     };
   } catch (error: any) {
     console.error("[FedaPay Payout] Error:", error);
-    const errorMessage = error?.message || error?.toString() || "Erreur inconnue";
+    
+    // Check for specific FedaPay error messages
+    const fedapayMessage = error?.httpResponse?.data?.message;
+    const httpStatus = error?.httpStatus;
+    
+    if (httpStatus === 403 || fedapayMessage === "Opération non autorisée") {
+      return { 
+        success: false, 
+        error: "Les retraits ne sont pas disponibles pour le moment. Veuillez contacter le support." 
+      };
+    }
+    
+    const errorMessage = fedapayMessage || error?.message || error?.toString() || "Erreur inconnue";
     return { success: false, error: errorMessage };
   }
 }
