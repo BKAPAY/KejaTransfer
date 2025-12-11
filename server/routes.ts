@@ -2703,12 +2703,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Verify SOFTPAY Payment - Polling endpoint (uses checkout-invoice/confirm GET API)
-  // CRITICAL SECURITY: Only mark transactions complete after STRICT Paydunya validation
+  // Verify Payment - Polling endpoint (supports both FedaPay and Paydunya)
+  // CRITICAL SECURITY: Only mark transactions complete after STRICT validation
   app.post("/api/softpay/verify-payment", async (req: Request, res: Response) => {
     try {
-      const { invoiceToken } = req.body;
+      const { invoiceToken, transactionId } = req.body;
 
+      // If transactionId is provided, check if it's a FedaPay transaction
+      if (transactionId) {
+        const transaction = await storage.getTransaction(transactionId);
+        if (transaction) {
+          let metadata: any = {};
+          try {
+            metadata = JSON.parse(transaction.metadata || "{}");
+          } catch (e) {}
+
+          // If it's a FedaPay transaction, verify via FedaPay API
+          if (metadata.fedapayTransactionId) {
+            console.log("[VERIFY] Checking FedaPay transaction:", transactionId, "fedapayId:", metadata.fedapayTransactionId);
+            
+            const fedapayStatus = await getTransactionStatus(metadata.fedapayTransactionId);
+            console.log("[VERIFY] FedaPay status:", fedapayStatus.status);
+
+            if (fedapayStatus.status === "approved" || fedapayStatus.status === "transferred") {
+              if (transaction.status === "pending") {
+                const result = await storage.finalizeIncomingTransaction(transaction.id, {});
+                console.log("[VERIFY] FedaPay transaction finalized:", result ? "success" : "already processed");
+              }
+              return res.json({ status: "completed", response_code: "00" });
+            } else if (fedapayStatus.status === "declined" || fedapayStatus.status === "canceled" || fedapayStatus.status === "refunded") {
+              if (transaction.status === "pending") {
+                await storage.updateTransactionStatus(transaction.id, "failed");
+              }
+              return res.json({ status: "failed", response_code: "05" });
+            } else {
+              // Check transaction status in DB (might have been updated by polling)
+              if (transaction.status === "completed") {
+                return res.json({ status: "completed", response_code: "00" });
+              } else if (transaction.status === "failed") {
+                return res.json({ status: "failed", response_code: "05" });
+              }
+              return res.json({ status: "pending", response_code: "01" });
+            }
+          }
+          
+          // Check DB status for non-FedaPay transactions
+          if (transaction.status === "completed") {
+            return res.json({ status: "completed", response_code: "00" });
+          } else if (transaction.status === "failed") {
+            return res.json({ status: "failed", response_code: "05" });
+          }
+        }
+      }
+
+      // Fallback to Paydunya verification if invoiceToken provided
       if (!invoiceToken) {
         return res.status(400).json({ error: "Token invalide" });
       }
@@ -2720,15 +2768,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log("[SOFTPAY VERIFY] Paydunya response:", JSON.stringify(paydunyaResponse));
 
-      // STRICT VALIDATION: Paydunya returns status at ROOT level OR in invoice object
-      // Format: { response_code: "00", status: "completed", invoice: {...} }
-      // The status field at root level indicates payment completion
       const hasValidInvoice = paydunyaResponse.invoice && typeof paydunyaResponse.invoice === 'object';
-      // Check status at ROOT level first (Paydunya's actual format), then fallback to invoice.status
       const paymentStatus = paydunyaResponse.status || paydunyaResponse.invoice?.status;
       const responseText = paydunyaResponse.response_text || '';
       
-      // Log validation details for debugging
       console.log("[SOFTPAY VERIFY] Validation:", {
         hasValidInvoice,
         rootStatus: paydunyaResponse.status,
@@ -2738,10 +2781,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         responseText: responseText.substring(0, 100),
       });
       
-      // ONLY mark as completed if ALL conditions are met:
-      // 1. response_code is "00"
-      // 2. invoice object exists
-      // 3. status (at root or in invoice) is explicitly "completed"
       if (paydunyaResponse.response_code === "00" && hasValidInvoice && paymentStatus === "completed") {
         const transaction = await storage.getTransactionByPaydunyaToken(invoiceToken);
         
@@ -2772,7 +2811,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       } else if (paymentStatus === "canceled" || paymentStatus === "cancelled" || 
                  paymentStatus === "fail" || paymentStatus === "failed") {
-        // Paydunya explicitly says payment failed/cancelled
         const transaction = await storage.getTransactionByPaydunyaToken(invoiceToken);
         if (transaction && transaction.status === "pending") {
           await storage.updateTransactionStatus(transaction.id, "failed");
@@ -2787,8 +2825,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           response_code: "05",
         });
       } else {
-        // Payment still pending or invalid response - keep polling
-        // This covers: no invoice object, pending status, unknown status
         console.log("[SOFTPAY VERIFY] Payment still pending or awaiting confirmation:", {
           paymentStatus,
           hasValidInvoice,
@@ -2802,7 +2838,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     } catch (error: any) {
       console.error("[SOFTPAY VERIFY] Error:", error);
-      // On error, return pending to continue polling (don't fail prematurely)
       res.json({
         status: "pending",
         response_code: "01",
@@ -3660,10 +3695,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           operator,
         });
 
-        await storage.updateTransactionMetadata(transactionId, updatedMetadata, {
-          country: country.toUpperCase(),
-          operator,
-        });
+        await storage.updateTransactionMetadata(transactionId, updatedMetadata);
 
         res.json({
           success: true,

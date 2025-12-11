@@ -152,14 +152,14 @@ export function usePaymentCountdown({
 
   // Payment status polling
   useEffect(() => {
-    if (!enabled || !invoiceToken || status !== "pending") return;
+    if (!enabled || (!invoiceToken && !transactionId) || status !== "pending") return;
 
     const pollPaymentStatus = async () => {
       try {
         const res = await fetch("/api/softpay/verify-payment", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ invoiceToken }),
+          body: JSON.stringify({ invoiceToken, transactionId }),
         });
         const data = await res.json();
 
@@ -198,7 +198,7 @@ export function usePaymentCountdown({
         clearInterval(pollRef.current);
       }
     };
-  }, [enabled, invoiceToken, storageKey, status, onCompleted, onFailed]);
+  }, [enabled, invoiceToken, transactionId, storageKey, status, onCompleted, onFailed]);
 
   // Cleanup on unmount when not in polling mode
   useEffect(() => {
