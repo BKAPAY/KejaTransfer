@@ -201,43 +201,85 @@ export const CURRENCY_CONVERSION_RATES: Record<string, number> = {
 };
 
 // Country and operator constants
+// Countries supported by FedaPay (7 countries total)
+// Collect (incoming): BJ, TG, CI, SN, GN, NE
+// Payout (outgoing): BJ, TG, CI, SN, BF, GN
 export const COUNTRIES = [
-  { code: "BJ", name: "Bénin", flag: "🇧🇯" },
-  { code: "TG", name: "Togo", flag: "🇹🇬" },
-  { code: "CI", name: "Côte d'Ivoire", flag: "🇨🇮" },
-  { code: "SN", name: "Sénégal", flag: "🇸🇳" },
-  { code: "BF", name: "Burkina Faso", flag: "🇧🇫" },
-  { code: "ML", name: "Mali", flag: "🇲🇱" },
+  { code: "BJ", name: "Benin", flag: "BJ" },
+  { code: "TG", name: "Togo", flag: "TG" },
+  { code: "CI", name: "Cote d'Ivoire", flag: "CI" },
+  { code: "SN", name: "Senegal", flag: "SN" },
+  { code: "BF", name: "Burkina Faso", flag: "BF" },
+  { code: "GN", name: "Guinee", flag: "GN" },
+  { code: "NE", name: "Niger", flag: "NE" },
 ] as const;
 
+// Operators by country for FedaPay
+// Codes are simple operator names (mtn, moov, etc.) - backend combines with country
+// Collect = incoming payments (deposits, payment links)
+// Payout = outgoing payments (withdrawals)
 export const OPERATORS = {
-  SN: [
-    { code: "orange", name: "Orange Money" },
-    { code: "free", name: "Free Money" },
-    { code: "expresso", name: "Expresso" },
-    { code: "wave", name: "Wave" },
-    { code: "wizall", name: "Wizall" },
-  ],
-  CI: [
-    { code: "orange", name: "Orange Money" },
-    { code: "mtn", name: "MTN" },
-    { code: "moov", name: "Moov" },
-    { code: "wave", name: "Wave" },
-  ],
-  BF: [
-    { code: "orange", name: "Orange Money" },
-    { code: "moov", name: "Moov" },
-  ],
+  // Benin - Collect: MTN, Moov, Celtiis | Payout: MTN, Moov, Celtiis
   BJ: [
-    { code: "moov", name: "Moov" },
-    { code: "mtn", name: "MTN" },
+    { code: "mtn", name: "MTN Mobile Money" },
+    { code: "moov", name: "Moov Money" },
+    { code: "celtiis", name: "Celtiis" },
   ],
+  // Togo - Collect: Moov, TogoCom | Payout: Moov, TogoCom
   TG: [
-    { code: "tmoney", name: "T-Money" },
-    { code: "moov", name: "Moov" },
+    { code: "togocom", name: "TogoCom (TMoney)" },
+    { code: "moov", name: "Moov Money" },
   ],
-  ML: [
+  // Cote d'Ivoire - Collect: MTN | Payout: MTN, Moov, Wave, Orange
+  CI: [
+    { code: "mtn", name: "MTN Mobile Money" },
+    { code: "moov", name: "Moov Money" },
+    { code: "wave", name: "Wave" },
     { code: "orange", name: "Orange Money" },
-    { code: "moov", name: "Moov" },
+  ],
+  // Senegal - Collect: Free | Payout: Wave, Orange
+  SN: [
+    { code: "free", name: "Free Money" },
+    { code: "wave", name: "Wave" },
+    { code: "orange", name: "Orange Money" },
+  ],
+  // Burkina Faso - Collect: None | Payout: Moov, Orange
+  BF: [
+    { code: "moov", name: "Moov Money" },
+    { code: "orange", name: "Orange Money" },
+  ],
+  // Guinee - Collect: MTN | Payout: MTN
+  GN: [
+    { code: "mtn", name: "MTN Mobile Money" },
+  ],
+  // Niger - Collect: Airtel | Payout: None
+  NE: [
+    { code: "airtel", name: "Airtel Money" },
   ],
 } as const;
+
+// Countries that support collect (deposits/incoming payments) via FedaPay
+export const COLLECT_COUNTRIES = ["BJ", "TG", "CI", "SN", "GN", "NE"] as const;
+
+// Countries that support payout (withdrawals/outgoing payments) via FedaPay
+export const PAYOUT_COUNTRIES = ["BJ", "TG", "CI", "SN", "BF", "GN"] as const;
+
+// Operators available for collect by country
+export const COLLECT_OPERATORS: Record<string, string[]> = {
+  BJ: ["mtn", "moov", "celtiis"],
+  TG: ["moov", "togocom"],
+  CI: ["mtn"],
+  SN: ["free"],
+  GN: ["mtn"],
+  NE: ["airtel"],
+};
+
+// Operators available for payout by country
+export const PAYOUT_OPERATORS: Record<string, string[]> = {
+  BJ: ["mtn", "moov", "celtiis"],
+  TG: ["moov", "togocom"],
+  CI: ["mtn", "moov", "wave", "orange"],
+  SN: ["wave", "orange"],
+  BF: ["moov", "orange"],
+  GN: ["mtn"],
+};

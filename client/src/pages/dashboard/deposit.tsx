@@ -1,7 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
@@ -10,80 +9,36 @@ import { z } from "zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { COUNTRIES, OPERATORS } from "@shared/schema";
+import { COUNTRIES, OPERATORS, COLLECT_COUNTRIES } from "@shared/schema";
 import type { User } from "@shared/schema";
-import { ArrowDownToLine, CheckCircle2, Clock, Info, ExternalLink, Copy, Check } from "lucide-react";
+import { ArrowDownToLine, CheckCircle2, Clock, Info, Loader2, Smartphone } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { calculateIncomingFee } from "@/lib/fees";
 import { useState, useEffect } from "react";
 
-// Instructions USSD Orange par pays
-const ORANGE_INSTRUCTIONS: Record<string, string> = {
-  SN: "Composez #144#391*VOTRE CODE PIN ORANGE MONEY# pour obtenir votre code de paiement",
-  CI: "Composez #144*82# puis choisissez l'option 2 pour obtenir votre code de paiement",
-  BF: "Composez *144*4*6# pour obtenir votre code de paiement",
-};
-
-const ORANGE_USSD_CODES: Record<string, string> = {
-  SN: "#144#391*PIN#",
-  CI: "#144*82#",
-  BF: "*144*4*6#",
-};
-
-const ORANGE_USSD_HINTS: Record<string, string> = {
-  SN: "Remplacez PIN par votre code secret Orange Money",
-  CI: "Choisissez l'option 2 pour obtenir votre code",
-  BF: "Suivez les instructions pour obtenir votre code",
-};
-
-function getOrangeUssdCode(country: string): string {
-  return ORANGE_USSD_CODES[country] || "#144#391*PIN#";
-}
-
-function getOrangeUssdHint(country: string): string {
-  return ORANGE_USSD_HINTS[country] || "Suivez les instructions pour obtenir votre code";
-}
-
 const depositSchema = z.object({
-  amount: z.number().min(1, "Le montant doit être supérieur à 0"),
-  country: z.string().min(1, "Sélectionnez un pays"),
-  operator: z.string().min(1, "Sélectionnez un opérateur"),
-  phone: z.string().min(8, "Le numéro de téléphone est requis"),
+  amount: z.number().min(100, "Le montant minimum est de 100 XOF"),
+  country: z.string().min(1, "Selectionnez un pays"),
+  operator: z.string().min(1, "Selectionnez un operateur"),
+  phone: z.string().min(8, "Le numero de telephone est requis"),
 });
 
 type DepositFormData = z.infer<typeof depositSchema>;
 
 export default function Deposit() {
   const { toast } = useToast();
-  const [paymentStep, setPaymentStep] = useState<"form" | "otp" | "wizall-second" | "polling" | "redirect">("form");
+  const [paymentStep, setPaymentStep] = useState<"form" | "polling" | "completed">("form");
   const [paymentData, setPaymentData] = useState<{
     transactionId?: string;
-    token?: string;
-    ussdInstruction?: string;
-    requiresOTP?: boolean;
-    requiresTwoStep?: boolean;
-    wizallTransactionId?: string;
-    redirectUrl?: string;
+    fedapayTransactionId?: number;
+    message?: string;
   }>({});
-  const [otp, setOtp] = useState("");
   const [pollingStatus, setPollingStatus] = useState<string | null>(null);
-  const [copiedUssd, setCopiedUssd] = useState(false);
-
-  const copyUssdCode = (code: string) => {
-    navigator.clipboard.writeText(code);
-    setCopiedUssd(true);
-    setTimeout(() => setCopiedUssd(false), 2000);
-    toast({
-      title: "Code copié",
-      description: "Le code USSD a été copié dans le presse-papiers",
-    });
-  };
 
   const { data: user } = useQuery<User>({
     queryKey: ["/api/auth/me"],
   });
 
-  // Fetch enabled countries/operators for deposits
   const { data: enabledCountriesOperators } = useQuery<Record<string, string[]>>({
     queryKey: ["/api/countries-operators/deposits"],
   });
@@ -99,10 +54,10 @@ export default function Deposit() {
   });
 
   const selectedCountry = form.watch("country");
-  const selectedOperator = form.watch("operator");
   const amount = form.watch("amount");
+
+  const collectCountries = COUNTRIES.filter(c => COLLECT_COUNTRIES.includes(c.code as any));
   
-  // Filter operators based on admin configuration
   const allCountryOperators = selectedCountry
     ? (OPERATORS[selectedCountry as keyof typeof OPERATORS] || [])
     : [];
@@ -111,184 +66,108 @@ export default function Deposit() {
     ? allCountryOperators.filter(op => (enabledCountriesOperators[selectedCountry] || []).includes(op.code))
     : allCountryOperators;
 
-  // Calculate net amount in real-time
   const netAmount = selectedCountry && amount ? calculateIncomingFee(Math.floor(amount), selectedCountry).netAmount : 0;
 
-  // INIT: Create invoice and get instructions
-  const initPaymentMutation = useMutation({
+  const depositMutation = useMutation({
     mutationFn: async (data: DepositFormData) => {
-      const res = await apiRequest("POST", "/api/softpay/init-payment", {
-        ...data,
-        description: `Dépôt de ${data.amount} XOF`,
-        customerName: `${user?.firstName} ${user?.lastName}`,
-        customerEmail: user?.email,
-      });
+      const res = await apiRequest("POST", "/api/fedapay/deposit", data);
       return res.json();
     },
     onSuccess: (response: any) => {
-      setPaymentData(response);
-      
-      // Handle Wave redirect - Show redirect stage with button
-      if (response.redirectUrl) {
-        setPaymentStep("redirect");
-        toast({
-          title: "Paiement Wave",
-          description: "Cliquez sur le bouton pour compléter le paiement via Wave",
+      if (response.success) {
+        setPaymentData({
+          transactionId: response.transactionId,
+          fedapayTransactionId: response.fedapayTransactionId,
+          message: response.message,
         });
-        return;
-      }
-
-      // If requires OTP, show OTP input
-      if (response.requiresOTP) {
-        setPaymentStep("otp");
-        toast({
-          title: "Instructions reçues",
-          description: "Veuillez suivre les instructions USSD et entrer le code OTP",
-        });
-      } else {
-        // No OTP required, start polling
         setPaymentStep("polling");
         toast({
-          title: "Paiement initié",
-          description: "Vérification automatique en cours",
+          title: "Paiement initie",
+          description: response.message || "Veuillez valider le paiement sur votre telephone",
         });
-      }
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Erreur",
-        description: error.message || "Erreur lors de l'initialisation du paiement",
-        variant: "destructive",
-      });
-    },
-  });
-
-  // CONFIRM: Submit OTP
-  const confirmPaymentMutation = useMutation({
-    mutationFn: async ({ transactionId, token, authorizationCode, country, operator, phone, customerName, customerEmail }: { 
-      transactionId: string; 
-      token: string; 
-      authorizationCode: string;
-      country: string;
-      operator: string;
-      phone: string;
-      customerName: string;
-      customerEmail: string;
-    }) => {
-      const res = await apiRequest("POST", "/api/softpay/confirm-payment", {
-        transactionId,
-        token,
-        authorizationCode,
-        country,
-        operator,
-        phone,
-        customerName,
-        customerEmail,
-      });
-      return res.json();
-    },
-    onSuccess: (response: any) => {
-      // Check if this is Wizall first step (requires second OTP)
-      if (response.requiresOTP && response.wizallTransactionId) {
-        setPaymentData(prev => ({
-          ...prev,
-          wizallTransactionId: response.wizallTransactionId,
-        }));
-        setPaymentStep("wizall-second");
-        setOtp("");
+      } else {
         toast({
-          title: "Code OTP envoyé",
-          description: "Veuillez entrer le code OTP reçu par SMS pour Wizall",
+          title: "Erreur",
+          description: response.error || "Erreur lors du depot",
+          variant: "destructive",
         });
-        return;
       }
-
-      // Payment confirmed, start polling
-      setPaymentStep("polling");
-      toast({
-        title: "Paiement confirmé",
-        description: "Vérification en cours",
-      });
     },
     onError: (error: any) => {
       toast({
         title: "Erreur",
-        description: error.message || "Erreur lors de la confirmation du paiement",
+        description: error.message || "Erreur lors du depot",
         variant: "destructive",
       });
     },
   });
 
-  // Poll payment status
   useEffect(() => {
-    if (paymentStep !== "polling" || !paymentData.token) return;
+    if (paymentStep !== "polling" || !paymentData.transactionId) return;
 
     const interval = setInterval(async () => {
       try {
-        const res = await apiRequest("POST", "/api/softpay/verify-payment", {
-          invoiceToken: paymentData.token,
-        });
-        const result = await res.json();
+        const res = await fetch(`/api/transactions/${paymentData.transactionId}`);
+        if (res.ok) {
+          const tx = await res.json();
+          if (tx.status === "completed") {
+            setPollingStatus("completed");
+            setPaymentStep("completed");
+            clearInterval(interval);
+            
+            toast({
+              title: "Paiement reussi",
+              description: "Votre depot a ete complete",
+            });
 
-        if (result.status === "completed" || result.response_code === "00") {
-          setPollingStatus("completed");
-          setPaymentStep("form");
-          clearInterval(interval);
-          
-          toast({
-            title: "Paiement réussi",
-            description: "Votre dépôt a été complété",
-          });
-
-          // Refresh user balance and reset form
-          setTimeout(() => {
-            queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
-            queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
-            form.reset();
-            setPaymentData({});
-            setOtp("");
-            setPollingStatus(null);
-          }, 2000);
+            setTimeout(() => {
+              queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+              queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+              form.reset();
+              setPaymentData({});
+              setPollingStatus(null);
+              setPaymentStep("form");
+            }, 3000);
+          } else if (tx.status === "failed") {
+            setPaymentStep("form");
+            clearInterval(interval);
+            toast({
+              title: "Paiement echoue",
+              description: "Le paiement n'a pas abouti",
+              variant: "destructive",
+            });
+          }
         }
       } catch (error) {
         console.error("Payment verification error:", error);
       }
     }, 5000);
 
-    return () => clearInterval(interval);
-  }, [paymentStep, paymentData.token, toast, form]);
+    const timeout = setTimeout(() => {
+      clearInterval(interval);
+      if (paymentStep === "polling") {
+        setPaymentStep("form");
+        toast({
+          title: "Delai expire",
+          description: "Le paiement n'a pas ete confirme dans le delai imparti",
+          variant: "destructive",
+        });
+      }
+    }, 600000);
+
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timeout);
+    };
+  }, [paymentStep, paymentData.transactionId, toast, form]);
 
   const onSubmit = (data: DepositFormData) => {
-    initPaymentMutation.mutate(data);
-  };
-
-  const handleConfirmOTP = () => {
-    if (!otp || !paymentData.transactionId || !paymentData.token) {
-      toast({
-        title: "Erreur",
-        description: "Veuillez entrer le code OTP",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const formValues = form.getValues();
-    confirmPaymentMutation.mutate({
-      transactionId: paymentData.transactionId,
-      token: paymentData.token,
-      authorizationCode: otp,
-      country: formValues.country,
-      operator: formValues.operator,
-      phone: formValues.phone,
-      customerName: `${user?.firstName || ''} ${user?.lastName || ''}`.trim(),
-      customerEmail: user?.email || '',
-    });
+    depositMutation.mutate(data);
   };
 
   const handleBackToForm = () => {
     setPaymentStep("form");
     setPaymentData({});
-    setOtp("");
     form.reset();
   };
 
@@ -297,7 +176,7 @@ export default function Deposit() {
       <div>
         <h1 className="text-2xl font-bold text-foreground mb-1 flex items-center gap-2">
           <ArrowDownToLine className="h-5 w-5" />
-          Dépôt
+          Depot
         </h1>
         <p className="text-sm text-muted-foreground">
           Ajoutez des fonds via mobile money
@@ -316,79 +195,68 @@ export default function Deposit() {
         </Alert>
       )}
 
-      {paymentStep === "redirect" && paymentData.redirectUrl && (
+      {paymentStep === "polling" && (
         <Card>
-          <CardHeader className="pb-2 text-center">
-            <CardTitle className="text-lg">Paiement Wave</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800">
-              <Info className="h-4 w-4 text-blue-600" />
-              <AlertDescription className="text-sm text-blue-900 dark:text-blue-100 ml-2">
-                Cliquez sur le bouton ci-dessous pour être redirigé vers Wave et compléter votre paiement de manière sécurisée.
-              </AlertDescription>
-            </Alert>
-            
+          <CardContent className="py-8 text-center space-y-4">
+            <div className="flex justify-center">
+              <div className="relative">
+                <Smartphone className="h-16 w-16 text-primary" />
+                <div className="absolute -top-1 -right-1">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                </div>
+              </div>
+            </div>
+            <div>
+              <p className="font-semibold text-lg">Validation en attente</p>
+              <p className="text-sm text-muted-foreground mt-2">
+                {paymentData.message || "Une demande de paiement a ete envoyee sur votre telephone."}
+              </p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Veuillez valider le paiement sur votre application mobile money.
+              </p>
+            </div>
             <div className="text-center p-4 bg-muted rounded-lg">
-              <p className="text-sm text-muted-foreground">Montant à déposer</p>
+              <p className="text-sm text-muted-foreground">Montant</p>
               <p className="text-2xl font-bold text-primary">
                 {amount?.toLocaleString()} FCFA
               </p>
             </div>
-            
-            <Button
-              onClick={() => {
-                window.open(paymentData.redirectUrl, "_blank");
-                setPaymentStep("polling");
-              }}
-              className="w-full bg-blue-600 hover:bg-blue-700"
-              size="lg"
-              data-testid="button-wave-redirect"
-            >
-              <ExternalLink className="w-5 h-5 mr-2" />
-              Aller à Wave pour payer
-            </Button>
-            
-            <p className="text-xs text-muted-foreground text-center">
-              Après le paiement, revenez sur cette page. La vérification sera automatique.
-            </p>
-            
+            <Alert className="border-yellow-200 bg-yellow-50 dark:bg-yellow-950 dark:border-yellow-800">
+              <Clock className="h-4 w-4 text-yellow-600" />
+              <AlertDescription className="text-sm text-yellow-900 dark:text-yellow-100 ml-2">
+                Ne fermez pas cette page. La verification est automatique.
+              </AlertDescription>
+            </Alert>
             <Button
               onClick={handleBackToForm}
-              variant="ghost"
+              variant="outline"
               size="sm"
-              className="w-full text-muted-foreground"
-              data-testid="button-back-deposit"
+              data-testid="button-cancel-polling"
             >
-              Annuler et recommencer
+              Annuler
             </Button>
           </CardContent>
         </Card>
       )}
 
-      {paymentStep === "polling" && (
-        <Alert className="border-yellow-200 bg-yellow-50 dark:bg-yellow-950 dark:border-yellow-800">
-          <Clock className="h-4 w-4 text-yellow-600 dark:text-yellow-500" />
-          <AlertDescription className="text-sm text-yellow-900 dark:text-yellow-100 ml-2">
-            <strong>Paiement en cours:</strong> Veuillez compléter le paiement sur votre téléphone. 
-            Vérification automatique toutes les 5 secondes.
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {pollingStatus === "completed" && (
-        <Alert className="border-green-200 bg-green-50 dark:bg-green-950 dark:border-green-800">
-          <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-500" />
-          <AlertDescription className="text-sm text-green-900 dark:text-green-100 ml-2">
-            <strong>Paiement confirmé!</strong> Votre dépôt a été complété avec succès.
-          </AlertDescription>
-        </Alert>
+      {paymentStep === "completed" && (
+        <Card>
+          <CardContent className="py-8 text-center space-y-4">
+            <CheckCircle2 className="h-12 w-12 mx-auto text-green-600" />
+            <div>
+              <p className="font-semibold text-green-700">Paiement reussi!</p>
+              <p className="text-sm text-muted-foreground">
+                Votre depot a ete complete avec succes.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {paymentStep === "form" && (
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg">Détails du dépôt</CardTitle>
+            <CardTitle className="text-lg">Details du depot</CardTitle>
           </CardHeader>
           <CardContent>
             <Form {...form}>
@@ -404,6 +272,7 @@ export default function Deposit() {
                           type="number"
                           placeholder="10000"
                           data-testid="input-amount"
+                          min="100"
                           value={field.value || ""}
                           onChange={(e) => {
                             const val = e.target.value;
@@ -422,14 +291,20 @@ export default function Deposit() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Pays</FormLabel>
-                      <Select value={field.value} onValueChange={field.onChange}>
+                      <Select 
+                        value={field.value} 
+                        onValueChange={(value) => {
+                          field.onChange(value);
+                          form.setValue("operator", "");
+                        }}
+                      >
                         <FormControl>
                           <SelectTrigger data-testid="select-country">
-                            <SelectValue placeholder="Sélectionnez un pays" />
+                            <SelectValue placeholder="Selectionnez un pays" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {COUNTRIES.map((country) => (
+                          {collectCountries.map((country) => (
                             <SelectItem key={country.code} value={country.code}>
                               {country.name} ({country.code})
                             </SelectItem>
@@ -447,16 +322,16 @@ export default function Deposit() {
                     name="operator"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Opérateur</FormLabel>
+                        <FormLabel>Operateur</FormLabel>
                         {countryOperators.length === 0 ? (
                           <div className="text-sm text-muted-foreground p-3 bg-muted rounded-md">
-                            Aucun opérateur disponible pour ce pays
+                            Aucun operateur disponible pour ce pays
                           </div>
                         ) : (
                           <Select value={field.value} onValueChange={field.onChange}>
                             <FormControl>
                               <SelectTrigger data-testid="select-operator">
-                                <SelectValue placeholder="Sélectionnez un opérateur" />
+                                <SelectValue placeholder="Selectionnez un operateur" />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
@@ -479,7 +354,7 @@ export default function Deposit() {
                   name="phone"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Numéro de téléphone</FormLabel>
+                      <FormLabel>Numero de telephone</FormLabel>
                       <FormControl>
                         <Input
                           placeholder="77123456"
@@ -492,39 +367,10 @@ export default function Deposit() {
                   )}
                 />
 
-                {selectedOperator?.toLowerCase().includes("orange") && selectedCountry && ORANGE_INSTRUCTIONS[selectedCountry] && (
-                  <Alert className="border-orange-200 bg-orange-50 dark:bg-orange-950 dark:border-orange-800">
-                    <Info className="h-4 w-4 text-orange-600 dark:text-orange-500" />
-                    <AlertDescription className="text-sm text-orange-900 dark:text-orange-100 ml-2">
-                      <strong>Instructions Orange Money:</strong>
-                      <div className="mt-2 flex items-center gap-2">
-                        <div className="flex-1 bg-white dark:bg-gray-900 border border-orange-300 dark:border-orange-700 rounded-md px-3 py-2">
-                          <code className="text-base font-bold text-orange-700 dark:text-orange-400">
-                            {selectedCountry ? getOrangeUssdCode(selectedCountry) : "#144#391*PIN#"}
-                          </code>
-                        </div>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => copyUssdCode(selectedCountry ? getOrangeUssdCode(selectedCountry) : "#144#391*PIN#")}
-                          className="border-orange-300 hover:bg-orange-100 dark:hover:bg-orange-900"
-                          data-testid="button-copy-ussd"
-                        >
-                          {copiedUssd ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
-                        </Button>
-                      </div>
-                      <p className="mt-2 text-xs text-orange-700 dark:text-orange-400">
-                        {selectedCountry ? getOrangeUssdHint(selectedCountry) : "Suivez les instructions pour obtenir votre code"}
-                      </p>
-                    </AlertDescription>
-                  </Alert>
-                )}
-
                 {amount && selectedCountry && netAmount > 0 && (
                   <div className="bg-muted p-3 rounded-md border">
                     <p className="text-sm text-muted-foreground">
-                      Vous recevrez
+                      Vous recevrez (frais 6% deduits)
                     </p>
                     <p className="text-lg font-semibold text-foreground" data-testid="text-net-amount">
                       {new Intl.NumberFormat("fr-FR", {
@@ -539,11 +385,14 @@ export default function Deposit() {
                 <Button
                   type="submit"
                   className="w-full"
-                  disabled={initPaymentMutation.isPending}
+                  disabled={depositMutation.isPending || countryOperators.length === 0}
                   data-testid="button-submit-deposit"
                 >
-                  {initPaymentMutation.isPending ? (
-                    <>En cours...</>
+                  {depositMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      En cours...
+                    </>
                   ) : (
                     <>
                       <CheckCircle2 className="h-4 w-4 mr-2" />
@@ -553,79 +402,6 @@ export default function Deposit() {
                 </Button>
               </form>
             </Form>
-          </CardContent>
-        </Card>
-      )}
-
-      {(paymentStep === "otp" || paymentStep === "wizall-second") && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg">
-              {paymentStep === "wizall-second" ? "Confirmation Wizall - Étape 2" : "Confirmation du paiement"}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {paymentData.ussdInstruction && (
-              <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800">
-                <Info className="h-4 w-4 text-blue-600 dark:text-blue-500" />
-                <AlertDescription className="text-sm text-blue-900 dark:text-blue-100 ml-2">
-                  <strong>Instructions USSD:</strong>
-                  <p className="mt-1 font-mono">{paymentData.ussdInstruction}</p>
-                </AlertDescription>
-              </Alert>
-            )}
-
-            {paymentStep === "wizall-second" && paymentData.wizallTransactionId && (
-              <Alert className="border-purple-200 bg-purple-50 dark:bg-purple-950 dark:border-purple-800">
-                <Info className="h-4 w-4 text-purple-600 dark:text-purple-500" />
-                <AlertDescription className="text-sm text-purple-900 dark:text-purple-100 ml-2">
-                  <strong>Transaction Wizall:</strong>
-                  <p className="mt-1 font-mono text-xs">{paymentData.wizallTransactionId}</p>
-                </AlertDescription>
-              </Alert>
-            )}
-
-            <div className="space-y-2">
-              <Label htmlFor="otp">Code OTP</Label>
-              <Input
-                id="otp"
-                type="text"
-                placeholder="Entrez le code OTP"
-                data-testid="input-otp"
-                value={otp}
-                onChange={(e) => setOtp(e.target.value)}
-                maxLength={6}
-              />
-              <p className="text-xs text-muted-foreground">
-                Entrez le code reçu par SMS sur votre téléphone
-              </p>
-            </div>
-
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                onClick={handleBackToForm}
-                className="flex-1"
-                data-testid="button-cancel"
-              >
-                Annuler
-              </Button>
-              <Button
-                onClick={handleConfirmOTP}
-                disabled={confirmPaymentMutation.isPending || !otp}
-                className="flex-1"
-                data-testid="button-confirm-otp"
-              >
-                {confirmPaymentMutation.isPending ? (
-                  <>Vérification...</>
-                ) : (
-                  <>
-                    <CheckCircle2 className="h-4 w-4 mr-2" />
-                    Confirmer
-                  </>
-                )}
-              </Button>
-            </div>
           </CardContent>
         </Card>
       )}

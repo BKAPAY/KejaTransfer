@@ -1,7 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
@@ -10,20 +9,20 @@ import { z } from "zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { COUNTRIES, OPERATORS } from "@shared/schema";
+import { COUNTRIES, OPERATORS, PAYOUT_COUNTRIES } from "@shared/schema";
 import type { User } from "@shared/schema";
-import { ArrowUpFromLine, Info, CheckCircle2 } from "lucide-react";
+import { ArrowUpFromLine, Info, CheckCircle2, Loader2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { calculateOutgoingFee } from "@/lib/fees";
 
 const withdrawalSchema = z.object({
   amount: z.number().min(500, "Le montant minimum est de 500 XOF"),
-  country: z.string().min(1, "Sélectionnez un pays"),
-  operator: z.string().min(1, "Sélectionnez un opérateur"),
-  phone: z.string().min(7, "Numéro de téléphone invalide").regex(/^\d+$/, "Le numéro doit contenir uniquement des chiffres"),
-  phoneConfirm: z.string().min(7, "Confirmez le numéro de téléphone"),
+  country: z.string().min(1, "Selectionnez un pays"),
+  operator: z.string().min(1, "Selectionnez un operateur"),
+  phone: z.string().min(7, "Numero de telephone invalide").regex(/^\d+$/, "Le numero doit contenir uniquement des chiffres"),
+  phoneConfirm: z.string().min(7, "Confirmez le numero de telephone"),
 }).refine((data) => data.phone === data.phoneConfirm, {
-  message: "Numéro incorrect - les numéros ne correspondent pas",
+  message: "Numero incorrect - les numeros ne correspondent pas",
   path: ["phoneConfirm"],
 });
 
@@ -36,7 +35,6 @@ export default function Withdrawal() {
     queryKey: ["/api/auth/me"],
   });
 
-  // Fetch enabled countries/operators for withdrawals
   const { data: enabledCountriesOperators } = useQuery<Record<string, string[]>>({
     queryKey: ["/api/countries-operators/withdrawals"],
   });
@@ -54,8 +52,9 @@ export default function Withdrawal() {
 
   const selectedCountry = form.watch("country");
   const amount = form.watch("amount");
+
+  const payoutCountries = COUNTRIES.filter(c => PAYOUT_COUNTRIES.includes(c.code as any));
   
-  // Filter operators based on admin configuration
   const allCountryOperators = selectedCountry
     ? (OPERATORS[selectedCountry as keyof typeof OPERATORS] || [])
     : [];
@@ -64,27 +63,33 @@ export default function Withdrawal() {
     ? allCountryOperators.filter(op => (enabledCountriesOperators[selectedCountry] || []).includes(op.code))
     : allCountryOperators;
 
-  // Calculate total deducted in real-time
   const totalDeducted = selectedCountry && amount ? calculateOutgoingFee(Math.floor(amount), selectedCountry).totalDeductedFromBalance : 0;
   const feeInfo = selectedCountry && amount ? calculateOutgoingFee(Math.floor(amount), selectedCountry) : null;
 
   const withdrawalMutation = useMutation({
     mutationFn: async (data: WithdrawalFormData) => {
-      const res = await apiRequest("POST", "/api/withdrawals", data);
+      const res = await apiRequest("POST", "/api/fedapay/withdrawal", data);
       return res.json();
     },
     onSuccess: (response: any) => {
-      toast({
-        title: "Retrait effectué",
-        description: `Retrait de ${amount} XOF approuvé. Le montant de ${response.totalDeducted || totalDeducted} XOF a été débité de votre solde.`,
-      });
-      form.reset();
-      // Refetch user balance
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+      if (response.success) {
+        toast({
+          title: "Retrait initie",
+          description: `Le retrait de ${amount} XOF a ete initie avec succes.`,
+        });
+        form.reset();
+        queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+      } else {
+        toast({
+          title: "Erreur",
+          description: response.error || "Erreur lors du retrait",
+          variant: "destructive",
+        });
+      }
     },
     onError: (error: any) => {
-      const errorMessage = error.message || error.response?.data?.error || "Erreur lors du retrait";
+      const errorMessage = error.message || "Erreur lors du retrait";
       toast({
         title: "Erreur",
         description: errorMessage,
@@ -97,17 +102,16 @@ export default function Withdrawal() {
     if (!user) {
       toast({
         title: "Erreur",
-        description: "Utilisateur non trouvé",
+        description: "Utilisateur non trouve",
         variant: "destructive",
       });
       return;
     }
 
-    // Check KYC verification
     if (user.kycStatus !== "verified") {
       toast({
-        title: "Vérification KYC requise",
-        description: "Vous devez vérifier votre identité (KYC) avant de faire des retraits. Veuillez compléter la vérification dans vos paramètres.",
+        title: "Verification KYC requise",
+        description: "Vous devez verifier votre identite (KYC) avant de faire des retraits.",
         variant: "destructive",
       });
       return;
@@ -117,7 +121,7 @@ export default function Withdrawal() {
     if (user.balance < feeInfo.totalDeductedFromBalance) {
       toast({
         title: "Solde insuffisant",
-        description: `Vous avez ${user.balance} XOF. Total à déduire: ${feeInfo.totalDeductedFromBalance} XOF`,
+        description: `Vous avez ${user.balance} XOF. Total a deduire: ${feeInfo.totalDeductedFromBalance} XOF`,
         variant: "destructive",
       });
       return;
@@ -134,7 +138,7 @@ export default function Withdrawal() {
           Retrait
         </h1>
         <p className="text-sm text-muted-foreground">
-          Transférez de l'argent vers votre porte-monnaie mobile money
+          Transferez de l'argent vers votre porte-monnaie mobile money
         </p>
       </div>
 
@@ -152,7 +156,7 @@ export default function Withdrawal() {
 
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-lg">Détails du retrait</CardTitle>
+          <CardTitle className="text-lg">Details du retrait</CardTitle>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -188,14 +192,20 @@ export default function Withdrawal() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Pays de destination</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
+                    <Select 
+                      value={field.value} 
+                      onValueChange={(value) => {
+                        field.onChange(value);
+                        form.setValue("operator", "");
+                      }}
+                    >
                       <FormControl>
                         <SelectTrigger data-testid="select-withdrawal-country">
-                          <SelectValue placeholder="Sélectionnez un pays" />
+                          <SelectValue placeholder="Selectionnez un pays" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {COUNTRIES.map((country) => (
+                        {payoutCountries.map((country) => (
                           <SelectItem key={country.code} value={country.code}>
                             {country.name} ({country.code})
                           </SelectItem>
@@ -213,16 +223,16 @@ export default function Withdrawal() {
                   name="operator"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Opérateur/Porte-monnaie</FormLabel>
+                      <FormLabel>Operateur/Porte-monnaie</FormLabel>
                       {countryOperators.length === 0 ? (
                         <div className="text-sm text-muted-foreground p-3 bg-muted rounded-md">
-                          Aucun opérateur disponible pour ce pays
+                          Aucun operateur disponible pour ce pays
                         </div>
                       ) : (
                         <Select value={field.value} onValueChange={field.onChange}>
                           <FormControl>
                             <SelectTrigger data-testid="select-withdrawal-operator">
-                              <SelectValue placeholder="Sélectionnez un opérateur" />
+                              <SelectValue placeholder="Selectionnez un operateur" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
@@ -245,7 +255,7 @@ export default function Withdrawal() {
                 name="phone"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Numéro de téléphone (sans code pays)</FormLabel>
+                    <FormLabel>Numero de telephone (sans code pays)</FormLabel>
                     <FormControl>
                       <Input
                         placeholder="771234567"
@@ -255,7 +265,7 @@ export default function Withdrawal() {
                       />
                     </FormControl>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Exemple pour Sénégal: 771234567 (sans le +221)
+                      Exemple pour Senegal: 771234567 (sans le +221)
                     </p>
                     <FormMessage />
                   </FormItem>
@@ -267,7 +277,7 @@ export default function Withdrawal() {
                 name="phoneConfirm"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Confirmer le numéro de téléphone</FormLabel>
+                    <FormLabel>Confirmer le numero de telephone</FormLabel>
                     <FormControl>
                       <Input
                         placeholder="771234567"
@@ -277,7 +287,7 @@ export default function Withdrawal() {
                       />
                     </FormControl>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Saisissez à nouveau le numéro pour confirmer
+                      Saisissez a nouveau le numero pour confirmer
                     </p>
                     <FormMessage />
                   </FormItem>
@@ -290,7 +300,7 @@ export default function Withdrawal() {
                     <Info className="h-4 w-4 mt-0.5 text-muted-foreground flex-shrink-0" />
                     <div className="text-sm space-y-2 w-full">
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Montant à envoyer:</span>
+                        <span className="text-muted-foreground">Montant a envoyer:</span>
                         <span className="font-medium">
                           {new Intl.NumberFormat("fr-FR", {
                             style: "currency",
@@ -310,7 +320,7 @@ export default function Withdrawal() {
                         </span>
                       </div>
                       <div className="border-t pt-2 flex justify-between font-semibold">
-                        <span>Total débité du solde:</span>
+                        <span>Total debite du solde:</span>
                         <span className="text-foreground" data-testid="text-total-deducted">
                           {new Intl.NumberFormat("fr-FR", {
                             style: "currency",
@@ -327,11 +337,14 @@ export default function Withdrawal() {
               <Button
                 type="submit"
                 className="w-full"
-                disabled={withdrawalMutation.isPending || !user || user.kycStatus !== "verified"}
+                disabled={withdrawalMutation.isPending || !user || user.kycStatus !== "verified" || countryOperators.length === 0}
                 data-testid="button-submit-withdrawal"
               >
                 {withdrawalMutation.isPending ? (
-                  <>Traitement en cours...</>
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Traitement en cours...
+                  </>
                 ) : (
                   <>
                     <CheckCircle2 className="h-4 w-4 mr-2" />
@@ -347,7 +360,7 @@ export default function Withdrawal() {
       <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800">
         <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
         <AlertDescription className="text-xs text-blue-900 dark:text-blue-100 ml-2">
-          <strong>Conseil de sécurité:</strong> Vérifiez toujours le numéro de téléphone avant de soumettre le retrait. Les retraits sont irrévocables une fois soumis.
+          <strong>Conseil de securite:</strong> Verifiez toujours le numero de telephone avant de soumettre le retrait. Les retraits sont irrevocables une fois soumis.
         </AlertDescription>
       </Alert>
     </div>

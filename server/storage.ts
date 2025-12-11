@@ -69,6 +69,7 @@ export interface IStorage {
   getTransaction(id: string): Promise<Transaction | undefined>;
   getTransactions(userId: string, limit?: number): Promise<Transaction[]>;
   getTransactionByPaydunyaToken(paydunyaToken: string): Promise<Transaction | undefined>;
+  getTransactionByFedapayId(fedapayId: number): Promise<Transaction | undefined>;
   getAllPendingTransactions(): Promise<(Transaction & { user?: User })[]>;
   createTransaction(transaction: InsertTransaction): Promise<Transaction>;
   updateTransactionStatus(id: string, status: string, paydunyaData?: any): Promise<Transaction | undefined>;
@@ -394,6 +395,26 @@ export class DbStorage implements IStorage {
       .where(eq(schema.transactions.paydunyaToken, paydunyaToken))
       .limit(1);
     return results[0];
+  }
+
+  async getTransactionByFedapayId(fedapayId: number): Promise<Transaction | undefined> {
+    // Search in metadata for FedaPay transaction ID
+    const pendingTransactions = await db
+      .select()
+      .from(schema.transactions)
+      .where(eq(schema.transactions.status, "pending"));
+    
+    for (const tx of pendingTransactions) {
+      if (tx.metadata) {
+        try {
+          const metadata = JSON.parse(tx.metadata as string);
+          if (metadata.fedapayTransactionId === fedapayId || metadata.fedapayPayoutId === fedapayId) {
+            return tx;
+          }
+        } catch {}
+      }
+    }
+    return undefined;
   }
 
   async getAllPendingTransactions(): Promise<(Transaction & { user?: User })[]> {
@@ -797,26 +818,46 @@ export class DbStorage implements IStorage {
     const existing = await this.getCountryOperatorConfigs();
     if (existing.length > 0) return;
 
-    // Initialize all country/operator combinations as enabled
-    const countries = ["BJ", "TG", "CI", "SN", "BF", "ML"];
-    const operators: Record<string, string[]> = {
-      BJ: ["mtn", "moov"],
-      TG: ["tmoney", "moov"],
-      CI: ["orange", "mtn", "moov", "wave"],
-      SN: ["orange", "free", "expresso", "wave", "wizall"],
-      BF: ["orange", "moov"],
-      ML: ["orange", "moov"],
+    // Initialize FedaPay country/operator combinations
+    // Collect (incoming payments): BJ, TG, CI, SN, GN, NE
+    // Payout (outgoing payments): BJ, TG, CI, SN, BF, GN
+    const collectOperators: Record<string, string[]> = {
+      BJ: ["mtn", "moov", "celtiis"],
+      TG: ["moov", "togocom"],
+      CI: ["mtn"],
+      SN: ["free"],
+      GN: ["mtn"],
+      NE: ["airtel"],
     };
 
-    for (const country of countries) {
-      for (const operator of operators[country] || []) {
+    const payoutOperators: Record<string, string[]> = {
+      BJ: ["mtn", "moov", "celtiis"],
+      TG: ["moov", "togocom"],
+      CI: ["mtn", "moov", "wave", "orange"],
+      SN: ["wave", "orange"],
+      BF: ["moov", "orange"],
+      GN: ["mtn"],
+    };
+
+    // Combine all unique operators per country
+    const allCountries = new Set([...Object.keys(collectOperators), ...Object.keys(payoutOperators)]);
+    
+    for (const country of allCountries) {
+      const collectOps = collectOperators[country] || [];
+      const payoutOps = payoutOperators[country] || [];
+      const allOps = new Set([...collectOps, ...payoutOps]);
+      
+      for (const operator of allOps) {
+        const incomingEnabled = collectOps.includes(operator);
+        const outgoingEnabled = payoutOps.includes(operator);
+        
         await db
           .insert(schema.countryOperatorConfig)
           .values({
             country,
             operator,
-            incomingEnabled: true,
-            outgoingEnabled: true,
+            incomingEnabled,
+            outgoingEnabled,
           })
           .catch(() => {}); // Ignore duplicates
       }

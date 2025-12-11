@@ -19,6 +19,21 @@ import {
   getUSSDInstruction,
   type SoftpayPaymentData 
 } from "./paydunya-softpay";
+import {
+  handleFedaPayDeposit,
+  handleFedaPayWithdrawal,
+  handlePaymentLinkPayment,
+  handleMerchantLinkPayment,
+  handleApiPayment,
+  handleFedaPayWebhook,
+} from "./fedapay-routes";
+import {
+  FEDAPAY_SUPPORTED_COUNTRIES_COLLECT,
+  FEDAPAY_SUPPORTED_COUNTRIES_PAYOUT,
+  getCollectOperatorsForCountry,
+  getPayoutOperatorsForCountry,
+  getTransactionStatus,
+} from "./fedapay";
 
 declare module "express-session" {
   interface SessionData {
@@ -1227,7 +1242,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get transaction status (for polling) - also forces Paydunya check if pending
+  // Get transaction status (for polling) - checks FedaPay or Paydunya if pending
   app.get("/api/transactions/:id/status", async (req: Request, res: Response) => {
     try {
       const transaction = await storage.getTransaction(req.params.id);
@@ -1235,58 +1250,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Transaction non trouvee" });
       }
 
-      // If transaction is pending and has a Paydunya token, check with Paydunya directly
-      if (transaction.status === "pending" && transaction.paydunyaToken) {
+      // If transaction is pending, check with payment provider
+      if (transaction.status === "pending") {
+        let metadata: any = {};
         try {
-          const paydunyaResponse = await fetch(
-            `https://app.paydunya.com/api/v1/checkout-invoice/confirm/${transaction.paydunyaToken}`,
-            {
-              method: "GET",
-              headers: {
-                "Content-Type": "application/json",
-                "PAYDUNYA-MASTER-KEY": process.env.PAYDUNYA_MASTER_KEY || "",
-                "PAYDUNYA-PRIVATE-KEY": process.env.PAYDUNYA_PRIVATE_KEY || "",
-                "PAYDUNYA-TOKEN": process.env.PAYDUNYA_TOKEN || "",
-              },
-            }
-          );
+          metadata = JSON.parse(transaction.metadata || "{}");
+        } catch {}
 
-          if (paydunyaResponse.ok) {
-            const data = await paydunyaResponse.json();
-            
-            // Check status at ROOT level first (Paydunya's actual format)
-            const paymentStatus = data.status || data.invoice?.status;
-            const hasValidInvoice = data.invoice && typeof data.invoice === "object";
+        // Check FedaPay if we have a FedaPay transaction ID
+        if (metadata.fedapayTransactionId) {
+          try {
+            const fedapayStatus = await getTransactionStatus(metadata.fedapayTransactionId);
+            console.log(`[TransactionStatus] FedaPay check for ${transaction.id}:`, fedapayStatus);
 
-            console.log(`[TransactionStatus] Real-time check for ${transaction.id}:`, {
-              responseCode: data.response_code,
-              rootStatus: data.status,
-              invoiceStatus: data.invoice?.status,
-              finalStatus: paymentStatus,
-            });
-
-            // ONLY finalize if ALL conditions are met
-            if (data.response_code === "00" && hasValidInvoice && paymentStatus === "completed") {
-              const result = await storage.finalizeIncomingTransaction(transaction.id, {
-                paydunyaReceiptUrl: data.invoice?.receipt_url || `https://paydunya.com/receipt/${transaction.paydunyaToken}`,
-              });
-              
-              console.log(`[TransactionStatus] ✅ Transaction ${transaction.id} CONFIRMED - finalized: ${result ? 'new' : 'already processed'}`);
+            if (fedapayStatus.status === "approved" || fedapayStatus.status === "transferred") {
+              const result = await storage.finalizeIncomingTransaction(transaction.id, {});
+              console.log(`[TransactionStatus] FedaPay CONFIRMED - finalized: ${result ? 'new' : 'already processed'}`);
               return res.json({ 
                 status: "completed",
-                message: "Paiement confirmé"
+                message: "Paiement confirme"
               });
-            } else if (paymentStatus === "cancelled" || paymentStatus === "canceled" || paymentStatus === "failed") {
+            } else if (fedapayStatus.status === "declined" || fedapayStatus.status === "canceled" || fedapayStatus.status === "refunded") {
               await storage.updateTransactionStatus(transaction.id, "failed");
               return res.json({ 
                 status: "failed",
-                message: "Paiement échoué ou annulé"
+                message: "Paiement echoue ou annule"
               });
             }
+          } catch (checkError) {
+            console.log(`[TransactionStatus] Error checking FedaPay for ${transaction.id}:`, checkError);
           }
-        } catch (checkError) {
-          console.log(`[TransactionStatus] Error checking Paydunya for ${transaction.id}:`, checkError);
-          // Continue with cached status
+        }
+
+        // Fallback: Check Paydunya if we have a Paydunya token
+        if (transaction.paydunyaToken) {
+          try {
+            const paydunyaResponse = await fetch(
+              `https://app.paydunya.com/api/v1/checkout-invoice/confirm/${transaction.paydunyaToken}`,
+              {
+                method: "GET",
+                headers: {
+                  "Content-Type": "application/json",
+                  "PAYDUNYA-MASTER-KEY": process.env.PAYDUNYA_MASTER_KEY || "",
+                  "PAYDUNYA-PRIVATE-KEY": process.env.PAYDUNYA_PRIVATE_KEY || "",
+                  "PAYDUNYA-TOKEN": process.env.PAYDUNYA_TOKEN || "",
+                },
+              }
+            );
+
+            if (paydunyaResponse.ok) {
+              const data = await paydunyaResponse.json();
+              const paymentStatus = data.status || data.invoice?.status;
+              const hasValidInvoice = data.invoice && typeof data.invoice === "object";
+
+              if (data.response_code === "00" && hasValidInvoice && paymentStatus === "completed") {
+                const result = await storage.finalizeIncomingTransaction(transaction.id, {
+                  paydunyaReceiptUrl: data.invoice?.receipt_url || `https://paydunya.com/receipt/${transaction.paydunyaToken}`,
+                });
+                console.log(`[TransactionStatus] Paydunya CONFIRMED - finalized: ${result ? 'new' : 'already processed'}`);
+                return res.json({ 
+                  status: "completed",
+                  message: "Paiement confirme"
+                });
+              } else if (paymentStatus === "cancelled" || paymentStatus === "canceled" || paymentStatus === "failed") {
+                await storage.updateTransactionStatus(transaction.id, "failed");
+                return res.json({ 
+                  status: "failed",
+                  message: "Paiement echoue ou annule"
+                });
+              }
+            }
+          } catch (checkError) {
+            console.log(`[TransactionStatus] Error checking Paydunya for ${transaction.id}:`, checkError);
+          }
         }
       }
 
@@ -2901,6 +2937,208 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== FedaPay Webhook Route =====
+  app.post("/api/webhooks/fedapay", handleFedaPayWebhook);
+
+  // ===== FedaPay Routes (New Payment System) =====
+  
+  // FedaPay Deposit Route
+  app.post("/api/fedapay/deposit", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) {
+        return res.status(404).json({ error: "Utilisateur non trouve" });
+      }
+      if (user.suspended) {
+        return res.status(403).json({ error: "Votre compte a ete suspendu" });
+      }
+
+      const { amount, country, operator, phone } = req.body;
+
+      if (!amount || amount < 100) {
+        return res.status(400).json({ error: "Le montant minimum est de 100 XOF" });
+      }
+
+      const result = await handleFedaPayDeposit(
+        req.session.userId!,
+        user,
+        amount,
+        country,
+        operator,
+        phone
+      );
+
+      if (result.success) {
+        res.json(result);
+      } else {
+        res.status(400).json({ error: result.error });
+      }
+    } catch (error: any) {
+      console.error("[FedaPay Deposit Route] Error:", error);
+      res.status(500).json({ error: "Erreur lors du depot" });
+    }
+  });
+
+  // FedaPay Withdrawal Route
+  app.post("/api/fedapay/withdrawal", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) {
+        return res.status(404).json({ error: "Utilisateur non trouve" });
+      }
+      if (user.suspended) {
+        return res.status(403).json({ error: "Votre compte a ete suspendu" });
+      }
+
+      const { amount, country, operator, phone } = req.body;
+
+      if (!amount || amount < 500) {
+        return res.status(400).json({ error: "Le montant minimum est de 500 XOF" });
+      }
+
+      const result = await handleFedaPayWithdrawal(
+        req.session.userId!,
+        user,
+        amount,
+        country,
+        operator,
+        phone
+      );
+
+      if (result.success) {
+        res.json(result);
+      } else {
+        res.status(400).json({ error: result.error });
+      }
+    } catch (error: any) {
+      console.error("[FedaPay Withdrawal Route] Error:", error);
+      res.status(500).json({ error: "Erreur lors du retrait" });
+    }
+  });
+
+  // FedaPay Payment Link Payment Route
+  app.post("/api/fedapay/payment-link/:token", async (req: Request, res: Response) => {
+    try {
+      const { token } = req.params;
+      const { customerName, customerEmail, customerPhone, country, operator } = req.body;
+
+      const paymentLink = await storage.getPaymentLinkByToken(token);
+      if (!paymentLink || !paymentLink.isActive) {
+        return res.status(404).json({ error: "Lien de paiement non trouve ou inactif" });
+      }
+
+      const owner = await storage.getUser(paymentLink.userId);
+      if (owner?.suspended) {
+        return res.status(404).json({ error: "Ce lien n'est plus disponible" });
+      }
+
+      const result = await handlePaymentLinkPayment(
+        paymentLink,
+        customerName,
+        customerEmail,
+        customerPhone,
+        country,
+        operator
+      );
+
+      if (result.success) {
+        res.json(result);
+      } else {
+        res.status(400).json({ error: result.error });
+      }
+    } catch (error: any) {
+      console.error("[FedaPay PaymentLink Route] Error:", error);
+      res.status(500).json({ error: "Erreur lors du paiement" });
+    }
+  });
+
+  // FedaPay Merchant Link Payment Route
+  app.post("/api/fedapay/merchant-link/:token", async (req: Request, res: Response) => {
+    try {
+      const { token } = req.params;
+      const { amount, customerName, customerEmail, customerPhone, country, operator } = req.body;
+
+      const merchantLink = await storage.getMerchantLinkByToken(token);
+      if (!merchantLink || !merchantLink.isActive) {
+        return res.status(404).json({ error: "Lien marchand non trouve ou inactif" });
+      }
+
+      const owner = await storage.getUser(merchantLink.userId);
+      if (owner?.suspended) {
+        return res.status(404).json({ error: "Ce lien n'est plus disponible" });
+      }
+
+      const result = await handleMerchantLinkPayment(
+        merchantLink,
+        amount,
+        customerName,
+        customerEmail,
+        customerPhone,
+        country,
+        operator
+      );
+
+      if (result.success) {
+        res.json(result);
+      } else {
+        res.status(400).json({ error: result.error });
+      }
+    } catch (error: any) {
+      console.error("[FedaPay MerchantLink Route] Error:", error);
+      res.status(500).json({ error: "Erreur lors du paiement" });
+    }
+  });
+
+  // FedaPay API Payment Route (for external integrations)
+  app.post("/api/fedapay/api-payment", requireApiKey, async (req: Request, res: Response) => {
+    try {
+      const apiKey = (req as any).apiKey;
+      const { amount, description, customerName, customerEmail, customerPhone, country, operator } = req.body;
+
+      if (!amount || amount < 100) {
+        return res.status(400).json({ error: "Le montant minimum est de 100 XOF" });
+      }
+
+      const result = await handleApiPayment(
+        apiKey,
+        amount,
+        description,
+        customerName,
+        customerEmail,
+        customerPhone,
+        country,
+        operator
+      );
+
+      if (result.success) {
+        res.json(result);
+      } else {
+        res.status(400).json({ error: result.error });
+      }
+    } catch (error: any) {
+      console.error("[FedaPay API Payment Route] Error:", error);
+      res.status(500).json({ error: "Erreur lors du paiement" });
+    }
+  });
+
+  // FedaPay Supported Countries/Operators Endpoint
+  app.get("/api/fedapay/config", (req: Request, res: Response) => {
+    const collectCountries = FEDAPAY_SUPPORTED_COUNTRIES_COLLECT.map(c => ({
+      code: c.toUpperCase(),
+      operators: getCollectOperatorsForCountry(c),
+    }));
+    
+    const payoutCountries = FEDAPAY_SUPPORTED_COUNTRIES_PAYOUT.map(c => ({
+      code: c.toUpperCase(),
+      operators: getPayoutOperatorsForCountry(c),
+    }));
+
+    res.json({
+      collect: collectCountries,
+      payout: payoutCountries,
+    });
+  });
+
   // ===== Withdrawal Routes (Paydunya Disburse API v2) =====
   // Documentation: https://developers.paydunya.com/doc/EN/api_deboursement
   app.post("/api/withdrawals", requireAuth, async (req: Request, res: Response) => {
@@ -3381,93 +3619,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get transaction
-      const transactions = await storage.getTransactions("", 1);
-      let transaction = transactions.find((t) => t.id === transactionId);
+      const transaction = await storage.getTransaction(transactionId);
 
       if (!transaction) {
-        return res.status(404).json({ error: "Transaction non trouvée" });
+        return res.status(404).json({ error: "Transaction non trouvee" });
       }
 
-      // Update transaction with country and operator
-      await storage.updateTransactionStatus(transactionId, "pending");
+      // Parse metadata to get API key info
+      let metadata: any = {};
+      try {
+        metadata = JSON.parse(transaction.metadata || "{}");
+      } catch {}
 
-      // Call Paydunya API to create checkout invoice with customer info
-      const paydunyaData = {
-        invoice: {
-          total_amount: transaction.amount,
-          description: transaction.description || "Paiement via BKApay",
-          customer: {
-            name: transaction.customerName || "Client",
-            email: transaction.customerEmail || "",
-            phone: transaction.customerPhone || "",
-          },
-        },
-        store: {
-          name: "BKApay",
-          tagline: "Plateforme de paiement mobile money",
-        },
-        custom_data: {
-          transaction_id: transaction.id,
-          customer_name: transaction.customerName,
-          customer_email: transaction.customerEmail,
-          customer_phone: transaction.customerPhone,
-          country: country,
-          operator: operator,
-        },
-        actions: {
-          callback_url: `${process.env.BASE_URL || 'http://localhost:5000'}/api/webhooks/paydunya`,
-        },
-      };
+      const customerName = transaction.customerName || "Client";
+      const nameParts = customerName.split(" ");
+      const firstName = nameParts[0] || "Client";
+      const lastName = nameParts.slice(1).join(" ") || "Client";
 
-      const paydunyaResponse = await callPaydunyaAPI("/checkout-invoice/create", paydunyaData);
+      // Use FedaPay to initiate payment
+      const { createCollect } = await import("./fedapay");
+      const result = await createCollect({
+        amount: transaction.amount,
+        description: transaction.description || "Paiement via BKApay",
+        customerFirstName: firstName,
+        customerLastName: lastName,
+        customerEmail: transaction.customerEmail || "",
+        customerPhone: transaction.customerPhone || "",
+        country: country,
+        operator: operator,
+        callbackUrl: `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/fedapay`,
+      });
 
-      if (paydunyaResponse.response_code === "00") {
-        // Update transaction with Paydunya token
-        await storage.updateTransactionStatus(transactionId, "pending", {
-          paydunyaToken: paydunyaResponse.token,
+      if (result.success && result.transactionId) {
+        // Update transaction metadata with FedaPay info
+        const updatedMetadata = JSON.stringify({
+          ...metadata,
+          fedapayTransactionId: result.transactionId,
+          fedapayReference: result.reference,
           country,
           operator,
         });
 
-        // CRITICAL FIX: Call SOFTPAY endpoint immediately for operators that don't require OTP
-        const operatorKey = getOperatorKey(operator, country);
-        if (operatorKey) {
-          const needsOTP = requiresOTP(operatorKey);
-          const twoStep = requiresTwoStep(operatorKey);
-
-          if (!needsOTP && !twoStep) {
-            console.log(`[API PAYMENTS SUBMIT] Operator ${operatorKey} does NOT require OTP - calling SOFTPAY endpoint immediately`);
-            
-            const paymentData: SoftpayPaymentData = {
-              customerName: transaction.customerName || "Client",
-              customerEmail: transaction.customerEmail || "",
-              phoneNumber: transaction.customerPhone || "",
-              invoiceToken: paydunyaResponse.token,
-            };
-
-            const softpayResult = await callPaydunyaSoftpay(operator, country, paymentData);
-            
-            console.log(`[API PAYMENTS SUBMIT] SOFTPAY result for ${operatorKey}:`, softpayResult);
-
-            if (!softpayResult.success) {
-              console.error(`[API PAYMENTS SUBMIT] SOFTPAY call failed:`, softpayResult.message);
-              // Continue anyway - let the status page handle it
-            }
-          }
-        }
+        await storage.updateTransactionMetadata(transactionId, updatedMetadata, {
+          country: country.toUpperCase(),
+          operator,
+        });
 
         res.json({
           success: true,
           transactionId: transactionId,
-          redirectUrl: paydunyaResponse.response_text,
+          message: result.message,
         });
       } else {
-        // Paydunya error - still return transactionId so client can redirect to status page
         await storage.updateTransactionStatus(transactionId, "failed");
         res.json({
           success: false,
           transactionId: transactionId,
-          error: "Erreur lors de l'initiation du paiement",
+          error: result.error || "Erreur lors de l'initiation du paiement",
         });
       }
     } catch (error: any) {

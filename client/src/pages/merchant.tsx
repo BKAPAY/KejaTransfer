@@ -246,10 +246,10 @@ export default function Merchant() {
     },
   });
 
-  // SOFTPAY INIT mutation
+  // FedaPay payment init mutation
   const initMutation = useMutation({
     mutationFn: async (data: MerchantPaymentFormData) => {
-      const res = await apiRequest("POST", `/api/merchant-links/softpay-init/${token}`, {
+      const res = await apiRequest("POST", `/api/fedapay/merchant-link/${token}`, {
         amount: data.amount,
         customerName: data.customerName,
         customerEmail: data.customerEmail,
@@ -260,48 +260,31 @@ export default function Merchant() {
       return res.json();
     },
     onSuccess: (data: any) => {
-      if (data.transactionId && data.token) {
+      if (data.success && data.transactionId) {
         const formData = form.getValues();
         setTransactionId(data.transactionId);
-        setInvoiceToken(data.token);
-        setUssdInstruction(data.ussdInstruction || data.message || null);
+        setInvoiceToken(data.transactionId);
+        setUssdInstruction(data.message || "Une demande de paiement a ete envoyee sur votre telephone.");
         setPaidAmount(formData.amount);
         setSavedCountry(formData.country);
         setSavedOperator(formData.operator);
         
-        let newStage: "ussd" | "otp" | "polling" | "redirect" = "polling";
+        countdown.startCountdown();
+        setPaymentStage("polling");
         
-        // Wave et autres opérateurs avec redirection
-        if (data.redirectUrl) {
-          setRedirectUrl(data.redirectUrl);
-          newStage = "redirect";
-          toast({
-            title: "Redirection Wave",
-            description: "Cliquez sur le bouton pour compléter le paiement via Wave",
-          });
-        } else if (data.requiresTwoStep) {
-          newStage = "ussd";
-        } else if (data.requiresOTP) {
-          newStage = "otp";
-        } else {
-          countdown.startCountdown();
-          toast({
-            title: "Paiement initié",
-            description: "Veuillez valider le paiement sur votre téléphone",
-          });
-        }
+        toast({
+          title: "Paiement initie",
+          description: data.message || "Veuillez valider le paiement sur votre telephone",
+        });
         
-        setPaymentStage(newStage);
-        
-        // Sauvegarder l'état pour persistance
         if (token) {
           saveMerchantPaymentState(token, {
-            stage: newStage,
-            invoiceToken: data.token,
+            stage: "polling",
+            invoiceToken: data.transactionId,
             transactionId: data.transactionId,
-            ussdInstruction: data.ussdInstruction || data.message || null,
+            ussdInstruction: data.message || null,
             wizallTransactionId: null,
-            redirectUrl: data.redirectUrl || null,
+            redirectUrl: null,
             paidAmount: formData.amount,
             country: formData.country,
             operator: formData.operator,
@@ -310,6 +293,12 @@ export default function Merchant() {
             customerPhone: formData.customerPhone,
           });
         }
+      } else {
+        toast({
+          title: "Erreur",
+          description: data.error || "Erreur lors de l'initialisation du paiement",
+          variant: "destructive",
+        });
       }
     },
     onError: (error: any) => {
