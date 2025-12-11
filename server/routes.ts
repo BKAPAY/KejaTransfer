@@ -34,6 +34,12 @@ import {
   getPayoutOperatorsForCountry,
   getTransactionStatus,
 } from "./fedapay";
+import {
+  convertCurrency,
+  convertXofToGnf,
+  getCurrencyForCountry,
+  needsCurrencyConversion,
+} from "./currency-converter";
 
 declare module "express-session" {
   interface SessionData {
@@ -2988,6 +2994,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ===== FedaPay Webhook Route =====
   app.post("/api/webhooks/fedapay", handleFedaPayWebhook);
+
+  // ===== Currency Conversion Route =====
+  app.post("/api/convert-currency", async (req: Request, res: Response) => {
+    try {
+      const { amount, fromCurrency, toCurrency } = req.body;
+      
+      if (!amount || amount <= 0) {
+        return res.status(400).json({ error: "Montant invalide" });
+      }
+      
+      const from = fromCurrency || "XOF";
+      const to = toCurrency || "GNF";
+      
+      const result = await convertCurrency(amount, from, to);
+      
+      if (result.success) {
+        res.json({
+          success: true,
+          originalAmount: result.originalAmount,
+          originalCurrency: result.originalCurrency,
+          convertedAmount: result.convertedAmount,
+          targetCurrency: result.targetCurrency,
+          conversionRate: result.conversionRate,
+        });
+      } else {
+        res.status(400).json({ error: result.error });
+      }
+    } catch (error: any) {
+      console.error("[Currency Conversion] Error:", error);
+      res.status(500).json({ error: "Erreur lors de la conversion" });
+    }
+  });
+
+  app.get("/api/currency-for-country/:countryCode", (req: Request, res: Response) => {
+    const { countryCode } = req.params;
+    const currency = getCurrencyForCountry(countryCode);
+    const needsConversion = needsCurrencyConversion(countryCode);
+    res.json({ currency, needsConversion });
+  });
 
   // ===== FedaPay Routes (New Payment System) =====
   
