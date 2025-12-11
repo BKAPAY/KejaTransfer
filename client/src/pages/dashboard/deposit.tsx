@@ -14,7 +14,14 @@ import type { User } from "@shared/schema";
 import { ArrowDownToLine, CheckCircle2, Clock, Info, Loader2, Smartphone } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { calculateIncomingFee } from "@/lib/fees";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+
+interface ConversionData {
+  convertedAmount: number;
+  targetCurrency: string;
+  conversionRate: number;
+  isLoading: boolean;
+}
 
 const depositSchema = z.object({
   amount: z.number().min(100, "Le montant minimum est de 100 XOF"),
@@ -34,6 +41,7 @@ export default function Deposit() {
     message?: string;
   }>({});
   const [pollingStatus, setPollingStatus] = useState<string | null>(null);
+  const [conversionData, setConversionData] = useState<ConversionData | null>(null);
 
   const { data: user } = useQuery<User>({
     queryKey: ["/api/auth/me"],
@@ -67,6 +75,51 @@ export default function Deposit() {
     : allCountryOperators;
 
   const netAmount = selectedCountry && amount ? calculateIncomingFee(Math.floor(amount), selectedCountry).netAmount : 0;
+
+  const isGuinea = selectedCountry?.toLowerCase() === "gn";
+
+  const fetchConversion = useCallback(async (amountToConvert: number) => {
+    if (!amountToConvert || amountToConvert <= 0) {
+      setConversionData(null);
+      return;
+    }
+
+    setConversionData(prev => prev ? { ...prev, isLoading: true } : { convertedAmount: 0, targetCurrency: "GNF", conversionRate: 0, isLoading: true });
+
+    try {
+      const res = await fetch("/api/convert-currency", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: amountToConvert, fromCurrency: "XOF", toCurrency: "GNF" }),
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        setConversionData({
+          convertedAmount: data.convertedAmount,
+          targetCurrency: data.targetCurrency,
+          conversionRate: data.conversionRate,
+          isLoading: false,
+        });
+      } else {
+        setConversionData(null);
+      }
+    } catch (error) {
+      console.error("Currency conversion error:", error);
+      setConversionData(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isGuinea && amount && amount > 0) {
+      const debounceTimer = setTimeout(() => {
+        fetchConversion(amount);
+      }, 500);
+      return () => clearTimeout(debounceTimer);
+    } else {
+      setConversionData(null);
+    }
+  }, [isGuinea, amount, fetchConversion]);
 
   const depositMutation = useMutation({
     mutationFn: async (data: DepositFormData) => {
@@ -366,6 +419,29 @@ export default function Deposit() {
                     </FormItem>
                   )}
                 />
+
+                {isGuinea && conversionData && (
+                  <div className="bg-green-50 dark:bg-green-950 p-3 rounded-md border border-green-200 dark:border-green-800">
+                    <p className="text-sm text-green-700 dark:text-green-300 font-medium">
+                      Montant en Franc Guineen (GNF)
+                    </p>
+                    {conversionData.isLoading ? (
+                      <div className="flex items-center gap-2 mt-1">
+                        <Loader2 className="h-4 w-4 animate-spin text-green-600" />
+                        <span className="text-sm text-green-600">Conversion en cours...</span>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-lg font-bold text-green-800 dark:text-green-200" data-testid="text-converted-amount">
+                          {new Intl.NumberFormat("fr-FR").format(conversionData.convertedAmount)} GNF
+                        </p>
+                        <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                          Taux: 1 XOF = {conversionData.conversionRate.toFixed(4)} GNF
+                        </p>
+                      </>
+                    )}
+                  </div>
+                )}
 
                 {amount && selectedCountry && netAmount > 0 && (
                   <div className="bg-muted p-3 rounded-md border">
