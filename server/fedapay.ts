@@ -277,11 +277,16 @@ export async function createPayout(params: CreatePayoutParams): Promise<PayoutRe
     // Check for specific FedaPay error messages
     const fedapayMessage = error?.httpResponse?.data?.message;
     const httpStatus = error?.httpStatus;
+    const httpResponseData = error?.httpResponse?.config?.data;
+    
+    console.log("[FedaPay Payout] Request data sent:", httpResponseData);
+    console.log("[FedaPay Payout] HTTP Status:", httpStatus);
+    console.log("[FedaPay Payout] FedaPay message:", fedapayMessage);
     
     if (httpStatus === 403 || fedapayMessage === "Opération non autorisée") {
       return { 
         success: false, 
-        error: "Les retraits ne sont pas disponibles pour le moment. Veuillez contacter le support." 
+        error: "La fonctionnalité de retrait n'est pas activée sur le compte FedaPay. Veuillez contacter le support FedaPay à support@fedapay.com pour activer les payouts." 
       };
     }
     
