@@ -1,5 +1,6 @@
 import { storage } from "./storage";
 import type { Transaction, User } from "@shared/schema";
+import { getTransactionStatus as getFedaPayTransactionStatus } from "./fedapay";
 
 const PAYDUNYA_MASTER_KEY = process.env.PAYDUNYA_MASTER_KEY;
 const PAYDUNYA_PRIVATE_KEY = process.env.PAYDUNYA_PRIVATE_KEY;
@@ -71,7 +72,53 @@ function hasPaymentExpired(transaction: Transaction): boolean {
   return age >= PAYMENT_TIMEOUT_MS;
 }
 
-async function processTransaction(transaction: Transaction & { user?: User }): Promise<void> {
+async function processFedaPayTransaction(transaction: Transaction & { user?: User }, metadata: any): Promise<boolean> {
+  const fedapayTransactionId = metadata.fedapayTransactionId;
+  const transactionAge = getTransactionAge(transaction);
+  const remainingTime = Math.max(0, PAYMENT_TIMEOUT_MS - transactionAge);
+  const remainingSeconds = Math.round(remainingTime / 1000);
+
+  console.log(`[PaymentPolling] Checking FedaPay transaction ${transaction.id} (fedapayId: ${fedapayTransactionId}, ${remainingSeconds}s remaining)`);
+
+  try {
+    const fedapayStatus = await getFedaPayTransactionStatus(fedapayTransactionId);
+    
+    console.log(`[PaymentPolling] FedaPay transaction ${transaction.id} - status:`, fedapayStatus.status);
+
+    if (fedapayStatus.status === "approved" || fedapayStatus.status === "transferred") {
+      const result = await storage.finalizeIncomingTransaction(transaction.id, {});
+      if (result) {
+        console.log(`[PaymentPolling] ✅ FedaPay transaction ${transaction.id} CONFIRMED - finalized: credited=${result.credited}`);
+      } else {
+        console.log(`[PaymentPolling] FedaPay transaction ${transaction.id} already processed - skipping`);
+      }
+      return true;
+    } else if (fedapayStatus.status === "declined" || fedapayStatus.status === "canceled" || fedapayStatus.status === "refunded") {
+      console.log(`[PaymentPolling] ❌ FedaPay transaction ${transaction.id} failed/cancelled (status: ${fedapayStatus.status})`);
+      await storage.updateTransactionStatus(transaction.id, "failed");
+      return true;
+    } else {
+      // Still pending
+      if (hasPaymentExpired(transaction)) {
+        console.log(`[PaymentPolling] ⏱️ FedaPay transaction ${transaction.id} TIMEOUT (10min) - marking as failed`);
+        await storage.updateTransactionStatus(transaction.id, "failed");
+        return true;
+      }
+      console.log(`[PaymentPolling] ⏳ FedaPay transaction ${transaction.id} still pending (${remainingSeconds}s remaining)`);
+      return false;
+    }
+  } catch (error) {
+    console.error(`[PaymentPolling] Error checking FedaPay transaction ${transaction.id}:`, error);
+    if (hasPaymentExpired(transaction)) {
+      console.log(`[PaymentPolling] ⏱️ FedaPay transaction ${transaction.id} expired with error - marking as failed`);
+      await storage.updateTransactionStatus(transaction.id, "failed");
+      return true;
+    }
+    return false;
+  }
+}
+
+async function processPaydunyaTransaction(transaction: Transaction & { user?: User }): Promise<void> {
   const transactionAge = getTransactionAge(transaction);
   const remainingTime = Math.max(0, PAYMENT_TIMEOUT_MS - transactionAge);
   const remainingSeconds = Math.round(remainingTime / 1000);
@@ -86,7 +133,7 @@ async function processTransaction(transaction: Transaction & { user?: User }): P
     return;
   }
 
-  console.log(`[PaymentPolling] Checking transaction ${transaction.id} (${remainingSeconds}s remaining, token: ${transaction.paydunyaToken.substring(0, 12)}...)`);
+  console.log(`[PaymentPolling] Checking Paydunya transaction ${transaction.id} (${remainingSeconds}s remaining, token: ${transaction.paydunyaToken.substring(0, 12)}...)`);
   
   const paydunyaStatus = await checkPaydunyaStatus(transaction.paydunyaToken);
 
@@ -100,13 +147,10 @@ async function processTransaction(transaction: Transaction & { user?: User }): P
     return;
   }
 
-  // STRICT VALIDATION: Paydunya returns status at ROOT level OR in invoice object
-  // Format: { response_code: "00", status: "completed", invoice: {...} }
   const hasValidInvoice = paydunyaStatus.invoice && typeof paydunyaStatus.invoice === 'object';
-  // Check status at ROOT level first (Paydunya's actual format), then fallback to invoice.status
   const paymentStatus = paydunyaStatus.status || paydunyaStatus.invoice?.status;
 
-  console.log(`[PaymentPolling] Transaction ${transaction.id} - Paydunya response:`, {
+  console.log(`[PaymentPolling] Paydunya transaction ${transaction.id} - response:`, {
     responseCode: paydunyaStatus.response_code,
     rootStatus: paydunyaStatus.status,
     invoiceStatus: paydunyaStatus.invoice?.status,
@@ -115,10 +159,6 @@ async function processTransaction(transaction: Transaction & { user?: User }): P
     remainingSeconds,
   });
 
-  // ONLY finalize if ALL conditions are met:
-  // 1. response_code is "00"
-  // 2. invoice object exists
-  // 3. status (at root or in invoice) is explicitly "completed"
   if (paydunyaStatus.response_code === "00" && hasValidInvoice && paymentStatus === "completed") {
     const invoiceData = paydunyaStatus.invoice as any;
     const result = await storage.finalizeIncomingTransaction(transaction.id, {
@@ -126,23 +166,58 @@ async function processTransaction(transaction: Transaction & { user?: User }): P
     });
 
     if (result) {
-      console.log(`[PaymentPolling] ✅ Transaction ${transaction.id} CONFIRMED by Paydunya - finalized: credited=${result.credited}`);
+      console.log(`[PaymentPolling] ✅ Paydunya transaction ${transaction.id} CONFIRMED - finalized: credited=${result.credited}`);
     } else {
-      console.log(`[PaymentPolling] Transaction ${transaction.id} already processed - skipping`);
+      console.log(`[PaymentPolling] Paydunya transaction ${transaction.id} already processed - skipping`);
     }
   } else if (paymentStatus === "cancelled" || paymentStatus === "canceled" || paymentStatus === "failed" || paymentStatus === "fail") {
-    console.log(`[PaymentPolling] ❌ Transaction ${transaction.id} failed/cancelled by Paydunya (status: ${paymentStatus})`);
+    console.log(`[PaymentPolling] ❌ Paydunya transaction ${transaction.id} failed/cancelled (status: ${paymentStatus})`);
     await storage.updateTransactionStatus(transaction.id, "failed");
   } else {
-    // Transaction still pending - DO NOT mark as failed unless timeout reached
     if (hasPaymentExpired(transaction)) {
-      console.log(`[PaymentPolling] ⏱️ Transaction ${transaction.id} TIMEOUT (10min) with pending status "${paymentStatus}" - marking as failed`);
+      console.log(`[PaymentPolling] ⏱️ Paydunya transaction ${transaction.id} TIMEOUT (10min) with pending status "${paymentStatus}" - marking as failed`);
       await storage.updateTransactionStatus(transaction.id, "failed");
     } else {
-      // Keep waiting - this is the normal case during countdown
-      console.log(`[PaymentPolling] ⏳ Transaction ${transaction.id} still pending (status: ${paymentStatus}, ${remainingSeconds}s remaining)`);
+      console.log(`[PaymentPolling] ⏳ Paydunya transaction ${transaction.id} still pending (status: ${paymentStatus}, ${remainingSeconds}s remaining)`);
     }
   }
+}
+
+async function processTransaction(transaction: Transaction & { user?: User }): Promise<void> {
+  // Parse metadata to determine which payment provider to check
+  let metadata: any = {};
+  if (transaction.metadata) {
+    try {
+      metadata = JSON.parse(transaction.metadata);
+    } catch (e) {}
+  }
+
+  // Check if this is a FedaPay transaction
+  if (metadata.fedapayTransactionId) {
+    await processFedaPayTransaction(transaction, metadata);
+    return;
+  }
+
+  // Check if this is a FedaPay payout (withdrawal)
+  if (metadata.fedapayPayoutId) {
+    // Payouts are handled differently - they complete immediately or fail
+    // We just check the status
+    const transactionAge = getTransactionAge(transaction);
+    if (transactionAge >= PAYMENT_TIMEOUT_MS) {
+      console.log(`[PaymentPolling] FedaPay payout ${transaction.id} timed out - marking as failed`);
+      await storage.updateTransactionStatus(transaction.id, "failed");
+      // Refund the balance
+      const deductedAmount = metadata.deductedFromBalance;
+      if (deductedAmount) {
+        await storage.updateUserBalance(transaction.userId, deductedAmount);
+        console.log(`[PaymentPolling] Refunded ${deductedAmount} to user ${transaction.userId}`);
+      }
+    }
+    return;
+  }
+
+  // Fallback to Paydunya
+  await processPaydunyaTransaction(transaction);
 }
 
 async function pollPendingPayments(): Promise<void> {
@@ -154,8 +229,7 @@ async function pollPendingPayments(): Promise<void> {
       return;
     }
 
-    console.log(`[PaymentPolling] Processing ${pendingTransactions.length} pending transactions:`, 
-      pendingTransactions.map(t => ({ id: t.id, token: t.paydunyaToken?.substring(0,8) + '...', amount: t.amount })));
+    console.log(`[PaymentPolling] Processing ${pendingTransactions.length} pending transactions`);
 
     for (const transaction of pendingTransactions) {
       try {
