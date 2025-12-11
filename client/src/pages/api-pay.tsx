@@ -1,7 +1,14 @@
 import { useParams, useLocation, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
+
+interface ConversionData {
+  convertedAmount: number;
+  targetCurrency: string;
+  conversionRate: number;
+  isLoading: boolean;
+}
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -109,6 +116,10 @@ export default function ApiPay() {
   const [country, setCountry] = useState("");
   const [operator, setOperator] = useState("");
   const [copiedUssd, setCopiedUssd] = useState(false);
+  const [conversionData, setConversionData] = useState<ConversionData | null>(null);
+
+  // Guinea currency conversion (XOF -> GNF)
+  const isGuinea = country?.toLowerCase() === "gn";
 
   const copyUssdCode = (code: string) => {
     navigator.clipboard.writeText(code);
@@ -146,6 +157,49 @@ export default function ApiPay() {
     : allCountryOperators.filter(op => enabledOperatorsForCountry.includes(op.code));
   
   const noOperatorsAvailable = !isLoadingOperators && !!country && countryOperators.length === 0;
+
+  const fetchConversion = useCallback(async (amountToConvert: number) => {
+    if (!amountToConvert || amountToConvert <= 0) {
+      setConversionData(null);
+      return;
+    }
+
+    setConversionData(prev => prev ? { ...prev, isLoading: true } : { convertedAmount: 0, targetCurrency: "GNF", conversionRate: 0, isLoading: true });
+
+    try {
+      const res = await fetch("/api/convert-currency", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: amountToConvert, fromCurrency: "XOF", toCurrency: "GNF" }),
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        setConversionData({
+          convertedAmount: data.convertedAmount,
+          targetCurrency: data.targetCurrency,
+          conversionRate: data.conversionRate,
+          isLoading: false,
+        });
+      } else {
+        setConversionData(null);
+      }
+    } catch (error) {
+      console.error("Currency conversion error:", error);
+      setConversionData(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isGuinea && amount && amount > 0) {
+      const debounceTimer = setTimeout(() => {
+        fetchConversion(amount);
+      }, 500);
+      return () => clearTimeout(debounceTimer);
+    } else {
+      setConversionData(null);
+    }
+  }, [isGuinea, amount, fetchConversion]);
 
   const [shouldStartCountdown, setShouldStartCountdown] = useState(false);
 
@@ -955,6 +1009,30 @@ export default function ApiPay() {
                 </Select>
               )}
             </div>
+
+            {/* Currency Conversion for Guinea */}
+            {isGuinea && conversionData && (
+              <div className="bg-green-50 dark:bg-green-950 p-3 rounded-md border border-green-200 dark:border-green-800">
+                <p className="text-sm text-green-700 dark:text-green-300 font-medium">
+                  Montant en Franc Guineen (GNF)
+                </p>
+                {conversionData.isLoading ? (
+                  <div className="flex items-center gap-2 mt-1">
+                    <Loader2 className="h-4 w-4 animate-spin text-green-600" />
+                    <span className="text-sm text-green-600">Conversion en cours...</span>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-lg font-bold text-green-800 dark:text-green-200" data-testid="text-converted-amount">
+                      {new Intl.NumberFormat("fr-FR").format(conversionData.convertedAmount)} GNF
+                    </p>
+                    <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                      Taux: 1 XOF = {conversionData.conversionRate.toFixed(4)} GNF
+                    </p>
+                  </>
+                )}
+              </div>
+            )}
 
             <Button
               onClick={handleSubmit}

@@ -1,6 +1,6 @@
 import { useParams, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
@@ -11,12 +11,23 @@ import { OPERATORS } from "@shared/schema";
 import type { Transaction } from "@shared/schema";
 import logoImage from "@assets/bkapay-logo.png";
 
+interface ConversionData {
+  convertedAmount: number;
+  targetCurrency: string;
+  conversionRate: number;
+  isLoading: boolean;
+}
+
 export default function ApiPayment() {
   const [, setLocation] = useLocation();
   const { transactionId } = useParams<{ transactionId: string }>();
   const [country, setCountry] = useState("");
   const [operator, setOperator] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [conversionData, setConversionData] = useState<ConversionData | null>(null);
+
+  // Guinea currency conversion (XOF -> GNF)
+  const isGuinea = country?.toLowerCase() === "gn";
 
   // Fetch transaction details
   const { data: transaction, isLoading: isLoadingTransaction, error } = useQuery<Transaction>({
@@ -24,6 +35,49 @@ export default function ApiPayment() {
   });
 
   const countryOperators = OPERATORS[(country as keyof typeof OPERATORS) || ("BJ" as const)] || [];
+
+  const fetchConversion = useCallback(async (amountToConvert: number) => {
+    if (!amountToConvert || amountToConvert <= 0) {
+      setConversionData(null);
+      return;
+    }
+
+    setConversionData(prev => prev ? { ...prev, isLoading: true } : { convertedAmount: 0, targetCurrency: "GNF", conversionRate: 0, isLoading: true });
+
+    try {
+      const res = await fetch("/api/convert-currency", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: amountToConvert, fromCurrency: "XOF", toCurrency: "GNF" }),
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        setConversionData({
+          convertedAmount: data.convertedAmount,
+          targetCurrency: data.targetCurrency,
+          conversionRate: data.conversionRate,
+          isLoading: false,
+        });
+      } else {
+        setConversionData(null);
+      }
+    } catch (error) {
+      console.error("Currency conversion error:", error);
+      setConversionData(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isGuinea && transaction?.amount && transaction.amount > 0) {
+      const debounceTimer = setTimeout(() => {
+        fetchConversion(transaction.amount);
+      }, 500);
+      return () => clearTimeout(debounceTimer);
+    } else {
+      setConversionData(null);
+    }
+  }, [isGuinea, transaction?.amount, fetchConversion]);
 
   const handlePayment = async () => {
     if (!country || !operator || !transactionId) {
@@ -133,12 +187,13 @@ export default function ApiPayment() {
                   <SelectValue placeholder="Sélectionnez un pays" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="SN">🇸🇳 Sénégal</SelectItem>
-                  <SelectItem value="CI">🇨🇮 Côte d'Ivoire</SelectItem>
-                  <SelectItem value="BF">🇧🇫 Burkina Faso</SelectItem>
-                  <SelectItem value="BJ">🇧🇯 Bénin</SelectItem>
-                  <SelectItem value="TG">🇹🇬 Togo</SelectItem>
-                  <SelectItem value="ML">🇲🇱 Mali</SelectItem>
+                  <SelectItem value="SN">Senegal</SelectItem>
+                  <SelectItem value="CI">Cote d'Ivoire</SelectItem>
+                  <SelectItem value="BF">Burkina Faso</SelectItem>
+                  <SelectItem value="BJ">Benin</SelectItem>
+                  <SelectItem value="TG">Togo</SelectItem>
+                  <SelectItem value="GN">Guinee</SelectItem>
+                  <SelectItem value="NE">Niger</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -160,11 +215,34 @@ export default function ApiPayment() {
             </div>
           </div>
 
+          {/* Currency Conversion for Guinea */}
+          {isGuinea && conversionData && (
+            <div className="bg-green-50 dark:bg-green-950 p-3 rounded-md border border-green-200 dark:border-green-800">
+              <p className="text-sm text-green-700 dark:text-green-300 font-medium">
+                Montant en Franc Guineen (GNF)
+              </p>
+              {conversionData.isLoading ? (
+                <div className="flex items-center gap-2 mt-1">
+                  <Loader2 className="h-4 w-4 animate-spin text-green-600" />
+                  <span className="text-sm text-green-600">Conversion en cours...</span>
+                </div>
+              ) : (
+                <>
+                  <p className="text-lg font-bold text-green-800 dark:text-green-200" data-testid="text-converted-amount">
+                    {new Intl.NumberFormat("fr-FR").format(conversionData.convertedAmount)} GNF
+                  </p>
+                  <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                    Taux: 1 XOF = {conversionData.conversionRate.toFixed(4)} GNF
+                  </p>
+                </>
+              )}
+            </div>
+          )}
+
           {/* Info */}
           <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
             <p className="text-xs text-blue-900 dark:text-blue-100">
-              ✓ Vous serez redirigé vers votre opérateur pour confirmer le paiement<br />
-              ✓ Vos données de paiement sont sécurisées
+              Vous serez redirige vers votre operateur pour confirmer le paiement. Vos donnees de paiement sont securisees.
             </p>
           </div>
 
