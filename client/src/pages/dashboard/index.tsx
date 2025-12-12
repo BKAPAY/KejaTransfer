@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Wallet, ArrowDownToLine, ArrowUpFromLine, TrendingUp } from "lucide-react";
+import { Wallet, ArrowDownToLine, ArrowUpFromLine, Link2, Store, Code2, HeadphonesIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -83,6 +83,50 @@ export default function Dashboard() {
             )}
           </CardContent>
         </Card>
+
+        {/* Quick Access Buttons */}
+        <div className="grid grid-cols-4 gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex flex-col items-center justify-center gap-1 h-auto py-3"
+            onClick={() => setLocation("/dashboard/payment-links")}
+            data-testid="button-quick-payment-link"
+          >
+            <Link2 className="h-5 w-5 text-primary" />
+            <span className="text-xs">Lien paiement</span>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex flex-col items-center justify-center gap-1 h-auto py-3"
+            onClick={() => setLocation("/dashboard/merchant-links")}
+            data-testid="button-quick-merchant-link"
+          >
+            <Store className="h-5 w-5 text-primary" />
+            <span className="text-xs">Lien marchand</span>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex flex-col items-center justify-center gap-1 h-auto py-3"
+            onClick={() => setLocation("/dashboard/api")}
+            data-testid="button-quick-api"
+          >
+            <Code2 className="h-5 w-5 text-primary" />
+            <span className="text-xs">API</span>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex flex-col items-center justify-center gap-1 h-auto py-3"
+            onClick={() => setLocation("/dashboard/support")}
+            data-testid="button-quick-support"
+          >
+            <HeadphonesIcon className="h-5 w-5 text-primary" />
+            <span className="text-xs">Support</span>
+          </Button>
+        </div>
 
         {/* Action Buttons */}
         <div className="flex gap-2">
