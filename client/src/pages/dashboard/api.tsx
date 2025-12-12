@@ -161,6 +161,15 @@ export default function ApiPage() {
   };
 
   const onSubmit = (data: ApiKeyFormData) => {
+    if (!isKycVerified) {
+      toast({
+        title: "Verification requise",
+        description: "Rendez-vous dans Parametres pour verifier votre compte et acceder a toutes les fonctionnalites.",
+        variant: "destructive",
+      });
+      setDialogOpen(false);
+      return;
+    }
     createMutation.mutate(data);
   };
 
@@ -189,8 +198,6 @@ export default function ApiPage() {
             <DialogTrigger asChild>
               <Button 
                 data-testid="button-create-api-key"
-                disabled={!isKycVerified}
-                title={!isKycVerified ? "Vous devez verifier votre identite (KYC) pour creer une cle API" : undefined}
               >
                 <Plus className="w-4 h-4 mr-2" />
                 Nouvelle cle
@@ -203,14 +210,6 @@ export default function ApiPage() {
                   Creez une cle pour integrer les paiements dans votre site
                 </DialogDescription>
               </DialogHeader>
-              {!isKycVerified ? (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>
-                    Vous devez verifier votre identite (KYC) avant de generer des cles API.
-                  </AlertDescription>
-                </Alert>
-              ) : null}
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                   <FormField
@@ -549,7 +548,6 @@ export default function ApiPage() {
                 <Button 
                   onClick={() => setDialogOpen(true)} 
                   data-testid="button-create-first"
-                  disabled={!isKycVerified}
                 >
                   <Plus className="w-4 h-4 mr-2" />
                   Creer votre premiere cle API

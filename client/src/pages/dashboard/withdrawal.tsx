@@ -110,8 +110,8 @@ export default function Withdrawal() {
 
     if (user.kycStatus !== "verified") {
       toast({
-        title: "Verification KYC requise",
-        description: "Vous devez verifier votre identite (KYC) avant de faire des retraits.",
+        title: "Verification requise",
+        description: "Rendez-vous dans Parametres pour verifier votre compte et acceder a toutes les fonctionnalites.",
         variant: "destructive",
       });
       return;
@@ -337,7 +337,7 @@ export default function Withdrawal() {
               <Button
                 type="submit"
                 className="w-full"
-                disabled={withdrawalMutation.isPending || !user || user.kycStatus !== "verified" || countryOperators.length === 0}
+                disabled={withdrawalMutation.isPending || !user || countryOperators.length === 0}
                 data-testid="button-submit-withdrawal"
               >
                 {withdrawalMutation.isPending ? (
