@@ -966,7 +966,6 @@ export default function ApiPay() {
                   <SelectItem value="BF">Burkina Faso</SelectItem>
                   <SelectItem value="BJ">Benin</SelectItem>
                   <SelectItem value="TG">Togo</SelectItem>
-                  <SelectItem value="ML">Mali</SelectItem>
                   <SelectItem value="NE">Niger</SelectItem>
                   <SelectItem value="GN">Guinee</SelectItem>
                 </SelectContent>
