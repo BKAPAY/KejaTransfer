@@ -30,6 +30,8 @@ const countries = [
   { code: "SN", name: "Sénégal", flag: "🇸🇳" },
   { code: "BF", name: "Burkina Faso", flag: "🇧🇫" },
   { code: "ML", name: "Mali", flag: "🇲🇱" },
+  { code: "GN", name: "Guinée", flag: "🇬🇳" },
+  { code: "NE", name: "Niger", flag: "🇳🇪" },
 ];
 
 const operators = [
@@ -128,7 +130,7 @@ export default function Home() {
                 Paiements Mobile Money pour l'Afrique de l'Ouest
               </h1>
               <p className="text-xs sm:text-sm md:text-base lg:text-lg text-muted-foreground">
-                Acceptez les paiements Orange Money, MTN, Moov, Wave et plus dans 6 pays. Plateforme simple, sécurisée et fiable.
+                Acceptez les paiements Orange Money, MTN, Moov, Wave et plus dans 8 pays. Plateforme simple, sécurisée et fiable.
               </p>
             </div>
             <div className="flex flex-wrap gap-2 sm:gap-4">
@@ -151,7 +153,7 @@ export default function Home() {
       <section className="py-6 sm:py-8 md:py-12 lg:py-16 bg-card overflow-hidden">
         <div className="container mx-auto px-2 sm:px-4 md:px-8 max-w-7xl">
           <div className="text-center mb-4 sm:mb-8">
-            <h2 className="text-lg sm:text-xl md:text-3xl lg:text-4xl font-bold mb-2 sm:mb-4 text-foreground">Disponible dans 6 pays</h2>
+            <h2 className="text-lg sm:text-xl md:text-3xl lg:text-4xl font-bold mb-2 sm:mb-4 text-foreground">Disponible dans 8 pays</h2>
             <p className="text-xs sm:text-sm md:text-base lg:text-lg text-muted-foreground">Couvrant toute l'Afrique de l'Ouest francophone</p>
           </div>
           <div className="flex gap-2 sm:gap-4 carousel-scroll">
