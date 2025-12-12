@@ -21,7 +21,7 @@ export const FEDAPAY_COLLECT_OPERATORS: Record<string, FedaPayOperator> = {
   moov_bj: { code: "moov", name: "Moov", countries: ["bj"] },
   celtiis_bj: { code: "celtiis", name: "Celtiis", countries: ["bj"] },
   moov_tg: { code: "moov_tg", name: "Moov", countries: ["tg"] },
-  togocom_tg: { code: "togocom", name: "TogoCom", countries: ["tg"] },
+  togocom_tg: { code: "togocel", name: "TogoCom", countries: ["tg"] },
   mtn_ci: { code: "mtn_ci", name: "MTN", countries: ["ci"] },
   free_sn: { code: "free_sn", name: "Free Senegal", countries: ["sn"] },
   mtn_gn: { code: "mtn_open_gn", name: "MTN Guinea", countries: ["gn"] },
