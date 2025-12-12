@@ -1508,12 +1508,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ===== Deposit Routes =====
+  // ===== Deposit Routes (Legacy - redirects to FedaPay) =====
+  // Note: Frontend now uses /api/fedapay/deposit directly
   app.post("/api/deposits", requireAuth, async (req: Request, res: Response) => {
     try {
       const user = await storage.getUser(req.session.userId!);
       if (user?.suspended) {
-        return res.status(403).json({ error: "Votre compte a été suspendu. Veuillez contacter le support." });
+        return res.status(403).json({ error: "Votre compte a ete suspendu. Veuillez contacter le support." });
       }
 
       const { amount, country, operator, phone } = req.body;
@@ -1522,69 +1523,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Montant invalide" });
       }
 
-      // Create Paydunya invoice (send GROSS amount to Paydunya)
-      const paydunyaData = {
-        invoice: {
-          total_amount: Math.floor(amount),
-          description: `Dépôt de ${amount} XOF sur BKApay`,
-          customer: {
-            name: `${user!.firstName} ${user!.lastName}`,
-            email: user!.email,
-            phone: phone,
-          },
-        },
-        store: {
-          name: "BKApay",
-        },
-        custom_data: {
-          user_id: req.session.userId!,
-          type: "deposit",
-          country,
-          operator,
-          phone,
-        },
-        actions: {
-          callback_url: `${process.env.BASE_URL || 'http://localhost:5000'}/api/webhooks/paydunya`,
-        },
-      };
-
-      const paydunyaResponse = await callPaydunyaAPI("/checkout-invoice/create", paydunyaData);
-
-      if (paydunyaResponse.response_code === "00") {
-        // Calculate fees for INCOMING payment (client pays GROSS)
-        const grossAmount = Math.floor(amount);
-        const feeInfo = calculateIncomingFee(grossAmount, country);
-        
-        // Create transaction with GROSS amount (what client pays)
-        const transactionId = randomUUID();
-        await storage.createTransaction({
-          userId: req.session.userId!,
-          type: "deposit",
-          amount: feeInfo.grossAmount, // Store GROSS amount (e.g., 2000)
-          fee: feeInfo.feeAmount, // Store fee (e.g., 60)
-          feePercentage: feeInfo.feePercentage, // Store percentage (30 or 60)
-          currency: "XOF",
-          status: "pending",
-          country,
-          operator,
-          description: `Dépôt de ${grossAmount} XOF`,
-          paydunyaToken: paydunyaResponse.token, // Store in dedicated column
-          metadata: JSON.stringify({
-            phone,
-          }),
-        });
-        
-        res.json({
-          success: true,
-          transactionId: transactionId,
-          paydunyaToken: paydunyaResponse.token,
-        });
-      } else {
-        res.status(400).json({ error: "Erreur lors de l'initiation du dépôt" });
+      // Validate country for FedaPay
+      if (!FEDAPAY_SUPPORTED_COUNTRIES_COLLECT.includes(country?.toLowerCase())) {
+        return res.status(400).json({ error: "Pays non supporte" });
       }
+
+      // Use FedaPay for deposit
+      const result = await handleFedaPayDeposit(
+        req.session.userId!,
+        user!,
+        Math.floor(amount),
+        country,
+        operator,
+        phone
+      );
+
+      if (!result.success) {
+        return res.status(400).json({ error: result.error || "Erreur lors du depot" });
+      }
+
+      res.json({
+        success: true,
+        transactionId: result.transactionId,
+        fedapayTransactionId: result.fedapayTransactionId,
+        message: result.message,
+      });
     } catch (error: any) {
       console.error("Deposit error:", error);
-      res.status(500).json({ error: "Erreur lors du dépôt" });
+      res.status(500).json({ error: "Erreur lors du depot" });
     }
   });
 
