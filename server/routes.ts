@@ -930,7 +930,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Initialize API payment
+  // Initialize API payment - Using FedaPay
   app.post("/api/api-pay/init", async (req: Request, res: Response) => {
     try {
       const { publicKey, amount, description, customerName, customerEmail, customerPhone, country, operator, callbackUrl } = req.body;
@@ -952,153 +952,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Cle API invalide ou desactivee" });
       }
 
-      // Validate country
-      const validCountries = ["SN", "CI", "BF", "BJ", "TG", "ML"];
-      if (!validCountries.includes(country)) {
+      // Validate country - FedaPay supported countries for collect
+      const validCountries = FEDAPAY_SUPPORTED_COUNTRIES_COLLECT.map(c => c.toUpperCase());
+      if (!validCountries.includes(country.toUpperCase())) {
         return res.status(400).json({ error: "Pays non supporte" });
       }
 
-      // Get operator key for SOFTPAY (IMPORTANT: operator first, then country)
-      const operatorKey = getOperatorKey(operator, country);
-      if (!operatorKey) {
-        return res.status(400).json({ error: "Operateur non supporte pour ce pays" });
-      }
-
-      // Calculate fee (6% uniform)
-      const fee = Math.round(numAmount * 0.06);
-      const netAmount = numAmount - fee;
-
-      // Sanitize phone number
-      let sanitizedPhone = customerPhone.replace(/\s+/g, "").replace(/[^0-9+]/g, "");
-      if (sanitizedPhone.startsWith("+")) {
-        sanitizedPhone = sanitizedPhone.substring(1);
-      }
-      const countryPrefixes: Record<string, string> = {
-        "SN": "221", "CI": "225", "BF": "226", "BJ": "229", "TG": "228", "ML": "223"
-      };
-      const prefix = countryPrefixes[country];
-      if (sanitizedPhone.startsWith(prefix)) {
-        sanitizedPhone = sanitizedPhone.substring(prefix.length);
-      }
-
-      // Create Paydunya invoice
-      const invoiceData = {
-        invoice: {
-          total_amount: numAmount,
-          description: description || `Paiement a ${(apiKey as any).siteName || apiKey.name}`,
-        },
-        store: {
-          name: "BKApay",
-          tagline: "Paiement Mobile Money",
-          website_url: "https://bkapay.com",
-        },
-        actions: {
-          callback_url: `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/paydunya`,
-          return_url: `${process.env.BASE_URL || "https://bkapay.com"}/payment-status`,
-        },
-        custom_data: {
-          userId: apiKey.userId,
-          type: "api_payment",
-          apiKeyId: apiKey.id,
-        },
-      };
-
-      const invoiceResult = await callPaydunyaAPI("/checkout-invoice/create", invoiceData);
-      
-      if (invoiceResult.response_code !== "00") {
-        return res.status(500).json({ error: "Erreur lors de la creation du paiement" });
-      }
-
-      const paydunyaToken = invoiceResult.token;
-
-      // Create pending transaction - store GROSS amount for webhook consistency
-      const transaction = await storage.createTransaction({
-        userId: apiKey.userId,
-        type: "api_payment",
-        amount: numAmount, // Store GROSS amount
-        fee,
-        feePercentage: 6,
-        currency: "XOF",
-        status: "pending",
-        country,
-        operator,
+      // Use FedaPay for payment
+      const result = await handleApiPayment(
+        apiKey,
+        numAmount,
+        description || `Paiement a ${(apiKey as any).siteName || apiKey.name}`,
         customerName,
         customerEmail,
-        customerPhone: sanitizedPhone,
-        description: description || `Paiement via ${(apiKey as any).siteName || apiKey.name}`,
-        paydunyaToken,
-        metadata: JSON.stringify({
-          siteName: (apiKey as any).siteName || apiKey.name,
-          apiKeyId: apiKey.id,
-          apiKeyPublicKey: publicKey, // Store for callback lookup
-          netAmount, // Store NET for reference
-          operatorKey,
-          callbackUrl: callbackUrl || null,
-        }),
-      });
+        customerPhone,
+        country,
+        operator
+      );
 
-      // Check if OTP or two-step is required
-      const needsOTP = requiresOTP(operatorKey);
-      const needsTwoStep = requiresTwoStep(operatorKey);
-      const ussdInstruction = getUSSDInstruction(operatorKey);
+      if (!result.success) {
+        return res.status(400).json({ error: result.error || "Erreur lors du paiement" });
+      }
 
-      // For operators that DO NOT require OTP, call SOFTPAY endpoint immediately
-      if (!needsOTP && !needsTwoStep) {
-        console.log(`[API-PAY INIT] Operator ${operatorKey} does NOT require OTP - calling SOFTPAY endpoint immediately`);
-        
-        const paymentData: SoftpayPaymentData = {
-          customerName,
-          customerEmail,
-          phoneNumber: sanitizedPhone,
-          invoiceToken: paydunyaToken,
-        };
-
-        const softpayResult = await callPaydunyaSoftpay(operator, country, paymentData);
-        
-        console.log(`[API-PAY INIT] SOFTPAY result for ${operatorKey}:`, softpayResult);
-
-        if (softpayResult.success) {
-          // For Wave, return redirect URL
-          if (softpayResult.url) {
-            return res.json({
-              success: true,
-              transactionId: transaction.id,
-              token: paydunyaToken,
-              ussdInstruction: softpayResult.message,
-              requiresOTP: false,
-              requiresTwoStep: false,
-              redirectUrl: softpayResult.url,
-            });
-          }
-
-          // Payment initiated - customer should receive SMS
-          return res.json({
-            success: true,
-            transactionId: transaction.id,
-            token: paydunyaToken,
-            ussdInstruction: softpayResult.message || ussdInstruction,
-            requiresOTP: false,
-            requiresTwoStep: false,
-            message: softpayResult.message,
-          });
-        } else {
-          // SOFTPAY call failed - return error
-          console.error(`[API-PAY INIT] SOFTPAY call failed:`, softpayResult.message);
-          await storage.updateTransactionStatus(transaction.id, "failed");
-          return res.status(400).json({
-            error: softpayResult.message || "Erreur lors de l'envoi du paiement",
-          });
+      // Store callback URL in transaction metadata if provided
+      if (callbackUrl && result.transactionId) {
+        const tx = await storage.getTransaction(result.transactionId);
+        if (tx) {
+          let metadata: any = {};
+          try { metadata = JSON.parse(tx.metadata as string || "{}"); } catch (e) {}
+          metadata.callbackUrl = callbackUrl;
+          await storage.updateTransactionMetadata(result.transactionId, JSON.stringify(metadata));
         }
       }
 
-      // For operators that require OTP, return token and wait for confirm step
       res.json({
         success: true,
-        transactionId: transaction.id,
-        token: paydunyaToken,
-        ussdInstruction,
-        requiresOTP: needsOTP,
-        requiresTwoStep: needsTwoStep,
+        transactionId: result.transactionId,
+        message: result.message || "Paiement initie. Veuillez valider sur votre telephone.",
+        requiresOTP: false,
+        requiresTwoStep: false,
       });
     } catch (error: any) {
       console.error("API Pay init error:", error);
@@ -2167,35 +2059,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // SOFTPAY for Payment Links - Initialize payment
+  // Payment Links - Initialize payment using FedaPay
   app.post("/api/payment-links/softpay-init/:token", async (req: Request, res: Response) => {
     try {
       const { customerName, customerEmail, customerPhone, country, operator } = req.body;
       const { token } = req.params;
 
       if (!country || !operator || !customerPhone) {
-        return res.status(400).json({ error: "Informations incomplètes" });
+        return res.status(400).json({ error: "Informations incompletes" });
       }
 
-      // Validate operator BEFORE creating transaction
-      const operatorKey = getOperatorKey(operator, country);
-      if (!operatorKey) {
-        return res.status(400).json({ error: "Opérateur non supporté pour ce pays" });
-      }
-
-      // Check if operator is enabled by admin
-      // Default behavior: if no config exists for this operator, treat as enabled (all operators enabled by default)
-      const configs = await storage.getCountryOperatorConfigs();
-      const operatorConfig = configs.find(c => c.country === country && c.operator === operator);
-      // Only reject if config exists AND incomingEnabled is explicitly false
-      if (operatorConfig && !operatorConfig.incomingEnabled) {
-        return res.status(400).json({ error: "Cet opérateur n'est pas disponible actuellement" });
+      // Validate country - FedaPay supported countries
+      if (!FEDAPAY_SUPPORTED_COUNTRIES_COLLECT.includes(country.toLowerCase())) {
+        return res.status(400).json({ error: "Pays non supporte" });
       }
 
       // Get payment link
       const paymentLink = await storage.getPaymentLinkByToken(token);
       if (!paymentLink) {
-        return res.status(404).json({ error: "Lien de paiement non trouvé" });
+        return res.status(404).json({ error: "Lien de paiement non trouve" });
       }
 
       // Check if user account is suspended
@@ -2204,130 +2086,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Ce lien n'existe pas" });
       }
 
-      // Create Paydunya invoice with customer info
-      const paydunyaData = {
-        invoice: {
-          total_amount: Math.floor(paymentLink.amount),
-          description: `Paiement - ${paymentLink.productName}`,
-          customer: {
-            name: customerName || "Client",
-            email: customerEmail || "",
-            phone: customerPhone,
-          },
-        },
-        store: {
-          name: "BKApay",
-        },
-        custom_data: {
-          type: "payment_link",
-          user_id: paymentLink.userId,
-          customer_name: customerName,
-          customer_email: customerEmail,
-          customer_phone: customerPhone,
-          country,
-          operator,
-        },
-        actions: {
-          callback_url: `${process.env.BASE_URL || 'http://localhost:5000'}/api/webhooks/paydunya`,
-        },
-      };
+      // Use FedaPay for payment
+      const result = await handlePaymentLinkPayment(
+        paymentLink,
+        customerName || "Client",
+        customerEmail || "",
+        customerPhone,
+        country,
+        operator
+      );
 
-      const paydunyaResponse = await callPaydunyaAPI("/checkout-invoice/create", paydunyaData);
-
-      if (paydunyaResponse.response_code === "00" && paydunyaResponse.token) {
-        // Calculate fees for INCOMING payment
-        const grossAmount = Math.floor(paymentLink.amount);
-        const feeInfo = calculateIncomingFee(grossAmount, country);
-        
-        // Create transaction
-        const transactionId = randomUUID();
-        await storage.createTransaction({
-          userId: paymentLink.userId,
-          type: "payment_link",
-          amount: feeInfo.grossAmount,
-          fee: feeInfo.feeAmount,
-          feePercentage: feeInfo.feePercentage,
-          currency: "XOF",
-          status: "pending",
-          country,
-          operator,
-          description: `Paiement - ${paymentLink.productName}`,
-          customerName,
-          customerEmail,
-          customerPhone,
-          paydunyaToken: paydunyaResponse.token,
-          metadata: JSON.stringify({
-            paymentLinkId: paymentLink.id,
-          }),
-        });
-
-        // Get operator configuration (already validated above)
-        const ussdInstruction = getUSSDInstruction(operatorKey);
-        const needsOTP = requiresOTP(operatorKey);
-        const twoStep = requiresTwoStep(operatorKey);
-
-        // CRITICAL FIX: For operators that DO NOT require OTP, call SOFTPAY endpoint immediately!
-        if (!needsOTP && !twoStep && operatorKey) {
-          console.log(`[PAYMENT_LINK SOFTPAY INIT] Operator ${operatorKey} does NOT require OTP - calling SOFTPAY endpoint immediately`);
-          
-          const paymentData: SoftpayPaymentData = {
-            customerName: customerName || "Client",
-            customerEmail: customerEmail || "",
-            phoneNumber: customerPhone,
-            invoiceToken: paydunyaResponse.token,
-          };
-
-          const softpayResult = await callPaydunyaSoftpay(operator, country, paymentData);
-          
-          console.log(`[PAYMENT_LINK SOFTPAY INIT] SOFTPAY result for ${operatorKey}:`, softpayResult);
-
-          if (softpayResult.success) {
-            // For Wave, return redirect URL
-            if (softpayResult.url) {
-              return res.json({
-                success: true,
-                transactionId,
-                token: paydunyaResponse.token,
-                ussdInstruction: softpayResult.message,
-                requiresOTP: false,
-                requiresTwoStep: false,
-                redirectUrl: softpayResult.url,
-              });
-            }
-
-            // Payment initiated - customer should receive SMS
-            return res.json({
-              success: true,
-              transactionId,
-              token: paydunyaResponse.token,
-              ussdInstruction: softpayResult.message || ussdInstruction,
-              requiresOTP: false,
-              requiresTwoStep: false,
-              message: softpayResult.message,
-            });
-          } else {
-            // SOFTPAY call failed - return error
-            console.error(`[PAYMENT_LINK SOFTPAY INIT] SOFTPAY call failed:`, softpayResult.message);
-            return res.status(400).json({
-              error: softpayResult.message || "Erreur lors de l'envoi du paiement",
-            });
-          }
-        }
-
-        // For operators that require OTP, just return the token and wait for confirm step
-        res.json({
-          success: true,
-          transactionId,
-          token: paydunyaResponse.token,
-          ussdInstruction,
-          requiresOTP: needsOTP,
-          requiresTwoStep: twoStep,
-        });
-      } else {
-        res.status(400).json({ error: "Erreur lors de la création de la facture" });
+      if (!result.success) {
+        return res.status(400).json({ error: result.error || "Erreur lors du paiement" });
       }
+
+      res.json({
+        success: true,
+        transactionId: result.transactionId,
+        message: result.message || "Paiement initie. Veuillez valider sur votre telephone.",
+        requiresOTP: false,
+        requiresTwoStep: false,
+      });
     } catch (error: any) {
-      console.error("[PAYMENT_LINK SOFTPAY INIT] Error:", error);
+      console.error("[PAYMENT_LINK FEDAPAY INIT] Error:", error);
       res.status(500).json({ error: "Erreur lors de l'initialisation du paiement" });
     }
   });
@@ -2436,7 +2217,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // SOFTPAY for Merchant Links - Initialize payment
+  // Merchant Links - Initialize payment using FedaPay
   app.post("/api/merchant-links/softpay-init/:token", async (req: Request, res: Response) => {
     try {
       const { amount, customerName, customerEmail, customerPhone, country, operator } = req.body;
@@ -2447,28 +2228,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (!country || !operator || !customerPhone) {
-        return res.status(400).json({ error: "Pays, opérateur et numéro de téléphone requis" });
+        return res.status(400).json({ error: "Pays, operateur et numero de telephone requis" });
       }
 
-      // Validate operator BEFORE creating transaction
-      const operatorKey = getOperatorKey(operator, country);
-      if (!operatorKey) {
-        return res.status(400).json({ error: "Opérateur non supporté pour ce pays" });
-      }
-
-      // Check if operator is enabled by admin
-      // Default behavior: if no config exists for this operator, treat as enabled (all operators enabled by default)
-      const configs = await storage.getCountryOperatorConfigs();
-      const operatorConfig = configs.find(c => c.country === country && c.operator === operator);
-      // Only reject if config exists AND incomingEnabled is explicitly false
-      if (operatorConfig && !operatorConfig.incomingEnabled) {
-        return res.status(400).json({ error: "Cet opérateur n'est pas disponible actuellement" });
+      // Validate country - FedaPay supported countries
+      if (!FEDAPAY_SUPPORTED_COUNTRIES_COLLECT.includes(country.toLowerCase())) {
+        return res.status(400).json({ error: "Pays non supporte" });
       }
 
       // Get merchant link
       const merchantLink = await storage.getMerchantLinkByToken(token);
       if (!merchantLink) {
-        return res.status(404).json({ error: "Lien marchand non trouvé" });
+        return res.status(404).json({ error: "Lien marchand non trouve" });
       }
 
       // Check if user account is suspended
@@ -2477,130 +2248,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Ce lien n'existe pas" });
       }
 
-      // Create Paydunya invoice with customer info
-      const paydunyaData = {
-        invoice: {
-          total_amount: Math.floor(amount),
-          description: `Paiement marchand - ${merchantLink.merchantName}`,
-          customer: {
-            name: customerName || "Client",
-            email: customerEmail || "",
-            phone: customerPhone,
-          },
-        },
-        store: {
-          name: "BKApay",
-        },
-        custom_data: {
-          type: "merchant_link",
-          user_id: merchantLink.userId,
-          customer_name: customerName,
-          customer_email: customerEmail,
-          customer_phone: customerPhone,
-          country,
-          operator,
-        },
-        actions: {
-          callback_url: `${process.env.BASE_URL || 'http://localhost:5000'}/api/webhooks/paydunya`,
-        },
-      };
+      // Use FedaPay for payment
+      const result = await handleMerchantLinkPayment(
+        merchantLink,
+        Math.floor(amount),
+        customerName || "Client",
+        customerEmail || "",
+        customerPhone,
+        country,
+        operator
+      );
 
-      const paydunyaResponse = await callPaydunyaAPI("/checkout-invoice/create", paydunyaData);
-
-      if (paydunyaResponse.response_code === "00" && paydunyaResponse.token) {
-        // Calculate fees for INCOMING payment
-        const grossAmount = Math.floor(amount);
-        const feeInfo = calculateIncomingFee(grossAmount, country);
-        
-        // Create transaction
-        const transactionId = randomUUID();
-        await storage.createTransaction({
-          userId: merchantLink.userId,
-          type: "merchant_link",
-          amount: feeInfo.grossAmount,
-          fee: feeInfo.feeAmount,
-          feePercentage: feeInfo.feePercentage,
-          currency: "XOF",
-          status: "pending",
-          country,
-          operator,
-          description: `Paiement marchand - ${merchantLink.merchantName}`,
-          customerName,
-          customerEmail,
-          customerPhone,
-          paydunyaToken: paydunyaResponse.token,
-          metadata: JSON.stringify({
-            merchantLinkId: merchantLink.id,
-          }),
-        });
-
-        // Get operator configuration (already validated above)
-        const ussdInstruction = getUSSDInstruction(operatorKey);
-        const needsOTP = requiresOTP(operatorKey);
-        const twoStep = requiresTwoStep(operatorKey);
-
-        // CRITICAL FIX: For operators that DO NOT require OTP, call SOFTPAY endpoint immediately!
-        if (!needsOTP && !twoStep && operatorKey) {
-          console.log(`[MERCHANT_LINK SOFTPAY INIT] Operator ${operatorKey} does NOT require OTP - calling SOFTPAY endpoint immediately`);
-          
-          const paymentData: SoftpayPaymentData = {
-            customerName: customerName || "Client",
-            customerEmail: customerEmail || "",
-            phoneNumber: customerPhone,
-            invoiceToken: paydunyaResponse.token,
-          };
-
-          const softpayResult = await callPaydunyaSoftpay(operator, country, paymentData);
-          
-          console.log(`[MERCHANT_LINK SOFTPAY INIT] SOFTPAY result for ${operatorKey}:`, softpayResult);
-
-          if (softpayResult.success) {
-            // For Wave, return redirect URL
-            if (softpayResult.url) {
-              return res.json({
-                success: true,
-                transactionId,
-                token: paydunyaResponse.token,
-                ussdInstruction: softpayResult.message,
-                requiresOTP: false,
-                requiresTwoStep: false,
-                redirectUrl: softpayResult.url,
-              });
-            }
-
-            // Payment initiated - customer should receive SMS
-            return res.json({
-              success: true,
-              transactionId,
-              token: paydunyaResponse.token,
-              ussdInstruction: softpayResult.message || ussdInstruction,
-              requiresOTP: false,
-              requiresTwoStep: false,
-              message: softpayResult.message,
-            });
-          } else {
-            // SOFTPAY call failed - return error
-            console.error(`[MERCHANT_LINK SOFTPAY INIT] SOFTPAY call failed:`, softpayResult.message);
-            return res.status(400).json({
-              error: softpayResult.message || "Erreur lors de l'envoi du paiement",
-            });
-          }
-        }
-
-        // For operators that require OTP, just return the token and wait for confirm step
-        res.json({
-          success: true,
-          transactionId,
-          token: paydunyaResponse.token,
-          ussdInstruction,
-          requiresOTP: needsOTP,
-          requiresTwoStep: twoStep,
-        });
-      } else {
-        res.status(400).json({ error: "Erreur lors de la création de la facture" });
+      if (!result.success) {
+        return res.status(400).json({ error: result.error || "Erreur lors du paiement" });
       }
+
+      res.json({
+        success: true,
+        transactionId: result.transactionId,
+        message: result.message || "Paiement initie. Veuillez valider sur votre telephone.",
+        requiresOTP: false,
+        requiresTwoStep: false,
+      });
     } catch (error: any) {
-      console.error("[MERCHANT_LINK SOFTPAY INIT] Error:", error);
+      console.error("[MERCHANT_LINK FEDAPAY INIT] Error:", error);
       res.status(500).json({ error: "Erreur lors de l'initialisation du paiement" });
     }
   });
