@@ -85,46 +85,46 @@ export default function Dashboard() {
         </Card>
 
         {/* Quick Access Buttons */}
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-4 gap-1">
           <Button
             variant="outline"
             size="sm"
-            className="flex flex-col items-center justify-center gap-1 h-auto py-3"
+            className="flex flex-col items-center justify-center gap-0.5 h-auto py-2 px-1"
             onClick={() => setLocation("/dashboard/payment-links")}
             data-testid="button-quick-payment-link"
           >
             <Link2 className="h-5 w-5 text-primary" />
-            <span className="text-xs">Lien paiement</span>
+            <span className="text-[10px] leading-tight text-center">Paiement</span>
           </Button>
           <Button
             variant="outline"
             size="sm"
-            className="flex flex-col items-center justify-center gap-1 h-auto py-3"
+            className="flex flex-col items-center justify-center gap-0.5 h-auto py-2 px-1"
             onClick={() => setLocation("/dashboard/merchant-links")}
             data-testid="button-quick-merchant-link"
           >
             <Store className="h-5 w-5 text-primary" />
-            <span className="text-xs">Lien marchand</span>
+            <span className="text-[10px] leading-tight text-center">Marchand</span>
           </Button>
           <Button
             variant="outline"
             size="sm"
-            className="flex flex-col items-center justify-center gap-1 h-auto py-3"
+            className="flex flex-col items-center justify-center gap-0.5 h-auto py-2 px-1"
             onClick={() => setLocation("/dashboard/api")}
             data-testid="button-quick-api"
           >
             <Code2 className="h-5 w-5 text-primary" />
-            <span className="text-xs">API</span>
+            <span className="text-[10px] leading-tight text-center">API</span>
           </Button>
           <Button
             variant="outline"
             size="sm"
-            className="flex flex-col items-center justify-center gap-1 h-auto py-3"
+            className="flex flex-col items-center justify-center gap-0.5 h-auto py-2 px-1"
             onClick={() => setLocation("/dashboard/support")}
             data-testid="button-quick-support"
           >
             <HeadphonesIcon className="h-5 w-5 text-primary" />
-            <span className="text-xs">Support</span>
+            <span className="text-[10px] leading-tight text-center">Support</span>
           </Button>
         </div>
 
