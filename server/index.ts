@@ -6,6 +6,9 @@ import { startPaymentPolling, stopPaymentPolling } from "./payment-polling";
 
 const app = express();
 
+let bootstrapComplete = false;
+let bootstrapError: string | null = null;
+
 declare module 'http' {
   interface IncomingMessage {
     rawBody: unknown
@@ -18,6 +21,16 @@ app.use(express.json({
   }
 }));
 app.use(express.urlencoded({ extended: false }));
+
+app.get("/healthz", (_req, res) => {
+  if (bootstrapError) {
+    return res.status(503).json({ status: "error", message: bootstrapError });
+  }
+  if (!bootstrapComplete) {
+    return res.status(503).json({ status: "starting", message: "Database bootstrap in progress" });
+  }
+  return res.status(200).json({ status: "healthy" });
+});
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -50,15 +63,6 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  // Bootstrap database (run migrations and seed admin)
-  try {
-    await bootstrapDatabase();
-  } catch (error) {
-    log("❌ Database bootstrap failed - cannot start server");
-    log(String(error));
-    process.exit(1); // Fail fast on unrecoverable errors
-  }
-
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -69,19 +73,12 @@ app.use((req, res, next) => {
     throw err;
   });
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
   if (app.get("env") === "development") {
     await setupVite(app, server);
   } else {
     serveStatic(app);
   }
 
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || '5000', 10);
   server.listen({
     port,
@@ -90,11 +87,20 @@ app.use((req, res, next) => {
   }, () => {
     log(`serving on port ${port}`);
     
-    // Start background payment polling after server is ready
-    startPaymentPolling();
+    (async () => {
+      try {
+        await bootstrapDatabase();
+        bootstrapComplete = true;
+        log("✅ Bootstrap complete, starting payment polling");
+        startPaymentPolling();
+      } catch (error) {
+        bootstrapError = String(error);
+        log("❌ Database bootstrap failed: " + bootstrapError);
+        setTimeout(() => process.exit(1), 5000);
+      }
+    })();
   });
 
-  // Graceful shutdown
   process.on("SIGTERM", () => {
     log("Received SIGTERM, stopping payment polling...");
     stopPaymentPolling();
