@@ -139,7 +139,7 @@ export async function createCollect(params: CreateCollectParams): Promise<Collec
       customer: {
         firstname: params.customerFirstName,
         lastname: params.customerLastName,
-        email: params.customerEmail,
+        email: "noreply@bkapay.com",
         phone_number: {
           number: sanitizedPhone,
           country: params.country.toLowerCase(),
