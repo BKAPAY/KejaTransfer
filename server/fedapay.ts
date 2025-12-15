@@ -125,8 +125,24 @@ export async function createCollect(params: CreateCollectParams): Promise<Collec
       "bj": "229", "tg": "228", "ci": "225", "sn": "221", "gn": "224", "ne": "227", "bf": "226"
     };
     const prefix = countryPrefixes[params.country.toLowerCase()];
+    const countryLower = params.country.toLowerCase();
+    
+    // Remove country prefix if present to get local number
     if (prefix && sanitizedPhone.startsWith(prefix)) {
       sanitizedPhone = sanitizedPhone.substring(prefix.length);
+    }
+    
+    // BENIN: Since Nov 30 2024, numbers are 10 digits starting with 01
+    // Convert 8-digit format to new 10-digit format if needed
+    if (countryLower === "bj") {
+      if (sanitizedPhone.length === 8 && !sanitizedPhone.startsWith("01")) {
+        // Old 8-digit format: add 01 prefix for new format
+        sanitizedPhone = "01" + sanitizedPhone;
+      }
+      // If user entered with leading 0 but only 9 digits (missing 1), fix it
+      if (sanitizedPhone.length === 9 && sanitizedPhone.startsWith("0") && !sanitizedPhone.startsWith("01")) {
+        sanitizedPhone = "01" + sanitizedPhone.substring(1);
+      }
     }
 
     console.log(`[FedaPay Collect] Creating transaction: ${params.amount} XOF, ${params.operator}/${params.country}, phone: ${sanitizedPhone.slice(-4)}`);
@@ -219,6 +235,7 @@ export async function createPayout(params: CreatePayoutParams): Promise<PayoutRe
       "bj": "229", "tg": "228", "ci": "225", "sn": "221", "gn": "224", "ne": "227", "bf": "226"
     };
     const prefix = countryPrefixes[params.country.toLowerCase()];
+    const countryLower = params.country.toLowerCase();
     
     // Remove + if present for processing
     if (sanitizedPhone.startsWith("+")) {
@@ -227,11 +244,30 @@ export async function createPayout(params: CreatePayoutParams): Promise<PayoutRe
     
     // Add country prefix if not present
     if (prefix && !sanitizedPhone.startsWith(prefix)) {
-      // Remove leading 0 if present (local format)
-      if (sanitizedPhone.startsWith("0")) {
-        sanitizedPhone = sanitizedPhone.substring(1);
+      // BENIN: Since Nov 30 2024, numbers are 10 digits starting with 01
+      // Format: 01XXXXXXXX -> +22901XXXXXXXX (keep the leading 0)
+      if (countryLower === "bj") {
+        // Benin 10-digit format: keep the full number with 0
+        if (sanitizedPhone.startsWith("01") && sanitizedPhone.length === 10) {
+          // Already in correct 10-digit format: 01XXXXXXXX
+          sanitizedPhone = prefix + sanitizedPhone;
+        } else if (sanitizedPhone.startsWith("0") && sanitizedPhone.length === 10) {
+          // Format 0XXXXXXXXX (10 digits starting with 0) - keep as is
+          sanitizedPhone = prefix + sanitizedPhone;
+        } else if (sanitizedPhone.length === 8) {
+          // Old 8-digit format: add 01 prefix for new format
+          sanitizedPhone = prefix + "01" + sanitizedPhone;
+        } else {
+          // Other format - try to use as is with country prefix
+          sanitizedPhone = prefix + sanitizedPhone;
+        }
+      } else {
+        // Other countries: Remove leading 0 if present (local format)
+        if (sanitizedPhone.startsWith("0")) {
+          sanitizedPhone = sanitizedPhone.substring(1);
+        }
+        sanitizedPhone = prefix + sanitizedPhone;
       }
-      sanitizedPhone = prefix + sanitizedPhone;
     }
     
     // Add + for international format (required by FedaPay payouts)
