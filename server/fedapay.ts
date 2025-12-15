@@ -132,19 +132,29 @@ export async function createCollect(params: CreateCollectParams): Promise<Collec
       sanitizedPhone = sanitizedPhone.substring(prefix.length);
     }
     
-    // BENIN: Since Nov 30 2024, numbers are 10 digits starting with 01
-    // Convert 8-digit format to new 10-digit format if needed
+    // Format phone based on country requirements
     if (countryLower === "bj") {
-      if (sanitizedPhone.length === 8 && !sanitizedPhone.startsWith("01")) {
-        // Old 8-digit format: add 01 prefix for new format
+      // BENIN: Since Nov 30 2024, numbers are 10 digits starting with 01
+      if (sanitizedPhone.length === 8 && !sanitizedPhone.startsWith("0")) {
         sanitizedPhone = "01" + sanitizedPhone;
+      } else if (sanitizedPhone.length === 9 && sanitizedPhone.startsWith("1")) {
+        sanitizedPhone = "0" + sanitizedPhone;
       }
-      // If user entered with leading 0 but only 9 digits (missing 1), fix it
-      if (sanitizedPhone.length === 9 && sanitizedPhone.startsWith("0") && !sanitizedPhone.startsWith("01")) {
-        sanitizedPhone = "01" + sanitizedPhone.substring(1);
+    } else if (countryLower === "ci") {
+      // IVORY COAST: Since 2021, numbers are 10 digits starting with 0
+      if (sanitizedPhone.length === 8 && !sanitizedPhone.startsWith("0")) {
+        sanitizedPhone = "0" + sanitizedPhone;
+      } else if (sanitizedPhone.length === 9 && !sanitizedPhone.startsWith("0")) {
+        sanitizedPhone = "0" + sanitizedPhone;
+      }
+    } else {
+      // Other countries: Remove leading 0 if present
+      if (sanitizedPhone.startsWith("0")) {
+        sanitizedPhone = sanitizedPhone.substring(1);
       }
     }
 
+    console.log(`[FedaPay Collect] Phone formatting: input=${params.customerPhone}, country=${countryLower}, result=${sanitizedPhone.length} digits`);
     console.log(`[FedaPay Collect] Creating transaction: ${params.amount} XOF, ${params.operator}/${params.country}, phone: ${sanitizedPhone.slice(-4)}`);
 
     const transaction = await Transaction.create({
@@ -234,44 +244,67 @@ export async function createPayout(params: CreatePayoutParams): Promise<PayoutRe
     const countryPrefixes: Record<string, string> = {
       "bj": "229", "tg": "228", "ci": "225", "sn": "221", "gn": "224", "ne": "227", "bf": "226"
     };
+    
+    // Expected local number lengths (without country prefix)
+    // BJ: 10 digits (01XXXXXXXX since Nov 2024)
+    // CI: 10 digits (0XXXXXXXXX since 2021)
+    // SN: 9 digits (7XXXXXXXX)
+    // GN: 9 digits (6XXXXXXXX)
+    // TG: 8 digits (9XXXXXXX)
+    // BF: 8 digits (7XXXXXXX)
+    const expectedLengths: Record<string, number> = {
+      "bj": 10, "ci": 10, "sn": 9, "gn": 9, "tg": 8, "bf": 8, "ne": 8
+    };
+    
     const prefix = countryPrefixes[params.country.toLowerCase()];
     const countryLower = params.country.toLowerCase();
+    const expectedLength = expectedLengths[countryLower] || 8;
     
     // Remove + if present for processing
     if (sanitizedPhone.startsWith("+")) {
       sanitizedPhone = sanitizedPhone.substring(1);
     }
     
-    // Add country prefix if not present
-    if (prefix && !sanitizedPhone.startsWith(prefix)) {
+    // If already has country prefix, extract local number
+    if (prefix && sanitizedPhone.startsWith(prefix)) {
+      sanitizedPhone = sanitizedPhone.substring(prefix.length);
+    }
+    
+    // Format phone number based on country
+    if (countryLower === "bj") {
       // BENIN: Since Nov 30 2024, numbers are 10 digits starting with 01
-      // Format: 01XXXXXXXX -> +22901XXXXXXXX (keep the leading 0)
-      if (countryLower === "bj") {
-        // Benin 10-digit format: keep the full number with 0
-        if (sanitizedPhone.startsWith("01") && sanitizedPhone.length === 10) {
-          // Already in correct 10-digit format: 01XXXXXXXX
-          sanitizedPhone = prefix + sanitizedPhone;
-        } else if (sanitizedPhone.startsWith("0") && sanitizedPhone.length === 10) {
-          // Format 0XXXXXXXXX (10 digits starting with 0) - keep as is
-          sanitizedPhone = prefix + sanitizedPhone;
-        } else if (sanitizedPhone.length === 8) {
-          // Old 8-digit format: add 01 prefix for new format
-          sanitizedPhone = prefix + "01" + sanitizedPhone;
-        } else {
-          // Other format - try to use as is with country prefix
-          sanitizedPhone = prefix + sanitizedPhone;
-        }
-      } else {
-        // Other countries: Remove leading 0 if present (local format)
-        if (sanitizedPhone.startsWith("0")) {
-          sanitizedPhone = sanitizedPhone.substring(1);
-        }
-        sanitizedPhone = prefix + sanitizedPhone;
+      // Keep the leading 0 for Benin!
+      if (sanitizedPhone.length === 8 && !sanitizedPhone.startsWith("0")) {
+        // Old 8-digit format: add 01 prefix
+        sanitizedPhone = "01" + sanitizedPhone;
+      } else if (sanitizedPhone.length === 9 && sanitizedPhone.startsWith("1")) {
+        // Missing leading 0: add it
+        sanitizedPhone = "0" + sanitizedPhone;
+      }
+      // For 10-digit numbers starting with 0, keep as is
+    } else if (countryLower === "ci") {
+      // IVORY COAST: Since 2021, numbers are 10 digits starting with 0
+      // Keep the leading 0 for Ivory Coast!
+      if (sanitizedPhone.length === 8 && !sanitizedPhone.startsWith("0")) {
+        // Old 8-digit format: add 0 prefix
+        sanitizedPhone = "0" + sanitizedPhone;
+      } else if (sanitizedPhone.length === 9 && !sanitizedPhone.startsWith("0")) {
+        // 9 digits without 0: add it
+        sanitizedPhone = "0" + sanitizedPhone;
+      }
+      // For 10-digit numbers starting with 0, keep as is
+    } else {
+      // Other countries: Remove leading 0 if present
+      // SN, GN, TG, BF, NE don't use leading 0 in international format
+      if (sanitizedPhone.startsWith("0")) {
+        sanitizedPhone = sanitizedPhone.substring(1);
       }
     }
     
-    // Add + for international format (required by FedaPay payouts)
-    const fullPhoneNumber = "+" + sanitizedPhone;
+    // Build full international number
+    const fullPhoneNumber = "+" + prefix + sanitizedPhone;
+    
+    console.log(`[FedaPay Payout] Phone formatting: input=${params.customerPhone}, country=${countryLower}, result=${fullPhoneNumber.slice(0, 5)}***${fullPhoneNumber.slice(-4)}, length=${sanitizedPhone.length}`);
 
     console.log(`[FedaPay Payout] Creating payout: ${params.amount} XOF, ${operatorCode}/${params.country}, phone: ${fullPhoneNumber.slice(-4)}`);
 

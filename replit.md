@@ -55,3 +55,32 @@ The frontend utilizes React 18 with TypeScript, styled with Shadcn UI and Tailwi
 - **Country Codes**: Lowercase (bj, tg, ci, sn, bf, gn, ne)
 - **Mode**: MUST be specified in Transaction.create() - use "live" for production
 - **Webhook URL**: https://bkapay.com/api/webhooks/fedapay
+
+## Phone Number Formats by Country
+| Country | Format | Digits | International Format | Notes |
+|---------|--------|--------|---------------------|-------|
+| **BJ (Bénin)** | 01XXXXXXXX | 10 | +22901XXXXXXXX | Changed Nov 30 2024 - KEEP leading 0 |
+| **CI (Côte d'Ivoire)** | 0XXXXXXXXX | 10 | +2250XXXXXXXXX | Changed 2021 - KEEP leading 0 |
+| **SN (Sénégal)** | 7XXXXXXXX | 9 | +2217XXXXXXXX | Remove leading 0 |
+| **GN (Guinée)** | 6XXXXXXXX | 9 | +2246XXXXXXXX | Remove leading 0 |
+| **TG (Togo)** | 9XXXXXXX | 8 | +2289XXXXXXX | Remove leading 0 |
+| **BF (Burkina Faso)** | 7XXXXXXX | 8 | +2267XXXXXXX | Remove leading 0 |
+| **NE (Niger)** | 8XXXXXXX | 8 | +2278XXXXXXX | Remove leading 0 |
+
+## FedaPay Payout Operator Codes (Verified)
+| Operator | Code | Countries |
+|----------|------|-----------|
+| MTN Benin | `mtn_open` | BJ |
+| Moov Benin | `moov` | BJ |
+| Celtiis Benin | `sbin` | BJ |
+| MTN CI | `mtn_ci` | CI |
+| Moov CI | `moov_ci` | CI |
+| Wave CI | `wave_ci` | CI |
+| Orange CI | `orange_ci` | CI |
+| Moov Togo | `moov_tg` | TG |
+| TogoCom | `togocel` | TG |
+| Wave Senegal | `wave_sn` | SN |
+| Orange Senegal | `orange_sn` | SN |
+| Moov BF | `moov_bf` | BF |
+| Orange BF | `orange-bf` | BF (note: hyphen!) |
+| MTN Guinea | `mtn_open_gn` | GN |
