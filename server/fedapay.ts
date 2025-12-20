@@ -347,10 +347,13 @@ export async function createPayout(params: CreatePayoutParams): Promise<PayoutRe
     const fedapayMessage = error?.httpResponse?.data?.message;
     const httpStatus = error?.httpStatus;
     const httpResponseData = error?.httpResponse?.config?.data;
+    const errors = error?.httpResponse?.data?.errors;
     
     console.log("[FedaPay Payout] Request data sent:", httpResponseData);
     console.log("[FedaPay Payout] HTTP Status:", httpStatus);
     console.log("[FedaPay Payout] FedaPay message:", fedapayMessage);
+    console.log("[FedaPay Payout] FedaPay errors:", JSON.stringify(errors));
+    console.log("[FedaPay Payout] Full error response:", JSON.stringify(error?.httpResponse?.data));
     
     if (httpStatus === 403 || fedapayMessage === "Opération non autorisée") {
       return { 
