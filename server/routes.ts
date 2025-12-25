@@ -699,14 +699,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/payment-links/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const updatePaymentLinkSchema = z.object({
+      const patchPaymentLinkSchema = z.object({
         productName: z.string().min(1, "Le nom du produit est requis").optional(),
         description: z.string().optional(),
         amount: z.number().min(1, "Le montant doit être supérieur à 0").optional(),
         imageUrl: z.string().optional(),
         isActive: z.boolean().optional(),
+        allowedCountries: z.array(z.string()).optional(),
+        customerPaysFee: z.boolean().optional(),
       });
-      const validatedData = updatePaymentLinkSchema.parse(req.body);
+      const validatedData = patchPaymentLinkSchema.parse(req.body);
       const link = await storage.updatePaymentLink(req.params.id, req.session.userId!, validatedData);
       if (!link) {
         return res.status(404).json({ error: "Lien non trouvé" });
@@ -912,6 +914,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update API key settings (allowed countries and customer pays fee)
+  app.patch("/api/api-keys/:id/settings", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const keyId = req.params.id;
+      const userId = req.session.userId!;
+      const { allowedCountries, customerPaysFee } = req.body;
+
+      const settingsSchema = z.object({
+        allowedCountries: z.array(z.string()).optional(),
+        customerPaysFee: z.boolean().optional(),
+      });
+
+      const validatedData = settingsSchema.parse({ allowedCountries, customerPaysFee });
+      
+      const updatedKey = await storage.updateApiKeySettings(keyId, userId, validatedData);
+      if (!updatedKey) {
+        return res.status(404).json({ error: "Clé API non trouvée" });
+      }
+
+      res.json({
+        success: true,
+        allowedCountries: updatedKey.allowedCountries,
+        customerPaysFee: updatedKey.customerPaysFee,
+        message: "Paramètres mis à jour avec succès"
+      });
+    } catch (error: any) {
+      console.error("Error updating API key settings:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
   // ===== API Pay Routes (Redirect-based API payments) =====
   
   // Get API key info by public key (for payment page)
@@ -924,6 +957,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         siteName: (apiKey as any).siteName || apiKey.name,
         isActive: apiKey.isActive,
+        allowedCountries: apiKey.allowedCountries || [],
+        customerPaysFee: apiKey.customerPaysFee || false,
       });
     } catch (error: any) {
       res.status(500).json({ error: "Une erreur est survenue" });

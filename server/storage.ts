@@ -64,6 +64,7 @@ export interface IStorage {
   deleteApiKey(id: string, userId: string): Promise<boolean>;
   updateApiKeyCallback(id: string, userId: string, callbackUrl: string | null): Promise<ApiKey | undefined>;
   regenerateApiKeyCallbackSecret(id: string, userId: string): Promise<ApiKey | undefined>;
+  updateApiKeySettings(id: string, userId: string, settings: { allowedCountries?: string[]; customerPaysFee?: boolean }): Promise<ApiKey | undefined>;
 
   // Transactions
   getTransaction(id: string): Promise<Transaction | undefined>;
@@ -367,6 +368,35 @@ export class DbStorage implements IStorage {
     const results = await db
       .update(schema.apiKeys)
       .set({ callbackSecret: newSecret })
+      .where(eq(schema.apiKeys.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async updateApiKeySettings(id: string, userId: string, settings: { allowedCountries?: string[]; customerPaysFee?: boolean }): Promise<ApiKey | undefined> {
+    const existing = await db.select().from(schema.apiKeys)
+      .where(eq(schema.apiKeys.id, id))
+      .limit(1);
+    
+    if (!existing[0] || existing[0].userId !== userId) {
+      return undefined;
+    }
+
+    const updateData: any = {};
+    if (settings.allowedCountries !== undefined) {
+      updateData.allowedCountries = settings.allowedCountries;
+    }
+    if (settings.customerPaysFee !== undefined) {
+      updateData.customerPaysFee = settings.customerPaysFee;
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return existing[0];
+    }
+
+    const results = await db
+      .update(schema.apiKeys)
+      .set(updateData)
       .where(eq(schema.apiKeys.id, id))
       .returning();
     return results[0];
