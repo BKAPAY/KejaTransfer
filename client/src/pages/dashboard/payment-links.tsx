@@ -4,12 +4,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Copy, ExternalLink, Trash2, Image as ImageIcon, Link as LinkIcon, Edit2 } from "lucide-react";
+import { Plus, Copy, ExternalLink, Trash2, Image as ImageIcon, Link as LinkIcon, Edit2, Globe, Wallet } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { PaymentLink } from "@shared/schema";
+import { COUNTRIES } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -64,9 +67,16 @@ const paymentLinkSchema = z.object({
   description: z.string().optional(),
   amount: z.number().min(1, "Le montant doit être supérieur à 0"),
   imageFile: z.instanceof(File).optional(),
+  allowedCountries: z.array(z.string()).default([]),
+  customerPaysFee: z.boolean().default(false),
 });
 
 type PaymentLinkFormData = z.infer<typeof paymentLinkSchema>;
+
+// Countries that support collect (incoming payments) via FedaPay
+const COLLECT_COUNTRIES = COUNTRIES.filter(c => 
+  ["BJ", "TG", "CI", "SN", "GN", "NE"].includes(c.code)
+);
 
 export default function PaymentLinks() {
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -87,6 +97,8 @@ export default function PaymentLinks() {
       description: "",
       amount: undefined as any,
       imageFile: undefined,
+      allowedCountries: [],
+      customerPaysFee: false,
     },
   });
 
@@ -97,6 +109,8 @@ export default function PaymentLinks() {
       description: link.description || "",
       amount: link.amount,
       imageFile: undefined,
+      allowedCountries: link.allowedCountries || [],
+      customerPaysFee: link.customerPaysFee || false,
     });
     setImagePreview(null);
     setDialogOpen(true);
@@ -117,7 +131,9 @@ export default function PaymentLinks() {
         productName: data.productName,
         description: data.description,
         amount: data.amount,
-        imageUrl: imageData, // Store base64 data directly
+        imageUrl: imageData,
+        allowedCountries: data.allowedCountries,
+        customerPaysFee: data.customerPaysFee,
       });
       return res.json() as Promise<PaymentLink>;
     },
@@ -157,6 +173,8 @@ export default function PaymentLinks() {
         description: data.description,
         amount: data.amount,
         ...(imageData && { imageUrl: imageData }),
+        allowedCountries: data.allowedCountries,
+        customerPaysFee: data.customerPaysFee,
       });
       return res.json() as Promise<PaymentLink>;
     },
@@ -393,6 +411,75 @@ export default function PaymentLinks() {
                         </div>
                       </FormControl>
                       <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Pays autorisés */}
+                <FormField
+                  control={form.control}
+                  name="allowedCountries"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-2">
+                        <Globe className="w-4 h-4" />
+                        Pays autorisés
+                      </FormLabel>
+                      <FormControl>
+                        <div className="space-y-2">
+                          <p className="text-sm text-muted-foreground">
+                            Sélectionnez les pays où les clients peuvent payer. Si aucun pays n'est sélectionné, tous les pays seront disponibles.
+                          </p>
+                          <div className="grid grid-cols-2 gap-2">
+                            {COLLECT_COUNTRIES.map((country) => (
+                              <div key={country.code} className="flex items-center space-x-2">
+                                <Checkbox
+                                  id={`country-${country.code}`}
+                                  data-testid={`checkbox-country-${country.code}`}
+                                  checked={field.value?.includes(country.code)}
+                                  onCheckedChange={(checked) => {
+                                    if (checked) {
+                                      field.onChange([...(field.value || []), country.code]);
+                                    } else {
+                                      field.onChange(field.value?.filter((c: string) => c !== country.code) || []);
+                                    }
+                                  }}
+                                />
+                                <Label htmlFor={`country-${country.code}`} className="text-sm cursor-pointer">
+                                  {country.name}
+                                </Label>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Frais de paiement */}
+                <FormField
+                  control={form.control}
+                  name="customerPaysFee"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                      <div className="space-y-0.5">
+                        <FormLabel className="flex items-center gap-2">
+                          <Wallet className="w-4 h-4" />
+                          Frais à la charge du client
+                        </FormLabel>
+                        <p className="text-sm text-muted-foreground">
+                          Si activé, le client paiera les frais de 6% en plus du montant.
+                        </p>
+                      </div>
+                      <FormControl>
+                        <Switch
+                          data-testid="switch-customer-pays-fee"
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
                     </FormItem>
                   )}
                 />
