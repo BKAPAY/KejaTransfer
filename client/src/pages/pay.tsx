@@ -200,6 +200,18 @@ export default function Pay() {
   // Déterminer si aucun opérateur n'est disponible (après chargement)
   const noOperatorsAvailable = !isLoadingOperators && selectedCountry && countryOperators.length === 0;
 
+  // Filtrer les pays selon allowedCountries du lien de paiement
+  // Si allowedCountries est vide ou non défini, tous les pays sont autorisés
+  const allowedCountries = paymentLink?.allowedCountries && paymentLink.allowedCountries.length > 0
+    ? COUNTRIES.filter(c => paymentLink.allowedCountries!.includes(c.code))
+    : COUNTRIES;
+
+  // Calculer le montant avec frais si customerPaysFee est activé
+  const baseAmount = paymentLink?.amount || 0;
+  const feePercentage = 6; // 6% fee
+  const feeAmount = paymentLink?.customerPaysFee ? Math.ceil(baseAmount * feePercentage / 100) : 0;
+  const totalAmount = baseAmount + feeAmount;
+
   // Guinea currency conversion (XOF -> GNF)
   const isGuinea = selectedCountry?.toLowerCase() === "gn";
   
@@ -899,7 +911,7 @@ export default function Pay() {
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  {COUNTRIES.map((country) => (
+                  {allowedCountries.map((country) => (
                     <SelectItem key={country.code} value={country.code}>
                       {country.flag} {country.name}
                     </SelectItem>
@@ -1030,7 +1042,16 @@ export default function Pay() {
             )}
           </div>
           <div className="text-lg sm:text-xl lg:text-2xl font-bold pt-2">
-            {formatAmount(paymentLink.amount)}
+            {paymentLink.customerPaysFee ? (
+              <div className="space-y-1">
+                <span>{formatAmount(totalAmount)}</span>
+                <p className="text-xs text-muted-foreground font-normal">
+                  ({formatAmount(baseAmount)} + {formatAmount(feeAmount)} frais)
+                </p>
+              </div>
+            ) : (
+              formatAmount(paymentLink.amount)
+            )}
           </div>
         </CardHeader>
         <CardContent className="p-3 sm:p-4 lg:p-6">
