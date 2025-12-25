@@ -39,6 +39,8 @@ export const paymentLinks = pgTable("payment_links", {
   imageUrl: text("image_url"),
   token: text("token").notNull().unique(), // Unique token for the payment link
   isActive: boolean("is_active").notNull().default(true),
+  allowedCountries: text("allowed_countries").array().default([]), // Empty array = all countries allowed
+  customerPaysFee: boolean("customer_pays_fee").notNull().default(false), // If true, customer pays the 6% fee
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -63,6 +65,8 @@ export const apiKeys = pgTable("api_keys", {
   callbackUrl: text("callback_url"), // URL to receive payment notifications for auto activation
   callbackSecret: text("callback_secret"), // HMAC secret for signing callbacks
   isActive: boolean("is_active").notNull().default(true),
+  allowedCountries: text("allowed_countries").array().default([]), // Empty array = all countries allowed
+  customerPaysFee: boolean("customer_pays_fee").notNull().default(false), // If true, customer pays the 6% fee
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -129,6 +133,8 @@ export const updatePaymentLinkSchema = z.object({
   amount: z.number().min(1, "Le montant doit être supérieur à 0").optional(),
   imageUrl: z.string().optional(),
   isActive: z.boolean().optional(),
+  allowedCountries: z.array(z.string()).optional(),
+  customerPaysFee: z.boolean().optional(),
 });
 
 export const insertMerchantLinkSchema = createInsertSchema(merchantLinks).omit({
