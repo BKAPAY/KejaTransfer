@@ -356,8 +356,30 @@ export async function handleApiPayment(
       return { success: false, error: `Operateur ${operator} non supporte pour ${country}` };
     }
 
-    const grossAmount = Math.floor(amount);
-    const feeInfo = calculateIncomingFee(grossAmount, country);
+    // Si customerPaysFee est activé, le client paie le montant + frais
+    // Le marchand reçoit toujours le montant de base
+    const baseAmount = Math.floor(amount);
+    const customerPaysFee = apiKey.customerPaysFee || false;
+    
+    let grossAmount: number;
+    let feeInfo: ReturnType<typeof calculateIncomingFee>;
+    
+    if (customerPaysFee) {
+      // Client paie les frais: on calcule le montant total que le client doit payer
+      const feePercentage = 6; // 6% uniform fee
+      const feeAmount = Math.ceil(baseAmount * feePercentage / 100);
+      grossAmount = baseAmount + feeAmount;
+      feeInfo = {
+        grossAmount: grossAmount,
+        netAmount: baseAmount, // Le marchand reçoit le montant de base
+        feeAmount: feeAmount,
+        feePercentage: feePercentage * 10, // Converti en décimal (60 = 6%)
+      };
+    } else {
+      // Marchand paie les frais: logique standard
+      grossAmount = baseAmount;
+      feeInfo = calculateIncomingFee(grossAmount, country);
+    }
 
     const nameParts = customerName.split(" ");
     const firstName = nameParts[0] || "Client";

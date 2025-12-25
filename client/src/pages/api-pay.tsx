@@ -24,6 +24,8 @@ import logoImage from "@assets/bkapay-logo.png";
 interface ApiKeyInfo {
   siteName: string;
   isActive: boolean;
+  allowedCountries?: string[];
+  customerPaysFee?: boolean;
 }
 
 type PaymentStage = "form" | "ussd" | "otp" | "polling" | "completed" | "failed" | "redirect";
@@ -716,9 +718,20 @@ export default function ApiPay() {
             
             <div className="text-center p-4 bg-muted rounded-lg">
               <p className="text-sm text-muted-foreground">Montant a payer</p>
-              <p className="text-2xl font-bold text-primary">
-                {amount.toLocaleString()} FCFA
-              </p>
+              {apiKeyInfo?.customerPaysFee ? (
+                <>
+                  <p className="text-2xl font-bold text-primary">
+                    {Math.ceil(amount * 1.06).toLocaleString()} FCFA
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    ({amount.toLocaleString()} + {Math.ceil(amount * 0.06).toLocaleString()} frais)
+                  </p>
+                </>
+              ) : (
+                <p className="text-2xl font-bold text-primary">
+                  {amount.toLocaleString()} FCFA
+                </p>
+              )}
             </div>
             
             <Button
@@ -932,13 +945,23 @@ export default function ApiPay() {
             <SelectValue placeholder="Selectionnez un pays" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="SN">Senegal</SelectItem>
-            <SelectItem value="CI">Cote d'Ivoire</SelectItem>
-            <SelectItem value="BF">Burkina Faso</SelectItem>
-            <SelectItem value="BJ">Benin</SelectItem>
-            <SelectItem value="TG">Togo</SelectItem>
-            <SelectItem value="NE">Niger</SelectItem>
-            <SelectItem value="GN">Guinee</SelectItem>
+            {(() => {
+              const allCountries = [
+                { code: "BJ", name: "Benin" },
+                { code: "TG", name: "Togo" },
+                { code: "CI", name: "Cote d'Ivoire" },
+                { code: "SN", name: "Senegal" },
+                { code: "GN", name: "Guinee" },
+                { code: "NE", name: "Niger" },
+              ];
+              const allowed = apiKeyInfo?.allowedCountries;
+              const filteredCountries = (allowed && allowed.length > 0)
+                ? allCountries.filter(c => allowed.includes(c.code))
+                : allCountries;
+              return filteredCountries.map(c => (
+                <SelectItem key={c.code} value={c.code}>{c.name}</SelectItem>
+              ));
+            })()}
           </SelectContent>
         </Select>
       </div>
@@ -1018,7 +1041,7 @@ export default function ApiPay() {
             Traitement...
           </>
         ) : (
-          `Payer ${amount.toLocaleString()} XOF`
+          `Payer ${apiKeyInfo?.customerPaysFee ? Math.ceil(amount * 1.06).toLocaleString() : amount.toLocaleString()} XOF`
         )}
       </Button>
     </div>
@@ -1043,9 +1066,20 @@ export default function ApiPay() {
           <div className="space-y-3 pb-4 border-b">
             <div>
               <p className="text-sm text-muted-foreground mb-1">Montant a payer</p>
-              <p className="text-3xl font-bold text-primary">
-                {amount.toLocaleString()} <span className="text-lg">XOF</span>
-              </p>
+              {apiKeyInfo?.customerPaysFee ? (
+                <>
+                  <p className="text-3xl font-bold text-primary">
+                    {Math.ceil(amount * 1.06).toLocaleString()} <span className="text-lg">XOF</span>
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    ({amount.toLocaleString()} XOF + {Math.ceil(amount * 0.06).toLocaleString()} XOF frais)
+                  </p>
+                </>
+              ) : (
+                <p className="text-3xl font-bold text-primary">
+                  {amount.toLocaleString()} <span className="text-lg">XOF</span>
+                </p>
+              )}
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Completez votre paiement en remplissant les informations</p>
