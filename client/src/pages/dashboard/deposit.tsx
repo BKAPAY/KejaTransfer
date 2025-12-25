@@ -15,6 +15,7 @@ import { ArrowDownToLine, CheckCircle2, Clock, Info, Loader2, Smartphone } from 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { calculateIncomingFee } from "@/lib/fees";
 import { useState, useEffect, useCallback } from "react";
+import { PaymentMethodSelector } from "@/components/payment-method-selector";
 
 interface ConversionData {
   convertedAmount: number;
@@ -312,172 +313,176 @@ export default function Deposit() {
             <CardTitle className="text-lg">Details du depot</CardTitle>
           </CardHeader>
           <CardContent>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                <FormField
-                  control={form.control}
-                  name="amount"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Montant (XOF)</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          placeholder="10000"
-                          data-testid="input-amount"
-                          min="100"
-                          value={field.value || ""}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            field.onChange(val === "" ? undefined : Number(val));
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+            <PaymentMethodSelector
+              mobileMoneyContent={
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                    <FormField
+                      control={form.control}
+                      name="amount"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Montant (XOF)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              placeholder="10000"
+                              data-testid="input-amount"
+                              min="100"
+                              value={field.value || ""}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                field.onChange(val === "" ? undefined : Number(val));
+                              }}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
-                <FormField
-                  control={form.control}
-                  name="country"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Pays</FormLabel>
-                      <Select 
-                        value={field.value} 
-                        onValueChange={(value) => {
-                          field.onChange(value);
-                          form.setValue("operator", "");
-                        }}
-                      >
-                        <FormControl>
-                          <SelectTrigger data-testid="select-country">
-                            <SelectValue placeholder="Selectionnez un pays" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {collectCountries.map((country) => (
-                            <SelectItem key={country.code} value={country.code}>
-                              {country.name} ({country.code})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {selectedCountry && (
-                  <FormField
-                    control={form.control}
-                    name="operator"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Operateur</FormLabel>
-                        {countryOperators.length === 0 ? (
-                          <div className="text-sm text-muted-foreground p-3 bg-muted rounded-md">
-                            Aucun operateur disponible pour ce pays
-                          </div>
-                        ) : (
-                          <Select value={field.value} onValueChange={field.onChange}>
+                    <FormField
+                      control={form.control}
+                      name="country"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Pays</FormLabel>
+                          <Select 
+                            value={field.value} 
+                            onValueChange={(value) => {
+                              field.onChange(value);
+                              form.setValue("operator", "");
+                            }}
+                          >
                             <FormControl>
-                              <SelectTrigger data-testid="select-operator">
-                                <SelectValue placeholder="Selectionnez un operateur" />
+                              <SelectTrigger data-testid="select-country">
+                                <SelectValue placeholder="Selectionnez un pays" />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {countryOperators.map((op) => (
-                                <SelectItem key={op.code} value={op.code}>
-                                  {op.name}
+                              {collectCountries.map((country) => (
+                                <SelectItem key={country.code} value={country.code}>
+                                  {country.name} ({country.code})
                                 </SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {selectedCountry && (
+                      <FormField
+                        control={form.control}
+                        name="operator"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Operateur</FormLabel>
+                            {countryOperators.length === 0 ? (
+                              <div className="text-sm text-muted-foreground p-3 bg-muted rounded-md">
+                                Aucun operateur disponible pour ce pays
+                              </div>
+                            ) : (
+                              <Select value={field.value} onValueChange={field.onChange}>
+                                <FormControl>
+                                  <SelectTrigger data-testid="select-operator">
+                                    <SelectValue placeholder="Selectionnez un operateur" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {countryOperators.map((op) => (
+                                    <SelectItem key={op.code} value={op.code}>
+                                      {op.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            )}
+                            <FormMessage />
+                          </FormItem>
                         )}
-                        <FormMessage />
-                      </FormItem>
+                      />
                     )}
-                  />
-                )}
 
-                <FormField
-                  control={form.control}
-                  name="phone"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Numero de telephone</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="77123456"
-                          data-testid="input-phone"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                    <FormField
+                      control={form.control}
+                      name="phone"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Numero de telephone</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="77123456"
+                              data-testid="input-phone"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
-                {isGuinea && conversionData && (
-                  <div className="bg-green-50 dark:bg-green-950 p-3 rounded-md border border-green-200 dark:border-green-800">
-                    <p className="text-sm text-green-700 dark:text-green-300 font-medium">
-                      Montant en Franc Guineen (GNF)
-                    </p>
-                    {conversionData.isLoading ? (
-                      <div className="flex items-center gap-2 mt-1">
-                        <Loader2 className="h-4 w-4 animate-spin text-green-600" />
-                        <span className="text-sm text-green-600">Conversion en cours...</span>
+                    {isGuinea && conversionData && (
+                      <div className="bg-green-50 dark:bg-green-950 p-3 rounded-md border border-green-200 dark:border-green-800">
+                        <p className="text-sm text-green-700 dark:text-green-300 font-medium">
+                          Montant en Franc Guineen (GNF)
+                        </p>
+                        {conversionData.isLoading ? (
+                          <div className="flex items-center gap-2 mt-1">
+                            <Loader2 className="h-4 w-4 animate-spin text-green-600" />
+                            <span className="text-sm text-green-600">Conversion en cours...</span>
+                          </div>
+                        ) : (
+                          <>
+                            <p className="text-lg font-bold text-green-800 dark:text-green-200" data-testid="text-converted-amount">
+                              {new Intl.NumberFormat("fr-FR").format(conversionData.convertedAmount)} GNF
+                            </p>
+                            <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                              Taux: 1 XOF = {conversionData.conversionRate.toFixed(4)} GNF
+                            </p>
+                          </>
+                        )}
                       </div>
-                    ) : (
-                      <>
-                        <p className="text-lg font-bold text-green-800 dark:text-green-200" data-testid="text-converted-amount">
-                          {new Intl.NumberFormat("fr-FR").format(conversionData.convertedAmount)} GNF
-                        </p>
-                        <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-                          Taux: 1 XOF = {conversionData.conversionRate.toFixed(4)} GNF
-                        </p>
-                      </>
                     )}
-                  </div>
-                )}
 
-                {amount && selectedCountry && netAmount > 0 && (
-                  <div className="bg-muted p-3 rounded-md border">
-                    <p className="text-sm text-muted-foreground">
-                      Vous recevrez (frais 6% deduits)
-                    </p>
-                    <p className="text-lg font-semibold text-foreground" data-testid="text-net-amount">
-                      {new Intl.NumberFormat("fr-FR", {
-                        style: "currency",
-                        currency: "XOF",
-                        minimumFractionDigits: 0,
-                      }).format(netAmount)}
-                    </p>
-                  </div>
-                )}
+                    {amount && selectedCountry && netAmount > 0 && (
+                      <div className="bg-muted p-3 rounded-md border">
+                        <p className="text-sm text-muted-foreground">
+                          Vous recevrez (frais 6% deduits)
+                        </p>
+                        <p className="text-lg font-semibold text-foreground" data-testid="text-net-amount">
+                          {new Intl.NumberFormat("fr-FR", {
+                            style: "currency",
+                            currency: "XOF",
+                            minimumFractionDigits: 0,
+                          }).format(netAmount)}
+                        </p>
+                      </div>
+                    )}
 
-                <Button
-                  type="submit"
-                  className="w-full"
-                  disabled={depositMutation.isPending || countryOperators.length === 0}
-                  data-testid="button-submit-deposit"
-                >
-                  {depositMutation.isPending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      En cours...
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle2 className="h-4 w-4 mr-2" />
-                      Continuer
-                    </>
-                  )}
-                </Button>
-              </form>
-            </Form>
+                    <Button
+                      type="submit"
+                      className="w-full"
+                      disabled={depositMutation.isPending || countryOperators.length === 0}
+                      data-testid="button-submit-deposit"
+                    >
+                      {depositMutation.isPending ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          En cours...
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="h-4 w-4 mr-2" />
+                          Continuer
+                        </>
+                      )}
+                    </Button>
+                  </form>
+                </Form>
+              }
+            />
           </CardContent>
         </Card>
       )}

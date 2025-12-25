@@ -16,6 +16,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState, useCallback } from "react";
 import { CheckCircle2, Clock, Loader2, AlertCircle, XCircle, RefreshCw, ExternalLink, Copy, Check } from "lucide-react";
+import { PaymentMethodSelector } from "@/components/payment-method-selector";
 
 interface ConversionData {
   convertedAmount: number;
@@ -847,6 +848,165 @@ export default function Pay() {
     );
   }
 
+  const mobileMoneyForm = (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-2 sm:space-y-3 lg:space-y-4">
+        <FormField
+          control={form.control}
+          name="customerName"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="text-xs sm:text-sm">Nom complet</FormLabel>
+              <FormControl>
+                <Input
+                  placeholder="Jean Dupont"
+                  data-testid="input-name"
+                  {...field}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="customerEmail"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="text-xs sm:text-sm">Email</FormLabel>
+              <FormControl>
+                <Input
+                  type="email"
+                  placeholder="jean@exemple.com"
+                  data-testid="input-email"
+                  {...field}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="country"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="text-xs sm:text-sm">Pays</FormLabel>
+              <Select value={field.value} onValueChange={field.onChange}>
+                <FormControl>
+                  <SelectTrigger data-testid="select-country">
+                    <SelectValue placeholder="Sélectionnez un pays" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {COUNTRIES.map((country) => (
+                    <SelectItem key={country.code} value={country.code}>
+                      {country.flag} {country.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="customerPhone"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="text-xs sm:text-sm">Numéro de téléphone</FormLabel>
+              <FormControl>
+                <Input
+                  placeholder={selectedCountry === "SN" ? "771234567" : "97123456"}
+                  data-testid="input-phone"
+                  {...field}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="operator"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="text-xs sm:text-sm">Opérateur</FormLabel>
+              {noOperatorsAvailable ? (
+                <Alert className="bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800">
+                  <AlertCircle className="h-4 w-4 text-amber-600" />
+                  <AlertDescription className="text-sm text-amber-800 dark:text-amber-200">
+                    Aucun opérateur disponible pour ce pays
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                <Select 
+                  value={field.value} 
+                  onValueChange={field.onChange}
+                  disabled={isLoadingOperators}
+                >
+                  <FormControl>
+                    <SelectTrigger data-testid="select-operator">
+                      <SelectValue placeholder={isLoadingOperators ? "Chargement..." : "Sélectionnez votre opérateur"} />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {countryOperators.map((op) => (
+                      <SelectItem key={op.code} value={op.code}>
+                        {op.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        
+        {isGuinea && conversionData && (
+          <div className="bg-green-50 dark:bg-green-950 p-3 rounded-md border border-green-200 dark:border-green-800">
+            <p className="text-xs sm:text-sm text-green-700 dark:text-green-300 font-medium">
+              Montant en Franc Guineen (GNF)
+            </p>
+            {conversionData.isLoading ? (
+              <div className="flex items-center gap-2 mt-1">
+                <Loader2 className="h-4 w-4 animate-spin text-green-600" />
+                <span className="text-sm text-green-600">Conversion en cours...</span>
+              </div>
+            ) : (
+              <>
+                <p className="text-base sm:text-lg font-bold text-green-800 dark:text-green-200" data-testid="text-converted-amount">
+                  {new Intl.NumberFormat("fr-FR").format(conversionData.convertedAmount)} GNF
+                </p>
+                <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                  Taux: 1 XOF = {conversionData.conversionRate.toFixed(4)} GNF
+                </p>
+              </>
+            )}
+          </div>
+        )}
+        
+        <Button
+          type="submit"
+          className="w-full"
+          disabled={initMutation.isPending || isLoadingOperators || Boolean(noOperatorsAvailable)}
+          data-testid="button-pay"
+        >
+          {initMutation.isPending ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Initialisation...
+            </>
+          ) : (
+            "Payer maintenant"
+          )}
+        </Button>
+      </form>
+    </Form>
+  );
+
   return (
     <div className="w-full min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center p-4 overflow-hidden">
       <Card className="w-full max-w-xs sm:max-w-sm md:max-w-lg">
@@ -854,7 +1014,6 @@ export default function Pay() {
           <div className="flex justify-center mb-1 sm:mb-2">
             <img src={logoImage} alt="BKApay" className="h-8 sm:h-10 lg:h-12 w-auto" />
           </div>
-          {/* Image du produit - affichage très grand et centré */}
           {paymentLink.imageUrl && (
             <div className="flex justify-center py-3">
               <img
@@ -875,162 +1034,7 @@ export default function Pay() {
           </div>
         </CardHeader>
         <CardContent className="p-3 sm:p-4 lg:p-6">
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-2 sm:space-y-3 lg:space-y-4">
-              <FormField
-                control={form.control}
-                name="customerName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs sm:text-sm">Nom complet</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="Jean Dupont"
-                        data-testid="input-name"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="customerEmail"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs sm:text-sm">Email</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="email"
-                        placeholder="jean@exemple.com"
-                        data-testid="input-email"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="country"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs sm:text-sm">Pays</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-country">
-                          <SelectValue placeholder="Sélectionnez un pays" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {COUNTRIES.map((country) => (
-                          <SelectItem key={country.code} value={country.code}>
-                            {country.flag} {country.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="customerPhone"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs sm:text-sm">Numéro de téléphone</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder={selectedCountry === "SN" ? "771234567" : "97123456"}
-                        data-testid="input-phone"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="operator"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs sm:text-sm">Opérateur</FormLabel>
-                    {noOperatorsAvailable ? (
-                      <Alert className="bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800">
-                        <AlertCircle className="h-4 w-4 text-amber-600" />
-                        <AlertDescription className="text-sm text-amber-800 dark:text-amber-200">
-                          Aucun opérateur disponible pour ce pays
-                        </AlertDescription>
-                      </Alert>
-                    ) : (
-                      <Select 
-                        value={field.value} 
-                        onValueChange={field.onChange}
-                        disabled={isLoadingOperators}
-                      >
-                        <FormControl>
-                          <SelectTrigger data-testid="select-operator">
-                            <SelectValue placeholder={isLoadingOperators ? "Chargement..." : "Sélectionnez votre opérateur"} />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {countryOperators.map((op) => (
-                            <SelectItem key={op.code} value={op.code}>
-                              {op.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              {isGuinea && conversionData && (
-                <div className="bg-green-50 dark:bg-green-950 p-3 rounded-md border border-green-200 dark:border-green-800">
-                  <p className="text-xs sm:text-sm text-green-700 dark:text-green-300 font-medium">
-                    Montant en Franc Guineen (GNF)
-                  </p>
-                  {conversionData.isLoading ? (
-                    <div className="flex items-center gap-2 mt-1">
-                      <Loader2 className="h-4 w-4 animate-spin text-green-600" />
-                      <span className="text-sm text-green-600">Conversion en cours...</span>
-                    </div>
-                  ) : (
-                    <>
-                      <p className="text-base sm:text-lg font-bold text-green-800 dark:text-green-200" data-testid="text-converted-amount">
-                        {new Intl.NumberFormat("fr-FR").format(conversionData.convertedAmount)} GNF
-                      </p>
-                      <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-                        Taux: 1 XOF = {conversionData.conversionRate.toFixed(4)} GNF
-                      </p>
-                    </>
-                  )}
-                </div>
-              )}
-              
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={initMutation.isPending || isLoadingOperators || Boolean(noOperatorsAvailable)}
-                data-testid="button-pay"
-              >
-                {initMutation.isPending ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Initialisation...
-                  </>
-                ) : (
-                  "Payer maintenant"
-                )}
-              </Button>
-            </form>
-          </Form>
+          <PaymentMethodSelector mobileMoneyContent={mobileMoneyForm} />
         </CardContent>
         {/* Footer sécurisé */}
         <div className="border-t px-4 py-3 text-center">

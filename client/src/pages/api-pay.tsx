@@ -2,6 +2,7 @@ import { useParams, useLocation, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
+import { PaymentMethodSelector } from "@/components/payment-method-selector";
 
 interface ConversionData {
   convertedAmount: number;
@@ -890,6 +891,139 @@ export default function ApiPay() {
     );
   }
 
+  const mobileMoneyForm = (
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="customerName" className="flex items-center gap-2">
+          <User className="w-4 h-4" />
+          Nom complet
+        </Label>
+        <Input
+          id="customerName"
+          placeholder="Votre nom complet"
+          value={customerName}
+          onChange={(e) => setCustomerName(e.target.value)}
+          data-testid="input-customer-name"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="customerEmail" className="flex items-center gap-2">
+          <Mail className="w-4 h-4" />
+          Email
+        </Label>
+        <Input
+          id="customerEmail"
+          type="email"
+          placeholder="votre@email.com"
+          value={customerEmail}
+          onChange={(e) => setCustomerEmail(e.target.value)}
+          data-testid="input-customer-email"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="country" className="flex items-center gap-2">
+          <Globe className="w-4 h-4" />
+          Pays
+        </Label>
+        <Select value={country} onValueChange={(v) => { setCountry(v); setOperator(""); }}>
+          <SelectTrigger id="country" data-testid="select-country">
+            <SelectValue placeholder="Selectionnez un pays" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="SN">Senegal</SelectItem>
+            <SelectItem value="CI">Cote d'Ivoire</SelectItem>
+            <SelectItem value="BF">Burkina Faso</SelectItem>
+            <SelectItem value="BJ">Benin</SelectItem>
+            <SelectItem value="TG">Togo</SelectItem>
+            <SelectItem value="NE">Niger</SelectItem>
+            <SelectItem value="GN">Guinee</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="customerPhone" className="flex items-center gap-2">
+          <Phone className="w-4 h-4" />
+          Numero de telephone
+        </Label>
+        <Input
+          id="customerPhone"
+          placeholder="Ex: 77 123 45 67"
+          value={customerPhone}
+          onChange={(e) => setCustomerPhone(e.target.value)}
+          data-testid="input-customer-phone"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="operator">Operateur Mobile Money</Label>
+        {noOperatorsAvailable ? (
+          <Alert className="bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800">
+            <AlertCircle className="h-4 w-4 text-amber-600" />
+            <AlertDescription className="text-sm text-amber-800 dark:text-amber-200">
+              Aucun opérateur disponible pour ce pays
+            </AlertDescription>
+          </Alert>
+        ) : (
+          <Select value={operator} onValueChange={setOperator} disabled={!country || isLoadingOperators}>
+            <SelectTrigger id="operator" data-testid="select-operator">
+              <SelectValue placeholder={isLoadingOperators ? "Chargement..." : (country ? "Selectionnez un operateur" : "Choisissez un pays d'abord")} />
+            </SelectTrigger>
+            <SelectContent>
+              {countryOperators.map((op) => (
+                <SelectItem key={op.code} value={op.code}>
+                  {op.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+      </div>
+
+      {isGuinea && conversionData && (
+        <div className="bg-green-50 dark:bg-green-950 p-3 rounded-md border border-green-200 dark:border-green-800">
+          <p className="text-sm text-green-700 dark:text-green-300 font-medium">
+            Montant en Franc Guineen (GNF)
+          </p>
+          {conversionData.isLoading ? (
+            <div className="flex items-center gap-2 mt-1">
+              <Loader2 className="h-4 w-4 animate-spin text-green-600" />
+              <span className="text-sm text-green-600">Conversion en cours...</span>
+            </div>
+          ) : (
+            <>
+              <p className="text-lg font-bold text-green-800 dark:text-green-200" data-testid="text-converted-amount">
+                {new Intl.NumberFormat("fr-FR").format(conversionData.convertedAmount)} GNF
+              </p>
+              <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                Taux: 1 XOF = {conversionData.conversionRate.toFixed(4)} GNF
+              </p>
+            </>
+          )}
+        </div>
+      )}
+
+      <Button
+        onClick={handleSubmit}
+        disabled={initMutation.isPending || noOperatorsAvailable}
+        className="w-full"
+        size="lg"
+        data-testid="button-submit-payment"
+      >
+        {initMutation.isPending ? (
+          <>
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            Traitement...
+          </>
+        ) : (
+          `Payer ${amount.toLocaleString()} XOF`
+        )}
+      </Button>
+    </div>
+  );
+
   return (
     <div className="w-full min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-accent/5 p-4">
       <Card className="w-full max-w-md">
@@ -921,137 +1055,7 @@ export default function ApiPay() {
             </div>
           </div>
 
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="customerName" className="flex items-center gap-2">
-                <User className="w-4 h-4" />
-                Nom complet
-              </Label>
-              <Input
-                id="customerName"
-                placeholder="Votre nom complet"
-                value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
-                data-testid="input-customer-name"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="customerEmail" className="flex items-center gap-2">
-                <Mail className="w-4 h-4" />
-                Email
-              </Label>
-              <Input
-                id="customerEmail"
-                type="email"
-                placeholder="votre@email.com"
-                value={customerEmail}
-                onChange={(e) => setCustomerEmail(e.target.value)}
-                data-testid="input-customer-email"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="country" className="flex items-center gap-2">
-                <Globe className="w-4 h-4" />
-                Pays
-              </Label>
-              <Select value={country} onValueChange={(v) => { setCountry(v); setOperator(""); }}>
-                <SelectTrigger id="country" data-testid="select-country">
-                  <SelectValue placeholder="Selectionnez un pays" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="SN">Senegal</SelectItem>
-                  <SelectItem value="CI">Cote d'Ivoire</SelectItem>
-                  <SelectItem value="BF">Burkina Faso</SelectItem>
-                  <SelectItem value="BJ">Benin</SelectItem>
-                  <SelectItem value="TG">Togo</SelectItem>
-                  <SelectItem value="NE">Niger</SelectItem>
-                  <SelectItem value="GN">Guinee</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="customerPhone" className="flex items-center gap-2">
-                <Phone className="w-4 h-4" />
-                Numero de telephone
-              </Label>
-              <Input
-                id="customerPhone"
-                placeholder="Ex: 77 123 45 67"
-                value={customerPhone}
-                onChange={(e) => setCustomerPhone(e.target.value)}
-                data-testid="input-customer-phone"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="operator">Operateur Mobile Money</Label>
-              {noOperatorsAvailable ? (
-                <Alert className="bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800">
-                  <AlertCircle className="h-4 w-4 text-amber-600" />
-                  <AlertDescription className="text-sm text-amber-800 dark:text-amber-200">
-                    Aucun opérateur disponible pour ce pays
-                  </AlertDescription>
-                </Alert>
-              ) : (
-                <Select value={operator} onValueChange={setOperator} disabled={!country || isLoadingOperators}>
-                  <SelectTrigger id="operator" data-testid="select-operator">
-                    <SelectValue placeholder={isLoadingOperators ? "Chargement..." : (country ? "Selectionnez un operateur" : "Choisissez un pays d'abord")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {countryOperators.map((op) => (
-                      <SelectItem key={op.code} value={op.code}>
-                        {op.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
-
-            {/* Currency Conversion for Guinea */}
-            {isGuinea && conversionData && (
-              <div className="bg-green-50 dark:bg-green-950 p-3 rounded-md border border-green-200 dark:border-green-800">
-                <p className="text-sm text-green-700 dark:text-green-300 font-medium">
-                  Montant en Franc Guineen (GNF)
-                </p>
-                {conversionData.isLoading ? (
-                  <div className="flex items-center gap-2 mt-1">
-                    <Loader2 className="h-4 w-4 animate-spin text-green-600" />
-                    <span className="text-sm text-green-600">Conversion en cours...</span>
-                  </div>
-                ) : (
-                  <>
-                    <p className="text-lg font-bold text-green-800 dark:text-green-200" data-testid="text-converted-amount">
-                      {new Intl.NumberFormat("fr-FR").format(conversionData.convertedAmount)} GNF
-                    </p>
-                    <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-                      Taux: 1 XOF = {conversionData.conversionRate.toFixed(4)} GNF
-                    </p>
-                  </>
-                )}
-              </div>
-            )}
-
-            <Button
-              onClick={handleSubmit}
-              disabled={initMutation.isPending || noOperatorsAvailable}
-              className="w-full"
-              size="lg"
-              data-testid="button-submit-payment"
-            >
-              {initMutation.isPending ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Traitement...
-                </>
-              ) : (
-                `Payer ${amount.toLocaleString()} XOF`
-              )}
-            </Button>
-          </div>
+          <PaymentMethodSelector mobileMoneyContent={mobileMoneyForm} />
 
           <div className="text-center pt-4 border-t">
             <Link href="/" className="text-xs text-primary hover:underline cursor-pointer">
