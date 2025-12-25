@@ -2,7 +2,9 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Copy, Eye, EyeOff, Trash2, Key, AlertCircle, ExternalLink, Webhook, RefreshCw, Check, X } from "lucide-react";
+import { Plus, Copy, Eye, EyeOff, Trash2, Key, AlertCircle, ExternalLink, Webhook, RefreshCw, Check, X, Settings, Globe } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { ApiKey, User } from "@shared/schema";
@@ -34,11 +36,22 @@ const apiKeySchema = z.object({
 
 type ApiKeyFormData = z.infer<typeof apiKeySchema>;
 
+const COLLECT_COUNTRIES = [
+  { code: "BJ", name: "Benin" },
+  { code: "TG", name: "Togo" },
+  { code: "CI", name: "Cote d'Ivoire" },
+  { code: "SN", name: "Senegal" },
+  { code: "GN", name: "Guinee" },
+  { code: "NE", name: "Niger" },
+];
+
 export default function ApiPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [visibleKeys, setVisibleKeys] = useState<Record<string, boolean>>({});
   const [editingCallback, setEditingCallback] = useState<string | null>(null);
   const [callbackUrls, setCallbackUrls] = useState<Record<string, string>>({});
+  const [editingSettings, setEditingSettings] = useState<string | null>(null);
+  const [settingsData, setSettingsData] = useState<Record<string, { allowedCountries: string[]; customerPaysFee: boolean }>>({});
   const { toast } = useToast();
 
   const { data: user } = useQuery<User>({
@@ -139,6 +152,28 @@ export default function ApiPage() {
       toast({
         title: "Erreur",
         description: error.message || "Erreur lors de la regeneration",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const settingsMutation = useMutation({
+    mutationFn: async ({ id, allowedCountries, customerPaysFee }: { id: string; allowedCountries: string[]; customerPaysFee: boolean }) => {
+      const res = await apiRequest("PATCH", `/api/api-keys/${id}/settings`, { allowedCountries, customerPaysFee });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/api-keys"] });
+      setEditingSettings(null);
+      toast({
+        title: "Parametres enregistres",
+        description: "Les options de paiement ont ete mises a jour",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erreur",
+        description: error.message || "Erreur lors de la sauvegarde",
         variant: "destructive",
       });
     },
@@ -518,6 +553,153 @@ export default function ApiPage() {
                           Configurer un callback
                         </Button>
                       )}
+                    </div>
+                  )}
+                </div>
+
+                <Separator className="my-4" />
+
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Settings className="w-4 h-4 text-muted-foreground" />
+                    <label className="text-sm font-medium">Options de paiement</label>
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Configurez les pays visibles et qui paie les frais de transaction (6%).
+                  </p>
+                  
+                  {editingSettings === apiKey.id ? (
+                    <div className="space-y-4">
+                      <div>
+                        <label className="text-sm font-medium mb-2 flex items-center gap-2">
+                          <Globe className="w-4 h-4" />
+                          Pays visibles pour les paiements
+                        </label>
+                        <p className="text-xs text-muted-foreground mb-3">
+                          Selectionnez les pays que vos clients peuvent utiliser. Si aucun n'est selectionne, tous les pays seront visibles.
+                        </p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {COLLECT_COUNTRIES.map((country) => {
+                            const currentData = settingsData[apiKey.id];
+                            const isChecked = currentData?.allowedCountries?.includes(country.code) || false;
+                            return (
+                              <div key={country.code} className="flex items-center gap-2">
+                                <Checkbox
+                                  id={`country-${apiKey.id}-${country.code}`}
+                                  checked={isChecked}
+                                  onCheckedChange={(checked) => {
+                                    setSettingsData(prev => {
+                                      const current = prev[apiKey.id] || { allowedCountries: [], customerPaysFee: false };
+                                      const newAllowed = checked
+                                        ? [...current.allowedCountries, country.code]
+                                        : current.allowedCountries.filter(c => c !== country.code);
+                                      return { ...prev, [apiKey.id]: { ...current, allowedCountries: newAllowed } };
+                                    });
+                                  }}
+                                  data-testid={`checkbox-country-${apiKey.id}-${country.code}`}
+                                />
+                                <label 
+                                  htmlFor={`country-${apiKey.id}-${country.code}`}
+                                  className="text-sm cursor-pointer"
+                                >
+                                  {country.name}
+                                </label>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                        <div>
+                          <label className="text-sm font-medium">Le client paie les frais</label>
+                          <p className="text-xs text-muted-foreground">
+                            Si active, les frais de 6% seront ajoutes au montant paye par le client
+                          </p>
+                        </div>
+                        <Switch
+                          checked={settingsData[apiKey.id]?.customerPaysFee || false}
+                          onCheckedChange={(checked) => {
+                            setSettingsData(prev => {
+                              const current = prev[apiKey.id] || { allowedCountries: [], customerPaysFee: false };
+                              return { ...prev, [apiKey.id]: { ...current, customerPaysFee: checked } };
+                            });
+                          }}
+                          data-testid={`switch-fee-${apiKey.id}`}
+                        />
+                      </div>
+                      
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            const data = settingsData[apiKey.id];
+                            settingsMutation.mutate({
+                              id: apiKey.id,
+                              allowedCountries: data?.allowedCountries || [],
+                              customerPaysFee: data?.customerPaysFee || false,
+                            });
+                          }}
+                          disabled={settingsMutation.isPending}
+                          data-testid={`button-save-settings-${apiKey.id}`}
+                        >
+                          <Check className="w-4 h-4 mr-1" />
+                          {settingsMutation.isPending ? "..." : "Enregistrer"}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            setEditingSettings(null);
+                            setSettingsData(prev => {
+                              const copy = { ...prev };
+                              delete copy[apiKey.id];
+                              return copy;
+                            });
+                          }}
+                          data-testid={`button-cancel-settings-${apiKey.id}`}
+                        >
+                          <X className="w-4 h-4 mr-1" />
+                          Annuler
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="flex flex-wrap gap-4 text-sm">
+                        <div>
+                          <span className="text-muted-foreground">Pays: </span>
+                          <span className="font-medium">
+                            {(apiKey as any).allowedCountries?.length > 0
+                              ? (apiKey as any).allowedCountries.join(", ")
+                              : "Tous"}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Frais: </span>
+                          <span className="font-medium">
+                            {(apiKey as any).customerPaysFee ? "Payes par le client" : "A votre charge"}
+                          </span>
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setSettingsData(prev => ({
+                            ...prev,
+                            [apiKey.id]: {
+                              allowedCountries: (apiKey as any).allowedCountries || [],
+                              customerPaysFee: (apiKey as any).customerPaysFee || false,
+                            }
+                          }));
+                          setEditingSettings(apiKey.id);
+                        }}
+                        data-testid={`button-edit-settings-${apiKey.id}`}
+                      >
+                        <Settings className="w-4 h-4 mr-2" />
+                        Configurer
+                      </Button>
                     </div>
                   )}
                 </div>
