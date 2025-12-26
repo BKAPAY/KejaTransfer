@@ -1,12 +1,13 @@
 import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { useEffect, useRef } from "react";
 import { useAuth } from "@/hooks/use-auth";
+import { Wallet } from "lucide-react";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import Signup from "@/pages/signup";
@@ -45,6 +46,22 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [location, setLocation] = useLocation();
   const { isLoading, error } = useAuth();
 
+  const { data: stats } = useQuery<{
+    totalBalance: number;
+  }>({
+    queryKey: ["/api/dashboard/stats"],
+    refetchInterval: 5000,
+  });
+
+  const formatAmount = (amount: number) => {
+    return new Intl.NumberFormat("fr-FR", {
+      style: "currency",
+      currency: "XOF",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  };
+
   // Si pas authentifié, rediriger vers login
   useEffect(() => {
     if (!isLoading && error && location.startsWith("/dashboard")) {
@@ -73,8 +90,14 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
       <div className="flex h-screen w-full">
         <AppSidebar />
         <div className="flex flex-col flex-1 min-w-0">
-          <header className="flex items-center gap-4 p-4 border-b bg-card sticky top-0 z-10">
+          <header className="flex items-center justify-between gap-4 p-4 border-b bg-card sticky top-0 z-10">
             <SidebarTrigger size="lg" data-testid="button-sidebar-toggle" />
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 rounded-lg" data-testid="header-balance">
+              <Wallet className="h-4 w-4 text-primary" />
+              <span className="text-sm font-semibold text-primary">
+                {formatAmount(stats?.totalBalance || 0)}
+              </span>
+            </div>
           </header>
           <main className="flex-1 overflow-auto">
             <div className="container max-w-7xl mx-auto px-4 md:px-8 py-8">

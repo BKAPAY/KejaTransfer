@@ -57,33 +57,10 @@ export default function Dashboard() {
     <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-bold text-foreground mb-1">Tableau de bord</h1>
-        <p className="text-sm text-muted-foreground">
-          Bienvenue {userLoading ? "..." : `${user?.firstName}`}
-        </p>
       </div>
 
       {/* Stats Cards */}
       <div className="space-y-3">
-        {/* Solde total */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-1">
-            <CardTitle className="text-xs font-medium">Solde total</CardTitle>
-            <Wallet className="h-3 w-3 text-muted-foreground" />
-          </CardHeader>
-          <CardContent className="pt-2">
-            {statsLoading ? (
-              <Skeleton className="h-6 w-28" />
-            ) : (
-              <>
-                <div className="text-xl font-bold" data-testid="stat-balance">
-                  {formatAmount(stats?.totalBalance || 0)}
-                </div>
-                <p className="text-xs text-muted-foreground mt-0.5">Disponible</p>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
         {/* Quick Access Buttons */}
         <div className="grid grid-cols-4 gap-1">
           <Button
