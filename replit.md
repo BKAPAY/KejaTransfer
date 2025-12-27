@@ -31,6 +31,9 @@ The frontend utilizes React 18 with TypeScript, styled with Shadcn UI and Tailwi
   - **Webhooks**: /api/webhooks/fedapay for automatic transaction status updates
 - **Withdrawal Flows**: Implemented using FedaPay Payout API. Features include KYC validation, balance checks, proper phone number sanitization, and immediate balance deduction on success.
 - **Silent Fees**: Automatic calculation of transaction fees - UNIFORM 6% for ALL countries and operators.
+- **Fee Deduction Logic**:
+  - **Deposits (INCOMING)**: Client pays GROSS amount. User receives NET (GROSS - 6% fees)
+  - **Withdrawals/Transfers (OUTGOING)**: User enters GROSS amount. Provider receives NET (GROSS - 6% fees). User's balance is debited GROSS amount.
 - **Account Suspension**: System for suspending and reactivating user accounts with primary admin protection.
 - **API Gateway v1.3**: Provides public/private API keys for developers to integrate with BKApay for incoming payments, including pending transaction creation, strict country validation, and automatic webhook/callback notifications for subscription/account activation.
 - **Fee System**: Robust and deterministic fee calculation logic distinguishing between INCOMING (client pays gross, credited net) and OUTGOING (user requests net, debited net+fees) transactions.

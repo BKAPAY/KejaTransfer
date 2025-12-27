@@ -109,8 +109,8 @@ export async function handleFedaPayWithdrawal(
       return { success: false, error: "Verification KYC requise pour les retraits" };
     }
 
-    const netAmount = Math.floor(amount);
-    const feeInfo = calculateOutgoingFee(netAmount, country);
+    const grossAmount = Math.floor(amount);
+    const feeInfo = calculateOutgoingFee(grossAmount, country);
 
     if (user.balance < feeInfo.totalDeductedFromBalance) {
       return { success: false, error: "Solde insuffisant" };
@@ -120,8 +120,9 @@ export async function handleFedaPayWithdrawal(
     const firstName = nameParts[0] || "Client";
     const lastName = nameParts.slice(1).join(" ") || "BKApay";
 
+    // Envoyer le montant recu (montant - frais) au provider
     const result = await createPayout({
-      amount: netAmount,
+      amount: feeInfo.amountReceived,
       customerFirstName: firstName,
       customerLastName: lastName,
       customerEmail: user.email,
@@ -134,25 +135,27 @@ export async function handleFedaPayWithdrawal(
       return { success: false, error: result.error || "Erreur lors du retrait" };
     }
 
+    // Debiter le montant brut (ce que l'utilisateur a saisi)
     await storage.updateUserBalance(userId, -feeInfo.totalDeductedFromBalance);
 
     const tx = await storage.createTransaction({
       userId: userId,
       type: "withdrawal",
-      amount: netAmount,
+      amount: grossAmount, // Montant saisi par l'utilisateur
       fee: feeInfo.feeAmount,
       feePercentage: feeInfo.feePercentage,
       currency: "XOF",
       status: "pending",
       country: country.toUpperCase(),
       operator: operator,
-      description: `Retrait de ${netAmount} XOF`,
+      description: `Retrait de ${grossAmount} XOF (recu: ${feeInfo.amountReceived} XOF)`,
       customerPhone: phone,
       metadata: JSON.stringify({
         fedapayPayoutId: result.payoutId,
         fedapayReference: result.reference,
         phone,
         deductedFromBalance: feeInfo.totalDeductedFromBalance,
+        amountReceived: feeInfo.amountReceived,
       }),
     });
 

@@ -61,30 +61,39 @@ export function calculateIncomingFee(grossAmount: number, country?: string): {
 /**
  * Calculate fees for OUTGOING payments (withdrawals, transfers)
  * 
- * @param netAmount - The NET amount user wants to send (e.g., 2000)
+ * @param grossAmount - The GROSS amount user enters (e.g., 10000)
  * @param country - Country code (ignored - 6% for all)
- * @returns {netAmount: 2000, feeAmount: 120, totalDeductedFromBalance: 2120}
+ * @returns {grossAmount: 10000, feeAmount: 600, amountReceived: 9400, totalDeductedFromBalance: 10000}
+ * 
+ * NOUVELLE LOGIQUE:
+ * - L'utilisateur ecrit 10000 XOF
+ * - Les frais (6% = 600) sont soustraits du montant ecrit
+ * - L'utilisateur recoit 9400 XOF
+ * - Le solde est debite de 10000 XOF (pas 10600)
  * 
  * Usage:
- * - Debit totalDeductedFromBalance from user balance (2120)
- * - Send netAmount to Paydunya (2000)
- * - Store netAmount in transaction.amount (2000)
- * - Display netAmount in transaction history (2000)
+ * - Debit totalDeductedFromBalance from user balance (10000)
+ * - Send amountReceived to provider (9400)
+ * - Store grossAmount in transaction.amount (10000)
+ * - Display grossAmount in transaction history (10000)
  */
-export function calculateOutgoingFee(netAmount: number, country?: string): {
-  netAmount: number;
+export function calculateOutgoingFee(grossAmount: number, country?: string): {
+  grossAmount: number;
   feeAmount: number;
   feePercentage: number;
+  amountReceived: number;
   totalDeductedFromBalance: number;
 } {
   const feePercentage = getFeePercentage(country);
-  const feeAmount = Math.floor((netAmount * feePercentage) / 1000);
-  const totalDeductedFromBalance = netAmount + feeAmount;
+  const feeAmount = Math.floor((grossAmount * feePercentage) / 1000);
+  const amountReceived = grossAmount - feeAmount;
+  const totalDeductedFromBalance = grossAmount;
 
   return {
-    netAmount,
+    grossAmount,
     feeAmount,
     feePercentage,
+    amountReceived,
     totalDeductedFromBalance,
   };
 }
