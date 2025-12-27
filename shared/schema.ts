@@ -17,12 +17,15 @@ export const users = pgTable("users", {
   lastName: text("last_name").notNull(),
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
+  country: text("country"), // User's country: BJ, TG, CI, BF, SN
   balance: integer("balance").notNull().default(0), // Balance in XOF
   kycStatus: text("kyc_status").notNull().default("pending"), // "pending", "submitted", "verified", "rejected"
   kycIdFront: text("kyc_id_front"), // Base64 encoded or URL
   kycIdBack: text("kyc_id_back"), // Base64 encoded or URL
   kycSelfie: text("kyc_selfie"), // Base64 encoded or URL
   kycRejectionReason: text("kyc_rejection_reason"), // Reason for KYC rejection
+  withdrawalPhones: text("withdrawal_phones").array().default([]), // Up to 3 withdrawal phone numbers
+  securityCode: text("security_code"), // 6-digit security code for transfers/withdrawals
   isAdmin: boolean("is_admin").notNull().default(false),
   isPrimaryAdmin: boolean("is_primary_admin").notNull().default(false), // Super admin that cannot be removed
   suspended: boolean("suspended").notNull().default(false),
@@ -103,6 +106,9 @@ export const countryOperatorConfig = pgTable("country_operator_config", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
+// Countries allowed for user registration
+export const ALLOWED_REGISTRATION_COUNTRIES = ["BJ", "TG", "CI", "BF", "SN"] as const;
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -111,7 +117,41 @@ export const insertUserSchema = createInsertSchema(users).omit({
   kycIdFront: true,
   kycIdBack: true,
   kycSelfie: true,
+  kycRejectionReason: true,
+  withdrawalPhones: true,
+  securityCode: true,
+  isAdmin: true,
+  isPrimaryAdmin: true,
+  suspended: true,
   createdAt: true,
+});
+
+// Schema for updating user country (for old users who don't have one)
+export const updateUserCountrySchema = z.object({
+  country: z.enum(["BJ", "TG", "CI", "BF", "SN"], {
+    required_error: "Veuillez sélectionner votre pays",
+  }),
+});
+
+// Schema for managing withdrawal phones
+export const updateWithdrawalPhonesSchema = z.object({
+  withdrawalPhones: z.array(z.string().regex(/^\d+$/, "Le numéro doit contenir uniquement des chiffres")).max(3, "Maximum 3 numéros autorisés"),
+});
+
+// Schema for setting security code
+export const setSecurityCodeSchema = z.object({
+  securityCode: z.string().length(6, "Le code doit contenir exactement 6 chiffres").regex(/^\d+$/, "Le code doit contenir uniquement des chiffres"),
+});
+
+// Schema for updating security code (requires old code)
+export const updateSecurityCodeSchema = z.object({
+  oldCode: z.string().length(6, "Le code doit contenir exactement 6 chiffres"),
+  newCode: z.string().length(6, "Le code doit contenir exactement 6 chiffres").regex(/^\d+$/, "Le code doit contenir uniquement des chiffres"),
+});
+
+// Schema for verifying security code
+export const verifySecurityCodeSchema = z.object({
+  securityCode: z.string().length(6, "Le code doit contenir exactement 6 chiffres"),
 });
 
 export const submitKycSchema = z.object({

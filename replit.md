@@ -42,6 +42,11 @@ The frontend utilizes React 18 with TypeScript, styled with Shadcn UI and Tailwi
   - No transactions are finalized without explicit FedaPay confirmation of payment receipt
 - **Operator Filtering**: Country-specific operator filtering with separate lists for collect (deposits) and payout (withdrawals).
 - **Versioned Documentation**: API documentation is now versioned with URLs like `/documentation/v1.3`. The system supports multiple versions, shows deprecation notices for old versions, and displays changelog for the current version.
+- **User Country System**: Users must select their country from 5 authorized countries (BJ, TG, CI, BF, SN) during registration. Legacy users without country must select it in their profile before using certain features. Country cannot be changed once set.
+- **Withdrawal Security System**:
+  - **Withdrawal Phone Numbers**: Users configure up to 3 withdrawal phone numbers in settings. Withdrawals are only allowed to these pre-configured numbers.
+  - **Security Code**: 6-digit security code required for all withdrawals, hashed with bcrypt. Users set it in settings, and must provide current code to change it.
+  - **Dashboard Actions**: Three buttons in order: Dépôt (deposit), Transfert (send to any number), Retrait (withdraw to pre-configured numbers with security code).
 
 ## External Dependencies
 - **FedaPay API**: Payment gateway for West Africa - handles both collect (incoming) and payout (outgoing) transactions.

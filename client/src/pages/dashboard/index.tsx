@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Wallet, ArrowDownToLine, ArrowUpFromLine, Link2, Store, Code2, HeadphonesIcon } from "lucide-react";
+import { Wallet, ArrowDownToLine, ArrowUpFromLine, Send, Link2, Store, Code2, HeadphonesIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -105,7 +105,7 @@ export default function Dashboard() {
           </Button>
         </div>
 
-        {/* Action Buttons */}
+        {/* Action Buttons - Order: Dépôt, Transfert, Retrait */}
         <div className="flex gap-2">
           <Button 
             data-testid="button-deposit"
@@ -114,6 +114,15 @@ export default function Dashboard() {
           >
             <ArrowDownToLine className="h-4 w-4" />
             Dépôt
+          </Button>
+          <Button 
+            data-testid="button-transfer"
+            variant="outline"
+            className="flex-1 flex items-center justify-center gap-2"
+            onClick={() => setLocation("/dashboard/transfer")}
+          >
+            <Send className="h-4 w-4" />
+            Transfert
           </Button>
           <Button 
             data-testid="button-withdrawal"

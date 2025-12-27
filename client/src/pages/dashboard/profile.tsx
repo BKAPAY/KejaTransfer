@@ -1,17 +1,58 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import type { User } from "@shared/schema";
+import { ALLOWED_REGISTRATION_COUNTRIES } from "@shared/schema";
 import { Skeleton } from "@/components/ui/skeleton";
-import { User as UserIcon, Mail, Calendar, Lock } from "lucide-react";
+import { User as UserIcon, Mail, Calendar, Lock, MapPin } from "lucide-react";
 import { useState } from "react";
 import { ChangePasswordDialog } from "@/components/change-password-dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+
+const COUNTRY_NAMES: Record<string, string> = {
+  BJ: "Bénin",
+  TG: "Togo",
+  CI: "Côte d'Ivoire",
+  BF: "Burkina Faso",
+  SN: "Sénégal",
+};
 
 export default function Profile() {
   const { data: user, isLoading } = useQuery<User>({
     queryKey: ["/api/auth/me"],
   });
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
+  const [selectedCountry, setSelectedCountry] = useState<string>("");
+  const { toast } = useToast();
+
+  const updateCountryMutation = useMutation({
+    mutationFn: async (country: string) => {
+      const res = await apiRequest("PATCH", "/api/user/country", { country });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Pays enregistré",
+        description: "Votre pays a été enregistré avec succès",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erreur",
+        description: error.message || "Erreur lors de l'enregistrement du pays",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSaveCountry = () => {
+    if (selectedCountry) {
+      updateCountryMutation.mutate(selectedCountry);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -71,6 +112,47 @@ export default function Profile() {
                   <div className="flex items-center gap-2 p-2 bg-muted rounded-md text-sm truncate">
                     {user.email}
                   </div>
+                </div>
+
+                <div className="space-y-1 md:col-span-2">
+                  <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                    <MapPin className="w-3 h-3" />
+                    Pays
+                  </label>
+                  {user.country ? (
+                    <div className="flex items-center gap-2 p-2 bg-muted rounded-md text-sm" data-testid="text-user-country">
+                      {COUNTRY_NAMES[user.country] || user.country}
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-800 rounded-md p-2">
+                        <p className="text-xs text-yellow-700 dark:text-yellow-300">
+                          Veuillez sélectionner votre pays pour continuer à utiliser BKApay
+                        </p>
+                      </div>
+                      <Select value={selectedCountry} onValueChange={setSelectedCountry}>
+                        <SelectTrigger data-testid="select-user-country">
+                          <SelectValue placeholder="Sélectionnez votre pays" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {ALLOWED_REGISTRATION_COUNTRIES.map((code) => (
+                            <SelectItem key={code} value={code}>
+                              {COUNTRY_NAMES[code]}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        size="sm"
+                        onClick={handleSaveCountry}
+                        disabled={!selectedCountry || updateCountryMutation.isPending}
+                        className="w-full"
+                        data-testid="button-save-country"
+                      >
+                        {updateCountryMutation.isPending ? "Enregistrement..." : "Enregistrer mon pays"}
+                      </Button>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-1 md:col-span-2">

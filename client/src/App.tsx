@@ -22,6 +22,7 @@ import History from "@/pages/dashboard/history";
 import Settings from "@/pages/dashboard/settings";
 import Support from "@/pages/dashboard/support";
 import Deposit from "@/pages/dashboard/deposit";
+import Transfer from "@/pages/dashboard/transfer";
 import Withdrawal from "@/pages/dashboard/withdrawal";
 import Admin from "@/pages/dashboard/admin";
 import ManagementWrapper from "@/pages/dashboard/management-wrapper";
@@ -137,6 +138,7 @@ function Router() {
           </Route>
           <Route path="/dashboard/support" component={Support} />
           <Route path="/dashboard/deposit" component={Deposit} />
+          <Route path="/dashboard/transfer" component={Transfer} />
           <Route path="/dashboard/withdrawal" component={Withdrawal} />
           <Route path="/dashboard/admin" component={Admin} />
           <Route path="/dashboard/admin-access-code" component={AdminAccessCode} />

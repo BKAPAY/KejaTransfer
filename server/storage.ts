@@ -41,6 +41,9 @@ export interface IStorage {
   getKycHistory(): Promise<Partial<User>[]>;
   suspendUser(userId: string): Promise<User | undefined>;
   unsuspendUser(userId: string): Promise<User | undefined>;
+  updateUserCountry(id: string, country: string): Promise<User | undefined>;
+  updateUserWithdrawalPhones(id: string, withdrawalPhones: string[]): Promise<User | undefined>;
+  updateUserSecurityCode(id: string, securityCode: string): Promise<User | undefined>;
 
   // Payment Links
   getPaymentLinks(userId: string): Promise<PaymentLink[]>;
@@ -223,6 +226,33 @@ export class DbStorage implements IStorage {
       .update(schema.users)
       .set({ suspended: false })
       .where(eq(schema.users.id, userId))
+      .returning();
+    return results[0];
+  }
+
+  async updateUserCountry(id: string, country: string): Promise<User | undefined> {
+    const results = await db
+      .update(schema.users)
+      .set({ country })
+      .where(eq(schema.users.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async updateUserWithdrawalPhones(id: string, withdrawalPhones: string[]): Promise<User | undefined> {
+    const results = await db
+      .update(schema.users)
+      .set({ withdrawalPhones })
+      .where(eq(schema.users.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async updateUserSecurityCode(id: string, securityCode: string): Promise<User | undefined> {
+    const results = await db
+      .update(schema.users)
+      .set({ securityCode })
+      .where(eq(schema.users.id, id))
       .returning();
     return results[0];
   }
@@ -598,6 +628,9 @@ export class DbStorage implements IStorage {
       isPrimaryAdmin: schema.users.isPrimaryAdmin,
       suspended: schema.users.suspended,
       createdAt: schema.users.createdAt,
+      country: schema.users.country,
+      withdrawalPhones: schema.users.withdrawalPhones,
+      securityCode: schema.users.securityCode,
       kycIdFront: sql<string | null>`NULL`.as('kycIdFront'),
       kycIdBack: sql<string | null>`NULL`.as('kycIdBack'),
       kycSelfie: sql<string | null>`NULL`.as('kycSelfie'),
@@ -870,12 +903,12 @@ export class DbStorage implements IStorage {
     };
 
     // Combine all unique operators per country
-    const allCountries = new Set([...Object.keys(collectOperators), ...Object.keys(payoutOperators)]);
+    const allCountries = Array.from(new Set([...Object.keys(collectOperators), ...Object.keys(payoutOperators)]));
     
     for (const country of allCountries) {
       const collectOps = collectOperators[country] || [];
       const payoutOps = payoutOperators[country] || [];
-      const allOps = new Set([...collectOps, ...payoutOps]);
+      const allOps = Array.from(new Set([...collectOps, ...payoutOps]));
       
       for (const operator of allOps) {
         const incomingEnabled = collectOps.includes(operator);

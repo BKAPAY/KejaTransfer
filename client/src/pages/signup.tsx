@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import logoImage from "@assets/bkapay-logo.png";
 import { useForm } from "react-hook-form";
@@ -12,11 +13,23 @@ import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { ALLOWED_REGISTRATION_COUNTRIES } from "@shared/schema";
+
+const COUNTRY_NAMES: Record<string, string> = {
+  BJ: "Bénin",
+  TG: "Togo",
+  CI: "Côte d'Ivoire",
+  BF: "Burkina Faso",
+  SN: "Sénégal",
+};
 
 const signupSchema = z.object({
   firstName: z.string().min(2, "Le prénom doit contenir au moins 2 caractères"),
   lastName: z.string().min(2, "Le nom doit contenir au moins 2 caractères"),
   email: z.string().email("Email invalide"),
+  country: z.enum(["BJ", "TG", "CI", "BF", "SN"], {
+    required_error: "Veuillez sélectionner votre pays",
+  }),
   password: z.string().min(8, "Le mot de passe doit contenir au moins 8 caractères"),
   confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
@@ -36,6 +49,7 @@ export default function Signup() {
       firstName: "",
       lastName: "",
       email: "",
+      country: undefined as any,
       password: "",
       confirmPassword: "",
     },
@@ -47,6 +61,7 @@ export default function Signup() {
         firstName: data.firstName,
         lastName: data.lastName,
         email: data.email,
+        country: data.country,
         password: data.password,
       });
       return response;
@@ -136,6 +151,31 @@ export default function Signup() {
                         {...field}
                       />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="country"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Pays</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-country">
+                          <SelectValue placeholder="Sélectionnez votre pays" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {ALLOWED_REGISTRATION_COUNTRIES.map((code) => (
+                          <SelectItem key={code} value={code}>
+                            {COUNTRY_NAMES[code]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}

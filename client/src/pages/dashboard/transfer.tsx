@@ -9,25 +9,27 @@ import { z } from "zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { OPERATORS } from "@shared/schema";
+import { COUNTRIES, OPERATORS, PAYOUT_COUNTRIES } from "@shared/schema";
 import type { User } from "@shared/schema";
-import { ArrowUpFromLine, Info, CheckCircle2, Loader2, Settings, AlertCircle } from "lucide-react";
+import { Send, Info, CheckCircle2, Loader2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { calculateOutgoingFee } from "@/lib/fees";
-import { useLocation } from "wouter";
 
-const withdrawalSchema = z.object({
+const transferSchema = z.object({
   amount: z.number().min(500, "Le montant minimum est de 500 XOF"),
-  withdrawalPhoneIndex: z.number().min(0, "Selectionnez un numero de retrait"),
+  country: z.string().min(1, "Selectionnez un pays"),
   operator: z.string().min(1, "Selectionnez un operateur"),
-  securityCode: z.string().length(6, "Le code de securite doit contenir 6 chiffres").regex(/^\d+$/, "Le code doit contenir uniquement des chiffres"),
+  phone: z.string().min(7, "Numero de telephone invalide").regex(/^\d+$/, "Le numero doit contenir uniquement des chiffres"),
+  phoneConfirm: z.string().min(7, "Confirmez le numero de telephone"),
+}).refine((data) => data.phone === data.phoneConfirm, {
+  message: "Numero incorrect - les numeros ne correspondent pas",
+  path: ["phoneConfirm"],
 });
 
-type WithdrawalFormData = z.infer<typeof withdrawalSchema>;
+type TransferFormData = z.infer<typeof transferSchema>;
 
-export default function Withdrawal() {
+export default function Transfer() {
   const { toast } = useToast();
-  const [, setLocation] = useLocation();
 
   const { data: user } = useQuery<User>({
     queryKey: ["/api/auth/me"],
@@ -37,54 +39,43 @@ export default function Withdrawal() {
     queryKey: ["/api/countries-operators/withdrawals"],
   });
 
-  const form = useForm<WithdrawalFormData>({
-    resolver: zodResolver(withdrawalSchema),
+  const form = useForm<TransferFormData>({
+    resolver: zodResolver(transferSchema),
     defaultValues: {
       amount: undefined as any,
-      withdrawalPhoneIndex: undefined as any,
+      country: "",
       operator: "",
-      securityCode: "",
+      phone: "",
+      phoneConfirm: "",
     },
   });
 
-  const selectedPhoneIndex = form.watch("withdrawalPhoneIndex");
+  const selectedCountry = form.watch("country");
   const amount = form.watch("amount");
 
-  const withdrawalPhones = user?.withdrawalPhones || [];
-  const userCountry = user?.country || "";
-
-  const allCountryOperators = userCountry
-    ? (OPERATORS[userCountry as keyof typeof OPERATORS] || [])
+  const payoutCountries = COUNTRIES.filter(c => PAYOUT_COUNTRIES.includes(c.code as any));
+  
+  const allCountryOperators = selectedCountry
+    ? (OPERATORS[selectedCountry as keyof typeof OPERATORS] || [])
     : [];
   
-  const countryOperators = enabledCountriesOperators && userCountry
-    ? allCountryOperators.filter(op => (enabledCountriesOperators[userCountry] || []).includes(op.code))
+  const countryOperators = enabledCountriesOperators && selectedCountry
+    ? allCountryOperators.filter(op => (enabledCountriesOperators[selectedCountry] || []).includes(op.code))
     : allCountryOperators;
 
-  const totalDeducted = userCountry && amount ? calculateOutgoingFee(Math.floor(amount), userCountry).totalDeductedFromBalance : 0;
-  const feeInfo = userCountry && amount ? calculateOutgoingFee(Math.floor(amount), userCountry) : null;
+  const totalDeducted = selectedCountry && amount ? calculateOutgoingFee(Math.floor(amount), selectedCountry).totalDeductedFromBalance : 0;
+  const feeInfo = selectedCountry && amount ? calculateOutgoingFee(Math.floor(amount), selectedCountry) : null;
 
-  const withdrawalMutation = useMutation({
-    mutationFn: async (data: WithdrawalFormData) => {
-      const selectedPhone = withdrawalPhones[data.withdrawalPhoneIndex];
-      if (!selectedPhone) {
-        throw new Error("Numero de retrait invalide");
-      }
-      
-      const res = await apiRequest("POST", "/api/withdrawal", {
-        amount: data.amount,
-        phone: selectedPhone,
-        operator: data.operator,
-        country: userCountry,
-        securityCode: data.securityCode,
-      });
+  const transferMutation = useMutation({
+    mutationFn: async (data: TransferFormData) => {
+      const res = await apiRequest("POST", "/api/fedapay/withdrawal", data);
       return res.json();
     },
     onSuccess: (response: any) => {
       if (response.success) {
         toast({
-          title: "Retrait initie",
-          description: `Le retrait de ${amount} XOF a ete initie avec succes.`,
+          title: "Transfert initie",
+          description: `Le transfert de ${amount} XOF a ete initie avec succes.`,
         });
         form.reset();
         queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
@@ -92,13 +83,13 @@ export default function Withdrawal() {
       } else {
         toast({
           title: "Erreur",
-          description: response.error || "Erreur lors du retrait",
+          description: response.error || "Erreur lors du transfert",
           variant: "destructive",
         });
       }
     },
     onError: (error: any) => {
-      const errorMessage = error.message || "Erreur lors du retrait";
+      const errorMessage = error.message || "Erreur lors du transfert";
       toast({
         title: "Erreur",
         description: errorMessage,
@@ -107,20 +98,11 @@ export default function Withdrawal() {
     },
   });
 
-  const onSubmit = (data: WithdrawalFormData) => {
+  const onSubmit = (data: TransferFormData) => {
     if (!user) {
       toast({
         title: "Erreur",
         description: "Utilisateur non trouve",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!user.country) {
-      toast({
-        title: "Pays requis",
-        description: "Veuillez d'abord selectionner votre pays dans votre profil",
         variant: "destructive",
       });
       return;
@@ -135,25 +117,7 @@ export default function Withdrawal() {
       return;
     }
 
-    if (!user.securityCode) {
-      toast({
-        title: "Code de securite requis",
-        description: "Veuillez d'abord configurer votre code de securite dans les parametres",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (withdrawalPhones.length === 0) {
-      toast({
-        title: "Numeros de retrait requis",
-        description: "Veuillez d'abord configurer vos numeros de retrait dans les parametres",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const feeInfo = calculateOutgoingFee(data.amount, userCountry);
+    const feeInfo = calculateOutgoingFee(data.amount, selectedCountry);
     if (user.balance < feeInfo.totalDeductedFromBalance) {
       toast({
         title: "Solde insuffisant",
@@ -163,59 +127,18 @@ export default function Withdrawal() {
       return;
     }
 
-    withdrawalMutation.mutate(data);
+    transferMutation.mutate(data);
   };
-
-  const hasNoWithdrawalPhones = withdrawalPhones.length === 0;
-  const hasNoSecurityCode = !user?.securityCode;
-  const hasNoCountry = !user?.country;
-
-  if (hasNoCountry || hasNoWithdrawalPhones || hasNoSecurityCode) {
-    return (
-      <div className="space-y-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground mb-1 flex items-center gap-2">
-            <ArrowUpFromLine className="h-5 w-5" />
-            Retrait
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Retirez vers vos numeros pre-configures
-          </p>
-        </div>
-
-        <Alert className="border-yellow-200 bg-yellow-50 dark:bg-yellow-950 dark:border-yellow-800">
-          <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
-          <AlertDescription className="text-sm text-yellow-900 dark:text-yellow-100 ml-2">
-            <strong>Configuration requise</strong>
-            <ul className="mt-2 space-y-1 list-disc list-inside text-xs">
-              {hasNoCountry && <li>Selectionnez votre pays dans votre profil</li>}
-              {hasNoWithdrawalPhones && <li>Configurez au moins un numero de retrait dans les parametres</li>}
-              {hasNoSecurityCode && <li>Configurez votre code de securite a 6 chiffres dans les parametres</li>}
-            </ul>
-          </AlertDescription>
-        </Alert>
-
-        <Button 
-          onClick={() => setLocation("/dashboard/settings")}
-          className="w-full"
-          data-testid="button-go-to-settings"
-        >
-          <Settings className="h-4 w-4 mr-2" />
-          Aller dans les parametres
-        </Button>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-bold text-foreground mb-1 flex items-center gap-2">
-          <ArrowUpFromLine className="h-5 w-5" />
-          Retrait
+          <Send className="h-5 w-5" />
+          Transfert
         </h1>
         <p className="text-sm text-muted-foreground">
-          Retirez vers vos numeros pre-configures
+          Envoyez de l'argent vers n'importe quel numero mobile money
         </p>
       </div>
 
@@ -233,7 +156,7 @@ export default function Withdrawal() {
 
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-lg">Details du retrait</CardTitle>
+          <CardTitle className="text-lg">Details du transfert</CardTitle>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -265,91 +188,113 @@ export default function Withdrawal() {
 
               <FormField
                 control={form.control}
-                name="withdrawalPhoneIndex"
+                name="country"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Numero de retrait</FormLabel>
+                    <FormLabel>Pays de destination</FormLabel>
                     <Select 
-                      value={field.value !== undefined ? String(field.value) : ""} 
-                      onValueChange={(value) => field.onChange(Number(value))}
+                      value={field.value} 
+                      onValueChange={(value) => {
+                        field.onChange(value);
+                        form.setValue("operator", "");
+                      }}
                     >
                       <FormControl>
-                        <SelectTrigger data-testid="select-withdrawal-phone">
-                          <SelectValue placeholder="Selectionnez un numero" />
+                        <SelectTrigger data-testid="select-withdrawal-country">
+                          <SelectValue placeholder="Selectionnez un pays" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {withdrawalPhones.map((phone, index) => (
-                          <SelectItem key={index} value={String(index)}>
-                            {phone}
+                        {payoutCountries.map((country) => (
+                          <SelectItem key={country.code} value={country.code}>
+                            {country.name} ({country.code})
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Numero configure dans vos parametres
-                    </p>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="operator"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Operateur/Porte-monnaie</FormLabel>
-                    {countryOperators.length === 0 ? (
-                      <div className="text-sm text-muted-foreground p-3 bg-muted rounded-md">
-                        Aucun operateur disponible pour votre pays
-                      </div>
-                    ) : (
-                      <Select value={field.value} onValueChange={field.onChange}>
-                        <FormControl>
-                          <SelectTrigger data-testid="select-withdrawal-operator">
-                            <SelectValue placeholder="Selectionnez un operateur" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {countryOperators.map((op) => (
-                            <SelectItem key={op.code} value={op.code}>
-                              {op.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {selectedCountry && (
+                <FormField
+                  control={form.control}
+                  name="operator"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Operateur/Porte-monnaie</FormLabel>
+                      {countryOperators.length === 0 ? (
+                        <div className="text-sm text-muted-foreground p-3 bg-muted rounded-md">
+                          Aucun operateur disponible pour ce pays
+                        </div>
+                      ) : (
+                        <Select value={field.value} onValueChange={field.onChange}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-withdrawal-operator">
+                              <SelectValue placeholder="Selectionnez un operateur" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {countryOperators.map((op) => (
+                              <SelectItem key={op.code} value={op.code}>
+                                {op.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
 
               <FormField
                 control={form.control}
-                name="securityCode"
+                name="phone"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Code de securite (6 chiffres)</FormLabel>
+                    <FormLabel>Numero de telephone (sans code pays)</FormLabel>
                     <FormControl>
                       <Input
-                        type="password"
-                        placeholder="******"
-                        maxLength={6}
-                        data-testid="input-security-code"
+                        placeholder="771234567"
+                        data-testid="input-withdrawal-phone"
                         inputMode="numeric"
                         {...field}
                       />
                     </FormControl>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Entrez votre code de securite a 6 chiffres
+                      Exemple pour Senegal: 771234567 (sans le +221)
                     </p>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
-              {amount && userCountry && totalDeducted > 0 && feeInfo && (
+              <FormField
+                control={form.control}
+                name="phoneConfirm"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Confirmer le numero de telephone</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="771234567"
+                        data-testid="input-withdrawal-phone-confirm"
+                        inputMode="numeric"
+                        {...field}
+                      />
+                    </FormControl>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Saisissez a nouveau le numero pour confirmer
+                    </p>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {amount && selectedCountry && totalDeducted > 0 && feeInfo && (
                 <div className="bg-muted p-4 rounded-md border space-y-3">
                   <div className="flex items-start gap-3">
                     <Info className="h-4 w-4 mt-0.5 text-muted-foreground flex-shrink-0" />
@@ -392,10 +337,10 @@ export default function Withdrawal() {
               <Button
                 type="submit"
                 className="w-full"
-                disabled={withdrawalMutation.isPending || !user || countryOperators.length === 0}
-                data-testid="button-submit-withdrawal"
+                disabled={transferMutation.isPending || !user || countryOperators.length === 0}
+                data-testid="button-submit-transfer"
               >
-                {withdrawalMutation.isPending ? (
+                {transferMutation.isPending ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                     Traitement en cours...
@@ -403,7 +348,7 @@ export default function Withdrawal() {
                 ) : (
                   <>
                     <CheckCircle2 className="h-4 w-4 mr-2" />
-                    Effectuer le retrait
+                    Effectuer le transfert
                   </>
                 )}
               </Button>
@@ -412,10 +357,10 @@ export default function Withdrawal() {
         </CardContent>
       </Card>
 
-      <Alert className="border-green-200 bg-green-50 dark:bg-green-950 dark:border-green-800">
-        <Info className="h-4 w-4 text-green-600 dark:text-green-400" />
-        <AlertDescription className="text-xs text-green-900 dark:text-green-100 ml-2">
-          <strong>Securite renforcee:</strong> Les retraits ne sont possibles que vers vos numeros pre-configures dans les parametres.
+      <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800">
+        <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+        <AlertDescription className="text-xs text-blue-900 dark:text-blue-100 ml-2">
+          <strong>Conseil de securite:</strong> Verifiez toujours le numero de telephone avant de soumettre le transfert. Les transferts sont irrevocables une fois soumis.
         </AlertDescription>
       </Alert>
     </div>

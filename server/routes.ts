@@ -629,6 +629,150 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== User Country Update =====
+  
+  app.patch("/api/user/country", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { country } = req.body;
+      
+      const allowedCountries = ["BJ", "TG", "CI", "BF", "SN"];
+      if (!country || !allowedCountries.includes(country)) {
+        return res.status(400).json({ error: "Pays non autorisé" });
+      }
+
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) {
+        return res.status(404).json({ error: "Utilisateur non trouvé" });
+      }
+
+      if (user.country) {
+        return res.status(400).json({ error: "Le pays ne peut pas être modifié une fois défini" });
+      }
+
+      await storage.updateUserCountry(req.session.userId!, country);
+      
+      res.json({ success: true, message: "Pays enregistré avec succès" });
+    } catch (error: any) {
+      console.error("Country update error:", error);
+      res.status(500).json({ error: "Erreur lors de la mise à jour du pays" });
+    }
+  });
+
+  // ===== Withdrawal Phones Management =====
+  
+  app.patch("/api/user/withdrawal-phones", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { withdrawalPhones } = req.body;
+      
+      if (!Array.isArray(withdrawalPhones) || withdrawalPhones.length > 3) {
+        return res.status(400).json({ error: "Maximum 3 numéros de retrait autorisés" });
+      }
+
+      for (const phone of withdrawalPhones) {
+        if (typeof phone !== "string" || !/^\d{8,15}$/.test(phone)) {
+          return res.status(400).json({ error: "Format de numéro invalide" });
+        }
+      }
+
+      await storage.updateUserWithdrawalPhones(req.session.userId!, withdrawalPhones);
+      
+      res.json({ success: true, message: "Numéros de retrait enregistrés" });
+    } catch (error: any) {
+      console.error("Withdrawal phones update error:", error);
+      res.status(500).json({ error: "Erreur lors de la mise à jour des numéros" });
+    }
+  });
+
+  // ===== Security Code Management =====
+  
+  app.post("/api/user/security-code", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { securityCode, currentSecurityCode } = req.body;
+      
+      if (!securityCode || !/^\d{6}$/.test(securityCode)) {
+        return res.status(400).json({ error: "Le code de sécurité doit contenir 6 chiffres" });
+      }
+
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) {
+        return res.status(404).json({ error: "Utilisateur non trouvé" });
+      }
+
+      if (user.securityCode) {
+        if (!currentSecurityCode) {
+          return res.status(400).json({ error: "Code de sécurité actuel requis" });
+        }
+        const validCode = await bcrypt.compare(currentSecurityCode, user.securityCode);
+        if (!validCode) {
+          return res.status(401).json({ error: "Code de sécurité actuel incorrect" });
+        }
+      }
+
+      const hashedCode = await bcrypt.hash(securityCode, 10);
+      await storage.updateUserSecurityCode(req.session.userId!, hashedCode);
+      
+      res.json({ success: true, message: "Code de sécurité enregistré" });
+    } catch (error: any) {
+      console.error("Security code update error:", error);
+      res.status(500).json({ error: "Erreur lors de la mise à jour du code de sécurité" });
+    }
+  });
+
+  // ===== Withdrawal with Security Code =====
+  
+  app.post("/api/withdrawal", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { amount, phone, operator, country, securityCode } = req.body;
+
+      if (!amount || !phone || !operator || !country || !securityCode) {
+        return res.status(400).json({ error: "Tous les champs sont requis" });
+      }
+
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) {
+        return res.status(404).json({ error: "Utilisateur non trouvé" });
+      }
+
+      if (user.kycStatus !== "verified") {
+        return res.status(403).json({ error: "Vérification KYC requise" });
+      }
+
+      if (!user.securityCode) {
+        return res.status(400).json({ error: "Code de sécurité non configuré" });
+      }
+
+      const validSecurityCode = await bcrypt.compare(securityCode, user.securityCode);
+      if (!validSecurityCode) {
+        return res.status(401).json({ error: "Code de sécurité incorrect" });
+      }
+
+      if (!user.withdrawalPhones || !user.withdrawalPhones.includes(phone)) {
+        return res.status(400).json({ error: "Numéro de retrait non autorisé" });
+      }
+
+      const feeInfo = calculateOutgoingFee(amount, country);
+      if (user.balance < feeInfo.totalDeductedFromBalance) {
+        return res.status(400).json({ 
+          error: `Solde insuffisant. Vous avez ${user.balance} XOF. Total à débiter: ${feeInfo.totalDeductedFromBalance} XOF` 
+        });
+      }
+
+      const withdrawalData = {
+        amount,
+        phone,
+        operator,
+        country,
+      };
+
+      const result = await handleFedaPayWithdrawal(req.session.userId!, withdrawalData);
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("Withdrawal error:", error);
+      res.status(500).json({ error: error.message || "Erreur lors du retrait" });
+    }
+  });
+
   // ===== Dashboard Stats =====
   
   app.get("/api/dashboard/stats", requireAuth, async (req: Request, res: Response) => {
