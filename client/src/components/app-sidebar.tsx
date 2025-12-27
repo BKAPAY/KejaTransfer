@@ -10,6 +10,7 @@ import {
   SidebarMenuItem,
   SidebarHeader,
   SidebarFooter,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import {
   LayoutDashboard,
@@ -107,10 +108,17 @@ const menuItems = [
 export function AppSidebar() {
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
+  const { setOpenMobile, isMobile } = useSidebar();
 
   const { data: user } = useQuery<UserType>({
     queryKey: ["/api/auth/me"],
   });
+
+  const handleMenuClick = () => {
+    if (isMobile) {
+      setOpenMobile(false);
+    }
+  };
 
   // Ajouter item Admin si l'utilisateur est admin
   const sidebarMenuItems = [...menuItems];
@@ -168,7 +176,7 @@ export function AppSidebar() {
                     isActive={location === item.url}
                     data-testid={item.testId}
                   >
-                    <Link href={item.url}>
+                    <Link href={item.url} onClick={handleMenuClick}>
                       <item.icon className="w-4 h-4" />
                       <span>{item.title}</span>
                     </Link>
@@ -183,7 +191,7 @@ export function AppSidebar() {
         <Button
           variant="ghost"
           className="w-full justify-start"
-          onClick={handleLogout}
+          onClick={() => { handleMenuClick(); handleLogout(); }}
           disabled={logoutMutation.isPending}
           data-testid="button-logout"
         >
