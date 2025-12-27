@@ -2901,10 +2901,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Votre compte a ete suspendu" });
       }
 
-      const { amount, country, operator, phone } = req.body;
+      const { amount, country, operator, phone, securityCode } = req.body;
 
       if (!amount || amount < 500) {
         return res.status(400).json({ error: "Le montant minimum est de 500 XOF" });
+      }
+
+      if (!securityCode) {
+        return res.status(400).json({ error: "Code de securite requis" });
+      }
+
+      if (!user.securityCode) {
+        return res.status(400).json({ error: "Code de securite non configure" });
+      }
+
+      const validSecurityCode = await bcrypt.compare(securityCode, user.securityCode);
+      if (!validSecurityCode) {
+        return res.status(401).json({ error: "Code de securite incorrect" });
       }
 
       const result = await handleFedaPayTransfer(

@@ -1,8 +1,10 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -11,9 +13,10 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { COUNTRIES, OPERATORS, PAYOUT_COUNTRIES } from "@shared/schema";
 import type { User } from "@shared/schema";
-import { Send, Info, CheckCircle2, Loader2 } from "lucide-react";
+import { Send, Info, CheckCircle2, Loader2, Lock, AlertCircle, Settings } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { calculateOutgoingFee } from "@/lib/fees";
+import { useLocation } from "wouter";
 
 const transferSchema = z.object({
   amount: z.number().min(500, "Le montant minimum est de 500 XOF"),
@@ -30,6 +33,11 @@ type TransferFormData = z.infer<typeof transferSchema>;
 
 export default function Transfer() {
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
+  const [showSecurityModal, setShowSecurityModal] = useState(false);
+  const [securityCode, setSecurityCode] = useState("");
+  const [securityError, setSecurityError] = useState("");
+  const [pendingData, setPendingData] = useState<TransferFormData | null>(null);
 
   const { data: user } = useQuery<User>({
     queryKey: ["/api/auth/me"],
@@ -63,38 +71,56 @@ export default function Transfer() {
     ? allCountryOperators.filter(op => (enabledCountriesOperators[selectedCountry] || []).includes(op.code))
     : allCountryOperators;
 
-  const totalDeducted = selectedCountry && amount ? calculateOutgoingFee(Math.floor(amount), selectedCountry).totalDeductedFromBalance : 0;
   const feeInfo = selectedCountry && amount ? calculateOutgoingFee(Math.floor(amount), selectedCountry) : null;
 
   const transferMutation = useMutation({
-    mutationFn: async (data: TransferFormData) => {
-      const res = await apiRequest("POST", "/api/fedapay/withdrawal", data);
+    mutationFn: async (data: { formData: TransferFormData; securityCode: string }) => {
+      const res = await apiRequest("POST", "/api/fedapay/withdrawal", {
+        ...data.formData,
+        securityCode: data.securityCode,
+      });
       return res.json();
     },
     onSuccess: (response: any) => {
       if (response.success) {
         toast({
           title: "Transfert initie",
-          description: `Le transfert de ${amount} XOF a ete initie avec succes.`,
+          description: `Le transfert de ${pendingData?.amount} XOF a ete initie avec succes.`,
         });
         form.reset();
+        setShowSecurityModal(false);
+        setSecurityCode("");
+        setSecurityError("");
+        setPendingData(null);
         queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
         queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
       } else {
-        toast({
-          title: "Erreur",
-          description: response.error || "Erreur lors du transfert",
-          variant: "destructive",
-        });
+        if (response.error?.includes("Code de securite")) {
+          setSecurityError(response.error);
+        } else {
+          setShowSecurityModal(false);
+          setSecurityCode("");
+          toast({
+            title: "Erreur",
+            description: response.error || "Erreur lors du transfert",
+            variant: "destructive",
+          });
+        }
       }
     },
     onError: (error: any) => {
       const errorMessage = error.message || "Erreur lors du transfert";
-      toast({
-        title: "Erreur",
-        description: errorMessage,
-        variant: "destructive",
-      });
+      if (errorMessage.includes("Code de securite") || errorMessage.includes("incorrect")) {
+        setSecurityError(errorMessage);
+      } else {
+        setShowSecurityModal(false);
+        setSecurityCode("");
+        toast({
+          title: "Erreur",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      }
     },
   });
 
@@ -117,18 +143,80 @@ export default function Transfer() {
       return;
     }
 
-    const feeInfo = calculateOutgoingFee(data.amount, selectedCountry);
-    if (user.balance < feeInfo.totalDeductedFromBalance) {
+    if (!user.securityCode) {
       toast({
-        title: "Solde insuffisant",
-        description: `Vous avez ${user.balance} XOF. Total a deduire: ${feeInfo.totalDeductedFromBalance} XOF`,
+        title: "Code de securite requis",
+        description: "Veuillez d'abord configurer votre code de securite dans les parametres",
         variant: "destructive",
       });
       return;
     }
 
-    transferMutation.mutate(data);
+    const feeInfo = calculateOutgoingFee(data.amount, selectedCountry);
+    const totalDeducted = data.amount + feeInfo.feeAmount;
+    if (user.balance < totalDeducted) {
+      toast({
+        title: "Solde insuffisant",
+        description: `Vous avez ${user.balance} XOF. Total a deduire: ${totalDeducted} XOF`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setPendingData(data);
+    setSecurityCode("");
+    setSecurityError("");
+    setShowSecurityModal(true);
   };
+
+  const handleSecurityCodeSubmit = () => {
+    if (!securityCode || securityCode.length !== 6 || !/^\d+$/.test(securityCode)) {
+      setSecurityError("Le code de securite doit contenir 6 chiffres");
+      return;
+    }
+
+    if (!pendingData) return;
+
+    setSecurityError("");
+    transferMutation.mutate({ formData: pendingData, securityCode });
+  };
+
+  const hasNoSecurityCode = !user?.securityCode;
+
+  if (hasNoSecurityCode) {
+    return (
+      <div className="space-y-4">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground mb-1 flex items-center gap-2">
+            <Send className="h-5 w-5" />
+            Transfert
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Envoyez de l'argent vers n'importe quel numero mobile money
+          </p>
+        </div>
+
+        <Alert className="border-yellow-200 bg-yellow-50 dark:bg-yellow-950 dark:border-yellow-800">
+          <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+          <AlertDescription className="text-sm text-yellow-900 dark:text-yellow-100 ml-2">
+            <strong>Configuration requise</strong>
+            <ul className="mt-2 space-y-1 list-disc list-inside text-xs">
+              <li>Configurez votre code de securite a 6 chiffres dans les parametres</li>
+            </ul>
+          </AlertDescription>
+        </Alert>
+
+        <Button 
+          onClick={() => setLocation("/dashboard/settings")}
+          className="w-full"
+          data-testid="button-go-to-settings"
+        >
+          <Settings className="h-4 w-4 mr-2" />
+          Aller dans les parametres
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -171,7 +259,7 @@ export default function Transfer() {
                       <Input
                         type="number"
                         placeholder="5000"
-                        data-testid="input-withdrawal-amount"
+                        data-testid="input-transfer-amount"
                         min="500"
                         value={field.value || ""}
                         onChange={(e) => {
@@ -192,22 +280,19 @@ export default function Transfer() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Pays de destination</FormLabel>
-                    <Select 
-                      value={field.value} 
-                      onValueChange={(value) => {
-                        field.onChange(value);
-                        form.setValue("operator", "");
-                      }}
-                    >
+                    <Select value={field.value} onValueChange={(value) => {
+                      field.onChange(value);
+                      form.setValue("operator", "");
+                    }}>
                       <FormControl>
-                        <SelectTrigger data-testid="select-withdrawal-country">
+                        <SelectTrigger data-testid="select-transfer-country">
                           <SelectValue placeholder="Selectionnez un pays" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
                         {payoutCountries.map((country) => (
                           <SelectItem key={country.code} value={country.code}>
-                            {country.name} ({country.code})
+                            {country.flag} {country.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -231,7 +316,7 @@ export default function Transfer() {
                       ) : (
                         <Select value={field.value} onValueChange={field.onChange}>
                           <FormControl>
-                            <SelectTrigger data-testid="select-withdrawal-operator">
+                            <SelectTrigger data-testid="select-transfer-operator">
                               <SelectValue placeholder="Selectionnez un operateur" />
                             </SelectTrigger>
                           </FormControl>
@@ -259,7 +344,7 @@ export default function Transfer() {
                     <FormControl>
                       <Input
                         placeholder="771234567"
-                        data-testid="input-withdrawal-phone"
+                        data-testid="input-transfer-phone"
                         inputMode="numeric"
                         {...field}
                       />
@@ -281,7 +366,7 @@ export default function Transfer() {
                     <FormControl>
                       <Input
                         placeholder="771234567"
-                        data-testid="input-withdrawal-phone-confirm"
+                        data-testid="input-transfer-phone-confirm"
                         inputMode="numeric"
                         {...field}
                       />
@@ -340,17 +425,8 @@ export default function Transfer() {
                 disabled={transferMutation.isPending || !user || countryOperators.length === 0}
                 data-testid="button-submit-transfer"
               >
-                {transferMutation.isPending ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Traitement en cours...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle2 className="h-4 w-4 mr-2" />
-                    Effectuer le transfert
-                  </>
-                )}
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+                Effectuer le transfert
               </Button>
             </form>
           </Form>
@@ -363,6 +439,84 @@ export default function Transfer() {
           <strong>Conseil de securite:</strong> Verifiez toujours le numero de telephone avant de soumettre le transfert. Les transferts sont irrevocables une fois soumis.
         </AlertDescription>
       </Alert>
+
+      <Dialog open={showSecurityModal} onOpenChange={setShowSecurityModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Lock className="h-5 w-5" />
+              Code de securite
+            </DialogTitle>
+            <DialogDescription>
+              Entrez votre code de securite a 6 chiffres pour confirmer le transfert
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Input
+                type="password"
+                placeholder="******"
+                maxLength={6}
+                inputMode="numeric"
+                value={securityCode}
+                onChange={(e) => {
+                  setSecurityCode(e.target.value.replace(/\D/g, ""));
+                  setSecurityError("");
+                }}
+                data-testid="input-modal-security-code"
+                className="text-center text-2xl tracking-widest"
+              />
+              {securityError && (
+                <p className="text-sm text-destructive text-center">{securityError}</p>
+              )}
+            </div>
+            <div className="bg-muted p-3 rounded-md text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Montant:</span>
+                <span className="font-medium">{pendingData?.amount} XOF</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Numero:</span>
+                <span className="font-medium">{pendingData?.phone}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Pays:</span>
+                <span className="font-medium">{pendingData?.country}</span>
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowSecurityModal(false);
+                setSecurityCode("");
+                setSecurityError("");
+              }}
+              data-testid="button-cancel-security"
+            >
+              Annuler
+            </Button>
+            <Button
+              onClick={handleSecurityCodeSubmit}
+              disabled={transferMutation.isPending || securityCode.length !== 6}
+              data-testid="button-confirm-security"
+            >
+              {transferMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Verification...
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                  Confirmer
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

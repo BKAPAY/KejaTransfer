@@ -1,8 +1,10 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -11,7 +13,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { OPERATORS } from "@shared/schema";
 import type { User } from "@shared/schema";
-import { ArrowUpFromLine, Info, CheckCircle2, Loader2, Settings, AlertCircle } from "lucide-react";
+import { ArrowUpFromLine, Info, CheckCircle2, Loader2, Settings, AlertCircle, Lock } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { calculateOutgoingFee } from "@/lib/fees";
 import { useLocation } from "wouter";
@@ -20,7 +22,6 @@ const withdrawalSchema = z.object({
   amount: z.number().min(500, "Le montant minimum est de 500 XOF"),
   withdrawalPhoneIndex: z.number().min(0, "Selectionnez un numero de retrait"),
   operator: z.string().min(1, "Selectionnez un operateur"),
-  securityCode: z.string().length(6, "Le code de securite doit contenir 6 chiffres").regex(/^\d+$/, "Le code doit contenir uniquement des chiffres"),
 });
 
 type WithdrawalFormData = z.infer<typeof withdrawalSchema>;
@@ -28,6 +29,10 @@ type WithdrawalFormData = z.infer<typeof withdrawalSchema>;
 export default function Withdrawal() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const [showSecurityModal, setShowSecurityModal] = useState(false);
+  const [securityCode, setSecurityCode] = useState("");
+  const [securityError, setSecurityError] = useState("");
+  const [pendingData, setPendingData] = useState<WithdrawalFormData | null>(null);
 
   const { data: user } = useQuery<User>({
     queryKey: ["/api/auth/me"],
@@ -43,7 +48,6 @@ export default function Withdrawal() {
       amount: undefined as any,
       withdrawalPhoneIndex: undefined as any,
       operator: "",
-      securityCode: "",
     },
   });
 
@@ -61,20 +65,19 @@ export default function Withdrawal() {
     ? allCountryOperators.filter(op => (enabledCountriesOperators[userCountry] || []).includes(op.code))
     : allCountryOperators;
 
-  const totalDeducted = userCountry && amount ? calculateOutgoingFee(Math.floor(amount), userCountry).totalDeductedFromBalance : 0;
   const feeInfo = userCountry && amount ? calculateOutgoingFee(Math.floor(amount), userCountry) : null;
 
   const withdrawalMutation = useMutation({
-    mutationFn: async (data: WithdrawalFormData) => {
-      const selectedPhone = withdrawalPhones[data.withdrawalPhoneIndex];
+    mutationFn: async (data: { formData: WithdrawalFormData; securityCode: string }) => {
+      const selectedPhone = withdrawalPhones[data.formData.withdrawalPhoneIndex];
       if (!selectedPhone) {
         throw new Error("Numero de retrait invalide");
       }
       
       const res = await apiRequest("POST", "/api/withdrawal", {
-        amount: data.amount,
+        amount: data.formData.amount,
         phone: selectedPhone,
-        operator: data.operator,
+        operator: data.formData.operator,
         country: userCountry,
         securityCode: data.securityCode,
       });
@@ -84,26 +87,42 @@ export default function Withdrawal() {
       if (response.success) {
         toast({
           title: "Retrait initie",
-          description: `Le retrait de ${amount} XOF a ete initie avec succes.`,
+          description: `Le retrait de ${pendingData?.amount} XOF a ete initie avec succes.`,
         });
         form.reset();
+        setShowSecurityModal(false);
+        setSecurityCode("");
+        setSecurityError("");
+        setPendingData(null);
         queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
         queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
       } else {
-        toast({
-          title: "Erreur",
-          description: response.error || "Erreur lors du retrait",
-          variant: "destructive",
-        });
+        if (response.error?.includes("Code de securite")) {
+          setSecurityError(response.error);
+        } else {
+          setShowSecurityModal(false);
+          setSecurityCode("");
+          toast({
+            title: "Erreur",
+            description: response.error || "Erreur lors du retrait",
+            variant: "destructive",
+          });
+        }
       }
     },
     onError: (error: any) => {
       const errorMessage = error.message || "Erreur lors du retrait";
-      toast({
-        title: "Erreur",
-        description: errorMessage,
-        variant: "destructive",
-      });
+      if (errorMessage.includes("Code de securite") || errorMessage.includes("incorrect")) {
+        setSecurityError(errorMessage);
+      } else {
+        setShowSecurityModal(false);
+        setSecurityCode("");
+        toast({
+          title: "Erreur",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      }
     },
   });
 
@@ -163,7 +182,22 @@ export default function Withdrawal() {
       return;
     }
 
-    withdrawalMutation.mutate(data);
+    setPendingData(data);
+    setSecurityCode("");
+    setSecurityError("");
+    setShowSecurityModal(true);
+  };
+
+  const handleSecurityCodeSubmit = () => {
+    if (!securityCode || securityCode.length !== 6 || !/^\d+$/.test(securityCode)) {
+      setSecurityError("Le code de securite doit contenir 6 chiffres");
+      return;
+    }
+
+    if (!pendingData) return;
+
+    setSecurityError("");
+    withdrawalMutation.mutate({ formData: pendingData, securityCode });
   };
 
   const hasNoWithdrawalPhones = withdrawalPhones.length === 0;
@@ -325,30 +359,6 @@ export default function Withdrawal() {
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="securityCode"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Code de securite (6 chiffres)</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="password"
-                        placeholder="******"
-                        maxLength={6}
-                        data-testid="input-security-code"
-                        inputMode="numeric"
-                        {...field}
-                      />
-                    </FormControl>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Entrez votre code de securite a 6 chiffres
-                    </p>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
               {amount && userCountry && feeInfo && (
                 <div className="bg-muted p-4 rounded-md border space-y-3">
                   <div className="flex items-start gap-3">
@@ -405,17 +415,8 @@ export default function Withdrawal() {
                 disabled={withdrawalMutation.isPending || !user || countryOperators.length === 0}
                 data-testid="button-submit-withdrawal"
               >
-                {withdrawalMutation.isPending ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Traitement en cours...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle2 className="h-4 w-4 mr-2" />
-                    Effectuer le retrait
-                  </>
-                )}
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+                Effectuer le retrait
               </Button>
             </form>
           </Form>
@@ -428,6 +429,80 @@ export default function Withdrawal() {
           <strong>Securite renforcee:</strong> Les retraits ne sont possibles que vers vos numeros pre-configures dans les parametres.
         </AlertDescription>
       </Alert>
+
+      <Dialog open={showSecurityModal} onOpenChange={setShowSecurityModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Lock className="h-5 w-5" />
+              Code de securite
+            </DialogTitle>
+            <DialogDescription>
+              Entrez votre code de securite a 6 chiffres pour confirmer le retrait
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Input
+                type="password"
+                placeholder="******"
+                maxLength={6}
+                inputMode="numeric"
+                value={securityCode}
+                onChange={(e) => {
+                  setSecurityCode(e.target.value.replace(/\D/g, ""));
+                  setSecurityError("");
+                }}
+                data-testid="input-modal-security-code"
+                className="text-center text-2xl tracking-widest"
+              />
+              {securityError && (
+                <p className="text-sm text-destructive text-center">{securityError}</p>
+              )}
+            </div>
+            <div className="bg-muted p-3 rounded-md text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Montant:</span>
+                <span className="font-medium">{pendingData?.amount} XOF</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Numero:</span>
+                <span className="font-medium">{pendingData && withdrawalPhones[pendingData.withdrawalPhoneIndex]}</span>
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowSecurityModal(false);
+                setSecurityCode("");
+                setSecurityError("");
+              }}
+              data-testid="button-cancel-security"
+            >
+              Annuler
+            </Button>
+            <Button
+              onClick={handleSecurityCodeSubmit}
+              disabled={withdrawalMutation.isPending || securityCode.length !== 6}
+              data-testid="button-confirm-security"
+            >
+              {withdrawalMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Verification...
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                  Confirmer
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
