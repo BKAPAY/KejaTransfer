@@ -117,8 +117,7 @@ export default function Dashboard() {
           </Button>
           <Button 
             data-testid="button-transfer"
-            variant="outline"
-            className="flex-1 flex items-center justify-center gap-2"
+            className="flex-1 flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white"
             onClick={() => setLocation("/dashboard/transfer")}
           >
             <Send className="h-4 w-4" />

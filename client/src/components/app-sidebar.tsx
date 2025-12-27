@@ -25,8 +25,6 @@ import {
   LogOut,
   TrendingUp,
   Shield,
-  ArrowDownToLine,
-  ArrowUpFromLine,
   Globe,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
@@ -75,16 +73,10 @@ const menuItems = [
     testId: "nav-analytics",
   },
   {
-    title: "Dépôt",
-    url: "/dashboard/deposit",
-    icon: ArrowDownToLine,
-    testId: "nav-deposit",
-  },
-  {
-    title: "Retrait",
-    url: "/dashboard/withdrawal",
-    icon: ArrowUpFromLine,
-    testId: "nav-withdrawal",
+    title: "Verification KYC",
+    url: "/dashboard/kyc",
+    icon: Shield,
+    testId: "nav-kyc",
   },
   {
     title: "Historique",
