@@ -22,6 +22,7 @@ import {
 import {
   handleFedaPayDeposit,
   handleFedaPayWithdrawal,
+  handleFedaPayTransfer,
   handlePaymentLinkPayment,
   handleMerchantLinkPayment,
   handleApiPayment,
@@ -757,14 +758,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const withdrawalData = {
+      const result = await handleFedaPayWithdrawal(
+        req.session.userId!,
+        user,
         amount,
-        phone,
-        operator,
         country,
-      };
-
-      const result = await handleFedaPayWithdrawal(req.session.userId!, withdrawalData);
+        operator,
+        phone
+      );
       
       res.json(result);
     } catch (error: any) {
@@ -2889,7 +2890,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // FedaPay Withdrawal Route
+  // FedaPay Transfer Route (uses old logic: amount sent = amount entered, fees added to balance deducted)
   app.post("/api/fedapay/withdrawal", requireAuth, async (req: Request, res: Response) => {
     try {
       const user = await storage.getUser(req.session.userId!);
@@ -2906,7 +2907,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Le montant minimum est de 500 XOF" });
       }
 
-      const result = await handleFedaPayWithdrawal(
+      const result = await handleFedaPayTransfer(
         req.session.userId!,
         user,
         amount,
@@ -2921,8 +2922,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(400).json({ error: result.error });
       }
     } catch (error: any) {
-      console.error("[FedaPay Withdrawal Route] Error:", error);
-      res.status(500).json({ error: "Erreur lors du retrait" });
+      console.error("[FedaPay Transfer Route] Error:", error);
+      res.status(500).json({ error: "Erreur lors du transfert" });
     }
   });
 

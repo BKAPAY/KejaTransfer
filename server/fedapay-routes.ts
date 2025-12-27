@@ -170,6 +170,91 @@ export async function handleFedaPayWithdrawal(
   }
 }
 
+// Fonction pour les TRANSFERTS (ancienne logique: montant envoye = montant saisi, frais ajoutes au solde debite)
+export async function handleFedaPayTransfer(
+  userId: string,
+  user: any,
+  amount: number,
+  country: string,
+  operator: string,
+  phone: string
+): Promise<{ success: boolean; transactionId?: string; message?: string; error?: string }> {
+  try {
+    if (!FEDAPAY_SUPPORTED_COUNTRIES_PAYOUT.includes(country.toLowerCase())) {
+      return { success: false, error: `Pays non supporte pour les transferts: ${country}` };
+    }
+
+    const operatorCode = getPayoutOperatorCode(operator, country);
+    if (!operatorCode) {
+      return { success: false, error: `Operateur ${operator} non supporte pour les transferts vers ${country}` };
+    }
+
+    if (user.kycStatus !== "verified") {
+      return { success: false, error: "Verification KYC requise pour les transferts" };
+    }
+
+    const netAmount = Math.floor(amount);
+    const feePercentage = 60; // 6%
+    const feeAmount = Math.floor((netAmount * feePercentage) / 1000);
+    const totalDeductedFromBalance = netAmount + feeAmount;
+
+    if (user.balance < totalDeductedFromBalance) {
+      return { success: false, error: "Solde insuffisant" };
+    }
+
+    const nameParts = (user.firstName + " " + user.lastName).split(" ");
+    const firstName = nameParts[0] || "Client";
+    const lastName = nameParts.slice(1).join(" ") || "BKApay";
+
+    // Envoyer le montant saisi (netAmount) au provider
+    const result = await createPayout({
+      amount: netAmount,
+      customerFirstName: firstName,
+      customerLastName: lastName,
+      customerEmail: user.email,
+      customerPhone: phone,
+      country: country,
+      operator: operator,
+    });
+
+    if (!result.success) {
+      return { success: false, error: result.error || "Erreur lors du transfert" };
+    }
+
+    // Debiter montant + frais
+    await storage.updateUserBalance(userId, -totalDeductedFromBalance);
+
+    const tx = await storage.createTransaction({
+      userId: userId,
+      type: "transfer",
+      amount: netAmount,
+      fee: feeAmount,
+      feePercentage: feePercentage,
+      currency: "XOF",
+      status: "pending",
+      country: country.toUpperCase(),
+      operator: operator,
+      description: `Transfert de ${netAmount} XOF`,
+      customerPhone: phone,
+      metadata: JSON.stringify({
+        fedapayPayoutId: result.payoutId,
+        fedapayReference: result.reference,
+        phone,
+        deductedFromBalance: totalDeductedFromBalance,
+      }),
+    });
+
+    return {
+      success: true,
+      transactionId: tx.id,
+      message: result.message || "Transfert initie avec succes",
+    };
+  } catch (error: any) {
+    console.error("[FedaPay Transfer] Error:", error);
+    return { success: false, error: "Erreur lors du transfert" };
+  }
+}
+
 export async function handlePaymentLinkPayment(
   paymentLink: any,
   customerName: string,

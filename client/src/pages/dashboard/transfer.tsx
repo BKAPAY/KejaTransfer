@@ -300,7 +300,7 @@ export default function Transfer() {
                     <Info className="h-4 w-4 mt-0.5 text-muted-foreground flex-shrink-0" />
                     <div className="text-sm space-y-2 w-full">
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Montant saisi:</span>
+                        <span className="text-muted-foreground">Montant a envoyer:</span>
                         <span className="font-medium">
                           {new Intl.NumberFormat("fr-FR", {
                             style: "currency",
@@ -312,31 +312,21 @@ export default function Transfer() {
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Frais (6%):</span>
                         <span className="font-medium text-orange-600 dark:text-orange-400" data-testid="text-fee-amount">
-                          -{new Intl.NumberFormat("fr-FR", {
+                          +{new Intl.NumberFormat("fr-FR", {
                             style: "currency",
                             currency: "XOF",
                             minimumFractionDigits: 0,
                           }).format(feeInfo.feeAmount)}
                         </span>
                       </div>
-                      <div className="flex justify-between font-semibold text-green-600 dark:text-green-400">
-                        <span>Montant recu:</span>
-                        <span data-testid="text-amount-received">
+                      <div className="border-t pt-2 flex justify-between font-semibold">
+                        <span>Total debite du solde:</span>
+                        <span className="text-foreground" data-testid="text-total-deducted">
                           {new Intl.NumberFormat("fr-FR", {
                             style: "currency",
                             currency: "XOF",
                             minimumFractionDigits: 0,
-                          }).format(feeInfo.amountReceived)}
-                        </span>
-                      </div>
-                      <div className="border-t pt-2 flex justify-between">
-                        <span className="text-muted-foreground">Debite du solde:</span>
-                        <span className="font-medium text-foreground" data-testid="text-total-deducted">
-                          {new Intl.NumberFormat("fr-FR", {
-                            style: "currency",
-                            currency: "XOF",
-                            minimumFractionDigits: 0,
-                          }).format(feeInfo.totalDeductedFromBalance)}
+                          }).format(amount + feeInfo.feeAmount)}
                         </span>
                       </div>
                     </div>

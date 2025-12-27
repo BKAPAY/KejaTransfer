@@ -33,7 +33,8 @@ The frontend utilizes React 18 with TypeScript, styled with Shadcn UI and Tailwi
 - **Silent Fees**: Automatic calculation of transaction fees - UNIFORM 6% for ALL countries and operators.
 - **Fee Deduction Logic**:
   - **Deposits (INCOMING)**: Client pays GROSS amount. User receives NET (GROSS - 6% fees)
-  - **Withdrawals/Transfers (OUTGOING)**: User enters GROSS amount. Provider receives NET (GROSS - 6% fees). User's balance is debited GROSS amount.
+  - **Withdrawals (OUTGOING)**: User enters GROSS amount. Provider receives NET (GROSS - 6% fees). User's balance is debited GROSS amount.
+  - **Transfers (OUTGOING)**: User enters NET amount. Provider receives NET. User's balance is debited NET + 6% fees.
 - **Account Suspension**: System for suspending and reactivating user accounts with primary admin protection.
 - **API Gateway v1.3**: Provides public/private API keys for developers to integrate with BKApay for incoming payments, including pending transaction creation, strict country validation, and automatic webhook/callback notifications for subscription/account activation.
 - **Fee System**: Robust and deterministic fee calculation logic distinguishing between INCOMING (client pays gross, credited net) and OUTGOING (user requests net, debited net+fees) transactions.
