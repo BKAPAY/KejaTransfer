@@ -7,18 +7,20 @@ import { useState } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { CountryOperatorConfig } from "@shared/schema";
-import { COUNTRIES as COUNTRIES_ARRAY, OPERATORS as OPERATORS_ARRAY } from "@shared/schema";
+import { COUNTRIES as COUNTRIES_ARRAY, OPERATORS as OPERATORS_BY_COUNTRY } from "@shared/schema";
 
 // Create lookup maps from shared arrays
 const COUNTRIES: Record<string, { name: string; code: string; flag: string }> = Object.fromEntries(
   COUNTRIES_ARRAY.map(c => [c.code, c])
 );
 
-const OPERATORS_NAMES: Record<string, string> = Object.fromEntries(
-  OPERATORS_ARRAY.map(o => [o.code, o.name])
-);
-
-// Use the shared operator names
+// Flatten all operators from all countries into a lookup map
+const OPERATORS_NAMES: Record<string, string> = {};
+Object.values(OPERATORS_BY_COUNTRY).forEach(ops => {
+  ops.forEach(op => {
+    OPERATORS_NAMES[op.code] = op.name;
+  });
+});
 
 export default function CountryOperatorConfig() {
   const { toast } = useToast();
