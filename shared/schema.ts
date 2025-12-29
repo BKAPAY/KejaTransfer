@@ -247,85 +247,135 @@ export const CURRENCY_CONVERSION_RATES: Record<string, number> = {
 };
 
 // Country and operator constants
-// Countries supported by FedaPay (7 countries total)
-// Collect (incoming): BJ, TG, CI, SN, GN, NE
-// Payout (outgoing): BJ, TG, CI, SN, BF, GN
+// Countries supported by AfribaPay (15 countries total) - Benin listed first
+// All countries support both Payin (collect) and Payout
 export const COUNTRIES = [
-  { code: "BJ", name: "Benin", flag: "BJ" },
-  { code: "TG", name: "Togo", flag: "TG" },
-  { code: "CI", name: "Cote d'Ivoire", flag: "CI" },
-  { code: "SN", name: "Senegal", flag: "SN" },
-  { code: "BF", name: "Burkina Faso", flag: "BF" },
-  { code: "GN", name: "Guinee", flag: "GN" },
-  { code: "NE", name: "Niger", flag: "NE" },
+  { code: "BJ", name: "Bénin", flag: "🇧🇯", phoneCode: "+229", phoneDigits: 10, currency: "XOF" },
+  { code: "CI", name: "Côte d'Ivoire", flag: "🇨🇮", phoneCode: "+225", phoneDigits: 10, currency: "XOF" },
+  { code: "SN", name: "Sénégal", flag: "🇸🇳", phoneCode: "+221", phoneDigits: 9, currency: "XOF" },
+  { code: "BF", name: "Burkina Faso", flag: "🇧🇫", phoneCode: "+226", phoneDigits: 8, currency: "XOF" },
+  { code: "TG", name: "Togo", flag: "🇹🇬", phoneCode: "+228", phoneDigits: 8, currency: "XOF" },
+  { code: "ML", name: "Mali", flag: "🇲🇱", phoneCode: "+223", phoneDigits: 8, currency: "XOF" },
+  { code: "GN", name: "Guinée", flag: "🇬🇳", phoneCode: "+224", phoneDigits: 9, currency: "GNF" },
+  { code: "NE", name: "Niger", flag: "🇳🇪", phoneCode: "+227", phoneDigits: 8, currency: "XOF" },
+  { code: "CM", name: "Cameroun", flag: "🇨🇲", phoneCode: "+237", phoneDigits: 9, currency: "XAF" },
+  { code: "CD", name: "RD Congo", flag: "🇨🇩", phoneCode: "+243", phoneDigits: 9, currency: "CDF" },
+  { code: "TD", name: "Tchad", flag: "🇹🇩", phoneCode: "+235", phoneDigits: 8, currency: "XAF" },
+  { code: "CG", name: "Congo-Brazzaville", flag: "🇨🇬", phoneCode: "+242", phoneDigits: 9, currency: "XAF" },
+  { code: "CF", name: "Centrafrique", flag: "🇨🇫", phoneCode: "+236", phoneDigits: 8, currency: "XAF" },
+  { code: "GA", name: "Gabon", flag: "🇬🇦", phoneCode: "+241", phoneDigits: 8, currency: "XAF" },
+  { code: "RW", name: "Rwanda", flag: "🇷🇼", phoneCode: "+250", phoneDigits: 9, currency: "RWF" },
 ] as const;
 
-// Operators by country for FedaPay
-// Codes are simple operator names (mtn, moov, etc.) - backend combines with country
-// Collect = incoming payments (deposits, payment links)
-// Payout = outgoing payments (withdrawals)
+// Operators by country for AfribaPay
+// All operators support both payin and payout unless noted
 export const OPERATORS = {
-  // Benin - Collect: MTN, Moov, Celtiis | Payout: MTN, Moov, Celtiis
   BJ: [
-    { code: "mtn", name: "MTN Mobile Money" },
-    { code: "moov", name: "Moov Money" },
-    { code: "celtiis", name: "Celtiis" },
+    { code: "mtn", name: "MTN Mobile Money", requiresOtp: false },
+    { code: "moov", name: "Moov Money", requiresOtp: false },
+    { code: "celtiis", name: "Celtiis", requiresOtp: false },
   ],
-  // Togo - Collect: Moov, TogoCom | Payout: Moov, TogoCom
-  TG: [
-    { code: "togocom", name: "TogoCom (TMoney)" },
-    { code: "moov", name: "Moov Money" },
-  ],
-  // Cote d'Ivoire - Collect: MTN | Payout: MTN, Moov, Wave, Orange
   CI: [
-    { code: "mtn", name: "MTN Mobile Money" },
-    { code: "moov", name: "Moov Money" },
-    { code: "wave", name: "Wave" },
-    { code: "orange", name: "Orange Money" },
+    { code: "orange", name: "Orange Money", requiresOtp: true },
+    { code: "mtn", name: "MTN Mobile Money", requiresOtp: false },
+    { code: "moov", name: "Moov Money", requiresOtp: false },
+    { code: "wave", name: "Wave", requiresOtp: false },
   ],
-  // Senegal - Collect: Free | Payout: Wave, Orange
   SN: [
-    { code: "free", name: "Free Money" },
-    { code: "wave", name: "Wave" },
-    { code: "orange", name: "Orange Money" },
+    { code: "orange", name: "Orange Money", requiresOtp: true },
+    { code: "wave", name: "Wave", requiresOtp: false },
+    { code: "free", name: "Free Money", requiresOtp: false },
   ],
-  // Burkina Faso - Collect: None | Payout: Moov, Orange
   BF: [
-    { code: "moov", name: "Moov Money" },
-    { code: "orange", name: "Orange Money" },
+    { code: "orange", name: "Orange Money", requiresOtp: true },
+    { code: "moov", name: "Moov Money", requiresOtp: false },
+    { code: "wave", name: "Wave", requiresOtp: false },
   ],
-  // Guinee - Collect: MTN | Payout: MTN
+  TG: [
+    { code: "moov", name: "Moov Money", requiresOtp: false },
+    { code: "togocom", name: "TogoCom (T-Money)", requiresOtp: false },
+  ],
+  ML: [
+    { code: "orange", name: "Orange Money", requiresOtp: false },
+    { code: "moov", name: "Moov Money", requiresOtp: false },
+    { code: "wave", name: "Wave", requiresOtp: false },
+  ],
   GN: [
-    { code: "mtn", name: "MTN Mobile Money" },
+    { code: "orange", name: "Orange Money", requiresOtp: true },
+    { code: "mtn", name: "MTN Mobile Money", requiresOtp: false },
   ],
-  // Niger - Collect: Airtel | Payout: None
   NE: [
-    { code: "airtel", name: "Airtel Money" },
+    { code: "airtel", name: "Airtel Money", requiresOtp: false },
+    { code: "moov", name: "Moov Money", requiresOtp: false },
+  ],
+  CM: [
+    { code: "orange", name: "Orange Money", requiresOtp: false },
+    { code: "mtn", name: "MTN Mobile Money", requiresOtp: false },
+  ],
+  CD: [
+    { code: "orange", name: "Orange Money", requiresOtp: false },
+    { code: "airtel", name: "Airtel Money", requiresOtp: false },
+    { code: "vodacom", name: "M-Pesa (Vodacom)", requiresOtp: false },
+  ],
+  TD: [
+    { code: "airtel", name: "Airtel Money", requiresOtp: false },
+    { code: "moov", name: "Moov Money", requiresOtp: false },
+  ],
+  CG: [
+    { code: "airtel", name: "Airtel Money", requiresOtp: false },
+    { code: "mtn", name: "MTN Mobile Money", requiresOtp: false },
+  ],
+  CF: [
+    { code: "orange", name: "Orange Money", requiresOtp: false },
+  ],
+  GA: [
+    { code: "airtel", name: "Airtel Money", requiresOtp: false },
+    { code: "moov", name: "Moov Money", requiresOtp: false },
+  ],
+  RW: [
+    { code: "mtn", name: "MTN Mobile Money", requiresOtp: false },
+    { code: "airtel", name: "Airtel Money", requiresOtp: false },
   ],
 } as const;
 
-// Countries that support collect (deposits/incoming payments) via FedaPay
-export const COLLECT_COUNTRIES = ["BJ", "TG", "CI", "SN", "GN", "NE"] as const;
+// All countries support both collect (payin) and payout via AfribaPay
+export const COLLECT_COUNTRIES = ["BJ", "CI", "SN", "BF", "TG", "ML", "GN", "NE", "CM", "CD", "TD", "CG", "CF", "GA", "RW"] as const;
+export const PAYOUT_COUNTRIES = ["BJ", "CI", "SN", "BF", "TG", "ML", "GN", "NE", "CM", "CD", "TD", "CG", "CF", "GA", "RW"] as const;
 
-// Countries that support payout (withdrawals/outgoing payments) via FedaPay
-export const PAYOUT_COUNTRIES = ["BJ", "TG", "CI", "SN", "BF", "GN"] as const;
-
-// Operators available for collect by country
+// All operators available for collect (payin) by country
 export const COLLECT_OPERATORS: Record<string, string[]> = {
   BJ: ["mtn", "moov", "celtiis"],
+  CI: ["orange", "mtn", "moov", "wave"],
+  SN: ["orange", "wave", "free"],
+  BF: ["orange", "moov", "wave"],
   TG: ["moov", "togocom"],
-  CI: ["mtn"],
-  SN: ["free"],
-  GN: ["mtn"],
-  NE: ["airtel"],
+  ML: ["orange", "moov", "wave"],
+  GN: ["orange", "mtn"],
+  NE: ["airtel", "moov"],
+  CM: ["orange", "mtn"],
+  CD: ["orange", "airtel", "vodacom"],
+  TD: ["airtel", "moov"],
+  CG: ["airtel", "mtn"],
+  CF: ["orange"],
+  GA: ["airtel", "moov"],
+  RW: ["mtn", "airtel"],
 };
 
-// Operators available for payout by country
+// All operators available for payout by country
 export const PAYOUT_OPERATORS: Record<string, string[]> = {
   BJ: ["mtn", "moov", "celtiis"],
+  CI: ["orange", "mtn", "moov", "wave"],
+  SN: ["orange", "wave", "free"],
+  BF: ["orange", "moov", "wave"],
   TG: ["moov", "togocom"],
-  CI: ["mtn", "moov", "wave", "orange"],
-  SN: ["wave", "orange"],
-  BF: ["moov", "orange"],
-  GN: ["mtn"],
+  ML: ["orange", "moov", "wave"],
+  GN: ["orange", "mtn"],
+  NE: ["airtel", "moov"],
+  CM: ["orange", "mtn"],
+  CD: ["orange", "airtel", "vodacom"],
+  TD: ["airtel", "moov"],
+  CG: ["airtel", "mtn"],
+  CF: ["orange"],
+  GA: ["airtel", "moov"],
+  RW: ["mtn", "airtel"],
 };

@@ -11,12 +11,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
+const COUNTRY_INFO: Record<string, { name: string; flag: string }> = {
+  BJ: { name: "Bénin", flag: "🇧🇯" },
+  TG: { name: "Togo", flag: "🇹🇬" },
+  CI: { name: "Côte d'Ivoire", flag: "🇨🇮" },
+  BF: { name: "Burkina Faso", flag: "🇧🇫" },
+  SN: { name: "Sénégal", flag: "🇸🇳" },
+};
+
 const COUNTRY_NAMES: Record<string, string> = {
-  BJ: "Bénin",
-  TG: "Togo",
-  CI: "Côte d'Ivoire",
-  BF: "Burkina Faso",
-  SN: "Sénégal",
+  BJ: "🇧🇯 Bénin",
+  TG: "🇹🇬 Togo",
+  CI: "🇨🇮 Côte d'Ivoire",
+  BF: "🇧🇫 Burkina Faso",
+  SN: "🇸🇳 Sénégal",
 };
 
 export default function Profile() {

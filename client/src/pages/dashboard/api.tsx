@@ -37,12 +37,21 @@ const apiKeySchema = z.object({
 type ApiKeyFormData = z.infer<typeof apiKeySchema>;
 
 const COLLECT_COUNTRIES = [
-  { code: "BJ", name: "Benin" },
-  { code: "TG", name: "Togo" },
-  { code: "CI", name: "Cote d'Ivoire" },
-  { code: "SN", name: "Senegal" },
-  { code: "GN", name: "Guinee" },
-  { code: "NE", name: "Niger" },
+  { code: "BJ", name: "Bénin", flag: "🇧🇯" },
+  { code: "CI", name: "Côte d'Ivoire", flag: "🇨🇮" },
+  { code: "SN", name: "Sénégal", flag: "🇸🇳" },
+  { code: "BF", name: "Burkina Faso", flag: "🇧🇫" },
+  { code: "TG", name: "Togo", flag: "🇹🇬" },
+  { code: "ML", name: "Mali", flag: "🇲🇱" },
+  { code: "GN", name: "Guinée", flag: "🇬🇳" },
+  { code: "NE", name: "Niger", flag: "🇳🇪" },
+  { code: "CM", name: "Cameroun", flag: "🇨🇲" },
+  { code: "CD", name: "RD Congo", flag: "🇨🇩" },
+  { code: "TD", name: "Tchad", flag: "🇹🇩" },
+  { code: "CG", name: "Congo-Brazzaville", flag: "🇨🇬" },
+  { code: "CF", name: "Centrafrique", flag: "🇨🇫" },
+  { code: "GA", name: "Gabon", flag: "🇬🇦" },
+  { code: "RW", name: "Rwanda", flag: "🇷🇼" },
 ];
 
 export default function ApiPage() {
@@ -600,9 +609,10 @@ export default function ApiPage() {
                                 />
                                 <label 
                                   htmlFor={`country-${apiKey.id}-${country.code}`}
-                                  className="text-sm cursor-pointer"
+                                  className="text-sm cursor-pointer flex items-center gap-1"
                                 >
-                                  {country.name}
+                                  <span>{country.flag}</span>
+                                  <span>{country.name}</span>
                                 </label>
                               </div>
                             );

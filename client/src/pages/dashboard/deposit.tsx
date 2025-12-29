@@ -362,7 +362,10 @@ export default function Deposit() {
                             <SelectContent>
                               {collectCountries.map((country) => (
                                 <SelectItem key={country.code} value={country.code}>
-                                  {country.name} ({country.code})
+                                  <span className="flex items-center gap-2">
+                                    <span className="text-base">{country.flag}</span>
+                                    <span>{country.name}</span>
+                                  </span>
                                 </SelectItem>
                               ))}
                             </SelectContent>

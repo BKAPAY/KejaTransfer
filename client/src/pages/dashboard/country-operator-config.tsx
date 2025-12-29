@@ -8,25 +8,34 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { CountryOperatorConfig } from "@shared/schema";
 
-const COUNTRIES: Record<string, { name: string; code: string }> = {
-  BJ: { name: "Bénin", code: "BJ" },
-  TG: { name: "Togo", code: "TG" },
-  CI: { name: "Côte d'Ivoire", code: "CI" },
-  SN: { name: "Sénégal", code: "SN" },
-  BF: { name: "Burkina Faso", code: "BF" },
-  GN: { name: "Guinée", code: "GN" },
-  NE: { name: "Niger", code: "NE" },
+const COUNTRIES: Record<string, { name: string; code: string; flag: string }> = {
+  BJ: { name: "Bénin", code: "BJ", flag: "🇧🇯" },
+  CI: { name: "Côte d'Ivoire", code: "CI", flag: "🇨🇮" },
+  SN: { name: "Sénégal", code: "SN", flag: "🇸🇳" },
+  BF: { name: "Burkina Faso", code: "BF", flag: "🇧🇫" },
+  TG: { name: "Togo", code: "TG", flag: "🇹🇬" },
+  ML: { name: "Mali", code: "ML", flag: "🇲🇱" },
+  GN: { name: "Guinée", code: "GN", flag: "🇬🇳" },
+  NE: { name: "Niger", code: "NE", flag: "🇳🇪" },
+  CM: { name: "Cameroun", code: "CM", flag: "🇨🇲" },
+  CD: { name: "RD Congo", code: "CD", flag: "🇨🇩" },
+  TD: { name: "Tchad", code: "TD", flag: "🇹🇩" },
+  CG: { name: "Congo-Brazzaville", code: "CG", flag: "🇨🇬" },
+  CF: { name: "Centrafrique", code: "CF", flag: "🇨🇫" },
+  GA: { name: "Gabon", code: "GA", flag: "🇬🇦" },
+  RW: { name: "Rwanda", code: "RW", flag: "🇷🇼" },
 };
 
 const OPERATORS: Record<string, string> = {
-  mtn: "MTN",
-  moov: "Moov",
+  mtn: "MTN Mobile Money",
+  moov: "Moov Money",
   celtiis: "Celtiis",
-  togocom: "TogoCom",
-  orange: "Orange",
+  togocom: "TogoCom (T-Money)",
+  orange: "Orange Money",
   wave: "Wave",
-  free: "Free Sénégal",
-  airtel: "Airtel Niger",
+  free: "Free Money",
+  airtel: "Airtel Money",
+  vodacom: "M-Pesa (Vodacom)",
 };
 
 export default function CountryOperatorConfig() {
@@ -114,7 +123,7 @@ export default function CountryOperatorConfig() {
                   className="p-6 flex items-center justify-between"
                 >
                   <div className="flex items-center gap-3">
-                    <Globe className="w-5 h-5 text-primary" />
+                    <span className="text-2xl">{countryInfo.flag}</span>
                     <div>
                       <h3 className="font-semibold text-foreground">{countryInfo.name}</h3>
                       <p className="text-sm text-muted-foreground">

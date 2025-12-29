@@ -73,10 +73,8 @@ const paymentLinkSchema = z.object({
 
 type PaymentLinkFormData = z.infer<typeof paymentLinkSchema>;
 
-// Countries that support collect (incoming payments) via FedaPay
-const COLLECT_COUNTRIES = COUNTRIES.filter(c => 
-  ["BJ", "TG", "CI", "SN", "GN", "NE"].includes(c.code)
-);
+// Countries that support collect (incoming payments) via AfribaPay
+const COLLECT_COUNTRIES = COUNTRIES;
 
 export default function PaymentLinks() {
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -445,8 +443,9 @@ export default function PaymentLinks() {
                                     }
                                   }}
                                 />
-                                <Label htmlFor={`country-${country.code}`} className="text-sm cursor-pointer">
-                                  {country.name}
+                                <Label htmlFor={`country-${country.code}`} className="text-sm cursor-pointer flex items-center gap-1">
+                                  <span>{country.flag}</span>
+                                  <span>{country.name}</span>
                                 </Label>
                               </div>
                             ))}
