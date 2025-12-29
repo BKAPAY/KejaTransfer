@@ -878,32 +878,17 @@ export class DbStorage implements IStorage {
   }
 
   async initializeCountryOperatorConfigs(): Promise<void> {
+    // Initialize AfribaPay country/operator combinations for all 15 countries
+    // Use definitions from schema.ts
+    const collectOperators = schema.COLLECT_OPERATORS;
+    const payoutOperators = schema.PAYOUT_OPERATORS;
+
+    // Get existing configs to check which ones are already present
     const existing = await this.getCountryOperatorConfigs();
-    if (existing.length > 0) return;
+    const existingSet = new Set(existing.map(c => `${c.country}-${c.operator}`));
 
-    // Initialize FedaPay country/operator combinations
-    // Collect (incoming payments): BJ, TG, CI, SN, GN, NE
-    // Payout (outgoing payments): BJ, TG, CI, SN, BF, GN
-    const collectOperators: Record<string, string[]> = {
-      BJ: ["mtn", "moov", "celtiis"],
-      TG: ["moov", "togocom"],
-      CI: ["mtn"],
-      SN: ["free"],
-      GN: ["mtn"],
-      NE: ["airtel"],
-    };
-
-    const payoutOperators: Record<string, string[]> = {
-      BJ: ["mtn", "moov", "celtiis"],
-      TG: ["moov", "togocom"],
-      CI: ["mtn", "moov", "wave", "orange"],
-      SN: ["wave", "orange"],
-      BF: ["moov", "orange"],
-      GN: ["mtn"],
-    };
-
-    // Combine all unique operators per country
-    const allCountries = Array.from(new Set([...Object.keys(collectOperators), ...Object.keys(payoutOperators)]));
+    // All 15 AfribaPay countries
+    const allCountries = schema.COLLECT_COUNTRIES;
     
     for (const country of allCountries) {
       const collectOps = collectOperators[country] || [];
@@ -911,6 +896,9 @@ export class DbStorage implements IStorage {
       const allOps = Array.from(new Set([...collectOps, ...payoutOps]));
       
       for (const operator of allOps) {
+        const key = `${country}-${operator}`;
+        if (existingSet.has(key)) continue; // Skip existing configs
+        
         const incomingEnabled = collectOps.includes(operator);
         const outgoingEnabled = payoutOps.includes(operator);
         
