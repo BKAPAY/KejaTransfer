@@ -7,36 +7,18 @@ import { useState } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { CountryOperatorConfig } from "@shared/schema";
+import { COUNTRIES as COUNTRIES_ARRAY, OPERATORS as OPERATORS_ARRAY } from "@shared/schema";
 
-const COUNTRIES: Record<string, { name: string; code: string; flag: string }> = {
-  BJ: { name: "Bénin", code: "BJ", flag: "🇧🇯" },
-  CI: { name: "Côte d'Ivoire", code: "CI", flag: "🇨🇮" },
-  SN: { name: "Sénégal", code: "SN", flag: "🇸🇳" },
-  BF: { name: "Burkina Faso", code: "BF", flag: "🇧🇫" },
-  TG: { name: "Togo", code: "TG", flag: "🇹🇬" },
-  ML: { name: "Mali", code: "ML", flag: "🇲🇱" },
-  GN: { name: "Guinée", code: "GN", flag: "🇬🇳" },
-  NE: { name: "Niger", code: "NE", flag: "🇳🇪" },
-  CM: { name: "Cameroun", code: "CM", flag: "🇨🇲" },
-  CD: { name: "RD Congo", code: "CD", flag: "🇨🇩" },
-  TD: { name: "Tchad", code: "TD", flag: "🇹🇩" },
-  CG: { name: "Congo-Brazzaville", code: "CG", flag: "🇨🇬" },
-  CF: { name: "Centrafrique", code: "CF", flag: "🇨🇫" },
-  GA: { name: "Gabon", code: "GA", flag: "🇬🇦" },
-  RW: { name: "Rwanda", code: "RW", flag: "🇷🇼" },
-};
+// Create lookup maps from shared arrays
+const COUNTRIES: Record<string, { name: string; code: string; flag: string }> = Object.fromEntries(
+  COUNTRIES_ARRAY.map(c => [c.code, c])
+);
 
-const OPERATORS: Record<string, string> = {
-  mtn: "MTN Mobile Money",
-  moov: "Moov Money",
-  celtiis: "Celtiis",
-  togocom: "TogoCom (T-Money)",
-  orange: "Orange Money",
-  wave: "Wave",
-  free: "Free Money",
-  airtel: "Airtel Money",
-  vodacom: "M-Pesa (Vodacom)",
-};
+const OPERATORS_NAMES: Record<string, string> = Object.fromEntries(
+  OPERATORS_ARRAY.map(o => [o.code, o.name])
+);
+
+// Use the shared operator names
 
 export default function CountryOperatorConfig() {
   const { toast } = useToast();
@@ -145,7 +127,7 @@ export default function CountryOperatorConfig() {
                           <div className="flex items-center gap-3">
                             <Wifi className="w-4 h-4 text-muted-foreground" />
                             <span className="font-medium text-foreground">
-                              {OPERATORS[config.operator] || config.operator}
+                              {OPERATORS_NAMES[config.operator] || config.operator}
                             </span>
                           </div>
 

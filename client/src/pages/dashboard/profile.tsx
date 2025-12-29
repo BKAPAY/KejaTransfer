@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import type { User } from "@shared/schema";
-import { ALLOWED_REGISTRATION_COUNTRIES } from "@shared/schema";
+import { ALLOWED_REGISTRATION_COUNTRIES, COUNTRIES } from "@shared/schema";
 import { Skeleton } from "@/components/ui/skeleton";
 import { User as UserIcon, Mail, Calendar, Lock, MapPin } from "lucide-react";
 import { useState } from "react";
@@ -11,20 +11,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
-const COUNTRY_INFO: Record<string, { name: string; flag: string }> = {
-  BJ: { name: "Bénin", flag: "🇧🇯" },
-  TG: { name: "Togo", flag: "🇹🇬" },
-  CI: { name: "Côte d'Ivoire", flag: "🇨🇮" },
-  BF: { name: "Burkina Faso", flag: "🇧🇫" },
-  SN: { name: "Sénégal", flag: "🇸🇳" },
-};
-
-const COUNTRY_NAMES: Record<string, string> = {
-  BJ: "🇧🇯 Bénin",
-  TG: "🇹🇬 Togo",
-  CI: "🇨🇮 Côte d'Ivoire",
-  BF: "🇧🇫 Burkina Faso",
-  SN: "🇸🇳 Sénégal",
+// Create lookup from shared COUNTRIES array
+const COUNTRY_MAP = Object.fromEntries(COUNTRIES.map(c => [c.code, c]));
+const getCountryDisplay = (code: string) => {
+  const country = COUNTRY_MAP[code];
+  return country ? `${country.flag} ${country.name}` : code;
 };
 
 export default function Profile() {
@@ -129,7 +120,7 @@ export default function Profile() {
                   </label>
                   {user.country ? (
                     <div className="flex items-center gap-2 p-2 bg-muted rounded-md text-sm" data-testid="text-user-country">
-                      {COUNTRY_NAMES[user.country] || user.country}
+                      {getCountryDisplay(user.country)}
                     </div>
                   ) : (
                     <div className="space-y-2">
@@ -145,7 +136,7 @@ export default function Profile() {
                         <SelectContent>
                           {ALLOWED_REGISTRATION_COUNTRIES.map((code) => (
                             <SelectItem key={code} value={code}>
-                              {COUNTRY_NAMES[code]}
+                              {getCountryDisplay(code)}
                             </SelectItem>
                           ))}
                         </SelectContent>

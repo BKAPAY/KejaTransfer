@@ -8,6 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { ApiKey, User } from "@shared/schema";
+import { COUNTRIES } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -36,23 +37,8 @@ const apiKeySchema = z.object({
 
 type ApiKeyFormData = z.infer<typeof apiKeySchema>;
 
-const COLLECT_COUNTRIES = [
-  { code: "BJ", name: "Bénin", flag: "🇧🇯" },
-  { code: "CI", name: "Côte d'Ivoire", flag: "🇨🇮" },
-  { code: "SN", name: "Sénégal", flag: "🇸🇳" },
-  { code: "BF", name: "Burkina Faso", flag: "🇧🇫" },
-  { code: "TG", name: "Togo", flag: "🇹🇬" },
-  { code: "ML", name: "Mali", flag: "🇲🇱" },
-  { code: "GN", name: "Guinée", flag: "🇬🇳" },
-  { code: "NE", name: "Niger", flag: "🇳🇪" },
-  { code: "CM", name: "Cameroun", flag: "🇨🇲" },
-  { code: "CD", name: "RD Congo", flag: "🇨🇩" },
-  { code: "TD", name: "Tchad", flag: "🇹🇩" },
-  { code: "CG", name: "Congo-Brazzaville", flag: "🇨🇬" },
-  { code: "CF", name: "Centrafrique", flag: "🇨🇫" },
-  { code: "GA", name: "Gabon", flag: "🇬🇦" },
-  { code: "RW", name: "Rwanda", flag: "🇷🇼" },
-];
+// All countries that support payments via AfribaPay
+const COLLECT_COUNTRIES = COUNTRIES;
 
 export default function ApiPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
