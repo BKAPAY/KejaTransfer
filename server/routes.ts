@@ -719,59 +719,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ===== Withdrawal with Security Code =====
+  // ===== Withdrawal with Security Code - DISABLED =====
   
   app.post("/api/withdrawal", requireAuth, async (req: Request, res: Response) => {
-    try {
-      const { amount, phone, operator, country, securityCode } = req.body;
-
-      if (!amount || !phone || !operator || !country || !securityCode) {
-        return res.status(400).json({ error: "Tous les champs sont requis" });
-      }
-
-      const user = await storage.getUser(req.session.userId!);
-      if (!user) {
-        return res.status(404).json({ error: "Utilisateur non trouvé" });
-      }
-
-      if (user.kycStatus !== "verified") {
-        return res.status(403).json({ error: "Vérification KYC requise" });
-      }
-
-      if (!user.securityCode) {
-        return res.status(400).json({ error: "Code de sécurité non configuré" });
-      }
-
-      const validSecurityCode = await bcrypt.compare(securityCode, user.securityCode);
-      if (!validSecurityCode) {
-        return res.status(401).json({ error: "Code de sécurité incorrect" });
-      }
-
-      if (!user.withdrawalPhones || !user.withdrawalPhones.includes(phone)) {
-        return res.status(400).json({ error: "Numéro de retrait non autorisé" });
-      }
-
-      const feeInfo = calculateOutgoingFee(amount, country);
-      if (user.balance < feeInfo.totalDeductedFromBalance) {
-        return res.status(400).json({ 
-          error: `Solde insuffisant. Vous avez ${user.balance} XOF. Total à débiter: ${feeInfo.totalDeductedFromBalance} XOF` 
-        });
-      }
-
-      const result = await handleFedaPayWithdrawal(
-        req.session.userId!,
-        user,
-        amount,
-        country,
-        operator,
-        phone
-      );
-      
-      res.json(result);
-    } catch (error: any) {
-      console.error("Withdrawal error:", error);
-      res.status(500).json({ error: error.message || "Erreur lors du retrait" });
-    }
+    return res.status(503).json({
+      success: false,
+      error: "Le système de paiement est temporairement indisponible. Veuillez réessayer ultérieurement."
+    });
   });
 
   // ===== Dashboard Stats =====
@@ -1110,72 +1064,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Initialize API payment - Using FedaPay
+  // Initialize API payment - DISABLED
   app.post("/api/api-pay/init", async (req: Request, res: Response) => {
-    try {
-      const { publicKey, amount, description, customerName, customerEmail, customerPhone, country, operator, callbackUrl } = req.body;
-
-      // Validate required fields
-      if (!publicKey || !customerName || !customerEmail || !customerPhone || !country || !operator) {
-        return res.status(400).json({ error: "Tous les champs sont requis" });
-      }
-
-      // Validate amount strictly
-      const numAmount = Number(amount);
-      if (!numAmount || numAmount < 100 || isNaN(numAmount)) {
-        return res.status(400).json({ error: "Le montant minimum est de 100 XOF" });
-      }
-
-      // Get API key
-      const apiKey = await storage.getApiKeyByPublicKey(publicKey);
-      if (!apiKey || !apiKey.isActive) {
-        return res.status(401).json({ error: "Cle API invalide ou desactivee" });
-      }
-
-      // Validate country - FedaPay supported countries for collect
-      const validCountries = FEDAPAY_SUPPORTED_COUNTRIES_COLLECT.map(c => c.toUpperCase());
-      if (!validCountries.includes(country.toUpperCase())) {
-        return res.status(400).json({ error: "Pays non supporte" });
-      }
-
-      // Use FedaPay for payment
-      const result = await handleApiPayment(
-        apiKey,
-        numAmount,
-        description || `Paiement a ${(apiKey as any).siteName || apiKey.name}`,
-        customerName,
-        customerEmail,
-        customerPhone,
-        country,
-        operator
-      );
-
-      if (!result.success) {
-        return res.status(400).json({ error: result.error || "Erreur lors du paiement" });
-      }
-
-      // Store callback URL in transaction metadata if provided
-      if (callbackUrl && result.transactionId) {
-        const tx = await storage.getTransaction(result.transactionId);
-        if (tx) {
-          let metadata: any = {};
-          try { metadata = JSON.parse(tx.metadata as string || "{}"); } catch (e) {}
-          metadata.callbackUrl = callbackUrl;
-          await storage.updateTransactionMetadata(result.transactionId, JSON.stringify(metadata));
-        }
-      }
-
-      res.json({
-        success: true,
-        transactionId: result.transactionId,
-        message: result.message || "Paiement initie. Veuillez valider sur votre telephone.",
-        requiresOTP: false,
-        requiresTwoStep: false,
-      });
-    } catch (error: any) {
-      console.error("API Pay init error:", error);
-      res.status(500).json({ error: "Une erreur est survenue" });
-    }
+    return res.status(503).json({
+      success: false,
+      error: "Le système de paiement est temporairement indisponible. Veuillez réessayer ultérieurement."
+    });
   });
 
   // Confirm API payment with OTP
@@ -1688,50 +1582,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ===== Deposit Routes (Legacy - redirects to FedaPay) =====
-  // Note: Frontend now uses /api/fedapay/deposit directly
+  // ===== Deposit Routes - DISABLED =====
   app.post("/api/deposits", requireAuth, async (req: Request, res: Response) => {
-    try {
-      const user = await storage.getUser(req.session.userId!);
-      if (user?.suspended) {
-        return res.status(403).json({ error: "Votre compte a ete suspendu. Veuillez contacter le support." });
-      }
-
-      const { amount, country, operator, phone } = req.body;
-
-      if (!amount || amount <= 0) {
-        return res.status(400).json({ error: "Montant invalide" });
-      }
-
-      // Validate country for FedaPay
-      if (!FEDAPAY_SUPPORTED_COUNTRIES_COLLECT.includes(country?.toLowerCase())) {
-        return res.status(400).json({ error: "Pays non supporte" });
-      }
-
-      // Use FedaPay for deposit
-      const result = await handleFedaPayDeposit(
-        req.session.userId!,
-        user!,
-        Math.floor(amount),
-        country,
-        operator,
-        phone
-      );
-
-      if (!result.success) {
-        return res.status(400).json({ error: result.error || "Erreur lors du depot" });
-      }
-
-      res.json({
-        success: true,
-        transactionId: result.transactionId,
-        fedapayTransactionId: result.fedapayTransactionId,
-        message: result.message,
-      });
-    } catch (error: any) {
-      console.error("Deposit error:", error);
-      res.status(500).json({ error: "Erreur lors du depot" });
-    }
+    return res.status(503).json({
+      success: false,
+      error: "Le système de paiement est temporairement indisponible. Veuillez réessayer ultérieurement."
+    });
   });
 
   // ===== SOFTPAY Routes (OTP-Based Operator-Specific Endpoints) =====
@@ -2205,58 +2061,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Payment Links - Initialize payment using FedaPay
+  // Payment Links - Initialize payment - DISABLED
   app.post("/api/payment-links/softpay-init/:token", async (req: Request, res: Response) => {
-    try {
-      const { customerName, customerEmail, customerPhone, country, operator } = req.body;
-      const { token } = req.params;
-
-      if (!country || !operator || !customerPhone) {
-        return res.status(400).json({ error: "Informations incompletes" });
-      }
-
-      // Validate country - FedaPay supported countries
-      if (!FEDAPAY_SUPPORTED_COUNTRIES_COLLECT.includes(country.toLowerCase())) {
-        return res.status(400).json({ error: "Pays non supporte" });
-      }
-
-      // Get payment link
-      const paymentLink = await storage.getPaymentLinkByToken(token);
-      if (!paymentLink) {
-        return res.status(404).json({ error: "Lien de paiement non trouve" });
-      }
-
-      // Check if user account is suspended
-      const owner = await storage.getUser(paymentLink.userId);
-      if (owner?.suspended) {
-        return res.status(404).json({ error: "Ce lien n'existe pas" });
-      }
-
-      // Use FedaPay for payment
-      const result = await handlePaymentLinkPayment(
-        paymentLink,
-        customerName || "Client",
-        customerEmail || "",
-        customerPhone,
-        country,
-        operator
-      );
-
-      if (!result.success) {
-        return res.status(400).json({ error: result.error || "Erreur lors du paiement" });
-      }
-
-      res.json({
-        success: true,
-        transactionId: result.transactionId,
-        message: result.message || "Paiement initie. Veuillez valider sur votre telephone.",
-        requiresOTP: false,
-        requiresTwoStep: false,
-      });
-    } catch (error: any) {
-      console.error("[PAYMENT_LINK FEDAPAY INIT] Error:", error);
-      res.status(500).json({ error: "Erreur lors de l'initialisation du paiement" });
-    }
+    return res.status(503).json({
+      success: false,
+      error: "Le système de paiement est temporairement indisponible. Veuillez réessayer ultérieurement."
+    });
   });
 
   // SOFTPAY for Payment Links - Confirm payment
@@ -2363,63 +2173,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Merchant Links - Initialize payment using FedaPay
+  // Merchant Links - Initialize payment - DISABLED
   app.post("/api/merchant-links/softpay-init/:token", async (req: Request, res: Response) => {
-    try {
-      const { amount, customerName, customerEmail, customerPhone, country, operator } = req.body;
-      const { token } = req.params;
-
-      if (!amount || amount <= 0) {
-        return res.status(400).json({ error: "Montant invalide" });
-      }
-
-      if (!country || !operator || !customerPhone) {
-        return res.status(400).json({ error: "Pays, operateur et numero de telephone requis" });
-      }
-
-      // Validate country - FedaPay supported countries
-      if (!FEDAPAY_SUPPORTED_COUNTRIES_COLLECT.includes(country.toLowerCase())) {
-        return res.status(400).json({ error: "Pays non supporte" });
-      }
-
-      // Get merchant link
-      const merchantLink = await storage.getMerchantLinkByToken(token);
-      if (!merchantLink) {
-        return res.status(404).json({ error: "Lien marchand non trouve" });
-      }
-
-      // Check if user account is suspended
-      const owner = await storage.getUser(merchantLink.userId);
-      if (owner?.suspended) {
-        return res.status(404).json({ error: "Ce lien n'existe pas" });
-      }
-
-      // Use FedaPay for payment
-      const result = await handleMerchantLinkPayment(
-        merchantLink,
-        Math.floor(amount),
-        customerName || "Client",
-        customerEmail || "",
-        customerPhone,
-        country,
-        operator
-      );
-
-      if (!result.success) {
-        return res.status(400).json({ error: result.error || "Erreur lors du paiement" });
-      }
-
-      res.json({
-        success: true,
-        transactionId: result.transactionId,
-        message: result.message || "Paiement initie. Veuillez valider sur votre telephone.",
-        requiresOTP: false,
-        requiresTwoStep: false,
-      });
-    } catch (error: any) {
-      console.error("[MERCHANT_LINK FEDAPAY INIT] Error:", error);
-      res.status(500).json({ error: "Erreur lors de l'initialisation du paiement" });
-    }
+    return res.status(503).json({
+      success: false,
+      error: "Le système de paiement est temporairement indisponible. Veuillez réessayer ultérieurement."
+    });
   });
 
   // SOFTPAY for Merchant Links - Confirm payment
@@ -2809,8 +2568,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ===== FedaPay Webhook Route =====
-  app.post("/api/webhooks/fedapay", handleFedaPayWebhook);
+  // ===== Webhook Route - DISABLED =====
+  app.post("/api/webhooks/fedapay", (req: Request, res: Response) => {
+    return res.status(503).json({
+      success: false,
+      error: "Service temporairement indisponible"
+    });
+  });
 
   // ===== Currency Conversion Route =====
   app.post("/api/convert-currency", async (req: Request, res: Response) => {
@@ -2851,210 +2615,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ currency, needsConversion });
   });
 
-  // ===== FedaPay Routes (New Payment System) =====
+  // ===== Payment Routes (AfribaPay - En attente d'intégration) =====
+  // Note: Les paiements sont temporairement désactivés en attendant les clés API AfribaPay
   
-  // FedaPay Deposit Route
+  const paymentSystemDisabledResponse = {
+    success: false,
+    error: "Le système de paiement est temporairement indisponible. Veuillez réessayer ultérieurement."
+  };
+  
+  // Deposit Route - DISABLED
   app.post("/api/fedapay/deposit", requireAuth, async (req: Request, res: Response) => {
-    try {
-      const user = await storage.getUser(req.session.userId!);
-      if (!user) {
-        return res.status(404).json({ error: "Utilisateur non trouve" });
-      }
-      if (user.suspended) {
-        return res.status(403).json({ error: "Votre compte a ete suspendu" });
-      }
-
-      const { amount, country, operator, phone } = req.body;
-
-      if (!amount || amount < 100) {
-        return res.status(400).json({ error: "Le montant minimum est de 100 XOF" });
-      }
-
-      const result = await handleFedaPayDeposit(
-        req.session.userId!,
-        user,
-        amount,
-        country,
-        operator,
-        phone
-      );
-
-      if (result.success) {
-        res.json(result);
-      } else {
-        res.status(400).json({ error: result.error });
-      }
-    } catch (error: any) {
-      console.error("[FedaPay Deposit Route] Error:", error);
-      res.status(500).json({ error: "Erreur lors du depot" });
-    }
+    return res.status(503).json(paymentSystemDisabledResponse);
   });
 
-  // FedaPay Transfer Route (uses old logic: amount sent = amount entered, fees added to balance deducted)
+  // Transfer/Withdrawal Route - DISABLED
   app.post("/api/fedapay/withdrawal", requireAuth, async (req: Request, res: Response) => {
-    try {
-      const user = await storage.getUser(req.session.userId!);
-      if (!user) {
-        return res.status(404).json({ error: "Utilisateur non trouve" });
-      }
-      if (user.suspended) {
-        return res.status(403).json({ error: "Votre compte a ete suspendu" });
-      }
-
-      const { amount, country, operator, phone, securityCode } = req.body;
-
-      if (!amount || amount < 500) {
-        return res.status(400).json({ error: "Le montant minimum est de 500 XOF" });
-      }
-
-      if (!securityCode) {
-        return res.status(400).json({ error: "Code de securite requis" });
-      }
-
-      if (!user.securityCode) {
-        return res.status(400).json({ error: "Code de securite non configure" });
-      }
-
-      const validSecurityCode = await bcrypt.compare(securityCode, user.securityCode);
-      if (!validSecurityCode) {
-        return res.status(401).json({ error: "Code de securite incorrect" });
-      }
-
-      const result = await handleFedaPayTransfer(
-        req.session.userId!,
-        user,
-        amount,
-        country,
-        operator,
-        phone
-      );
-
-      if (result.success) {
-        res.json(result);
-      } else {
-        res.status(400).json({ error: result.error });
-      }
-    } catch (error: any) {
-      console.error("[FedaPay Transfer Route] Error:", error);
-      res.status(500).json({ error: "Erreur lors du transfert" });
-    }
+    return res.status(503).json(paymentSystemDisabledResponse);
   });
 
-  // FedaPay Payment Link Payment Route
+  // Payment Link Route - DISABLED
   app.post("/api/fedapay/payment-link/:token", async (req: Request, res: Response) => {
-    try {
-      const { token } = req.params;
-      const { customerName, customerEmail, customerPhone, country, operator } = req.body;
-
-      const paymentLink = await storage.getPaymentLinkByToken(token);
-      if (!paymentLink || !paymentLink.isActive) {
-        return res.status(404).json({ error: "Lien de paiement non trouve ou inactif" });
-      }
-
-      const owner = await storage.getUser(paymentLink.userId);
-      if (owner?.suspended) {
-        return res.status(404).json({ error: "Ce lien n'est plus disponible" });
-      }
-
-      const result = await handlePaymentLinkPayment(
-        paymentLink,
-        customerName,
-        customerEmail,
-        customerPhone,
-        country,
-        operator
-      );
-
-      if (result.success) {
-        res.json(result);
-      } else {
-        res.status(400).json({ error: result.error });
-      }
-    } catch (error: any) {
-      console.error("[FedaPay PaymentLink Route] Error:", error);
-      res.status(500).json({ error: "Erreur lors du paiement" });
-    }
+    return res.status(503).json(paymentSystemDisabledResponse);
   });
 
-  // FedaPay Merchant Link Payment Route
+  // Merchant Link Route - DISABLED
   app.post("/api/fedapay/merchant-link/:token", async (req: Request, res: Response) => {
-    try {
-      const { token } = req.params;
-      const { amount, customerName, customerEmail, customerPhone, country, operator } = req.body;
-
-      const merchantLink = await storage.getMerchantLinkByToken(token);
-      if (!merchantLink || !merchantLink.isActive) {
-        return res.status(404).json({ error: "Lien marchand non trouve ou inactif" });
-      }
-
-      const owner = await storage.getUser(merchantLink.userId);
-      if (owner?.suspended) {
-        return res.status(404).json({ error: "Ce lien n'est plus disponible" });
-      }
-
-      const result = await handleMerchantLinkPayment(
-        merchantLink,
-        amount,
-        customerName,
-        customerEmail,
-        customerPhone,
-        country,
-        operator
-      );
-
-      if (result.success) {
-        res.json(result);
-      } else {
-        res.status(400).json({ error: result.error });
-      }
-    } catch (error: any) {
-      console.error("[FedaPay MerchantLink Route] Error:", error);
-      res.status(500).json({ error: "Erreur lors du paiement" });
-    }
+    return res.status(503).json(paymentSystemDisabledResponse);
   });
 
-  // FedaPay API Payment Route (for external integrations)
+  // API Payment Route - DISABLED
   app.post("/api/fedapay/api-payment", requireApiKey, async (req: Request, res: Response) => {
-    try {
-      const apiKey = (req as any).apiKey;
-      const { amount, description, customerName, customerEmail, customerPhone, country, operator } = req.body;
-
-      if (!amount || amount < 100) {
-        return res.status(400).json({ error: "Le montant minimum est de 100 XOF" });
-      }
-
-      const result = await handleApiPayment(
-        apiKey,
-        amount,
-        description,
-        customerName,
-        customerEmail,
-        customerPhone,
-        country,
-        operator
-      );
-
-      if (result.success) {
-        res.json(result);
-      } else {
-        res.status(400).json({ error: result.error });
-      }
-    } catch (error: any) {
-      console.error("[FedaPay API Payment Route] Error:", error);
-      res.status(500).json({ error: "Erreur lors du paiement" });
-    }
+    return res.status(503).json(paymentSystemDisabledResponse);
   });
 
-  // FedaPay Supported Countries/Operators Endpoint
-  app.get("/api/fedapay/config", (req: Request, res: Response) => {
-    const collectCountries = FEDAPAY_SUPPORTED_COUNTRIES_COLLECT.map(c => ({
-      code: c.toUpperCase(),
-      operators: getCollectOperatorsForCountry(c),
+  // AfribaPay Config Endpoint - Returns AfribaPay countries/operators
+  app.get("/api/fedapay/config", async (req: Request, res: Response) => {
+    const { AFRIBAPAY_COUNTRIES } = await import("@shared/afribapay-countries");
+    
+    const collectCountries = AFRIBAPAY_COUNTRIES.map(c => ({
+      code: c.code,
+      operators: c.operators.filter(op => op.payin).map(op => ({ code: op.code, name: op.name })),
     }));
     
-    const payoutCountries = FEDAPAY_SUPPORTED_COUNTRIES_PAYOUT.map(c => ({
-      code: c.toUpperCase(),
-      operators: getPayoutOperatorsForCountry(c),
+    const payoutCountries = AFRIBAPAY_COUNTRIES.map(c => ({
+      code: c.code,
+      operators: c.operators.filter(op => op.payout).map(op => ({ code: op.code, name: op.name })),
     }));
 
     res.json({
@@ -4237,6 +3842,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Initialize country/operator configs on startup
   await storage.initializeCountryOperatorConfigs();
+  await storage.initializeCountryStatuses();
+
+  // ===== Country Status Routes (Country-level payin/payout control) =====
+  app.get("/api/admin/country-status", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const statuses = await storage.getCountryStatuses();
+      res.json(statuses);
+    } catch (error: any) {
+      console.error("Get country statuses error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
+  app.put("/api/admin/country-status/:country", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { country } = req.params;
+      const { payinEnabled, payoutEnabled } = req.body;
+
+      const status = await storage.updateCountryStatus(country, {
+        payinEnabled,
+        payoutEnabled,
+      });
+
+      if (!status) {
+        return res.status(404).json({ error: "Pays non trouvé" });
+      }
+
+      res.json(status);
+    } catch (error: any) {
+      console.error("Update country status error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
 
   const httpServer = createServer(app);
   return httpServer;

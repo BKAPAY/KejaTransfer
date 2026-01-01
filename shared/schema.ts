@@ -243,6 +243,8 @@ export type InsertCountryOperatorConfig = z.infer<typeof insertCountryOperatorCo
 export type CountryOperatorConfig = typeof countryOperatorConfig.$inferSelect;
 export type UpdateCountryOperatorConfig = z.infer<typeof updateCountryOperatorConfigSchema>;
 
+export type CountryStatus = typeof countryStatus.$inferSelect;
+
 // Currency constants
 export const CURRENCIES = [
   { code: "XOF", name: "Franc CFA", symbol: "Fr", rate: 1 },

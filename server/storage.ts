@@ -878,40 +878,76 @@ export class DbStorage implements IStorage {
   }
 
   async initializeCountryOperatorConfigs(): Promise<void> {
-    // Initialize AfribaPay country/operator combinations for all 15 countries
-    // Use definitions from schema.ts
-    const collectOperators = schema.COLLECT_OPERATORS;
-    const payoutOperators = schema.PAYOUT_OPERATORS;
+    // Initialize AfribaPay country/operator combinations using AfribaPay configuration
+    const { AFRIBAPAY_COUNTRIES } = await import("@shared/afribapay-countries");
 
     // Get existing configs to check which ones are already present
     const existing = await this.getCountryOperatorConfigs();
     const existingSet = new Set(existing.map(c => `${c.country}-${c.operator}`));
-
-    // All 15 AfribaPay countries
-    const allCountries = schema.COLLECT_COUNTRIES;
     
-    for (const country of allCountries) {
-      const collectOps = collectOperators[country] || [];
-      const payoutOps = payoutOperators[country] || [];
-      const allOps = Array.from(new Set([...collectOps, ...payoutOps]));
-      
-      for (const operator of allOps) {
-        const key = `${country}-${operator}`;
+    for (const country of AFRIBAPAY_COUNTRIES) {
+      for (const operator of country.operators) {
+        const key = `${country.code}-${operator.code}`;
         if (existingSet.has(key)) continue; // Skip existing configs
-        
-        const incomingEnabled = collectOps.includes(operator);
-        const outgoingEnabled = payoutOps.includes(operator);
         
         await db
           .insert(schema.countryOperatorConfig)
           .values({
-            country,
-            operator,
-            incomingEnabled,
-            outgoingEnabled,
+            country: country.code,
+            operator: operator.code,
+            incomingEnabled: operator.payin,
+            outgoingEnabled: operator.payout,
           })
           .catch(() => {}); // Ignore duplicates
       }
+    }
+  }
+
+  // Country Status Methods (for country-level payin/payout control)
+  async getCountryStatuses(): Promise<schema.CountryStatus[]> {
+    return db.select().from(schema.countryStatus);
+  }
+
+  async getCountryStatus(country: string): Promise<schema.CountryStatus | undefined> {
+    const results = await db
+      .select()
+      .from(schema.countryStatus)
+      .where(eq(schema.countryStatus.country, country));
+    return results[0];
+  }
+
+  async updateCountryStatus(
+    country: string,
+    updates: { payinEnabled?: boolean; payoutEnabled?: boolean }
+  ): Promise<schema.CountryStatus | undefined> {
+    const results = await db
+      .update(schema.countryStatus)
+      .set({
+        ...updates,
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.countryStatus.country, country))
+      .returning();
+    return results[0];
+  }
+
+  async initializeCountryStatuses(): Promise<void> {
+    // Initialize country status for all AfribaPay countries
+    const { AFRIBAPAY_COUNTRIES } = await import("@shared/afribapay-countries");
+    const existing = await this.getCountryStatuses();
+    const existingSet = new Set(existing.map(c => c.country));
+
+    for (const country of AFRIBAPAY_COUNTRIES) {
+      if (existingSet.has(country.code)) continue;
+      
+      await db
+        .insert(schema.countryStatus)
+        .values({
+          country: country.code,
+          payinEnabled: true,
+          payoutEnabled: true,
+        })
+        .catch(() => {}); // Ignore duplicates
     }
   }
 }

@@ -1,36 +1,27 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Globe, Wifi, CheckCircle2, XCircle } from "lucide-react";
+import { Globe, Wifi, CheckCircle2, XCircle, ChevronDown, ChevronRight } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { CountryOperatorConfig } from "@shared/schema";
-import { COUNTRIES as COUNTRIES_ARRAY, OPERATORS as OPERATORS_BY_COUNTRY } from "@shared/schema";
-
-// Create lookup maps from shared arrays
-const COUNTRIES: Record<string, { name: string; code: string; flag: string }> = Object.fromEntries(
-  COUNTRIES_ARRAY.map(c => [c.code, c])
-);
-
-// Flatten all operators from all countries into a lookup map
-const OPERATORS_NAMES: Record<string, string> = {};
-Object.values(OPERATORS_BY_COUNTRY).forEach(ops => {
-  ops.forEach(op => {
-    OPERATORS_NAMES[op.code] = op.name;
-  });
-});
+import type { CountryOperatorConfig, CountryStatus } from "@shared/schema";
+import { AFRIBAPAY_COUNTRIES } from "@shared/afribapay-countries";
 
 export default function CountryOperatorConfig() {
   const { toast } = useToast();
   const [expandedCountry, setExpandedCountry] = useState<string | null>(null);
 
-  const { data: configs, isLoading } = useQuery<CountryOperatorConfig[]>({
+  const { data: operatorConfigs, isLoading: isLoadingOperators } = useQuery<CountryOperatorConfig[]>({
     queryKey: ["/api/admin/country-operator-config"],
   });
 
-  const updateMutation = useMutation({
+  const { data: countryStatuses, isLoading: isLoadingCountries } = useQuery<CountryStatus[]>({
+    queryKey: ["/api/admin/country-status"],
+  });
+
+  const updateOperatorMutation = useMutation({
     mutationFn: async (payload: {
       country: string;
       operator: string;
@@ -45,7 +36,7 @@ export default function CountryOperatorConfig() {
     onSuccess: () => {
       toast({
         title: "Succès",
-        description: "Configuration mise à jour",
+        description: "Configuration opérateur mise à jour",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/country-operator-config"] });
     },
@@ -58,18 +49,53 @@ export default function CountryOperatorConfig() {
     },
   });
 
-  const toggleSetting = (config: CountryOperatorConfig, type: "incoming" | "outgoing") => {
+  const updateCountryMutation = useMutation({
+    mutationFn: async (payload: {
+      country: string;
+      payinEnabled?: boolean;
+      payoutEnabled?: boolean;
+    }) => {
+      return apiRequest("PUT", `/api/admin/country-status/${payload.country}`, {
+        payinEnabled: payload.payinEnabled,
+        payoutEnabled: payload.payoutEnabled,
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Succès",
+        description: "Statut du pays mis à jour",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/country-status"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erreur",
+        description: error.message || "Impossible de mettre à jour",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const toggleOperatorSetting = (config: CountryOperatorConfig, type: "incoming" | "outgoing") => {
     const newValue = type === "incoming" ? !config.incomingEnabled : !config.outgoingEnabled;
-    updateMutation.mutate({
+    updateOperatorMutation.mutate({
       country: config.country,
       operator: config.operator,
       ...(type === "incoming" ? { incomingEnabled: newValue } : { outgoingEnabled: newValue }),
     });
   };
 
+  const toggleCountrySetting = (status: CountryStatus, type: "payin" | "payout") => {
+    const newValue = type === "payin" ? !status.payinEnabled : !status.payoutEnabled;
+    updateCountryMutation.mutate({
+      country: status.country,
+      ...(type === "payin" ? { payinEnabled: newValue } : { payoutEnabled: newValue }),
+    });
+  };
+
   const groupedConfigs: Record<string, CountryOperatorConfig[]> = {};
-  if (configs) {
-    configs.forEach((config) => {
+  if (operatorConfigs) {
+    operatorConfigs.forEach((config) => {
       if (!groupedConfigs[config.country]) {
         groupedConfigs[config.country] = [];
       }
@@ -77,12 +103,21 @@ export default function CountryOperatorConfig() {
     });
   }
 
+  const countryStatusMap: Record<string, CountryStatus> = {};
+  if (countryStatuses) {
+    countryStatuses.forEach((status) => {
+      countryStatusMap[status.country] = status;
+    });
+  }
+
+  const isLoading = isLoadingOperators || isLoadingCountries;
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-foreground mb-1">Gestion des Pays & Opérateurs</h1>
+        <h1 className="text-2xl font-bold text-foreground mb-1">Gestion des Pays et Opérateurs</h1>
         <p className="text-sm text-muted-foreground">
-          Contrôlez quels pays et opérateurs sont disponibles pour les paiements entrants et sortants
+          Contrôlez quels pays et opérateurs sont disponibles pour les paiements entrants et sortants (AfribaPay)
         </p>
       </div>
 
@@ -94,82 +129,137 @@ export default function CountryOperatorConfig() {
         </div>
       ) : (
         <div className="grid gap-4">
-          {Object.entries(COUNTRIES).map(([countryCode, countryInfo]) => {
+          {AFRIBAPAY_COUNTRIES.map((countryInfo) => {
+            const countryCode = countryInfo.code;
             const countryConfigs = groupedConfigs[countryCode] || [];
+            const countryStatus = countryStatusMap[countryCode];
             const isExpanded = expandedCountry === countryCode;
 
-            if (countryConfigs.length === 0) return null;
-
             return (
-              <Card key={countryCode} className="cursor-pointer hover-elevate">
-                <div
-                  onClick={() => setExpandedCountry(isExpanded ? null : countryCode)}
-                  className="p-6 flex items-center justify-between"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl">{countryInfo.flag}</span>
-                    <div>
-                      <h3 className="font-semibold text-foreground">{countryInfo.name}</h3>
-                      <p className="text-sm text-muted-foreground">
-                        {countryConfigs.length} opérateur{countryConfigs.length > 1 ? "s" : ""}
-                      </p>
+              <Card key={countryCode} className="overflow-hidden">
+                <div className="p-4 border-b bg-muted/30">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">{countryInfo.flag}</span>
+                      <div>
+                        <h3 className="font-semibold text-foreground">{countryInfo.name}</h3>
+                        <p className="text-sm text-muted-foreground">
+                          {countryInfo.operators.length} opérateur{countryInfo.operators.length > 1 ? "s" : ""} - {countryInfo.currency}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      {countryStatus && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant={countryStatus.payinEnabled ? "default" : "outline"}
+                            onClick={() => toggleCountrySetting(countryStatus, "payin")}
+                            disabled={updateCountryMutation.isPending}
+                            data-testid={`toggle-country-payin-${countryCode}`}
+                            className="gap-2"
+                          >
+                            {countryStatus.payinEnabled ? (
+                              <CheckCircle2 className="w-4 h-4" />
+                            ) : (
+                              <XCircle className="w-4 h-4" />
+                            )}
+                            <span className="text-xs">Payin</span>
+                          </Button>
+
+                          <Button
+                            size="sm"
+                            variant={countryStatus.payoutEnabled ? "default" : "outline"}
+                            onClick={() => toggleCountrySetting(countryStatus, "payout")}
+                            disabled={updateCountryMutation.isPending}
+                            data-testid={`toggle-country-payout-${countryCode}`}
+                            className="gap-2"
+                          >
+                            {countryStatus.payoutEnabled ? (
+                              <CheckCircle2 className="w-4 h-4" />
+                            ) : (
+                              <XCircle className="w-4 h-4" />
+                            )}
+                            <span className="text-xs">Payout</span>
+                          </Button>
+                        </>
+                      )}
+
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => setExpandedCountry(isExpanded ? null : countryCode)}
+                        data-testid={`expand-country-${countryCode}`}
+                      >
+                        {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                      </Button>
                     </div>
                   </div>
-                  <span className="text-muted-foreground">{isExpanded ? "▼" : "▶"}</span>
                 </div>
 
                 {isExpanded && (
-                  <CardContent className="border-t pt-6">
-                    <div className="space-y-4">
-                      {countryConfigs.map((config) => (
-                        <div
-                          key={`${config.country}-${config.operator}`}
-                          className="flex items-center justify-between p-4 bg-secondary rounded-lg"
-                        >
-                          <div className="flex items-center gap-3">
-                            <Wifi className="w-4 h-4 text-muted-foreground" />
-                            <span className="font-medium text-foreground">
-                              {OPERATORS_NAMES[config.operator] || config.operator}
-                            </span>
-                          </div>
+                  <CardContent className="pt-4">
+                    <div className="space-y-3">
+                      <h4 className="text-sm font-medium text-muted-foreground mb-2">Opérateurs AfribaPay</h4>
+                      {countryInfo.operators.map((afribapayOp) => {
+                        const config = countryConfigs.find(c => c.operator === afribapayOp.code);
+                        
+                        return (
+                          <div
+                            key={`${countryCode}-${afribapayOp.code}`}
+                            className="flex items-center justify-between p-3 bg-secondary rounded-lg"
+                          >
+                            <div className="flex items-center gap-3">
+                              <Wifi className="w-4 h-4 text-muted-foreground" />
+                              <div>
+                                <span className="font-medium text-foreground">{afribapayOp.name}</span>
+                                <div className="flex gap-2 text-xs text-muted-foreground">
+                                  {afribapayOp.payin && <span className="text-green-600">Payin</span>}
+                                  {afribapayOp.payout && <span className="text-blue-600">Payout</span>}
+                                  {afribapayOp.requiresOtp && <span className="text-orange-600">OTP</span>}
+                                </div>
+                              </div>
+                            </div>
 
-                          <div className="flex items-center gap-4">
-                            {/* Incoming (Deposits) */}
-                            <Button
-                              size="sm"
-                              variant={config.incomingEnabled ? "default" : "outline"}
-                              onClick={() => toggleSetting(config, "incoming")}
-                              disabled={updateMutation.isPending}
-                              data-testid={`toggle-incoming-${config.country}-${config.operator}`}
-                              className="gap-2"
-                            >
-                              {config.incomingEnabled ? (
-                                <CheckCircle2 className="w-4 h-4" />
-                              ) : (
-                                <XCircle className="w-4 h-4" />
-                              )}
-                              <span className="text-xs">Entrant</span>
-                            </Button>
+                            {config && (
+                              <div className="flex items-center gap-3">
+                                <Button
+                                  size="sm"
+                                  variant={config.incomingEnabled ? "default" : "outline"}
+                                  onClick={() => toggleOperatorSetting(config, "incoming")}
+                                  disabled={updateOperatorMutation.isPending}
+                                  data-testid={`toggle-incoming-${countryCode}-${afribapayOp.code}`}
+                                  className="gap-2"
+                                >
+                                  {config.incomingEnabled ? (
+                                    <CheckCircle2 className="w-4 h-4" />
+                                  ) : (
+                                    <XCircle className="w-4 h-4" />
+                                  )}
+                                  <span className="text-xs">Entrant</span>
+                                </Button>
 
-                            {/* Outgoing (Withdrawals) */}
-                            <Button
-                              size="sm"
-                              variant={config.outgoingEnabled ? "default" : "outline"}
-                              onClick={() => toggleSetting(config, "outgoing")}
-                              disabled={updateMutation.isPending}
-                              data-testid={`toggle-outgoing-${config.country}-${config.operator}`}
-                              className="gap-2"
-                            >
-                              {config.outgoingEnabled ? (
-                                <CheckCircle2 className="w-4 h-4" />
-                              ) : (
-                                <XCircle className="w-4 h-4" />
-                              )}
-                              <span className="text-xs">Sortant</span>
-                            </Button>
+                                <Button
+                                  size="sm"
+                                  variant={config.outgoingEnabled ? "default" : "outline"}
+                                  onClick={() => toggleOperatorSetting(config, "outgoing")}
+                                  disabled={updateOperatorMutation.isPending}
+                                  data-testid={`toggle-outgoing-${countryCode}-${afribapayOp.code}`}
+                                  className="gap-2"
+                                >
+                                  {config.outgoingEnabled ? (
+                                    <CheckCircle2 className="w-4 h-4" />
+                                  ) : (
+                                    <XCircle className="w-4 h-4" />
+                                  )}
+                                  <span className="text-xs">Sortant</span>
+                                </Button>
+                              </div>
+                            )}
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </CardContent>
                 )}
