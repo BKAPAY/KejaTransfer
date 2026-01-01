@@ -9,7 +9,7 @@ import { z } from "zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { COUNTRIES, OPERATORS, COLLECT_COUNTRIES } from "@shared/schema";
+import { COUNTRIES, OPERATORS } from "@shared/schema";
 import type { User } from "@shared/schema";
 import { ArrowDownToLine, CheckCircle2, Clock, Info, Loader2, Smartphone } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -65,7 +65,10 @@ export default function Deposit() {
   const selectedCountry = form.watch("country");
   const amount = form.watch("amount");
 
-  const collectCountries = COUNTRIES.filter(c => COLLECT_COUNTRIES.includes(c.code as any));
+  // Filter countries to only show those enabled by admin (have at least one enabled operator)
+  const collectCountries = enabledCountriesOperators 
+    ? COUNTRIES.filter(c => Object.keys(enabledCountriesOperators).includes(c.code))
+    : [];
   
   const allCountryOperators = selectedCountry
     ? (OPERATORS[selectedCountry as keyof typeof OPERATORS] || [])

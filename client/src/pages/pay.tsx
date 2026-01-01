@@ -200,11 +200,16 @@ export default function Pay() {
   // Déterminer si aucun opérateur n'est disponible (après chargement)
   const noOperatorsAvailable = !isLoadingOperators && selectedCountry && countryOperators.length === 0;
 
-  // Filtrer les pays selon allowedCountries du lien de paiement
-  // Si allowedCountries est vide ou non défini, tous les pays sont autorisés
+  // Filtrer les pays selon:
+  // 1. Les pays activés par l'admin (ont au moins un opérateur activé)
+  // 2. Les pays autorisés dans le lien de paiement (si défini)
+  const adminEnabledCountries = enabledCountriesOperators 
+    ? COUNTRIES.filter(c => Object.keys(enabledCountriesOperators).includes(c.code))
+    : [];
+  
   const allowedCountries = paymentLink?.allowedCountries && paymentLink.allowedCountries.length > 0
-    ? COUNTRIES.filter(c => paymentLink.allowedCountries!.includes(c.code))
-    : COUNTRIES;
+    ? adminEnabledCountries.filter(c => paymentLink.allowedCountries!.includes(c.code))
+    : adminEnabledCountries;
 
   // Calculer le montant avec frais si customerPaysFee est activé
   const baseAmount = paymentLink?.amount || 0;

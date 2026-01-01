@@ -11,7 +11,7 @@ import { z } from "zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { COUNTRIES, OPERATORS, PAYOUT_COUNTRIES } from "@shared/schema";
+import { COUNTRIES, OPERATORS } from "@shared/schema";
 import type { User } from "@shared/schema";
 import { Send, Info, CheckCircle2, Loader2, Lock, AlertCircle, Settings } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -61,7 +61,10 @@ export default function Transfer() {
   const selectedCountry = form.watch("country");
   const amount = form.watch("amount");
 
-  const payoutCountries = COUNTRIES.filter(c => PAYOUT_COUNTRIES.includes(c.code as any));
+  // Filter countries to only show those enabled by admin (have at least one enabled operator for payout)
+  const payoutCountries = enabledCountriesOperators 
+    ? COUNTRIES.filter(c => Object.keys(enabledCountriesOperators).includes(c.code))
+    : [];
   
   const allCountryOperators = selectedCountry
     ? (OPERATORS[selectedCountry as keyof typeof OPERATORS] || [])

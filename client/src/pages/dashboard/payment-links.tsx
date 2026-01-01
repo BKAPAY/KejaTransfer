@@ -73,9 +73,6 @@ const paymentLinkSchema = z.object({
 
 type PaymentLinkFormData = z.infer<typeof paymentLinkSchema>;
 
-// Countries that support collect (incoming payments) via AfribaPay
-const COLLECT_COUNTRIES = COUNTRIES;
-
 export default function PaymentLinks() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -87,6 +84,16 @@ export default function PaymentLinks() {
   const { data: paymentLinks, isLoading } = useQuery<PaymentLink[]>({
     queryKey: ["/api/payment-links"],
   });
+
+  // Fetch enabled countries for deposits (incoming payments)
+  const { data: enabledCountriesOperators } = useQuery<Record<string, string[]>>({
+    queryKey: ["/api/countries-operators/deposits"],
+  });
+
+  // Filter countries to only show those enabled by admin
+  const COLLECT_COUNTRIES = enabledCountriesOperators 
+    ? COUNTRIES.filter(c => Object.keys(enabledCountriesOperators).includes(c.code))
+    : [];
 
   const form = useForm<PaymentLinkFormData>({
     resolver: zodResolver(paymentLinkSchema),

@@ -3801,10 +3801,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Public endpoint - get enabled countries/operators for deposits (incoming)
+  // Filters by both country-level payinEnabled AND operator-level incomingEnabled
   app.get("/api/countries-operators/deposits", async (req: Request, res: Response) => {
     try {
-      const configs = await storage.getCountryOperatorConfigs();
-      const enabledConfigs = configs.filter((c) => c.incomingEnabled);
+      const [configs, countryStatuses] = await Promise.all([
+        storage.getCountryOperatorConfigs(),
+        storage.getCountryStatuses(),
+      ]);
+      
+      // Create a set of countries where payin is enabled at country level
+      const payinEnabledCountries = new Set(
+        countryStatuses.filter(cs => cs.payinEnabled).map(cs => cs.country)
+      );
+      
+      // Filter by country-level payin AND operator-level incoming
+      const enabledConfigs = configs.filter(
+        (c) => c.incomingEnabled && payinEnabledCountries.has(c.country)
+      );
       
       const result: Record<string, string[]> = {};
       for (const config of enabledConfigs) {
@@ -3821,10 +3834,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Public endpoint - get enabled countries/operators for withdrawals (outgoing)
+  // Filters by both country-level payoutEnabled AND operator-level outgoingEnabled
   app.get("/api/countries-operators/withdrawals", async (req: Request, res: Response) => {
     try {
-      const configs = await storage.getCountryOperatorConfigs();
-      const enabledConfigs = configs.filter((c) => c.outgoingEnabled);
+      const [configs, countryStatuses] = await Promise.all([
+        storage.getCountryOperatorConfigs(),
+        storage.getCountryStatuses(),
+      ]);
+      
+      // Create a set of countries where payout is enabled at country level
+      const payoutEnabledCountries = new Set(
+        countryStatuses.filter(cs => cs.payoutEnabled).map(cs => cs.country)
+      );
+      
+      // Filter by country-level payout AND operator-level outgoing
+      const enabledConfigs = configs.filter(
+        (c) => c.outgoingEnabled && payoutEnabledCountries.has(c.country)
+      );
       
       const result: Record<string, string[]> = {};
       for (const config of enabledConfigs) {

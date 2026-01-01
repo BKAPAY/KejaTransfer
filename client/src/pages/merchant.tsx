@@ -927,7 +927,10 @@ export default function Merchant() {
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  {COUNTRIES.map((country) => (
+                  {(enabledCountriesOperators 
+                    ? COUNTRIES.filter(c => Object.keys(enabledCountriesOperators).includes(c.code))
+                    : []
+                  ).map((country) => (
                     <SelectItem key={country.code} value={country.code}>
                       {country.flag} {country.name}
                     </SelectItem>
