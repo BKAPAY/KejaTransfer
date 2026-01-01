@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertCircle, Loader2 } from "lucide-react";
-import { OPERATORS } from "@shared/schema";
+import { OPERATORS, COUNTRIES } from "@shared/schema";
 import type { Transaction } from "@shared/schema";
 import logoImage from "@assets/bkapay-logo.png";
 
@@ -26,8 +26,9 @@ export default function ApiPayment() {
   const [isLoading, setIsLoading] = useState(false);
   const [conversionData, setConversionData] = useState<ConversionData | null>(null);
 
-  // Guinea currency conversion (XOF -> GNF)
-  const isGuinea = country?.toLowerCase() === "gn";
+  // Currency conversion for non-XOF countries
+  const targetCurrency = COUNTRIES.find(c => c.code === country)?.currency || "XOF";
+  const needsConversion = targetCurrency !== "XOF";
 
   // Fetch transaction details
   const { data: transaction, isLoading: isLoadingTransaction, error } = useQuery<Transaction>({
@@ -36,19 +37,19 @@ export default function ApiPayment() {
 
   const countryOperators = OPERATORS[(country as keyof typeof OPERATORS) || ("BJ" as const)] || [];
 
-  const fetchConversion = useCallback(async (amountToConvert: number) => {
-    if (!amountToConvert || amountToConvert <= 0) {
+  const fetchConversion = useCallback(async (amountToConvert: number, toCurrency: string) => {
+    if (!amountToConvert || amountToConvert <= 0 || toCurrency === "XOF") {
       setConversionData(null);
       return;
     }
 
-    setConversionData(prev => prev ? { ...prev, isLoading: true } : { convertedAmount: 0, targetCurrency: "GNF", conversionRate: 0, isLoading: true });
+    setConversionData(prev => prev ? { ...prev, isLoading: true } : { convertedAmount: 0, targetCurrency: toCurrency, conversionRate: 0, isLoading: true });
 
     try {
       const res = await fetch("/api/convert-currency", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: amountToConvert, fromCurrency: "XOF", toCurrency: "GNF" }),
+        body: JSON.stringify({ amount: amountToConvert, fromCurrency: "XOF", toCurrency }),
       });
       
       if (res.ok) {
@@ -69,15 +70,15 @@ export default function ApiPayment() {
   }, []);
 
   useEffect(() => {
-    if (isGuinea && transaction?.amount && transaction.amount > 0) {
+    if (needsConversion && transaction?.amount && transaction.amount > 0) {
       const debounceTimer = setTimeout(() => {
-        fetchConversion(transaction.amount);
+        fetchConversion(transaction.amount, targetCurrency);
       }, 500);
       return () => clearTimeout(debounceTimer);
     } else {
       setConversionData(null);
     }
-  }, [isGuinea, transaction?.amount, fetchConversion]);
+  }, [needsConversion, transaction?.amount, targetCurrency, fetchConversion]);
 
   const handlePayment = async () => {
     if (!country || !operator || !transactionId) {

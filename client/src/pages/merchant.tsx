@@ -208,22 +208,23 @@ export default function Merchant() {
   // Watch amount for currency conversion
   const watchedAmount = form.watch("amount");
 
-  // Guinea currency conversion (XOF -> GNF)
-  const isGuinea = selectedCountry?.toLowerCase() === "gn";
+  // Currency conversion for non-XOF countries
+  const targetCurrency = COUNTRIES.find(c => c.code === selectedCountry)?.currency || "XOF";
+  const needsConversion = targetCurrency !== "XOF";
   
-  const fetchConversion = useCallback(async (amountToConvert: number) => {
-    if (!amountToConvert || amountToConvert <= 0) {
+  const fetchConversion = useCallback(async (amountToConvert: number, toCurrency: string) => {
+    if (!amountToConvert || amountToConvert <= 0 || toCurrency === "XOF") {
       setConversionData(null);
       return;
     }
 
-    setConversionData(prev => prev ? { ...prev, isLoading: true } : { convertedAmount: 0, targetCurrency: "GNF", conversionRate: 0, isLoading: true });
+    setConversionData(prev => prev ? { ...prev, isLoading: true } : { convertedAmount: 0, targetCurrency: toCurrency, conversionRate: 0, isLoading: true });
 
     try {
       const res = await fetch("/api/convert-currency", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: amountToConvert, fromCurrency: "XOF", toCurrency: "GNF" }),
+        body: JSON.stringify({ amount: amountToConvert, fromCurrency: "XOF", toCurrency }),
       });
       
       if (res.ok) {
@@ -244,15 +245,15 @@ export default function Merchant() {
   }, []);
 
   useEffect(() => {
-    if (isGuinea && watchedAmount && watchedAmount > 0) {
+    if (needsConversion && watchedAmount && watchedAmount > 0) {
       const debounceTimer = setTimeout(() => {
-        fetchConversion(watchedAmount);
+        fetchConversion(watchedAmount, targetCurrency);
       }, 500);
       return () => clearTimeout(debounceTimer);
     } else {
       setConversionData(null);
     }
-  }, [isGuinea, watchedAmount, fetchConversion]);
+  }, [needsConversion, watchedAmount, targetCurrency, fetchConversion]);
 
   // Fonction pour recommencer un nouveau paiement
   const handleNewPayment = () => {

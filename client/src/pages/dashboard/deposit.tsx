@@ -77,21 +77,23 @@ export default function Deposit() {
 
   const netAmount = selectedCountry && amount ? calculateIncomingFee(Math.floor(amount), selectedCountry).netAmount : 0;
 
-  const isGuinea = selectedCountry?.toLowerCase() === "gn";
+  // Currency conversion for non-XOF countries
+  const targetCurrency = COUNTRIES.find(c => c.code === selectedCountry)?.currency || "XOF";
+  const needsConversion = targetCurrency !== "XOF";
 
-  const fetchConversion = useCallback(async (amountToConvert: number) => {
-    if (!amountToConvert || amountToConvert <= 0) {
+  const fetchConversion = useCallback(async (amountToConvert: number, toCurrency: string) => {
+    if (!amountToConvert || amountToConvert <= 0 || toCurrency === "XOF") {
       setConversionData(null);
       return;
     }
 
-    setConversionData(prev => prev ? { ...prev, isLoading: true } : { convertedAmount: 0, targetCurrency: "GNF", conversionRate: 0, isLoading: true });
+    setConversionData(prev => prev ? { ...prev, isLoading: true } : { convertedAmount: 0, targetCurrency: toCurrency, conversionRate: 0, isLoading: true });
 
     try {
       const res = await fetch("/api/convert-currency", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: amountToConvert, fromCurrency: "XOF", toCurrency: "GNF" }),
+        body: JSON.stringify({ amount: amountToConvert, fromCurrency: "XOF", toCurrency }),
       });
       
       if (res.ok) {
@@ -112,15 +114,15 @@ export default function Deposit() {
   }, []);
 
   useEffect(() => {
-    if (isGuinea && amount && amount > 0) {
+    if (needsConversion && amount && amount > 0) {
       const debounceTimer = setTimeout(() => {
-        fetchConversion(amount);
+        fetchConversion(amount, targetCurrency);
       }, 500);
       return () => clearTimeout(debounceTimer);
     } else {
       setConversionData(null);
     }
-  }, [isGuinea, amount, fetchConversion]);
+  }, [needsConversion, amount, targetCurrency, fetchConversion]);
 
   const depositMutation = useMutation({
     mutationFn: async (data: DepositFormData) => {
