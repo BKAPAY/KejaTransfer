@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { AlertCircle, Loader2, CheckCircle2, Phone, Mail, User, Globe, XCircle, RefreshCw, ExternalLink, Copy, Check } from "lucide-react";
-import { OPERATORS } from "@shared/schema";
+import { OPERATORS, COUNTRIES } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { usePaymentCountdown } from "@/hooks/use-payment-countdown";
@@ -121,8 +121,9 @@ export default function ApiPay() {
   const [copiedUssd, setCopiedUssd] = useState(false);
   const [conversionData, setConversionData] = useState<ConversionData | null>(null);
 
-  // Guinea currency conversion (XOF -> GNF)
-  const isGuinea = country?.toLowerCase() === "gn";
+  // Currency conversion for non-XOF countries
+  const targetCurrency = COUNTRIES.find(c => c.code === country)?.currency || "XOF";
+  const needsConversion = targetCurrency !== "XOF";
 
   const copyUssdCode = (code: string) => {
     navigator.clipboard.writeText(code);
@@ -161,19 +162,19 @@ export default function ApiPay() {
   
   const noOperatorsAvailable = !isLoadingOperators && !!country && countryOperators.length === 0;
 
-  const fetchConversion = useCallback(async (amountToConvert: number) => {
-    if (!amountToConvert || amountToConvert <= 0) {
+  const fetchConversion = useCallback(async (amountToConvert: number, toCurrency: string) => {
+    if (!amountToConvert || amountToConvert <= 0 || toCurrency === "XOF") {
       setConversionData(null);
       return;
     }
 
-    setConversionData(prev => prev ? { ...prev, isLoading: true } : { convertedAmount: 0, targetCurrency: "GNF", conversionRate: 0, isLoading: true });
+    setConversionData(prev => prev ? { ...prev, isLoading: true } : { convertedAmount: 0, targetCurrency: toCurrency, conversionRate: 0, isLoading: true });
 
     try {
       const res = await fetch("/api/convert-currency", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: amountToConvert, fromCurrency: "XOF", toCurrency: "GNF" }),
+        body: JSON.stringify({ amount: amountToConvert, fromCurrency: "XOF", toCurrency }),
       });
       
       if (res.ok) {
@@ -194,15 +195,15 @@ export default function ApiPay() {
   }, []);
 
   useEffect(() => {
-    if (isGuinea && amount && amount > 0) {
+    if (needsConversion && amount && amount > 0) {
       const debounceTimer = setTimeout(() => {
-        fetchConversion(amount);
+        fetchConversion(amount, targetCurrency);
       }, 500);
       return () => clearTimeout(debounceTimer);
     } else {
       setConversionData(null);
     }
-  }, [isGuinea, amount, fetchConversion]);
+  }, [needsConversion, amount, targetCurrency, fetchConversion]);
 
   const [shouldStartCountdown, setShouldStartCountdown] = useState(false);
 
@@ -718,20 +719,9 @@ export default function ApiPay() {
             
             <div className="text-center p-4 bg-muted rounded-lg">
               <p className="text-sm text-muted-foreground">Montant a payer</p>
-              {apiKeyInfo?.customerPaysFee ? (
-                <>
-                  <p className="text-2xl font-bold text-primary">
-                    {Math.ceil(amount * 1.06).toLocaleString()} FCFA
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    ({amount.toLocaleString()} + {Math.ceil(amount * 0.06).toLocaleString()} frais)
-                  </p>
-                </>
-              ) : (
-                <p className="text-2xl font-bold text-primary">
-                  {amount.toLocaleString()} FCFA
-                </p>
-              )}
+              <p className="text-2xl font-bold text-primary">
+                {apiKeyInfo?.customerPaysFee ? Math.ceil(amount * 1.06).toLocaleString() : amount.toLocaleString()} FCFA
+              </p>
             </div>
             
             <Button
@@ -1005,10 +995,10 @@ export default function ApiPay() {
         )}
       </div>
 
-      {isGuinea && conversionData && (
+      {conversionData && (
         <div className="bg-green-50 dark:bg-green-950 p-3 rounded-md border border-green-200 dark:border-green-800">
           <p className="text-sm text-green-700 dark:text-green-300 font-medium">
-            Montant en Franc Guineen (GNF)
+            Montant à payer
           </p>
           {conversionData.isLoading ? (
             <div className="flex items-center gap-2 mt-1">
@@ -1016,14 +1006,9 @@ export default function ApiPay() {
               <span className="text-sm text-green-600">Conversion en cours...</span>
             </div>
           ) : (
-            <>
-              <p className="text-lg font-bold text-green-800 dark:text-green-200" data-testid="text-converted-amount">
-                {new Intl.NumberFormat("fr-FR").format(conversionData.convertedAmount)} GNF
-              </p>
-              <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-                Taux: 1 XOF = {conversionData.conversionRate.toFixed(4)} GNF
-              </p>
-            </>
+            <p className="text-lg font-bold text-green-800 dark:text-green-200" data-testid="text-converted-amount">
+              {new Intl.NumberFormat("fr-FR").format(conversionData.convertedAmount)} {conversionData.targetCurrency}
+            </p>
           )}
         </div>
       )}
@@ -1066,20 +1051,9 @@ export default function ApiPay() {
           <div className="space-y-3 pb-4 border-b">
             <div>
               <p className="text-sm text-muted-foreground mb-1">Montant a payer</p>
-              {apiKeyInfo?.customerPaysFee ? (
-                <>
-                  <p className="text-3xl font-bold text-primary">
-                    {Math.ceil(amount * 1.06).toLocaleString()} <span className="text-lg">XOF</span>
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    ({amount.toLocaleString()} XOF + {Math.ceil(amount * 0.06).toLocaleString()} XOF frais)
-                  </p>
-                </>
-              ) : (
-                <p className="text-3xl font-bold text-primary">
-                  {amount.toLocaleString()} <span className="text-lg">XOF</span>
-                </p>
-              )}
+              <p className="text-3xl font-bold text-primary">
+                {apiKeyInfo?.customerPaysFee ? Math.ceil(amount * 1.06).toLocaleString() : amount.toLocaleString()} <span className="text-lg">XOF</span>
+              </p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Completez votre paiement en remplissant les informations</p>

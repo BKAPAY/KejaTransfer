@@ -426,10 +426,10 @@ export default function Deposit() {
                       )}
                     />
 
-                    {isGuinea && conversionData && (
+                    {conversionData && (
                       <div className="bg-green-50 dark:bg-green-950 p-3 rounded-md border border-green-200 dark:border-green-800">
                         <p className="text-sm text-green-700 dark:text-green-300 font-medium">
-                          Montant en Franc Guineen (GNF)
+                          Montant à payer
                         </p>
                         {conversionData.isLoading ? (
                           <div className="flex items-center gap-2 mt-1">
@@ -437,14 +437,9 @@ export default function Deposit() {
                             <span className="text-sm text-green-600">Conversion en cours...</span>
                           </div>
                         ) : (
-                          <>
-                            <p className="text-lg font-bold text-green-800 dark:text-green-200" data-testid="text-converted-amount">
-                              {new Intl.NumberFormat("fr-FR").format(conversionData.convertedAmount)} GNF
-                            </p>
-                            <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-                              Taux: 1 XOF = {conversionData.conversionRate.toFixed(4)} GNF
-                            </p>
-                          </>
+                          <p className="text-lg font-bold text-green-800 dark:text-green-200" data-testid="text-converted-amount">
+                            {new Intl.NumberFormat("fr-FR").format(conversionData.convertedAmount)} {conversionData.targetCurrency}
+                          </p>
                         )}
                       </div>
                     )}
@@ -452,7 +447,7 @@ export default function Deposit() {
                     {amount && selectedCountry && netAmount > 0 && (
                       <div className="bg-muted p-3 rounded-md border">
                         <p className="text-sm text-muted-foreground">
-                          Vous recevrez (frais 6% deduits)
+                          Vous recevrez
                         </p>
                         <p className="text-lg font-semibold text-foreground" data-testid="text-net-amount">
                           {new Intl.NumberFormat("fr-FR", {

@@ -979,10 +979,10 @@ export default function Pay() {
           )}
         />
         
-        {isGuinea && conversionData && (
+        {isConversionNeeded && conversionData && (
           <div className="bg-green-50 dark:bg-green-950 p-3 rounded-md border border-green-200 dark:border-green-800">
             <p className="text-xs sm:text-sm text-green-700 dark:text-green-300 font-medium">
-              Montant en Franc Guineen (GNF)
+              Montant à payer
             </p>
             {conversionData.isLoading ? (
               <div className="flex items-center gap-2 mt-1">
@@ -990,14 +990,9 @@ export default function Pay() {
                 <span className="text-sm text-green-600">Conversion en cours...</span>
               </div>
             ) : (
-              <>
-                <p className="text-base sm:text-lg font-bold text-green-800 dark:text-green-200" data-testid="text-converted-amount">
-                  {new Intl.NumberFormat("fr-FR").format(conversionData.convertedAmount)} GNF
-                </p>
-                <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-                  Taux: 1 XOF = {conversionData.conversionRate.toFixed(4)} GNF
-                </p>
-              </>
+              <p className="text-base sm:text-lg font-bold text-green-800 dark:text-green-200" data-testid="text-converted-amount">
+                {new Intl.NumberFormat("fr-FR").format(conversionData.convertedAmount)} {conversionData.targetCurrency}
+              </p>
             )}
           </div>
         )}
@@ -1044,16 +1039,7 @@ export default function Pay() {
             )}
           </div>
           <div className="text-lg sm:text-xl lg:text-2xl font-bold pt-2">
-            {paymentLink.customerPaysFee ? (
-              <div className="space-y-1">
-                <span>{formatAmount(totalAmount)}</span>
-                <p className="text-xs text-muted-foreground font-normal">
-                  ({formatAmount(baseAmount)} + {formatAmount(feeAmount)} frais)
-                </p>
-              </div>
-            ) : (
-              formatAmount(paymentLink.amount)
-            )}
+            {formatAmount(totalAmount)}
           </div>
         </CardHeader>
         <CardContent className="p-3 sm:p-4 lg:p-6">

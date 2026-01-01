@@ -117,12 +117,35 @@ export function getCurrencyForCountry(countryCode: string): string {
     ci: "XOF",
     sn: "XOF",
     bf: "XOF",
+    ml: "XOF",
     ne: "XOF",
     gn: "GNF",
+    cm: "XAF",
+    td: "XAF",
+    cg: "XAF",
+    cf: "XAF",
+    ga: "XAF",
+    cd: "CDF",
   };
   return countryCurrencies[countryCode.toLowerCase()] || "XOF";
 }
 
 export function needsCurrencyConversion(countryCode: string): boolean {
-  return countryCode.toLowerCase() === "gn";
+  const currency = getCurrencyForCountry(countryCode);
+  return currency !== "XOF";
+}
+
+export async function convertXofToTargetCurrency(amountXof: number, countryCode: string): Promise<ConversionResult> {
+  const targetCurrency = getCurrencyForCountry(countryCode);
+  if (targetCurrency === "XOF") {
+    return {
+      success: true,
+      originalAmount: amountXof,
+      originalCurrency: "XOF",
+      convertedAmount: amountXof,
+      targetCurrency: "XOF",
+      conversionRate: 1,
+    };
+  }
+  return convertCurrency(amountXof, "XOF", targetCurrency);
 }
