@@ -109,6 +109,16 @@ export const countryOperatorConfig = pgTable("country_operator_config", {
 // Countries allowed for user registration
 export const ALLOWED_REGISTRATION_COUNTRIES = ["BJ", "TG", "CI", "BF", "SN"] as const;
 
+// AfribaPay country configuration with payin/payout status
+export const countryStatus = pgTable("country_status", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  country: text("country").notNull().unique(), // "BJ", "CI", etc.
+  payinEnabled: boolean("payin_enabled").notNull().default(true),
+  payoutEnabled: boolean("payout_enabled").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -271,9 +281,8 @@ export const COUNTRIES = [
 // All operators support both payin and payout unless noted
 export const OPERATORS = {
   BJ: [
-    { code: "mtn", name: "MTN Mobile Money", requiresOtp: false },
     { code: "moov", name: "Moov Money", requiresOtp: false },
-    { code: "celtiis", name: "Celtiis", requiresOtp: false },
+    { code: "mtn", name: "MTN Mobile Money", requiresOtp: false },
   ],
   CI: [
     { code: "orange", name: "Orange Money", requiresOtp: true },
@@ -283,8 +292,9 @@ export const OPERATORS = {
   ],
   SN: [
     { code: "orange", name: "Orange Money", requiresOtp: true },
-    { code: "wave", name: "Wave", requiresOtp: false },
     { code: "free", name: "Free Money", requiresOtp: false },
+    { code: "expresso", name: "Expresso", requiresOtp: false },
+    { code: "wave", name: "Wave", requiresOtp: false },
   ],
   BF: [
     { code: "orange", name: "Orange Money", requiresOtp: true },
@@ -293,7 +303,7 @@ export const OPERATORS = {
   ],
   TG: [
     { code: "moov", name: "Moov Money", requiresOtp: false },
-    { code: "togocom", name: "TogoCom (T-Money)", requiresOtp: false },
+    { code: "tmoney", name: "Togocell", requiresOtp: false },
   ],
   ML: [
     { code: "orange", name: "Orange Money", requiresOtp: false },
@@ -306,7 +316,6 @@ export const OPERATORS = {
   ],
   NE: [
     { code: "airtel", name: "Airtel Money", requiresOtp: false },
-    { code: "moov", name: "Moov Money", requiresOtp: false },
   ],
   CM: [
     { code: "orange", name: "Orange Money", requiresOtp: false },
@@ -315,7 +324,8 @@ export const OPERATORS = {
   CD: [
     { code: "orange", name: "Orange Money", requiresOtp: false },
     { code: "airtel", name: "Airtel Money", requiresOtp: false },
-    { code: "vodacom", name: "M-Pesa (Vodacom)", requiresOtp: false },
+    { code: "mpesa", name: "Mpesa", requiresOtp: false },
+    { code: "africell", name: "Africell", requiresOtp: false },
   ],
   TD: [
     { code: "airtel", name: "Airtel Money", requiresOtp: false },
@@ -327,6 +337,7 @@ export const OPERATORS = {
   ],
   CF: [
     { code: "orange", name: "Orange Money", requiresOtp: false },
+    { code: "telecel", name: "Telecel", requiresOtp: false },
   ],
   GA: [
     { code: "airtel", name: "Airtel Money", requiresOtp: false },
@@ -344,38 +355,38 @@ export const PAYOUT_COUNTRIES = ["BJ", "CI", "SN", "BF", "TG", "ML", "GN", "NE",
 
 // All operators available for collect (payin) by country
 export const COLLECT_OPERATORS: Record<string, string[]> = {
-  BJ: ["mtn", "moov", "celtiis"],
-  CI: ["orange", "mtn", "moov", "wave"],
-  SN: ["orange", "wave", "free"],
+  BJ: ["moov", "mtn"],
+  CI: ["orange", "moov", "mtn", "wave"],
+  SN: ["orange", "free", "expresso", "wave"],
   BF: ["orange", "moov", "wave"],
-  TG: ["moov", "togocom"],
+  TG: ["moov", "tmoney"],
   ML: ["orange", "moov", "wave"],
   GN: ["orange", "mtn"],
-  NE: ["airtel", "moov"],
+  NE: ["airtel"],
   CM: ["orange", "mtn"],
-  CD: ["orange", "airtel", "vodacom"],
+  CD: ["orange", "airtel", "mpesa", "africell"],
   TD: ["airtel", "moov"],
   CG: ["airtel", "mtn"],
-  CF: ["orange"],
+  CF: ["orange", "telecel"],
   GA: ["airtel", "moov"],
   RW: ["mtn", "airtel"],
 };
 
 // All operators available for payout by country
 export const PAYOUT_OPERATORS: Record<string, string[]> = {
-  BJ: ["mtn", "moov", "celtiis"],
-  CI: ["orange", "mtn", "moov", "wave"],
-  SN: ["orange", "wave", "free"],
+  BJ: ["moov", "mtn"],
+  CI: ["orange", "moov", "mtn", "wave"],
+  SN: ["orange", "free", "expresso", "wave"],
   BF: ["orange", "moov", "wave"],
-  TG: ["moov", "togocom"],
+  TG: ["moov", "tmoney"],
   ML: ["orange", "moov", "wave"],
   GN: ["orange", "mtn"],
-  NE: ["airtel", "moov"],
+  NE: ["airtel"],
   CM: ["orange", "mtn"],
-  CD: ["orange", "airtel", "vodacom"],
+  CD: ["orange", "airtel", "mpesa", "africell"],
   TD: ["airtel", "moov"],
   CG: ["airtel", "mtn"],
-  CF: ["orange"],
+  CF: ["orange", "telecel"],
   GA: ["airtel", "moov"],
   RW: ["mtn", "airtel"],
 };

@@ -209,25 +209,27 @@ export default function Pay() {
   // Calculer le montant avec frais si customerPaysFee est activé
   const baseAmount = paymentLink?.amount || 0;
   const feePercentage = 6; // 6% fee
-  const feeAmount = paymentLink?.customerPaysFee ? Math.ceil(baseAmount * feePercentage / 100) : 0;
-  const totalAmount = baseAmount + feeAmount;
+  const feeAmount = Math.ceil(baseAmount * 0.06);
+  const totalAmount = paymentLink?.customerPaysFee ? baseAmount + feeAmount : baseAmount;
 
-  // Guinea currency conversion (XOF -> GNF)
-  const isGuinea = selectedCountry?.toLowerCase() === "gn";
+  // conversion (XOF -> Target Currency)
+  const targetCurrency = COUNTRIES.find(c => c.code === selectedCountry)?.currency || "XOF";
+  const isConversionNeeded = targetCurrency !== "XOF";
+  const isGuinea = selectedCountry === "GN";
   
-  const fetchConversion = useCallback(async (amountToConvert: number) => {
-    if (!amountToConvert || amountToConvert <= 0) {
+  const fetchConversion = useCallback(async (amountToConvert: number, toCurrency: string) => {
+    if (!amountToConvert || amountToConvert <= 0 || toCurrency === "XOF") {
       setConversionData(null);
       return;
     }
 
-    setConversionData(prev => prev ? { ...prev, isLoading: true } : { convertedAmount: 0, targetCurrency: "GNF", conversionRate: 0, isLoading: true });
+    setConversionData(prev => prev ? { ...prev, isLoading: true } : { convertedAmount: 0, targetCurrency: toCurrency, conversionRate: 0, isLoading: true });
 
     try {
       const res = await fetch("/api/convert-currency", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: amountToConvert, fromCurrency: "XOF", toCurrency: "GNF" }),
+        body: JSON.stringify({ amount: amountToConvert, fromCurrency: "XOF", toCurrency }),
       });
       
       if (res.ok) {
@@ -248,15 +250,15 @@ export default function Pay() {
   }, []);
 
   useEffect(() => {
-    if (isGuinea && paymentLink?.amount && paymentLink.amount > 0) {
+    if (isConversionNeeded && totalAmount > 0) {
       const debounceTimer = setTimeout(() => {
-        fetchConversion(paymentLink.amount);
+        fetchConversion(totalAmount, targetCurrency);
       }, 500);
       return () => clearTimeout(debounceTimer);
     } else {
       setConversionData(null);
     }
-  }, [isGuinea, paymentLink?.amount, fetchConversion]);
+  }, [isConversionNeeded, totalAmount, targetCurrency, fetchConversion]);
 
   // Fonction pour recommencer un nouveau paiement
   const handleNewPayment = () => {
