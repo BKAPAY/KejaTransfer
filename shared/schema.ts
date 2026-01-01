@@ -276,6 +276,7 @@ export const COUNTRIES = [
   { code: "CG", name: "Congo-Brazzaville", flag: "🇨🇬", phoneCode: "+242", phoneDigits: 9, currency: "XAF" },
   { code: "CF", name: "Centrafrique", flag: "🇨🇫", phoneCode: "+236", phoneDigits: 8, currency: "XAF" },
   { code: "GA", name: "Gabon", flag: "🇬🇦", phoneCode: "+241", phoneDigits: 8, currency: "XAF" },
+  { code: "RW", name: "Rwanda", flag: "🇷🇼", phoneCode: "+250", phoneDigits: 9, currency: "RWF" },
 ] as const;
 
 // Operators by country for AfribaPay (verified from AfribaPay documentation)
@@ -343,11 +344,15 @@ export const OPERATORS = {
     { code: "airtel", name: "Airtel Money", requiresOtp: false },
     { code: "moov", name: "Moov Money", requiresOtp: false },
   ],
+  RW: [
+    { code: "mtn", name: "MTN Mobile Money", requiresOtp: false },
+    { code: "airtel", name: "Airtel Money", requiresOtp: false },
+  ],
 } as const;
 
 // All countries support both collect (payin) and payout via AfribaPay (14 countries)
-export const COLLECT_COUNTRIES = ["BJ", "CI", "SN", "BF", "TG", "ML", "GN", "NE", "CM", "CD", "TD", "CG", "CF", "GA"] as const;
-export const PAYOUT_COUNTRIES = ["BJ", "CI", "SN", "BF", "TG", "ML", "GN", "NE", "CM", "CD", "TD", "CG", "CF", "GA"] as const;
+export const COLLECT_COUNTRIES = ["BJ", "CI", "SN", "BF", "TG", "ML", "GN", "NE", "CM", "CD", "TD", "CG", "CF", "GA", "RW"] as const;
+export const PAYOUT_COUNTRIES = ["BJ", "CI", "SN", "BF", "TG", "ML", "GN", "NE", "CM", "CD", "TD", "CG", "CF", "GA", "RW"] as const;
 
 // All operators available for collect (payin) by country
 export const COLLECT_OPERATORS: Record<string, string[]> = {
@@ -365,6 +370,7 @@ export const COLLECT_OPERATORS: Record<string, string[]> = {
   CG: ["airtel", "mtn"],
   CF: ["orange", "telecel"],
   GA: ["airtel", "moov"],
+  RW: ["mtn", "airtel"],
 };
 
 // All operators available for payout by country
@@ -383,4 +389,5 @@ export const PAYOUT_OPERATORS: Record<string, string[]> = {
   CG: ["airtel", "mtn"],
   CF: ["orange", "telecel"],
   GA: ["airtel", "moov"],
+  RW: ["mtn", "airtel"],
 };
