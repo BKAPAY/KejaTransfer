@@ -206,6 +206,19 @@ export const AFRIBAPAY_COUNTRIES: AfribaPayCountry[] = [
       { code: "moov", name: "Moov Money", requiresOtp: false, payin: true, payout: true },
     ],
   },
+  {
+    code: "RW",
+    name: "Rwanda",
+    flag: "🇷🇼",
+    phoneCode: "+250",
+    phoneDigits: 9,
+    phoneFormat: "7XXXXXXXX",
+    currency: "RWF",
+    operators: [
+      { code: "mtn", name: "MTN Mobile Money", requiresOtp: false, payin: true, payout: true },
+      { code: "airtel", name: "Airtel Money", requiresOtp: false, payin: true, payout: true },
+    ],
+  },
 ];
 
 export const getCountryByCode = (code: string): AfribaPayCountry | undefined => {
@@ -238,4 +251,5 @@ export const CURRENCY_INFO: Record<string, { symbol: string; name: string }> = {
   XAF: { symbol: "FCFA", name: "Franc CFA (BEAC)" },
   GNF: { symbol: "GNF", name: "Franc Guinéen" },
   CDF: { symbol: "CDF", name: "Franc Congolais" },
+  RWF: { symbol: "RWF", name: "Franc Rwandais" },
 };

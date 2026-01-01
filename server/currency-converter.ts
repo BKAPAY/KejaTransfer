@@ -126,6 +126,7 @@ export function getCurrencyForCountry(countryCode: string): string {
     cf: "XAF",
     ga: "XAF",
     cd: "CDF",
+    rw: "RWF",
   };
   return countryCurrencies[countryCode.toLowerCase()] || "XOF";
 }
