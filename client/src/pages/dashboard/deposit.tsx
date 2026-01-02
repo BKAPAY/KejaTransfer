@@ -11,6 +11,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { COUNTRIES, OPERATORS } from "@shared/schema";
 import type { User } from "@shared/schema";
+import { PhoneInputWithPrefix } from "@/components/phone-input-with-prefix";
 import { ArrowDownToLine, CheckCircle2, Clock, Info, Loader2, Smartphone } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { calculateIncomingFee } from "@/lib/fees";
@@ -420,10 +421,11 @@ export default function Deposit() {
                         <FormItem>
                           <FormLabel>Numero de telephone</FormLabel>
                           <FormControl>
-                            <Input
-                              placeholder="77123456"
+                            <PhoneInputWithPrefix
+                              country={selectedCountry}
+                              value={field.value}
+                              onChange={field.onChange}
                               data-testid="input-phone"
-                              {...field}
                             />
                           </FormControl>
                           <FormMessage />

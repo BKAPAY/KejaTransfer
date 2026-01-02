@@ -7,6 +7,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import type { PaymentLink } from "@shared/schema";
 import { COUNTRIES, OPERATORS } from "@shared/schema";
+import { PhoneInputWithPrefix } from "@/components/phone-input-with-prefix";
 import logoImage from "@assets/bkapay-logo.png";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -936,10 +937,11 @@ export default function Pay() {
             <FormItem>
               <FormLabel className="text-xs sm:text-sm">Numéro de téléphone</FormLabel>
               <FormControl>
-                <Input
-                  placeholder={selectedCountry === "SN" ? "771234567" : "97123456"}
+                <PhoneInputWithPrefix
+                  country={selectedCountry}
+                  value={field.value}
+                  onChange={field.onChange}
                   data-testid="input-phone"
-                  {...field}
                 />
               </FormControl>
               <FormMessage />

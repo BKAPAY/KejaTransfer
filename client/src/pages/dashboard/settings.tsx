@@ -7,6 +7,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useState, useEffect } from "react";
 import { CheckCircle2, AlertCircle, Phone, Lock, Plus, Trash2 } from "lucide-react";
+import { PhoneInputWithPrefix } from "@/components/phone-input-with-prefix";
+import { COUNTRIES } from "@shared/schema";
 
 export default function Settings() {
   const { user } = useAuth();
@@ -157,30 +159,34 @@ export default function Settings() {
           </p>
           
           <div className="space-y-2">
-            {withdrawalPhones.map((phone, index) => (
-              <div key={index} className="flex items-center gap-2 p-3 bg-muted rounded-md">
-                <Phone className="w-4 h-4 text-muted-foreground" />
-                <span className="flex-1 font-mono text-sm" data-testid={`text-phone-${index}`}>{phone}</span>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  onClick={() => handleRemovePhone(index)}
-                  disabled={updateWithdrawalPhonesMutation.isPending}
-                  data-testid={`button-remove-phone-${index}`}
-                >
-                  <Trash2 className="w-4 h-4 text-red-500" />
-                </Button>
-              </div>
-            ))}
+            {withdrawalPhones.map((phone, index) => {
+              const countryData = user?.country ? COUNTRIES.find(c => c.code === user.country) : null;
+              const displayPhone = countryData?.phoneCode ? `${countryData.phoneCode} ${phone}` : phone;
+              return (
+                <div key={index} className="flex items-center gap-2 p-3 bg-muted rounded-md">
+                  <Phone className="w-4 h-4 text-muted-foreground" />
+                  <span className="flex-1 font-mono text-sm" data-testid={`text-phone-${index}`}>{displayPhone}</span>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => handleRemovePhone(index)}
+                    disabled={updateWithdrawalPhonesMutation.isPending}
+                    data-testid={`button-remove-phone-${index}`}
+                  >
+                    <Trash2 className="w-4 h-4 text-red-500" />
+                  </Button>
+                </div>
+              );
+            })}
           </div>
 
-          {withdrawalPhones.length < 3 && (
+          {withdrawalPhones.length < 3 && user?.country && (
             <div className="flex gap-2">
-              <Input
-                placeholder="Numero de telephone (ex: 97123456)"
+              <PhoneInputWithPrefix
+                country={user.country}
                 value={newPhone}
-                onChange={(e) => setNewPhone(e.target.value.replace(/\D/g, ""))}
-                maxLength={15}
+                onChange={(val) => setNewPhone(val)}
+                placeholder="Numero local"
                 data-testid="input-new-phone"
               />
               <Button
@@ -192,6 +198,12 @@ export default function Settings() {
                 Ajouter
               </Button>
             </div>
+          )}
+
+          {!user?.country && withdrawalPhones.length < 3 && (
+            <p className="text-xs text-muted-foreground">
+              Veuillez d'abord selectionner votre pays dans votre profil pour ajouter des numeros de retrait.
+            </p>
           )}
 
           {withdrawalPhones.length >= 3 && (

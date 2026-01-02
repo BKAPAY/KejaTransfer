@@ -1,9 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import logoImage from "@assets/bkapay-logo.png";
@@ -11,9 +10,11 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { ALLOWED_REGISTRATION_COUNTRIES } from "@shared/schema";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
+import { Loader2, Mail, ArrowLeft } from "lucide-react";
 
 const COUNTRY_NAMES: Record<string, string> = {
   BJ: "Bénin",
@@ -39,9 +40,20 @@ const signupSchema = z.object({
 
 type SignupFormData = z.infer<typeof signupSchema>;
 
+type Step = "form" | "verification";
+
 export default function Signup() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const [step, setStep] = useState<Step>("form");
+  const [verificationCode, setVerificationCode] = useState("");
+  const [formData, setFormData] = useState<SignupFormData | null>(null);
+
+  const { data: emailVerificationStatus } = useQuery<{ required: boolean; configured: boolean }>({
+    queryKey: ["/api/auth/email-verification-status"],
+  });
+
+  const emailVerificationRequired = emailVerificationStatus?.required ?? false;
 
   const form = useForm<SignupFormData>({
     resolver: zodResolver(signupSchema),
@@ -55,16 +67,38 @@ export default function Signup() {
     },
   });
 
+  const sendCodeMutation = useMutation({
+    mutationFn: async (email: string) => {
+      const response = await apiRequest("POST", "/api/auth/signup/send-code", { email });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Code envoyé",
+        description: "Vérifiez votre boîte de réception",
+      });
+      setStep("verification");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erreur",
+        description: error.message || "Erreur lors de l'envoi du code",
+        variant: "destructive",
+      });
+    },
+  });
+
   const signupMutation = useMutation({
-    mutationFn: async (data: SignupFormData) => {
+    mutationFn: async (data: SignupFormData & { verificationCode?: string }) => {
       const response = await apiRequest("POST", "/api/auth/signup", {
         firstName: data.firstName,
         lastName: data.lastName,
         email: data.email,
         country: data.country,
         password: data.password,
+        verificationCode: data.verificationCode,
       });
-      return response;
+      return response.json();
     },
     onSuccess: () => {
       toast({
@@ -83,8 +117,114 @@ export default function Signup() {
   });
 
   const onSubmit = (data: SignupFormData) => {
-    signupMutation.mutate(data);
+    if (emailVerificationRequired) {
+      setFormData(data);
+      sendCodeMutation.mutate(data.email);
+    } else {
+      signupMutation.mutate(data);
+    }
   };
+
+  const handleVerifyAndComplete = () => {
+    if (!formData) return;
+    if (verificationCode.length !== 6) {
+      toast({
+        title: "Erreur",
+        description: "Le code doit contenir 6 chiffres",
+        variant: "destructive",
+      });
+      return;
+    }
+    signupMutation.mutate({ ...formData, verificationCode });
+  };
+
+  const handleResendCode = () => {
+    if (formData) {
+      sendCodeMutation.mutate(formData.email);
+    }
+  };
+
+  if (step === "verification" && formData) {
+    return (
+      <div className="w-full min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center p-4 overflow-hidden">
+        <Card className="w-full max-w-xs sm:max-w-sm">
+          <CardHeader className="space-y-2 sm:space-y-3 text-center p-3 sm:p-4 lg:p-6">
+            <Link href="/">
+              <div className="flex justify-center mb-1 sm:mb-2 cursor-pointer hover:opacity-80 transition-opacity">
+                <img src={logoImage} alt="BKApay" className="h-10 sm:h-12 lg:h-16 w-auto" />
+              </div>
+            </Link>
+            <CardTitle className="text-lg sm:text-xl lg:text-2xl font-bold">Vérification email</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">
+              Entrez le code à 6 chiffres envoyé à {formData.email}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-3 sm:p-4 lg:p-6">
+            <div className="space-y-4">
+              <div className="flex justify-center">
+                <InputOTP
+                  maxLength={6}
+                  value={verificationCode}
+                  onChange={setVerificationCode}
+                  data-testid="input-verification-code"
+                >
+                  <InputOTPGroup>
+                    <InputOTPSlot index={0} />
+                    <InputOTPSlot index={1} />
+                    <InputOTPSlot index={2} />
+                    <InputOTPSlot index={3} />
+                    <InputOTPSlot index={4} />
+                    <InputOTPSlot index={5} />
+                  </InputOTPGroup>
+                </InputOTP>
+              </div>
+
+              <Button
+                className="w-full"
+                onClick={handleVerifyAndComplete}
+                disabled={signupMutation.isPending || verificationCode.length !== 6}
+                data-testid="button-verify"
+              >
+                {signupMutation.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Création du compte...
+                  </>
+                ) : (
+                  "Vérifier et créer le compte"
+                )}
+              </Button>
+
+              <Button
+                variant="ghost"
+                className="w-full"
+                onClick={handleResendCode}
+                disabled={sendCodeMutation.isPending}
+              >
+                {sendCodeMutation.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Envoi...
+                  </>
+                ) : (
+                  "Renvoyer le code"
+                )}
+              </Button>
+
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => setStep("form")}
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Modifier mes informations
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center p-4 overflow-hidden">
@@ -146,7 +286,7 @@ export default function Signup() {
                     <FormControl>
                       <Input
                         type="email"
-                        placeholder="jean.dupont@example.com"
+                        placeholder="jean@exemple.com"
                         data-testid="input-email"
                         {...field}
                       />
@@ -171,7 +311,7 @@ export default function Signup() {
                       <SelectContent>
                         {ALLOWED_REGISTRATION_COUNTRIES.map((code) => (
                           <SelectItem key={code} value={code}>
-                            {COUNTRY_NAMES[code]}
+                            {COUNTRY_NAMES[code] || code}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -222,10 +362,17 @@ export default function Signup() {
               <Button
                 type="submit"
                 className="w-full"
-                disabled={signupMutation.isPending}
+                disabled={signupMutation.isPending || sendCodeMutation.isPending}
                 data-testid="button-submit"
               >
-                {signupMutation.isPending ? "Inscription..." : "S'inscrire"}
+                {(signupMutation.isPending || sendCodeMutation.isPending) ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    {emailVerificationRequired ? "Envoi du code..." : "Inscription..."}
+                  </>
+                ) : (
+                  emailVerificationRequired ? "Continuer" : "S'inscrire"
+                )}
               </Button>
             </form>
           </Form>

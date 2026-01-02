@@ -42,6 +42,7 @@ import Terms from "@/pages/terms";
 import Privacy from "@/pages/privacy";
 import Cookies from "@/pages/cookies";
 import DocumentationVersion from "@/pages/documentation-version";
+import ForgotPassword from "@/pages/forgot-password";
 import { CURRENT_VERSION } from "@/lib/doc-versions";
 
 function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -169,6 +170,7 @@ function Router() {
       </Route>
       <Route path="/signup" component={Signup} />
       <Route path="/login" component={Login} />
+      <Route path="/forgot-password" component={ForgotPassword} />
       <Route path="/terms" component={Terms} />
       <Route path="/privacy" component={Privacy} />
       <Route path="/cookies" component={Cookies} />

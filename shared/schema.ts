@@ -109,6 +109,17 @@ export const countryOperatorConfig = pgTable("country_operator_config", {
 // Countries allowed for user registration
 export const ALLOWED_REGISTRATION_COUNTRIES = ["BJ", "TG", "CI", "BF", "SN"] as const;
 
+// Email verification codes
+export const verificationCodes = pgTable("verification_codes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  email: text("email").notNull(),
+  code: text("code").notNull(),
+  type: text("type").notNull(), // "signup" or "password_reset"
+  expiresAt: timestamp("expires_at").notNull(),
+  used: boolean("used").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 // AfribaPay country configuration with payin/payout status
 export const countryStatus = pgTable("country_status", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

@@ -16,6 +16,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { AlertCircle, Loader2, CheckCircle2, Phone, Mail, User, Globe, XCircle, RefreshCw, ExternalLink, Copy, Check } from "lucide-react";
 import { OPERATORS, COUNTRIES } from "@shared/schema";
+import { PhoneInputWithPrefix } from "@/components/phone-input-with-prefix";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { usePaymentCountdown } from "@/hooks/use-payment-countdown";
@@ -961,11 +962,10 @@ export default function ApiPay() {
           <Phone className="w-4 h-4" />
           Numero de telephone
         </Label>
-        <Input
-          id="customerPhone"
-          placeholder="Ex: 77 123 45 67"
+        <PhoneInputWithPrefix
+          country={country}
           value={customerPhone}
-          onChange={(e) => setCustomerPhone(e.target.value)}
+          onChange={setCustomerPhone}
           data-testid="input-customer-phone"
         />
       </div>

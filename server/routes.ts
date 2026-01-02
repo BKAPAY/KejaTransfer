@@ -41,6 +41,11 @@ import {
   getCurrencyForCountry,
   needsCurrencyConversion,
 } from "./currency-converter";
+import {
+  generateVerificationCode,
+  sendVerificationEmail,
+  isEmailServiceConfigured,
+} from "./email-service";
 
 declare module "express-session" {
   interface SessionData {
@@ -483,10 +488,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ===== Auth Routes =====
   
-  // Signup
+  // Step 1: Send verification code for signup
+  app.post("/api/auth/signup/send-code", async (req: Request, res: Response) => {
+    try {
+      const { email } = req.body;
+      
+      if (!email || typeof email !== "string") {
+        return res.status(400).json({ error: "Email requis" });
+      }
+
+      // Check if email service is configured
+      if (!isEmailServiceConfigured()) {
+        return res.status(503).json({ 
+          error: "Le service d'envoi d'email n'est pas configuré. Contactez l'administrateur." 
+        });
+      }
+      
+      // Check if user already exists
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({ error: "Un utilisateur avec cet email existe déjà" });
+      }
+
+      // Generate and send code
+      const code = generateVerificationCode();
+      await storage.createVerificationCode(email, code, "signup");
+      
+      const sent = await sendVerificationEmail(email, code, "signup");
+      if (!sent) {
+        return res.status(500).json({ error: "Erreur lors de l'envoi du code de vérification" });
+      }
+
+      res.json({ success: true, message: "Code de vérification envoyé" });
+    } catch (error: any) {
+      console.error("[Signup] Error sending code:", error);
+      res.status(500).json({ error: "Erreur lors de l'envoi du code" });
+    }
+  });
+
+  // Step 2: Verify code and complete signup
   app.post("/api/auth/signup", async (req: Request, res: Response) => {
     try {
-      const validatedData = insertUserSchema.parse(req.body);
+      const { verificationCode, ...userData } = req.body;
+      const validatedData = insertUserSchema.parse(userData);
+      
+      // Check if email service is configured - if not, skip verification
+      const skipVerification = !isEmailServiceConfigured();
+      
+      if (!skipVerification) {
+        // Verify the code
+        if (!verificationCode || typeof verificationCode !== "string") {
+          return res.status(400).json({ error: "Code de vérification requis" });
+        }
+        
+        const isValid = await storage.verifyCode(validatedData.email, verificationCode, "signup");
+        if (!isValid) {
+          return res.status(400).json({ error: "Code de vérification invalide ou expiré" });
+        }
+      }
       
       // Check if user already exists
       const existingUser = await storage.getUserByEmail(validatedData.email);
@@ -502,11 +561,130 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...validatedData,
         password: hashedPassword,
       });
+      
+      // Mark code as used
+      if (!skipVerification) {
+        await storage.markCodeAsUsed(validatedData.email, verificationCode, "signup");
+      }
 
       res.json({ success: true, message: "Compte créé avec succès" });
     } catch (error: any) {
+      console.error("[Signup] Error:", error);
       res.status(400).json({ error: "Erreur lors de l'inscription" });
     }
+  });
+
+  // Password Reset - Step 1: Send code
+  app.post("/api/auth/forgot-password/send-code", async (req: Request, res: Response) => {
+    try {
+      const { email } = req.body;
+      
+      if (!email || typeof email !== "string") {
+        return res.status(400).json({ error: "Email requis" });
+      }
+
+      // Check if email service is configured
+      if (!isEmailServiceConfigured()) {
+        return res.status(503).json({ 
+          error: "Le service d'envoi d'email n'est pas configuré. Contactez l'administrateur." 
+        });
+      }
+      
+      // Check if user exists
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        // For security, don't reveal if user exists
+        return res.json({ success: true, message: "Si un compte existe avec cet email, un code a été envoyé" });
+      }
+
+      // Generate and send code
+      const code = generateVerificationCode();
+      await storage.createVerificationCode(email, code, "password_reset");
+      
+      const sent = await sendVerificationEmail(email, code, "password_reset");
+      if (!sent) {
+        return res.status(500).json({ error: "Erreur lors de l'envoi du code" });
+      }
+
+      res.json({ success: true, message: "Code de vérification envoyé" });
+    } catch (error: any) {
+      console.error("[ForgotPassword] Error sending code:", error);
+      res.status(500).json({ error: "Erreur lors de l'envoi du code" });
+    }
+  });
+
+  // Password Reset - Step 2: Verify code
+  app.post("/api/auth/forgot-password/verify-code", async (req: Request, res: Response) => {
+    try {
+      const { email, code } = req.body;
+      
+      if (!email || !code) {
+        return res.status(400).json({ error: "Email et code requis" });
+      }
+
+      const isValid = await storage.verifyCode(email, code, "password_reset");
+      if (!isValid) {
+        return res.status(400).json({ error: "Code invalide ou expiré" });
+      }
+
+      res.json({ success: true, message: "Code vérifié avec succès" });
+    } catch (error: any) {
+      console.error("[ForgotPassword] Error verifying code:", error);
+      res.status(500).json({ error: "Erreur lors de la vérification" });
+    }
+  });
+
+  // Password Reset - Step 3: Reset password
+  app.post("/api/auth/forgot-password/reset", async (req: Request, res: Response) => {
+    try {
+      const { email, code, newPassword, confirmPassword } = req.body;
+      
+      if (!email || !code || !newPassword || !confirmPassword) {
+        return res.status(400).json({ error: "Tous les champs sont requis" });
+      }
+
+      if (newPassword !== confirmPassword) {
+        return res.status(400).json({ error: "Les mots de passe ne correspondent pas" });
+      }
+
+      if (newPassword.length < 8) {
+        return res.status(400).json({ error: "Le mot de passe doit contenir au moins 8 caractères" });
+      }
+
+      // Verify code again
+      const isValid = await storage.verifyCode(email, code, "password_reset");
+      if (!isValid) {
+        return res.status(400).json({ error: "Code invalide ou expiré" });
+      }
+
+      // Get user
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        return res.status(400).json({ error: "Utilisateur non trouvé" });
+      }
+
+      // Hash new password
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+      
+      // Update password
+      await storage.updateUserPassword(user.id, hashedPassword);
+      
+      // Mark code as used
+      await storage.markCodeAsUsed(email, code, "password_reset");
+
+      res.json({ success: true, message: "Mot de passe réinitialisé avec succès" });
+    } catch (error: any) {
+      console.error("[ForgotPassword] Error resetting password:", error);
+      res.status(500).json({ error: "Erreur lors de la réinitialisation" });
+    }
+  });
+
+  // Check if email verification is required
+  app.get("/api/auth/email-verification-status", (req: Request, res: Response) => {
+    res.json({ 
+      required: isEmailServiceConfigured(),
+      configured: isEmailServiceConfigured()
+    });
   });
 
   // Login

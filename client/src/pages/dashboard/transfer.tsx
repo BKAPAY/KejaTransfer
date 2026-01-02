@@ -13,6 +13,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { COUNTRIES, OPERATORS } from "@shared/schema";
 import type { User } from "@shared/schema";
+import { PhoneInputWithPrefix } from "@/components/phone-input-with-prefix";
 import { Send, Info, CheckCircle2, Loader2, Lock, AlertCircle, Settings } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { calculateOutgoingFee } from "@/lib/fees";
@@ -343,18 +344,15 @@ export default function Transfer() {
                 name="phone"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Numero de telephone (sans code pays)</FormLabel>
+                    <FormLabel>Numero de telephone</FormLabel>
                     <FormControl>
-                      <Input
-                        placeholder="771234567"
+                      <PhoneInputWithPrefix
+                        country={selectedCountry}
+                        value={field.value}
+                        onChange={field.onChange}
                         data-testid="input-transfer-phone"
-                        inputMode="numeric"
-                        {...field}
                       />
                     </FormControl>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Exemple pour Senegal: 771234567 (sans le +221)
-                    </p>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -367,16 +365,13 @@ export default function Transfer() {
                   <FormItem>
                     <FormLabel>Confirmer le numero de telephone</FormLabel>
                     <FormControl>
-                      <Input
-                        placeholder="771234567"
+                      <PhoneInputWithPrefix
+                        country={selectedCountry}
+                        value={field.value}
+                        onChange={field.onChange}
                         data-testid="input-transfer-phone-confirm"
-                        inputMode="numeric"
-                        {...field}
                       />
                     </FormControl>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Saisissez a nouveau le numero pour confirmer
-                    </p>
                     <FormMessage />
                   </FormItem>
                 )}

@@ -99,6 +99,12 @@ export interface IStorage {
     allTransactions: Transaction[];
     stats: { totalUsers: number; verifiedUsers: number; totalDeposits: number; totalWithdrawals: number };
   }>;
+
+  // Verification Codes
+  createVerificationCode(email: string, code: string, type: "signup" | "password_reset"): Promise<void>;
+  verifyCode(email: string, code: string, type: "signup" | "password_reset"): Promise<boolean>;
+  markCodeAsUsed(email: string, code: string, type: "signup" | "password_reset"): Promise<void>;
+  cleanupExpiredCodes(): Promise<void>;
 }
 
 export class DbStorage implements IStorage {
@@ -949,6 +955,75 @@ export class DbStorage implements IStorage {
         })
         .catch(() => {}); // Ignore duplicates
     }
+  }
+
+  // Verification Codes
+  async createVerificationCode(email: string, code: string, type: "signup" | "password_reset"): Promise<void> {
+    // Delete any existing unused codes for this email and type
+    await db
+      .delete(schema.verificationCodes)
+      .where(
+        and(
+          eq(schema.verificationCodes.email, email.toLowerCase()),
+          eq(schema.verificationCodes.type, type),
+          eq(schema.verificationCodes.used, false)
+        )
+      );
+
+    // Create new code with 10 minute expiry
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    await db.insert(schema.verificationCodes).values({
+      email: email.toLowerCase(),
+      code,
+      type,
+      expiresAt,
+      used: false,
+    });
+  }
+
+  async verifyCode(email: string, code: string, type: "signup" | "password_reset"): Promise<boolean> {
+    const results = await db
+      .select()
+      .from(schema.verificationCodes)
+      .where(
+        and(
+          eq(schema.verificationCodes.email, email.toLowerCase()),
+          eq(schema.verificationCodes.code, code),
+          eq(schema.verificationCodes.type, type),
+          eq(schema.verificationCodes.used, false)
+        )
+      )
+      .limit(1);
+
+    if (results.length === 0) return false;
+
+    const verificationCode = results[0];
+    
+    // Check if code is expired
+    if (new Date() > verificationCode.expiresAt) {
+      return false;
+    }
+
+    return true;
+  }
+
+  async markCodeAsUsed(email: string, code: string, type: "signup" | "password_reset"): Promise<void> {
+    await db
+      .update(schema.verificationCodes)
+      .set({ used: true })
+      .where(
+        and(
+          eq(schema.verificationCodes.email, email.toLowerCase()),
+          eq(schema.verificationCodes.code, code),
+          eq(schema.verificationCodes.type, type)
+        )
+      );
+  }
+
+  async cleanupExpiredCodes(): Promise<void> {
+    await db
+      .delete(schema.verificationCodes)
+      .where(sql`${schema.verificationCodes.expiresAt} < NOW()`);
   }
 }
 
