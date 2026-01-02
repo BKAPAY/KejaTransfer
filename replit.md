@@ -51,6 +51,12 @@ The frontend utilizes React 18 with TypeScript, styled with Shadcn UI and Tailwi
   - **Withdrawal Phone Numbers**: Users configure up to 3 withdrawal phone numbers in settings. Withdrawals are only allowed to these pre-configured numbers.
   - **Security Code**: 6-digit security code required for all withdrawals, hashed with bcrypt. Users set it in settings, and must provide current code to change it.
   - **Dashboard Actions**: Three buttons in order: Dépôt (deposit), Transfert (send to any number), Retrait (withdraw to pre-configured numbers with security code).
+- **Phone Input with Locked Prefix**: All phone number inputs display a locked country dial code prefix (e.g., "+229" for Benin). Users enter only local digits. Component: `PhoneInputWithPrefix`. Used on deposit, transfer, payment links, merchant checkout, API payment, and settings pages. Storage keeps local digits for backend formatting flexibility.
+- **Email Verification System**:
+  - **Signup Verification**: Optional two-step signup with 6-digit email verification code. Controlled by GMAIL_APP_PASSWORD environment variable - if not configured, verification is skipped.
+  - **Password Reset**: Three-step flow (email → 6-digit code → new password) via `/forgot-password` page.
+  - **Verification Codes**: 6-digit codes expire after 10 minutes. Single-use codes stored in `verification_codes` table.
+  - **Email Service**: Uses Gmail SMTP via nodemailer. Requires `GMAIL_USER` and `GMAIL_APP_PASSWORD` secrets.
 
 ## External Dependencies
 - **FedaPay API**: Payment gateway for West Africa - handles both collect (incoming) and payout (outgoing) transactions.
