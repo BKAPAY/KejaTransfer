@@ -77,6 +77,7 @@ export interface IStorage {
   getAllPendingTransactions(): Promise<(Transaction & { user?: User })[]>;
   createTransaction(transaction: InsertTransaction): Promise<Transaction>;
   updateTransactionStatus(id: string, status: string, paydunyaData?: any): Promise<Transaction | undefined>;
+  updateTransaction(id: string, updates: Partial<Pick<Transaction, 'paydunyaToken' | 'country' | 'operator' | 'status' | 'metadata' | 'paydunyaReceiptUrl'>>): Promise<Transaction | undefined>;
   updateTransactionMetadata(id: string, metadata: string): Promise<Transaction | undefined>;
   finalizeIncomingTransaction(id: string, extras?: { paydunyaReceiptUrl?: string }): Promise<{ transaction: Transaction; credited: boolean } | null>;
   getUserStats(userId: string): Promise<{
@@ -532,6 +533,15 @@ export class DbStorage implements IStorage {
     const results = await db
       .update(schema.transactions)
       .set(updateData)
+      .where(eq(schema.transactions.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async updateTransaction(id: string, updates: Partial<Pick<Transaction, 'paydunyaToken' | 'country' | 'operator' | 'status' | 'metadata' | 'paydunyaReceiptUrl'>>): Promise<Transaction | undefined> {
+    const results = await db
+      .update(schema.transactions)
+      .set(updates)
       .where(eq(schema.transactions.id, id))
       .returning();
     return results[0];
