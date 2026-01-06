@@ -331,45 +331,126 @@ export default function Pay() {
       if (data.success && data.transactionId) {
         const formData = form.getValues();
         setTransactionId(data.transactionId);
-        setInvoiceToken(data.transactionId);
-        setUssdInstruction(data.message || "Une demande de paiement a ete envoyee sur votre telephone.");
+        setInvoiceToken(data.token || data.transactionId);
+        setUssdInstruction(data.ussdInstruction || data.message || "Une demande de paiement a ete envoyee sur votre telephone.");
         setSavedCountry(formData.country);
         setSavedOperator(formData.operator);
         
-        countdown.startCountdown();
-        setPaymentStage("polling");
-        
-        toast({
-          title: "Paiement initie",
-          description: data.message || "Veuillez valider le paiement sur votre telephone",
-        });
-        
-        if (token) {
-          savePaymentState(token, {
-            stage: "polling",
-            invoiceToken: data.transactionId,
-            transactionId: data.transactionId,
-            ussdInstruction: data.message || null,
-            wizallTransactionId: null,
-            redirectUrl: null,
-            country: formData.country,
-            operator: formData.operator,
-            customerName: formData.customerName,
-            customerEmail: formData.customerEmail,
-            customerPhone: formData.customerPhone,
+        // Vérifier si c'est un opérateur qui nécessite une redirection (Wave)
+        if (data.redirectUrl) {
+          setRedirectUrl(data.redirectUrl);
+          setPaymentStage("redirect");
+          
+          toast({
+            title: "Redirection requise",
+            description: "Cliquez sur le bouton pour finaliser le paiement",
           });
+          
+          if (token) {
+            savePaymentState(token, {
+              stage: "redirect",
+              invoiceToken: data.token || data.transactionId,
+              transactionId: data.transactionId,
+              ussdInstruction: data.ussdInstruction || data.message || null,
+              wizallTransactionId: null,
+              redirectUrl: data.redirectUrl,
+              country: formData.country,
+              operator: formData.operator,
+              customerName: formData.customerName,
+              customerEmail: formData.customerEmail,
+              customerPhone: formData.customerPhone,
+            });
+          }
+        } else if (data.requiresOTP) {
+          // Opérateur Orange nécessite un code OTP
+          setPaymentStage("otp");
+          
+          toast({
+            title: "Code OTP requis",
+            description: data.ussdInstruction || "Generez votre code de paiement",
+          });
+          
+          if (token) {
+            savePaymentState(token, {
+              stage: "otp",
+              invoiceToken: data.token || data.transactionId,
+              transactionId: data.transactionId,
+              ussdInstruction: data.ussdInstruction || data.message || null,
+              wizallTransactionId: null,
+              redirectUrl: null,
+              country: formData.country,
+              operator: formData.operator,
+              customerName: formData.customerName,
+              customerEmail: formData.customerEmail,
+              customerPhone: formData.customerPhone,
+            });
+          }
+        } else if (data.requiresTwoStep) {
+          // Paiement USSD en deux étapes (confirmation manuelle)
+          setPaymentStage("ussd");
+          
+          toast({
+            title: "Instructions de paiement",
+            description: data.ussdInstruction || data.message || "Suivez les instructions sur votre telephone",
+          });
+          
+          if (token) {
+            savePaymentState(token, {
+              stage: "ussd",
+              invoiceToken: data.token || data.transactionId,
+              transactionId: data.transactionId,
+              ussdInstruction: data.ussdInstruction || data.message || null,
+              wizallTransactionId: null,
+              redirectUrl: null,
+              country: formData.country,
+              operator: formData.operator,
+              customerName: formData.customerName,
+              customerEmail: formData.customerEmail,
+              customerPhone: formData.customerPhone,
+            });
+          }
+        } else {
+          // Paiement standard avec polling
+          countdown.startCountdown();
+          setPaymentStage("polling");
+          
+          toast({
+            title: "Paiement initie",
+            description: data.message || "Veuillez valider le paiement sur votre telephone",
+          });
+          
+          if (token) {
+            savePaymentState(token, {
+              stage: "polling",
+              invoiceToken: data.token || data.transactionId,
+              transactionId: data.transactionId,
+              ussdInstruction: data.ussdInstruction || data.message || null,
+              wizallTransactionId: null,
+              redirectUrl: null,
+              country: formData.country,
+              operator: formData.operator,
+              customerName: formData.customerName,
+              customerEmail: formData.customerEmail,
+              customerPhone: formData.customerPhone,
+            });
+          }
         }
       } else {
+        // Paiement échoué - afficher l'erreur et passer à l'état "failed"
+        setPaymentStage("failed");
+        if (token) clearPaymentState(token);
         toast({
-          title: "Erreur",
+          title: "Paiement echoue",
           description: data.error || "Erreur lors de l'initialisation du paiement",
           variant: "destructive",
         });
       }
     },
     onError: (error: any) => {
+      setPaymentStage("failed");
+      if (token) clearPaymentState(token);
       toast({
-        title: "Erreur",
+        title: "Paiement echoue",
         description: error.message || "Erreur lors de l'initialisation du paiement",
         variant: "destructive",
       });

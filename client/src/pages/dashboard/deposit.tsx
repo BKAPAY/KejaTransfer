@@ -190,7 +190,7 @@ export default function Deposit() {
         country: formData.country,
         operator: formData.operator,
         customerPhone: formData.phone,
-        customerName: user?.fullName || "Client",
+        customerName: user ? `${user.firstName} ${user.lastName}`.trim() : "Client",
         customerEmail: user?.email || "noreply@bkapay.com",
       });
       return res.json();
