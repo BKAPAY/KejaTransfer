@@ -6,6 +6,10 @@
  * Each operator has its own endpoint and parameter structure
  */
 
+// Email générique pour protéger la confidentialité des clients
+// Les emails des clients ne sont JAMAIS envoyés aux fournisseurs de paiement
+const BKAPAY_GENERIC_EMAIL = "noreply@bkapay.com";
+
 // Operator codes mapping
 export type OperatorCode = 
   | "orange_sn" | "free_sn" | "expresso_sn" | "wave_sn" | "wizall_sn"
@@ -48,7 +52,7 @@ export const SOFTPAY_OPERATORS: Record<string, SoftpayOperatorConfig> = {
     ussdInstruction: "Composez #144#391*VOTRE CODE PIN ORANGE MONEY# pour obtenir votre code de paiement",
     parameterMapping: (data) => ({
       customer_name: data.customerName,
-      customer_email: data.customerEmail,
+      customer_email: BKAPAY_GENERIC_EMAIL,
       phone_number: data.phoneNumber,
       authorization_code: data.authorizationCode,
       invoice_token: data.invoiceToken,
@@ -63,7 +67,7 @@ export const SOFTPAY_OPERATORS: Record<string, SoftpayOperatorConfig> = {
     ussdInstruction: "Après validation, composez #150# sur votre téléphone pour finaliser le paiement",
     parameterMapping: (data) => ({
       customer_name: data.customerName,
-      customer_email: data.customerEmail,
+      customer_email: BKAPAY_GENERIC_EMAIL,
       phone_number: data.phoneNumber,
       payment_token: data.invoiceToken
     })
@@ -76,7 +80,7 @@ export const SOFTPAY_OPERATORS: Record<string, SoftpayOperatorConfig> = {
     ussdInstruction: "Vous recevrez un SMS de validation. Validez le paiement pour le compléter.",
     parameterMapping: (data) => ({
       expresso_sn_fullName: data.customerName,
-      expresso_sn_email: data.customerEmail,
+      expresso_sn_email: BKAPAY_GENERIC_EMAIL,
       expresso_sn_phone: data.phoneNumber,
       payment_token: data.invoiceToken
     })
@@ -90,7 +94,7 @@ export const SOFTPAY_OPERATORS: Record<string, SoftpayOperatorConfig> = {
     ussdInstruction: "Cliquez sur le bouton pour aller à Wave et compléter le paiement",
     parameterMapping: (data) => ({
       wave_senegal_fullName: data.customerName,
-      wave_senegal_email: data.customerEmail,
+      wave_senegal_email: BKAPAY_GENERIC_EMAIL,
       wave_senegal_phone: data.phoneNumber,
       wave_senegal_payment_token: data.invoiceToken
     })
@@ -103,7 +107,7 @@ export const SOFTPAY_OPERATORS: Record<string, SoftpayOperatorConfig> = {
     ussdInstruction: "Vous recevrez un code OTP par SMS. Entrez ce code pour confirmer le paiement.",
     parameterMapping: (data) => ({
       customer_name: data.customerName,
-      customer_email: data.customerEmail,
+      customer_email: BKAPAY_GENERIC_EMAIL,
       phone_number: data.phoneNumber,
       invoice_token: data.invoiceToken
     })
@@ -117,7 +121,7 @@ export const SOFTPAY_OPERATORS: Record<string, SoftpayOperatorConfig> = {
     ussdInstruction: "Validez le paiement sur votre téléphone",
     parameterMapping: (data) => ({
       orange_money_mali_customer_fullname: data.customerName,
-      orange_money_mali_email: data.customerEmail,
+      orange_money_mali_email: BKAPAY_GENERIC_EMAIL,
       orange_money_mali_phone_number: data.phoneNumber,
       orange_money_mali_customer_address: data.customerAddress || "Mali",
       payment_token: data.invoiceToken
@@ -131,7 +135,7 @@ export const SOFTPAY_OPERATORS: Record<string, SoftpayOperatorConfig> = {
     ussdInstruction: "Finalisez le paiement sur votre téléphone",
     parameterMapping: (data) => ({
       moov_ml_customer_fullname: data.customerName,
-      moov_ml_email: data.customerEmail,
+      moov_ml_email: BKAPAY_GENERIC_EMAIL,
       moov_ml_phone_number: data.phoneNumber,
       moov_ml_customer_address: data.customerAddress || "Mali",
       payment_token: data.invoiceToken
@@ -149,7 +153,7 @@ export const SOFTPAY_OPERATORS: Record<string, SoftpayOperatorConfig> = {
     ussdInstruction: "Vous recevrez un SMS. Validez le paiement après réception.",
     parameterMapping: (data) => ({
       mtn_benin_customer_fullname: data.customerName,
-      mtn_benin_email: data.customerEmail,
+      mtn_benin_email: BKAPAY_GENERIC_EMAIL,
       mtn_benin_phone_number: data.phoneNumber,
       mtn_benin_wallet_provider: "MTNBENIN",
       payment_token: data.invoiceToken
@@ -163,7 +167,7 @@ export const SOFTPAY_OPERATORS: Record<string, SoftpayOperatorConfig> = {
     ussdInstruction: "Finalisez le paiement sur votre téléphone",
     parameterMapping: (data) => ({
       moov_benin_customer_fullname: data.customerName,
-      moov_benin_email: data.customerEmail,
+      moov_benin_email: BKAPAY_GENERIC_EMAIL,
       moov_benin_phone_number: data.phoneNumber,
       payment_token: data.invoiceToken
     })
@@ -177,7 +181,7 @@ export const SOFTPAY_OPERATORS: Record<string, SoftpayOperatorConfig> = {
     ussdInstruction: "Vous recevrez un SMS. Validez le paiement après réception.",
     parameterMapping: (data) => ({
       name_t_money: data.customerName,
-      email_t_money: data.customerEmail,
+      email_t_money: BKAPAY_GENERIC_EMAIL,
       phone_t_money: data.phoneNumber,
       payment_token: data.invoiceToken
     })
@@ -190,7 +194,7 @@ export const SOFTPAY_OPERATORS: Record<string, SoftpayOperatorConfig> = {
     ussdInstruction: "Finalisez le paiement sur votre téléphone",
     parameterMapping: (data) => ({
       moov_togo_customer_fullname: data.customerName,
-      moov_togo_email: data.customerEmail,
+      moov_togo_email: BKAPAY_GENERIC_EMAIL,
       moov_togo_customer_address: data.customerAddress || "Togo",
       moov_togo_phone_number: data.phoneNumber,
       payment_token: data.invoiceToken
@@ -205,7 +209,7 @@ export const SOFTPAY_OPERATORS: Record<string, SoftpayOperatorConfig> = {
     ussdInstruction: "Composez #144*82# puis choisissez l'option 2 pour obtenir votre code de paiement",
     parameterMapping: (data) => ({
       orange_money_ci_customer_fullname: data.customerName,
-      orange_money_ci_email: data.customerEmail,
+      orange_money_ci_email: BKAPAY_GENERIC_EMAIL,
       orange_money_ci_phone_number: data.phoneNumber,
       orange_money_ci_otp: data.authorizationCode,
       payment_token: data.invoiceToken
@@ -219,7 +223,7 @@ export const SOFTPAY_OPERATORS: Record<string, SoftpayOperatorConfig> = {
     ussdInstruction: "Finalisez le paiement sur votre téléphone",
     parameterMapping: (data) => ({
       mtn_ci_customer_fullname: data.customerName,
-      mtn_ci_email: data.customerEmail,
+      mtn_ci_email: BKAPAY_GENERIC_EMAIL,
       mtn_ci_phone_number: data.phoneNumber,
       mtn_ci_wallet_provider: "MTNCI",
       payment_token: data.invoiceToken
@@ -233,7 +237,7 @@ export const SOFTPAY_OPERATORS: Record<string, SoftpayOperatorConfig> = {
     ussdInstruction: "Un popup s'ouvrira automatiquement. Entrez votre code secret dans les 30 secondes.",
     parameterMapping: (data) => ({
       moov_ci_customer_fullname: data.customerName,
-      moov_ci_email: data.customerEmail,
+      moov_ci_email: BKAPAY_GENERIC_EMAIL,
       moov_ci_phone_number: data.phoneNumber,
       payment_token: data.invoiceToken
     })
@@ -247,7 +251,7 @@ export const SOFTPAY_OPERATORS: Record<string, SoftpayOperatorConfig> = {
     ussdInstruction: "Cliquez sur le bouton pour aller à Wave et compléter le paiement",
     parameterMapping: (data) => ({
       wave_ci_fullName: data.customerName,
-      wave_ci_email: data.customerEmail,
+      wave_ci_email: BKAPAY_GENERIC_EMAIL,
       wave_ci_phone: data.phoneNumber,
       wave_ci_payment_token: data.invoiceToken
     })
@@ -261,7 +265,7 @@ export const SOFTPAY_OPERATORS: Record<string, SoftpayOperatorConfig> = {
     ussdInstruction: "Composez *144*4*6*MONTANT# pour obtenir votre code OTP",
     parameterMapping: (data) => ({
       name_bf: data.customerName,
-      email_bf: data.customerEmail,
+      email_bf: BKAPAY_GENERIC_EMAIL,
       phone_bf: data.phoneNumber,
       otp_code: data.authorizationCode,
       payment_token: data.invoiceToken
@@ -275,7 +279,7 @@ export const SOFTPAY_OPERATORS: Record<string, SoftpayOperatorConfig> = {
     ussdInstruction: "Composez *555*6# pour finaliser le paiement",
     parameterMapping: (data) => ({
       moov_burkina_faso_fullName: data.customerName,
-      moov_burkina_faso_email: data.customerEmail,
+      moov_burkina_faso_email: BKAPAY_GENERIC_EMAIL,
       moov_burkina_faso_phone_number: data.phoneNumber,
       moov_burkina_faso_payment_token: data.invoiceToken
     })
@@ -289,7 +293,7 @@ export const SOFTPAY_OPERATORS: Record<string, SoftpayOperatorConfig> = {
     ussdInstruction: "Entrez votre mot de passe Paydunya",
     parameterMapping: (data) => ({
       customer_name: data.customerName,
-      customer_email: data.customerEmail,
+      customer_email: BKAPAY_GENERIC_EMAIL,
       phone_phone: data.phoneNumber,
       password: data.authorizationCode, // Paydunya password
       invoice_token: data.invoiceToken
