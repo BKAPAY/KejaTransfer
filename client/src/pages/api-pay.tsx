@@ -837,6 +837,9 @@ export default function ApiPay() {
   }
 
   if (paymentStage === "otp") {
+    const isOrangeOperator = operator.toLowerCase().includes("orange");
+    const orangeInstruction = isOrangeOperator && country ? ORANGE_INSTRUCTIONS[country] : null;
+    
     return (
       <div className="w-full min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
@@ -844,17 +847,48 @@ export default function ApiPay() {
             <Link href="/">
               <img src={logoImage} alt="BKApay" className="h-10 w-auto mx-auto cursor-pointer" />
             </Link>
-            <CardTitle>Entrez le code OTP</CardTitle>
+            <CardTitle>Code de confirmation</CardTitle>
             <CardDescription>
-              Saisissez le code recu par SMS pour confirmer votre paiement
+              {isOrangeOperator 
+                ? "Generez votre code de paiement Orange Money" 
+                : "Entrez le code OTP recu par SMS"}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {orangeInstruction && (
+              <Alert className="bg-orange-50 dark:bg-orange-950 border-orange-200 dark:border-orange-800">
+                <AlertCircle className="h-4 w-4 text-orange-600" />
+                <AlertDescription className="text-sm text-orange-800 dark:text-orange-200">
+                  <strong>Instructions :</strong>
+                  <div className="mt-2 flex items-center gap-2">
+                    <div className="flex-1 bg-white dark:bg-gray-900 border border-orange-300 dark:border-orange-700 rounded-md px-3 py-2">
+                      <code className="text-base font-bold text-orange-700 dark:text-orange-400">
+                        {getOrangeUssdCode(country)}
+                      </code>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => copyUssdCode(getOrangeUssdCode(country))}
+                      className="border-orange-300 hover:bg-orange-100 dark:hover:bg-orange-900"
+                      data-testid="button-copy-ussd-otp"
+                    >
+                      {copiedUssd ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                  <p className="mt-2 text-xs text-orange-700 dark:text-orange-400">
+                    Composez ce code, puis entrez le code obtenu ci-dessous
+                  </p>
+                </AlertDescription>
+              </Alert>
+            )}
+            
             <div className="space-y-2">
-              <Label htmlFor="otp">Code OTP</Label>
+              <Label htmlFor="otp">Code de paiement</Label>
               <Input
                 id="otp"
-                placeholder="Entrez le code recu par SMS"
+                placeholder="Entrez le code obtenu"
                 value={authCode}
                 onChange={(e) => setAuthCode(e.target.value)}
                 className="text-center text-lg font-mono"

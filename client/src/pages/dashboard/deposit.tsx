@@ -36,14 +36,17 @@ type DepositFormData = z.infer<typeof depositSchema>;
 
 export default function Deposit() {
   const { toast } = useToast();
-  const [paymentStep, setPaymentStep] = useState<"form" | "polling" | "completed">("form");
+  const [paymentStep, setPaymentStep] = useState<"form" | "polling" | "completed" | "otp">("form");
   const [paymentData, setPaymentData] = useState<{
     transactionId?: string;
     fedapayTransactionId?: number;
     message?: string;
     redirectUrl?: string;
     ussdInstruction?: string;
+    paydunyaToken?: string;
+    requiresOTP?: boolean;
   }>({});
+  const [otpCode, setOtpCode] = useState("");
   const [pollingStatus, setPollingStatus] = useState<string | null>(null);
   const [conversionData, setConversionData] = useState<ConversionData | null>(null);
 
@@ -143,12 +146,23 @@ export default function Deposit() {
           message: response.message,
           redirectUrl: response.redirectUrl,
           ussdInstruction: response.ussdInstruction,
+          paydunyaToken: response.token,
+          requiresOTP: response.requiresOTP,
         });
-        setPaymentStep("polling");
-        toast({
-          title: "Paiement initie",
-          description: response.message || "Veuillez valider le paiement sur votre telephone",
-        });
+        
+        if (response.requiresOTP) {
+          setPaymentStep("otp");
+          toast({
+            title: "Code OTP requis",
+            description: response.ussdInstruction || "Generez votre code de paiement",
+          });
+        } else {
+          setPaymentStep("polling");
+          toast({
+            title: "Paiement initie",
+            description: response.message || "Veuillez valider le paiement sur votre telephone",
+          });
+        }
       } else {
         toast({
           title: "Erreur",
@@ -165,6 +179,69 @@ export default function Deposit() {
       });
     },
   });
+
+  const otpMutation = useMutation({
+    mutationFn: async ({ authorizationCode }: { authorizationCode: string }) => {
+      const formData = form.getValues();
+      const res = await apiRequest("POST", "/api/payment-links/softpay-confirm", {
+        token: paymentData.paydunyaToken,
+        transactionId: paymentData.transactionId,
+        authorizationCode,
+        country: formData.country,
+        operator: formData.operator,
+        customerPhone: formData.phone,
+        customerName: user?.fullName || "Client",
+        customerEmail: user?.email || "noreply@bkapay.com",
+      });
+      return res.json();
+    },
+    onSuccess: (response: any) => {
+      if (response.success) {
+        setPaymentStep("polling");
+        setOtpCode("");
+        toast({
+          title: "Code valide",
+          description: "Veuillez valider le paiement sur votre telephone",
+        });
+      } else {
+        toast({
+          title: "Erreur",
+          description: response.error || "Code OTP invalide",
+          variant: "destructive",
+        });
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erreur",
+        description: error.message || "Erreur lors de la validation du code",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleOtpSubmit = () => {
+    if (!otpCode.trim()) {
+      toast({
+        title: "Erreur",
+        description: "Veuillez entrer le code OTP",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (!paymentData.paydunyaToken || !paymentData.transactionId) {
+      toast({
+        title: "Erreur",
+        description: "Donnees de paiement manquantes. Veuillez recommencer.",
+        variant: "destructive",
+      });
+      setPaymentStep("form");
+      return;
+    }
+    
+    otpMutation.mutate({ authorizationCode: otpCode });
+  };
 
   useEffect(() => {
     if (paymentStep !== "polling" || !paymentData.transactionId) return;
@@ -330,6 +407,63 @@ export default function Deposit() {
                 Votre depot a ete complete avec succes.
               </p>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {paymentStep === "otp" && (
+        <Card>
+          <CardContent className="py-8 space-y-4">
+            <div className="text-center space-y-2">
+              <Smartphone className="h-12 w-12 mx-auto text-primary" />
+              <p className="font-semibold text-lg">Code de confirmation requis</p>
+              <p className="text-sm text-muted-foreground">
+                {paymentData.ussdInstruction || "Generez votre code de paiement et entrez-le ci-dessous"}
+              </p>
+            </div>
+            <div className="text-center p-4 bg-muted rounded-lg">
+              <p className="text-sm text-muted-foreground">Montant</p>
+              <p className="text-2xl font-bold text-primary">
+                {amount?.toLocaleString()} FCFA
+              </p>
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="otp-code" className="block text-sm font-medium">
+                Code de paiement
+              </label>
+              <Input
+                id="otp-code"
+                type="text"
+                value={otpCode}
+                onChange={(e) => setOtpCode(e.target.value)}
+                placeholder="Entrez le code obtenu"
+                data-testid="input-otp-code"
+              />
+            </div>
+            <Button
+              onClick={handleOtpSubmit}
+              disabled={otpMutation.isPending || !otpCode.trim()}
+              className="w-full"
+              data-testid="button-submit-otp"
+            >
+              {otpMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Validation...
+                </>
+              ) : (
+                "Valider le code"
+              )}
+            </Button>
+            <Button
+              onClick={handleBackToForm}
+              variant="outline"
+              size="sm"
+              className="w-full"
+              data-testid="button-cancel-otp"
+            >
+              Annuler
+            </Button>
           </CardContent>
         </Card>
       )}
