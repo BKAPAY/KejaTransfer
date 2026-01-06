@@ -41,6 +41,8 @@ export default function Deposit() {
     transactionId?: string;
     fedapayTransactionId?: number;
     message?: string;
+    redirectUrl?: string;
+    ussdInstruction?: string;
   }>({});
   const [pollingStatus, setPollingStatus] = useState<string | null>(null);
   const [conversionData, setConversionData] = useState<ConversionData | null>(null);
@@ -139,6 +141,8 @@ export default function Deposit() {
           transactionId: response.transactionId,
           fedapayTransactionId: response.fedapayTransactionId,
           message: response.message,
+          redirectUrl: response.redirectUrl,
+          ussdInstruction: response.ussdInstruction,
         });
         setPaymentStep("polling");
         toast({
@@ -281,6 +285,23 @@ export default function Deposit() {
                 {amount?.toLocaleString()} FCFA
               </p>
             </div>
+            {paymentData.ussdInstruction && (
+              <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800 text-left">
+                <Info className="h-4 w-4 text-blue-600" />
+                <AlertDescription className="text-sm text-blue-900 dark:text-blue-100 ml-2 whitespace-pre-line">
+                  {paymentData.ussdInstruction}
+                </AlertDescription>
+              </Alert>
+            )}
+            {paymentData.redirectUrl && (
+              <Button
+                onClick={() => window.open(paymentData.redirectUrl, "_blank")}
+                className="w-full"
+                data-testid="button-redirect-wave"
+              >
+                Aller vers Wave pour payer
+              </Button>
+            )}
             <Alert className="border-yellow-200 bg-yellow-50 dark:bg-yellow-950 dark:border-yellow-800">
               <Clock className="h-4 w-4 text-yellow-600" />
               <AlertDescription className="text-sm text-yellow-900 dark:text-yellow-100 ml-2">
