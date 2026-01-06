@@ -80,7 +80,11 @@ export default function Transfer() {
   const transferMutation = useMutation({
     mutationFn: async (data: { formData: TransferFormData; securityCode: string }) => {
       const res = await apiRequest("POST", "/api/fedapay/withdrawal", {
-        ...data.formData,
+        amount: data.formData.amount,
+        phone: data.formData.phone,
+        country: data.formData.country,
+        operator: data.formData.operator,
+        type: "transfer",
         securityCode: data.securityCode,
       });
       return res.json();
