@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { queryClient } from "@/lib/queryClient";
-import html2pdf from "html2pdf.js";
+import { jsPDF } from "jspdf";
 import { 
   Search, 
   Users, 
@@ -172,89 +172,50 @@ export default function DiagnosticPage() {
   };
 
   const downloadKycPdf = (user: KycUser) => {
-    const element = document.createElement("div");
-    element.innerHTML = `
-      <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto;">
-        <div style="text-align: center; margin-bottom: 30px; border-bottom: 3px solid #228B22; padding-bottom: 20px;">
-          <h1 style="font-size: 28px; color: #228B22; margin: 0;">BKApay</h1>
-          <p style="font-size: 14px; color: #666; margin: 5px 0 0 0;">Document de Verification KYC</p>
-        </div>
-        
-        <div style="background: #f9f9f9; padding: 20px; border-radius: 8px; margin-bottom: 25px;">
-          <h2 style="font-size: 18px; margin: 0 0 15px 0; color: #333; border-bottom: 1px solid #ddd; padding-bottom: 10px;">Informations de l'Utilisateur</h2>
-          <table style="width: 100%; border-collapse: collapse;">
-            <tr>
-              <td style="padding: 8px 0; font-weight: bold; width: 150px;">Nom complet:</td>
-              <td style="padding: 8px 0;">${user.firstName} ${user.lastName}</td>
-            </tr>
-            <tr>
-              <td style="padding: 8px 0; font-weight: bold;">Email:</td>
-              <td style="padding: 8px 0;">${user.email}</td>
-            </tr>
-            <tr>
-              <td style="padding: 8px 0; font-weight: bold;">Statut KYC:</td>
-              <td style="padding: 8px 0;">
-                <span style="background: ${user.kycStatus === 'verified' ? '#22c55e' : '#eab308'}; color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px;">
-                  ${user.kycStatus === 'verified' ? 'Verifie' : user.kycStatus === 'submitted' ? 'En attente' : user.kycStatus}
-                </span>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding: 8px 0; font-weight: bold;">Date de soumission:</td>
-              <td style="padding: 8px 0;">${new Date(user.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })}</td>
-            </tr>
-            <tr>
-              <td style="padding: 8px 0; font-weight: bold;">Date du rapport:</td>
-              <td style="padding: 8px 0;">${new Date().toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })}</td>
-            </tr>
-          </table>
-        </div>
-        
-        <h2 style="font-size: 18px; margin: 30px 0 20px 0; color: #333; border-bottom: 1px solid #ddd; padding-bottom: 10px;">Documents Fournis</h2>
-        
-        ${user.kycIdFront ? `
-          <div style="margin-bottom: 30px; page-break-inside: avoid;">
-            <h3 style="font-size: 14px; color: #555; margin-bottom: 10px;">Piece d'identite (Recto)</h3>
-            <div style="border: 1px solid #ddd; border-radius: 8px; padding: 10px; background: white;">
-              <img src="${user.kycIdFront}" style="max-width: 100%; height: auto; display: block; margin: 0 auto; border-radius: 4px;" />
-            </div>
-          </div>
-        ` : '<p style="color: #999;">Piece d\'identite (Recto) non fournie</p>'}
-        
-        ${user.kycIdBack ? `
-          <div style="margin-bottom: 30px; page-break-inside: avoid;">
-            <h3 style="font-size: 14px; color: #555; margin-bottom: 10px;">Piece d'identite (Verso)</h3>
-            <div style="border: 1px solid #ddd; border-radius: 8px; padding: 10px; background: white;">
-              <img src="${user.kycIdBack}" style="max-width: 100%; height: auto; display: block; margin: 0 auto; border-radius: 4px;" />
-            </div>
-          </div>
-        ` : '<p style="color: #999;">Piece d\'identite (Verso) non fournie</p>'}
-        
-        ${user.kycSelfie ? `
-          <div style="margin-bottom: 30px; page-break-inside: avoid;">
-            <h3 style="font-size: 14px; color: #555; margin-bottom: 10px;">Selfie de verification</h3>
-            <div style="border: 1px solid #ddd; border-radius: 8px; padding: 10px; background: white;">
-              <img src="${user.kycSelfie}" style="max-width: 100%; height: auto; display: block; margin: 0 auto; border-radius: 4px;" />
-            </div>
-          </div>
-        ` : '<p style="color: #999;">Selfie non fourni</p>'}
-        
-        <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; text-align: center; color: #999; font-size: 12px;">
-          <p>Document genere automatiquement par BKApay</p>
-          <p>Ce document est confidentiel et destine uniquement a des fins de verification interne.</p>
-        </div>
-      </div>
-    `;
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    let y = 20;
     
-    const options = {
-      margin: 10,
-      filename: `KYC_${user.firstName}_${user.lastName}_${new Date().getTime()}.pdf`,
-      image: { type: "png" as const, quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, allowTaint: true },
-      jsPDF: { orientation: "portrait" as const, unit: "mm", format: "a4" },
-    };
+    doc.setFontSize(24);
+    doc.text("BKApay", pageWidth / 2, y, { align: "center" });
+    y += 10;
+    doc.setFontSize(12);
+    doc.text("Document de Verification KYC", pageWidth / 2, y, { align: "center" });
+    y += 20;
     
-    html2pdf().set(options).from(element).save();
+    doc.setFontSize(16);
+    doc.text("Informations de l'Utilisateur", 20, y);
+    y += 10;
+    
+    doc.setFontSize(12);
+    doc.text(`Nom complet: ${user.firstName} ${user.lastName}`, 20, y);
+    y += 8;
+    doc.text(`Email: ${user.email}`, 20, y);
+    y += 8;
+    const statusText = user.kycStatus === 'verified' ? 'Verifie' : user.kycStatus === 'submitted' ? 'En attente' : user.kycStatus;
+    doc.text(`Statut KYC: ${statusText}`, 20, y);
+    y += 8;
+    doc.text(`Date de soumission: ${new Date(user.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}`, 20, y);
+    y += 8;
+    doc.text(`Date du rapport: ${new Date().toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}`, 20, y);
+    y += 15;
+    
+    doc.setFontSize(16);
+    doc.text("Documents Fournis", 20, y);
+    y += 10;
+    
+    doc.setFontSize(12);
+    doc.text(user.kycIdFront ? "Piece d'identite (Recto): Fournie" : "Piece d'identite (Recto): Non fournie", 20, y);
+    y += 8;
+    doc.text(user.kycIdBack ? "Piece d'identite (Verso): Fournie" : "Piece d'identite (Verso): Non fournie", 20, y);
+    y += 8;
+    doc.text(user.kycSelfie ? "Selfie de verification: Fourni" : "Selfie de verification: Non fourni", 20, y);
+    y += 20;
+    
+    doc.setFontSize(10);
+    doc.text("Document genere automatiquement par BKApay", pageWidth / 2, 280, { align: "center" });
+    
+    doc.save(`KYC_${user.firstName}_${user.lastName}_${new Date().getTime()}.pdf`);
     
     toast({
       title: "Telechargement lance",
