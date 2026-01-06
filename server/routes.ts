@@ -3946,7 +3946,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ===== Country/Operator Config Routes =====
+  // ===== Country/Operator Config Routes (Multi-Provider) =====
   app.get("/api/admin/country-operator-config", requireAdmin, async (req: Request, res: Response) => {
     try {
       const configs = await storage.getCountryOperatorConfigs();
@@ -3957,12 +3957,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/admin/country-operator-config/:country/:operator", requireAdmin, async (req: Request, res: Response) => {
+  app.get("/api/admin/country-operator-config/:provider", requireAdmin, async (req: Request, res: Response) => {
     try {
-      const { country, operator } = req.params;
+      const { provider } = req.params;
+      const configs = await storage.getCountryOperatorConfigsByProvider(provider);
+      res.json(configs);
+    } catch (error: any) {
+      console.error("Get country operator configs by provider error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
+  app.put("/api/admin/country-operator-config/:provider/:country/:operator", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { provider, country, operator } = req.params;
       const { incomingEnabled, outgoingEnabled } = req.body;
 
-      const config = await storage.updateCountryOperatorConfig(country, operator, {
+      // If enabling, disable same country for other providers (mutual exclusivity)
+      if (incomingEnabled === true) {
+        await storage.disableCountryForOtherProviders(provider, country, "incoming");
+      }
+      if (outgoingEnabled === true) {
+        await storage.disableCountryForOtherProviders(provider, country, "outgoing");
+      }
+
+      const config = await storage.updateCountryOperatorConfig(provider, country, operator, {
         incomingEnabled,
         outgoingEnabled,
       });
@@ -4047,8 +4066,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Initialize country/operator configs on startup
   await storage.initializeCountryOperatorConfigs();
   await storage.initializeCountryStatuses();
+  await storage.initializeProviderConfigs();
 
-  // ===== Country Status Routes (Country-level payin/payout control) =====
+  // ===== Country Status Routes (Country-level payin/payout control per provider) =====
   app.get("/api/admin/country-status", requireAdmin, async (req: Request, res: Response) => {
     try {
       const statuses = await storage.getCountryStatuses();
@@ -4059,12 +4079,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/admin/country-status/:country", requireAdmin, async (req: Request, res: Response) => {
+  app.get("/api/admin/country-status/:provider", requireAdmin, async (req: Request, res: Response) => {
     try {
-      const { country } = req.params;
+      const { provider } = req.params;
+      const statuses = await storage.getCountryStatusesByProvider(provider);
+      res.json(statuses);
+    } catch (error: any) {
+      console.error("Get country statuses by provider error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
+  app.put("/api/admin/country-status/:provider/:country", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { provider, country } = req.params;
       const { payinEnabled, payoutEnabled } = req.body;
 
-      const status = await storage.updateCountryStatus(country, {
+      // If enabling, disable same country for other providers (mutual exclusivity)
+      if (payinEnabled === true) {
+        await storage.disableCountryForOtherProviders(provider, country, "incoming");
+      }
+      if (payoutEnabled === true) {
+        await storage.disableCountryForOtherProviders(provider, country, "outgoing");
+      }
+
+      const status = await storage.updateCountryStatus(provider, country, {
         payinEnabled,
         payoutEnabled,
       });
@@ -4076,6 +4115,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(status);
     } catch (error: any) {
       console.error("Update country status error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
+  // ===== Provider Config Routes (API Keys Management) =====
+  app.get("/api/admin/providers", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const configs = await storage.getProviderConfigs();
+      // Mask API keys for security - only show first/last chars
+      const masked = configs.map(c => ({
+        ...c,
+        apiKey: c.apiKey ? `${c.apiKey.slice(0, 8)}...${c.apiKey.slice(-4)}` : null,
+        secretKey: c.secretKey ? `${c.secretKey.slice(0, 8)}...${c.secretKey.slice(-4)}` : null,
+        publicKey: c.publicKey ? `${c.publicKey.slice(0, 8)}...${c.publicKey.slice(-4)}` : null,
+        masterKey: c.masterKey ? `${c.masterKey.slice(0, 8)}...${c.masterKey.slice(-4)}` : null,
+        token: c.token ? `${c.token.slice(0, 8)}...${c.token.slice(-4)}` : null,
+      }));
+      res.json(masked);
+    } catch (error: any) {
+      console.error("Get provider configs error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
+  app.put("/api/admin/providers/:provider", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { provider } = req.params;
+      const { isActive, apiKey, secretKey, publicKey, masterKey, token } = req.body;
+
+      const updates: any = { updatedAt: new Date() };
+      if (typeof isActive === "boolean") updates.isActive = isActive;
+      if (apiKey !== undefined) updates.apiKey = apiKey || null;
+      if (secretKey !== undefined) updates.secretKey = secretKey || null;
+      if (publicKey !== undefined) updates.publicKey = publicKey || null;
+      if (masterKey !== undefined) updates.masterKey = masterKey || null;
+      if (token !== undefined) updates.token = token || null;
+
+      const config = await storage.updateProviderConfig(provider, updates);
+
+      if (!config) {
+        return res.status(404).json({ error: "Fournisseur non trouvé" });
+      }
+
+      // Mask keys in response
+      res.json({
+        ...config,
+        apiKey: config.apiKey ? `${config.apiKey.slice(0, 8)}...${config.apiKey.slice(-4)}` : null,
+        secretKey: config.secretKey ? `${config.secretKey.slice(0, 8)}...${config.secretKey.slice(-4)}` : null,
+        publicKey: config.publicKey ? `${config.publicKey.slice(0, 8)}...${config.publicKey.slice(-4)}` : null,
+        masterKey: config.masterKey ? `${config.masterKey.slice(0, 8)}...${config.masterKey.slice(-4)}` : null,
+        token: config.token ? `${config.token.slice(0, 8)}...${config.token.slice(-4)}` : null,
+      });
+    } catch (error: any) {
+      console.error("Update provider config error:", error);
       res.status(500).json({ error: "Une erreur est survenue" });
     }
   });

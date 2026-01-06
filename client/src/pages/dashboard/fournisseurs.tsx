@@ -1,0 +1,438 @@
+import { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Loader2, Key, Shield, Eye, EyeOff, Save, Check, AlertCircle } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Skeleton } from "@/components/ui/skeleton";
+
+interface ProviderConfig {
+  id: string;
+  provider: string;
+  isActive: boolean;
+  apiKey: string | null;
+  secretKey: string | null;
+  publicKey: string | null;
+  masterKey: string | null;
+  token: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface ProviderForm {
+  apiKey: string;
+  secretKey: string;
+  publicKey: string;
+  masterKey: string;
+  token: string;
+}
+
+const PROVIDER_INFO = {
+  afribapay: {
+    name: "AfribaPay",
+    description: "Fournisseur principal couvrant 15 pays africains",
+    color: "bg-purple-500",
+    fields: ["apiKey"],
+    countries: "15 pays (Bénin, Togo, CI, Sénégal, Ghana, Cameroun, etc.)",
+  },
+  paydunya: {
+    name: "Paydunya",
+    description: "Solution de paiement mobile pour l'Afrique de l'Ouest",
+    color: "bg-blue-500",
+    fields: ["masterKey", "publicKey", "secretKey", "token"],
+    countries: "6 pays (Bénin, Togo, CI, Sénégal, BF, Mali)",
+  },
+  fedapay: {
+    name: "FedaPay",
+    description: "Plateforme de paiement pour l'Afrique francophone",
+    color: "bg-green-500",
+    fields: ["secretKey"],
+    countries: "7 pays (Bénin, Togo, CI, Sénégal, Guinée, Niger, BF)",
+  },
+};
+
+export default function FournisseursPage() {
+  const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState("afribapay");
+  const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
+  const [forms, setForms] = useState<Record<string, ProviderForm>>({
+    afribapay: { apiKey: "", secretKey: "", publicKey: "", masterKey: "", token: "" },
+    paydunya: { apiKey: "", secretKey: "", publicKey: "", masterKey: "", token: "" },
+    fedapay: { apiKey: "", secretKey: "", publicKey: "", masterKey: "", token: "" },
+  });
+
+  const { data: providers, isLoading } = useQuery<ProviderConfig[]>({
+    queryKey: ["/api/admin/providers"],
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async (payload: { provider: string; updates: Partial<ProviderConfig> }) => {
+      return apiRequest("PUT", `/api/admin/providers/${payload.provider}`, payload.updates);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Succès",
+        description: "Configuration du fournisseur mise à jour",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/providers"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erreur",
+        description: error.message || "Impossible de mettre à jour",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const toggleActive = (provider: string, currentActive: boolean) => {
+    updateMutation.mutate({
+      provider,
+      updates: { isActive: !currentActive },
+    });
+  };
+
+  const saveKeys = (provider: string) => {
+    const form = forms[provider];
+    const updates: Partial<ProviderConfig> = {};
+    
+    if (form.apiKey) updates.apiKey = form.apiKey;
+    if (form.secretKey) updates.secretKey = form.secretKey;
+    if (form.publicKey) updates.publicKey = form.publicKey;
+    if (form.masterKey) updates.masterKey = form.masterKey;
+    if (form.token) updates.token = form.token;
+
+    if (Object.keys(updates).length === 0) {
+      toast({
+        title: "Aucune modification",
+        description: "Veuillez entrer au moins une clé API",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    updateMutation.mutate({ provider, updates });
+    setForms(prev => ({
+      ...prev,
+      [provider]: { apiKey: "", secretKey: "", publicKey: "", masterKey: "", token: "" },
+    }));
+  };
+
+  const updateForm = (provider: string, field: keyof ProviderForm, value: string) => {
+    setForms(prev => ({
+      ...prev,
+      [provider]: { ...prev[provider], [field]: value },
+    }));
+  };
+
+  const toggleShowKey = (key: string) => {
+    setShowKeys(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const getProviderConfig = (provider: string) => {
+    return providers?.find(p => p.provider === provider);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground mb-1">Gestion des Fournisseurs</h1>
+          <p className="text-sm text-muted-foreground">
+            Configurez les clés API et activez/désactivez les fournisseurs de paiement
+          </p>
+        </div>
+        <div className="grid gap-4">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-48" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-foreground mb-1">Gestion des Fournisseurs</h1>
+        <p className="text-sm text-muted-foreground">
+          Configurez les clés API et activez/désactivez les fournisseurs de paiement
+        </p>
+      </div>
+
+      <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 mb-4">
+        <div className="flex gap-2">
+          <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-medium text-amber-700 dark:text-amber-400">
+              Exclusivité mutuelle par pays
+            </p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Un pays ne peut être activé que chez un seul fournisseur à la fois (séparément pour les paiements entrants et sortants).
+              Activer un pays chez un fournisseur le désactivera automatiquement chez les autres.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid w-full grid-cols-3">
+          {Object.entries(PROVIDER_INFO).map(([key, info]) => {
+            const config = getProviderConfig(key);
+            return (
+              <TabsTrigger key={key} value={key} className="relative gap-2" data-testid={`tab-provider-${key}`}>
+                <span className={`w-2 h-2 rounded-full ${config?.isActive ? "bg-green-500" : "bg-gray-400"}`} />
+                {info.name}
+              </TabsTrigger>
+            );
+          })}
+        </TabsList>
+
+        {Object.entries(PROVIDER_INFO).map(([provider, info]) => {
+          const config = getProviderConfig(provider);
+          const form = forms[provider];
+
+          return (
+            <TabsContent key={provider} value={provider} className="space-y-4 mt-4">
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-12 h-12 rounded-lg ${info.color} flex items-center justify-center`}>
+                        <Shield className="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <CardTitle className="flex items-center gap-2">
+                          {info.name}
+                          {config?.isActive ? (
+                            <Badge variant="default" className="bg-green-500">Actif</Badge>
+                          ) : (
+                            <Badge variant="outline">Inactif</Badge>
+                          )}
+                        </CardTitle>
+                        <CardDescription>{info.description}</CardDescription>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Label htmlFor={`active-${provider}`} className="text-sm">
+                        {config?.isActive ? "Désactiver" : "Activer"}
+                      </Label>
+                      <Switch
+                        id={`active-${provider}`}
+                        checked={config?.isActive || false}
+                        onCheckedChange={() => toggleActive(provider, config?.isActive || false)}
+                        disabled={updateMutation.isPending}
+                        data-testid={`switch-provider-${provider}`}
+                      />
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="text-sm text-muted-foreground">
+                    <span className="font-medium">Couverture :</span> {info.countries}
+                  </div>
+
+                  <div className="border-t pt-4">
+                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                      <Key className="w-5 h-5" />
+                      Clés API
+                    </h3>
+
+                    <div className="space-y-4">
+                      {info.fields.includes("apiKey") && (
+                        <div className="space-y-2">
+                          <Label htmlFor={`apiKey-${provider}`}>Clé API</Label>
+                          <div className="flex gap-2">
+                            <div className="relative flex-1">
+                              <Input
+                                id={`apiKey-${provider}`}
+                                type={showKeys[`apiKey-${provider}`] ? "text" : "password"}
+                                placeholder={config?.apiKey || "Entrez votre clé API..."}
+                                value={form.apiKey}
+                                onChange={(e) => updateForm(provider, "apiKey", e.target.value)}
+                                data-testid={`input-apiKey-${provider}`}
+                              />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="absolute right-0 top-0 h-full"
+                                onClick={() => toggleShowKey(`apiKey-${provider}`)}
+                              >
+                                {showKeys[`apiKey-${provider}`] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                              </Button>
+                            </div>
+                          </div>
+                          {config?.apiKey && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1">
+                              <Check className="w-3 h-3 text-green-500" />
+                              Clé configurée : {config.apiKey}
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {info.fields.includes("secretKey") && (
+                        <div className="space-y-2">
+                          <Label htmlFor={`secretKey-${provider}`}>Clé Secrète</Label>
+                          <div className="flex gap-2">
+                            <div className="relative flex-1">
+                              <Input
+                                id={`secretKey-${provider}`}
+                                type={showKeys[`secretKey-${provider}`] ? "text" : "password"}
+                                placeholder={config?.secretKey || "Entrez votre clé secrète..."}
+                                value={form.secretKey}
+                                onChange={(e) => updateForm(provider, "secretKey", e.target.value)}
+                                data-testid={`input-secretKey-${provider}`}
+                              />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="absolute right-0 top-0 h-full"
+                                onClick={() => toggleShowKey(`secretKey-${provider}`)}
+                              >
+                                {showKeys[`secretKey-${provider}`] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                              </Button>
+                            </div>
+                          </div>
+                          {config?.secretKey && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1">
+                              <Check className="w-3 h-3 text-green-500" />
+                              Clé configurée : {config.secretKey}
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {info.fields.includes("publicKey") && (
+                        <div className="space-y-2">
+                          <Label htmlFor={`publicKey-${provider}`}>Clé Publique</Label>
+                          <div className="flex gap-2">
+                            <div className="relative flex-1">
+                              <Input
+                                id={`publicKey-${provider}`}
+                                type={showKeys[`publicKey-${provider}`] ? "text" : "password"}
+                                placeholder={config?.publicKey || "Entrez votre clé publique..."}
+                                value={form.publicKey}
+                                onChange={(e) => updateForm(provider, "publicKey", e.target.value)}
+                                data-testid={`input-publicKey-${provider}`}
+                              />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="absolute right-0 top-0 h-full"
+                                onClick={() => toggleShowKey(`publicKey-${provider}`)}
+                              >
+                                {showKeys[`publicKey-${provider}`] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                              </Button>
+                            </div>
+                          </div>
+                          {config?.publicKey && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1">
+                              <Check className="w-3 h-3 text-green-500" />
+                              Clé configurée : {config.publicKey}
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {info.fields.includes("masterKey") && (
+                        <div className="space-y-2">
+                          <Label htmlFor={`masterKey-${provider}`}>Master Key</Label>
+                          <div className="flex gap-2">
+                            <div className="relative flex-1">
+                              <Input
+                                id={`masterKey-${provider}`}
+                                type={showKeys[`masterKey-${provider}`] ? "text" : "password"}
+                                placeholder={config?.masterKey || "Entrez votre master key..."}
+                                value={form.masterKey}
+                                onChange={(e) => updateForm(provider, "masterKey", e.target.value)}
+                                data-testid={`input-masterKey-${provider}`}
+                              />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="absolute right-0 top-0 h-full"
+                                onClick={() => toggleShowKey(`masterKey-${provider}`)}
+                              >
+                                {showKeys[`masterKey-${provider}`] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                              </Button>
+                            </div>
+                          </div>
+                          {config?.masterKey && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1">
+                              <Check className="w-3 h-3 text-green-500" />
+                              Clé configurée : {config.masterKey}
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {info.fields.includes("token") && (
+                        <div className="space-y-2">
+                          <Label htmlFor={`token-${provider}`}>Token</Label>
+                          <div className="flex gap-2">
+                            <div className="relative flex-1">
+                              <Input
+                                id={`token-${provider}`}
+                                type={showKeys[`token-${provider}`] ? "text" : "password"}
+                                placeholder={config?.token || "Entrez votre token..."}
+                                value={form.token}
+                                onChange={(e) => updateForm(provider, "token", e.target.value)}
+                                data-testid={`input-token-${provider}`}
+                              />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="absolute right-0 top-0 h-full"
+                                onClick={() => toggleShowKey(`token-${provider}`)}
+                              >
+                                {showKeys[`token-${provider}`] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                              </Button>
+                            </div>
+                          </div>
+                          {config?.token && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1">
+                              <Check className="w-3 h-3 text-green-500" />
+                              Token configuré : {config.token}
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="pt-4">
+                        <Button
+                          onClick={() => saveKeys(provider)}
+                          disabled={updateMutation.isPending}
+                          className="gap-2"
+                          data-testid={`save-keys-${provider}`}
+                        >
+                          {updateMutation.isPending ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Save className="w-4 h-4" />
+                          )}
+                          Enregistrer les clés
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          );
+        })}
+      </Tabs>
+    </div>
+  );
+}

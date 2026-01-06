@@ -86,11 +86,26 @@ export interface IStorage {
     recentTransactions: Transaction[];
   }>;
 
-  // Country/Operator Config
+  // Country/Operator Config (Multi-Provider)
   getCountryOperatorConfigs(): Promise<CountryOperatorConfig[]>;
-  getCountryOperatorConfig(country: string, operator: string): Promise<CountryOperatorConfig | undefined>;
-  updateCountryOperatorConfig(country: string, operator: string, config: UpdateCountryOperatorConfig): Promise<CountryOperatorConfig | undefined>;
+  getCountryOperatorConfigsByProvider(provider: string): Promise<CountryOperatorConfig[]>;
+  getCountryOperatorConfig(provider: string, country: string, operator: string): Promise<CountryOperatorConfig | undefined>;
+  updateCountryOperatorConfig(provider: string, country: string, operator: string, config: UpdateCountryOperatorConfig): Promise<CountryOperatorConfig | undefined>;
+  disableCountryForOtherProviders(provider: string, country: string, type: "incoming" | "outgoing"): Promise<void>;
   initializeCountryOperatorConfigs(): Promise<void>;
+  
+  // Country Status (Multi-Provider)
+  getCountryStatuses(): Promise<schema.CountryStatus[]>;
+  getCountryStatusesByProvider(provider: string): Promise<schema.CountryStatus[]>;
+  getCountryStatus(provider: string, country: string): Promise<schema.CountryStatus | undefined>;
+  updateCountryStatus(provider: string, country: string, updates: { payinEnabled?: boolean; payoutEnabled?: boolean }): Promise<schema.CountryStatus | undefined>;
+  initializeCountryStatuses(): Promise<void>;
+  
+  // Provider Configs
+  getProviderConfigs(): Promise<schema.ProviderConfig[]>;
+  getProviderConfig(provider: string): Promise<schema.ProviderConfig | undefined>;
+  updateProviderConfig(provider: string, updates: Partial<Omit<schema.ProviderConfig, 'id' | 'provider' | 'createdAt'>>): Promise<schema.ProviderConfig | undefined>;
+  initializeProviderConfigs(): Promise<void>;
   
   // Diagnostic
   getDiagnosticData(): Promise<{
@@ -843,17 +858,23 @@ export class DbStorage implements IStorage {
     };
   }
 
-  // ===== Country/Operator Config =====
+  // ===== Country/Operator Config (Multi-Provider) =====
   async getCountryOperatorConfigs(): Promise<CountryOperatorConfig[]> {
     return db.select().from(schema.countryOperatorConfig);
   }
 
-  async getCountryOperatorConfig(country: string, operator: string): Promise<CountryOperatorConfig | undefined> {
+  async getCountryOperatorConfigsByProvider(provider: string): Promise<CountryOperatorConfig[]> {
+    return db.select().from(schema.countryOperatorConfig)
+      .where(eq(schema.countryOperatorConfig.provider, provider));
+  }
+
+  async getCountryOperatorConfig(provider: string, country: string, operator: string): Promise<CountryOperatorConfig | undefined> {
     const results = await db
       .select()
       .from(schema.countryOperatorConfig)
       .where(
         and(
+          eq(schema.countryOperatorConfig.provider, provider),
           eq(schema.countryOperatorConfig.country, country),
           eq(schema.countryOperatorConfig.operator, operator)
         )
@@ -863,6 +884,7 @@ export class DbStorage implements IStorage {
   }
 
   async updateCountryOperatorConfig(
+    provider: string,
     country: string,
     operator: string,
     config: UpdateCountryOperatorConfig
@@ -875,6 +897,7 @@ export class DbStorage implements IStorage {
       })
       .where(
         and(
+          eq(schema.countryOperatorConfig.provider, provider),
           eq(schema.countryOperatorConfig.country, country),
           eq(schema.countryOperatorConfig.operator, operator)
         )
@@ -883,46 +906,135 @@ export class DbStorage implements IStorage {
     return results[0];
   }
 
+  // Disable same country for other providers (mutual exclusivity)
+  async disableCountryForOtherProviders(
+    provider: string,
+    country: string,
+    type: "incoming" | "outgoing"
+  ): Promise<void> {
+    const updateField = type === "incoming" ? { incomingEnabled: false } : { outgoingEnabled: false };
+    
+    await db
+      .update(schema.countryOperatorConfig)
+      .set({
+        ...updateField,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(schema.countryOperatorConfig.country, country),
+          sql`${schema.countryOperatorConfig.provider} != ${provider}`
+        )
+      );
+    
+    // Also disable at country status level for other providers
+    await db
+      .update(schema.countryStatus)
+      .set({
+        ...(type === "incoming" ? { payinEnabled: false } : { payoutEnabled: false }),
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(schema.countryStatus.country, country),
+          sql`${schema.countryStatus.provider} != ${provider}`
+        )
+      );
+  }
+
   async initializeCountryOperatorConfigs(): Promise<void> {
-    // Initialize AfribaPay country/operator combinations using AfribaPay configuration
+    // Initialize all providers' country/operator combinations
     const { AFRIBAPAY_COUNTRIES } = await import("@shared/afribapay-countries");
+    const { PAYDUNYA_COUNTRIES } = await import("@shared/paydunya-countries");
+    const { FEDAPAY_COUNTRIES } = await import("@shared/fedapay-countries");
 
     // Get existing configs to check which ones are already present
     const existing = await this.getCountryOperatorConfigs();
-    const existingSet = new Set(existing.map(c => `${c.country}-${c.operator}`));
+    const existingSet = new Set(existing.map(c => `${c.provider}-${c.country}-${c.operator}`));
     
+    // Initialize AfribaPay
     for (const country of AFRIBAPAY_COUNTRIES) {
       for (const operator of country.operators) {
-        const key = `${country.code}-${operator.code}`;
-        if (existingSet.has(key)) continue; // Skip existing configs
+        const key = `afribapay-${country.code}-${operator.code}`;
+        if (existingSet.has(key)) continue;
         
         await db
           .insert(schema.countryOperatorConfig)
           .values({
+            provider: "afribapay",
             country: country.code,
             operator: operator.code,
-            incomingEnabled: operator.payin,
-            outgoingEnabled: operator.payout,
+            incomingEnabled: false,
+            outgoingEnabled: false,
           })
-          .catch(() => {}); // Ignore duplicates
+          .catch(() => {});
+      }
+    }
+
+    // Initialize Paydunya
+    for (const country of PAYDUNYA_COUNTRIES) {
+      for (const operator of country.operators) {
+        const key = `paydunya-${country.code}-${operator.code}`;
+        if (existingSet.has(key)) continue;
+        
+        await db
+          .insert(schema.countryOperatorConfig)
+          .values({
+            provider: "paydunya",
+            country: country.code,
+            operator: operator.code,
+            incomingEnabled: false,
+            outgoingEnabled: false,
+          })
+          .catch(() => {});
+      }
+    }
+
+    // Initialize FedaPay
+    for (const country of FEDAPAY_COUNTRIES) {
+      for (const operator of country.operators) {
+        const key = `fedapay-${country.code}-${operator.code}`;
+        if (existingSet.has(key)) continue;
+        
+        await db
+          .insert(schema.countryOperatorConfig)
+          .values({
+            provider: "fedapay",
+            country: country.code,
+            operator: operator.code,
+            incomingEnabled: false,
+            outgoingEnabled: false,
+          })
+          .catch(() => {});
       }
     }
   }
 
-  // Country Status Methods (for country-level payin/payout control)
+  // Country Status Methods (for country-level payin/payout control per provider)
   async getCountryStatuses(): Promise<schema.CountryStatus[]> {
     return db.select().from(schema.countryStatus);
   }
 
-  async getCountryStatus(country: string): Promise<schema.CountryStatus | undefined> {
+  async getCountryStatusesByProvider(provider: string): Promise<schema.CountryStatus[]> {
+    return db.select().from(schema.countryStatus)
+      .where(eq(schema.countryStatus.provider, provider));
+  }
+
+  async getCountryStatus(provider: string, country: string): Promise<schema.CountryStatus | undefined> {
     const results = await db
       .select()
       .from(schema.countryStatus)
-      .where(eq(schema.countryStatus.country, country));
+      .where(
+        and(
+          eq(schema.countryStatus.provider, provider),
+          eq(schema.countryStatus.country, country)
+        )
+      );
     return results[0];
   }
 
   async updateCountryStatus(
+    provider: string,
     country: string,
     updates: { payinEnabled?: boolean; payoutEnabled?: boolean }
   ): Promise<schema.CountryStatus | undefined> {
@@ -932,28 +1044,117 @@ export class DbStorage implements IStorage {
         ...updates,
         updatedAt: new Date(),
       })
-      .where(eq(schema.countryStatus.country, country))
+      .where(
+        and(
+          eq(schema.countryStatus.provider, provider),
+          eq(schema.countryStatus.country, country)
+        )
+      )
       .returning();
     return results[0];
   }
 
   async initializeCountryStatuses(): Promise<void> {
-    // Initialize country status for all AfribaPay countries
+    // Initialize country status for all providers
     const { AFRIBAPAY_COUNTRIES } = await import("@shared/afribapay-countries");
+    const { PAYDUNYA_COUNTRIES } = await import("@shared/paydunya-countries");
+    const { FEDAPAY_COUNTRIES } = await import("@shared/fedapay-countries");
+    
     const existing = await this.getCountryStatuses();
-    const existingSet = new Set(existing.map(c => c.country));
+    const existingSet = new Set(existing.map(c => `${c.provider}-${c.country}`));
 
+    // Initialize AfribaPay countries
     for (const country of AFRIBAPAY_COUNTRIES) {
-      if (existingSet.has(country.code)) continue;
+      const key = `afribapay-${country.code}`;
+      if (existingSet.has(key)) continue;
       
       await db
         .insert(schema.countryStatus)
         .values({
+          provider: "afribapay",
           country: country.code,
-          payinEnabled: true,
-          payoutEnabled: true,
+          payinEnabled: false,
+          payoutEnabled: false,
         })
-        .catch(() => {}); // Ignore duplicates
+        .catch(() => {});
+    }
+
+    // Initialize Paydunya countries
+    for (const country of PAYDUNYA_COUNTRIES) {
+      const key = `paydunya-${country.code}`;
+      if (existingSet.has(key)) continue;
+      
+      await db
+        .insert(schema.countryStatus)
+        .values({
+          provider: "paydunya",
+          country: country.code,
+          payinEnabled: false,
+          payoutEnabled: false,
+        })
+        .catch(() => {});
+    }
+
+    // Initialize FedaPay countries
+    for (const country of FEDAPAY_COUNTRIES) {
+      const key = `fedapay-${country.code}`;
+      if (existingSet.has(key)) continue;
+      
+      await db
+        .insert(schema.countryStatus)
+        .values({
+          provider: "fedapay",
+          country: country.code,
+          payinEnabled: false,
+          payoutEnabled: false,
+        })
+        .catch(() => {});
+    }
+  }
+
+  // ===== Provider Configs =====
+  async getProviderConfigs(): Promise<schema.ProviderConfig[]> {
+    return db.select().from(schema.providerConfigs);
+  }
+
+  async getProviderConfig(provider: string): Promise<schema.ProviderConfig | undefined> {
+    const results = await db
+      .select()
+      .from(schema.providerConfigs)
+      .where(eq(schema.providerConfigs.provider, provider));
+    return results[0];
+  }
+
+  async updateProviderConfig(
+    provider: string,
+    updates: Partial<Omit<schema.ProviderConfig, 'id' | 'provider' | 'createdAt'>>
+  ): Promise<schema.ProviderConfig | undefined> {
+    const results = await db
+      .update(schema.providerConfigs)
+      .set({
+        ...updates,
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.providerConfigs.provider, provider))
+      .returning();
+    return results[0];
+  }
+
+  async initializeProviderConfigs(): Promise<void> {
+    const providers = ["afribapay", "paydunya", "fedapay"];
+    const existing = await this.getProviderConfigs();
+    const existingSet = new Set(existing.map(p => p.provider));
+
+    for (const provider of providers) {
+      if (existingSet.has(provider)) continue;
+      
+      await db
+        .insert(schema.providerConfigs)
+        .values({
+          provider,
+          isActive: false,
+        })
+        .catch(() => {});
     }
   }
 

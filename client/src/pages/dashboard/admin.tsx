@@ -165,13 +165,13 @@ export default function Admin() {
         </div>
         <div className="flex gap-2 flex-wrap">
           <Button
-            onClick={() => setLocation("/dashboard/diagnostic")}
-            data-testid="button-diagnostic-advanced"
+            onClick={() => setLocation("/dashboard/fournisseurs")}
+            data-testid="button-fournisseurs"
             className="gap-2"
             variant="destructive"
           >
             <Database className="w-4 h-4" />
-            Diagnostic Avancé
+            FOURNISSEURS
           </Button>
           <Button
             onClick={handleSyncDatabase}

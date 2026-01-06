@@ -95,13 +95,14 @@ export const transactions = pgTable("transactions", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-// Country/Operator Configuration - Admin control
+// Country/Operator Configuration - Admin control per provider
 export const countryOperatorConfig = pgTable("country_operator_config", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  provider: text("provider").notNull().default("afribapay"), // "afribapay", "paydunya", "fedapay"
   country: text("country").notNull(), // "BJ", "TG", "CI", "SN", "BF", "ML"
   operator: text("operator").notNull(), // "orange", "mtn", "moov", "wave", "free", "tmoney", "wizall", "expresso"
-  incomingEnabled: boolean("incoming_enabled").notNull().default(true), // For deposits
-  outgoingEnabled: boolean("outgoing_enabled").notNull().default(true), // For withdrawals
+  incomingEnabled: boolean("incoming_enabled").notNull().default(false), // For deposits
+  outgoingEnabled: boolean("outgoing_enabled").notNull().default(false), // For withdrawals
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -120,15 +121,32 @@ export const verificationCodes = pgTable("verification_codes", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-// AfribaPay country configuration with payin/payout status
+// Country configuration with payin/payout status per provider
 export const countryStatus = pgTable("country_status", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  country: text("country").notNull().unique(), // "BJ", "CI", etc.
-  payinEnabled: boolean("payin_enabled").notNull().default(true),
-  payoutEnabled: boolean("payout_enabled").notNull().default(true),
+  provider: text("provider").notNull().default("afribapay"), // "afribapay", "paydunya", "fedapay"
+  country: text("country").notNull(), // "BJ", "CI", etc.
+  payinEnabled: boolean("payin_enabled").notNull().default(false),
+  payoutEnabled: boolean("payout_enabled").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
+
+// Payment provider configurations (API keys)
+export const providerConfigs = pgTable("provider_configs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  provider: text("provider").notNull().unique(), // "afribapay", "paydunya", "fedapay"
+  isActive: boolean("is_active").notNull().default(false),
+  apiKey: text("api_key"), // Main API key
+  secretKey: text("secret_key"), // Secret key if needed
+  publicKey: text("public_key"), // Public key if needed
+  masterKey: text("master_key"), // Master key for Paydunya
+  token: text("token"), // Token for Paydunya
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export type ProviderConfig = typeof providerConfigs.$inferSelect;
 
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
