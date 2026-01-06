@@ -2801,49 +2801,429 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ currency, needsConversion });
   });
 
-  // ===== Payment Routes (AfribaPay - En attente d'intégration) =====
-  // Note: Les paiements sont temporairement désactivés en attendant les clés API AfribaPay
-  
-  const paymentSystemDisabledResponse = {
-    success: false,
-    error: "Le système de paiement est temporairement indisponible. Veuillez réessayer ultérieurement."
-  };
-  
-  // Deposit Route - DISABLED
-  app.post("/api/fedapay/deposit", requireAuth, async (req: Request, res: Response) => {
-    return res.status(503).json(paymentSystemDisabledResponse);
-  });
-
-  // Transfer/Withdrawal Route - DISABLED
-  app.post("/api/fedapay/withdrawal", requireAuth, async (req: Request, res: Response) => {
-    return res.status(503).json(paymentSystemDisabledResponse);
-  });
-
-  // Payment Link Route - DISABLED
-  app.post("/api/fedapay/payment-link/:token", async (req: Request, res: Response) => {
-    return res.status(503).json(paymentSystemDisabledResponse);
-  });
-
-  // Merchant Link Route - DISABLED
-  app.post("/api/fedapay/merchant-link/:token", async (req: Request, res: Response) => {
-    return res.status(503).json(paymentSystemDisabledResponse);
-  });
-
-  // API Payment Route - DISABLED
-  app.post("/api/fedapay/api-payment", requireApiKey, async (req: Request, res: Response) => {
-    return res.status(503).json(paymentSystemDisabledResponse);
-  });
-
-  // AfribaPay Config Endpoint - Returns AfribaPay countries/operators
-  app.get("/api/fedapay/config", async (req: Request, res: Response) => {
-    const { AFRIBAPAY_COUNTRIES } = await import("@shared/afribapay-countries");
+  // ===== Payment Routes - Multi-Provider System =====
+  // Helper function to determine active provider for a country/operator
+  async function getActiveProviderForDeposit(country: string, operator: string): Promise<string | null> {
+    const [configs, countryStatuses, providerConfigs] = await Promise.all([
+      storage.getCountryOperatorConfigs(),
+      storage.getCountryStatuses(),
+      storage.getProviderConfigs(),
+    ]);
     
-    const collectCountries = AFRIBAPAY_COUNTRIES.map(c => ({
+    // First check which providers are globally active
+    const activeProviders = new Set(
+      providerConfigs.filter(p => p.isActive).map(p => p.provider)
+    );
+    
+    // Find operators that are enabled for incoming for this country
+    const enabledConfigs = configs.filter(c => 
+      c.country.toUpperCase() === country.toUpperCase() &&
+      c.operator.toLowerCase() === operator.toLowerCase() &&
+      c.incomingEnabled &&
+      activeProviders.has(c.provider)
+    );
+    
+    // Also check country-level status
+    const enabledCountries = countryStatuses.filter(cs =>
+      cs.country.toUpperCase() === country.toUpperCase() &&
+      cs.payinEnabled &&
+      activeProviders.has(cs.provider)
+    );
+    
+    // Find provider that has both operator-level and country-level enabled
+    for (const config of enabledConfigs) {
+      const hasCountryLevel = enabledCountries.some(c => c.provider === config.provider);
+      if (hasCountryLevel) {
+        return config.provider;
+      }
+    }
+    
+    // If only operator-level is configured, use that
+    if (enabledConfigs.length > 0) {
+      return enabledConfigs[0].provider;
+    }
+    
+    return null;
+  }
+
+  async function getActiveProviderForWithdrawal(country: string, operator: string): Promise<string | null> {
+    const [configs, countryStatuses, providerConfigs] = await Promise.all([
+      storage.getCountryOperatorConfigs(),
+      storage.getCountryStatuses(),
+      storage.getProviderConfigs(),
+    ]);
+    
+    const activeProviders = new Set(
+      providerConfigs.filter(p => p.isActive).map(p => p.provider)
+    );
+    
+    const enabledConfigs = configs.filter(c => 
+      c.country.toUpperCase() === country.toUpperCase() &&
+      c.operator.toLowerCase() === operator.toLowerCase() &&
+      c.outgoingEnabled &&
+      activeProviders.has(c.provider)
+    );
+    
+    const enabledCountries = countryStatuses.filter(cs =>
+      cs.country.toUpperCase() === country.toUpperCase() &&
+      cs.payoutEnabled &&
+      activeProviders.has(cs.provider)
+    );
+    
+    for (const config of enabledConfigs) {
+      const hasCountryLevel = enabledCountries.some(c => c.provider === config.provider);
+      if (hasCountryLevel) {
+        return config.provider;
+      }
+    }
+    
+    if (enabledConfigs.length > 0) {
+      return enabledConfigs[0].provider;
+    }
+    
+    return null;
+  }
+  
+  // Deposit Route - Multi-Provider
+  app.post("/api/fedapay/deposit", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { amount, country, operator, phone } = req.body;
+      const user = await storage.getUser(req.session.userId!);
+
+      if (!user) {
+        return res.status(404).json({ success: false, error: "Utilisateur non trouve" });
+      }
+
+      if (user.suspended) {
+        return res.status(403).json({ success: false, error: "Votre compte a ete suspendu" });
+      }
+
+      if (!amount || amount <= 0) {
+        return res.status(400).json({ success: false, error: "Montant invalide" });
+      }
+
+      if (!country || !operator || !phone) {
+        return res.status(400).json({ success: false, error: "Pays, operateur et telephone requis" });
+      }
+
+      // Determine which provider to use based on configuration
+      const activeProvider = await getActiveProviderForDeposit(country, operator);
+      
+      if (!activeProvider) {
+        console.log(`[DEPOSIT] No active provider found for ${country}/${operator}`);
+        return res.status(503).json({ 
+          success: false, 
+          error: "Aucun fournisseur de paiement n'est configure pour ce pays et operateur. Veuillez contacter l'administrateur." 
+        });
+      }
+
+      console.log(`[DEPOSIT] Using provider: ${activeProvider} for ${country}/${operator}`);
+
+      if (activeProvider === "fedapay") {
+        // Use FedaPay
+        const result = await handleFedaPayDeposit(
+          req.session.userId!,
+          user,
+          amount,
+          country,
+          operator,
+          phone
+        );
+
+        if (result.success) {
+          return res.json({
+            success: true,
+            transactionId: result.transactionId,
+            message: result.message || "Demande de paiement envoyee. Veuillez valider sur votre telephone.",
+          });
+        } else {
+          return res.status(400).json({ success: false, error: result.error });
+        }
+      } else if (activeProvider === "paydunya") {
+        // Use Paydunya - redirect to softpay init
+        // For now, return an instruction to use the SOFTPAY flow
+        return res.json({
+          success: false,
+          error: "Veuillez utiliser le formulaire de depot standard pour Paydunya",
+          useSoftpay: true,
+        });
+      } else {
+        return res.status(503).json({ 
+          success: false, 
+          error: "Fournisseur de paiement non supporte" 
+        });
+      }
+    } catch (error: any) {
+      console.error("[DEPOSIT] Error:", error);
+      return res.status(500).json({ success: false, error: "Erreur lors du depot" });
+    }
+  });
+
+  // Transfer/Withdrawal Route - Multi-Provider
+  app.post("/api/fedapay/withdrawal", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { amount, country, operator, phone, type } = req.body;
+      const user = await storage.getUser(req.session.userId!);
+
+      if (!user) {
+        return res.status(404).json({ success: false, error: "Utilisateur non trouve" });
+      }
+
+      if (user.suspended) {
+        return res.status(403).json({ success: false, error: "Votre compte a ete suspendu" });
+      }
+
+      if (user.kycStatus !== "verified") {
+        return res.status(403).json({ success: false, error: "Verification KYC requise" });
+      }
+
+      if (!amount || amount <= 0) {
+        return res.status(400).json({ success: false, error: "Montant invalide" });
+      }
+
+      if (!country || !operator || !phone) {
+        return res.status(400).json({ success: false, error: "Pays, operateur et telephone requis" });
+      }
+
+      // Determine which provider to use
+      const activeProvider = await getActiveProviderForWithdrawal(country, operator);
+      
+      if (!activeProvider) {
+        console.log(`[WITHDRAWAL] No active provider found for ${country}/${operator}`);
+        return res.status(503).json({ 
+          success: false, 
+          error: "Aucun fournisseur n'est configure pour les retraits vers ce pays et operateur" 
+        });
+      }
+
+      console.log(`[WITHDRAWAL] Using provider: ${activeProvider} for ${country}/${operator}`);
+
+      if (activeProvider === "fedapay") {
+        // Use FedaPay
+        const isTransfer = type === "transfer";
+        const result = isTransfer 
+          ? await handleFedaPayTransfer(req.session.userId!, user, amount, country, operator, phone)
+          : await handleFedaPayWithdrawal(req.session.userId!, user, amount, country, operator, phone);
+
+        if (result.success) {
+          return res.json({
+            success: true,
+            transactionId: result.transactionId,
+            message: result.message,
+          });
+        } else {
+          return res.status(400).json({ success: false, error: result.error });
+        }
+      } else if (activeProvider === "paydunya") {
+        // Use the existing Paydunya withdrawal flow
+        return res.json({
+          success: false,
+          error: "Veuillez utiliser le formulaire de retrait standard pour Paydunya",
+          usePaydunya: true,
+        });
+      } else {
+        return res.status(503).json({ 
+          success: false, 
+          error: "Fournisseur de paiement non supporte" 
+        });
+      }
+    } catch (error: any) {
+      console.error("[WITHDRAWAL] Error:", error);
+      return res.status(500).json({ success: false, error: "Erreur lors du retrait" });
+    }
+  });
+
+  // Payment Link Route - Multi-Provider
+  app.post("/api/fedapay/payment-link/:token", async (req: Request, res: Response) => {
+    try {
+      const { customerName, customerPhone, country, operator } = req.body;
+      const { token } = req.params;
+
+      const paymentLink = await storage.getPaymentLinkByToken(token);
+      if (!paymentLink || !paymentLink.isActive) {
+        return res.status(404).json({ success: false, error: "Lien de paiement non trouve ou inactif" });
+      }
+
+      const owner = await storage.getUser(paymentLink.userId);
+      if (owner?.suspended) {
+        return res.status(404).json({ success: false, error: "Ce lien n'existe pas" });
+      }
+
+      const activeProvider = await getActiveProviderForDeposit(country, operator);
+      
+      if (!activeProvider) {
+        return res.status(503).json({ 
+          success: false, 
+          error: "Aucun fournisseur configure pour ce pays et operateur" 
+        });
+      }
+
+      if (activeProvider === "fedapay") {
+        // handlePaymentLinkPayment(paymentLink, customerName, customerEmail, customerPhone, country, operator)
+        const result = await handlePaymentLinkPayment(
+          paymentLink,
+          customerName || "Client",
+          "noreply@bkapay.com", // Privacy: never send real customer emails to providers
+          customerPhone,
+          country,
+          operator
+        );
+
+        if (result.success) {
+          return res.json({
+            success: true,
+            transactionId: result.transactionId,
+            message: result.message,
+          });
+        } else {
+          return res.status(400).json({ success: false, error: result.error });
+        }
+      } else {
+        return res.json({
+          success: false,
+          error: "Veuillez utiliser le formulaire standard",
+          useSoftpay: true,
+        });
+      }
+    } catch (error: any) {
+      console.error("[PAYMENT_LINK_FEDAPAY] Error:", error);
+      return res.status(500).json({ success: false, error: "Erreur lors du paiement" });
+    }
+  });
+
+  // Merchant Link Route - Multi-Provider
+  app.post("/api/fedapay/merchant-link/:token", async (req: Request, res: Response) => {
+    try {
+      const { customerName, customerPhone, amount, country, operator } = req.body;
+      const { token } = req.params;
+
+      const merchantLink = await storage.getMerchantLinkByToken(token);
+      if (!merchantLink || !merchantLink.isActive) {
+        return res.status(404).json({ success: false, error: "Lien marchand non trouve ou inactif" });
+      }
+
+      const owner = await storage.getUser(merchantLink.userId);
+      if (owner?.suspended) {
+        return res.status(404).json({ success: false, error: "Ce lien n'existe pas" });
+      }
+
+      const activeProvider = await getActiveProviderForDeposit(country, operator);
+      
+      if (!activeProvider) {
+        return res.status(503).json({ 
+          success: false, 
+          error: "Aucun fournisseur configure pour ce pays et operateur" 
+        });
+      }
+
+      if (activeProvider === "fedapay") {
+        // handleMerchantLinkPayment(merchantLink, amount, customerName, customerEmail, customerPhone, country, operator)
+        const result = await handleMerchantLinkPayment(
+          merchantLink,
+          amount,
+          customerName || "Client",
+          "noreply@bkapay.com", // Privacy: never send real customer emails to providers
+          customerPhone,
+          country,
+          operator
+        );
+
+        if (result.success) {
+          return res.json({
+            success: true,
+            transactionId: result.transactionId,
+            message: result.message,
+          });
+        } else {
+          return res.status(400).json({ success: false, error: result.error });
+        }
+      } else {
+        return res.json({
+          success: false,
+          error: "Veuillez utiliser le formulaire standard",
+          useSoftpay: true,
+        });
+      }
+    } catch (error: any) {
+      console.error("[MERCHANT_LINK_FEDAPAY] Error:", error);
+      return res.status(500).json({ success: false, error: "Erreur lors du paiement" });
+    }
+  });
+
+  // API Payment Route - Multi-Provider
+  app.post("/api/fedapay/api-payment", requireApiKey, async (req: Request, res: Response) => {
+    try {
+      const { transactionId, country, operator, customerPhone, customerName } = req.body;
+
+      if (!transactionId) {
+        return res.status(400).json({ success: false, error: "Transaction ID requis" });
+      }
+
+      const transaction = await storage.getTransaction(transactionId);
+      if (!transaction) {
+        return res.status(404).json({ success: false, error: "Transaction non trouvee" });
+      }
+
+      // Get API key from request
+      const apiKey = (req as any).apiKey;
+      if (!apiKey) {
+        return res.status(401).json({ success: false, error: "Cle API non valide" });
+      }
+
+      const activeProvider = await getActiveProviderForDeposit(country, operator);
+      
+      if (!activeProvider) {
+        return res.status(503).json({ 
+          success: false, 
+          error: "Aucun fournisseur configure pour ce pays et operateur" 
+        });
+      }
+
+      if (activeProvider === "fedapay") {
+        // handleApiPayment(apiKey, amount, description, customerName, customerEmail, customerPhone, country, operator)
+        const result = await handleApiPayment(
+          apiKey,
+          transaction.amount,
+          transaction.description || "Paiement via API",
+          customerName || transaction.customerName || "Client",
+          "noreply@bkapay.com", // Privacy: never send real customer emails to providers
+          customerPhone || transaction.customerPhone || "",
+          country,
+          operator
+        );
+
+        if (result.success) {
+          return res.json({
+            success: true,
+            transactionId: result.transactionId || transaction.id,
+            message: result.message,
+          });
+        } else {
+          return res.status(400).json({ success: false, error: result.error });
+        }
+      } else {
+        return res.json({
+          success: false,
+          error: "Veuillez utiliser le flux API standard",
+          useSoftpay: true,
+        });
+      }
+    } catch (error: any) {
+      console.error("[API_PAYMENT_FEDAPAY] Error:", error);
+      return res.status(500).json({ success: false, error: "Erreur lors du paiement" });
+    }
+  });
+
+  // Config Endpoint - Returns enabled countries/operators across all providers
+  app.get("/api/fedapay/config", async (req: Request, res: Response) => {
+    const { FEDAPAY_COUNTRIES } = await import("@shared/fedapay-countries");
+    
+    const collectCountries = FEDAPAY_COUNTRIES.map(c => ({
       code: c.code,
       operators: c.operators.filter(op => op.payin).map(op => ({ code: op.code, name: op.name })),
     }));
     
-    const payoutCountries = AFRIBAPAY_COUNTRIES.map(c => ({
+    const payoutCountries = FEDAPAY_COUNTRIES.map(c => ({
       code: c.code,
       operators: c.operators.filter(op => op.payout).map(op => ({ code: op.code, name: op.name })),
     }));
