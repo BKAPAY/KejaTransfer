@@ -74,12 +74,13 @@ export default function Withdrawal() {
         throw new Error("Numero de retrait invalide");
       }
       
-      const res = await apiRequest("POST", "/api/withdrawal", {
+      const res = await apiRequest("POST", "/api/fedapay/withdrawal", {
         amount: data.formData.amount,
         phone: selectedPhone,
         operator: data.formData.operator,
         country: userCountry,
         securityCode: data.securityCode,
+        type: "withdrawal",
       });
       return res.json();
     },

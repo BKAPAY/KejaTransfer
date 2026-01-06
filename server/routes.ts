@@ -3077,7 +3077,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Transfer/Withdrawal Route - Multi-Provider
   app.post("/api/fedapay/withdrawal", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { amount, country, operator, phone, type } = req.body;
+      const { amount, country, operator, phone, type, securityCode } = req.body;
       const user = await storage.getUser(req.session.userId!);
 
       if (!user) {
@@ -3092,12 +3092,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ success: false, error: "Verification KYC requise" });
       }
 
+      // Validate security code for withdrawals (not transfers)
+      if (type !== "transfer") {
+        if (!securityCode) {
+          return res.status(400).json({ success: false, error: "Code de securite requis" });
+        }
+        if (!user.securityCode) {
+          return res.status(400).json({ success: false, error: "Code de securite non configure" });
+        }
+        const bcrypt = await import("bcrypt");
+        const isValidCode = await bcrypt.compare(securityCode, user.securityCode);
+        if (!isValidCode) {
+          return res.status(400).json({ success: false, error: "Code de securite incorrect" });
+        }
+      }
+
       if (!amount || amount <= 0) {
         return res.status(400).json({ success: false, error: "Montant invalide" });
       }
 
+      // Minimum 1000 XOF for outgoing payments
+      if (amount < 1000) {
+        return res.status(400).json({ success: false, error: "Montant minimum: 1000 XOF" });
+      }
+
       if (!country || !operator || !phone) {
         return res.status(400).json({ success: false, error: "Pays, operateur et telephone requis" });
+      }
+
+      // Calculate fees
+      const feeInfo = calculateOutgoingFee(Math.floor(amount), country);
+
+      // Check balance
+      if (user.balance < feeInfo.totalDeductedFromBalance) {
+        return res.status(400).json({ 
+          success: false, 
+          error: "Solde insuffisant" 
+        });
       }
 
       // Determine which provider to use
@@ -3130,12 +3161,120 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ success: false, error: result.error });
         }
       } else if (activeProvider === "paydunya") {
-        // Use the existing Paydunya withdrawal flow
-        return res.json({
-          success: false,
-          error: "Veuillez utiliser le formulaire de retrait standard pour Paydunya",
-          usePaydunya: true,
-        });
+        // Use Paydunya Disburse API for withdrawals/transfers
+        console.log(`[WITHDRAWAL] Using Paydunya Disburse for ${country}/${operator}`);
+
+        // Map operator to Paydunya withdraw_mode
+        const withdrawModeMap: Record<string, string> = {
+          "orange-sn": "orange-money-senegal", "free-sn": "free-money-senegal", "expresso-sn": "expresso-senegal",
+          "wave-sn": "wave-senegal", "wizall-sn": "wizall-senegal",
+          "orange-ci": "orange-money-ci", "mtn-ci": "mtn-ci", "moov-ci": "moov-ci", "wave-ci": "wave-ci",
+          "orange-bf": "orange-money-burkina", "moov-bf": "moov-burkina-faso",
+          "moov-bj": "moov-benin", "mtn-bj": "mtn-benin",
+          "tmoney-tg": "t-money-togo", "moov-tg": "moov-togo",
+          "orange-ml": "orange-money-mali", "moov-ml": "moov-mali",
+        };
+
+        const withdrawMode = withdrawModeMap[`${operator}-${country.toLowerCase()}`];
+        if (!withdrawMode) {
+          return res.status(400).json({ success: false, error: "Operateur non supporte pour les retraits Paydunya" });
+        }
+
+        // Clean phone number (remove country prefix)
+        let cleanPhone = phone.replace(/[\s\-\.]+/g, "");
+        if (!/^\+?\d+$/.test(cleanPhone)) {
+          return res.status(400).json({ success: false, error: "Numero de telephone invalide" });
+        }
+
+        const countryPhoneInfo: Record<string, { code: string, localLength: number[] }> = {
+          "SN": { code: "221", localLength: [9] }, "CI": { code: "225", localLength: [10] },
+          "BF": { code: "226", localLength: [8] }, "BJ": { code: "229", localLength: [8, 10] },
+          "TG": { code: "228", localLength: [8] }, "ML": { code: "223", localLength: [8] },
+        };
+
+        const phoneInfo = countryPhoneInfo[country.toUpperCase()];
+        if (phoneInfo) {
+          const prefixes = [`+${phoneInfo.code}`, `00${phoneInfo.code}`];
+          for (const prefix of prefixes) {
+            if (cleanPhone.startsWith(prefix)) {
+              cleanPhone = cleanPhone.substring(prefix.length);
+              break;
+            }
+          }
+          if (cleanPhone.startsWith(phoneInfo.code)) {
+            const withoutCode = cleanPhone.substring(phoneInfo.code.length);
+            if (phoneInfo.localLength.includes(withoutCode.length)) {
+              cleanPhone = withoutCode;
+            }
+          }
+        }
+
+        const callbackUrl = `${process.env.BASE_URL || 'https://bkapay.com'}/api/webhooks/paydunya-disburse`;
+
+        // Step 1: Get disburse invoice
+        const getInvoiceData = {
+          account_alias: cleanPhone,
+          amount: Math.floor(amount),
+          withdraw_mode: withdrawMode,
+          callback_url: callbackUrl,
+        };
+
+        console.log("[WITHDRAWAL PAYDUNYA] Creating disburse invoice:", getInvoiceData);
+        const getInvoiceResponse = await callPaydunyaAPIv2("/disburse/get-invoice", getInvoiceData);
+        console.log("[WITHDRAWAL PAYDUNYA] Get-invoice response:", getInvoiceResponse);
+
+        if (getInvoiceResponse.response_code !== "00" || !getInvoiceResponse.disburse_token) {
+          console.error("[WITHDRAWAL PAYDUNYA] Get-invoice failed:", getInvoiceResponse);
+          return res.status(400).json({ success: false, error: "Erreur lors de la creation du retrait" });
+        }
+
+        // Step 2: Submit disburse invoice
+        const submitData = {
+          disburse_invoice: getInvoiceResponse.disburse_token,
+          disburse_id: `${type || 'withdrawal'}-${user.id.substring(0, 8)}-${Date.now()}`,
+        };
+
+        console.log("[WITHDRAWAL PAYDUNYA] Submitting disburse invoice:", submitData);
+        const submitResponse = await callPaydunyaAPIv2("/disburse/submit-invoice", submitData);
+        console.log("[WITHDRAWAL PAYDUNYA] Submit-invoice response:", submitResponse);
+
+        if (submitResponse.response_code === "00") {
+          // Success - Deduct balance
+          await storage.updateUserBalance(req.session.userId!, -feeInfo.totalDeductedFromBalance);
+          
+          // Create transaction record
+          const tx = await storage.createTransaction({
+            userId: req.session.userId!,
+            type: type === "transfer" ? "transfer" : "withdrawal",
+            amount: Math.floor(amount),
+            fee: feeInfo.feeAmount,
+            feePercentage: feeInfo.feePercentage,
+            currency: "XOF",
+            status: "completed",
+            country,
+            operator,
+            customerPhone: cleanPhone,
+            description: type === "transfer" ? `Transfert de ${amount} XOF vers ${cleanPhone}` : `Retrait de ${amount} XOF vers ${cleanPhone}`,
+            paydunyaToken: getInvoiceResponse.disburse_token,
+            metadata: JSON.stringify({
+              paydunyaTransactionId: submitResponse.transaction_id,
+              disburseId: submitData.disburse_id,
+              provider: "paydunya",
+            }),
+          });
+
+          console.log("[WITHDRAWAL PAYDUNYA] Success - Balance deducted:", feeInfo.totalDeductedFromBalance);
+
+          return res.json({
+            success: true,
+            transactionId: tx.id,
+            message: type === "transfer" ? "Transfert effectue avec succes" : "Retrait effectue avec succes",
+            totalDeducted: feeInfo.totalDeductedFromBalance,
+          });
+        } else {
+          console.error("[WITHDRAWAL PAYDUNYA] Submit-invoice failed:", submitResponse);
+          return res.status(400).json({ success: false, error: "Erreur lors du retrait" });
+        }
       } else {
         return res.status(503).json({ 
           success: false, 
