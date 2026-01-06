@@ -58,8 +58,35 @@ The frontend utilizes React 18 with TypeScript, styled with Shadcn UI and Tailwi
   - **Verification Codes**: 6-digit codes expire after 10 minutes. Single-use codes stored in `verification_codes` table.
   - **Email Service**: Uses Gmail SMTP via nodemailer. Requires `GMAIL_USER` and `GMAIL_APP_PASSWORD` secrets.
 
+## Multi-Provider System (NEW)
+BKApay now supports 3 payment providers with mutual exclusivity:
+- **AfribaPay**: 15 countries (Benin, Togo, CI, Senegal, Ghana, Cameroon, etc.)
+- **Paydunya**: 6 countries (Benin, Togo, CI, Senegal, Burkina Faso, Mali)
+- **FedaPay**: 7 countries (Benin, Togo, CI, Senegal, Guinea, Niger, Burkina Faso)
+
+### Mutual Exclusivity
+- A country can only be active for ONE provider at a time (separately for payin and payout)
+- Enabling a country for one provider automatically disables it for other providers
+- Managed via admin page `/dashboard/country-operator-config`
+
+### Provider Configuration Files
+- `shared/afribapay-countries.ts` - AfribaPay countries and operators
+- `shared/paydunya-countries.ts` - Paydunya countries and operators  
+- `shared/fedapay-countries.ts` - FedaPay countries and operators
+
+### Admin Pages
+- `/dashboard/fournisseurs` - Manage API keys and toggle providers on/off
+- `/dashboard/country-operator-config` - Enable/disable countries and operators per provider
+
+### Database Tables
+- `provider_configs` - API keys and active status per provider
+- `country_operator_config` - Operator-level payin/payout settings (with provider field)
+- `country_status` - Country-level payin/payout settings (with provider field)
+
 ## External Dependencies
-- **FedaPay API**: Payment gateway for West Africa - handles both collect (incoming) and payout (outgoing) transactions.
+- **AfribaPay API**: Payment gateway for 15 African countries
+- **Paydunya API**: Payment gateway for West Africa (6 countries)
+- **FedaPay API**: Payment gateway for francophone Africa (7 countries)
 - **PostgreSQL**: Primary database.
 - **Drizzle ORM**: For database interactions.
 - **connect-pg-simple**: For PostgreSQL session store.
