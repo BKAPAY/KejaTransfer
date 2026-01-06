@@ -2940,13 +2940,128 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ success: false, error: result.error });
         }
       } else if (activeProvider === "paydunya") {
-        // Use Paydunya - redirect to softpay init
-        // For now, return an instruction to use the SOFTPAY flow
-        return res.json({
-          success: false,
-          error: "Veuillez utiliser le formulaire de depot standard pour Paydunya",
-          useSoftpay: true,
-        });
+        // Use Paydunya SOFTPAY
+        console.log(`[DEPOSIT] Using Paydunya SOFTPAY for ${country}/${operator}`);
+        
+        const effectiveCustomerName = `${user.firstName} ${user.lastName}`;
+        
+        const paydunyaData = {
+          invoice: {
+            total_amount: Math.floor(amount),
+            description: `Depot de ${amount} XOF`,
+            customer: {
+              name: effectiveCustomerName,
+              email: "noreply@bkapay.com",
+              phone: phone,
+            },
+          },
+          store: {
+            name: "BKApay",
+          },
+          custom_data: {
+            user_id: req.session.userId!,
+            type: "deposit",
+            country,
+            operator,
+            phone,
+          },
+          actions: {
+            callback_url: `${process.env.BASE_URL || 'https://bkapay.com'}/api/webhooks/paydunya`,
+          },
+        };
+
+        console.log("[DEPOSIT PAYDUNYA] Creating invoice:", paydunyaData);
+
+        const paydunyaResponse = await callPaydunyaAPI("/checkout-invoice/create", paydunyaData);
+
+        if (paydunyaResponse.response_code === "00" && paydunyaResponse.token) {
+          const grossAmount = Math.floor(amount);
+          const feeInfo = calculateIncomingFee(grossAmount, country);
+          
+          const transactionId = randomUUID();
+          await storage.createTransaction({
+            userId: req.session.userId!,
+            type: "deposit",
+            amount: feeInfo.grossAmount,
+            fee: feeInfo.feeAmount,
+            feePercentage: feeInfo.feePercentage,
+            currency: "XOF",
+            status: "pending",
+            country,
+            operator,
+            description: `Depot de ${grossAmount} XOF`,
+            paydunyaToken: paydunyaResponse.token,
+            metadata: JSON.stringify({
+              phone,
+              customerName: effectiveCustomerName,
+              provider: "paydunya",
+            }),
+          });
+
+          const operatorKey = getOperatorKey(operator, country);
+          const ussdInstruction = operatorKey ? getUSSDInstruction(operatorKey) : null;
+          const needsOTP = operatorKey ? requiresOTP(operatorKey) : false;
+          const twoStep = operatorKey ? requiresTwoStep(operatorKey) : false;
+
+          if (!needsOTP && !twoStep && operatorKey) {
+            console.log(`[DEPOSIT PAYDUNYA] Operator ${operatorKey} does NOT require OTP - calling SOFTPAY immediately`);
+            
+            const paymentData: SoftpayPaymentData = {
+              customerName: effectiveCustomerName,
+              customerEmail: "noreply@bkapay.com",
+              phoneNumber: phone,
+              invoiceToken: paydunyaResponse.token,
+            };
+
+            const softpayResult = await callPaydunyaSoftpay(operator, country, paymentData);
+            
+            console.log(`[DEPOSIT PAYDUNYA] SOFTPAY result:`, softpayResult);
+
+            if (softpayResult.success) {
+              if (softpayResult.url) {
+                return res.json({
+                  success: true,
+                  transactionId,
+                  token: paydunyaResponse.token,
+                  message: softpayResult.message,
+                  redirectUrl: softpayResult.url,
+                  provider: "paydunya",
+                });
+              }
+
+              return res.json({
+                success: true,
+                transactionId,
+                token: paydunyaResponse.token,
+                message: softpayResult.message || ussdInstruction || "Validez le paiement sur votre telephone",
+                provider: "paydunya",
+              });
+            } else {
+              console.error(`[DEPOSIT PAYDUNYA] SOFTPAY call failed:`, softpayResult.message);
+              return res.status(400).json({ 
+                success: false, 
+                error: softpayResult.message || "Erreur lors du paiement SOFTPAY" 
+              });
+            }
+          }
+
+          return res.json({
+            success: true,
+            transactionId,
+            token: paydunyaResponse.token,
+            ussdInstruction,
+            requiresOTP: needsOTP,
+            requiresTwoStep: twoStep,
+            message: ussdInstruction || "Suivez les instructions pour valider le paiement",
+            provider: "paydunya",
+          });
+        } else {
+          console.error("[DEPOSIT PAYDUNYA] Invoice creation failed:", paydunyaResponse);
+          return res.status(400).json({ 
+            success: false, 
+            error: paydunyaResponse.response_text || "Erreur lors de la creation de la facture" 
+          });
+        }
       } else {
         return res.status(503).json({ 
           success: false, 

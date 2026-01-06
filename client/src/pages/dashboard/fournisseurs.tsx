@@ -57,6 +57,29 @@ const PROVIDER_INFO = {
   },
 };
 
+const getFieldLabel = (provider: string, field: string): string => {
+  if (provider === "paydunya") {
+    switch (field) {
+      case "masterKey": return "Clé Principale";
+      case "publicKey": return "Clé Publique";
+      case "secretKey": return "Clé Privée";
+      case "token": return "Token";
+      default: return field;
+    }
+  }
+  if (provider === "fedapay") {
+    if (field === "secretKey") return "Clé Secrète (sk_live_xxx ou sk_sandbox_xxx)";
+  }
+  switch (field) {
+    case "apiKey": return "Clé API";
+    case "secretKey": return "Clé Secrète";
+    case "publicKey": return "Clé Publique";
+    case "masterKey": return "Master Key";
+    case "token": return "Token";
+    default: return field;
+  }
+};
+
 export default function FournisseursPage() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("afribapay");
@@ -247,7 +270,7 @@ export default function FournisseursPage() {
                     <div className="space-y-4">
                       {info.fields.includes("apiKey") && (
                         <div className="space-y-2">
-                          <Label htmlFor={`apiKey-${provider}`}>Clé API</Label>
+                          <Label htmlFor={`apiKey-${provider}`}>{getFieldLabel(provider, "apiKey")}</Label>
                           <div className="flex gap-2">
                             <div className="relative flex-1">
                               <Input
@@ -280,7 +303,7 @@ export default function FournisseursPage() {
 
                       {info.fields.includes("secretKey") && (
                         <div className="space-y-2">
-                          <Label htmlFor={`secretKey-${provider}`}>Clé Secrète</Label>
+                          <Label htmlFor={`secretKey-${provider}`}>{getFieldLabel(provider, "secretKey")}</Label>
                           <div className="flex gap-2">
                             <div className="relative flex-1">
                               <Input
@@ -313,7 +336,7 @@ export default function FournisseursPage() {
 
                       {info.fields.includes("publicKey") && (
                         <div className="space-y-2">
-                          <Label htmlFor={`publicKey-${provider}`}>Clé Publique</Label>
+                          <Label htmlFor={`publicKey-${provider}`}>{getFieldLabel(provider, "publicKey")}</Label>
                           <div className="flex gap-2">
                             <div className="relative flex-1">
                               <Input
@@ -346,7 +369,7 @@ export default function FournisseursPage() {
 
                       {info.fields.includes("masterKey") && (
                         <div className="space-y-2">
-                          <Label htmlFor={`masterKey-${provider}`}>Master Key</Label>
+                          <Label htmlFor={`masterKey-${provider}`}>{getFieldLabel(provider, "masterKey")}</Label>
                           <div className="flex gap-2">
                             <div className="relative flex-1">
                               <Input
@@ -379,7 +402,7 @@ export default function FournisseursPage() {
 
                       {info.fields.includes("token") && (
                         <div className="space-y-2">
-                          <Label htmlFor={`token-${provider}`}>Token</Label>
+                          <Label htmlFor={`token-${provider}`}>{getFieldLabel(provider, "token")}</Label>
                           <div className="flex gap-2">
                             <div className="relative flex-1">
                               <Input
