@@ -1300,9 +1300,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         if (!authorizationCode && !wizallTransactionId) {
           // First step: initiate Wizall payment
+          // Note: customerEmail is NOT sent to providers - use generic email for privacy
           const paymentData: SoftpayPaymentData = {
             customerName: customerName || transaction.customerName || "",
-            customerEmail: customerEmail || transaction.customerEmail || "",
+            customerEmail: "noreply@bkapay.com", // Privacy: never send real customer emails to providers
             phoneNumber: phone,
             invoiceToken: transaction.paydunyaToken!,
           };
@@ -1359,13 +1360,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Call SOFTPAY OTP confirm
+      // Note: Use generic email for privacy - never send real customer emails to providers
       const confirmData = {
         invoice_token: transaction.paydunyaToken,
         payment_token: operatorKey,
         phone_number: phone,
         otp_code: authorizationCode,
         customer_name: customerName || transaction.customerName,
-        customer_email: customerEmail || transaction.customerEmail,
+        customer_email: "noreply@bkapay.com", // Privacy: never send real customer emails to providers
       };
 
       const confirmResult = await callPaydunyaAPI("/softpay/v2/otp-confirm", confirmData);
@@ -1580,13 +1582,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Call Paydunya API to create checkout invoice with customer info
+      // Note: Use generic email for privacy - never send real customer emails to providers
       const paydunyaData = {
         invoice: {
           total_amount: paymentLink.amount,
           description: `Paiement - ${paymentLink.productName}`,
           customer: {
             name: customerName || "Client",
-            email: customerEmail || "",
+            email: "noreply@bkapay.com", // Privacy: never send real customer emails to providers
             phone: customerPhone,
           },
         },
@@ -1598,7 +1601,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           type: "payment_link",
           user_id: paymentLink.userId,
           customer_name: customerName,
-          customer_email: customerEmail,
+          customer_email: "noreply@bkapay.com", // Privacy: never send real customer emails to providers
           customer_phone: customerPhone,
           country,
           operator,
@@ -1684,13 +1687,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Call Paydunya API with customer info
+      // Note: Use generic email for privacy - never send real customer emails to providers
       const paydunyaData = {
         invoice: {
           total_amount: amount,
           description: `Paiement marchand - ${merchantLink.merchantName}`,
           customer: {
             name: customerName || "Client",
-            email: customerEmail || "",
+            email: "noreply@bkapay.com", // Privacy: never send real customer emails to providers
             phone: customerPhone,
           },
         },
@@ -1702,7 +1706,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           merchant_user_id: merchantLink.userId,
           merchant_name: merchantLink.merchantName,
           customer_name: customerName,
-          customer_email: customerEmail,
+          customer_email: "noreply@bkapay.com", // Privacy: never send real customer emails to providers
           customer_phone: customerPhone,
           country,
           operator,
@@ -1790,8 +1794,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Create Paydunya invoice to get token
       // Include customer info in invoice for pre-filling payment page
+      // Note: Use generic email for privacy - never send real customer emails to providers
       const effectiveCustomerName = customerName || `${user!.firstName} ${user!.lastName}`;
-      const effectiveCustomerEmail = customerEmail || user!.email;
       
       const paydunyaData = {
         invoice: {
@@ -1799,7 +1803,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           description: description || `Dépôt de ${amount} XOF`,
           customer: {
             name: effectiveCustomerName,
-            email: effectiveCustomerEmail,
+            email: "noreply@bkapay.com", // Privacy: never send real customer emails to providers
             phone: phone,
           },
         },
@@ -1844,7 +1848,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           metadata: JSON.stringify({
             phone,
             customerName: effectiveCustomerName,
-            customerEmail: effectiveCustomerEmail,
           }),
         });
 
@@ -1859,9 +1862,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!needsOTP && !twoStep && operatorKey) {
           console.log(`[SOFTPAY INIT] Operator ${operatorKey} does NOT require OTP - calling SOFTPAY endpoint immediately`);
           
+          // Note: Use generic email for privacy - never send real customer emails to providers
           const paymentData: SoftpayPaymentData = {
             customerName: effectiveCustomerName,
-            customerEmail: effectiveCustomerEmail,
+            customerEmail: "noreply@bkapay.com", // Privacy: never send real customer emails to providers
             phoneNumber: phone,
             invoiceToken: paydunyaResponse.token,
           };
@@ -1978,9 +1982,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       } else {
         // STANDARD FLOW: Call operator-specific SOFTPAY endpoint
+        // Note: Use generic email for privacy - never send real customer emails to providers
         const paymentData: SoftpayPaymentData = {
           customerName: customerName || metadata.customerName || `${user!.firstName} ${user!.lastName}`,
-          customerEmail: customerEmail || metadata.customerEmail || user!.email,
+          customerEmail: "noreply@bkapay.com", // Privacy: never send real customer emails to providers
           phoneNumber: phone,
           invoiceToken: token,
           authorizationCode,
@@ -2182,9 +2187,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       } else {
         // STANDARD FLOW
+        // Note: Use generic email for privacy - never send real customer emails to providers
         const paymentData: SoftpayPaymentData = {
           customerName: customerName || transaction.customerName || "Client",
-          customerEmail: customerEmail || transaction.customerEmail || "",
+          customerEmail: "noreply@bkapay.com", // Privacy: never send real customer emails to providers
           phoneNumber: customerPhone,
           invoiceToken: token,
           authorizationCode,
@@ -2294,9 +2300,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       } else {
         // STANDARD FLOW
+        // Note: Use generic email for privacy - never send real customer emails to providers
         const paymentData: SoftpayPaymentData = {
           customerName: customerName || transaction.customerName || "Client",
-          customerEmail: customerEmail || transaction.customerEmail || "",
+          customerEmail: "noreply@bkapay.com", // Privacy: never send real customer emails to providers
           phoneNumber: customerPhone,
           invoiceToken: token,
           authorizationCode,
@@ -2406,9 +2413,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       } else {
         // STANDARD FLOW
+        // Note: Use generic email for privacy - never send real customer emails to providers
         const paymentData: SoftpayPaymentData = {
           customerName: customerName || transaction.customerName || "Client",
-          customerEmail: customerEmail || transaction.customerEmail || "",
+          customerEmail: "noreply@bkapay.com", // Privacy: never send real customer emails to providers
           phoneNumber: customerPhone,
           invoiceToken: token,
           authorizationCode,
@@ -3257,9 +3265,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       } else {
         // STANDARD FLOW
+        // Note: Use generic email for privacy - never send real customer emails to providers
         const paymentData: SoftpayPaymentData = {
           customerName: customerName || transaction.customerName || "Client",
-          customerEmail: customerEmail || transaction.customerEmail || "",
+          customerEmail: "noreply@bkapay.com", // Privacy: never send real customer emails to providers
           phoneNumber: customerPhone,
           invoiceToken: token,
           authorizationCode,
@@ -3344,13 +3353,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const lastName = nameParts.slice(1).join(" ") || "Client";
 
       // Use FedaPay to initiate payment
+      // Note: Use generic email for privacy - never send real customer emails to providers
       const { createCollect } = await import("./fedapay");
       const result = await createCollect({
         amount: transaction.amount,
         description: transaction.description || "Paiement via BKApay",
         customerFirstName: firstName,
         customerLastName: lastName,
-        customerEmail: transaction.customerEmail || "",
+        customerEmail: "noreply@bkapay.com", // Privacy: never send real customer emails to providers
         customerPhone: transaction.customerPhone || "",
         country: country,
         operator: operator,
