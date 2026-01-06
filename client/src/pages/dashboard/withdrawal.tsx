@@ -19,7 +19,7 @@ import { calculateOutgoingFee } from "@/lib/fees";
 import { useLocation } from "wouter";
 
 const withdrawalSchema = z.object({
-  amount: z.number().min(500, "Le montant minimum est de 500 XOF"),
+  amount: z.number().min(1000, "Le montant minimum est de 1000 XOF"),
   withdrawalPhoneIndex: z.number().min(0, "Selectionnez un numero de retrait"),
   operator: z.string().min(1, "Selectionnez un operateur"),
 });
@@ -283,7 +283,7 @@ export default function Withdrawal() {
                         type="number"
                         placeholder="5000"
                         data-testid="input-withdrawal-amount"
-                        min="500"
+                        min="1000"
                         value={field.value || ""}
                         onChange={(e) => {
                           const val = e.target.value;
@@ -291,7 +291,7 @@ export default function Withdrawal() {
                         }}
                       />
                     </FormControl>
-                    <p className="text-xs text-muted-foreground mt-1">Montant minimum: 500 XOF</p>
+                    <p className="text-xs text-muted-foreground mt-1">Montant minimum: 1000 XOF</p>
                     <FormMessage />
                   </FormItem>
                 )}

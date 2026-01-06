@@ -3665,7 +3665,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Retrait échoué" });
       }
 
-      const minAmount = 500;
+      const minAmount = 1000;
       if (amount < minAmount) {
         return res.status(400).json({ error: "Retrait échoué" });
       }
