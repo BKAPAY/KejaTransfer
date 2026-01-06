@@ -38,31 +38,55 @@ const paymentSchema = z.object({
 
 type PaymentFormData = z.infer<typeof paymentSchema>;
 
-// Instructions USSD Orange par pays
+// Instructions USSD Orange par pays (tous les pays où Orange est disponible)
 const ORANGE_INSTRUCTIONS: Record<string, string> = {
   SN: "Composez #144#391*VOTRE CODE PIN ORANGE MONEY# pour obtenir votre code de paiement",
   CI: "Composez #144*82# puis choisissez l'option 2 pour obtenir votre code de paiement",
   BF: "Composez *144*4*6# pour obtenir votre code de paiement",
+  ML: "Composez #144*8# pour obtenir votre code de paiement",
+  GN: "Composez #144*6# pour obtenir votre code de paiement",
+  CM: "Composez #150*50# pour obtenir votre code de paiement",
+  CD: "Composez *144*1*1# pour obtenir votre code de paiement",
+  NE: "Composez #144*4# pour obtenir votre code de paiement",
+  BJ: "Composez #144*6# pour obtenir votre code de paiement",
+  TG: "Composez #144*6# pour obtenir votre code de paiement",
+  DEFAULT: "Composez le code USSD Orange Money de votre pays pour obtenir votre code de paiement",
 };
 
 const ORANGE_USSD_CODES: Record<string, string> = {
   SN: "#144#391*PIN#",
   CI: "#144*82#",
   BF: "*144*4*6#",
+  ML: "#144*8#",
+  GN: "#144*6#",
+  CM: "#150*50#",
+  CD: "*144*1*1#",
+  NE: "#144*4#",
+  BJ: "#144*6#",
+  TG: "#144*6#",
+  DEFAULT: "#144#",
 };
 
 const ORANGE_USSD_HINTS: Record<string, string> = {
   SN: "Remplacez PIN par votre code secret Orange Money",
   CI: "Choisissez l'option 2 pour obtenir votre code",
   BF: "Suivez les instructions pour obtenir votre code",
+  ML: "Suivez les instructions pour obtenir votre code",
+  GN: "Suivez les instructions pour obtenir votre code",
+  CM: "Suivez les instructions pour obtenir votre code",
+  CD: "Suivez les instructions pour obtenir votre code",
+  NE: "Suivez les instructions pour obtenir votre code",
+  BJ: "Suivez les instructions pour obtenir votre code",
+  TG: "Suivez les instructions pour obtenir votre code",
+  DEFAULT: "Suivez les instructions pour obtenir votre code",
 };
 
 function getOrangeUssdCode(country: string): string {
-  return ORANGE_USSD_CODES[country] || "#144#391*PIN#";
+  return ORANGE_USSD_CODES[country] || ORANGE_USSD_CODES.DEFAULT;
 }
 
 function getOrangeUssdHint(country: string): string {
-  return ORANGE_USSD_HINTS[country] || "Suivez les instructions pour obtenir votre code";
+  return ORANGE_USSD_HINTS[country] || ORANGE_USSD_HINTS.DEFAULT;
 }
 
 // Clé pour stocker l'état du paiement
@@ -180,6 +204,11 @@ export default function Pay() {
   }, [token, form]);
 
   const selectedCountry = form.watch("country");
+  const selectedOperator = form.watch("operator");
+  
+  // Vérifier si l'opérateur sélectionné est Orange (nécessite code OTP)
+  const isOrangeOperator = selectedOperator?.toLowerCase().includes("orange");
+  const showOrangeOtpOnForm = isOrangeOperator && selectedCountry;
   
   // Filtrer les opérateurs selon la configuration admin
   const allCountryOperators = selectedCountry
@@ -1067,6 +1096,52 @@ export default function Pay() {
           )}
         />
         
+        {/* Instructions OTP Orange sur le formulaire */}
+        {showOrangeOtpOnForm && (
+          <div className="space-y-3">
+            <Alert className="bg-orange-50 dark:bg-orange-950 border-orange-200 dark:border-orange-800">
+              <AlertCircle className="h-4 w-4 text-orange-600" />
+              <AlertDescription className="text-sm text-orange-800 dark:text-orange-200">
+                <strong>Instructions Orange Money :</strong>
+                <div className="mt-2 flex items-center gap-2">
+                  <div className="flex-1 bg-white dark:bg-gray-900 border border-orange-300 dark:border-orange-700 rounded-md px-3 py-2">
+                    <code className="text-base font-bold text-orange-700 dark:text-orange-400">
+                      {getOrangeUssdCode(selectedCountry)}
+                    </code>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => copyUssdCode(getOrangeUssdCode(selectedCountry))}
+                    className="border-orange-300 hover:bg-orange-100 dark:hover:bg-orange-900"
+                    data-testid="button-copy-ussd-form"
+                  >
+                    {copiedUssd ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                  </Button>
+                </div>
+                <p className="mt-2 text-xs text-orange-700 dark:text-orange-400">
+                  {getOrangeUssdHint(selectedCountry)}
+                </p>
+              </AlertDescription>
+            </Alert>
+            
+            <div>
+              <FormLabel className="text-xs sm:text-sm">Code OTP Orange Money</FormLabel>
+              <Input
+                placeholder="Entrez le code obtenu"
+                value={authCode}
+                onChange={(e) => setAuthCode(e.target.value)}
+                className="mt-1"
+                data-testid="input-otp-form"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Composez le code USSD ci-dessus, puis entrez le code de paiement obtenu
+              </p>
+            </div>
+          </div>
+        )}
+        
         {isConversionNeeded && conversionData && (
           <div className="bg-green-50 dark:bg-green-950 p-3 rounded-md border border-green-200 dark:border-green-800">
             <p className="text-xs sm:text-sm text-green-700 dark:text-green-300 font-medium">
@@ -1088,7 +1163,7 @@ export default function Pay() {
         <Button
           type="submit"
           className="w-full"
-          disabled={initMutation.isPending || isLoadingOperators || Boolean(noOperatorsAvailable)}
+          disabled={initMutation.isPending || isLoadingOperators || Boolean(noOperatorsAvailable) || (Boolean(showOrangeOtpOnForm) && !authCode.trim())}
           data-testid="button-pay"
         >
           {initMutation.isPending ? (
