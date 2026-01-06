@@ -3244,11 +3244,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             operator,
             description: paymentLink.description || `Paiement via lien`,
             paydunyaToken: paydunyaResponse.token,
-            paymentLinkId: paymentLink.id,
             metadata: JSON.stringify({
               phone: customerPhone,
               customerName: effectiveCustomerName,
               provider: "paydunya",
+              paymentLinkId: paymentLink.id,
             }),
           });
 
@@ -3363,7 +3363,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const paydunyaData = {
           invoice: {
             total_amount: Math.floor(amount),
-            description: merchantLink.description || `Paiement de ${amount} XOF`,
+            description: `Paiement ${merchantLink.merchantName} - ${amount} XOF`,
             customer: {
               name: effectiveCustomerName,
               email: "noreply@bkapay.com",
@@ -3403,13 +3403,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             status: "pending",
             country,
             operator,
-            description: merchantLink.description || `Paiement marchand`,
+            description: `Paiement ${merchantLink.merchantName}`,
             paydunyaToken: paydunyaResponse.token,
-            merchantLinkId: merchantLink.id,
             metadata: JSON.stringify({
               phone: customerPhone,
               customerName: effectiveCustomerName,
               provider: "paydunya",
+              merchantLinkId: merchantLink.id,
             }),
           });
 
@@ -3520,11 +3520,97 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } else {
           return res.status(400).json({ success: false, error: result.error });
         }
+      } else if (activeProvider === "paydunya") {
+        // Use Paydunya SOFTPAY for API payments
+        console.log(`[API_PAYMENT] Using Paydunya SOFTPAY for ${country}/${operator}`);
+        
+        const effectiveCustomerName = customerName || transaction.customerName || "Client";
+        const effectivePhone = customerPhone || transaction.customerPhone || "";
+        
+        const paydunyaData = {
+          invoice: {
+            total_amount: Math.floor(transaction.amount),
+            description: transaction.description || `Paiement API de ${transaction.amount} XOF`,
+            customer: {
+              name: effectiveCustomerName,
+              email: "noreply@bkapay.com",
+              phone: effectivePhone,
+            },
+          },
+          store: {
+            name: "BKApay",
+          },
+          custom_data: {
+            user_id: apiKey.userId,
+            original_transaction_id: transaction.id,
+            type: "api_payment",
+            country,
+            operator,
+            phone: effectivePhone,
+          },
+          actions: {
+            callback_url: `${process.env.BASE_URL || 'https://bkapay.com'}/api/webhooks/paydunya`,
+          },
+        };
+
+        const paydunyaResponse = await callPaydunyaAPI("/checkout-invoice/create", paydunyaData);
+
+        if (paydunyaResponse.response_code === "00" && paydunyaResponse.token) {
+          // Update the existing transaction with Paydunya token
+          await storage.updateTransaction(transaction.id, {
+            paydunyaToken: paydunyaResponse.token,
+            country,
+            operator,
+          });
+
+          const operatorKey = getOperatorKey(operator, country);
+          const needsOTP = operatorKey ? requiresOTP(operatorKey) : false;
+          const twoStep = operatorKey ? requiresTwoStep(operatorKey) : false;
+
+          if (!needsOTP && !twoStep && operatorKey) {
+            const paymentData: SoftpayPaymentData = {
+              customerName: effectiveCustomerName,
+              customerEmail: "noreply@bkapay.com",
+              phoneNumber: effectivePhone,
+              invoiceToken: paydunyaResponse.token,
+            };
+
+            const softpayResult = await callPaydunyaSoftpay(operator, country, paymentData);
+
+            if (softpayResult.success) {
+              return res.json({
+                success: true,
+                transactionId: transaction.id,
+                token: paydunyaResponse.token,
+                message: softpayResult.message || "Validez le paiement sur votre telephone",
+                redirectUrl: softpayResult.url,
+                provider: "paydunya",
+              });
+            } else {
+              return res.status(400).json({ 
+                success: false, 
+                error: softpayResult.message || "Erreur lors du paiement" 
+              });
+            }
+          }
+
+          return res.json({
+            success: true,
+            transactionId: transaction.id,
+            token: paydunyaResponse.token,
+            message: "Suivez les instructions pour valider le paiement",
+            provider: "paydunya",
+          });
+        } else {
+          return res.status(400).json({ 
+            success: false, 
+            error: paydunyaResponse.response_text || "Erreur lors de la creation de la facture" 
+          });
+        }
       } else {
-        return res.json({
+        return res.status(503).json({
           success: false,
-          error: "Veuillez utiliser le flux API standard",
-          useSoftpay: true,
+          error: "Fournisseur de paiement non supporte",
         });
       }
     } catch (error: any) {
