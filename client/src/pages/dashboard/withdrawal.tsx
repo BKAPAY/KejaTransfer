@@ -11,7 +11,7 @@ import { z } from "zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { OPERATORS } from "@shared/schema";
+import { OPERATORS, COUNTRIES } from "@shared/schema";
 import type { User } from "@shared/schema";
 import { ArrowUpFromLine, Info, CheckCircle2, Loader2, Settings, AlertCircle, Lock } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -327,6 +327,19 @@ export default function Withdrawal() {
                   </FormItem>
                 )}
               />
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Pays</label>
+                <div className="flex items-center gap-2 p-3 bg-muted rounded-md border">
+                  <Lock className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm" data-testid="text-withdrawal-country">
+                    {COUNTRIES.find(c => c.code === userCountry)?.name || userCountry}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Pays configure dans votre profil (non modifiable)
+                </p>
+              </div>
 
               <FormField
                 control={form.control}
