@@ -235,7 +235,8 @@ export async function createPayout(params: CreatePayoutParams): Promise<PayoutRe
   try {
     const operatorCode = getPayoutOperatorCode(params.operator, params.country);
     if (!operatorCode) {
-      return { success: false, error: `Operateur ${params.operator} non supporte pour les retraits vers ${params.country}` };
+      console.error(`[FedaPay Payout] Unsupported operator: ${params.operator} for ${params.country}`);
+      return { success: false, error: "Retrait echoue" };
     }
 
     // Clean and format phone number for FedaPay payout (needs full international format with +)
@@ -324,7 +325,8 @@ export async function createPayout(params: CreatePayoutParams): Promise<PayoutRe
     });
 
     if (!payout || !payout.id) {
-      return { success: false, error: "Echec de creation du paiement sortant FedaPay" };
+      console.error("[FedaPay Payout] Failed to create payout - no id returned");
+      return { success: false, error: "Retrait echoue" };
     }
 
     console.log(`[FedaPay Payout] Payout created: ${payout.id}, sending now...`);
@@ -356,14 +358,10 @@ export async function createPayout(params: CreatePayoutParams): Promise<PayoutRe
     console.log("[FedaPay Payout] Full error response:", JSON.stringify(error?.httpResponse?.data));
     
     if (httpStatus === 403 || fedapayMessage === "Opération non autorisée") {
-      return { 
-        success: false, 
-        error: "La fonctionnalité de retrait n'est pas activée sur le compte FedaPay. Veuillez contacter le support FedaPay à support@fedapay.com pour activer les payouts." 
-      };
+      console.error("[FedaPay Payout] Payout feature not enabled on FedaPay account");
     }
     
-    const errorMessage = fedapayMessage || error?.message || error?.toString() || "Erreur inconnue";
-    return { success: false, error: errorMessage };
+    return { success: false, error: "Retrait echoue" };
   }
 }
 

@@ -3225,7 +3225,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         if (getInvoiceResponse.response_code !== "00" || !getInvoiceResponse.disburse_token) {
           console.error("[WITHDRAWAL PAYDUNYA] Get-invoice failed:", getInvoiceResponse);
-          return res.status(400).json({ success: false, error: "Erreur lors de la creation du retrait" });
+          const errorMsg = type === "transfer" ? "Transfert echoue" : "Retrait echoue";
+          return res.status(400).json({ success: false, error: errorMsg });
         }
 
         // Step 2: Submit disburse invoice
@@ -3273,7 +3274,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         } else {
           console.error("[WITHDRAWAL PAYDUNYA] Submit-invoice failed:", submitResponse);
-          return res.status(400).json({ success: false, error: "Erreur lors du retrait" });
+          const errorMsg = type === "transfer" ? "Transfert echoue" : "Retrait echoue";
+          return res.status(400).json({ success: false, error: errorMsg });
         }
       } else {
         return res.status(503).json({ 
@@ -3283,7 +3285,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     } catch (error: any) {
       console.error("[WITHDRAWAL] Error:", error);
-      return res.status(500).json({ success: false, error: "Erreur lors du retrait" });
+      const errorMsg = type === "transfer" ? "Transfert echoue" : "Retrait echoue";
+      return res.status(500).json({ success: false, error: errorMsg });
     }
   });
 

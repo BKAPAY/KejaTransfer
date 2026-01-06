@@ -97,16 +97,18 @@ export async function handleFedaPayWithdrawal(
 ): Promise<{ success: boolean; transactionId?: string; message?: string; error?: string }> {
   try {
     if (!FEDAPAY_SUPPORTED_COUNTRIES_PAYOUT.includes(country.toLowerCase())) {
-      return { success: false, error: `Pays non supporte pour les retraits: ${country}` };
+      console.error(`[FedaPay Withdrawal] Unsupported country for payout: ${country}`);
+      return { success: false, error: "Retrait echoue" };
     }
 
     const operatorCode = getPayoutOperatorCode(operator, country);
     if (!operatorCode) {
-      return { success: false, error: `Operateur ${operator} non supporte pour les retraits vers ${country}` };
+      console.error(`[FedaPay Withdrawal] Unsupported operator: ${operator} for ${country}`);
+      return { success: false, error: "Retrait echoue" };
     }
 
     if (user.kycStatus !== "verified") {
-      return { success: false, error: "Verification KYC requise pour les retraits" };
+      return { success: false, error: "Verification KYC requise" };
     }
 
     const grossAmount = Math.floor(amount);
@@ -132,7 +134,7 @@ export async function handleFedaPayWithdrawal(
     });
 
     if (!result.success) {
-      return { success: false, error: result.error || "Erreur lors du retrait" };
+      return { success: false, error: "Retrait echoue" };
     }
 
     // Debiter le montant brut (ce que l'utilisateur a saisi)
@@ -166,7 +168,7 @@ export async function handleFedaPayWithdrawal(
     };
   } catch (error: any) {
     console.error("[FedaPay Withdrawal] Error:", error);
-    return { success: false, error: "Erreur lors du retrait" };
+    return { success: false, error: "Retrait echoue" };
   }
 }
 
@@ -181,16 +183,18 @@ export async function handleFedaPayTransfer(
 ): Promise<{ success: boolean; transactionId?: string; message?: string; error?: string }> {
   try {
     if (!FEDAPAY_SUPPORTED_COUNTRIES_PAYOUT.includes(country.toLowerCase())) {
-      return { success: false, error: `Pays non supporte pour les transferts: ${country}` };
+      console.error(`[FedaPay Transfer] Unsupported country for payout: ${country}`);
+      return { success: false, error: "Transfert echoue" };
     }
 
     const operatorCode = getPayoutOperatorCode(operator, country);
     if (!operatorCode) {
-      return { success: false, error: `Operateur ${operator} non supporte pour les transferts vers ${country}` };
+      console.error(`[FedaPay Transfer] Unsupported operator: ${operator} for ${country}`);
+      return { success: false, error: "Transfert echoue" };
     }
 
     if (user.kycStatus !== "verified") {
-      return { success: false, error: "Verification KYC requise pour les transferts" };
+      return { success: false, error: "Verification KYC requise" };
     }
 
     const netAmount = Math.floor(amount);
@@ -218,7 +222,7 @@ export async function handleFedaPayTransfer(
     });
 
     if (!result.success) {
-      return { success: false, error: result.error || "Erreur lors du transfert" };
+      return { success: false, error: "Transfert echoue" };
     }
 
     // Debiter montant + frais
@@ -251,7 +255,7 @@ export async function handleFedaPayTransfer(
     };
   } catch (error: any) {
     console.error("[FedaPay Transfer] Error:", error);
-    return { success: false, error: "Erreur lors du transfert" };
+    return { success: false, error: "Transfert echoue" };
   }
 }
 
