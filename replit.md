@@ -44,6 +44,11 @@ The frontend utilizes React 18 with TypeScript, styled with Shadcn UI and Tailwi
   - Transactions are created as "pending" and ONLY marked "completed" after strict FedaPay confirmation
   - Atomic `finalizeIncomingTransaction` function prevents duplicate balance credits from webhook/polling race conditions
   - No transactions are finalized without explicit FedaPay confirmation of payment receipt
+- **Customer Email Privacy (CRITICAL)**: 
+  - Customer email addresses are NEVER sent to payment providers (FedaPay, Paydunya, AfribaPay)
+  - All provider API calls use generic email: `noreply@bkapay.com`
+  - This protects customer privacy and prevents providers from contacting customers directly
+  - Customer emails are stored internally for BKApay's own notifications only
 - **Operator Filtering**: Country-specific operator filtering with separate lists for collect (deposits) and payout (withdrawals).
 - **Versioned Documentation**: API documentation is now versioned with URLs like `/documentation/v1.3`. The system supports multiple versions, shows deprecation notices for old versions, and displays changelog for the current version.
 - **User Country System**: Users must select their country from 5 authorized countries (BJ, TG, CI, BF, SN) during registration. Legacy users without country must select it in their profile before using certain features. Country cannot be changed once set.
