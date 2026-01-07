@@ -77,6 +77,43 @@ export function calculateIncomingFee(grossAmount: number, country?: string): {
  * - Store grossAmount in transaction.amount (10000)
  * - Display grossAmount in transaction history (10000)
  */
+/**
+ * Calculate fees when CUSTOMER PAYS FEE for incoming payments
+ * 
+ * @param baseAmount - The amount user wants to receive (e.g., 3500)
+ * @param country - Country code (ignored - 6% for all)
+ * @returns {baseAmount: 3500, feeAmount: 210, totalForProvider: 3710}
+ * 
+ * LOGIQUE FRAIS À LA CHARGE DU CLIENT:
+ * - L'utilisateur crée un lien de 3500 XOF avec customerPaysFee=true
+ * - Les frais sont calculés sur le montant de base: 3500 * 6% = 210 XOF
+ * - Le client paie le TOTAL: 3500 + 210 = 3710 XOF
+ * - Le fournisseur reçoit 3710 XOF
+ * - L'utilisateur reçoit le montant exact: 3500 XOF (sans déduction)
+ * 
+ * Usage:
+ * - Send totalForProvider to payment provider (3710)
+ * - Credit baseAmount to user balance (3500)
+ * - Store baseAmount as the net amount in transaction
+ */
+export function calculateCustomerPaysFee(baseAmount: number, country?: string): {
+  baseAmount: number;
+  feeAmount: number;
+  feePercentage: number;
+  totalForProvider: number;
+} {
+  const feePercentage = getFeePercentage(country);
+  const feeAmount = Math.floor((baseAmount * feePercentage) / 1000);
+  const totalForProvider = baseAmount + feeAmount;
+
+  return {
+    baseAmount,
+    feeAmount,
+    feePercentage,
+    totalForProvider,
+  };
+}
+
 export function calculateOutgoingFee(grossAmount: number, country?: string): {
   grossAmount: number;
   feeAmount: number;

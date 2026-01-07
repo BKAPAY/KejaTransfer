@@ -9,7 +9,7 @@ import { z } from "zod";
 import { insertUserSchema, insertPaymentLinkSchema, insertMerchantLinkSchema, insertApiKeySchema } from "@shared/schema";
 import { validatePhoneOperator } from "@shared/phone-utils";
 import { randomUUID } from "crypto";
-import { calculateIncomingFee, calculateOutgoingFee } from "./utils/fees";
+import { calculateIncomingFee, calculateOutgoingFee, calculateCustomerPaysFee } from "./utils/fees";
 import { sendPaymentCallback } from "./utils/callback";
 import { 
   SOFTPAY_OPERATORS, 
@@ -1581,11 +1581,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Ce lien n'existe pas ou a été supprimé" });
       }
 
+      // Calculate amount to send to provider based on customerPaysFee setting
+      let amountForProvider: number;
+      let feeAmount: number;
+      let feePercentage: number;
+      let netAmountForUser: number;
+      
+      if (paymentLink.customerPaysFee) {
+        // Customer pays fee: send TOTAL (base + fees) to provider, user receives base amount
+        const feeInfo = calculateCustomerPaysFee(paymentLink.amount, country);
+        amountForProvider = feeInfo.totalForProvider;
+        feeAmount = feeInfo.feeAmount;
+        feePercentage = feeInfo.feePercentage;
+        netAmountForUser = feeInfo.baseAmount;
+        console.log("[PAYMENT_LINK] Customer pays fee - sending total to provider:", {
+          baseAmount: paymentLink.amount,
+          fee: feeAmount,
+          totalForProvider: amountForProvider,
+          userReceives: netAmountForUser,
+        });
+      } else {
+        // User pays fee: send base amount, user receives net (base - fees)
+        const feeInfo = calculateIncomingFee(paymentLink.amount, country);
+        amountForProvider = feeInfo.grossAmount;
+        feeAmount = feeInfo.feeAmount;
+        feePercentage = feeInfo.feePercentage;
+        netAmountForUser = feeInfo.netAmount;
+      }
+
       // Call Paydunya API to create checkout invoice with customer info
       // Note: Use generic email for privacy - never send real customer emails to providers
       const paydunyaData = {
         invoice: {
-          total_amount: paymentLink.amount,
+          total_amount: amountForProvider,
           description: `Paiement - ${paymentLink.productName}`,
           customer: {
             name: customerName || "Client",
@@ -1605,6 +1633,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           customer_phone: customerPhone,
           country,
           operator,
+          customerPaysFee: paymentLink.customerPaysFee,
         },
         actions: {
           callback_url: `${process.env.BASE_URL || 'http://localhost:5000'}/api/webhooks/paydunya`,
@@ -1616,18 +1645,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const paydunyaResponse = await callPaydunyaAPI("/checkout-invoice/create", paydunyaData);
 
       if (paydunyaResponse.response_code === "00") {
-        // Calculate fees for INCOMING payment (client pays GROSS)
-        const grossAmount = paymentLink.amount;
-        const feeInfo = calculateIncomingFee(grossAmount, country);
-        
-        // Create transaction with GROSS amount (what client pays)
+        // Create transaction
         const transactionId = randomUUID();
         await storage.createTransaction({
           userId: paymentLink.userId,
           type: "payment_link",
-          amount: feeInfo.grossAmount, // Store GROSS amount (e.g., 2000)
-          fee: feeInfo.feeAmount, // Store fee (e.g., 60)
-          feePercentage: feeInfo.feePercentage, // Store percentage (30 or 60)
+          amount: amountForProvider, // Store what client actually pays
+          fee: feeAmount,
+          feePercentage: feePercentage,
           currency: "XOF",
           status: "pending",
           country,
@@ -1639,6 +1664,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           paydunyaToken: paydunyaResponse.token, // Store in dedicated column
           metadata: JSON.stringify({
             paymentLinkId: paymentLink.id,
+            customerPaysFee: paymentLink.customerPaysFee,
+            baseAmount: paymentLink.amount,
+            netAmountForUser: netAmountForUser,
           }),
         });
 
@@ -3285,7 +3313,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     } catch (error: any) {
       console.error("[WITHDRAWAL] Error:", error);
-      const errorMsg = type === "transfer" ? "Transfert echoue" : "Retrait echoue";
+      const errorMsg = req.body?.type === "transfer" ? "Transfert echoue" : "Retrait echoue";
       return res.status(500).json({ success: false, error: errorMsg });
     }
   });
@@ -3341,9 +3369,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         const effectiveCustomerName = customerName || "Client";
         
+        // Calculate amount based on customerPaysFee setting
+        let amountForProvider: number;
+        let feeAmount: number;
+        let feePercentage: number;
+        let netAmountForUser: number;
+        
+        if (paymentLink.customerPaysFee) {
+          const feeInfo = calculateCustomerPaysFee(paymentLink.amount, country);
+          amountForProvider = feeInfo.totalForProvider;
+          feeAmount = feeInfo.feeAmount;
+          feePercentage = feeInfo.feePercentage;
+          netAmountForUser = feeInfo.baseAmount;
+        } else {
+          const feeInfo = calculateIncomingFee(paymentLink.amount, country);
+          amountForProvider = feeInfo.grossAmount;
+          feeAmount = feeInfo.feeAmount;
+          feePercentage = feeInfo.feePercentage;
+          netAmountForUser = feeInfo.netAmount;
+        }
+        
         const paydunyaData = {
           invoice: {
-            total_amount: Math.floor(paymentLink.amount),
+            total_amount: Math.floor(amountForProvider),
             description: paymentLink.description || `Paiement de ${paymentLink.amount} XOF`,
             customer: {
               name: effectiveCustomerName,
@@ -3361,6 +3409,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             country,
             operator,
             phone: customerPhone,
+            customerPaysFee: paymentLink.customerPaysFee,
           },
           actions: {
             callback_url: `${process.env.BASE_URL || 'https://bkapay.com'}/api/webhooks/paydunya`,
@@ -3370,16 +3419,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const paydunyaResponse = await callPaydunyaAPI("/checkout-invoice/create", paydunyaData);
 
         if (paydunyaResponse.response_code === "00" && paydunyaResponse.token) {
-          const grossAmount = Math.floor(paymentLink.amount);
-          const feeInfo = calculateIncomingFee(grossAmount, country);
-          
           const transactionId = randomUUID();
           await storage.createTransaction({
             userId: paymentLink.userId,
             type: "payment_link",
-            amount: feeInfo.grossAmount,
-            fee: feeInfo.feeAmount,
-            feePercentage: feeInfo.feePercentage,
+            amount: amountForProvider,
+            fee: feeAmount,
+            feePercentage: feePercentage,
             currency: "XOF",
             status: "pending",
             country,
@@ -3391,6 +3437,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               customerName: effectiveCustomerName,
               provider: "paydunya",
               paymentLinkId: paymentLink.id,
+              customerPaysFee: paymentLink.customerPaysFee,
+              baseAmount: paymentLink.amount,
+              netAmountForUser: netAmountForUser,
             }),
           });
 

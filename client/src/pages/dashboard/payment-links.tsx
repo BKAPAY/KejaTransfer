@@ -65,7 +65,14 @@ const compressImage = (file: File): Promise<string> => {
 const paymentLinkSchema = z.object({
   productName: z.string().min(1, "Le nom du produit est requis"),
   description: z.string().optional(),
-  amount: z.number().min(1, "Le montant doit être supérieur à 0"),
+  amount: z.preprocess(
+    (val) => {
+      if (val === "" || val === undefined || val === null) return undefined;
+      const num = Number(val);
+      return isNaN(num) ? undefined : num;
+    },
+    z.number({ invalid_type_error: "Veuillez entrer un montant valide" }).min(500, "Le montant minimum est de 500 XOF")
+  ),
   imageFile: z.instanceof(File).optional(),
   allowedCountries: z.array(z.string()).default([]),
   customerPaysFee: z.boolean().default(false),
