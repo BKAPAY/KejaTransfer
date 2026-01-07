@@ -335,6 +335,7 @@ export const OPERATORS = {
   TG: [
     { code: "moov", name: "Moov Money", requiresOtp: false },
     { code: "tmoney", name: "Togocell", requiresOtp: false },
+    { code: "togocom", name: "TogoCom (Togocel)", requiresOtp: false },
   ],
   ML: [
     { code: "orange", name: "Orange Money", requiresOtp: false },
@@ -389,7 +390,7 @@ export const COLLECT_OPERATORS: Record<string, string[]> = {
   CI: ["orange", "moov", "mtn", "wave"],
   SN: ["orange", "free", "expresso", "wave"],
   BF: ["orange", "moov", "wave"],
-  TG: ["moov", "tmoney"],
+  TG: ["moov", "tmoney", "togocom"],
   ML: ["orange", "moov"],
   GN: ["orange", "mtn"],
   NE: ["airtel"],
@@ -408,7 +409,7 @@ export const PAYOUT_OPERATORS: Record<string, string[]> = {
   CI: ["orange", "moov", "mtn", "wave"],
   SN: ["orange", "free", "expresso", "wave"],
   BF: ["orange", "moov", "wave"],
-  TG: ["moov", "tmoney"],
+  TG: ["moov", "tmoney", "togocom"],
   ML: ["orange", "moov"],
   GN: ["orange", "mtn"],
   NE: ["airtel"],
