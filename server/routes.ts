@@ -3240,9 +3240,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const callbackUrl = `${process.env.BASE_URL || 'https://bkapay.com'}/api/webhooks/paydunya-disburse`;
 
         // Step 1: Get disburse invoice
+        // Pour les retraits, envoyer le montant NET (après déduction des frais)
         const getInvoiceData = {
           account_alias: cleanPhone,
-          amount: Math.floor(amount),
+          amount: feeInfo.amountReceived,
           withdraw_mode: withdrawMode,
           callback_url: callbackUrl,
         };
@@ -3283,7 +3284,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             country,
             operator,
             customerPhone: cleanPhone,
-            description: type === "transfer" ? `Transfert de ${amount} XOF vers ${cleanPhone}` : `Retrait de ${amount} XOF vers ${cleanPhone}`,
+            description: type === "transfer" ? `Transfert de ${amount} XOF vers ${cleanPhone}` : `Retrait de ${amount} XOF (recu: ${feeInfo.amountReceived} XOF)`,
             paydunyaToken: getInvoiceResponse.disburse_token,
             metadata: JSON.stringify({
               paydunyaTransactionId: submitResponse.transaction_id,
