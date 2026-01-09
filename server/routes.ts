@@ -3239,11 +3239,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const callbackUrl = `${process.env.BASE_URL || 'https://bkapay.com'}/api/webhooks/paydunya-disburse`;
 
+        // Logique différente pour transfert vs retrait
+        // TRANSFERT: L'utilisateur écrit 1000 → débité 1060 → fournisseur reçoit 1000 → destinataire reçoit 1000
+        // RETRAIT: L'utilisateur écrit 1000 → débité 1000 → fournisseur reçoit 940 → utilisateur reçoit 940
+        const isTransfer = type === "transfer";
+        const amountForProvider = isTransfer ? Math.floor(amount) : feeInfo.amountReceived;
+        const amountToDebit = isTransfer ? (Math.floor(amount) + feeInfo.feeAmount) : feeInfo.totalDeductedFromBalance;
+
+        // Vérifier le solde avec le bon montant à débiter
+        if (user.balance < amountToDebit) {
+          return res.status(400).json({ 
+            success: false, 
+            error: "Solde insuffisant" 
+          });
+        }
+
         // Step 1: Get disburse invoice
-        // Pour les retraits, envoyer le montant NET (après déduction des frais)
         const getInvoiceData = {
           account_alias: cleanPhone,
-          amount: feeInfo.amountReceived,
+          amount: amountForProvider,
           withdraw_mode: withdrawMode,
           callback_url: callbackUrl,
         };
@@ -3269,13 +3283,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log("[WITHDRAWAL PAYDUNYA] Submit-invoice response:", submitResponse);
 
         if (submitResponse.response_code === "00") {
-          // Success - Deduct balance
-          await storage.updateUserBalance(req.session.userId!, -feeInfo.totalDeductedFromBalance);
+          // Success - Deduct balance (montant différent pour transfert vs retrait)
+          await storage.updateUserBalance(req.session.userId!, -amountToDebit);
           
           // Create transaction record
           const tx = await storage.createTransaction({
             userId: req.session.userId!,
-            type: type === "transfer" ? "transfer" : "withdrawal",
+            type: isTransfer ? "transfer" : "withdrawal",
             amount: Math.floor(amount),
             fee: feeInfo.feeAmount,
             feePercentage: feeInfo.feePercentage,
@@ -3284,22 +3298,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
             country,
             operator,
             customerPhone: cleanPhone,
-            description: type === "transfer" ? `Transfert de ${amount} XOF vers ${cleanPhone}` : `Retrait de ${amount} XOF (recu: ${feeInfo.amountReceived} XOF)`,
+            description: isTransfer 
+              ? `Transfert de ${Math.floor(amount)} XOF vers ${cleanPhone}` 
+              : `Retrait de ${Math.floor(amount)} XOF (recu: ${feeInfo.amountReceived} XOF)`,
             paydunyaToken: getInvoiceResponse.disburse_token,
             metadata: JSON.stringify({
               paydunyaTransactionId: submitResponse.transaction_id,
               disburseId: submitData.disburse_id,
               provider: "paydunya",
+              amountSentToProvider: amountForProvider,
+              amountDebitedFromBalance: amountToDebit,
             }),
           });
 
-          console.log("[WITHDRAWAL PAYDUNYA] Success - Balance deducted:", feeInfo.totalDeductedFromBalance);
+          console.log(`[${isTransfer ? 'TRANSFER' : 'WITHDRAWAL'} PAYDUNYA] Success - Balance deducted: ${amountToDebit}, Sent to provider: ${amountForProvider}`);
 
           return res.json({
             success: true,
             transactionId: tx.id,
-            message: type === "transfer" ? "Transfert effectue avec succes" : "Retrait effectue avec succes",
-            totalDeducted: feeInfo.totalDeductedFromBalance,
+            message: isTransfer ? "Transfert effectue avec succes" : "Retrait effectue avec succes",
+            totalDeducted: amountToDebit,
           });
         } else {
           console.error("[WITHDRAWAL PAYDUNYA] Submit-invoice failed:", submitResponse);
