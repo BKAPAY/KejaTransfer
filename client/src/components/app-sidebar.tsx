@@ -27,6 +27,7 @@ import {
   TrendingUp,
   Shield,
   Globe,
+  Bitcoin,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import type { User as UserType } from "@shared/schema";
@@ -120,7 +121,7 @@ export function AppSidebar() {
     }
   };
 
-  // Ajouter item Admin si l'utilisateur est admin
+  // Ajouter items Admin si l'utilisateur est admin
   const sidebarMenuItems = [...menuItems];
   if (user?.isAdmin) {
     sidebarMenuItems.push({
@@ -128,6 +129,12 @@ export function AppSidebar() {
       url: "/dashboard/admin",
       icon: Shield,
       testId: "nav-admin",
+    });
+    sidebarMenuItems.push({
+      title: "Config Crypto",
+      url: "/dashboard/crypto-config",
+      icon: Bitcoin,
+      testId: "nav-crypto-config",
     });
   }
 

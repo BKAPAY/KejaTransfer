@@ -21,6 +21,7 @@ interface ProviderConfig {
   publicKey: string | null;
   masterKey: string | null;
   token: string | null;
+  ipnSecret: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -31,6 +32,7 @@ interface ProviderForm {
   publicKey: string;
   masterKey: string;
   token: string;
+  ipnSecret: string;
 }
 
 const PROVIDER_INFO = {
@@ -55,6 +57,13 @@ const PROVIDER_INFO = {
     fields: ["secretKey"],
     countries: "7 pays (Bénin, Togo, CI, Sénégal, Guinée, Niger, BF)",
   },
+  nowpayments: {
+    name: "NOWPayments",
+    description: "Paiements en cryptomonnaies (Bitcoin, Ethereum, USDT, etc.)",
+    color: "bg-orange-500",
+    fields: ["apiKey", "ipnSecret"],
+    countries: "Global - Crypto uniquement",
+  },
 };
 
 const getFieldLabel = (provider: string, field: string): string => {
@@ -70,12 +79,20 @@ const getFieldLabel = (provider: string, field: string): string => {
   if (provider === "fedapay") {
     if (field === "secretKey") return "Clé Secrète (sk_live_xxx ou sk_sandbox_xxx)";
   }
+  if (provider === "nowpayments") {
+    switch (field) {
+      case "apiKey": return "Clé API NOWPayments";
+      case "ipnSecret": return "IPN Secret (pour les webhooks)";
+      default: return field;
+    }
+  }
   switch (field) {
     case "apiKey": return "Clé API";
     case "secretKey": return "Clé Secrète";
     case "publicKey": return "Clé Publique";
     case "masterKey": return "Master Key";
     case "token": return "Token";
+    case "ipnSecret": return "IPN Secret";
     default: return field;
   }
 };
@@ -85,9 +102,10 @@ export default function FournisseursPage() {
   const [activeTab, setActiveTab] = useState("afribapay");
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
   const [forms, setForms] = useState<Record<string, ProviderForm>>({
-    afribapay: { apiKey: "", secretKey: "", publicKey: "", masterKey: "", token: "" },
-    paydunya: { apiKey: "", secretKey: "", publicKey: "", masterKey: "", token: "" },
-    fedapay: { apiKey: "", secretKey: "", publicKey: "", masterKey: "", token: "" },
+    afribapay: { apiKey: "", secretKey: "", publicKey: "", masterKey: "", token: "", ipnSecret: "" },
+    paydunya: { apiKey: "", secretKey: "", publicKey: "", masterKey: "", token: "", ipnSecret: "" },
+    fedapay: { apiKey: "", secretKey: "", publicKey: "", masterKey: "", token: "", ipnSecret: "" },
+    nowpayments: { apiKey: "", secretKey: "", publicKey: "", masterKey: "", token: "", ipnSecret: "" },
   });
 
   const { data: providers, isLoading } = useQuery<ProviderConfig[]>({
@@ -130,6 +148,7 @@ export default function FournisseursPage() {
     if (form.publicKey) updates.publicKey = form.publicKey;
     if (form.masterKey) updates.masterKey = form.masterKey;
     if (form.token) updates.token = form.token;
+    if (form.ipnSecret) updates.ipnSecret = form.ipnSecret;
 
     if (Object.keys(updates).length === 0) {
       toast({
@@ -143,7 +162,7 @@ export default function FournisseursPage() {
     updateMutation.mutate({ provider, updates });
     setForms(prev => ({
       ...prev,
-      [provider]: { apiKey: "", secretKey: "", publicKey: "", masterKey: "", token: "" },
+      [provider]: { apiKey: "", secretKey: "", publicKey: "", masterKey: "", token: "", ipnSecret: "" },
     }));
   };
 

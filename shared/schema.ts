@@ -136,18 +136,39 @@ export const countryStatus = pgTable("country_status", {
 // Payment provider configurations (API keys)
 export const providerConfigs = pgTable("provider_configs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  provider: text("provider").notNull().unique(), // "afribapay", "paydunya", "fedapay"
+  provider: text("provider").notNull().unique(), // "afribapay", "paydunya", "fedapay", "nowpayments"
   isActive: boolean("is_active").notNull().default(false),
   apiKey: text("api_key"), // Main API key
   secretKey: text("secret_key"), // Secret key if needed
   publicKey: text("public_key"), // Public key if needed
   masterKey: text("master_key"), // Master key for Paydunya
   token: text("token"), // Token for Paydunya
+  ipnSecret: text("ipn_secret"), // IPN secret for NOWPayments webhooks
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
 export type ProviderConfig = typeof providerConfigs.$inferSelect;
+
+// Cryptocurrency configuration for NOWPayments
+export const cryptoCurrencies = pgTable("crypto_currencies", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  code: text("code").notNull().unique(), // "btc", "eth", "usdt", "ltc", etc.
+  name: text("name").notNull(), // "Bitcoin", "Ethereum", etc.
+  symbol: text("symbol").notNull(), // "BTC", "ETH", etc.
+  isEnabled: boolean("is_enabled").notNull().default(true),
+  minAmount: integer("min_amount"), // Minimum payment amount in USD cents
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export type CryptoCurrency = typeof cryptoCurrencies.$inferSelect;
+export const insertCryptoCurrencySchema = createInsertSchema(cryptoCurrencies).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertCryptoCurrency = z.infer<typeof insertCryptoCurrencySchema>;
 
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({

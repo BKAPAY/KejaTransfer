@@ -121,6 +121,16 @@ export interface IStorage {
   verifyCode(email: string, code: string, type: "signup" | "password_reset"): Promise<boolean>;
   markCodeAsUsed(email: string, code: string, type: "signup" | "password_reset"): Promise<void>;
   cleanupExpiredCodes(): Promise<void>;
+
+  // Crypto Currencies
+  getAllCryptoCurrencies(): Promise<schema.CryptoCurrency[]>;
+  getEnabledCryptoCurrencies(): Promise<schema.CryptoCurrency[]>;
+  getCryptoCurrencyByCode(code: string): Promise<schema.CryptoCurrency | undefined>;
+  createCryptoCurrency(data: schema.InsertCryptoCurrency): Promise<schema.CryptoCurrency>;
+  updateCryptoCurrency(code: string, updates: Partial<schema.InsertCryptoCurrency>): Promise<schema.CryptoCurrency | undefined>;
+
+  // Transactions by metadata
+  getTransactionsByMetadataPaymentId(paymentId: string): Promise<Transaction[]>;
 }
 
 export class DbStorage implements IStorage {
@@ -1151,7 +1161,7 @@ export class DbStorage implements IStorage {
   }
 
   async initializeProviderConfigs(): Promise<void> {
-    const providers = ["afribapay", "paydunya", "fedapay"];
+    const providers = ["afribapay", "paydunya", "fedapay", "nowpayments"];
     const existing = await this.getProviderConfigs();
     const existingSet = new Set(existing.map(p => p.provider));
 
@@ -1235,6 +1245,55 @@ export class DbStorage implements IStorage {
     await db
       .delete(schema.verificationCodes)
       .where(sql`${schema.verificationCodes.expiresAt} < NOW()`);
+  }
+
+  // Crypto Currencies
+  async getAllCryptoCurrencies(): Promise<schema.CryptoCurrency[]> {
+    return db.select().from(schema.cryptoCurrencies);
+  }
+
+  async getEnabledCryptoCurrencies(): Promise<schema.CryptoCurrency[]> {
+    return db
+      .select()
+      .from(schema.cryptoCurrencies)
+      .where(eq(schema.cryptoCurrencies.isEnabled, true));
+  }
+
+  async getCryptoCurrencyByCode(code: string): Promise<schema.CryptoCurrency | undefined> {
+    const results = await db
+      .select()
+      .from(schema.cryptoCurrencies)
+      .where(eq(schema.cryptoCurrencies.code, code))
+      .limit(1);
+    return results[0];
+  }
+
+  async createCryptoCurrency(data: schema.InsertCryptoCurrency): Promise<schema.CryptoCurrency> {
+    const results = await db.insert(schema.cryptoCurrencies).values(data).returning();
+    return results[0];
+  }
+
+  async updateCryptoCurrency(code: string, updates: Partial<schema.InsertCryptoCurrency>): Promise<schema.CryptoCurrency | undefined> {
+    const results = await db
+      .update(schema.cryptoCurrencies)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(schema.cryptoCurrencies.code, code))
+      .returning();
+    return results[0];
+  }
+
+  // Transactions by metadata
+  async getTransactionsByMetadataPaymentId(paymentId: string): Promise<Transaction[]> {
+    const allTransactions = await db.select().from(schema.transactions);
+    return allTransactions.filter((t) => {
+      if (!t.metadata) return false;
+      try {
+        const meta = JSON.parse(t.metadata);
+        return meta.paymentId?.toString() === paymentId;
+      } catch {
+        return false;
+      }
+    });
   }
 }
 

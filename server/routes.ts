@@ -46,6 +46,7 @@ import {
   sendVerificationEmail,
   isEmailServiceConfigured,
 } from "./email-service";
+import nowpaymentsRoutes from "./nowpayments-routes";
 
 declare module "express-session" {
   interface SessionData {
@@ -485,6 +486,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       },
     })
   );
+
+  // ===== NOWPayments Routes =====
+  app.use(nowpaymentsRoutes);
 
   // ===== Auth Routes =====
   
