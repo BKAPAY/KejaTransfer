@@ -7,10 +7,19 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Loader2, Key, Shield, Eye, EyeOff, Save, Check, AlertCircle } from "lucide-react";
+import { Loader2, Key, Shield, Eye, EyeOff, Save, Check, AlertCircle, Bitcoin, Coins, CircleDollarSign } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+
+interface CryptoCurrency {
+  id: string | null;
+  code: string;
+  name: string;
+  symbol: string;
+  isEnabled: boolean;
+}
 
 interface ProviderConfig {
   id: string;
@@ -96,6 +105,127 @@ const getFieldLabel = (provider: string, field: string): string => {
     default: return field;
   }
 };
+
+function CryptoConfigSection() {
+  const { toast } = useToast();
+
+  const { data: cryptoStatus, isLoading: statusLoading } = useQuery<{ available: boolean; message: string }>({
+    queryKey: ["/api/crypto/status"],
+  });
+
+  const { data: currencies, isLoading: currenciesLoading } = useQuery<CryptoCurrency[]>({
+    queryKey: ["/api/admin/crypto-currencies"],
+  });
+
+  const updateCryptoMutation = useMutation({
+    mutationFn: async ({ code, isEnabled }: { code: string; isEnabled: boolean }) => {
+      return apiRequest("PUT", `/api/admin/crypto-currencies/${code}`, { isEnabled });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Succès",
+        description: "Cryptomonnaie mise à jour",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/crypto-currencies"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erreur",
+        description: error.message || "Impossible de mettre à jour",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const toggleCrypto = (code: string, currentEnabled: boolean) => {
+    updateCryptoMutation.mutate({ code, isEnabled: !currentEnabled });
+  };
+
+  if (statusLoading || currenciesLoading) {
+    return (
+      <Card className="mt-4">
+        <CardContent className="py-6">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-20" />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="mt-4">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Coins className="h-5 w-5" />
+          Cryptomonnaies acceptées
+        </CardTitle>
+        <CardDescription>
+          Activez ou désactivez les cryptomonnaies pour les paiements
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {!cryptoStatus?.available && (
+          <Alert variant="destructive">
+            <AlertDescription>
+              NOWPayments n'est pas configuré. Veuillez d'abord entrer la clé API ci-dessus.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {cryptoStatus?.available && (
+          <Alert>
+            <AlertDescription className="flex items-center gap-2">
+              <div className="h-2 w-2 rounded-full bg-green-500" />
+              NOWPayments connecté - Les cryptomonnaies sont opérationnelles
+            </AlertDescription>
+          </Alert>
+        )}
+
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {currencies?.map((crypto) => (
+            <div
+              key={crypto.code}
+              className="flex items-center justify-between p-4 border rounded-lg"
+            >
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
+                  {crypto.symbol === "BTC" ? (
+                    <Bitcoin className="h-5 w-5 text-orange-500" />
+                  ) : crypto.symbol === "USDT" ? (
+                    <CircleDollarSign className="h-5 w-5 text-green-500" />
+                  ) : (
+                    <Coins className="h-5 w-5 text-primary" />
+                  )}
+                </div>
+                <div>
+                  <p className="font-medium">{crypto.name}</p>
+                  <Badge variant="secondary" className="text-xs">
+                    {crypto.symbol}
+                  </Badge>
+                </div>
+              </div>
+              <Switch
+                checked={crypto.isEnabled}
+                onCheckedChange={() => toggleCrypto(crypto.code, crypto.isEnabled)}
+                disabled={updateCryptoMutation.isPending || !cryptoStatus?.available}
+                data-testid={`switch-crypto-${crypto.code}`}
+              />
+            </div>
+          ))}
+        </div>
+
+        {(!currencies || currencies.length === 0) && cryptoStatus?.available && (
+          <div className="text-center py-8 text-muted-foreground">
+            Chargement des cryptomonnaies...
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function FournisseursPage() {
   const { toast } = useToast();
@@ -224,7 +354,7 @@ export default function FournisseursPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           {Object.entries(PROVIDER_INFO).map(([key, info]) => {
             const config = getProviderConfig(key);
             return (
@@ -452,6 +582,39 @@ export default function FournisseursPage() {
                         </div>
                       )}
 
+                      {info.fields.includes("ipnSecret") && (
+                        <div className="space-y-2">
+                          <Label htmlFor={`ipnSecret-${provider}`}>{getFieldLabel(provider, "ipnSecret")}</Label>
+                          <div className="flex gap-2">
+                            <div className="relative flex-1">
+                              <Input
+                                id={`ipnSecret-${provider}`}
+                                type={showKeys[`ipnSecret-${provider}`] ? "text" : "password"}
+                                placeholder={config?.ipnSecret ? "••••••••" : "Entrez votre IPN Secret..."}
+                                value={form.ipnSecret}
+                                onChange={(e) => updateForm(provider, "ipnSecret", e.target.value)}
+                                data-testid={`input-ipnSecret-${provider}`}
+                              />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="absolute right-0 top-0 h-full"
+                                onClick={() => toggleShowKey(`ipnSecret-${provider}`)}
+                              >
+                                {showKeys[`ipnSecret-${provider}`] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                              </Button>
+                            </div>
+                          </div>
+                          {config?.ipnSecret && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1">
+                              <Check className="w-3 h-3 text-green-500" />
+                              IPN Secret configuré
+                            </p>
+                          )}
+                        </div>
+                      )}
+
                       <div className="pt-4">
                         <Button
                           onClick={() => saveKeys(provider)}
@@ -471,6 +634,8 @@ export default function FournisseursPage() {
                   </div>
                 </CardContent>
               </Card>
+
+              {provider === "nowpayments" && <CryptoConfigSection />}
             </TabsContent>
           );
         })}

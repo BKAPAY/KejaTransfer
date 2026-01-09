@@ -33,7 +33,6 @@ import KYC from "@/pages/dashboard/kyc";
 import CountryOperatorConfig from "@/pages/dashboard/country-operator-config";
 import Diagnostic from "@/pages/dashboard/diagnostic";
 import Fournisseurs from "@/pages/dashboard/fournisseurs";
-import CryptoConfig from "@/pages/dashboard/crypto-config";
 import Pay from "@/pages/pay";
 import Merchant from "@/pages/merchant";
 import ApiPayment from "@/pages/api-payment";
@@ -153,7 +152,6 @@ function Router() {
           <Route path="/dashboard/country-operator-config" component={CountryOperatorConfig} />
           <Route path="/dashboard/diagnostic" component={Diagnostic} />
           <Route path="/dashboard/fournisseurs" component={Fournisseurs} />
-          <Route path="/dashboard/crypto-config" component={CryptoConfig} />
           <Route component={NotFound} />
         </Switch>
       </DashboardLayout>
