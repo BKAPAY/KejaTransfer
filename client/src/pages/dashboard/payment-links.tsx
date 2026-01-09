@@ -386,13 +386,18 @@ export default function PaymentLinks() {
                       <FormLabel>Montant (XOF)</FormLabel>
                       <FormControl>
                         <Input
-                          type="number"
+                          type="text"
+                          inputMode="numeric"
                           placeholder="10000"
                           data-testid="input-amount"
-                          value={field.value || ""}
+                          value={field.value === undefined || field.value === null ? "" : String(field.value)}
                           onChange={(e) => {
-                            const val = e.target.value;
-                            field.onChange(val === "" ? undefined : Number(val));
+                            const val = e.target.value.replace(/[^0-9]/g, "");
+                            if (val === "") {
+                              field.onChange(undefined);
+                            } else {
+                              field.onChange(Number(val));
+                            }
                           }}
                         />
                       </FormControl>
