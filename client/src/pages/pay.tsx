@@ -222,6 +222,14 @@ export default function Pay() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [savedCountry, setSavedCountry] = useState<string>("");
   const [savedOperator, setSavedOperator] = useState<string>("");
+  
+  // État pour le flux crypto en 2 étapes
+  const [cryptoStep, setCryptoStep] = useState<"info" | "payment">("info");
+  const [cryptoCustomerInfo, setCryptoCustomerInfo] = useState<{
+    customerName: string;
+    customerEmail: string;
+    customerPhone: string;
+  } | null>(null);
   const [copiedUssd, setCopiedUssd] = useState(false);
   const [conversionData, setConversionData] = useState<ConversionData | null>(null);
   const { toast } = useToast();
@@ -1285,14 +1293,106 @@ export default function Pay() {
           <PaymentMethodSelector 
             mobileMoneyContent={mobileMoneyForm}
             cryptoContent={
-              <CryptoPaymentFlow
-                amountXof={totalAmount}
-                paymentLinkId={paymentLink.id}
-                orderDescription={`Paiement ${paymentLink.productName}`}
-                onSuccess={() => {
-                  setPaymentStage("completed");
-                }}
-              />
+              totalAmount >= 500 ? (
+                cryptoStep === "payment" && cryptoCustomerInfo ? (
+                  <div className="space-y-4">
+                    <div className="bg-muted p-3 rounded-md">
+                      <p className="text-sm text-muted-foreground">Montant à payer</p>
+                      <p className="text-xl font-bold">{totalAmount.toLocaleString()} XOF</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {cryptoCustomerInfo.customerName} - {cryptoCustomerInfo.customerEmail}
+                      </p>
+                    </div>
+                    <CryptoPaymentFlow
+                      amountXof={totalAmount}
+                      paymentLinkId={paymentLink.id}
+                      orderDescription={`Paiement ${paymentLink.productName} par ${cryptoCustomerInfo.customerName}`}
+                      onSuccess={() => {
+                        setPaymentStage("completed");
+                      }}
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setCryptoStep("info");
+                        setCryptoCustomerInfo(null);
+                      }}
+                      className="w-full"
+                      data-testid="button-back-crypto-info"
+                    >
+                      Modifier les informations
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <p className="text-sm text-muted-foreground text-center mb-4">
+                      Renseignez vos informations pour payer en cryptomonnaie
+                    </p>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-xs sm:text-sm font-medium">Nom complet</label>
+                        <Input
+                          placeholder="Jean Dupont"
+                          data-testid="input-crypto-name"
+                          value={cryptoCustomerInfo?.customerName || ""}
+                          onChange={(e) => setCryptoCustomerInfo(prev => ({
+                            ...prev,
+                            customerName: e.target.value,
+                            customerEmail: prev?.customerEmail || "",
+                            customerPhone: prev?.customerPhone || "",
+                          }))}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs sm:text-sm font-medium">Email</label>
+                        <Input
+                          type="email"
+                          placeholder="jean@exemple.com"
+                          data-testid="input-crypto-email"
+                          value={cryptoCustomerInfo?.customerEmail || ""}
+                          onChange={(e) => setCryptoCustomerInfo(prev => ({
+                            ...prev,
+                            customerName: prev?.customerName || "",
+                            customerEmail: e.target.value,
+                            customerPhone: prev?.customerPhone || "",
+                          }))}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs sm:text-sm font-medium">Téléphone</label>
+                        <Input
+                          placeholder="+229 00 00 00 00"
+                          data-testid="input-crypto-phone"
+                          value={cryptoCustomerInfo?.customerPhone || ""}
+                          onChange={(e) => setCryptoCustomerInfo(prev => ({
+                            ...prev,
+                            customerName: prev?.customerName || "",
+                            customerEmail: prev?.customerEmail || "",
+                            customerPhone: e.target.value,
+                          }))}
+                        />
+                      </div>
+                    </div>
+                    <Button
+                      className="w-full"
+                      disabled={
+                        !cryptoCustomerInfo?.customerName?.trim() ||
+                        !cryptoCustomerInfo?.customerEmail?.trim() ||
+                        !cryptoCustomerInfo?.customerPhone?.trim()
+                      }
+                      onClick={() => setCryptoStep("payment")}
+                      data-testid="button-continue-crypto"
+                    >
+                      Continuer vers le paiement crypto
+                    </Button>
+                  </div>
+                )
+              ) : (
+                <div className="p-4 text-center text-muted-foreground">
+                  Le montant minimum pour les paiements crypto est de 500 XOF
+                </div>
+              )
             }
           />
         </CardContent>
