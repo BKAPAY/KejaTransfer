@@ -17,11 +17,19 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp
 import { Loader2, Mail, ArrowLeft } from "lucide-react";
 
 const COUNTRY_NAMES: Record<string, string> = {
-  BJ: "Bénin",
+  BJ: "Benin",
   TG: "Togo",
-  CI: "Côte d'Ivoire",
+  CI: "Cote d'Ivoire",
   BF: "Burkina Faso",
-  SN: "Sénégal",
+  SN: "Senegal",
+};
+
+const COUNTRY_FLAGS: Record<string, string> = {
+  BJ: "\uD83C\uDDE7\uD83C\uDDEF",
+  TG: "\uD83C\uDDF9\uD83C\uDDEC",
+  CI: "\uD83C\uDDE8\uD83C\uDDEE",
+  BF: "\uD83C\uDDE7\uD83C\uDDEB",
+  SN: "\uD83C\uDDF8\uD83C\uDDF3",
 };
 
 const signupSchema = z.object({
@@ -311,7 +319,10 @@ export default function Signup() {
                       <SelectContent>
                         {ALLOWED_REGISTRATION_COUNTRIES.map((code) => (
                           <SelectItem key={code} value={code}>
-                            {COUNTRY_NAMES[code] || code}
+                            <span className="flex items-center gap-2">
+                              <span className="text-base">{COUNTRY_FLAGS[code]}</span>
+                              <span>{COUNTRY_NAMES[code] || code}</span>
+                            </span>
                           </SelectItem>
                         ))}
                       </SelectContent>
