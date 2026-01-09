@@ -3,14 +3,41 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
-import { Users, UserCheck, TrendingDown, TrendingUp, Search, Settings, Globe, RefreshCw, Database, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Users, UserCheck, TrendingDown, TrendingUp, Search, Settings, Globe, RefreshCw, Database, AlertCircle, CheckCircle2, Eye, History, MapPin, Mail, Phone, CreditCard } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
-import type { User } from "@shared/schema";
+import type { User, Transaction } from "@shared/schema";
+import { TransactionDetailsDialog } from "@/components/transaction-details-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+
+const COUNTRY_NAMES: Record<string, string> = {
+  BJ: "Bénin",
+  TG: "Togo",
+  CI: "Côte d'Ivoire",
+  SN: "Sénégal",
+  BF: "Burkina Faso",
+  GN: "Guinée",
+  NE: "Niger",
+};
+
+const COUNTRY_FLAGS: Record<string, string> = {
+  BJ: "🇧🇯",
+  TG: "🇹🇬",
+  CI: "🇨🇮",
+  SN: "🇸🇳",
+  BF: "🇧🇫",
+  GN: "🇬🇳",
+  NE: "🇳🇪",
+};
 
 interface DiagnosticResult {
   timestamp: string;
@@ -38,13 +65,22 @@ interface DiagnosticResult {
   message: string;
 }
 
+interface TransactionWithUser extends Transaction {
+  user?: User;
+}
+
 export default function Admin() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"search" | "all">("all");
+  const [mainTab, setMainTab] = useState<"users" | "transactions">("users");
   const [isSyncing, setIsSyncing] = useState(false);
   const [isDiagnosing, setIsDiagnosing] = useState(false);
   const [diagnosticResult, setDiagnosticResult] = useState<DiagnosticResult | null>(null);
   const [showDiagnostic, setShowDiagnostic] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+  const [transactionDialogOpen, setTransactionDialogOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [userDialogOpen, setUserDialogOpen] = useState(false);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
@@ -141,6 +177,12 @@ export default function Admin() {
       return response.json();
     },
     enabled: searchQuery.length > 0,
+  });
+
+  // Get all transactions for admin
+  const { data: allTransactions = [], isLoading: transactionsLoading } = useQuery<TransactionWithUser[]>({
+    queryKey: ["/api/admin/all-transactions"],
+    enabled: mainTab === "transactions",
   });
 
   // Display filtered results if searching, otherwise show all users
@@ -376,124 +418,411 @@ export default function Admin() {
         </Card>
       )}
 
-      {/* Gestion des utilisateurs - Onglets */}
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between gap-4 flex-wrap">
-            <CardTitle className="flex items-center gap-2">
-              <Users className="w-5 h-5" />
-              Gestion des Utilisateurs
-            </CardTitle>
-            <div className="flex gap-2">
-              <Button
-                variant={activeTab === "all" ? "default" : "outline"}
-                size="sm"
-                onClick={() => {
-                  setActiveTab("all");
-                  setSearchQuery("");
-                }}
-                data-testid="button-tab-all-users"
-              >
-                Tous les Utilisateurs ({allUsers.length})
-              </Button>
-              <Button
-                variant={activeTab === "search" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setActiveTab("search")}
-                data-testid="button-tab-search-users"
-              >
-                <Search className="w-4 h-4 mr-2" />
-                Rechercher
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {activeTab === "search" && (
-            <div className="flex gap-2">
-              <Input
-                placeholder="Rechercher par token, email, nom ou prénom..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                data-testid="input-search-users"
-              />
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => setSearchQuery("")}
-                data-testid="button-clear-search"
-              >
-                Réinitialiser
-              </Button>
-            </div>
-          )}
+      {/* Onglets principaux */}
+      <div className="flex gap-2 mb-4">
+        <Button
+          variant={mainTab === "users" ? "default" : "outline"}
+          size="lg"
+          onClick={() => setMainTab("users")}
+          data-testid="button-main-tab-users"
+          className="gap-2"
+        >
+          <Users className="w-5 h-5" />
+          Utilisateurs ({allUsers.length})
+        </Button>
+        <Button
+          variant={mainTab === "transactions" ? "default" : "outline"}
+          size="lg"
+          onClick={() => setMainTab("transactions")}
+          data-testid="button-main-tab-transactions"
+          className="gap-2"
+        >
+          <History className="w-5 h-5" />
+          Transactions
+        </Button>
+      </div>
 
-          {/* Liste des utilisateurs */}
-          {isLoading ? (
-            <div className="space-y-2">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="flex items-center gap-4">
-                  <Skeleton className="h-10 w-10 rounded-full" />
-                  <div className="flex-1 space-y-1">
-                    <Skeleton className="h-4 w-32" />
-                    <Skeleton className="h-3 w-24" />
-                  </div>
-                </div>
-              ))}
+      {/* Section Utilisateurs */}
+      {mainTab === "users" && (
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <CardTitle className="flex items-center gap-2">
+                <Users className="w-5 h-5" />
+                Gestion des Utilisateurs
+              </CardTitle>
+              <div className="flex gap-2">
+                <Button
+                  variant={activeTab === "all" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => {
+                    setActiveTab("all");
+                    setSearchQuery("");
+                  }}
+                  data-testid="button-tab-all-users"
+                >
+                  Tous ({allUsers.length})
+                </Button>
+                <Button
+                  variant={activeTab === "search" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setActiveTab("search")}
+                  data-testid="button-tab-search-users"
+                >
+                  <Search className="w-4 h-4 mr-2" />
+                  Rechercher
+                </Button>
+              </div>
             </div>
-          ) : displayedUsers && displayedUsers.length > 0 ? (
-            <ScrollArea className="h-[600px] border rounded-lg">
-              <div className="divide-y pr-4">
-                {displayedUsers.map((user) => (
-                  <div
-                    key={user.id}
-                    className="p-4 flex items-center justify-between gap-4 hover:bg-muted/50"
-                    data-testid={`user-row-${user.id}`}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <h4 className="font-semibold text-sm">
-                          {user.firstName} {user.lastName}
-                        </h4>
-                        <Badge
-                          variant={user.kycStatus === "verified" ? "default" : "secondary"}
-                          className="text-xs"
-                          data-testid={`badge-kyc-${user.id}`}
-                        >
-                          {user.kycStatus === "verified" ? "✓ Vérifiée" : "Non vérifiée"}
-                        </Badge>
-                        {user.isAdmin && (
-                          <Badge variant="destructive" className="text-xs" data-testid={`badge-admin-${user.id}`}>
-                            Admin
-                          </Badge>
-                        )}
-                      </div>
-                      <p className="text-sm text-muted-foreground truncate" data-testid={`email-${user.id}`}>
-                        {user.email}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Créé le {new Date(user.createdAt).toLocaleDateString("fr-FR")}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-semibold text-sm" data-testid={`balance-${user.id}`}>
-                        {formatAmount(user.balance)}
-                      </p>
-                      <p className="text-xs text-muted-foreground">Solde</p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {activeTab === "search" && (
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Rechercher par token, email, nom ou prénom..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  data-testid="input-search-users"
+                />
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setSearchQuery("")}
+                  data-testid="button-clear-search"
+                >
+                  Réinitialiser
+                </Button>
+              </div>
+            )}
+
+            {/* Liste des utilisateurs */}
+            {isLoading ? (
+              <div className="space-y-2">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <div key={i} className="flex items-center gap-4">
+                    <Skeleton className="h-10 w-10 rounded-full" />
+                    <div className="flex-1 space-y-1">
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-3 w-24" />
                     </div>
                   </div>
                 ))}
               </div>
-            </ScrollArea>
-          ) : (
-            <div className="text-center py-8">
-              <p className="text-muted-foreground">
-                {searchQuery ? "Aucun utilisateur trouvé" : "Aucun utilisateur sur la plateforme"}
-              </p>
+            ) : displayedUsers && displayedUsers.length > 0 ? (
+              <ScrollArea className="h-[600px] border rounded-lg">
+                <div className="divide-y pr-4">
+                  {displayedUsers.map((user) => (
+                    <div
+                      key={user.id}
+                      className="p-4 flex items-center justify-between gap-4 hover:bg-muted/50 cursor-pointer"
+                      data-testid={`user-row-${user.id}`}
+                      onClick={() => {
+                        setSelectedUser(user);
+                        setUserDialogOpen(true);
+                      }}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <h4 className="font-semibold text-sm">
+                            {user.firstName} {user.lastName}
+                          </h4>
+                          {user.country && (
+                            <span className="text-sm" title={COUNTRY_NAMES[user.country] || user.country}>
+                              {COUNTRY_FLAGS[user.country] || user.country}
+                            </span>
+                          )}
+                          <Badge
+                            variant={user.kycStatus === "verified" ? "default" : "secondary"}
+                            className="text-xs"
+                            data-testid={`badge-kyc-${user.id}`}
+                          >
+                            {user.kycStatus === "verified" ? "Verifie" : "Non verifie"}
+                          </Badge>
+                          {user.isAdmin && (
+                            <Badge variant="destructive" className="text-xs" data-testid={`badge-admin-${user.id}`}>
+                              Admin
+                            </Badge>
+                          )}
+                          {user.suspended && (
+                            <Badge variant="destructive" className="text-xs">
+                              Suspendu
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-sm text-muted-foreground truncate" data-testid={`email-${user.id}`}>
+                          {user.email}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Cree le {new Date(user.createdAt).toLocaleDateString("fr-FR")}
+                        </p>
+                      </div>
+                      <div className="text-right flex items-center gap-3">
+                        <div>
+                          <p className="font-semibold text-sm" data-testid={`balance-${user.id}`}>
+                            {formatAmount(user.balance)}
+                          </p>
+                          <p className="text-xs text-muted-foreground">Solde</p>
+                        </div>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedUser(user);
+                            setUserDialogOpen(true);
+                          }}
+                          data-testid={`button-view-user-${user.id}`}
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">
+                  {searchQuery ? "Aucun utilisateur trouve" : "Aucun utilisateur sur la plateforme"}
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Section Transactions */}
+      {mainTab === "transactions" && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2">
+              <History className="w-5 h-5" />
+              Toutes les Transactions ({allTransactions.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {transactionsLoading ? (
+              <div className="space-y-2">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <div key={i} className="flex items-center gap-4">
+                    <Skeleton className="h-10 w-full" />
+                  </div>
+                ))}
+              </div>
+            ) : allTransactions.length > 0 ? (
+              <ScrollArea className="h-[600px] border rounded-lg">
+                <div className="divide-y pr-4">
+                  {allTransactions.map((tx) => (
+                    <div
+                      key={tx.id}
+                      className="p-4 flex items-center justify-between gap-4 hover:bg-muted/50 cursor-pointer"
+                      data-testid={`transaction-row-${tx.id}`}
+                      onClick={() => {
+                        setSelectedTransaction(tx);
+                        setTransactionDialogOpen(true);
+                      }}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <Badge
+                            variant={tx.status === "completed" ? "default" : tx.status === "pending" ? "secondary" : "destructive"}
+                            className="text-xs"
+                          >
+                            {tx.status === "completed" ? "Complete" : tx.status === "pending" ? "En attente" : "Echoue"}
+                          </Badge>
+                          <span className="text-sm font-medium">
+                            {tx.type === "deposit" ? "Depot" : tx.type === "transfer" ? "Transfert" : tx.type === "payment_link" ? "Lien paiement" : tx.type === "merchant_link" ? "Lien marchand" : tx.type === "api_payment" ? "Paiement API" : tx.type}
+                          </span>
+                          {tx.country && (
+                            <span className="text-sm">
+                              {COUNTRY_FLAGS[tx.country] || tx.country}
+                            </span>
+                          )}
+                          {tx.operator && (
+                            <span className="text-xs text-muted-foreground capitalize">
+                              {tx.operator}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          {tx.user && (
+                            <span className="font-medium">
+                              {tx.user.firstName} {tx.user.lastName}
+                            </span>
+                          )}
+                          {tx.customerName && (
+                            <span className="text-xs">| Client: {tx.customerName}</span>
+                          )}
+                          {tx.customerEmail && (
+                            <span className="text-xs truncate max-w-[150px]">| {tx.customerEmail}</span>
+                          )}
+                          {tx.customerPhone && (
+                            <span className="text-xs">| {tx.customerPhone}</span>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {new Date(tx.createdAt).toLocaleDateString("fr-FR", {
+                            year: "numeric",
+                            month: "short",
+                            day: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </p>
+                      </div>
+                      <div className="text-right flex items-center gap-3">
+                        <div>
+                          <p className="font-semibold text-sm">
+                            {formatAmount(tx.amount)}
+                          </p>
+                          <p className="text-xs text-muted-foreground">{tx.currency || "XOF"}</p>
+                        </div>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedTransaction(tx);
+                            setTransactionDialogOpen(true);
+                          }}
+                          data-testid={`button-view-tx-${tx.id}`}
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">Aucune transaction sur la plateforme</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Dialogue de détails utilisateur */}
+      <Dialog open={userDialogOpen} onOpenChange={setUserDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Details de l'utilisateur</DialogTitle>
+          </DialogHeader>
+          {selectedUser && (
+            <div className="space-y-6">
+              <div className="bg-muted p-3 rounded-md border border-border">
+                <label className="text-xs font-medium text-muted-foreground block mb-2">ID Utilisateur</label>
+                <code className="text-xs font-mono break-all">{selectedUser.id}</code>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">Nom complet</p>
+                  <p className="text-lg font-semibold">{selectedUser.firstName} {selectedUser.lastName}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">Pays</p>
+                  <p className="text-sm font-medium flex items-center gap-2">
+                    {selectedUser.country ? (
+                      <>
+                        <span className="text-lg">{COUNTRY_FLAGS[selectedUser.country]}</span>
+                        {COUNTRY_NAMES[selectedUser.country] || selectedUser.country}
+                      </>
+                    ) : (
+                      <span className="text-muted-foreground">Non defini</span>
+                    )}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Mail className="w-3 h-3" /> Email
+                  </p>
+                  <p className="text-sm font-medium">{selectedUser.email}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <CreditCard className="w-3 h-3" /> Solde
+                  </p>
+                  <p className="text-lg font-bold">{formatAmount(selectedUser.balance)}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">Statut KYC</p>
+                  <Badge variant={selectedUser.kycStatus === "verified" ? "default" : "secondary"}>
+                    {selectedUser.kycStatus === "verified" ? "Verifie" : selectedUser.kycStatus === "submitted" ? "Soumis" : selectedUser.kycStatus === "rejected" ? "Rejete" : "En attente"}
+                  </Badge>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">Statut Admin</p>
+                  <div className="flex items-center gap-2">
+                    {selectedUser.isAdmin ? (
+                      <Badge variant="destructive">Administrateur</Badge>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">Utilisateur</span>
+                    )}
+                    {selectedUser.isPrimaryAdmin && (
+                      <Badge variant="default">Principal</Badge>
+                    )}
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">Statut du compte</p>
+                  {selectedUser.suspended ? (
+                    <Badge variant="destructive">Suspendu</Badge>
+                  ) : (
+                    <Badge variant="default">Actif</Badge>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">Date d'inscription</p>
+                  <p className="text-sm">
+                    {new Date(selectedUser.createdAt).toLocaleDateString("fr-FR", {
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </p>
+                </div>
+              </div>
+
+              {selectedUser.withdrawalPhones && selectedUser.withdrawalPhones.length > 0 && (
+                <div className="space-y-2 border-t pt-4">
+                  <h3 className="font-semibold text-lg flex items-center gap-2">
+                    <Phone className="w-4 h-4" /> Numeros de retrait configures
+                  </h3>
+                  <div className="space-y-1">
+                    {selectedUser.withdrawalPhones.map((phone, index) => (
+                      <p key={index} className="text-sm font-mono bg-muted p-2 rounded">
+                        {phone}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-2 pt-4 border-t">
+                <Button
+                  variant="outline"
+                  onClick={() => setLocation(`/dashboard/management?userId=${selectedUser.id}`)}
+                  data-testid="button-manage-user"
+                >
+                  <Settings className="w-4 h-4 mr-2" />
+                  Gerer cet utilisateur
+                </Button>
+              </div>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialogue de détails transaction */}
+      <TransactionDetailsDialog
+        transaction={selectedTransaction}
+        open={transactionDialogOpen}
+        onOpenChange={setTransactionDialogOpen}
+      />
 
       {/* Informations */}
       <Card className="border-primary/20 bg-primary/5">

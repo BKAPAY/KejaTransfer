@@ -4847,6 +4847,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get all transactions for admin (with user info)
+  app.get("/api/admin/all-transactions", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 500;
+      const transactions = await storage.getAllTransactionsForAdmin(limit);
+      res.json(transactions);
+    } catch (error: any) {
+      console.error("Get all transactions error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
   app.get("/api/admin/user/:userId/payment-links", requireAdmin, async (req: Request, res: Response) => {
     try {
       const links = await storage.getPaymentLinks(req.params.userId);

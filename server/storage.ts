@@ -77,6 +77,7 @@ export interface IStorage {
   getTransactionByPaydunyaToken(paydunyaToken: string): Promise<Transaction | undefined>;
   getTransactionByFedapayId(fedapayId: number): Promise<Transaction | undefined>;
   getAllPendingTransactions(): Promise<(Transaction & { user?: User })[]>;
+  getAllTransactionsForAdmin(limit?: number): Promise<(Transaction & { user?: User })[]>;
   createTransaction(transaction: InsertTransaction): Promise<Transaction>;
   updateTransactionStatus(id: string, status: string, paydunyaData?: any): Promise<Transaction | undefined>;
   updateTransaction(id: string, updates: Partial<Pick<Transaction, 'paydunyaToken' | 'country' | 'operator' | 'status' | 'metadata' | 'paydunyaReceiptUrl'>>): Promise<Transaction | undefined>;
@@ -531,6 +532,24 @@ export class DbStorage implements IStorage {
     // Fetch user info for each transaction
     const transactionsWithUsers = await Promise.all(
       pendingTransactions.map(async (tx) => {
+        const user = await this.getUser(tx.userId);
+        return { ...tx, user };
+      })
+    );
+    
+    return transactionsWithUsers;
+  }
+
+  async getAllTransactionsForAdmin(limit: number = 500): Promise<(Transaction & { user?: User })[]> {
+    const allTransactions = await db
+      .select()
+      .from(schema.transactions)
+      .orderBy(desc(schema.transactions.createdAt))
+      .limit(limit);
+    
+    // Fetch user info for each transaction
+    const transactionsWithUsers = await Promise.all(
+      allTransactions.map(async (tx) => {
         const user = await this.getUser(tx.userId);
         return { ...tx, user };
       })
