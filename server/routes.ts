@@ -3151,8 +3151,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Calculate fees
       const feeInfo = calculateOutgoingFee(Math.floor(amount), country);
 
-      // Check balance
-      if (user.balance < feeInfo.totalDeductedFromBalance) {
+      // Calculer le montant à débiter selon le type (transfert vs retrait)
+      // TRANSFERT: débiter montant + frais | RETRAIT: débiter montant uniquement
+      const isTransfer = type === "transfer";
+      const requiredBalance = isTransfer 
+        ? (Math.floor(amount) + feeInfo.feeAmount) 
+        : feeInfo.totalDeductedFromBalance;
+
+      // Check balance avec le bon montant selon le type
+      if (user.balance < requiredBalance) {
         return res.status(400).json({ 
           success: false, 
           error: "Solde insuffisant" 
@@ -3174,7 +3181,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (activeProvider === "fedapay") {
         // Use FedaPay
-        const isTransfer = type === "transfer";
         const result = isTransfer 
           ? await handleFedaPayTransfer(req.session.userId!, user, amount, country, operator, phone)
           : await handleFedaPayWithdrawal(req.session.userId!, user, amount, country, operator, phone);
@@ -3242,17 +3248,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Logique différente pour transfert vs retrait
         // TRANSFERT: L'utilisateur écrit 1000 → débité 1060 → fournisseur reçoit 1000 → destinataire reçoit 1000
         // RETRAIT: L'utilisateur écrit 1000 → débité 1000 → fournisseur reçoit 940 → utilisateur reçoit 940
-        const isTransfer = type === "transfer";
         const amountForProvider = isTransfer ? Math.floor(amount) : feeInfo.amountReceived;
         const amountToDebit = isTransfer ? (Math.floor(amount) + feeInfo.feeAmount) : feeInfo.totalDeductedFromBalance;
-
-        // Vérifier le solde avec le bon montant à débiter
-        if (user.balance < amountToDebit) {
-          return res.status(400).json({ 
-            success: false, 
-            error: "Solde insuffisant" 
-          });
-        }
 
         // Step 1: Get disburse invoice
         const getInvoiceData = {
