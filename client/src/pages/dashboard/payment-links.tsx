@@ -26,7 +26,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 
-// Compress image to reduce size
+// Compress image with high quality
 const compressImage = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -39,9 +39,9 @@ const compressImage = (file: File): Promise<string> => {
         let width = img.width;
         let height = img.height;
 
-        // Reduce to max 500x500 to save space
-        if (width > 500 || height > 500) {
-          const ratio = Math.min(500 / width, 500 / height);
+        // Reduce to max 1200x1200 for good quality
+        if (width > 1200 || height > 1200) {
+          const ratio = Math.min(1200 / width, 1200 / height);
           width = Math.round(width * ratio);
           height = Math.round(height * ratio);
         }
@@ -53,8 +53,10 @@ const compressImage = (file: File): Promise<string> => {
           reject(new Error("Cannot get canvas context"));
           return;
         }
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
         ctx.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL("image/jpeg", 0.7));
+        resolve(canvas.toDataURL("image/jpeg", 0.92));
       };
       img.onerror = () => reject(new Error("Cannot load image"));
     };
