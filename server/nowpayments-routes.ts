@@ -269,22 +269,36 @@ router.post("/api/webhooks/nowpayments", async (req: Request, res: Response) => 
 
 router.get("/api/admin/crypto-currencies", async (req: Request, res: Response) => {
   try {
-    const cryptos = await storage.getAllCryptoCurrencies();
+    const cryptosInDb = await storage.getAllCryptoCurrencies();
     
-    if (cryptos.length === 0) {
-      return res.json(
-        SUPPORTED_CRYPTOCURRENCIES.map((c) => ({
-          id: null,
-          code: c.code,
-          name: c.name,
-          symbol: c.symbol,
-          isEnabled: false,
-          minAmount: null,
-        }))
-      );
+    // Fusionner toutes les cryptos supportées avec celles en base de données
+    const cryptoMap = new Map<string, any>();
+    
+    // D'abord, ajouter toutes les cryptos supportées avec isEnabled: false par défaut
+    for (const c of SUPPORTED_CRYPTOCURRENCIES) {
+      cryptoMap.set(c.code, {
+        id: null,
+        code: c.code,
+        name: c.name,
+        symbol: c.symbol,
+        isEnabled: false,
+        minAmount: null,
+      });
     }
-
-    res.json(cryptos);
+    
+    // Ensuite, mettre à jour avec les données de la base de données
+    for (const dbCrypto of cryptosInDb) {
+      cryptoMap.set(dbCrypto.code, {
+        id: dbCrypto.id,
+        code: dbCrypto.code,
+        name: dbCrypto.name,
+        symbol: dbCrypto.symbol,
+        isEnabled: dbCrypto.isEnabled,
+        minAmount: dbCrypto.minAmount,
+      });
+    }
+    
+    res.json(Array.from(cryptoMap.values()));
   } catch (error: any) {
     console.error("[Admin] Get crypto currencies failed:", error);
     res.status(500).json({ error: "Impossible de récupérer les cryptomonnaies" });
