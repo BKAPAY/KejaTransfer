@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { Bitcoin } from "lucide-react";
 import mobileMoneyImage from "@assets/mobile_money-logo-1_1766663492110.png";
+import cryptoImage from "@assets/cryptomonnaies-1-1100x733_1767970452802.jpg";
 
 type PaymentMethod = "mobile_money" | "crypto";
 
@@ -68,9 +68,11 @@ export function PaymentMethodSelector({
             )}
             data-testid="button-select-crypto"
           >
-            <div className="w-full h-16 flex items-center justify-center bg-gradient-to-br from-orange-100 to-yellow-100 dark:from-orange-950 dark:to-yellow-950 rounded">
-              <Bitcoin className="w-10 h-10 text-orange-500" />
-            </div>
+            <img
+              src={cryptoImage}
+              alt="Cryptomonnaie"
+              className="w-full h-16 object-contain rounded"
+            />
             <span className="block mt-2 text-xs font-medium text-foreground">
               Cryptomonnaie
             </span>
