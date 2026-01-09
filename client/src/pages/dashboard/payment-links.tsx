@@ -73,7 +73,6 @@ const paymentLinkSchema = z.object({
     },
     z.number({ invalid_type_error: "Veuillez entrer un montant valide" }).min(500, "Le montant minimum est de 500 XOF")
   ),
-  imageFile: z.instanceof(File).optional(),
   allowedCountries: z.array(z.string()).default([]),
   customerPaysFee: z.boolean().default(false),
 });
@@ -83,7 +82,9 @@ type PaymentLinkFormData = z.infer<typeof paymentLinkSchema>;
 export default function PaymentLinks() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [existingImages, setExistingImages] = useState<string[]>([]);
+  const [newImageFiles, setNewImageFiles] = useState<File[]>([]);
   const [successToken, setSuccessToken] = useState<string | null>(null);
   const [successImage, setSuccessImage] = useState<string | null>(null);
   const { toast } = useToast();
@@ -108,7 +109,6 @@ export default function PaymentLinks() {
       productName: "",
       description: "",
       amount: undefined as any,
-      imageFile: undefined,
       allowedCountries: [],
       customerPaysFee: false,
     },
@@ -120,30 +120,58 @@ export default function PaymentLinks() {
       productName: link.productName,
       description: link.description || "",
       amount: link.amount,
-      imageFile: undefined,
       allowedCountries: link.allowedCountries || [],
       customerPaysFee: link.customerPaysFee || false,
     });
-    setImagePreview(null);
+    const images = link.imageUrls?.length ? link.imageUrls : (link.imageUrl ? [link.imageUrl] : []);
+    setExistingImages(images);
+    setImagePreviews([]);
+    setNewImageFiles([]);
     setDialogOpen(true);
+  };
+
+  const handleImageAdd = async (files: FileList | null) => {
+    if (!files) return;
+    const totalImages = existingImages.length + imagePreviews.length;
+    const remaining = 3 - totalImages;
+    if (remaining <= 0) {
+      toast({ title: "Maximum 3 images", description: "Vous ne pouvez pas ajouter plus de 3 images", variant: "destructive" });
+      return;
+    }
+    const filesToAdd = Array.from(files).slice(0, remaining);
+    const newPreviews: string[] = [];
+    const newFiles: File[] = [];
+    for (const file of filesToAdd) {
+      try {
+        const compressed = await compressImage(file);
+        newPreviews.push(compressed);
+        newFiles.push(file);
+      } catch {
+        toast({ title: "Erreur", description: "Erreur lors du traitement d'une image", variant: "destructive" });
+      }
+    }
+    setImagePreviews(prev => [...prev, ...newPreviews]);
+    setNewImageFiles(prev => [...prev, ...newFiles]);
+  };
+
+  const removeExistingImage = (index: number) => {
+    setExistingImages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const removeNewImage = (index: number) => {
+    setImagePreviews(prev => prev.filter((_, i) => i !== index));
+    setNewImageFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   const createMutation = useMutation({
     mutationFn: async (data: PaymentLinkFormData) => {
-      let imageData: string | undefined;
-      if (data.imageFile) {
-        try {
-          imageData = await compressImage(data.imageFile);
-        } catch (error) {
-          throw new Error("Erreur lors du traitement de l'image");
-        }
-      }
+      const allImages = [...imagePreviews];
 
       const res = await apiRequest("POST", "/api/payment-links", {
         productName: data.productName,
         description: data.description,
         amount: data.amount,
-        imageUrl: imageData,
+        imageUrls: allImages,
         allowedCountries: data.allowedCountries,
         customerPaysFee: data.customerPaysFee,
       });
@@ -151,13 +179,14 @@ export default function PaymentLinks() {
     },
     onSuccess: (data: PaymentLink) => {
       queryClient.invalidateQueries({ queryKey: ["/api/payment-links"] });
-      // Show success screen with image and short link
-      if (data.imageUrl) {
-        setSuccessImage(data.imageUrl);
+      if (data.imageUrls?.[0] || data.imageUrl) {
+        setSuccessImage(data.imageUrls?.[0] || data.imageUrl || null);
       }
       setSuccessToken(data.token);
       setDialogOpen(false);
-      setImagePreview(null);
+      setImagePreviews([]);
+      setNewImageFiles([]);
+      setExistingImages([]);
       form.reset();
     },
     onError: (error: any) => {
@@ -171,20 +200,13 @@ export default function PaymentLinks() {
 
   const editMutation = useMutation({
     mutationFn: async (data: PaymentLinkFormData) => {
-      let imageData: string | undefined;
-      if (data.imageFile) {
-        try {
-          imageData = await compressImage(data.imageFile);
-        } catch (error) {
-          throw new Error("Erreur lors du traitement de l'image");
-        }
-      }
+      const allImages = [...existingImages, ...imagePreviews];
 
       const res = await apiRequest("PATCH", `/api/payment-links/${editingId}`, {
         productName: data.productName,
         description: data.description,
         amount: data.amount,
-        ...(imageData && { imageUrl: imageData }),
+        imageUrls: allImages,
         allowedCountries: data.allowedCountries,
         customerPaysFee: data.customerPaysFee,
       });
@@ -198,7 +220,9 @@ export default function PaymentLinks() {
       });
       setEditingId(null);
       setDialogOpen(false);
-      setImagePreview(null);
+      setImagePreviews([]);
+      setNewImageFiles([]);
+      setExistingImages([]);
       form.reset();
     },
     onError: (error: any) => {
@@ -377,55 +401,57 @@ export default function PaymentLinks() {
                   )}
                 />
 
-                <FormField
-                  control={form.control}
-                  name="imageFile"
-                  render={({ field: { onChange, value, ...field } }) => (
-                    <FormItem>
-                      <FormLabel>Image du produit (optionnel)</FormLabel>
-                      <FormControl>
-                        <div className="space-y-3">
-                          <Input
-                            type="file"
-                            accept="image/*"
-                            data-testid="input-image-file"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) {
-                                // Validate file size (max 5MB)
-                                if (file.size > 5 * 1024 * 1024) {
-                                  toast({
-                                    title: "Fichier trop volumineux",
-                                    description: "L'image doit faire moins de 5MB",
-                                    variant: "destructive",
-                                  });
-                                  return;
-                                }
-                                onChange(file);
-                                const reader = new FileReader();
-                                reader.onloadend = () => {
-                                  setImagePreview(reader.result as string);
-                                };
-                                reader.readAsDataURL(file);
-                              }
-                            }}
-                            {...field}
-                          />
-                          {imagePreview && (
-                            <div className="relative w-full max-w-xs">
-                              <img
-                                src={imagePreview}
-                                alt="Aperçu"
-                                className="w-full h-32 object-cover rounded-md border"
-                              />
-                            </div>
-                          )}
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div className="space-y-3">
+                  <Label>Images du produit (optionnel, max 3)</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {existingImages.map((img, index) => (
+                      <div key={`existing-${index}`} className="relative w-20 h-20">
+                        <img src={img} alt={`Image ${index + 1}`} className="w-full h-full object-cover rounded-md border" />
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="destructive"
+                          className="absolute -top-2 -right-2 h-5 w-5"
+                          onClick={() => removeExistingImage(index)}
+                          data-testid={`btn-remove-existing-image-${index}`}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+                    {imagePreviews.map((img, index) => (
+                      <div key={`new-${index}`} className="relative w-20 h-20">
+                        <img src={img} alt={`Nouvelle ${index + 1}`} className="w-full h-full object-cover rounded-md border" />
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="destructive"
+                          className="absolute -top-2 -right-2 h-5 w-5"
+                          onClick={() => removeNewImage(index)}
+                          data-testid={`btn-remove-new-image-${index}`}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+                    {existingImages.length + imagePreviews.length < 3 && (
+                      <label className="w-20 h-20 border-2 border-dashed rounded-md flex items-center justify-center cursor-pointer hover:bg-muted/50">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          className="hidden"
+                          data-testid="input-image-files"
+                          onChange={(e) => handleImageAdd(e.target.files)}
+                        />
+                        <Plus className="h-6 w-6 text-muted-foreground" />
+                      </label>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {existingImages.length + imagePreviews.length}/3 images. Les images défilent automatiquement sur la page de paiement.
+                  </p>
+                </div>
 
                 {/* Pays autorisés */}
                 <FormField

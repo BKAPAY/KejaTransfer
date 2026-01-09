@@ -981,6 +981,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         description: z.string().optional(),
         amount: z.number().min(1, "Le montant doit être supérieur à 0").optional(),
         imageUrl: z.string().optional(),
+        imageUrls: z.array(z.string()).optional(),
         isActive: z.boolean().optional(),
         allowedCountries: z.array(z.string()).optional(),
         customerPaysFee: z.boolean().optional(),

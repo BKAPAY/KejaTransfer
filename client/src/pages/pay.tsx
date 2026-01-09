@@ -15,9 +15,89 @@ import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { useEffect, useState, useCallback } from "react";
-import { CheckCircle2, Clock, Loader2, AlertCircle, XCircle, RefreshCw, ExternalLink, Copy, Check } from "lucide-react";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { CheckCircle2, Clock, Loader2, AlertCircle, XCircle, RefreshCw, ExternalLink, Copy, Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { PaymentMethodSelector } from "@/components/payment-method-selector";
+
+function ImageCarousel({ images, productName }: { images: string[]; productName: string }) {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (images.length <= 1) return;
+    intervalRef.current = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % images.length);
+    }, 5000);
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [images.length]);
+
+  if (images.length === 0) return null;
+
+  const goToPrev = () => {
+    setCurrentIndex((prev) => (prev - 1 + images.length) % images.length);
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = setInterval(() => {
+        setCurrentIndex((prev) => (prev + 1) % images.length);
+      }, 5000);
+    }
+  };
+
+  const goToNext = () => {
+    setCurrentIndex((prev) => (prev + 1) % images.length);
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = setInterval(() => {
+        setCurrentIndex((prev) => (prev + 1) % images.length);
+      }, 5000);
+    }
+  };
+
+  return (
+    <div className="flex justify-center py-3">
+      <div className="relative w-full max-w-[280px] sm:max-w-[320px]">
+        <img
+          src={images[currentIndex]}
+          alt={`${productName} - Image ${currentIndex + 1}`}
+          className="w-full h-auto object-contain rounded-xl border bg-muted transition-opacity duration-300"
+        />
+        {images.length > 1 && (
+          <>
+            <button
+              type="button"
+              onClick={goToPrev}
+              className="absolute left-1 top-1/2 -translate-y-1/2 bg-black/50 text-white rounded-full p-1 hover:bg-black/70"
+              data-testid="btn-carousel-prev"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={goToNext}
+              className="absolute right-1 top-1/2 -translate-y-1/2 bg-black/50 text-white rounded-full p-1 hover:bg-black/70"
+              data-testid="btn-carousel-next"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
+              {images.map((_, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => setCurrentIndex(idx)}
+                  className={`w-2 h-2 rounded-full transition-colors ${idx === currentIndex ? "bg-white" : "bg-white/50"}`}
+                  data-testid={`btn-carousel-dot-${idx}`}
+                />
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
 
 interface ConversionData {
   convertedAmount: number;
@@ -1186,15 +1266,10 @@ export default function Pay() {
           <div className="flex justify-center mb-1 sm:mb-2">
             <img src={logoImage} alt="BKApay" className="h-8 sm:h-10 lg:h-12 w-auto" />
           </div>
-          {paymentLink.imageUrl && (
-            <div className="flex justify-center py-3">
-              <img
-                src={paymentLink.imageUrl}
-                alt={paymentLink.productName}
-                className="w-full max-w-[280px] sm:max-w-[320px] h-auto object-contain rounded-xl border bg-muted"
-              />
-            </div>
-          )}
+          <ImageCarousel 
+            images={paymentLink.imageUrls?.length ? paymentLink.imageUrls : (paymentLink.imageUrl ? [paymentLink.imageUrl] : [])}
+            productName={paymentLink.productName}
+          />
           <div>
             <CardTitle className="text-sm sm:text-lg lg:text-2xl mb-1 sm:mb-2">{paymentLink.productName}</CardTitle>
             {paymentLink.description && (
