@@ -52,6 +52,12 @@ router.get("/api/crypto/currencies", async (req: Request, res: Response) => {
   }
 });
 
+// Configuration des frais crypto (en arrière-plan, invisible pour les utilisateurs)
+const CRYPTO_MARKUP_PERCENT = 10; // 10% markup sur le montant crypto
+const CRYPTO_FEE_PERCENT = 15; // 15% frais crypto supplémentaires
+const STANDARD_INCOMING_FEE_PERCENT = 6; // 6% frais standard incoming
+const TOTAL_CRYPTO_FEE_PERCENT = CRYPTO_FEE_PERCENT + STANDARD_INCOMING_FEE_PERCENT; // 21% total
+
 router.get("/api/crypto/estimate", async (req: Request, res: Response) => {
   try {
     const { amount, currency, crypto } = req.query;
@@ -65,12 +71,16 @@ router.get("/api/crypto/estimate", async (req: Request, res: Response) => {
       return res.status(503).json({ error: "Paiements crypto non disponibles" });
     }
 
-    let usdAmount = parseFloat(amount as string);
+    let baseAmount = parseFloat(amount as string);
     const sourceCurrency = (currency as string).toUpperCase();
 
+    // Appliquer le markup de 10% en arrière-plan
+    const amountWithMarkup = baseAmount * (1 + CRYPTO_MARKUP_PERCENT / 100);
+
+    let usdAmount = amountWithMarkup;
     if (sourceCurrency === "XOF") {
       const conversionRate = 0.0015;
-      usdAmount = usdAmount * conversionRate;
+      usdAmount = amountWithMarkup * conversionRate;
     } else if (sourceCurrency !== "USD") {
       return res.status(400).json({ error: "Devise non supportée. Utilisez XOF ou USD." });
     }
@@ -82,8 +92,10 @@ router.get("/api/crypto/estimate", async (req: Request, res: Response) => {
       priceCurrency: "usd",
       payCurrency: crypto,
       estimatedAmount: estimate.estimated_amount,
-      originalAmount: parseFloat(amount as string),
+      originalAmount: baseAmount,
       originalCurrency: sourceCurrency,
+      // Le montant avec markup est ce que le client paie réellement
+      amountWithMarkup: sourceCurrency === "XOF" ? Math.ceil(amountWithMarkup) : amountWithMarkup,
     });
   } catch (error: any) {
     console.error("[NOWPayments] Estimate failed:", error);
@@ -132,7 +144,12 @@ router.post("/api/crypto/create-payment", async (req: Request, res: Response) =>
       return res.status(400).json({ error: "Impossible d'identifier le destinataire du paiement" });
     }
 
-    const usdAmount = parseFloat(amountXof) * 0.0015;
+    // Montant de base demandé par l'utilisateur
+    const baseAmountXof = parseFloat(amountXof);
+    
+    // Appliquer le markup de 10% en arrière-plan (le client paie ce montant majoré)
+    const amountWithMarkupXof = baseAmountXof * (1 + CRYPTO_MARKUP_PERCENT / 100);
+    const usdAmount = amountWithMarkupXof * 0.0015;
 
     const minAmount = await client.getMinAmount(crypto, "usd");
     if (usdAmount < minAmount.min_amount) {
@@ -159,12 +176,17 @@ router.post("/api/crypto/create-payment", async (req: Request, res: Response) =>
       color: { dark: "#000000", light: "#ffffff" },
     });
 
+    // Calculer les frais totaux: 15% crypto + 6% standard = 21%
+    // Les frais s'appliquent TOUJOURS sur les paiements crypto, même si "customerPaysFee" est activé
+    const totalFee = Math.floor(baseAmountXof * (TOTAL_CRYPTO_FEE_PERCENT / 100));
+    const feePercentage = TOTAL_CRYPTO_FEE_PERCENT * 10; // 210 pour 21%
+
     const transaction = await storage.createTransaction({
       userId: ownerUserId,
       type: "deposit",
-      amount: parseInt(amountXof),
-      fee: Math.floor(parseInt(amountXof) * 0.06),
-      feePercentage: 60,
+      amount: Math.floor(baseAmountXof), // Montant de base (sans markup)
+      fee: totalFee, // 21% de frais (15% crypto + 6% standard)
+      feePercentage: feePercentage,
       currency: "XOF",
       status: "pending",
       country: "CRYPTO",
@@ -182,6 +204,12 @@ router.post("/api/crypto/create-payment", async (req: Request, res: Response) =>
         apiKeyId,
         purchaseId: payment.purchase_id,
         network: payment.network,
+        // Informations de frais crypto (invisibles pour l'utilisateur)
+        cryptoMarkupPercent: CRYPTO_MARKUP_PERCENT,
+        cryptoFeePercent: CRYPTO_FEE_PERCENT,
+        standardFeePercent: STANDARD_INCOMING_FEE_PERCENT,
+        amountWithMarkupXof: Math.ceil(amountWithMarkupXof),
+        baseAmountXof: Math.floor(baseAmountXof),
       }),
     });
 
@@ -192,7 +220,8 @@ router.post("/api/crypto/create-payment", async (req: Request, res: Response) =>
       payAmount: payment.pay_amount,
       payCurrency: payment.pay_currency,
       priceAmountUsd: payment.price_amount,
-      priceAmountXof: parseInt(amountXof),
+      // Afficher le montant avec markup (ce que le client paie en crypto)
+      priceAmountXof: Math.ceil(amountWithMarkupXof),
       qrCode: qrCodeDataUrl,
       transactionId: transaction.id,
       expiresIn: 1800,

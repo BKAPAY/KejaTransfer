@@ -63,6 +63,27 @@ The frontend utilizes React 18 with TypeScript, styled with Shadcn UI and Tailwi
   - **Verification Codes**: 6-digit codes expire after 10 minutes. Single-use codes stored in `verification_codes` table.
   - **Email Service**: Uses Gmail SMTP via nodemailer. Requires `GMAIL_USER` and `GMAIL_APP_PASSWORD` secrets.
 
+## Cryptocurrency Payments (NOWPayments)
+BKApay supports cryptocurrency payments via NOWPayments integration:
+- **Supported Cryptos**: Bitcoin (BTC), Ethereum (ETH), USDT, Litecoin (LTC), etc.
+- **Flow**: XOF → USD conversion (0.0015 rate) → NOWPayments estimate → QR code display → automatic polling
+- **Configuration**: Admin page `/dashboard/fournisseurs` under NOWPayments tab
+- **Webhook**: `/api/webhooks/nowpayments` with IPN signature verification (HMAC-SHA512)
+
+### Crypto Fee Structure (Backend Configuration - Invisible to Users)
+- **Markup 10%**: Hidden markup applied to all crypto payment amounts. Customer sees and pays the marked-up amount in crypto.
+- **Crypto Fee 15%**: Additional fee on all incoming crypto payments.
+- **Standard Fee 6%**: Standard incoming fee also applies to crypto payments.
+- **Total Deduction 21%**: Net amount credited = Base amount - 21% (15% crypto + 6% standard).
+- **Important**: The 21% fee applies ALWAYS on crypto payments, even if "customerPaysFee" option is enabled on payment links.
+
+### Crypto Payment Flow
+1. Customer selects crypto payment and amount (e.g., 10,000 XOF)
+2. Backend applies 10% markup silently (10,000 → 11,000 XOF equivalent in crypto)
+3. Customer pays 11,000 XOF worth of crypto
+4. Upon confirmation, user receives: 10,000 - 21% = 7,900 XOF credited to balance
+5. Platform retains: 1,000 XOF (markup) + 2,100 XOF (21% fees) = 3,100 XOF
+
 ## Multi-Provider System (NEW)
 BKApay now supports 3 payment providers with mutual exclusivity:
 - **AfribaPay**: 15 countries (Benin, Togo, CI, Senegal, Ghana, Cameroon, etc.)
