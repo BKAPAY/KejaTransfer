@@ -18,6 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { CheckCircle2, Clock, Loader2, AlertCircle, XCircle, RefreshCw, ExternalLink, Copy, Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { PaymentMethodSelector } from "@/components/payment-method-selector";
+import { CryptoPaymentFlow } from "@/components/crypto-payment-flow";
 
 function ImageCarousel({ images, productName }: { images: string[]; productName: string }) {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -1281,7 +1282,19 @@ export default function Pay() {
           </div>
         </CardHeader>
         <CardContent className="p-3 sm:p-4 lg:p-6">
-          <PaymentMethodSelector mobileMoneyContent={mobileMoneyForm} />
+          <PaymentMethodSelector 
+            mobileMoneyContent={mobileMoneyForm}
+            cryptoContent={
+              <CryptoPaymentFlow
+                amountXof={totalAmount}
+                paymentLinkId={paymentLink.id}
+                orderDescription={`Paiement ${paymentLink.productName}`}
+                onSuccess={() => {
+                  setPaymentStage("completed");
+                }}
+              />
+            }
+          />
         </CardContent>
         {/* Footer sécurisé */}
         <div className="border-t px-4 py-3 text-center">

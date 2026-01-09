@@ -17,6 +17,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { calculateIncomingFee } from "@/lib/fees";
 import { useState, useEffect, useCallback } from "react";
 import { PaymentMethodSelector } from "@/components/payment-method-selector";
+import { CryptoPaymentFlow } from "@/components/crypto-payment-flow";
 
 interface ConversionData {
   convertedAmount: number;
@@ -475,6 +476,24 @@ export default function Deposit() {
           </CardHeader>
           <CardContent>
             <PaymentMethodSelector
+              cryptoContent={
+                amount && amount >= 500 ? (
+                  <CryptoPaymentFlow
+                    amountXof={amount}
+                    userId={user?.id}
+                    orderDescription="Depot BKApay"
+                    onSuccess={() => {
+                      setPaymentStep("completed");
+                      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+                      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+                    }}
+                  />
+                ) : (
+                  <div className="p-4 text-center text-muted-foreground">
+                    Entrez un montant d'au moins 500 XOF pour payer en crypto
+                  </div>
+                )
+              }
               mobileMoneyContent={
                 <Form {...form}>
                   <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">

@@ -18,6 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState, useCallback } from "react";
 import { CheckCircle2, Clock, Loader2, AlertCircle, XCircle, RefreshCw, ExternalLink, Copy, Check } from "lucide-react";
 import { PaymentMethodSelector } from "@/components/payment-method-selector";
+import { CryptoPaymentFlow } from "@/components/crypto-payment-flow";
 
 interface ConversionData {
   convertedAmount: number;
@@ -1207,7 +1208,25 @@ export default function Merchant() {
           </div>
         </CardHeader>
         <CardContent className="p-3 sm:p-4 lg:p-6">
-          <PaymentMethodSelector mobileMoneyContent={mobileMoneyForm} />
+          <PaymentMethodSelector 
+            mobileMoneyContent={mobileMoneyForm}
+            cryptoContent={
+              paidAmount && paidAmount >= 500 ? (
+                <CryptoPaymentFlow
+                  amountXof={paidAmount}
+                  merchantLinkId={merchantLink.id}
+                  orderDescription={`Paiement à ${merchantLink.merchantName}`}
+                  onSuccess={() => {
+                    setPaymentStage("completed");
+                  }}
+                />
+              ) : (
+                <div className="p-4 text-center text-muted-foreground">
+                  Entrez un montant d'au moins 500 XOF pour payer en crypto
+                </div>
+              )
+            }
+          />
         </CardContent>
         <div className="border-t px-4 py-3 text-center">
           <p className="text-xs sm:text-sm text-muted-foreground">

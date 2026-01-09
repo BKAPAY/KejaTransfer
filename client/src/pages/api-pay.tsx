@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { PaymentMethodSelector } from "@/components/payment-method-selector";
+import { CryptoPaymentFlow } from "@/components/crypto-payment-flow";
 
 interface ConversionData {
   convertedAmount: number;
@@ -1171,7 +1172,25 @@ export default function ApiPay() {
             </div>
           </div>
 
-          <PaymentMethodSelector mobileMoneyContent={mobileMoneyForm} />
+          <PaymentMethodSelector 
+            mobileMoneyContent={mobileMoneyForm}
+            cryptoContent={
+              amount && amount >= 500 ? (
+                <CryptoPaymentFlow
+                  amountXof={apiKeyInfo?.customerPaysFee ? Math.ceil(amount * 1.06) : amount}
+                  apiKeyId={key}
+                  orderDescription={description || `Paiement à ${apiKeyInfo?.siteName}`}
+                  onSuccess={() => {
+                    setPaymentStage("completed");
+                  }}
+                />
+              ) : (
+                <div className="p-4 text-center text-muted-foreground">
+                  Le montant minimum pour payer en crypto est de 500 XOF
+                </div>
+              )
+            }
+          />
 
           <div className="text-center pt-4 border-t">
             <Link href="/" className="text-xs text-primary hover:underline cursor-pointer">
