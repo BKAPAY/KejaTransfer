@@ -36,6 +36,9 @@ interface CryptoPaymentFlowProps {
   merchantLinkId?: string;
   apiKeyId?: string;
   orderDescription?: string;
+  customerName?: string;
+  customerEmail?: string;
+  customerPhone?: string;
   onSuccess?: (transactionId: string) => void;
   onError?: (error: string) => void;
 }
@@ -59,6 +62,9 @@ export function CryptoPaymentFlow({
   merchantLinkId,
   apiKeyId,
   orderDescription,
+  customerName,
+  customerEmail,
+  customerPhone,
   onSuccess,
   onError,
 }: CryptoPaymentFlowProps) {
@@ -98,6 +104,9 @@ export function CryptoPaymentFlow({
         merchantLinkId,
         apiKeyId,
         orderDescription: orderDescription || `Paiement BKApay ${amountXof} XOF`,
+        customerName,
+        customerEmail,
+        customerPhone,
       });
       return res.json();
     },

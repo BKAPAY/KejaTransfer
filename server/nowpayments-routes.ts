@@ -112,7 +112,19 @@ router.get("/api/crypto/estimate", async (req: Request, res: Response) => {
 
 router.post("/api/crypto/create-payment", async (req: Request, res: Response) => {
   try {
-    const { amountXof, crypto, orderId, orderDescription, userId, paymentLinkId, merchantLinkId, apiKeyId } = req.body;
+    const { 
+      amountXof, 
+      crypto, 
+      orderId, 
+      orderDescription, 
+      userId, 
+      paymentLinkId, 
+      merchantLinkId, 
+      apiKeyId,
+      customerName,
+      customerEmail,
+      customerPhone
+    } = req.body;
 
     if (!amountXof || !crypto) {
       return res.status(400).json({ error: "Paramètres manquants: amountXof, crypto" });
@@ -211,6 +223,9 @@ router.post("/api/crypto/create-payment", async (req: Request, res: Response) =>
       country: "CRYPTO",
       operator: crypto,
       description: `Paiement crypto ${getCryptoDisplayName(crypto)}`,
+      customerName: customerName || null,
+      customerEmail: customerEmail || null,
+      customerPhone: customerPhone || null,
       metadata: JSON.stringify({
         paymentProvider: "nowpayments",
         isCrypto: true,

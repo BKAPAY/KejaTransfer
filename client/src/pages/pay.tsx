@@ -1307,6 +1307,9 @@ export default function Pay() {
                       amountXof={totalAmount}
                       paymentLinkId={paymentLink.id}
                       orderDescription={`Paiement ${paymentLink.productName} par ${cryptoCustomerInfo.customerName}`}
+                      customerName={cryptoCustomerInfo.customerName}
+                      customerEmail={cryptoCustomerInfo.customerEmail}
+                      customerPhone={cryptoCustomerInfo.customerPhone}
                       onSuccess={() => {
                         setPaymentStage("completed");
                       }}

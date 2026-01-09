@@ -1233,6 +1233,9 @@ export default function Merchant() {
                     amountXof={cryptoCustomerInfo.amount}
                     merchantLinkId={merchantLink.id}
                     orderDescription={`Paiement à ${merchantLink.merchantName} par ${cryptoCustomerInfo.customerName}`}
+                    customerName={cryptoCustomerInfo.customerName}
+                    customerEmail={cryptoCustomerInfo.customerEmail}
+                    customerPhone={cryptoCustomerInfo.customerPhone}
                     onSuccess={() => {
                       setPaymentStage("completed");
                       setPaidAmount(cryptoCustomerInfo.amount);

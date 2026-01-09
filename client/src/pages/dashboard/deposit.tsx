@@ -502,6 +502,8 @@ export default function Deposit() {
                     amountXof={amount}
                     userId={user?.id}
                     orderDescription="Depot BKApay"
+                    customerName={user ? `${user.firstName} ${user.lastName}` : undefined}
+                    customerEmail={user?.email}
                     onSuccess={() => {
                       setPaymentStep("completed");
                       queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });

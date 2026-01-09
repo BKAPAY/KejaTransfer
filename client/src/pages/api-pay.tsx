@@ -1180,6 +1180,9 @@ export default function ApiPay() {
                   amountXof={apiKeyInfo?.customerPaysFee ? Math.ceil(amount * 1.06) : amount}
                   apiKeyId={key}
                   orderDescription={description || `Paiement à ${apiKeyInfo?.siteName}`}
+                  customerName={customerName}
+                  customerEmail={customerEmail}
+                  customerPhone={customerPhone}
                   onSuccess={() => {
                     setPaymentStage("completed");
                   }}
