@@ -335,25 +335,20 @@ router.post("/api/webhooks/nowpayments", async (req: Request, res: Response) => 
       return res.json({ success: true, message: "Already processed" });
     }
 
-    let newStatus: "completed" | "pending" | "failed" = "pending";
-
     if (payment_status === "finished" || payment_status === "confirmed") {
-      newStatus = "completed";
-    } else if (payment_status === "failed" || payment_status === "expired" || payment_status === "refunded") {
-      newStatus = "failed";
-    }
-
-    if (newStatus !== "pending") {
-      await storage.updateTransactionStatus(transaction.id, newStatus);
-
-      if (newStatus === "completed") {
-        const netAmount = transaction.amount - transaction.fee;
-        await storage.updateUserBalance(transaction.userId, netAmount);
-        console.log(`[NOWPayments Webhook] Credited ${netAmount} XOF to user ${transaction.userId}`);
+      // Use atomic finalize to prevent double crediting from webhook/polling race
+      const result = await storage.finalizeIncomingTransaction(transaction.id, {});
+      if (result) {
+        console.log(`[NOWPayments Webhook] ✅ Transaction ${transaction.id} finalized - credited=${result.credited}`);
+      } else {
+        console.log(`[NOWPayments Webhook] Transaction ${transaction.id} already processed by polling`);
       }
+    } else if (payment_status === "failed" || payment_status === "expired" || payment_status === "refunded") {
+      await storage.updateTransactionStatus(transaction.id, "failed");
+      console.log(`[NOWPayments Webhook] Transaction ${transaction.id} marked as failed (${payment_status})`);
+    } else {
+      console.log(`[NOWPayments Webhook] Transaction ${transaction.id} still pending (${payment_status})`);
     }
-
-    console.log(`[NOWPayments Webhook] Updated transaction ${transaction.id} to ${newStatus}`);
     res.json({ success: true });
   } catch (error: any) {
     console.error("[NOWPayments Webhook] Error:", error);

@@ -1,6 +1,7 @@
 import { storage } from "./storage";
 import type { Transaction, User } from "@shared/schema";
 import { getTransactionStatus as getFedaPayTransactionStatus, getPayoutStatus as getFedaPayPayoutStatus } from "./fedapay";
+import { NowPaymentsClient } from "./nowpayments";
 
 const PAYDUNYA_MASTER_KEY = process.env.PAYDUNYA_MASTER_KEY;
 const PAYDUNYA_PRIVATE_KEY = process.env.PAYDUNYA_PRIVATE_KEY;
@@ -124,6 +125,76 @@ async function processFedaPayTransaction(transaction: Transaction & { user?: Use
     console.error(`[PaymentPolling] Error checking FedaPay transaction ${transaction.id}:`, error);
     if (hasPaymentExpired(transaction)) {
       console.log(`[PaymentPolling] ⏱️ FedaPay transaction ${transaction.id} expired with error - marking as failed`);
+      await storage.updateTransactionStatus(transaction.id, "failed");
+      return true;
+    }
+    return false;
+  }
+}
+
+async function getNowPaymentsClient(): Promise<NowPaymentsClient | null> {
+  const config = await storage.getProviderConfig("nowpayments");
+  if (!config || !config.isActive || !config.apiKey) {
+    return null;
+  }
+  return new NowPaymentsClient({
+    apiKey: config.apiKey,
+    ipnSecret: config.ipnSecret || undefined,
+  });
+}
+
+async function processNowPaymentsTransaction(transaction: Transaction & { user?: User }, metadata: any): Promise<boolean> {
+  const nowPaymentsPaymentId = metadata.paymentId || metadata.nowPaymentsPaymentId;
+  const transactionAge = getTransactionAge(transaction);
+  const remainingTime = Math.max(0, CRYPTO_TIMEOUT_MS - transactionAge);
+  const remainingSeconds = Math.round(remainingTime / 1000);
+
+  console.log(`[PaymentPolling] Checking NOWPayments transaction ${transaction.id} (paymentId: ${nowPaymentsPaymentId}, ${remainingSeconds}s remaining)`);
+
+  try {
+    const client = await getNowPaymentsClient();
+    if (!client) {
+      console.log(`[PaymentPolling] NOWPayments client not available for transaction ${transaction.id}`);
+      if (hasPaymentExpired(transaction)) {
+        console.log(`[PaymentPolling] ⏱️ NOWPayments transaction ${transaction.id} TIMEOUT - marking as failed`);
+        await storage.updateTransactionStatus(transaction.id, "failed");
+        return true;
+      }
+      return false;
+    }
+
+    const status = await client.getPaymentStatus(nowPaymentsPaymentId);
+    
+    console.log(`[PaymentPolling] NOWPayments transaction ${transaction.id} - status:`, status.payment_status);
+
+    if (status.payment_status === "finished" || status.payment_status === "confirmed") {
+      // Payment is confirmed - use atomic finalize to prevent double crediting
+      const result = await storage.finalizeIncomingTransaction(transaction.id, {});
+      if (result) {
+        console.log(`[PaymentPolling] ✅ NOWPayments transaction ${transaction.id} CONFIRMED - credited=${result.credited}`);
+      } else {
+        console.log(`[PaymentPolling] NOWPayments transaction ${transaction.id} already processed - skipping`);
+      }
+      return true;
+    } else if (status.payment_status === "failed" || status.payment_status === "expired" || status.payment_status === "refunded") {
+      console.log(`[PaymentPolling] ❌ NOWPayments transaction ${transaction.id} failed/expired (status: ${status.payment_status})`);
+      await storage.updateTransactionStatus(transaction.id, "failed");
+      return true;
+    } else {
+      // Still pending (waiting, confirming, sending, partially_paid)
+      if (hasPaymentExpired(transaction)) {
+        const timeoutMinutes = Math.round(CRYPTO_TIMEOUT_MS / 60000);
+        console.log(`[PaymentPolling] ⏱️ NOWPayments transaction ${transaction.id} TIMEOUT (${timeoutMinutes}min) - marking as failed`);
+        await storage.updateTransactionStatus(transaction.id, "failed");
+        return true;
+      }
+      console.log(`[PaymentPolling] ⏳ NOWPayments transaction ${transaction.id} still pending (status: ${status.payment_status}, ${remainingSeconds}s remaining)`);
+      return false;
+    }
+  } catch (error) {
+    console.error(`[PaymentPolling] Error checking NOWPayments transaction ${transaction.id}:`, error);
+    if (hasPaymentExpired(transaction)) {
+      console.log(`[PaymentPolling] ⏱️ NOWPayments transaction ${transaction.id} expired with error - marking as failed`);
       await storage.updateTransactionStatus(transaction.id, "failed");
       return true;
     }
@@ -266,6 +337,12 @@ async function processTransaction(transaction: Transaction & { user?: User }): P
     try {
       metadata = JSON.parse(transaction.metadata);
     } catch (e) {}
+  }
+
+  // Check if this is a NOWPayments crypto transaction
+  if (metadata.paymentId || metadata.nowPaymentsPaymentId || metadata.paymentProvider === "nowpayments" || metadata.isCrypto === true) {
+    await processNowPaymentsTransaction(transaction, metadata);
+    return;
   }
 
   // Check if this is a FedaPay transaction
