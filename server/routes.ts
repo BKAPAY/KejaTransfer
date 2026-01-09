@@ -3144,9 +3144,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ success: false, error: "Montant invalide" });
       }
 
-      // Minimum 1000 XOF for outgoing payments
-      if (amount < 1000) {
-        return res.status(400).json({ success: false, error: "Montant minimum: 1000 XOF" });
+      // Minimum amounts: 500 XOF for transfers, 1000 XOF for withdrawals
+      const isTransferType = type === "transfer";
+      const minAmount = isTransferType ? 500 : 1000;
+      if (amount < minAmount) {
+        return res.status(400).json({ success: false, error: `Montant minimum: ${minAmount} XOF` });
       }
 
       if (!country || !operator || !phone) {

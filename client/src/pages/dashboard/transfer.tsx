@@ -20,7 +20,7 @@ import { calculateOutgoingFee } from "@/lib/fees";
 import { useLocation } from "wouter";
 
 const transferSchema = z.object({
-  amount: z.number().min(1000, "Le montant minimum est de 1000 XOF"),
+  amount: z.number().min(500, "Le montant minimum est de 500 XOF"),
   country: z.string().min(1, "Selectionnez un pays"),
   operator: z.string().min(1, "Selectionnez un operateur"),
   phone: z.string().min(7, "Numero de telephone invalide").regex(/^\d+$/, "Le numero doit contenir uniquement des chiffres"),
@@ -266,9 +266,9 @@ export default function Transfer() {
                     <FormControl>
                       <Input
                         type="number"
-                        placeholder="5000"
+                        placeholder="500"
                         data-testid="input-transfer-amount"
-                        min="1000"
+                        min="500"
                         value={field.value || ""}
                         onChange={(e) => {
                           const val = e.target.value;
@@ -276,7 +276,7 @@ export default function Transfer() {
                         }}
                       />
                     </FormControl>
-                    <p className="text-xs text-muted-foreground mt-1">Montant minimum: 1000 XOF</p>
+                    <p className="text-xs text-muted-foreground mt-1">Montant minimum: 500 XOF</p>
                     <FormMessage />
                   </FormItem>
                 )}
