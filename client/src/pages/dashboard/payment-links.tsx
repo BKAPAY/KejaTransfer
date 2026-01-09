@@ -87,6 +87,7 @@ export default function PaymentLinks() {
   const [newImageFiles, setNewImageFiles] = useState<File[]>([]);
   const [successToken, setSuccessToken] = useState<string | null>(null);
   const [successImage, setSuccessImage] = useState<string | null>(null);
+  const [amountInput, setAmountInput] = useState<string>("");
   const { toast } = useToast();
 
   const { data: paymentLinks, isLoading } = useQuery<PaymentLink[]>({
@@ -116,6 +117,7 @@ export default function PaymentLinks() {
 
   const startEditingLink = (link: PaymentLink) => {
     setEditingId(link.id);
+    setAmountInput(String(link.amount));
     form.reset({
       productName: link.productName,
       description: link.description || "",
@@ -325,9 +327,24 @@ export default function PaymentLinks() {
             Montant fixe - partagez vos liens
           </p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <Dialog open={dialogOpen} onOpenChange={(open) => {
+          if (open && !editingId) {
+            form.reset({
+              productName: "",
+              description: "",
+              amount: undefined as any,
+              allowedCountries: [],
+              customerPaysFee: false,
+            });
+            setAmountInput("");
+            setExistingImages([]);
+            setImagePreviews([]);
+            setNewImageFiles([]);
+          }
+          setDialogOpen(open);
+        }}>
           <DialogTrigger asChild>
-            <Button data-testid="button-create-link">
+            <Button data-testid="button-create-link" onClick={() => setEditingId(null)}>
               <Plus className="w-4 h-4 mr-2" />
               Nouveau lien
             </Button>
@@ -390,9 +407,10 @@ export default function PaymentLinks() {
                           inputMode="numeric"
                           placeholder="10000"
                           data-testid="input-amount"
-                          value={field.value === undefined || field.value === null ? "" : String(field.value)}
+                          value={amountInput}
                           onChange={(e) => {
                             const val = e.target.value.replace(/[^0-9]/g, "");
+                            setAmountInput(val);
                             if (val === "") {
                               field.onChange(undefined);
                             } else {
@@ -659,7 +677,21 @@ export default function PaymentLinks() {
                   <p className="text-muted-foreground mb-4">
                     Vous n'avez pas encore créé de lien de paiement
                   </p>
-                  <Button onClick={() => setDialogOpen(true)} data-testid="button-create-first">
+                  <Button onClick={() => {
+                    setEditingId(null);
+                    form.reset({
+                      productName: "",
+                      description: "",
+                      amount: undefined as any,
+                      allowedCountries: [],
+                      customerPaysFee: false,
+                    });
+                    setAmountInput("");
+                    setExistingImages([]);
+                    setImagePreviews([]);
+                    setNewImageFiles([]);
+                    setDialogOpen(true);
+                  }} data-testid="button-create-first">
                     <Plus className="w-4 h-4 mr-2" />
                     Créer votre premier lien
                   </Button>
