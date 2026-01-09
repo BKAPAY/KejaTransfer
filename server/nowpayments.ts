@@ -178,7 +178,7 @@ export const SUPPORTED_CRYPTOCURRENCIES = [
   { code: "ltc", name: "Litecoin", symbol: "LTC", minAmountXOF: CRYPTO_MIN_AMOUNT_XOF },
   { code: "xrp", name: "Ripple", symbol: "XRP", minAmountXOF: CRYPTO_MIN_AMOUNT_XOF },
   { code: "trx", name: "Tron", symbol: "TRX", minAmountXOF: CRYPTO_MIN_AMOUNT_XOF },
-  { code: "bnbmainnet", name: "BNB", symbol: "BNB", minAmountXOF: CRYPTO_MIN_AMOUNT_XOF },
+  { code: "bnbbsc", name: "BNB", symbol: "BNB", minAmountXOF: CRYPTO_MIN_AMOUNT_XOF },
   { code: "sol", name: "Solana", symbol: "SOL", minAmountXOF: CRYPTO_MIN_AMOUNT_XOF },
   { code: "doge", name: "Dogecoin", symbol: "DOGE", minAmountXOF: CRYPTO_MIN_AMOUNT_XOF },
   { code: "matic", name: "Polygon", symbol: "MATIC", minAmountXOF: CRYPTO_MIN_AMOUNT_XOF },
