@@ -104,6 +104,34 @@ router.post("/api/crypto/create-payment", async (req: Request, res: Response) =>
       return res.status(503).json({ error: "Paiements crypto non disponibles" });
     }
 
+    // Trouver le userId du propriétaire du lien/API
+    let ownerUserId = userId;
+    
+    if (!ownerUserId && paymentLinkId) {
+      const paymentLink = await storage.getPaymentLinkById(paymentLinkId);
+      if (paymentLink) {
+        ownerUserId = paymentLink.userId;
+      }
+    }
+    
+    if (!ownerUserId && merchantLinkId) {
+      const merchantLink = await storage.getMerchantLinkById(merchantLinkId);
+      if (merchantLink) {
+        ownerUserId = merchantLink.userId;
+      }
+    }
+    
+    if (!ownerUserId && apiKeyId) {
+      const apiKey = await storage.getApiKeyByPublicKey(apiKeyId);
+      if (apiKey) {
+        ownerUserId = apiKey.userId;
+      }
+    }
+    
+    if (!ownerUserId) {
+      return res.status(400).json({ error: "Impossible d'identifier le destinataire du paiement" });
+    }
+
     const usdAmount = parseFloat(amountXof) * 0.0015;
 
     const minAmount = await client.getMinAmount(crypto, "usd");
@@ -132,7 +160,7 @@ router.post("/api/crypto/create-payment", async (req: Request, res: Response) =>
     });
 
     const transaction = await storage.createTransaction({
-      userId: userId || "system",
+      userId: ownerUserId,
       type: "deposit",
       amount: parseInt(amountXof),
       fee: Math.floor(parseInt(amountXof) * 0.06),

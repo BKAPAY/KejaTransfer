@@ -47,6 +47,7 @@ export interface IStorage {
 
   // Payment Links
   getPaymentLinks(userId: string): Promise<PaymentLink[]>;
+  getPaymentLinkById(id: string): Promise<PaymentLink | undefined>;
   getPaymentLinkByToken(token: string): Promise<PaymentLink | undefined>;
   createPaymentLink(link: InsertPaymentLink & { userId: string }): Promise<PaymentLink>;
   updatePaymentLink(id: string, userId: string, link: Partial<InsertPaymentLink>): Promise<PaymentLink | undefined>;
@@ -54,6 +55,7 @@ export interface IStorage {
 
   // Merchant Links
   getMerchantLinks(userId: string): Promise<MerchantLink[]>;
+  getMerchantLinkById(id: string): Promise<MerchantLink | undefined>;
   getMerchantLinkByToken(token: string): Promise<MerchantLink | undefined>;
   getMerchantLinkByName(merchantName: string): Promise<MerchantLink | undefined>;
   createMerchantLink(link: InsertMerchantLink & { userId: string }): Promise<MerchantLink>;
@@ -294,6 +296,11 @@ export class DbStorage implements IStorage {
     return db.select().from(schema.paymentLinks).where(eq(schema.paymentLinks.userId, userId)).orderBy(desc(schema.paymentLinks.createdAt));
   }
 
+  async getPaymentLinkById(id: string): Promise<PaymentLink | undefined> {
+    const results = await db.select().from(schema.paymentLinks).where(eq(schema.paymentLinks.id, id)).limit(1);
+    return results[0];
+  }
+
   async getPaymentLinkByToken(token: string): Promise<PaymentLink | undefined> {
     const results = await db.select().from(schema.paymentLinks).where(eq(schema.paymentLinks.token, token)).limit(1);
     return results[0];
@@ -330,6 +337,11 @@ export class DbStorage implements IStorage {
   // Merchant Links
   async getMerchantLinks(userId: string): Promise<MerchantLink[]> {
     return db.select().from(schema.merchantLinks).where(eq(schema.merchantLinks.userId, userId)).orderBy(desc(schema.merchantLinks.createdAt));
+  }
+
+  async getMerchantLinkById(id: string): Promise<MerchantLink | undefined> {
+    const results = await db.select().from(schema.merchantLinks).where(eq(schema.merchantLinks.id, id)).limit(1);
+    return results[0];
   }
 
   async getMerchantLinkByToken(token: string): Promise<MerchantLink | undefined> {
