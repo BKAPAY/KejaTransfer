@@ -180,8 +180,13 @@ router.post("/api/crypto/create-payment", async (req: Request, res: Response) =>
       });
     }
     
-    // Appliquer le markup de 10% en arrière-plan (le client paie ce montant majoré)
-    const amountWithMarkupXof = baseAmountXof * (1 + CRYPTO_MARKUP_PERCENT / 100);
+    // Montant que le client voit (avec les 6% si customerPaysFee=true)
+    const customerAmountXof = customerPaysFee 
+      ? Math.ceil(baseAmountXof * 1.06) 
+      : baseAmountXof;
+    
+    // Appliquer le markup de 10% en arrière-plan sur le montant client (le client paie ce montant majoré en crypto)
+    const amountWithMarkupXof = customerAmountXof * (1 + CRYPTO_MARKUP_PERCENT / 100);
     const usdAmount = amountWithMarkupXof * 0.0015;
 
     const baseUrl = process.env.BASE_URL || `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`;
@@ -245,6 +250,7 @@ router.post("/api/crypto/create-payment", async (req: Request, res: Response) =>
         cryptoFeePercent: CRYPTO_FEE_PERCENT,
         standardFeePercent: customerPaysFee ? 0 : STANDARD_INCOMING_FEE_PERCENT,
         effectiveFeePercent,
+        customerAmountXof: Math.ceil(customerAmountXof),
         amountWithMarkupXof: Math.ceil(amountWithMarkupXof),
         baseAmountXof: Math.floor(baseAmountXof),
       }),
