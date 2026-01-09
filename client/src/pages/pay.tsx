@@ -1270,18 +1270,18 @@ export default function Pay() {
           <PaymentMethodSelector 
             mobileMoneyContent={mobileMoneyForm}
             cryptoContent={
-              totalAmount >= 500 ? (
+              baseAmount >= 500 ? (
                 cryptoStep === "payment" && cryptoCustomerInfo ? (
                   <div className="space-y-4">
                     <div className="bg-muted p-3 rounded-md">
-                      <p className="text-sm text-muted-foreground">Montant à payer</p>
-                      <p className="text-xl font-bold">{totalAmount.toLocaleString()} XOF</p>
+                      <p className="text-sm text-muted-foreground">Montant du produit</p>
+                      <p className="text-xl font-bold">{baseAmount.toLocaleString()} XOF</p>
                       <p className="text-xs text-muted-foreground mt-1">
                         {cryptoCustomerInfo.customerName} - {cryptoCustomerInfo.customerEmail}
                       </p>
                     </div>
                     <CryptoPaymentFlow
-                      amountXof={totalAmount}
+                      amountXof={baseAmount}
                       paymentLinkId={paymentLink.id}
                       orderDescription={`Paiement ${paymentLink.productName} par ${cryptoCustomerInfo.customerName}`}
                       customerName={cryptoCustomerInfo.customerName}
