@@ -112,7 +112,8 @@ async function processFedaPayTransaction(transaction: Transaction & { user?: Use
     } else {
       // Still pending
       if (hasPaymentExpired(transaction)) {
-        console.log(`[PaymentPolling] ⏱️ FedaPay transaction ${transaction.id} TIMEOUT (10min) - marking as failed`);
+        const timeoutMinutes = Math.round(PAYMENT_TIMEOUT_MS / 60000);
+        console.log(`[PaymentPolling] ⏱️ FedaPay transaction ${transaction.id} TIMEOUT (${timeoutMinutes}min) - marking as failed`);
         await storage.updateTransactionStatus(transaction.id, "failed");
         return true;
       }

@@ -203,6 +203,8 @@ router.post("/api/crypto/create-payment", async (req: Request, res: Response) =>
       operator: crypto,
       description: `Paiement crypto ${getCryptoDisplayName(crypto)}`,
       metadata: JSON.stringify({
+        paymentProvider: "nowpayments",
+        isCrypto: true,
         paymentId: payment.payment_id,
         payAddress: payment.pay_address,
         payAmount: payment.pay_amount,
