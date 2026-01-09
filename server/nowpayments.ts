@@ -166,20 +166,29 @@ export class NowPaymentsClient {
   }
 }
 
+// Minimums en XOF pour les paiements crypto
+export const CRYPTO_MIN_AMOUNT_XOF = 2000; // Minimum par défaut: 2000 XOF
+export const USDT_MIN_AMOUNT_XOF = 8000; // Minimum pour USDT (TRC20 et ERC20): 8000 XOF
+
 export const SUPPORTED_CRYPTOCURRENCIES = [
-  { code: "btc", name: "Bitcoin", symbol: "BTC" },
-  { code: "eth", name: "Ethereum", symbol: "ETH" },
-  { code: "usdttrc20", name: "Tether (TRC20)", symbol: "USDT" },
-  { code: "usdterc20", name: "Tether (ERC20)", symbol: "USDT" },
-  { code: "ltc", name: "Litecoin", symbol: "LTC" },
-  { code: "xrp", name: "Ripple", symbol: "XRP" },
-  { code: "trx", name: "Tron", symbol: "TRX" },
-  { code: "bnbmainnet", name: "BNB", symbol: "BNB" },
-  { code: "sol", name: "Solana", symbol: "SOL" },
-  { code: "doge", name: "Dogecoin", symbol: "DOGE" },
-  { code: "matic", name: "Polygon", symbol: "MATIC" },
-  { code: "ada", name: "Cardano", symbol: "ADA" },
+  { code: "btc", name: "Bitcoin", symbol: "BTC", minAmountXOF: CRYPTO_MIN_AMOUNT_XOF },
+  { code: "eth", name: "Ethereum", symbol: "ETH", minAmountXOF: CRYPTO_MIN_AMOUNT_XOF },
+  { code: "usdttrc20", name: "Tether (TRC20)", symbol: "USDT", minAmountXOF: USDT_MIN_AMOUNT_XOF },
+  { code: "usdterc20", name: "Tether (ERC20)", symbol: "USDT", minAmountXOF: USDT_MIN_AMOUNT_XOF },
+  { code: "ltc", name: "Litecoin", symbol: "LTC", minAmountXOF: CRYPTO_MIN_AMOUNT_XOF },
+  { code: "xrp", name: "Ripple", symbol: "XRP", minAmountXOF: CRYPTO_MIN_AMOUNT_XOF },
+  { code: "trx", name: "Tron", symbol: "TRX", minAmountXOF: CRYPTO_MIN_AMOUNT_XOF },
+  { code: "bnbmainnet", name: "BNB", symbol: "BNB", minAmountXOF: CRYPTO_MIN_AMOUNT_XOF },
+  { code: "sol", name: "Solana", symbol: "SOL", minAmountXOF: CRYPTO_MIN_AMOUNT_XOF },
+  { code: "doge", name: "Dogecoin", symbol: "DOGE", minAmountXOF: CRYPTO_MIN_AMOUNT_XOF },
+  { code: "matic", name: "Polygon", symbol: "MATIC", minAmountXOF: CRYPTO_MIN_AMOUNT_XOF },
+  { code: "ada", name: "Cardano", symbol: "ADA", minAmountXOF: CRYPTO_MIN_AMOUNT_XOF },
 ];
+
+export function getCryptoMinAmountXOF(code: string): number {
+  const crypto = SUPPORTED_CRYPTOCURRENCIES.find((c) => c.code === code);
+  return crypto ? crypto.minAmountXOF : CRYPTO_MIN_AMOUNT_XOF;
+}
 
 export function getCryptoDisplayName(code: string): string {
   const crypto = SUPPORTED_CRYPTOCURRENCIES.find((c) => c.code === code);

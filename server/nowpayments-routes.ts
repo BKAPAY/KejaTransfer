@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import { storage } from "./storage";
-import { NowPaymentsClient, SUPPORTED_CRYPTOCURRENCIES, getCryptoDisplayName } from "./nowpayments";
+import { NowPaymentsClient, SUPPORTED_CRYPTOCURRENCIES, getCryptoDisplayName, getCryptoMinAmountXOF, CRYPTO_MIN_AMOUNT_XOF, USDT_MIN_AMOUNT_XOF } from "./nowpayments";
 import QRCode from "qrcode";
 
 const router = Router();
@@ -41,11 +41,18 @@ router.get("/api/crypto/currencies", async (req: Request, res: Response) => {
         name: c.name,
         symbol: c.symbol,
         isEnabled: true,
+        minAmountXOF: c.minAmountXOF,
       }));
       return res.json(defaultCryptos);
     }
 
-    res.json(enabledCryptos);
+    // Ajouter les minimums XOF aux cryptos activées
+    const cryptosWithMinimums = enabledCryptos.map((crypto: any) => ({
+      ...crypto,
+      minAmountXOF: getCryptoMinAmountXOF(crypto.code),
+    }));
+
+    res.json(cryptosWithMinimums);
   } catch (error: any) {
     console.error("[NOWPayments] Get currencies failed:", error);
     res.status(500).json({ error: "Impossible de récupérer les cryptomonnaies" });
@@ -152,16 +159,18 @@ router.post("/api/crypto/create-payment", async (req: Request, res: Response) =>
     // Montant de base demandé par l'utilisateur
     const baseAmountXof = parseFloat(amountXof);
     
+    // Validation du montant minimum en XOF selon la cryptomonnaie
+    const minAmountXof = getCryptoMinAmountXOF(crypto);
+    if (baseAmountXof < minAmountXof) {
+      const cryptoName = getCryptoDisplayName(crypto);
+      return res.status(400).json({
+        error: `Montant minimum pour ${cryptoName}: ${minAmountXof.toLocaleString("fr-FR")} XOF`,
+      });
+    }
+    
     // Appliquer le markup de 10% en arrière-plan (le client paie ce montant majoré)
     const amountWithMarkupXof = baseAmountXof * (1 + CRYPTO_MARKUP_PERCENT / 100);
     const usdAmount = amountWithMarkupXof * 0.0015;
-
-    const minAmount = await client.getMinAmount(crypto, "usd");
-    if (usdAmount < minAmount.min_amount) {
-      return res.status(400).json({
-        error: `Montant minimum: ${minAmount.min_amount} USD (environ ${Math.ceil(minAmount.min_amount / 0.0015)} XOF)`,
-      });
-    }
 
     const baseUrl = process.env.BASE_URL || `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`;
     const ipnCallbackUrl = `${baseUrl}/api/webhooks/nowpayments`;

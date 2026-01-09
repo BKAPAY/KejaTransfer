@@ -26,6 +26,7 @@ interface CryptoCurrency {
   name: string;
   symbol: string;
   isEnabled: boolean;
+  minAmountXOF: number;
 }
 
 interface CryptoPaymentFlowProps {
@@ -412,26 +413,41 @@ export function CryptoPaymentFlow({
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {enabledCurrencies.map((crypto) => (
-              <button
-                key={crypto.code}
-                type="button"
-                onClick={() => {
-                  setSelectedCrypto(crypto.code);
-                  setPaymentStep("confirm");
-                }}
-                className={cn(
-                  "p-3 rounded-lg border-2 text-center transition-all hover-elevate",
-                  selectedCrypto === crypto.code
-                    ? "border-primary bg-primary/5"
-                    : "border-border hover:border-primary/50"
-                )}
-                data-testid={`button-crypto-${crypto.code}`}
-              >
-                <div className="font-semibold">{crypto.symbol}</div>
-                <div className="text-xs text-muted-foreground">{crypto.name}</div>
-              </button>
-            ))}
+            {enabledCurrencies.map((crypto) => {
+              const isAvailable = amountXof >= (crypto.minAmountXOF || 0);
+              return (
+                <button
+                  key={crypto.code}
+                  type="button"
+                  onClick={() => {
+                    if (isAvailable) {
+                      setSelectedCrypto(crypto.code);
+                      setPaymentStep("confirm");
+                    }
+                  }}
+                  disabled={!isAvailable}
+                  className={cn(
+                    "p-3 rounded-lg border-2 text-center transition-all",
+                    isAvailable && "hover-elevate",
+                    selectedCrypto === crypto.code
+                      ? "border-primary bg-primary/5"
+                      : isAvailable 
+                        ? "border-border hover:border-primary/50"
+                        : "border-border opacity-50 cursor-not-allowed"
+                  )}
+                  data-testid={`button-crypto-${crypto.code}`}
+                >
+                  <div className="font-semibold">{crypto.symbol}</div>
+                  <div className="text-xs text-muted-foreground">{crypto.name}</div>
+                  <div className={cn(
+                    "text-xs mt-1",
+                    isAvailable ? "text-muted-foreground" : "text-destructive"
+                  )}>
+                    Min: {(crypto.minAmountXOF || 0).toLocaleString("fr-FR")} XOF
+                  </div>
+                </button>
+              );
+            })}
           </div>
 
           {enabledCurrencies.length === 0 && (
