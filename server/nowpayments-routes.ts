@@ -116,13 +116,15 @@ router.post("/api/crypto/create-payment", async (req: Request, res: Response) =>
       return res.status(503).json({ error: "Paiements crypto non disponibles" });
     }
 
-    // Trouver le userId du propriétaire du lien/API
+    // Trouver le userId et vérifier customerPaysFee
     let ownerUserId = userId;
+    let customerPaysFee = false;
     
     if (!ownerUserId && paymentLinkId) {
       const paymentLink = await storage.getPaymentLinkById(paymentLinkId);
       if (paymentLink) {
         ownerUserId = paymentLink.userId;
+        customerPaysFee = paymentLink.customerPaysFee || false;
       }
     }
     
@@ -130,6 +132,8 @@ router.post("/api/crypto/create-payment", async (req: Request, res: Response) =>
       const merchantLink = await storage.getMerchantLinkById(merchantLinkId);
       if (merchantLink) {
         ownerUserId = merchantLink.userId;
+        // merchantLinks n'a pas customerPaysFee, donc on utilise false par défaut
+        customerPaysFee = false;
       }
     }
     
@@ -137,6 +141,7 @@ router.post("/api/crypto/create-payment", async (req: Request, res: Response) =>
       const apiKey = await storage.getApiKeyByPublicKey(apiKeyId);
       if (apiKey) {
         ownerUserId = apiKey.userId;
+        customerPaysFee = apiKey.customerPaysFee || false;
       }
     }
     
@@ -176,16 +181,21 @@ router.post("/api/crypto/create-payment", async (req: Request, res: Response) =>
       color: { dark: "#000000", light: "#ffffff" },
     });
 
-    // Calculer les frais totaux: 15% crypto + 6% standard = 21%
-    // Les frais s'appliquent TOUJOURS sur les paiements crypto, même si "customerPaysFee" est activé
-    const totalFee = Math.floor(baseAmountXof * (TOTAL_CRYPTO_FEE_PERCENT / 100));
-    const feePercentage = TOTAL_CRYPTO_FEE_PERCENT * 10; // 210 pour 21%
+    // Calculer les frais crypto:
+    // - 15% crypto TOUJOURS prélevés
+    // - 6% standard SEULEMENT si customerPaysFee est désactivé
+    const effectiveFeePercent = customerPaysFee 
+      ? CRYPTO_FEE_PERCENT  // 15% seulement (client a déjà payé les 6%)
+      : TOTAL_CRYPTO_FEE_PERCENT; // 21% (15% + 6%)
+    
+    const totalFee = Math.floor(baseAmountXof * (effectiveFeePercent / 100));
+    const feePercentage = effectiveFeePercent * 10;
 
     const transaction = await storage.createTransaction({
       userId: ownerUserId,
       type: "deposit",
-      amount: Math.floor(baseAmountXof), // Montant de base (sans markup)
-      fee: totalFee, // 21% de frais (15% crypto + 6% standard)
+      amount: Math.floor(baseAmountXof),
+      fee: totalFee,
       feePercentage: feePercentage,
       currency: "XOF",
       status: "pending",
@@ -204,10 +214,11 @@ router.post("/api/crypto/create-payment", async (req: Request, res: Response) =>
         apiKeyId,
         purchaseId: payment.purchase_id,
         network: payment.network,
-        // Informations de frais crypto (invisibles pour l'utilisateur)
+        customerPaysFee,
         cryptoMarkupPercent: CRYPTO_MARKUP_PERCENT,
         cryptoFeePercent: CRYPTO_FEE_PERCENT,
-        standardFeePercent: STANDARD_INCOMING_FEE_PERCENT,
+        standardFeePercent: customerPaysFee ? 0 : STANDARD_INCOMING_FEE_PERCENT,
+        effectiveFeePercent,
         amountWithMarkupXof: Math.ceil(amountWithMarkupXof),
         baseAmountXof: Math.floor(baseAmountXof),
       }),

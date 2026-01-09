@@ -72,10 +72,11 @@ BKApay supports cryptocurrency payments via NOWPayments integration:
 
 ### Crypto Fee Structure (Backend Configuration - Invisible to Users)
 - **Markup 10%**: Hidden markup applied to all crypto payment amounts. Customer sees and pays the marked-up amount in crypto.
-- **Crypto Fee 15%**: Additional fee on all incoming crypto payments.
-- **Standard Fee 6%**: Standard incoming fee also applies to crypto payments.
-- **Total Deduction 21%**: Net amount credited = Base amount - 21% (15% crypto + 6% standard).
-- **Important**: The 21% fee applies ALWAYS on crypto payments, even if "customerPaysFee" option is enabled on payment links.
+- **Crypto Fee 15%**: Additional fee on all incoming crypto payments. ALWAYS applied.
+- **Standard Fee 6%**: Standard incoming fee applies ONLY if "customerPaysFee" is disabled.
+- **Total Deduction**: 
+  - If customerPaysFee=false: 21% (15% crypto + 6% standard)
+  - If customerPaysFee=true: 15% (crypto fee only, 6% already paid by customer)
 
 ### Crypto Payment Flow
 1. Customer selects crypto payment and amount (e.g., 10,000 XOF)
