@@ -27,7 +27,6 @@ interface ConversionData {
 }
 
 const depositSchema = z.object({
-  amount: z.number().min(100, "Le montant minimum est de 100 XOF"),
   country: z.string().min(1, "Selectionnez un pays"),
   operator: z.string().min(1, "Selectionnez un operateur"),
   phone: z.string().min(8, "Le numero de telephone est requis"),
@@ -38,6 +37,7 @@ type DepositFormData = z.infer<typeof depositSchema>;
 export default function Deposit() {
   const { toast } = useToast();
   const [paymentStep, setPaymentStep] = useState<"form" | "polling" | "completed" | "otp">("form");
+  const [depositAmount, setDepositAmount] = useState<number | undefined>(undefined);
   const [paymentData, setPaymentData] = useState<{
     transactionId?: string;
     fedapayTransactionId?: number;
@@ -62,7 +62,6 @@ export default function Deposit() {
   const form = useForm<DepositFormData>({
     resolver: zodResolver(depositSchema),
     defaultValues: {
-      amount: undefined as any,
       country: "",
       operator: "",
       phone: "",
@@ -70,7 +69,7 @@ export default function Deposit() {
   });
 
   const selectedCountry = form.watch("country");
-  const amount = form.watch("amount");
+  const amount = depositAmount;
 
   // Filter countries to only show those enabled by admin (have at least one enabled operator)
   const collectCountries = enabledCountriesOperators 
@@ -136,7 +135,10 @@ export default function Deposit() {
 
   const depositMutation = useMutation({
     mutationFn: async (data: DepositFormData) => {
-      const res = await apiRequest("POST", "/api/fedapay/deposit", data);
+      const res = await apiRequest("POST", "/api/fedapay/deposit", {
+        ...data,
+        amount: depositAmount,
+      });
       return res.json();
     },
     onSuccess: (response: any) => {
@@ -474,7 +476,25 @@ export default function Deposit() {
           <CardHeader className="pb-2">
             <CardTitle className="text-lg">Details du depot</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Montant (XOF)</label>
+              <Input
+                type="number"
+                placeholder="10000"
+                data-testid="input-deposit-amount"
+                min="100"
+                value={depositAmount || ""}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setDepositAmount(val === "" ? undefined : Number(val));
+                }}
+              />
+              {depositAmount !== undefined && depositAmount < 100 && (
+                <p className="text-sm text-destructive">Le montant minimum est de 100 XOF</p>
+              )}
+            </div>
+
             <PaymentMethodSelector
               cryptoContent={
                 amount && amount >= 500 ? (
@@ -497,30 +517,6 @@ export default function Deposit() {
               mobileMoneyContent={
                 <Form {...form}>
                   <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                    <FormField
-                      control={form.control}
-                      name="amount"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Montant (XOF)</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              placeholder="10000"
-                              data-testid="input-amount"
-                              min="100"
-                              value={field.value || ""}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                field.onChange(val === "" ? undefined : Number(val));
-                              }}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
                     <FormField
                       control={form.control}
                       name="country"

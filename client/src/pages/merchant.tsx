@@ -148,6 +148,15 @@ export default function Merchant() {
   const [copiedUssd, setCopiedUssd] = useState(false);
   const [conversionData, setConversionData] = useState<ConversionData | null>(null);
   const { toast } = useToast();
+  
+  // État pour le flux crypto en 2 étapes
+  const [cryptoStep, setCryptoStep] = useState<"info" | "payment">("info");
+  const [cryptoCustomerInfo, setCryptoCustomerInfo] = useState<{
+    amount: number;
+    customerName: string;
+    customerEmail: string;
+    customerPhone: string;
+  } | null>(null);
 
   const copyUssdCode = (code: string) => {
     navigator.clipboard.writeText(code);
@@ -1211,18 +1220,128 @@ export default function Merchant() {
           <PaymentMethodSelector 
             mobileMoneyContent={mobileMoneyForm}
             cryptoContent={
-              paidAmount && paidAmount >= 500 ? (
-                <CryptoPaymentFlow
-                  amountXof={paidAmount}
-                  merchantLinkId={merchantLink.id}
-                  orderDescription={`Paiement à ${merchantLink.merchantName}`}
-                  onSuccess={() => {
-                    setPaymentStage("completed");
-                  }}
-                />
+              cryptoStep === "payment" && cryptoCustomerInfo ? (
+                <div className="space-y-4">
+                  <div className="bg-muted p-3 rounded-md">
+                    <p className="text-sm text-muted-foreground">Montant à payer</p>
+                    <p className="text-xl font-bold">{cryptoCustomerInfo.amount.toLocaleString()} XOF</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {cryptoCustomerInfo.customerName} - {cryptoCustomerInfo.customerEmail}
+                    </p>
+                  </div>
+                  <CryptoPaymentFlow
+                    amountXof={cryptoCustomerInfo.amount}
+                    merchantLinkId={merchantLink.id}
+                    orderDescription={`Paiement à ${merchantLink.merchantName} par ${cryptoCustomerInfo.customerName}`}
+                    onSuccess={() => {
+                      setPaymentStage("completed");
+                      setPaidAmount(cryptoCustomerInfo.amount);
+                    }}
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setCryptoStep("info");
+                      setCryptoCustomerInfo(null);
+                    }}
+                    className="w-full"
+                    data-testid="button-back-crypto-info"
+                  >
+                    Modifier les informations
+                  </Button>
+                </div>
               ) : (
-                <div className="p-4 text-center text-muted-foreground">
-                  Entrez un montant d'au moins 500 XOF pour payer en crypto
+                <div className="space-y-4">
+                  <p className="text-sm text-muted-foreground text-center mb-4">
+                    Renseignez vos informations pour payer en cryptomonnaie
+                  </p>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-xs sm:text-sm font-medium">Montant (XOF)</label>
+                      <Input
+                        type="number"
+                        placeholder="10000"
+                        min={500}
+                        data-testid="input-crypto-amount"
+                        value={cryptoCustomerInfo?.amount || ""}
+                        onChange={(e) => setCryptoCustomerInfo(prev => ({
+                          ...prev,
+                          amount: parseFloat(e.target.value) || 0,
+                          customerName: prev?.customerName || "",
+                          customerEmail: prev?.customerEmail || "",
+                          customerPhone: prev?.customerPhone || "",
+                        }))}
+                      />
+                      {cryptoCustomerInfo?.amount !== undefined && cryptoCustomerInfo.amount > 0 && cryptoCustomerInfo.amount < 500 && (
+                        <p className="text-xs text-destructive mt-1">Le montant minimum est de 500 XOF</p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="text-xs sm:text-sm font-medium">Nom complet</label>
+                      <Input
+                        placeholder="Jean Dupont"
+                        data-testid="input-crypto-name"
+                        value={cryptoCustomerInfo?.customerName || ""}
+                        onChange={(e) => setCryptoCustomerInfo(prev => ({
+                          ...prev,
+                          amount: prev?.amount || 0,
+                          customerName: e.target.value,
+                          customerEmail: prev?.customerEmail || "",
+                          customerPhone: prev?.customerPhone || "",
+                        }))}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs sm:text-sm font-medium">Email</label>
+                      <Input
+                        type="email"
+                        placeholder="jean@exemple.com"
+                        data-testid="input-crypto-email"
+                        value={cryptoCustomerInfo?.customerEmail || ""}
+                        onChange={(e) => setCryptoCustomerInfo(prev => ({
+                          ...prev,
+                          amount: prev?.amount || 0,
+                          customerName: prev?.customerName || "",
+                          customerEmail: e.target.value,
+                          customerPhone: prev?.customerPhone || "",
+                        }))}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs sm:text-sm font-medium">Téléphone</label>
+                      <Input
+                        placeholder="+229 00 00 00 00"
+                        data-testid="input-crypto-phone"
+                        value={cryptoCustomerInfo?.customerPhone || ""}
+                        onChange={(e) => setCryptoCustomerInfo(prev => ({
+                          ...prev,
+                          amount: prev?.amount || 0,
+                          customerName: prev?.customerName || "",
+                          customerEmail: prev?.customerEmail || "",
+                          customerPhone: e.target.value,
+                        }))}
+                      />
+                    </div>
+                  </div>
+                  <Button
+                    className="w-full"
+                    disabled={
+                      !cryptoCustomerInfo?.amount || 
+                      cryptoCustomerInfo.amount < 500 ||
+                      !cryptoCustomerInfo?.customerName?.trim() ||
+                      !cryptoCustomerInfo?.customerEmail?.trim() ||
+                      !cryptoCustomerInfo?.customerPhone?.trim()
+                    }
+                    onClick={() => {
+                      if (cryptoCustomerInfo && cryptoCustomerInfo.amount >= 500) {
+                        setCryptoStep("payment");
+                      }
+                    }}
+                    data-testid="button-continue-crypto"
+                  >
+                    Continuer vers le paiement crypto
+                  </Button>
                 </div>
               )
             }
