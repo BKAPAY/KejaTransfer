@@ -8,7 +8,8 @@ const PAYDUNYA_TOKEN = process.env.PAYDUNYA_TOKEN;
 
 // Polling every 5 seconds for active transactions
 const POLLING_INTERVAL = 5000;
-const PAYMENT_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes timeout
+const PAYMENT_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes timeout (Mobile Money)
+const CRYPTO_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes timeout (Crypto)
 
 interface PaydunyaStatusResponse {
   response_code: string;
@@ -51,6 +52,15 @@ function getTransactionAge(transaction: Transaction): number {
   return Date.now() - createdAt;
 }
 
+function getPaymentTimeoutForTransaction(transaction: Transaction, metadata: any): number {
+  // Crypto transactions get 30 minutes timeout
+  if (metadata.paymentProvider === "nowpayments" || metadata.isCrypto === true) {
+    return CRYPTO_TIMEOUT_MS;
+  }
+  // Mobile Money and other transactions get 10 minutes
+  return PAYMENT_TIMEOUT_MS;
+}
+
 function hasPaymentExpired(transaction: Transaction): boolean {
   let metadata: any = {};
   if (transaction.metadata) {
@@ -59,9 +69,11 @@ function hasPaymentExpired(transaction: Transaction): boolean {
     } catch (e) {}
   }
 
+  const timeoutMs = getPaymentTimeoutForTransaction(transaction, metadata);
+
   if (metadata.startTime) {
     const elapsed = Date.now() - metadata.startTime;
-    return elapsed >= PAYMENT_TIMEOUT_MS;
+    return elapsed >= timeoutMs;
   }
 
   if (metadata.expiresAt) {
@@ -69,7 +81,7 @@ function hasPaymentExpired(transaction: Transaction): boolean {
   }
 
   const age = getTransactionAge(transaction);
-  return age >= PAYMENT_TIMEOUT_MS;
+  return age >= timeoutMs;
 }
 
 async function processFedaPayTransaction(transaction: Transaction & { user?: User }, metadata: any): Promise<boolean> {

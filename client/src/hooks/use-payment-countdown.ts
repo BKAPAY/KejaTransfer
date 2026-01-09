@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { queryClient } from "@/lib/queryClient";
 
-const COUNTDOWN_DURATION = 10 * 60; // 10 minutes in seconds
+export const DEFAULT_COUNTDOWN_DURATION = 10 * 60; // 10 minutes in seconds (Mobile Money)
+export const CRYPTO_COUNTDOWN_DURATION = 30 * 60; // 30 minutes in seconds (Crypto)
 const POLL_INTERVAL = 1000; // 1 second
 
 interface PaymentCountdownState {
@@ -18,6 +19,8 @@ interface UsePaymentCountdownOptions {
   onCompleted?: () => void;
   onFailed?: () => void;
   onExpired?: () => void;
+  /** Duration in seconds. Default 600 (10 min) for Mobile Money, use 1800 (30 min) for crypto */
+  durationSeconds?: number;
 }
 
 function getStorageKey(invoiceToken: string | null, transactionId: string | null): string {
@@ -47,9 +50,9 @@ function clearStartTime(key: string): void {
   }
 }
 
-function calculateRemainingTime(startTime: number): number {
+function calculateRemainingTime(startTime: number, duration: number): number {
   const elapsed = Math.floor((Date.now() - startTime) / 1000);
-  return Math.max(0, COUNTDOWN_DURATION - elapsed);
+  return Math.max(0, duration - elapsed);
 }
 
 function formatTime(seconds: number): string {
@@ -65,11 +68,12 @@ export function usePaymentCountdown({
   onCompleted,
   onFailed,
   onExpired,
+  durationSeconds = DEFAULT_COUNTDOWN_DURATION,
 }: UsePaymentCountdownOptions): PaymentCountdownState & {
   startCountdown: () => void;
   resetCountdown: () => void;
 } {
-  const [remainingTime, setRemainingTime] = useState(COUNTDOWN_DURATION);
+  const [remainingTime, setRemainingTime] = useState(durationSeconds);
   const [status, setStatus] = useState<"pending" | "completed" | "failed" | "expired">("pending");
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const pollRef = useRef<NodeJS.Timeout | null>(null);
@@ -82,7 +86,7 @@ export function usePaymentCountdown({
     
     const existingStartTime = getStartTime(storageKey);
     if (existingStartTime) {
-      const remaining = calculateRemainingTime(existingStartTime);
+      const remaining = calculateRemainingTime(existingStartTime, durationSeconds);
       setRemainingTime(remaining);
       
       // If already expired, set status
@@ -90,7 +94,7 @@ export function usePaymentCountdown({
         setStatus("expired");
       }
     }
-  }, [storageKey]);
+  }, [storageKey, durationSeconds]);
 
   const startCountdown = useCallback(() => {
     if (!storageKey) return;
@@ -101,22 +105,22 @@ export function usePaymentCountdown({
       setStartTime(storageKey, startTime);
     }
 
-    const remaining = calculateRemainingTime(startTime);
+    const remaining = calculateRemainingTime(startTime, durationSeconds);
     setRemainingTime(remaining);
 
     if (remaining <= 0) {
       setStatus("expired");
       onExpired?.();
     }
-  }, [storageKey, onExpired]);
+  }, [storageKey, onExpired, durationSeconds]);
 
   const resetCountdown = useCallback(() => {
     if (storageKey) {
       clearStartTime(storageKey);
     }
-    setRemainingTime(COUNTDOWN_DURATION);
+    setRemainingTime(durationSeconds);
     setStatus("pending");
-  }, [storageKey]);
+  }, [storageKey, durationSeconds]);
 
   // Countdown timer
   useEffect(() => {
@@ -131,7 +135,7 @@ export function usePaymentCountdown({
       const storedStartTime = getStartTime(storageKey);
       if (!storedStartTime) return;
 
-      const remaining = calculateRemainingTime(storedStartTime);
+      const remaining = calculateRemainingTime(storedStartTime, durationSeconds);
       setRemainingTime(remaining);
 
       if (remaining <= 0 && status === "pending") {
