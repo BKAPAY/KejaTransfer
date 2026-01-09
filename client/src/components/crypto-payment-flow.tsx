@@ -349,11 +349,11 @@ export function CryptoPaymentFlow({
             </div>
             {estimateLoading ? (
               <Skeleton className="h-6 w-24 ml-auto" />
-            ) : estimate ? (
+            ) : estimate && estimate.estimatedAmount ? (
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Estimation</span>
                 <span className="font-semibold">
-                  ~{estimate.estimatedAmount.toFixed(8)} {selectedCrypto.toUpperCase()}
+                  ~{Number(estimate.estimatedAmount).toFixed(8)} {selectedCrypto.toUpperCase()}
                 </span>
               </div>
             ) : null}
