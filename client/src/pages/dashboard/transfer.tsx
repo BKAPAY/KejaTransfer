@@ -507,6 +507,29 @@ export default function Transfer() {
                           }).format(amount + feeInfo.feeAmount)}
                         </span>
                       </div>
+                      {needsConversion && conversionData && !conversionData.isLoading && (
+                        <div className="border-t pt-2 mt-2">
+                          <div className="flex justify-between text-green-600 dark:text-green-400 font-semibold">
+                            <span>Destinataire recevra:</span>
+                            <span data-testid="text-converted-amount">
+                              {new Intl.NumberFormat("fr-FR", {
+                                style: "currency",
+                                currency: conversionData.targetCurrency,
+                                minimumFractionDigits: 0,
+                              }).format(conversionData.convertedAmount)}
+                            </span>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Taux: 1 XOF = {conversionData.conversionRate.toFixed(6)} {conversionData.targetCurrency}
+                          </p>
+                        </div>
+                      )}
+                      {needsConversion && conversionData?.isLoading && (
+                        <div className="border-t pt-2 mt-2 flex items-center gap-2 text-muted-foreground">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          <span className="text-xs">Calcul de la conversion...</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

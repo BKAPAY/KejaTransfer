@@ -489,7 +489,7 @@ export default function Withdrawal() {
                         </span>
                       </div>
                       <div className="flex justify-between font-semibold text-green-600 dark:text-green-400">
-                        <span>Montant recu:</span>
+                        <span>Montant recu (XOF):</span>
                         <span data-testid="text-amount-received">
                           {new Intl.NumberFormat("fr-FR", {
                             style: "currency",
@@ -498,6 +498,24 @@ export default function Withdrawal() {
                           }).format(feeInfo.amountReceived)}
                         </span>
                       </div>
+                      {needsConversion && conversionData && !conversionData.isLoading && (
+                        <div className="flex justify-between font-semibold text-blue-600 dark:text-blue-400">
+                          <span>Equivalent en {conversionData.targetCurrency}:</span>
+                          <span data-testid="text-converted-amount">
+                            {new Intl.NumberFormat("fr-FR", {
+                              style: "currency",
+                              currency: conversionData.targetCurrency,
+                              minimumFractionDigits: 0,
+                            }).format(conversionData.convertedAmount)}
+                          </span>
+                        </div>
+                      )}
+                      {needsConversion && conversionData?.isLoading && (
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          <span className="text-xs">Calcul de la conversion...</span>
+                        </div>
+                      )}
                       <div className="border-t pt-2 flex justify-between">
                         <span className="text-muted-foreground">Debite du solde:</span>
                         <span className="font-medium text-foreground" data-testid="text-total-deducted">
@@ -508,6 +526,11 @@ export default function Withdrawal() {
                           }).format(feeInfo.totalDeductedFromBalance)}
                         </span>
                       </div>
+                      {needsConversion && conversionData && !conversionData.isLoading && (
+                        <p className="text-xs text-muted-foreground">
+                          Taux: 1 XOF = {conversionData.conversionRate.toFixed(6)} {conversionData.targetCurrency}
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>
