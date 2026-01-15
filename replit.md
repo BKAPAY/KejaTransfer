@@ -85,11 +85,13 @@ BKApay supports cryptocurrency payments via NOWPayments integration:
 4. Upon confirmation, user receives: 10,000 - 21% = 7,900 XOF credited to balance
 5. Platform retains: 1,000 XOF (markup) + 2,100 XOF (21% fees) = 3,100 XOF
 
-## Multi-Provider System (NEW)
-BKApay now supports 3 payment providers with mutual exclusivity:
+## Multi-Provider System
+BKApay now supports 5 payment providers with mutual exclusivity:
 - **AfribaPay**: 15 countries (Benin, Togo, CI, Senegal, Ghana, Cameroon, etc.)
 - **Paydunya**: 6 countries (Benin, Togo, CI, Senegal, Burkina Faso, Mali)
 - **FedaPay**: 7 countries (Benin, Togo, CI, Senegal, Guinea, Niger, Burkina Faso)
+- **MbiyoPay**: 11 countries (Benin, Togo, CI, Senegal, Burkina Faso, Mali, Guinea, Cameroon, Congo-Brazzaville, RD Congo, Gambia)
+- **NOWPayments**: Cryptocurrency payments (BTC, ETH, USDT, LTC, etc.)
 
 ### Mutual Exclusivity
 - A country can only be active for ONE provider at a time (separately for payin and payout)
@@ -100,6 +102,7 @@ BKApay now supports 3 payment providers with mutual exclusivity:
 - `shared/afribapay-countries.ts` - AfribaPay countries and operators
 - `shared/paydunya-countries.ts` - Paydunya countries and operators  
 - `shared/fedapay-countries.ts` - FedaPay countries and operators
+- `shared/mbiyopay-countries.ts` - MbiyoPay countries and operators
 
 ### Admin Pages
 - `/dashboard/fournisseurs` - Manage API keys and toggle providers on/off
@@ -114,6 +117,8 @@ BKApay now supports 3 payment providers with mutual exclusivity:
 - **AfribaPay API**: Payment gateway for 15 African countries
 - **Paydunya API**: Payment gateway for West Africa (6 countries)
 - **FedaPay API**: Payment gateway for francophone Africa (7 countries)
+- **MbiyoPay API**: Payment gateway for 11 African countries via Merchant API (https://dashboard.mbiyo.africa)
+- **NOWPayments API**: Cryptocurrency payment gateway
 - **PostgreSQL**: Primary database.
 - **Drizzle ORM**: For database interactions.
 - **connect-pg-simple**: For PostgreSQL session store.
