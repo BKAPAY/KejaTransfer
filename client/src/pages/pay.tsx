@@ -327,15 +327,18 @@ export default function Pay() {
     }
   }, [selectedCountry]);
 
-  // conversion (XOF -> Target Currency)
+  // Get the owner's currency (the currency of the payment link creator)
+  const ownerCurrency = (paymentLink as any)?.ownerCurrency || "XOF";
+  
+  // conversion (ownerCurrency -> Target Currency)
   const targetCurrency = hasMultipleCurrencies(selectedCountry) 
     ? selectedCurrency 
     : (COUNTRIES.find(c => c.code === selectedCountry)?.currency || "XOF");
-  const isConversionNeeded = targetCurrency !== "XOF";
+  const isConversionNeeded = targetCurrency !== ownerCurrency;
   const isGuinea = selectedCountry === "GN";
   
-  const fetchConversion = useCallback(async (amountToConvert: number, toCurrency: string) => {
-    if (!amountToConvert || amountToConvert <= 0 || toCurrency === "XOF") {
+  const fetchConversion = useCallback(async (amountToConvert: number, fromCurrency: string, toCurrency: string) => {
+    if (!amountToConvert || amountToConvert <= 0 || toCurrency === fromCurrency) {
       setConversionData(null);
       return;
     }
@@ -346,7 +349,7 @@ export default function Pay() {
       const res = await fetch("/api/convert-currency", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: amountToConvert, fromCurrency: "XOF", toCurrency }),
+        body: JSON.stringify({ amount: amountToConvert, fromCurrency, toCurrency }),
       });
       
       if (res.ok) {
@@ -369,13 +372,13 @@ export default function Pay() {
   useEffect(() => {
     if (isConversionNeeded && totalAmount > 0) {
       const debounceTimer = setTimeout(() => {
-        fetchConversion(totalAmount, targetCurrency);
+        fetchConversion(totalAmount, ownerCurrency, targetCurrency);
       }, 500);
       return () => clearTimeout(debounceTimer);
     } else {
       setConversionData(null);
     }
-  }, [isConversionNeeded, totalAmount, targetCurrency, fetchConversion, selectedCurrency]);
+  }, [isConversionNeeded, totalAmount, ownerCurrency, targetCurrency, fetchConversion, selectedCurrency]);
 
   // Fonction pour recommencer un nouveau paiement
   const handleNewPayment = () => {

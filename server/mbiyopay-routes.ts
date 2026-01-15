@@ -32,7 +32,7 @@ export async function handleMbiyoPayDeposit(
     }
 
     const grossAmount = Math.floor(amount);
-    const feeInfo = calculateIncomingFee(grossAmount, country);
+    const feeInfo = calculateIncomingFee(grossAmount);
     const currency = getCurrencyForCountry(country);
 
     const result = await createMbiyoPayPayin({
@@ -103,7 +103,7 @@ export async function handleMbiyoPayWithdrawal(
     }
 
     const grossAmount = Math.floor(amount);
-    const feeInfo = calculateOutgoingFee(grossAmount, country);
+    const feeInfo = calculateOutgoingFee(grossAmount);
     const currency = getCurrencyForCountry(country);
 
     if (user.balance < feeInfo.totalDeductedFromBalance) {
@@ -177,7 +177,7 @@ export async function handleMbiyoPayTransfer(
     }
 
     const netAmount = Math.floor(amount);
-    const feeInfo = calculateOutgoingFee(netAmount, country);
+    const feeInfo = calculateOutgoingFee(netAmount);
     const currency = getCurrencyForCountry(country);
     const totalToDebit = netAmount + feeInfo.feeAmount;
 
@@ -322,7 +322,7 @@ export async function handleMbiyoPayMerchantLink(
     }
 
     const grossAmount = Math.floor(amount);
-    const feeInfo = calculateIncomingFee(grossAmount, country);
+    const feeInfo = calculateIncomingFee(grossAmount);
     const currency = getCurrencyForCountry(country);
 
     const result = await createMbiyoPayPayin({
@@ -394,7 +394,7 @@ export async function handleMbiyoPayApiPayment(
     }
 
     const grossAmount = Math.floor(amount);
-    const feeInfo = calculateIncomingFee(grossAmount, country);
+    const feeInfo = calculateIncomingFee(grossAmount);
     const currency = getCurrencyForCountry(country);
 
     const result = await createMbiyoPayPayin({
