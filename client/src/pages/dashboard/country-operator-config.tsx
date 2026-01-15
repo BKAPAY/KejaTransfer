@@ -182,7 +182,7 @@ export default function CountryOperatorConfigPage() {
       </div>
 
       <Tabs value={activeProvider} onValueChange={setActiveProvider}>
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           {PROVIDERS.map((provider) => {
             const isActive = isProviderActive(provider.id);
             return (

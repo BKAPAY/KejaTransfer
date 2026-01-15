@@ -998,6 +998,7 @@ export class DbStorage implements IStorage {
     const { AFRIBAPAY_COUNTRIES } = await import("@shared/afribapay-countries");
     const { PAYDUNYA_COUNTRIES } = await import("@shared/paydunya-countries");
     const { FEDAPAY_COUNTRIES } = await import("@shared/fedapay-countries");
+    const { MBIYOPAY_COUNTRIES } = await import("@shared/mbiyopay-countries");
 
     // Get existing configs to check which ones are already present
     const existing = await this.getCountryOperatorConfigs();
@@ -1059,6 +1060,25 @@ export class DbStorage implements IStorage {
           .catch(() => {});
       }
     }
+
+    // Initialize MbiyoPay
+    for (const country of MBIYOPAY_COUNTRIES) {
+      for (const operator of country.operators) {
+        const key = `mbiyopay-${country.code}-${operator.code}`;
+        if (existingSet.has(key)) continue;
+        
+        await db
+          .insert(schema.countryOperatorConfig)
+          .values({
+            provider: "mbiyopay",
+            country: country.code,
+            operator: operator.code,
+            incomingEnabled: false,
+            outgoingEnabled: false,
+          })
+          .catch(() => {});
+      }
+    }
   }
 
   // Country Status Methods (for country-level payin/payout control per provider)
@@ -1110,6 +1130,7 @@ export class DbStorage implements IStorage {
     const { AFRIBAPAY_COUNTRIES } = await import("@shared/afribapay-countries");
     const { PAYDUNYA_COUNTRIES } = await import("@shared/paydunya-countries");
     const { FEDAPAY_COUNTRIES } = await import("@shared/fedapay-countries");
+    const { MBIYOPAY_COUNTRIES } = await import("@shared/mbiyopay-countries");
     
     const existing = await this.getCountryStatuses();
     const existingSet = new Set(existing.map(c => `${c.provider}-${c.country}`));
@@ -1161,6 +1182,22 @@ export class DbStorage implements IStorage {
         })
         .catch(() => {});
     }
+
+    // Initialize MbiyoPay countries
+    for (const country of MBIYOPAY_COUNTRIES) {
+      const key = `mbiyopay-${country.code}`;
+      if (existingSet.has(key)) continue;
+      
+      await db
+        .insert(schema.countryStatus)
+        .values({
+          provider: "mbiyopay",
+          country: country.code,
+          payinEnabled: false,
+          payoutEnabled: false,
+        })
+        .catch(() => {});
+    }
   }
 
   // ===== Provider Configs =====
@@ -1192,7 +1229,7 @@ export class DbStorage implements IStorage {
   }
 
   async initializeProviderConfigs(): Promise<void> {
-    const providers = ["afribapay", "paydunya", "fedapay", "nowpayments"];
+    const providers = ["afribapay", "paydunya", "fedapay", "mbiyopay", "nowpayments"];
     const existing = await this.getProviderConfigs();
     const existingSet = new Set(existing.map(p => p.provider));
 
