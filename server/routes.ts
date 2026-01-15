@@ -1351,6 +1351,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           success: true,
           transactionId: tx.id,
           token: tx.id,
+          redirectUrl: result.redirectUrl,
           message: result.message || "Paiement initie. Veuillez valider sur votre telephone.",
           provider: "mbiyopay",
         });
@@ -3225,6 +3226,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.json({
             success: true,
             transactionId: result.transactionId,
+            redirectUrl: result.redirectUrl,
             message: result.message || "Demande de paiement envoyee. Veuillez valider sur votre telephone.",
             provider: "mbiyopay",
           });
@@ -3679,6 +3681,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.json({
             success: true,
             transactionId: result.transactionId,
+            redirectUrl: result.redirectUrl,
             message: result.message || "Demande de paiement envoyee",
             provider: "mbiyopay",
           });
@@ -3862,6 +3865,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.json({
             success: true,
             transactionId: result.transactionId,
+            redirectUrl: result.redirectUrl,
             message: result.message || "Demande de paiement envoyee",
             provider: "mbiyopay",
           });

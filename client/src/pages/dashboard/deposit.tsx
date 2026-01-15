@@ -394,9 +394,13 @@ export default function Deposit() {
               <Button
                 onClick={() => window.open(paymentData.redirectUrl, "_blank")}
                 className="w-full"
-                data-testid="button-redirect-wave"
+                data-testid="button-redirect-payment"
               >
-                Aller vers Wave pour payer
+                {form.getValues("operator")?.toLowerCase() === "wave" 
+                  ? "Ouvrir Wave pour scanner le QR code" 
+                  : form.getValues("operator")?.toLowerCase() === "orange" 
+                    ? "Ouvrir la page de paiement Orange Money"
+                    : "Ouvrir la page de paiement"}
               </Button>
             )}
             <Alert className="border-yellow-200 bg-yellow-50 dark:bg-yellow-950 dark:border-yellow-800">

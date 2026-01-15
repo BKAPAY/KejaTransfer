@@ -2,6 +2,7 @@ export interface MbiyoPayOperator {
   code: string;
   name: string;
   requiresOtp: boolean;
+  requiresRedirect: boolean;
   payin: boolean;
   payout: boolean;
 }
@@ -28,9 +29,9 @@ export const MBIYOPAY_COUNTRIES: MbiyoPayCountry[] = [
     phoneFormat: "01XXXXXXXX",
     currency: "XOF",
     operators: [
-      { code: "mtn", name: "MTN Mobile Money", requiresOtp: false, payin: true, payout: true },
-      { code: "moov", name: "Moov Money", requiresOtp: false, payin: true, payout: true },
-      { code: "celtiis", name: "Celtiis", requiresOtp: false, payin: true, payout: true },
+      { code: "mtn", name: "MTN Mobile Money", requiresOtp: false, requiresRedirect: false, payin: true, payout: true },
+      { code: "moov", name: "Moov Money", requiresOtp: false, requiresRedirect: false, payin: true, payout: true },
+      { code: "celtiis", name: "Celtiis", requiresOtp: false, requiresRedirect: false, payin: true, payout: true },
     ],
   },
   {
@@ -42,9 +43,9 @@ export const MBIYOPAY_COUNTRIES: MbiyoPayCountry[] = [
     phoneFormat: "7XXXXXXX",
     currency: "XOF",
     operators: [
-      { code: "orange", name: "Orange Money", requiresOtp: false, payin: true, payout: true },
-      { code: "moov", name: "Moov Money", requiresOtp: false, payin: true, payout: true },
-      { code: "coris", name: "Coris Money", requiresOtp: false, payin: true, payout: true },
+      { code: "orange", name: "Orange Money", requiresOtp: true, requiresRedirect: true, payin: true, payout: true },
+      { code: "moov", name: "Moov Money", requiresOtp: false, requiresRedirect: false, payin: true, payout: true },
+      { code: "coris", name: "Coris Money", requiresOtp: false, requiresRedirect: false, payin: true, payout: true },
     ],
   },
   {
@@ -56,10 +57,10 @@ export const MBIYOPAY_COUNTRIES: MbiyoPayCountry[] = [
     phoneFormat: "0XXXXXXXXX",
     currency: "XOF",
     operators: [
-      { code: "orange", name: "Orange Money", requiresOtp: false, payin: true, payout: true },
-      { code: "mtn", name: "MTN Mobile Money", requiresOtp: false, payin: true, payout: true },
-      { code: "wave", name: "Wave", requiresOtp: false, payin: true, payout: true },
-      { code: "moov", name: "Moov Money", requiresOtp: false, payin: true, payout: true },
+      { code: "orange", name: "Orange Money", requiresOtp: true, requiresRedirect: true, payin: true, payout: true },
+      { code: "mtn", name: "MTN Mobile Money", requiresOtp: false, requiresRedirect: false, payin: true, payout: true },
+      { code: "wave", name: "Wave", requiresOtp: false, requiresRedirect: true, payin: true, payout: true },
+      { code: "moov", name: "Moov Money", requiresOtp: false, requiresRedirect: false, payin: true, payout: true },
     ],
   },
   {
@@ -71,8 +72,8 @@ export const MBIYOPAY_COUNTRIES: MbiyoPayCountry[] = [
     phoneFormat: "7XXXXXXXX",
     currency: "XOF",
     operators: [
-      { code: "orange", name: "Orange Money", requiresOtp: false, payin: true, payout: true },
-      { code: "free", name: "Free Money", requiresOtp: false, payin: true, payout: true },
+      { code: "orange", name: "Orange Money", requiresOtp: true, requiresRedirect: true, payin: true, payout: true },
+      { code: "free", name: "Free Money", requiresOtp: false, requiresRedirect: false, payin: true, payout: true },
     ],
   },
   {
@@ -84,8 +85,8 @@ export const MBIYOPAY_COUNTRIES: MbiyoPayCountry[] = [
     phoneFormat: "9XXXXXXX",
     currency: "XOF",
     operators: [
-      { code: "moov", name: "Moov Money", requiresOtp: false, payin: true, payout: true },
-      { code: "togocom", name: "TogoCom", requiresOtp: false, payin: true, payout: true },
+      { code: "moov", name: "Moov Money", requiresOtp: false, requiresRedirect: false, payin: true, payout: true },
+      { code: "togocom", name: "TogoCom", requiresOtp: false, requiresRedirect: false, payin: true, payout: true },
     ],
   },
   {
@@ -97,8 +98,8 @@ export const MBIYOPAY_COUNTRIES: MbiyoPayCountry[] = [
     phoneFormat: "XXXXXXXX",
     currency: "XOF",
     operators: [
-      { code: "orange", name: "Orange Money", requiresOtp: false, payin: true, payout: true },
-      { code: "moov", name: "Moov Money", requiresOtp: false, payin: true, payout: true },
+      { code: "orange", name: "Orange Money", requiresOtp: true, requiresRedirect: true, payin: true, payout: true },
+      { code: "moov", name: "Moov Money", requiresOtp: false, requiresRedirect: false, payin: true, payout: true },
     ],
   },
   {
@@ -110,8 +111,8 @@ export const MBIYOPAY_COUNTRIES: MbiyoPayCountry[] = [
     phoneFormat: "6XXXXXXXX",
     currency: "GNF",
     operators: [
-      { code: "orange", name: "Orange Money", requiresOtp: false, payin: true, payout: true },
-      { code: "mtn", name: "MTN Mobile Money", requiresOtp: false, payin: true, payout: true },
+      { code: "orange", name: "Orange Money", requiresOtp: true, requiresRedirect: true, payin: true, payout: true },
+      { code: "mtn", name: "MTN Mobile Money", requiresOtp: false, requiresRedirect: false, payin: true, payout: true },
     ],
   },
   {
@@ -123,8 +124,8 @@ export const MBIYOPAY_COUNTRIES: MbiyoPayCountry[] = [
     phoneFormat: "6XXXXXXXX",
     currency: "XAF",
     operators: [
-      { code: "orange", name: "Orange Money", requiresOtp: false, payin: true, payout: true },
-      { code: "moov", name: "Moov Money", requiresOtp: false, payin: true, payout: true },
+      { code: "orange", name: "Orange Money", requiresOtp: true, requiresRedirect: true, payin: true, payout: true },
+      { code: "moov", name: "Moov Money", requiresOtp: false, requiresRedirect: false, payin: true, payout: true },
     ],
   },
   {
@@ -136,7 +137,7 @@ export const MBIYOPAY_COUNTRIES: MbiyoPayCountry[] = [
     phoneFormat: "XXXXXXXXX",
     currency: "XAF",
     operators: [
-      { code: "mtn", name: "MTN Mobile Money", requiresOtp: false, payin: true, payout: true },
+      { code: "mtn", name: "MTN Mobile Money", requiresOtp: false, requiresRedirect: false, payin: true, payout: true },
     ],
   },
   {
@@ -149,10 +150,10 @@ export const MBIYOPAY_COUNTRIES: MbiyoPayCountry[] = [
     currency: "CDF",
     currencies: ["CDF", "USD"],
     operators: [
-      { code: "mpesa", name: "M-Pesa", requiresOtp: false, payin: true, payout: true },
-      { code: "airtel", name: "Airtel Money", requiresOtp: false, payin: true, payout: true },
-      { code: "orange", name: "Orange Money", requiresOtp: false, payin: true, payout: true },
-      { code: "afrimoney", name: "Afrimoney", requiresOtp: false, payin: true, payout: true },
+      { code: "mpesa", name: "M-Pesa", requiresOtp: false, requiresRedirect: false, payin: true, payout: true },
+      { code: "airtel", name: "Airtel Money", requiresOtp: false, requiresRedirect: false, payin: true, payout: true },
+      { code: "orange", name: "Orange Money", requiresOtp: true, requiresRedirect: true, payin: true, payout: true },
+      { code: "afrimoney", name: "Afrimoney", requiresOtp: false, requiresRedirect: false, payin: true, payout: true },
     ],
   },
   {
@@ -164,9 +165,9 @@ export const MBIYOPAY_COUNTRIES: MbiyoPayCountry[] = [
     phoneFormat: "XXXXXXX",
     currency: "GMD",
     operators: [
-      { code: "afrimoney", name: "Afrimoney", requiresOtp: false, payin: true, payout: true },
-      { code: "qmoney", name: "QMoney", requiresOtp: false, payin: true, payout: true },
-      { code: "wave", name: "Wave", requiresOtp: false, payin: true, payout: true },
+      { code: "afrimoney", name: "Afrimoney", requiresOtp: false, requiresRedirect: false, payin: true, payout: true },
+      { code: "qmoney", name: "QMoney", requiresOtp: false, requiresRedirect: false, payin: true, payout: true },
+      { code: "wave", name: "Wave", requiresOtp: false, requiresRedirect: true, payin: true, payout: true },
     ],
   },
 ];
@@ -216,4 +217,16 @@ export const getMbiyoPayCurrenciesForCountry = (countryCode: string): string[] =
 export const hasMultipleCurrencies = (countryCode: string): boolean => {
   const country = getMbiyoPayCountryByCode(countryCode);
   return (country?.currencies?.length || 0) > 1;
+};
+
+export const operatorRequiresRedirect = (countryCode: string, operatorCode: string): boolean => {
+  const operators = getMbiyoPayOperatorsForCountry(countryCode);
+  const operator = operators.find((op) => op.code.toLowerCase() === operatorCode.toLowerCase());
+  return operator?.requiresRedirect || false;
+};
+
+export const operatorRequiresOtp = (countryCode: string, operatorCode: string): boolean => {
+  const operators = getMbiyoPayOperatorsForCountry(countryCode);
+  const operator = operators.find((op) => op.code.toLowerCase() === operatorCode.toLowerCase());
+  return operator?.requiresOtp || false;
 };
