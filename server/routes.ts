@@ -1307,7 +1307,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Calculate fees
       const { calculateIncomingFee } = await import("./utils/fees");
-      const feeInfo = calculateIncomingFee(grossAmount, country);
+      const feeInfo = calculateIncomingFee(grossAmount);
 
       if (activeProvider === "mbiyopay") {
         // Use MbiyoPay
@@ -1713,7 +1713,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (paymentLink.customerPaysFee) {
         // Customer pays fee: send TOTAL (base + fees) to provider, user receives base amount
-        const feeInfo = calculateCustomerPaysFee(paymentLink.amount, country);
+        const feeInfo = calculateCustomerPaysFee(paymentLink.amount);
         amountForProvider = feeInfo.totalForProvider;
         feeAmount = feeInfo.feeAmount;
         feePercentage = feeInfo.feePercentage;
@@ -1875,7 +1875,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (paydunyaResponse.response_code === "00") {
         // Calculate fees for INCOMING payment (client pays GROSS)
         const grossAmount = Math.floor(amount);
-        const feeInfo = calculateIncomingFee(grossAmount, country);
+        const feeInfo = calculateIncomingFee(grossAmount);
         
         // Create transaction with GROSS amount (what client pays)
         const transactionId = randomUUID();
@@ -1981,7 +1981,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (paydunyaResponse.response_code === "00" && paydunyaResponse.token) {
         // Calculate fees for INCOMING payment (client pays GROSS)
         const grossAmount = Math.floor(amount);
-        const feeInfo = calculateIncomingFee(grossAmount, country);
+        const feeInfo = calculateIncomingFee(grossAmount);
         
         // Create transaction with GROSS amount (what client pays)
         const transactionId = randomUUID();
@@ -2245,7 +2245,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (paydunyaResponse.response_code === "00" && paydunyaResponse.token) {
         // Calculate fees for INCOMING payment
         const grossAmount = paymentLink.amount;
-        const feeInfo = calculateIncomingFee(grossAmount, country);
+        const feeInfo = calculateIncomingFee(grossAmount);
         
         // Create transaction
         const transactionId = randomUUID();
@@ -3131,7 +3131,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         if (paydunyaResponse.response_code === "00" && paydunyaResponse.token) {
           const grossAmount = Math.floor(amount);
-          const feeInfo = calculateIncomingFee(grossAmount, country);
+          const feeInfo = calculateIncomingFee(grossAmount);
           
           const transactionId = randomUUID();
           await storage.createTransaction({
@@ -3520,6 +3520,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ success: false, error: "Ce lien n'existe pas" });
       }
 
+      // Get owner's currency and payer's currency for cross-currency conversion
+      const ownerCurrency = owner?.country ? getCurrencyForCountry(owner.country) : "XOF";
+      const payerCurrency = getCurrencyForCountry(country);
+      
+      // Convert amount if currencies are different
+      let amountInPayerCurrency = paymentLink.amount;
+      let conversionRate = 1;
+      let conversionApplied = false;
+      
+      if (ownerCurrency !== payerCurrency) {
+        const conversionResult = await convertCurrency(paymentLink.amount, ownerCurrency, payerCurrency);
+        if (conversionResult.success) {
+          amountInPayerCurrency = conversionResult.convertedAmount;
+          conversionRate = conversionResult.conversionRate;
+          conversionApplied = true;
+          console.log(`[PAYMENT_LINK] Currency conversion: ${paymentLink.amount} ${ownerCurrency} -> ${amountInPayerCurrency} ${payerCurrency} (rate: ${conversionRate})`);
+        } else {
+          console.error(`[PAYMENT_LINK] Currency conversion failed: ${conversionResult.error}`);
+          return res.status(400).json({ success: false, error: "Erreur de conversion de devise" });
+        }
+      }
+
       const activeProvider = await getActiveProviderForDeposit(country, operator);
       
       if (!activeProvider) {
@@ -3555,20 +3577,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         const effectiveCustomerName = customerName || "Client";
         
-        // Calculate amount based on customerPaysFee setting
+        // Calculate amount based on customerPaysFee setting - using converted amount
         let amountForProvider: number;
         let feeAmount: number;
         let feePercentage: number;
         let netAmountForUser: number;
         
         if (paymentLink.customerPaysFee) {
-          const feeInfo = calculateCustomerPaysFee(paymentLink.amount, country);
+          const feeInfo = calculateCustomerPaysFee(amountInPayerCurrency);
           amountForProvider = feeInfo.totalForProvider;
           feeAmount = feeInfo.feeAmount;
           feePercentage = feeInfo.feePercentage;
           netAmountForUser = feeInfo.baseAmount;
         } else {
-          const feeInfo = calculateIncomingFee(paymentLink.amount, country);
+          const feeInfo = calculateIncomingFee(amountInPayerCurrency);
           amountForProvider = feeInfo.grossAmount;
           feeAmount = feeInfo.feeAmount;
           feePercentage = feeInfo.feePercentage;
@@ -3578,7 +3600,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const paydunyaData = {
           invoice: {
             total_amount: Math.floor(amountForProvider),
-            description: paymentLink.description || `Paiement de ${paymentLink.amount} XOF`,
+            description: paymentLink.description || `Paiement de ${amountInPayerCurrency} ${payerCurrency}`,
             customer: {
               name: effectiveCustomerName,
               email: "noreply@bkapay.com",
@@ -3612,7 +3634,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             amount: amountForProvider,
             fee: feeAmount,
             feePercentage: feePercentage,
-            currency: "XOF",
+            currency: payerCurrency,
             status: "pending",
             country,
             operator,
@@ -3624,7 +3646,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
               provider: "paydunya",
               paymentLinkId: paymentLink.id,
               customerPaysFee: paymentLink.customerPaysFee,
-              baseAmount: paymentLink.amount,
+              originalAmount: paymentLink.amount,
+              originalCurrency: ownerCurrency,
+              convertedAmount: amountInPayerCurrency,
+              conversionRate: conversionRate,
+              conversionApplied: conversionApplied,
               netAmountForUser: netAmountForUser,
             }),
           });
@@ -3789,7 +3815,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         if (paydunyaResponse.response_code === "00" && paydunyaResponse.token) {
           const grossAmount = Math.floor(amount);
-          const feeInfo = calculateIncomingFee(grossAmount, country);
+          const feeInfo = calculateIncomingFee(grossAmount);
           
           const transactionId = randomUUID();
           await storage.createTransaction({
@@ -4609,7 +4635,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const { calculateIncomingFee } = await import("./utils/fees");
         
         const grossAmount = transaction.amount;
-        const feeInfo = calculateIncomingFee(grossAmount, country);
+        const feeInfo = calculateIncomingFee(grossAmount);
         const txCurrency = currency || getCurrencyForCountry(country);
 
         const result = await createMbiyoPayPayin({

@@ -33,7 +33,7 @@ export async function handleFedaPayDeposit(
     }
 
     const grossAmount = Math.floor(amount);
-    const feeInfo = calculateIncomingFee(grossAmount, country);
+    const feeInfo = calculateIncomingFee(grossAmount);
 
     const nameParts = (user.firstName + " " + user.lastName).split(" ");
     const firstName = nameParts[0] || "Client";
@@ -112,7 +112,7 @@ export async function handleFedaPayWithdrawal(
     }
 
     const grossAmount = Math.floor(amount);
-    const feeInfo = calculateOutgoingFee(grossAmount, country);
+    const feeInfo = calculateOutgoingFee(grossAmount);
 
     if (user.balance < feeInfo.totalDeductedFromBalance) {
       return { success: false, error: "Solde insuffisant" };
@@ -299,7 +299,7 @@ export async function handlePaymentLinkPayment(
     } else {
       // Marchand paie les frais: logique standard
       grossAmount = baseAmount;
-      feeInfo = calculateIncomingFee(grossAmount, country);
+      feeInfo = calculateIncomingFee(grossAmount);
     }
 
     const nameParts = customerName.split(" ");
@@ -374,7 +374,7 @@ export async function handleMerchantLinkPayment(
     }
 
     const grossAmount = Math.floor(amount);
-    const feeInfo = calculateIncomingFee(grossAmount, country);
+    const feeInfo = calculateIncomingFee(grossAmount);
 
     const nameParts = customerName.split(" ");
     const firstName = nameParts[0] || "Client";
@@ -470,7 +470,7 @@ export async function handleApiPayment(
     } else {
       // Marchand paie les frais: logique standard
       grossAmount = baseAmount;
-      feeInfo = calculateIncomingFee(grossAmount, country);
+      feeInfo = calculateIncomingFee(grossAmount);
     }
 
     const nameParts = customerName.split(" ");
