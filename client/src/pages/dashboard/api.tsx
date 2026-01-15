@@ -662,20 +662,29 @@ export default function ApiPage() {
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      <div className="flex flex-wrap gap-4 text-sm">
+                      <div className="space-y-2 text-sm">
                         <div>
-                          <span className="text-muted-foreground">Pays: </span>
-                          <span className="font-medium">
-                            {(apiKey as any).allowedCountries?.length > 0
-                              ? (apiKey as any).allowedCountries.join(", ")
-                              : "Tous"}
-                          </span>
+                          <span className="text-muted-foreground">Pays supportes: </span>
+                          {(apiKey as any).allowedCountries?.length > 0 ? (
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {(apiKey as any).allowedCountries.map((code: string) => {
+                                const country = COUNTRIES.find(c => c.code === code);
+                                return (
+                                  <Badge key={code} variant="secondary" className="text-xs">
+                                    {country?.flag} {country?.name || code}
+                                  </Badge>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <span className="font-medium">Tous les pays</span>
+                          )}
                         </div>
                         <div>
                           <span className="text-muted-foreground">Frais: </span>
-                          <span className="font-medium">
-                            {(apiKey as any).customerPaysFee ? "Payes par le client" : "A votre charge"}
-                          </span>
+                          <Badge variant={(apiKey as any).customerPaysFee ? "default" : "outline"} className="text-xs">
+                            {(apiKey as any).customerPaysFee ? "Payes par le client (+6%)" : "A votre charge"}
+                          </Badge>
                         </div>
                       </div>
                       <Button
