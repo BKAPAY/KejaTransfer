@@ -5442,6 +5442,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== Fee Configuration Routes =====
+  app.get("/api/admin/fee-configs", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const configs = await storage.getAllFeeConfigs();
+      res.json(configs);
+    } catch (error: any) {
+      console.error("Get fee configs error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
+  app.get("/api/admin/fee-configs/:country", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { country } = req.params;
+      const configs = await storage.getFeeConfigsByCountry(country);
+      res.json(configs);
+    } catch (error: any) {
+      console.error("Get fee configs by country error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
+  app.put("/api/admin/fee-configs/:country/:operator", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { country, operator } = req.params;
+      const { incomingFeePercentage, outgoingFeePercentage } = req.body;
+
+      // Validate fee percentages (0-100 as whole number, stored as 0-1000)
+      if (incomingFeePercentage !== undefined && (incomingFeePercentage < 0 || incomingFeePercentage > 1000)) {
+        return res.status(400).json({ error: "Le pourcentage des frais entrants doit etre entre 0 et 100" });
+      }
+      if (outgoingFeePercentage !== undefined && (outgoingFeePercentage < 0 || outgoingFeePercentage > 1000)) {
+        return res.status(400).json({ error: "Le pourcentage des frais sortants doit etre entre 0 et 100" });
+      }
+
+      // Check if config exists, create if not
+      let config = await storage.getFeeConfig(country, operator);
+      if (!config) {
+        config = await storage.createOrUpdateFeeConfig({
+          country,
+          operator,
+          incomingFeePercentage: incomingFeePercentage ?? 60,
+          outgoingFeePercentage: outgoingFeePercentage ?? 60,
+        });
+      } else {
+        config = await storage.updateFeeConfig(country, operator, {
+          incomingFeePercentage,
+          outgoingFeePercentage,
+        });
+      }
+
+      res.json(config);
+    } catch (error: any) {
+      console.error("Update fee config error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
+  // Public endpoint to get fee for a specific country/operator
+  app.get("/api/fees/:country/:operator", async (req: Request, res: Response) => {
+    try {
+      const { country, operator } = req.params;
+      const config = await storage.getFeeConfig(country.toUpperCase(), operator.toLowerCase());
+      
+      if (config) {
+        res.json({
+          incomingFeePercentage: config.incomingFeePercentage,
+          outgoingFeePercentage: config.outgoingFeePercentage,
+        });
+      } else {
+        // Default to 6% if no config exists
+        res.json({
+          incomingFeePercentage: 60,
+          outgoingFeePercentage: 60,
+        });
+      }
+    } catch (error: any) {
+      console.error("Get fee error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
+  // Initialize fee configs
+  await storage.initializeFeeConfigs();
+
   // ===== Provider Config Routes (API Keys Management) =====
   app.get("/api/admin/providers", requireAdmin, async (req: Request, res: Response) => {
     try {

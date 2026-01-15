@@ -3,7 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
-import { Users, UserCheck, TrendingDown, TrendingUp, Search, Settings, Globe, RefreshCw, Database, AlertCircle, CheckCircle2, Eye, History, MapPin, Mail, Phone, CreditCard } from "lucide-react";
+import { Users, UserCheck, TrendingDown, TrendingUp, Search, Settings, Globe, RefreshCw, Database, AlertCircle, CheckCircle2, Eye, History, MapPin, Mail, Phone, CreditCard, Percent } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -232,7 +232,16 @@ export default function Admin() {
             variant="outline"
           >
             <Globe className="w-4 h-4" />
-            Pays & Opérateurs
+            Pays & Operateurs
+          </Button>
+          <Button
+            onClick={() => setLocation("/dashboard/fee-config")}
+            data-testid="button-fee-config"
+            className="gap-2"
+            variant="outline"
+          >
+            <Percent className="w-4 h-4" />
+            Frais
           </Button>
           <Button
             onClick={() => setLocation("/dashboard/management")}

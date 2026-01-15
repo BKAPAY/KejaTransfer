@@ -31,6 +31,7 @@ import KycVerification from "@/pages/dashboard/kyc-verification";
 import KycHistory from "@/pages/dashboard/kyc-history";
 import KYC from "@/pages/dashboard/kyc";
 import CountryOperatorConfig from "@/pages/dashboard/country-operator-config";
+import FeeConfig from "@/pages/dashboard/fee-config";
 import Diagnostic from "@/pages/dashboard/diagnostic";
 import Fournisseurs from "@/pages/dashboard/fournisseurs";
 import Pay from "@/pages/pay";
@@ -150,6 +151,7 @@ function Router() {
           <Route path="/dashboard/kyc-verification" component={KycVerification} />
           <Route path="/dashboard/kyc-history" component={KycHistory} />
           <Route path="/dashboard/country-operator-config" component={CountryOperatorConfig} />
+          <Route path="/dashboard/fee-config" component={FeeConfig} />
           <Route path="/dashboard/diagnostic" component={Diagnostic} />
           <Route path="/dashboard/fournisseurs" component={Fournisseurs} />
           <Route component={NotFound} />
