@@ -42,6 +42,19 @@ import {
   needsCurrencyConversion,
 } from "./currency-converter";
 import {
+  handleMbiyoPayDeposit,
+  handleMbiyoPayWithdrawal,
+  handleMbiyoPayTransfer,
+  handleMbiyoPayPaymentLink,
+  handleMbiyoPayMerchantLink,
+  handleMbiyoPayApiPayment,
+  handleMbiyoPayWebhook,
+} from "./mbiyopay-routes";
+import {
+  MBIYOPAY_SUPPORTED_COUNTRIES,
+  MBIYOPAY_OPERATORS,
+} from "./mbiyopay";
+import {
   generateVerificationCode,
   sendVerificationEmail,
   isEmailServiceConfigured,
@@ -2794,6 +2807,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       error: "Service temporairement indisponible"
     });
   });
+
+  // ===== MbiyoPay Webhook =====
+  app.post("/api/webhooks/mbiyopay", handleMbiyoPayWebhook);
 
   // ===== Currency Conversion Route =====
   app.post("/api/convert-currency", async (req: Request, res: Response) => {

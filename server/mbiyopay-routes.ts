@@ -11,7 +11,6 @@ import {
   getCurrencyForCountry,
   formatPhoneForMbiyoPay,
 } from "./mbiyopay";
-import { sendPaymentCallback } from "./utils/callback";
 
 export async function handleMbiyoPayDeposit(
   userId: string,
@@ -282,10 +281,10 @@ export async function handleMbiyoPayPaymentLink(
       customerPhone: customerPhone,
       customerName: customerName,
       customerEmail: customerEmail,
-      paymentLinkId: paymentLink.id,
       metadata: JSON.stringify({
         mbiyopayTransactionId: result.transactionId,
         redirectUrl: result.redirectUrl,
+        paymentLinkId: paymentLink.id,
         customerPaysFee,
         grossAmount,
         baseAmount,
@@ -354,10 +353,10 @@ export async function handleMbiyoPayMerchantLink(
       customerPhone: customerPhone,
       customerName: customerName,
       customerEmail: customerEmail,
-      merchantLinkId: merchantLink.id,
       metadata: JSON.stringify({
         mbiyopayTransactionId: result.transactionId,
         redirectUrl: result.redirectUrl,
+        merchantLinkId: merchantLink.id,
         grossAmount,
         provider: "mbiyopay",
       }),
@@ -426,10 +425,10 @@ export async function handleMbiyoPayApiPayment(
       customerPhone: customerPhone,
       customerName: customerName,
       customerEmail: customerEmail,
-      apiKeyId: apiKey.id,
       metadata: JSON.stringify({
         mbiyopayTransactionId: result.transactionId,
         redirectUrl: result.redirectUrl,
+        apiKeyId: apiKey.id,
         grossAmount,
         provider: "mbiyopay",
         developerCallbackUrl: callbackUrl,
@@ -454,21 +453,27 @@ export async function handleMbiyoPayWebhook(req: Request, res: Response) {
     const payload = req.body;
     console.log("[MbiyoPay Webhook] Received:", JSON.stringify(payload));
 
-    const { event, transaction_id, status, amount, order_id } = payload;
+    const { transaction_id, status } = payload;
 
     if (!transaction_id) {
       console.error("[MbiyoPay Webhook] Missing transaction_id");
       return res.status(400).json({ error: "Missing transaction_id" });
     }
 
-    const transactions = await storage.getTransactionsByMetadata("mbiyopayTransactionId", transaction_id);
+    const pendingTransactions = await storage.getAllPendingTransactions();
+    const tx = pendingTransactions.find((t: any) => {
+      try {
+        const metadata = JSON.parse(t.metadata || "{}");
+        return metadata.mbiyopayTransactionId === transaction_id;
+      } catch {
+        return false;
+      }
+    });
     
-    if (!transactions || transactions.length === 0) {
+    if (!tx) {
       console.error(`[MbiyoPay Webhook] Transaction not found: ${transaction_id}`);
       return res.status(404).json({ error: "Transaction not found" });
     }
-
-    const tx = transactions[0];
 
     if (tx.status === "completed" || tx.status === "failed") {
       console.log(`[MbiyoPay Webhook] Transaction ${tx.id} already finalized: ${tx.status}`);
@@ -481,11 +486,6 @@ export async function handleMbiyoPayWebhook(req: Request, res: Response) {
         await storage.updateUserBalance(tx.userId, netAmount);
         await storage.updateTransactionStatus(tx.id, "completed");
         console.log(`[MbiyoPay Webhook] Deposit completed: ${tx.id}, credited ${netAmount}`);
-        
-        const metadata = JSON.parse(tx.metadata || "{}");
-        if (metadata.developerCallbackUrl) {
-          await sendPaymentCallback(metadata.developerCallbackUrl, tx.id, "completed", tx.amount, tx.currency);
-        }
       } else if (tx.type === "withdrawal" || tx.type === "transfer") {
         await storage.updateTransactionStatus(tx.id, "completed");
         console.log(`[MbiyoPay Webhook] Withdrawal/Transfer completed: ${tx.id}`);
@@ -499,11 +499,6 @@ export async function handleMbiyoPayWebhook(req: Request, res: Response) {
       }
       await storage.updateTransactionStatus(tx.id, "failed");
       console.log(`[MbiyoPay Webhook] Transaction failed: ${tx.id}`);
-      
-      const metadata = JSON.parse(tx.metadata || "{}");
-      if (metadata.developerCallbackUrl) {
-        await sendPaymentCallback(metadata.developerCallbackUrl, tx.id, "failed", tx.amount, tx.currency);
-      }
     }
 
     res.json({ success: true });

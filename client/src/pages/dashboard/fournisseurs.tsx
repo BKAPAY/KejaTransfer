@@ -66,6 +66,13 @@ const PROVIDER_INFO = {
     fields: ["secretKey"],
     countries: "7 pays (Bénin, Togo, CI, Sénégal, Guinée, Niger, BF)",
   },
+  mbiyopay: {
+    name: "MbiyoPay",
+    description: "Passerelle de paiement pour 11 pays africains",
+    color: "bg-teal-500",
+    fields: ["apiKey"],
+    countries: "11 pays (Bénin, BF, CI, Sénégal, Togo, Mali, Guinée, Cameroun, Congo, RDC, Gambie)",
+  },
   nowpayments: {
     name: "NOWPayments",
     description: "Paiements en cryptomonnaies (Bitcoin, Ethereum, USDT, etc.)",
@@ -94,6 +101,9 @@ const getFieldLabel = (provider: string, field: string): string => {
       case "ipnSecret": return "IPN Secret (pour les webhooks)";
       default: return field;
     }
+  }
+  if (provider === "mbiyopay") {
+    if (field === "apiKey") return "Clé API Merchant MbiyoPay";
   }
   switch (field) {
     case "apiKey": return "Clé API";
