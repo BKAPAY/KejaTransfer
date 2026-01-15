@@ -80,6 +80,13 @@ const PROVIDER_INFO = {
     fields: ["apiKey", "ipnSecret"],
     countries: "Global - Crypto uniquement",
   },
+  exchangerate: {
+    name: "ExchangeRate API",
+    description: "Service de conversion de devises en temps reel",
+    color: "bg-cyan-500",
+    fields: ["apiKey"],
+    countries: "Global - Conversion XOF, XAF, CDF, USD",
+  },
 };
 
 const getFieldLabel = (provider: string, field: string): string => {
@@ -104,6 +111,9 @@ const getFieldLabel = (provider: string, field: string): string => {
   }
   if (provider === "mbiyopay") {
     if (field === "apiKey") return "Clé API Merchant MbiyoPay";
+  }
+  if (provider === "exchangerate") {
+    if (field === "apiKey") return "Clé API ExchangeRate (exchangerate-api.com)";
   }
   switch (field) {
     case "apiKey": return "Clé API";
