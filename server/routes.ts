@@ -3111,6 +3111,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
             error: paydunyaResponse.response_text || "Erreur lors de la creation de la facture" 
           });
         }
+      } else if (activeProvider === "mbiyopay") {
+        // Use MbiyoPay
+        console.log(`[DEPOSIT] Using MbiyoPay for ${country}/${operator}`);
+        const result = await handleMbiyoPayDeposit(
+          req.session.userId!,
+          user,
+          amount,
+          country,
+          operator,
+          phone
+        );
+
+        if (result.success) {
+          return res.json({
+            success: true,
+            transactionId: result.transactionId,
+            message: result.message || "Demande de paiement envoyee. Veuillez valider sur votre telephone.",
+            provider: "mbiyopay",
+          });
+        } else {
+          return res.status(400).json({ success: false, error: result.error });
+        }
       } else {
         return res.status(503).json({ 
           success: false, 
@@ -3344,6 +3366,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const errorMsg = type === "transfer" ? "Transfert echoue" : "Retrait echoue";
           return res.status(400).json({ success: false, error: errorMsg });
         }
+      } else if (activeProvider === "mbiyopay") {
+        // Use MbiyoPay for withdrawals/transfers
+        console.log(`[WITHDRAWAL] Using MbiyoPay for ${country}/${operator}`);
+        
+        const result = isTransfer 
+          ? await handleMbiyoPayTransfer(req.session.userId!, user, amount, country, operator, phone)
+          : await handleMbiyoPayWithdrawal(req.session.userId!, user, amount, country, operator, phone);
+
+        if (result.success) {
+          return res.json({
+            success: true,
+            transactionId: result.transactionId,
+            message: result.message || (isTransfer ? "Transfert effectue avec succes" : "Retrait effectue avec succes"),
+            provider: "mbiyopay",
+          });
+        } else {
+          return res.status(400).json({ success: false, error: result.error });
+        }
       } else {
         return res.status(503).json({ 
           success: false, 
@@ -3526,6 +3566,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
             error: paydunyaResponse.response_text || "Erreur lors de la creation de la facture" 
           });
         }
+      } else if (activeProvider === "mbiyopay") {
+        // Use MbiyoPay for payment links
+        console.log(`[PAYMENT_LINK] Using MbiyoPay for ${country}/${operator}`);
+        const result = await handleMbiyoPayPaymentLink(
+          paymentLink,
+          customerName || "Client",
+          "noreply@bkapay.com",
+          customerPhone,
+          country,
+          operator
+        );
+
+        if (result.success) {
+          return res.json({
+            success: true,
+            transactionId: result.transactionId,
+            message: result.message || "Demande de paiement envoyee",
+            provider: "mbiyopay",
+          });
+        } else {
+          return res.status(400).json({ success: false, error: result.error });
+        }
       } else {
         return res.status(503).json({
           success: false,
@@ -3687,6 +3749,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
             error: paydunyaResponse.response_text || "Erreur lors de la creation de la facture" 
           });
         }
+      } else if (activeProvider === "mbiyopay") {
+        // Use MbiyoPay for merchant links
+        console.log(`[MERCHANT_LINK] Using MbiyoPay for ${country}/${operator}`);
+        const result = await handleMbiyoPayMerchantLink(
+          merchantLink,
+          amount,
+          customerName || "Client",
+          "noreply@bkapay.com",
+          customerPhone,
+          country,
+          operator
+        );
+
+        if (result.success) {
+          return res.json({
+            success: true,
+            transactionId: result.transactionId,
+            message: result.message || "Demande de paiement envoyee",
+            provider: "mbiyopay",
+          });
+        } else {
+          return res.status(400).json({ success: false, error: result.error });
+        }
       } else {
         return res.status(503).json({
           success: false,
@@ -3836,6 +3921,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
             success: false, 
             error: paydunyaResponse.response_text || "Erreur lors de la creation de la facture" 
           });
+        }
+      } else if (activeProvider === "mbiyopay") {
+        // Use MbiyoPay for API payments
+        console.log(`[API_PAYMENT] Using MbiyoPay for ${country}/${operator}`);
+        const result = await handleMbiyoPayApiPayment(
+          apiKey,
+          transaction.amount,
+          transaction.description || "Paiement via API",
+          customerName || transaction.customerName || "Client",
+          "noreply@bkapay.com",
+          customerPhone || transaction.customerPhone || "",
+          country,
+          operator
+        );
+
+        if (result.success) {
+          await storage.updateTransaction(transaction.id, {
+            country,
+            operator,
+            metadata: JSON.stringify({
+              ...JSON.parse(transaction.metadata || "{}"),
+              provider: "mbiyopay",
+              mbiyopayTransactionId: result.mbiyopayTransactionId,
+            }),
+          });
+
+          return res.json({
+            success: true,
+            transactionId: transaction.id,
+            message: result.message || "Demande de paiement envoyee",
+            provider: "mbiyopay",
+          });
+        } else {
+          return res.status(400).json({ success: false, error: result.error });
         }
       } else {
         return res.status(503).json({

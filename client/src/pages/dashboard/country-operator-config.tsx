@@ -12,6 +12,7 @@ import type { CountryOperatorConfig, CountryStatus } from "@shared/schema";
 import { AFRIBAPAY_COUNTRIES } from "@shared/afribapay-countries";
 import { PAYDUNYA_COUNTRIES } from "@shared/paydunya-countries";
 import { FEDAPAY_COUNTRIES } from "@shared/fedapay-countries";
+import { MBIYOPAY_COUNTRIES } from "@shared/mbiyopay-countries";
 
 interface ProviderConfig {
   id: string;
@@ -37,6 +38,12 @@ const PROVIDERS = [
     name: "FedaPay", 
     color: "bg-green-500",
     countries: FEDAPAY_COUNTRIES 
+  },
+  { 
+    id: "mbiyopay", 
+    name: "MbiyoPay", 
+    color: "bg-teal-500",
+    countries: MBIYOPAY_COUNTRIES 
   },
 ];
 
