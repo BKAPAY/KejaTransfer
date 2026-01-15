@@ -17,6 +17,9 @@ import { ArrowUpFromLine, Info, CheckCircle2, Loader2, Settings, AlertCircle, Lo
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { calculateOutgoingFee } from "@/lib/fees";
 import { useLocation } from "wouter";
+import { CurrencySelector, getCurrencyLabel } from "@/components/currency-selector";
+import { hasMultipleCurrencies, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
+import { useEffect, useCallback } from "react";
 
 const withdrawalSchema = z.object({
   amount: z.number().min(1000, "Le montant minimum est de 1000 XOF"),
@@ -33,6 +36,13 @@ export default function Withdrawal() {
   const [securityCode, setSecurityCode] = useState("");
   const [securityError, setSecurityError] = useState("");
   const [pendingData, setPendingData] = useState<WithdrawalFormData | null>(null);
+  const [selectedCurrency, setSelectedCurrency] = useState<string>("XOF");
+  const [conversionData, setConversionData] = useState<{
+    convertedAmount: number;
+    targetCurrency: string;
+    conversionRate: number;
+    isLoading: boolean;
+  } | null>(null);
 
   const { data: user } = useQuery<User>({
     queryKey: ["/api/auth/me"],
@@ -67,6 +77,66 @@ export default function Withdrawal() {
 
   const feeInfo = userCountry && amount ? calculateOutgoingFee(Math.floor(amount), userCountry) : null;
 
+  // Handle currency selection when country changes
+  useEffect(() => {
+    if (userCountry && hasMultipleCurrencies(userCountry)) {
+      const currencies = getMbiyoPayCurrenciesForCountry(userCountry);
+      setSelectedCurrency(currencies[0]);
+    } else if (userCountry) {
+      const countryCurrency = COUNTRIES.find(c => c.code === userCountry)?.currency || "XOF";
+      setSelectedCurrency(countryCurrency);
+    }
+  }, [userCountry]);
+
+  // Currency conversion for non-XOF countries
+  const targetCurrency = hasMultipleCurrencies(userCountry) 
+    ? selectedCurrency 
+    : (COUNTRIES.find(c => c.code === userCountry)?.currency || "XOF");
+  const needsConversion = targetCurrency !== "XOF";
+
+  const fetchConversion = useCallback(async (amountToConvert: number, toCurrency: string) => {
+    if (!amountToConvert || amountToConvert <= 0 || toCurrency === "XOF") {
+      setConversionData(null);
+      return;
+    }
+
+    setConversionData(prev => prev ? { ...prev, isLoading: true } : { convertedAmount: 0, targetCurrency: toCurrency, conversionRate: 0, isLoading: true });
+
+    try {
+      const res = await fetch("/api/convert-currency", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: amountToConvert, fromCurrency: "XOF", toCurrency }),
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        setConversionData({
+          convertedAmount: data.convertedAmount,
+          targetCurrency: data.targetCurrency,
+          conversionRate: data.conversionRate,
+          isLoading: false,
+        });
+      } else {
+        setConversionData(null);
+      }
+    } catch (error) {
+      console.error("Currency conversion error:", error);
+      setConversionData(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (needsConversion && amount && amount > 0) {
+      const debounceTimer = setTimeout(() => {
+        fetchConversion(amount, targetCurrency);
+      }, 500);
+      return () => clearTimeout(debounceTimer);
+    } else {
+      setConversionData(null);
+    }
+  }, [needsConversion, amount, targetCurrency, fetchConversion, selectedCurrency]);
+
   const withdrawalMutation = useMutation({
     mutationFn: async (data: { formData: WithdrawalFormData; securityCode: string }) => {
       const selectedPhone = withdrawalPhones[data.formData.withdrawalPhoneIndex];
@@ -81,6 +151,7 @@ export default function Withdrawal() {
         country: userCountry,
         securityCode: data.securityCode,
         type: "withdrawal",
+        currency: selectedCurrency,
       });
       return res.json();
     },
@@ -341,6 +412,14 @@ export default function Withdrawal() {
                   Pays configure dans votre profil (non modifiable)
                 </p>
               </div>
+
+              {hasMultipleCurrencies(userCountry) && (
+                <CurrencySelector
+                  countryCode={userCountry}
+                  selectedCurrency={selectedCurrency}
+                  onCurrencyChange={setSelectedCurrency}
+                />
+              )}
 
               <FormField
                 control={form.control}

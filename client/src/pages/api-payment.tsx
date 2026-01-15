@@ -8,6 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertCircle, Loader2 } from "lucide-react";
 import { OPERATORS, COUNTRIES } from "@shared/schema";
+import { CurrencySelector, getCurrencyLabel } from "@/components/currency-selector";
+import { hasMultipleCurrencies, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
 import type { Transaction } from "@shared/schema";
 import logoImage from "@assets/bkapay-logo.png";
 
@@ -25,9 +27,23 @@ export default function ApiPayment() {
   const [operator, setOperator] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [conversionData, setConversionData] = useState<ConversionData | null>(null);
+  const [selectedCurrency, setSelectedCurrency] = useState<string>("XOF");
+
+  // Handle currency selection when country changes
+  useEffect(() => {
+    if (country && hasMultipleCurrencies(country)) {
+      const currencies = getMbiyoPayCurrenciesForCountry(country);
+      setSelectedCurrency(currencies[0]);
+    } else if (country) {
+      const countryCurrency = COUNTRIES.find(c => c.code === country)?.currency || "XOF";
+      setSelectedCurrency(countryCurrency);
+    }
+  }, [country]);
 
   // Currency conversion for non-XOF countries
-  const targetCurrency = COUNTRIES.find(c => c.code === country)?.currency || "XOF";
+  const targetCurrency = hasMultipleCurrencies(country) 
+    ? selectedCurrency 
+    : (COUNTRIES.find(c => c.code === country)?.currency || "XOF");
   const needsConversion = targetCurrency !== "XOF";
 
   // Fetch transaction details
@@ -78,7 +94,7 @@ export default function ApiPayment() {
     } else {
       setConversionData(null);
     }
-  }, [needsConversion, transaction?.amount, targetCurrency, fetchConversion]);
+  }, [needsConversion, transaction?.amount, targetCurrency, fetchConversion, selectedCurrency]);
 
   const handlePayment = async () => {
     if (!country || !operator || !transactionId) {
@@ -95,6 +111,7 @@ export default function ApiPayment() {
           transactionId,
           country,
           operator,
+          currency: selectedCurrency,
         }),
       });
 
@@ -195,9 +212,18 @@ export default function ApiPayment() {
                   <SelectItem value="TG">Togo</SelectItem>
                   <SelectItem value="GN">Guinee</SelectItem>
                   <SelectItem value="NE">Niger</SelectItem>
+                  <SelectItem value="CD">RD Congo</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+
+            {hasMultipleCurrencies(country) && (
+              <CurrencySelector
+                countryCode={country}
+                selectedCurrency={selectedCurrency}
+                onCurrencyChange={setSelectedCurrency}
+              />
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="operator">Opérateur Mobile Money</Label>

@@ -19,6 +19,8 @@ import { useEffect, useState, useCallback } from "react";
 import { CheckCircle2, Clock, Loader2, AlertCircle, XCircle, RefreshCw, ExternalLink, Copy, Check } from "lucide-react";
 import { PaymentMethodSelector } from "@/components/payment-method-selector";
 import { CryptoPaymentFlow } from "@/components/crypto-payment-flow";
+import { CurrencySelector, getCurrencyLabel } from "@/components/currency-selector";
+import { hasMultipleCurrencies, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
 
 interface ConversionData {
   convertedAmount: number;
@@ -147,6 +149,7 @@ export default function Merchant() {
   const [savedOperator, setSavedOperator] = useState<string>("");
   const [copiedUssd, setCopiedUssd] = useState(false);
   const [conversionData, setConversionData] = useState<ConversionData | null>(null);
+  const [selectedCurrency, setSelectedCurrency] = useState<string>("XOF");
   const { toast } = useToast();
   
   // État pour le flux crypto en 2 étapes
@@ -248,8 +251,21 @@ export default function Merchant() {
   // Watch amount for currency conversion
   const watchedAmount = form.watch("amount");
 
+  // Handle currency selection when country changes
+  useEffect(() => {
+    if (selectedCountry && hasMultipleCurrencies(selectedCountry)) {
+      const currencies = getMbiyoPayCurrenciesForCountry(selectedCountry);
+      setSelectedCurrency(currencies[0]);
+    } else if (selectedCountry) {
+      const countryCurrency = COUNTRIES.find(c => c.code === selectedCountry)?.currency || "XOF";
+      setSelectedCurrency(countryCurrency);
+    }
+  }, [selectedCountry]);
+
   // Currency conversion for non-XOF countries
-  const targetCurrency = COUNTRIES.find(c => c.code === selectedCountry)?.currency || "XOF";
+  const targetCurrency = hasMultipleCurrencies(selectedCountry) 
+    ? selectedCurrency 
+    : (COUNTRIES.find(c => c.code === selectedCountry)?.currency || "XOF");
   const needsConversion = targetCurrency !== "XOF";
   
   const fetchConversion = useCallback(async (amountToConvert: number, toCurrency: string) => {
@@ -293,7 +309,7 @@ export default function Merchant() {
     } else {
       setConversionData(null);
     }
-  }, [needsConversion, watchedAmount, targetCurrency, fetchConversion]);
+  }, [needsConversion, watchedAmount, targetCurrency, fetchConversion, selectedCurrency]);
 
   // Fonction pour recommencer un nouveau paiement
   const handleNewPayment = () => {
@@ -355,6 +371,7 @@ export default function Merchant() {
         customerPhone: data.customerPhone,
         country: data.country,
         operator: data.operator,
+        currency: selectedCurrency,
       });
       return res.json();
     },
@@ -1065,6 +1082,13 @@ export default function Merchant() {
             </FormItem>
           )}
         />
+        {hasMultipleCurrencies(selectedCountry) && (
+          <CurrencySelector
+            countryCode={selectedCountry}
+            selectedCurrency={selectedCurrency}
+            onCurrencyChange={setSelectedCurrency}
+          />
+        )}
         <FormField
           control={form.control}
           name="customerPhone"

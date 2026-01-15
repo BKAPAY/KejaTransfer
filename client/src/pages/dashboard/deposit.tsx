@@ -18,6 +18,8 @@ import { calculateIncomingFee } from "@/lib/fees";
 import { useState, useEffect, useCallback } from "react";
 import { PaymentMethodSelector } from "@/components/payment-method-selector";
 import { CryptoPaymentFlow } from "@/components/crypto-payment-flow";
+import { CurrencySelector, getCurrencyLabel } from "@/components/currency-selector";
+import { hasMultipleCurrencies, getMbiyoPayCurrencyForCountry, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
 
 interface ConversionData {
   convertedAmount: number;
@@ -50,6 +52,7 @@ export default function Deposit() {
   const [otpCode, setOtpCode] = useState("");
   const [pollingStatus, setPollingStatus] = useState<string | null>(null);
   const [conversionData, setConversionData] = useState<ConversionData | null>(null);
+  const [selectedCurrency, setSelectedCurrency] = useState<string>("XOF");
 
   const { data: user } = useQuery<User>({
     queryKey: ["/api/auth/me"],
@@ -86,8 +89,21 @@ export default function Deposit() {
 
   const netAmount = selectedCountry && amount ? calculateIncomingFee(Math.floor(amount), selectedCountry).netAmount : 0;
 
+  // Handle currency selection when country changes
+  useEffect(() => {
+    if (selectedCountry && hasMultipleCurrencies(selectedCountry)) {
+      const currencies = getMbiyoPayCurrenciesForCountry(selectedCountry);
+      setSelectedCurrency(currencies[0]);
+    } else if (selectedCountry) {
+      const countryCurrency = COUNTRIES.find(c => c.code === selectedCountry)?.currency || "XOF";
+      setSelectedCurrency(countryCurrency);
+    }
+  }, [selectedCountry]);
+
   // Currency conversion for non-XOF countries
-  const targetCurrency = COUNTRIES.find(c => c.code === selectedCountry)?.currency || "XOF";
+  const targetCurrency = hasMultipleCurrencies(selectedCountry) 
+    ? selectedCurrency 
+    : (COUNTRIES.find(c => c.code === selectedCountry)?.currency || "XOF");
   const needsConversion = targetCurrency !== "XOF";
 
   const fetchConversion = useCallback(async (amountToConvert: number, toCurrency: string) => {
@@ -131,13 +147,14 @@ export default function Deposit() {
     } else {
       setConversionData(null);
     }
-  }, [needsConversion, amount, targetCurrency, fetchConversion]);
+  }, [needsConversion, amount, targetCurrency, fetchConversion, selectedCurrency]);
 
   const depositMutation = useMutation({
     mutationFn: async (data: DepositFormData) => {
       const res = await apiRequest("POST", "/api/fedapay/deposit", {
         ...data,
         amount: depositAmount,
+        currency: selectedCurrency,
       });
       return res.json();
     },
@@ -552,6 +569,14 @@ export default function Deposit() {
                         </FormItem>
                       )}
                     />
+
+                    {selectedCountry && hasMultipleCurrencies(selectedCountry) && (
+                      <CurrencySelector
+                        countryCode={selectedCountry}
+                        selectedCurrency={selectedCurrency}
+                        onCurrencyChange={setSelectedCurrency}
+                      />
+                    )}
 
                     {selectedCountry && (
                       <FormField

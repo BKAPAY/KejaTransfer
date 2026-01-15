@@ -18,6 +18,9 @@ import { Send, Info, CheckCircle2, Loader2, Lock, AlertCircle, Settings } from "
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { calculateOutgoingFee } from "@/lib/fees";
 import { useLocation } from "wouter";
+import { CurrencySelector, getCurrencyLabel } from "@/components/currency-selector";
+import { hasMultipleCurrencies, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
+import { useEffect, useCallback } from "react";
 
 const transferSchema = z.object({
   amount: z.number().min(500, "Le montant minimum est de 500 XOF"),
@@ -39,6 +42,13 @@ export default function Transfer() {
   const [securityCode, setSecurityCode] = useState("");
   const [securityError, setSecurityError] = useState("");
   const [pendingData, setPendingData] = useState<TransferFormData | null>(null);
+  const [selectedCurrency, setSelectedCurrency] = useState<string>("XOF");
+  const [conversionData, setConversionData] = useState<{
+    convertedAmount: number;
+    targetCurrency: string;
+    conversionRate: number;
+    isLoading: boolean;
+  } | null>(null);
 
   const { data: user } = useQuery<User>({
     queryKey: ["/api/auth/me"],
@@ -77,6 +87,66 @@ export default function Transfer() {
 
   const feeInfo = selectedCountry && amount ? calculateOutgoingFee(Math.floor(amount), selectedCountry) : null;
 
+  // Handle currency selection when country changes
+  useEffect(() => {
+    if (selectedCountry && hasMultipleCurrencies(selectedCountry)) {
+      const currencies = getMbiyoPayCurrenciesForCountry(selectedCountry);
+      setSelectedCurrency(currencies[0]);
+    } else if (selectedCountry) {
+      const countryCurrency = COUNTRIES.find(c => c.code === selectedCountry)?.currency || "XOF";
+      setSelectedCurrency(countryCurrency);
+    }
+  }, [selectedCountry]);
+
+  // Currency conversion for non-XOF countries
+  const targetCurrency = hasMultipleCurrencies(selectedCountry) 
+    ? selectedCurrency 
+    : (COUNTRIES.find(c => c.code === selectedCountry)?.currency || "XOF");
+  const needsConversion = targetCurrency !== "XOF";
+
+  const fetchConversion = useCallback(async (amountToConvert: number, toCurrency: string) => {
+    if (!amountToConvert || amountToConvert <= 0 || toCurrency === "XOF") {
+      setConversionData(null);
+      return;
+    }
+
+    setConversionData(prev => prev ? { ...prev, isLoading: true } : { convertedAmount: 0, targetCurrency: toCurrency, conversionRate: 0, isLoading: true });
+
+    try {
+      const res = await fetch("/api/convert-currency", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: amountToConvert, fromCurrency: "XOF", toCurrency }),
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        setConversionData({
+          convertedAmount: data.convertedAmount,
+          targetCurrency: data.targetCurrency,
+          conversionRate: data.conversionRate,
+          isLoading: false,
+        });
+      } else {
+        setConversionData(null);
+      }
+    } catch (error) {
+      console.error("Currency conversion error:", error);
+      setConversionData(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (needsConversion && amount && amount > 0) {
+      const debounceTimer = setTimeout(() => {
+        fetchConversion(amount, targetCurrency);
+      }, 500);
+      return () => clearTimeout(debounceTimer);
+    } else {
+      setConversionData(null);
+    }
+  }, [needsConversion, amount, targetCurrency, fetchConversion, selectedCurrency]);
+
   const transferMutation = useMutation({
     mutationFn: async (data: { formData: TransferFormData; securityCode: string }) => {
       const res = await apiRequest("POST", "/api/fedapay/withdrawal", {
@@ -86,6 +156,7 @@ export default function Transfer() {
         operator: data.formData.operator,
         type: "transfer",
         securityCode: data.securityCode,
+        currency: selectedCurrency,
       });
       return res.json();
     },
@@ -309,6 +380,14 @@ export default function Transfer() {
                   </FormItem>
                 )}
               />
+
+              {selectedCountry && hasMultipleCurrencies(selectedCountry) && (
+                <CurrencySelector
+                  countryCode={selectedCountry}
+                  selectedCurrency={selectedCurrency}
+                  onCurrencyChange={setSelectedCurrency}
+                />
+              )}
 
               {selectedCountry && (
                 <FormField

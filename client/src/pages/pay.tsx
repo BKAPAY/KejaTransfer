@@ -19,6 +19,8 @@ import { useEffect, useState, useCallback } from "react";
 import { CheckCircle2, Clock, Loader2, AlertCircle, XCircle, RefreshCw, ExternalLink, Copy, Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { PaymentMethodSelector } from "@/components/payment-method-selector";
 import { CryptoPaymentFlow } from "@/components/crypto-payment-flow";
+import { CurrencySelector, getCurrencyLabel } from "@/components/currency-selector";
+import { hasMultipleCurrencies, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
 
 function ImageCarousel({ images, productName }: { images: string[]; productName: string }) {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -209,6 +211,7 @@ export default function Pay() {
   } | null>(null);
   const [copiedUssd, setCopiedUssd] = useState(false);
   const [conversionData, setConversionData] = useState<ConversionData | null>(null);
+  const [selectedCurrency, setSelectedCurrency] = useState<string>("XOF");
   const { toast } = useToast();
 
   const copyUssdCode = (code: string) => {
@@ -313,8 +316,21 @@ export default function Pay() {
   const feeAmount = Math.ceil(baseAmount * 0.06);
   const totalAmount = paymentLink?.customerPaysFee ? baseAmount + feeAmount : baseAmount;
 
+  // Handle currency selection when country changes
+  useEffect(() => {
+    if (selectedCountry && hasMultipleCurrencies(selectedCountry)) {
+      const currencies = getMbiyoPayCurrenciesForCountry(selectedCountry);
+      setSelectedCurrency(currencies[0]);
+    } else if (selectedCountry) {
+      const countryCurrency = COUNTRIES.find(c => c.code === selectedCountry)?.currency || "XOF";
+      setSelectedCurrency(countryCurrency);
+    }
+  }, [selectedCountry]);
+
   // conversion (XOF -> Target Currency)
-  const targetCurrency = COUNTRIES.find(c => c.code === selectedCountry)?.currency || "XOF";
+  const targetCurrency = hasMultipleCurrencies(selectedCountry) 
+    ? selectedCurrency 
+    : (COUNTRIES.find(c => c.code === selectedCountry)?.currency || "XOF");
   const isConversionNeeded = targetCurrency !== "XOF";
   const isGuinea = selectedCountry === "GN";
   
@@ -359,7 +375,7 @@ export default function Pay() {
     } else {
       setConversionData(null);
     }
-  }, [isConversionNeeded, totalAmount, targetCurrency, fetchConversion]);
+  }, [isConversionNeeded, totalAmount, targetCurrency, fetchConversion, selectedCurrency]);
 
   // Fonction pour recommencer un nouveau paiement
   const handleNewPayment = () => {
@@ -419,6 +435,7 @@ export default function Pay() {
         customerPhone: data.customerPhone,
         country: data.country,
         operator: data.operator,
+        currency: selectedCurrency,
       });
       return res.json();
     },
@@ -1106,6 +1123,13 @@ export default function Pay() {
             </FormItem>
           )}
         />
+        {hasMultipleCurrencies(selectedCountry) && (
+          <CurrencySelector
+            countryCode={selectedCountry}
+            selectedCurrency={selectedCurrency}
+            onCurrencyChange={setSelectedCurrency}
+          />
+        )}
         <FormField
           control={form.control}
           name="customerPhone"
