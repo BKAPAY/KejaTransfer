@@ -16,7 +16,7 @@ import type { User } from "@shared/schema";
 import { PhoneInputWithPrefix } from "@/components/phone-input-with-prefix";
 import { Send, Info, CheckCircle2, Loader2, Lock, AlertCircle, Settings } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { calculateOutgoingFee } from "@/lib/fees";
+import { calculateOutgoingFee, fetchFeeConfig, formatFeePercentage } from "@/lib/fees";
 import { useLocation } from "wouter";
 import { CurrencySelector, getCurrencyLabel } from "@/components/currency-selector";
 import { hasMultipleCurrencies, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
@@ -43,6 +43,7 @@ export default function Transfer() {
   const [securityError, setSecurityError] = useState("");
   const [pendingData, setPendingData] = useState<TransferFormData | null>(null);
   const [selectedCurrency, setSelectedCurrency] = useState<string>("XOF");
+  const [feePercentage, setFeePercentage] = useState<number>(60);
   const [conversionData, setConversionData] = useState<{
     convertedAmount: number;
     targetCurrency: string;
@@ -85,7 +86,18 @@ export default function Transfer() {
     ? allCountryOperators.filter(op => (enabledCountriesOperators[selectedCountry] || []).includes(op.code))
     : allCountryOperators;
 
-  const feeInfo = selectedCountry && amount ? calculateOutgoingFee(Math.floor(amount), selectedCountry) : null;
+  const selectedOperator = form.watch("operator");
+
+  // Fetch dynamic fee from database when country/operator changes
+  useEffect(() => {
+    if (selectedCountry && selectedOperator) {
+      fetchFeeConfig(selectedCountry, selectedOperator).then(fees => {
+        setFeePercentage(fees.outgoing);
+      });
+    }
+  }, [selectedCountry, selectedOperator]);
+
+  const feeInfo = amount ? calculateOutgoingFee(Math.floor(amount), feePercentage) : null;
 
   // Handle currency selection when country changes
   useEffect(() => {
@@ -231,8 +243,8 @@ export default function Transfer() {
       return;
     }
 
-    const feeInfo = calculateOutgoingFee(data.amount, selectedCountry);
-    const totalDeducted = data.amount + feeInfo.feeAmount;
+    const feeInfoCalc = calculateOutgoingFee(data.amount, feePercentage);
+    const totalDeducted = data.amount + feeInfoCalc.feeAmount;
     if (user.balance < totalDeducted) {
       toast({
         title: "Solde insuffisant",

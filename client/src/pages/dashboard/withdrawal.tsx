@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,11 +15,10 @@ import { OPERATORS, COUNTRIES } from "@shared/schema";
 import type { User } from "@shared/schema";
 import { ArrowUpFromLine, Info, CheckCircle2, Loader2, Settings, AlertCircle, Lock } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { calculateOutgoingFee } from "@/lib/fees";
+import { calculateOutgoingFee, fetchFeeConfig, formatFeePercentage } from "@/lib/fees";
 import { useLocation } from "wouter";
 import { CurrencySelector, getCurrencyLabel } from "@/components/currency-selector";
 import { hasMultipleCurrencies, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
-import { useEffect, useCallback } from "react";
 
 const withdrawalSchema = z.object({
   amount: z.number().min(1000, "Le montant minimum est de 1000 XOF"),
@@ -37,6 +36,7 @@ export default function Withdrawal() {
   const [securityError, setSecurityError] = useState("");
   const [pendingData, setPendingData] = useState<WithdrawalFormData | null>(null);
   const [selectedCurrency, setSelectedCurrency] = useState<string>("XOF");
+  const [feePercentage, setFeePercentage] = useState<number>(60);
   const [conversionData, setConversionData] = useState<{
     convertedAmount: number;
     targetCurrency: string;
@@ -75,7 +75,18 @@ export default function Withdrawal() {
     ? allCountryOperators.filter(op => (enabledCountriesOperators[userCountry] || []).includes(op.code))
     : allCountryOperators;
 
-  const feeInfo = userCountry && amount ? calculateOutgoingFee(Math.floor(amount), userCountry) : null;
+  const selectedOperator = form.watch("operator");
+
+  // Fetch dynamic fee from database when country/operator changes
+  useEffect(() => {
+    if (userCountry && selectedOperator) {
+      fetchFeeConfig(userCountry, selectedOperator).then(fees => {
+        setFeePercentage(fees.outgoing);
+      });
+    }
+  }, [userCountry, selectedOperator]);
+
+  const feeInfo = amount ? calculateOutgoingFee(Math.floor(amount), feePercentage) : null;
 
   // Handle currency selection when country changes
   useEffect(() => {
@@ -244,11 +255,11 @@ export default function Withdrawal() {
       return;
     }
 
-    const feeInfo = calculateOutgoingFee(data.amount, userCountry);
-    if (user.balance < feeInfo.totalDeductedFromBalance) {
+    const feeInfoCalc = calculateOutgoingFee(data.amount, feePercentage);
+    if (user.balance < feeInfoCalc.totalDeductedFromBalance) {
       toast({
         title: "Solde insuffisant",
-        description: `Vous avez ${user.balance} XOF. Total a deduire: ${feeInfo.totalDeductedFromBalance} XOF`,
+        description: `Vous avez ${user.balance} XOF. Total a deduire: ${feeInfoCalc.totalDeductedFromBalance} XOF`,
         variant: "destructive",
       });
       return;

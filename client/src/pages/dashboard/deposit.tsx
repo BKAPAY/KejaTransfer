@@ -14,7 +14,7 @@ import type { User } from "@shared/schema";
 import { PhoneInputWithPrefix } from "@/components/phone-input-with-prefix";
 import { ArrowDownToLine, CheckCircle2, Clock, Info, Loader2, Smartphone } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { calculateIncomingFee } from "@/lib/fees";
+import { calculateIncomingFee, fetchFeeConfig, formatFeePercentage } from "@/lib/fees";
 import { useState, useEffect, useCallback } from "react";
 import { PaymentMethodSelector } from "@/components/payment-method-selector";
 import { CryptoPaymentFlow } from "@/components/crypto-payment-flow";
@@ -53,6 +53,7 @@ export default function Deposit() {
   const [pollingStatus, setPollingStatus] = useState<string | null>(null);
   const [conversionData, setConversionData] = useState<ConversionData | null>(null);
   const [selectedCurrency, setSelectedCurrency] = useState<string>("XOF");
+  const [feePercentage, setFeePercentage] = useState<number>(60);
 
   const { data: user } = useQuery<User>({
     queryKey: ["/api/auth/me"],
@@ -72,6 +73,7 @@ export default function Deposit() {
   });
 
   const selectedCountry = form.watch("country");
+  const selectedOperator = form.watch("operator");
   const amount = depositAmount;
 
   // Filter countries to only show those enabled by admin (have at least one enabled operator)
@@ -87,7 +89,16 @@ export default function Deposit() {
     ? allCountryOperators.filter(op => (enabledCountriesOperators[selectedCountry] || []).includes(op.code))
     : allCountryOperators;
 
-  const netAmount = selectedCountry && amount ? calculateIncomingFee(Math.floor(amount), selectedCountry).netAmount : 0;
+  // Fetch dynamic fee from database when country/operator changes
+  useEffect(() => {
+    if (selectedCountry && selectedOperator) {
+      fetchFeeConfig(selectedCountry, selectedOperator).then(fees => {
+        setFeePercentage(fees.incoming);
+      });
+    }
+  }, [selectedCountry, selectedOperator]);
+
+  const netAmount = amount ? calculateIncomingFee(Math.floor(amount), feePercentage).netAmount : 0;
 
   // Handle currency selection when country changes
   useEffect(() => {
