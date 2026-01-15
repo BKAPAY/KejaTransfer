@@ -109,7 +109,7 @@ export const countryOperatorConfig = pgTable("country_operator_config", {
 });
 
 // Countries allowed for user registration
-export const ALLOWED_REGISTRATION_COUNTRIES = ["BJ", "TG", "CI", "BF", "SN"] as const;
+export const ALLOWED_REGISTRATION_COUNTRIES = ["BJ", "CI", "SN", "TG", "BF", "CM", "CD", "CG", "ML"] as const;
 
 // Email verification codes
 export const verificationCodes = pgTable("verification_codes", {
@@ -323,13 +323,21 @@ export type CountryStatus = typeof countryStatus.$inferSelect;
 
 // Currency constants
 export const CURRENCIES = [
-  { code: "XOF", name: "Franc CFA", symbol: "Fr", rate: 1 },
+  { code: "XOF", name: "Franc CFA BCEAO", symbol: "Fr", rate: 1 },
+  { code: "XAF", name: "Franc CFA BEAC", symbol: "Fr", rate: 1 },
+  { code: "CDF", name: "Franc Congolais", symbol: "FC", rate: 0.00036 },
+  { code: "GNF", name: "Franc Guinéen", symbol: "FG", rate: 0.00012 },
+  { code: "RWF", name: "Franc Rwandais", symbol: "FRw", rate: 0.00074 },
   { code: "USD", name: "Dollar US", symbol: "$", rate: 0.0015 },
-  { code: "EUR", name: "Euro", symbol: "€", rate: 0.0015 },
+  { code: "EUR", name: "Euro", symbol: "€", rate: 0.0014 },
 ] as const;
 
 export const CURRENCY_CONVERSION_RATES: Record<string, number> = {
   XOF: 1,
+  XAF: 1,
+  CDF: 0.00036,
+  GNF: 0.00012,
+  RWF: 0.00074,
   USD: 0.0015,
   EUR: 0.0014,
 };

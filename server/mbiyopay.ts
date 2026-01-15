@@ -14,7 +14,7 @@ export const MBIYOPAY_COUNTRY_CURRENCIES: Record<string, string> = {
   gn: "GNF",
   cm: "XAF",
   cg: "XAF",
-  cd: "USD",
+  cd: "CDF",
   gm: "GMD",
 };
 
