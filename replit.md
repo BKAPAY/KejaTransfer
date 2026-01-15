@@ -104,6 +104,19 @@ BKApay now supports 5 payment providers with mutual exclusivity:
 - `shared/fedapay-countries.ts` - FedaPay countries and operators
 - `shared/mbiyopay-countries.ts` - MbiyoPay countries and operators
 
+## Multi-Currency Support (DRC)
+BKApay supports multiple currencies for certain countries, specifically the Democratic Republic of Congo (DRC):
+- **Supported Currencies for DRC**: CDF (Congolese Franc - default) and USD (US Dollar)
+- **Selection Method**: Checkbox-based single selection with visual highlighting
+- **Component**: `CurrencySelector` in `client/src/components/currency-selector.tsx`
+- **Helper Functions**: 
+  - `hasMultipleCurrencies(countryCode)` - Check if a country supports multiple currencies
+  - `getMbiyoPayCurrenciesForCountry(countryCode)` - Get available currencies for a country
+- **Integration**: Currency selector displays automatically when a multi-currency country is selected
+- **Conversion**: Automatic real-time conversion from XOF to selected currency using EXCHANGERATE_API_KEY
+- **Pages Integrated**: Deposit, Withdrawal, Transfer, Pay, Merchant, and API Payment pages
+- **Currency Reset**: Currency automatically resets to default when country changes
+
 ### Admin Pages
 - `/dashboard/fournisseurs` - Manage API keys and toggle providers on/off
 - `/dashboard/country-operator-config` - Enable/disable countries and operators per provider
