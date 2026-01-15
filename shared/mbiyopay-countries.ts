@@ -14,6 +14,7 @@ export interface MbiyoPayCountry {
   phoneDigits: number;
   phoneFormat: string;
   currency: string;
+  currencies?: string[];
   operators: MbiyoPayOperator[];
 }
 
@@ -144,7 +145,8 @@ export const MBIYOPAY_COUNTRIES: MbiyoPayCountry[] = [
     phoneCode: "+243",
     phoneDigits: 9,
     phoneFormat: "XXXXXXXXX",
-    currency: "USD",
+    currency: "CDF",
+    currencies: ["CDF", "USD"],
     operators: [
       { code: "mpesa", name: "M-Pesa", requiresOtp: false, payin: true, payout: true },
       { code: "airtel", name: "Airtel Money", requiresOtp: false, payin: true, payout: true },
@@ -197,6 +199,20 @@ export const MBIYOPAY_CURRENCY_INFO: Record<string, { symbol: string; name: stri
   XOF: { symbol: "FCFA", name: "Franc CFA (BCEAO)" },
   XAF: { symbol: "FCFA", name: "Franc CFA (BEAC)" },
   GNF: { symbol: "GNF", name: "Franc Guinéen" },
+  CDF: { symbol: "FC", name: "Franc Congolais" },
   USD: { symbol: "$", name: "Dollar US" },
   GMD: { symbol: "GMD", name: "Dalasi Gambien" },
+};
+
+export const getMbiyoPayCurrenciesForCountry = (countryCode: string): string[] => {
+  const country = getMbiyoPayCountryByCode(countryCode);
+  if (country?.currencies && country.currencies.length > 0) {
+    return country.currencies;
+  }
+  return [country?.currency || "XOF"];
+};
+
+export const hasMultipleCurrencies = (countryCode: string): boolean => {
+  const country = getMbiyoPayCountryByCode(countryCode);
+  return (country?.currencies?.length || 0) > 1;
 };
