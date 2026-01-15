@@ -249,7 +249,7 @@ export async function handleMbiyoPayPaymentLink(
 
     const customerPaysFee = paymentLink.customerPaysFee === true;
     const baseAmount = paymentLink.amount;
-    const feeInfo = calculateIncomingFee(baseAmount, country);
+    const feeInfo = calculateIncomingFee(baseAmount);
     const grossAmount = customerPaysFee ? Math.ceil(baseAmount * 1.06) : baseAmount;
     const currency = getCurrencyForCountry(country);
 

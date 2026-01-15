@@ -17,26 +17,34 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp
 import { Loader2, Mail, ArrowLeft } from "lucide-react";
 
 const COUNTRY_NAMES: Record<string, string> = {
-  BJ: "Benin",
+  BJ: "Bénin",
   TG: "Togo",
-  CI: "Cote d'Ivoire",
+  CI: "Côte d'Ivoire",
   BF: "Burkina Faso",
-  SN: "Senegal",
+  SN: "Sénégal",
+  CM: "Cameroun",
+  CD: "RD Congo",
+  CG: "Congo Brazzaville",
+  ML: "Mali",
 };
 
 const COUNTRY_FLAGS: Record<string, string> = {
-  BJ: "\uD83C\uDDE7\uD83C\uDDEF",
-  TG: "\uD83C\uDDF9\uD83C\uDDEC",
-  CI: "\uD83C\uDDE8\uD83C\uDDEE",
-  BF: "\uD83C\uDDE7\uD83C\uDDEB",
-  SN: "\uD83C\uDDF8\uD83C\uDDF3",
+  BJ: "🇧🇯",
+  TG: "🇹🇬",
+  CI: "🇨🇮",
+  BF: "🇧🇫",
+  SN: "🇸🇳",
+  CM: "🇨🇲",
+  CD: "🇨🇩",
+  CG: "🇨🇬",
+  ML: "🇲🇱",
 };
 
 const signupSchema = z.object({
   firstName: z.string().min(2, "Le prénom doit contenir au moins 2 caractères"),
   lastName: z.string().min(2, "Le nom doit contenir au moins 2 caractères"),
   email: z.string().email("Email invalide"),
-  country: z.enum(["BJ", "TG", "CI", "BF", "SN"], {
+  country: z.enum(["BJ", "TG", "CI", "BF", "SN", "CM", "CD", "CG", "ML"], {
     required_error: "Veuillez sélectionner votre pays",
   }),
   password: z.string().min(8, "Le mot de passe doit contenir au moins 8 caractères"),
