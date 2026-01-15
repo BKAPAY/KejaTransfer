@@ -337,6 +337,7 @@ export const OPERATORS = {
   BJ: [
     { code: "moov", name: "Moov Money", requiresOtp: false },
     { code: "mtn", name: "MTN Mobile Money", requiresOtp: false },
+    { code: "celtiis", name: "Celtiis", requiresOtp: false },
   ],
   CI: [
     { code: "orange", name: "Orange Money", requiresOtp: true },
@@ -409,7 +410,7 @@ export const PAYOUT_COUNTRIES = ["BJ", "CI", "SN", "BF", "TG", "ML", "GN", "NE",
 
 // All operators available for collect (payin) by country
 export const COLLECT_OPERATORS: Record<string, string[]> = {
-  BJ: ["moov", "mtn"],
+  BJ: ["moov", "mtn", "celtiis"],
   CI: ["orange", "moov", "mtn", "wave"],
   SN: ["orange", "free", "expresso", "wave"],
   BF: ["orange", "moov", "wave"],
@@ -428,7 +429,7 @@ export const COLLECT_OPERATORS: Record<string, string[]> = {
 
 // All operators available for payout by country
 export const PAYOUT_OPERATORS: Record<string, string[]> = {
-  BJ: ["moov", "mtn"],
+  BJ: ["moov", "mtn", "celtiis"],
   CI: ["orange", "moov", "mtn", "wave"],
   SN: ["orange", "free", "expresso", "wave"],
   BF: ["orange", "moov", "wave"],

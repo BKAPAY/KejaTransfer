@@ -3571,10 +3571,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`[PAYMENT_LINK] Using MbiyoPay for ${country}/${operator}`);
         const result = await handleMbiyoPayPaymentLink(
           paymentLink,
+          customerPhone,
           customerName || "Client",
           "noreply@bkapay.com",
-          customerPhone,
-          country,
           operator
         );
 
@@ -3755,10 +3754,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const result = await handleMbiyoPayMerchantLink(
           merchantLink,
           amount,
+          customerPhone,
           customerName || "Client",
           "noreply@bkapay.com",
-          customerPhone,
-          country,
           operator
         );
 

@@ -111,6 +111,7 @@ export const MBIYOPAY_COUNTRIES: MbiyoPayCountry[] = [
     currency: "GNF",
     operators: [
       { code: "orange", name: "Orange Money", requiresOtp: false, payin: true, payout: true },
+      { code: "mtn", name: "MTN Mobile Money", requiresOtp: false, payin: true, payout: true },
     ],
   },
   {
