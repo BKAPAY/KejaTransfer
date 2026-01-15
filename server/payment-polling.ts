@@ -2,6 +2,7 @@ import { storage } from "./storage";
 import type { Transaction, User } from "@shared/schema";
 import { getTransactionStatus as getFedaPayTransactionStatus, getPayoutStatus as getFedaPayPayoutStatus } from "./fedapay";
 import { NowPaymentsClient } from "./nowpayments";
+import { getMbiyoPayTransactionStatus } from "./mbiyopay";
 
 const PAYDUNYA_MASTER_KEY = process.env.PAYDUNYA_MASTER_KEY;
 const PAYDUNYA_PRIVATE_KEY = process.env.PAYDUNYA_PRIVATE_KEY;
@@ -202,6 +203,70 @@ async function processNowPaymentsTransaction(transaction: Transaction & { user?:
   }
 }
 
+async function processMbiyoPayTransaction(transaction: Transaction & { user?: User }, metadata: any): Promise<boolean> {
+  const mbiyopayTransactionId = metadata.mbiyopayTransactionId;
+  const transactionAge = getTransactionAge(transaction);
+  const remainingTime = Math.max(0, PAYMENT_TIMEOUT_MS - transactionAge);
+  const remainingSeconds = Math.round(remainingTime / 1000);
+
+  console.log(`[PaymentPolling] Checking MbiyoPay transaction ${transaction.id} (mbiyopayId: ${mbiyopayTransactionId}, ${remainingSeconds}s remaining)`);
+
+  try {
+    const statusResult = await getMbiyoPayTransactionStatus(mbiyopayTransactionId);
+    
+    console.log(`[PaymentPolling] MbiyoPay transaction ${transaction.id} - status:`, statusResult.status);
+
+    if (statusResult.success && statusResult.status) {
+      const status = statusResult.status.toLowerCase();
+      
+      // MbiyoPay status: completed, success, successful = payment confirmed
+      if (status === "completed" || status === "success" || status === "successful" || status === "approved") {
+        const result = await storage.finalizeIncomingTransaction(transaction.id, {});
+        if (result) {
+          console.log(`[PaymentPolling] ✅ MbiyoPay transaction ${transaction.id} CONFIRMED - finalized: credited=${result.credited}`);
+        } else {
+          console.log(`[PaymentPolling] MbiyoPay transaction ${transaction.id} already processed - skipping`);
+        }
+        return true;
+      } 
+      // MbiyoPay status: failed, cancelled, declined, expired = payment failed
+      else if (status === "failed" || status === "cancelled" || status === "canceled" || status === "declined" || status === "expired") {
+        console.log(`[PaymentPolling] ❌ MbiyoPay transaction ${transaction.id} failed (status: ${status})`);
+        await storage.updateTransactionStatus(transaction.id, "failed");
+        return true;
+      } 
+      // Still pending
+      else {
+        if (hasPaymentExpired(transaction)) {
+          const timeoutMinutes = Math.round(PAYMENT_TIMEOUT_MS / 60000);
+          console.log(`[PaymentPolling] ⏱️ MbiyoPay transaction ${transaction.id} TIMEOUT (${timeoutMinutes}min) - marking as failed`);
+          await storage.updateTransactionStatus(transaction.id, "failed");
+          return true;
+        }
+        console.log(`[PaymentPolling] ⏳ MbiyoPay transaction ${transaction.id} still pending (status: ${status}, ${remainingSeconds}s remaining)`);
+        return false;
+      }
+    } else {
+      // API call failed but transaction might still be valid - wait
+      if (hasPaymentExpired(transaction)) {
+        console.log(`[PaymentPolling] ⏱️ MbiyoPay transaction ${transaction.id} expired with API error - marking as failed`);
+        await storage.updateTransactionStatus(transaction.id, "failed");
+        return true;
+      }
+      console.log(`[PaymentPolling] MbiyoPay API error for ${transaction.id}: ${statusResult.error}, will retry (${remainingSeconds}s remaining)`);
+      return false;
+    }
+  } catch (error) {
+    console.error(`[PaymentPolling] Error checking MbiyoPay transaction ${transaction.id}:`, error);
+    if (hasPaymentExpired(transaction)) {
+      console.log(`[PaymentPolling] ⏱️ MbiyoPay transaction ${transaction.id} expired with error - marking as failed`);
+      await storage.updateTransactionStatus(transaction.id, "failed");
+      return true;
+    }
+    return false;
+  }
+}
+
 async function processFedaPayPayout(transaction: Transaction & { user?: User }, metadata: any): Promise<boolean> {
   const fedapayPayoutId = metadata.fedapayPayoutId;
   const transactionAge = getTransactionAge(transaction);
@@ -354,6 +419,12 @@ async function processTransaction(transaction: Transaction & { user?: User }): P
   // Check if this is a FedaPay payout (withdrawal)
   if (metadata.fedapayPayoutId) {
     await processFedaPayPayout(transaction, metadata);
+    return;
+  }
+
+  // Check if this is a MbiyoPay transaction
+  if (metadata.mbiyopayTransactionId || metadata.paymentProvider === "mbiyopay") {
+    await processMbiyoPayTransaction(transaction, metadata);
     return;
   }
 
