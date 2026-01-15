@@ -1,9 +1,9 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
-import { Users, UserCheck, TrendingDown, TrendingUp, Search, Settings, Globe, RefreshCw, Database, AlertCircle, CheckCircle2, Eye, History, MapPin, Mail, Phone, CreditCard, Percent } from "lucide-react";
+import { Users, UserCheck, TrendingDown, TrendingUp, Search, Settings, Globe, RefreshCw, Database, AlertCircle, CheckCircle2, Eye, History, MapPin, Mail, Phone, CreditCard, Percent, Lock } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -17,7 +17,10 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
+
+const ADMIN_ACCESS_CODE = "19992025";
 
 const COUNTRY_NAMES: Record<string, string> = {
   BJ: "Bénin",
@@ -81,8 +84,35 @@ export default function Admin() {
   const [transactionDialogOpen, setTransactionDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [userDialogOpen, setUserDialogOpen] = useState(false);
+  const [accessCodeDialogOpen, setAccessCodeDialogOpen] = useState(false);
+  const [accessCode, setAccessCode] = useState("");
+  const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+
+  const handleProtectedNavigation = (path: string) => {
+    setPendingNavigation(path);
+    setAccessCode("");
+    setAccessCodeDialogOpen(true);
+  };
+
+  const handleAccessCodeSubmit = () => {
+    if (accessCode === ADMIN_ACCESS_CODE) {
+      setAccessCodeDialogOpen(false);
+      if (pendingNavigation) {
+        setLocation(pendingNavigation);
+        setPendingNavigation(null);
+      }
+      setAccessCode("");
+    } else {
+      toast({
+        title: "Erreur",
+        description: "Code d'accès incorrect",
+        variant: "destructive",
+      });
+      setAccessCode("");
+    }
+  };
 
   const handleSyncDatabase = async () => {
     setIsSyncing(true);
@@ -207,12 +237,12 @@ export default function Admin() {
         </div>
         <div className="flex gap-2 flex-wrap">
           <Button
-            onClick={() => setLocation("/dashboard/fournisseurs")}
+            onClick={() => handleProtectedNavigation("/dashboard/fournisseurs")}
             data-testid="button-fournisseurs"
             className="gap-2"
             variant="destructive"
           >
-            <Database className="w-4 h-4" />
+            <Lock className="w-4 h-4" />
             FOURNISSEURS
           </Button>
           <Button
@@ -226,21 +256,21 @@ export default function Admin() {
             {isSyncing ? "Synchronisation..." : "Synchroniser BD"}
           </Button>
           <Button
-            onClick={() => setLocation("/dashboard/country-operator-config")}
+            onClick={() => handleProtectedNavigation("/dashboard/country-operator-config")}
             data-testid="button-country-operator-config"
             className="gap-2"
             variant="outline"
           >
-            <Globe className="w-4 h-4" />
+            <Lock className="w-4 h-4" />
             Pays & Operateurs
           </Button>
           <Button
-            onClick={() => setLocation("/dashboard/fee-config")}
+            onClick={() => handleProtectedNavigation("/dashboard/fee-config")}
             data-testid="button-fee-config"
             className="gap-2"
             variant="outline"
           >
-            <Percent className="w-4 h-4" />
+            <Lock className="w-4 h-4" />
             Frais
           </Button>
           <Button
@@ -832,6 +862,50 @@ export default function Admin() {
         open={transactionDialogOpen}
         onOpenChange={setTransactionDialogOpen}
       />
+
+      {/* Dialogue de code d'accès */}
+      <Dialog open={accessCodeDialogOpen} onOpenChange={setAccessCodeDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="flex items-center justify-center w-12 h-12 rounded-lg bg-primary/10 mx-auto mb-2">
+              <Lock className="w-6 h-6 text-primary" />
+            </div>
+            <DialogTitle className="text-center">Accès protégé</DialogTitle>
+            <DialogDescription className="text-center">
+              Veuillez entrer le code d'accès pour continuer
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Input
+              type="password"
+              placeholder="Entrez le code d'accès"
+              value={accessCode}
+              onChange={(e) => setAccessCode(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleAccessCodeSubmit()}
+              className="text-center text-2xl tracking-widest"
+              maxLength={8}
+              data-testid="input-access-code"
+            />
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setAccessCodeDialogOpen(false)}
+                className="flex-1"
+              >
+                Annuler
+              </Button>
+              <Button
+                onClick={handleAccessCodeSubmit}
+                disabled={accessCode.length === 0}
+                className="flex-1"
+                data-testid="button-submit-access-code"
+              >
+                Accéder
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Informations */}
       <Card className="border-primary/20 bg-primary/5">
