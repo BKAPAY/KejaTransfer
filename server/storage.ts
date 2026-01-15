@@ -16,6 +16,8 @@ import type {
   CountryOperatorConfig,
   InsertCountryOperatorConfig,
   UpdateCountryOperatorConfig,
+  FeeConfig,
+  InsertFeeConfig,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -134,6 +136,14 @@ export interface IStorage {
 
   // Transactions by metadata
   getTransactionsByMetadataPaymentId(paymentId: string): Promise<Transaction[]>;
+
+  // Fee Configuration
+  getAllFeeConfigs(): Promise<FeeConfig[]>;
+  getFeeConfig(country: string, operator: string): Promise<FeeConfig | undefined>;
+  getFeeConfigsByCountry(country: string): Promise<FeeConfig[]>;
+  createOrUpdateFeeConfig(config: InsertFeeConfig): Promise<FeeConfig>;
+  updateFeeConfig(country: string, operator: string, updates: { incomingFeePercentage?: number; outgoingFeePercentage?: number }): Promise<FeeConfig | undefined>;
+  initializeFeeConfigs(): Promise<void>;
 }
 
 export class DbStorage implements IStorage {
@@ -1362,6 +1372,91 @@ export class DbStorage implements IStorage {
         return false;
       }
     });
+  }
+
+  // Fee Configuration
+  async getAllFeeConfigs(): Promise<FeeConfig[]> {
+    return db.select().from(schema.feeConfigs);
+  }
+
+  async getFeeConfig(country: string, operator: string): Promise<FeeConfig | undefined> {
+    const results = await db
+      .select()
+      .from(schema.feeConfigs)
+      .where(and(
+        eq(schema.feeConfigs.country, country),
+        eq(schema.feeConfigs.operator, operator)
+      ))
+      .limit(1);
+    return results[0];
+  }
+
+  async getFeeConfigsByCountry(country: string): Promise<FeeConfig[]> {
+    return db
+      .select()
+      .from(schema.feeConfigs)
+      .where(eq(schema.feeConfigs.country, country));
+  }
+
+  async createOrUpdateFeeConfig(config: InsertFeeConfig): Promise<FeeConfig> {
+    const existing = await this.getFeeConfig(config.country, config.operator);
+    if (existing) {
+      const results = await db
+        .update(schema.feeConfigs)
+        .set({ 
+          incomingFeePercentage: config.incomingFeePercentage,
+          outgoingFeePercentage: config.outgoingFeePercentage,
+          updatedAt: new Date() 
+        })
+        .where(and(
+          eq(schema.feeConfigs.country, config.country),
+          eq(schema.feeConfigs.operator, config.operator)
+        ))
+        .returning();
+      return results[0];
+    }
+    const results = await db.insert(schema.feeConfigs).values(config).returning();
+    return results[0];
+  }
+
+  async updateFeeConfig(country: string, operator: string, updates: { incomingFeePercentage?: number; outgoingFeePercentage?: number }): Promise<FeeConfig | undefined> {
+    const results = await db
+      .update(schema.feeConfigs)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(and(
+        eq(schema.feeConfigs.country, country),
+        eq(schema.feeConfigs.operator, operator)
+      ))
+      .returning();
+    return results[0];
+  }
+
+  async initializeFeeConfigs(): Promise<void> {
+    const existingConfigs = await this.getAllFeeConfigs();
+    if (existingConfigs.length > 0) {
+      console.log(`[FeeConfigs] Already initialized with ${existingConfigs.length} configs`);
+      return;
+    }
+
+    // Initialize with default 6% (60) for all countries and operators from OPERATORS
+    const allOperators = schema.OPERATORS;
+    const configs: InsertFeeConfig[] = [];
+
+    for (const [country, operators] of Object.entries(allOperators)) {
+      for (const op of operators) {
+        configs.push({
+          country,
+          operator: op.code,
+          incomingFeePercentage: 60,
+          outgoingFeePercentage: 60,
+        });
+      }
+    }
+
+    if (configs.length > 0) {
+      await db.insert(schema.feeConfigs).values(configs);
+      console.log(`[FeeConfigs] Initialized ${configs.length} fee configurations with default 6%`);
+    }
   }
 }
 

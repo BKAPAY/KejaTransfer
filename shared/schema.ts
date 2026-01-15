@@ -170,6 +170,30 @@ export const insertCryptoCurrencySchema = createInsertSchema(cryptoCurrencies).o
 });
 export type InsertCryptoCurrency = z.infer<typeof insertCryptoCurrencySchema>;
 
+// Fee configuration per country/operator
+export const feeConfigs = pgTable("fee_configs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  country: text("country").notNull(), // "BJ", "TG", "CI", "SN", "BF", etc.
+  operator: text("operator").notNull(), // "orange", "mtn", "moov", "wave", etc.
+  incomingFeePercentage: integer("incoming_fee_percentage").notNull().default(60), // 60 = 6%, 40 = 4%, etc.
+  outgoingFeePercentage: integer("outgoing_fee_percentage").notNull().default(60), // 60 = 6%, 40 = 4%, etc.
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export type FeeConfig = typeof feeConfigs.$inferSelect;
+export const insertFeeConfigSchema = createInsertSchema(feeConfigs).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertFeeConfig = z.infer<typeof insertFeeConfigSchema>;
+
+export const updateFeeConfigSchema = z.object({
+  incomingFeePercentage: z.number().min(0).max(100).optional(),
+  outgoingFeePercentage: z.number().min(0).max(100).optional(),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
