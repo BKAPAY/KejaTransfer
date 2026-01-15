@@ -25,7 +25,7 @@ export const MBIYOPAY_OPERATORS: Record<string, string[]> = {
   sn: ["orange", "free"],
   tg: ["moov", "togocom"],
   ml: ["orange", "moov"],
-  gn: ["orange"],
+  gn: ["orange", "mtn"],
   cm: ["orange", "moov"],
   cg: ["mtn"],
   cd: ["mpesa", "airtel", "orange", "afrimoney"],
@@ -60,27 +60,31 @@ async function getMbiyoPayApiKey(): Promise<string | null> {
 }
 
 export function formatPhoneForMbiyoPay(phone: string, countryCode: string): string {
-  let sanitized = phone.replace(/\s+/g, "").replace(/[^0-9+]/g, "");
+  // Remove all non-numeric characters (including +)
+  let sanitized = phone.replace(/\s+/g, "").replace(/[^0-9]/g, "");
   
-  if (sanitized.startsWith("+")) {
+  const prefix = COUNTRY_PHONE_PREFIXES[countryCode.toLowerCase()];
+  const prefixDigits = prefix ? prefix.replace("+", "") : "";
+  const countryLower = countryCode.toLowerCase();
+  
+  // If phone already starts with country prefix digits, return as-is (without +)
+  if (prefixDigits && sanitized.startsWith(prefixDigits)) {
     return sanitized;
   }
   
-  const prefix = COUNTRY_PHONE_PREFIXES[countryCode.toLowerCase()];
-  if (!prefix) {
-    return "+" + sanitized;
-  }
+  // Countries that KEEP the leading 0 (Benin and Ivory Coast changed their formats)
+  // BJ: 01XXXXXXXX (10 digits, keep leading 0)
+  // CI: 0XXXXXXXXX (10 digits, keep leading 0)
+  const keepLeadingZero = ["bj", "ci"];
   
-  const prefixDigits = prefix.replace("+", "");
-  if (sanitized.startsWith(prefixDigits)) {
-    return "+" + sanitized;
-  }
-  
-  if (sanitized.startsWith("0")) {
+  // Remove leading 0 ONLY for countries that don't keep it
+  if (sanitized.startsWith("0") && !keepLeadingZero.includes(countryLower)) {
     sanitized = sanitized.substring(1);
   }
   
-  return prefix + sanitized;
+  // Return with country prefix (WITHOUT the +)
+  // Example: 22901234567 for Benin, 2250123456789 for Ivory Coast
+  return prefixDigits + sanitized;
 }
 
 export interface MbiyoPayPayinParams {
@@ -123,6 +127,8 @@ export async function createMbiyoPayPayin(params: MbiyoPayPayinParams): Promise<
     
     const formattedPhone = formatPhoneForMbiyoPay(params.phone, params.countryCode);
     
+    console.log(`[MbiyoPay Payin] Phone formatting: input="${params.phone}" -> output="${formattedPhone}" (country=${params.countryCode})`);
+    
     const requestBody = {
       amount: params.amount,
       currency: params.currency,
@@ -136,7 +142,7 @@ export async function createMbiyoPayPayin(params: MbiyoPayPayinParams): Promise<
       },
     };
     
-    console.log(`[MbiyoPay Payin] Creating payment: ${params.amount} ${params.currency}, ${params.network}/${params.countryCode}`);
+    console.log(`[MbiyoPay Payin] Creating payment: ${params.amount} ${params.currency}, ${params.network}/${params.countryCode}, phone=${formattedPhone}`);
     
     const response = await fetch(`${MBIYOPAY_BASE_URL}/merchant/payin`, {
       method: "POST",
@@ -207,6 +213,8 @@ export async function createMbiyoPayPayout(params: MbiyoPayPayoutParams): Promis
     
     const formattedPhone = formatPhoneForMbiyoPay(params.phone, params.countryCode);
     
+    console.log(`[MbiyoPay Payout] Phone formatting: input="${params.phone}" -> output="${formattedPhone}" (country=${params.countryCode})`);
+    
     const requestBody = {
       amount: params.amount,
       currency: params.currency,
@@ -220,7 +228,7 @@ export async function createMbiyoPayPayout(params: MbiyoPayPayoutParams): Promis
       },
     };
     
-    console.log(`[MbiyoPay Payout] Creating payout: ${params.amount} ${params.currency}, ${params.network}/${params.countryCode}`);
+    console.log(`[MbiyoPay Payout] Creating payout: ${params.amount} ${params.currency}, ${params.network}/${params.countryCode}, phone=${formattedPhone}`);
     
     const response = await fetch(`${MBIYOPAY_BASE_URL}/merchant/payout`, {
       method: "POST",

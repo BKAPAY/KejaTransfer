@@ -1260,12 +1260,110 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Initialize API payment - DISABLED
+  // Initialize API payment
   app.post("/api/api-pay/init", async (req: Request, res: Response) => {
-    return res.status(503).json({
-      success: false,
-      error: "Le système de paiement est temporairement indisponible. Veuillez réessayer ultérieurement."
-    });
+    try {
+      const { publicKey, amount, description, customerName, customerEmail, customerPhone, country, operator, callbackUrl } = req.body;
+
+      if (!publicKey || !amount || !customerPhone || !country || !operator) {
+        return res.status(400).json({ error: "Donnees manquantes" });
+      }
+
+      // Validate API key
+      const apiKey = await storage.getApiKeyByPublicKey(publicKey);
+      if (!apiKey || !apiKey.isActive) {
+        return res.status(401).json({ error: "Cle API invalide ou inactive" });
+      }
+
+      // Check if country is allowed
+      if (apiKey.allowedCountries && apiKey.allowedCountries.length > 0) {
+        if (!apiKey.allowedCountries.includes(country)) {
+          return res.status(400).json({ error: "Ce pays n'est pas autorise pour cette cle API" });
+        }
+      }
+
+      // Get active provider for this country/operator
+      const activeProvider = await getActiveProviderForDeposit(country, operator);
+      console.log(`[API-PAY INIT] Provider for ${country}/${operator}: ${activeProvider}`);
+
+      if (!activeProvider) {
+        return res.status(503).json({ 
+          success: false, 
+          error: "Aucun fournisseur configure pour ce pays et operateur" 
+        });
+      }
+
+      const grossAmount = Math.floor(Number(amount));
+      if (grossAmount < 100) {
+        return res.status(400).json({ error: "Montant minimum: 100 XOF" });
+      }
+
+      // Calculate fees
+      const { calculateIncomingFee } = await import("./utils/fees");
+      const feeInfo = calculateIncomingFee(grossAmount, country);
+
+      if (activeProvider === "mbiyopay") {
+        // Use MbiyoPay
+        const { createMbiyoPayPayin, getCurrencyForCountry } = await import("./mbiyopay");
+        const currency = getCurrencyForCountry(country);
+
+        console.log(`[API-PAY INIT] Using MbiyoPay for ${country}/${operator}, phone=${customerPhone}`);
+
+        const result = await createMbiyoPayPayin({
+          amount: grossAmount,
+          currency: currency,
+          phone: customerPhone,
+          countryCode: country,
+          network: operator,
+          orderId: `BKAPAY-APIPAY-${Date.now()}`,
+          callbackUrl: `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/mbiyopay`,
+        });
+
+        if (!result.success) {
+          return res.status(400).json({ success: false, error: result.error || "Erreur lors du paiement" });
+        }
+
+        // Create transaction record
+        const tx = await storage.createTransaction({
+          userId: apiKey.userId,
+          type: "api_payment",
+          amount: feeInfo.grossAmount,
+          fee: feeInfo.feeAmount,
+          feePercentage: feeInfo.feePercentage,
+          currency: currency,
+          status: "pending",
+          country: country.toUpperCase(),
+          operator: operator,
+          description: description || "Paiement via API",
+          customerPhone: customerPhone,
+          customerName: customerName || "Client",
+          customerEmail: customerEmail || null,
+          metadata: JSON.stringify({
+            mbiyopayTransactionId: result.transactionId,
+            redirectUrl: result.redirectUrl,
+            apiKeyId: apiKey.id,
+            callbackUrl: callbackUrl || null,
+            provider: "mbiyopay",
+          }),
+        });
+
+        return res.json({
+          success: true,
+          transactionId: tx.id,
+          token: tx.id,
+          message: result.message || "Paiement initie. Veuillez valider sur votre telephone.",
+          provider: "mbiyopay",
+        });
+      } else {
+        return res.status(503).json({ 
+          success: false, 
+          error: "Fournisseur non supporte pour ce mode de paiement" 
+        });
+      }
+    } catch (error: any) {
+      console.error("[API-PAY INIT] Error:", error);
+      return res.status(500).json({ error: "Erreur lors de l'initialisation du paiement" });
+    }
   });
 
   // Confirm API payment with OTP
@@ -4460,7 +4558,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Called from the payment form page when user selects country/operator
   app.post("/api/payments/submit", async (req: Request, res: Response) => {
     try {
-      const { transactionId, country, operator } = req.body;
+      const { transactionId, country, operator, currency } = req.body;
 
       if (!transactionId) {
         return res.status(400).json({ error: "Transaction ID requis" });
@@ -4480,48 +4578,115 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch {}
 
       const customerName = transaction.customerName || "Client";
-      const nameParts = customerName.split(" ");
-      const firstName = nameParts[0] || "Client";
-      const lastName = nameParts.slice(1).join(" ") || "Client";
+      const customerPhone = transaction.customerPhone || "";
 
-      // Use FedaPay to initiate payment
-      // Note: Use generic email for privacy - never send real customer emails to providers
-      const { createCollect } = await import("./fedapay");
-      const result = await createCollect({
-        amount: transaction.amount,
-        description: transaction.description || "Paiement via BKApay",
-        customerFirstName: firstName,
-        customerLastName: lastName,
-        customerEmail: "noreply@bkapay.com", // Privacy: never send real customer emails to providers
-        customerPhone: transaction.customerPhone || "",
-        country: country,
-        operator: operator,
-        callbackUrl: `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/fedapay`,
-      });
+      // Get active provider for this country/operator
+      const activeProvider = await getActiveProviderForDeposit(country, operator);
+      console.log(`[PAYMENT_SUBMIT] Provider for ${country}/${operator}: ${activeProvider}`);
 
-      if (result.success && result.transactionId) {
-        // Update transaction metadata with FedaPay info
-        const updatedMetadata = JSON.stringify({
-          ...metadata,
-          fedapayTransactionId: result.transactionId,
-          fedapayReference: result.reference,
-          country,
-          operator,
+      if (!activeProvider) {
+        return res.status(503).json({ 
+          success: false, 
+          error: "Aucun fournisseur configure pour ce pays et operateur" 
+        });
+      }
+
+      if (activeProvider === "mbiyopay") {
+        // Use MbiyoPay for payment
+        console.log(`[PAYMENT_SUBMIT] Using MbiyoPay for ${country}/${operator}, phone=${customerPhone}`);
+        const { createMbiyoPayPayin, getCurrencyForCountry } = await import("./mbiyopay");
+        const { calculateIncomingFee } = await import("./utils/fees");
+        
+        const grossAmount = transaction.amount;
+        const feeInfo = calculateIncomingFee(grossAmount, country);
+        const txCurrency = currency || getCurrencyForCountry(country);
+
+        const result = await createMbiyoPayPayin({
+          amount: grossAmount,
+          currency: txCurrency,
+          phone: customerPhone,
+          countryCode: country,
+          network: operator,
+          orderId: `BKAPAY-API-${transactionId}-${Date.now()}`,
+          callbackUrl: `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/mbiyopay`,
         });
 
-        await storage.updateTransactionMetadata(transactionId, updatedMetadata);
+        if (result.success && result.transactionId) {
+          // Update transaction metadata with MbiyoPay info
+          const updatedMetadata = JSON.stringify({
+            ...metadata,
+            mbiyopayTransactionId: result.transactionId,
+            redirectUrl: result.redirectUrl,
+            country,
+            operator,
+            provider: "mbiyopay",
+          });
 
-        res.json({
-          success: true,
-          transactionId: transactionId,
-          message: result.message,
+          await storage.updateTransactionMetadata(transactionId, updatedMetadata);
+
+          res.json({
+            success: true,
+            transactionId: transactionId,
+            message: result.message || "Paiement initie. Veuillez valider sur votre telephone.",
+            provider: "mbiyopay",
+          });
+        } else {
+          await storage.updateTransactionStatus(transactionId, "failed");
+          res.json({
+            success: false,
+            transactionId: transactionId,
+            error: result.error || "Erreur lors de l'initiation du paiement",
+          });
+        }
+      } else if (activeProvider === "fedapay") {
+        // Use FedaPay to initiate payment
+        const nameParts = customerName.split(" ");
+        const firstName = nameParts[0] || "Client";
+        const lastName = nameParts.slice(1).join(" ") || "Client";
+        
+        const { createCollect } = await import("./fedapay");
+        const result = await createCollect({
+          amount: transaction.amount,
+          description: transaction.description || "Paiement via BKApay",
+          customerFirstName: firstName,
+          customerLastName: lastName,
+          customerEmail: "noreply@bkapay.com",
+          customerPhone: customerPhone,
+          country: country,
+          operator: operator,
+          callbackUrl: `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/fedapay`,
         });
+
+        if (result.success && result.transactionId) {
+          const updatedMetadata = JSON.stringify({
+            ...metadata,
+            fedapayTransactionId: result.transactionId,
+            fedapayReference: result.reference,
+            country,
+            operator,
+            provider: "fedapay",
+          });
+
+          await storage.updateTransactionMetadata(transactionId, updatedMetadata);
+
+          res.json({
+            success: true,
+            transactionId: transactionId,
+            message: result.message,
+            provider: "fedapay",
+          });
+        } else {
+          await storage.updateTransactionStatus(transactionId, "failed");
+          res.json({
+            success: false,
+            transactionId: transactionId,
+            error: result.error || "Erreur lors de l'initiation du paiement",
+          });
+        }
       } else {
-        await storage.updateTransactionStatus(transactionId, "failed");
-        res.json({
-          success: false,
-          transactionId: transactionId,
-          error: result.error || "Erreur lors de l'initiation du paiement",
+        return res.status(503).json({ 
+          success: false, 
+          error: "Fournisseur de paiement non supporte" 
         });
       }
     } catch (error: any) {
