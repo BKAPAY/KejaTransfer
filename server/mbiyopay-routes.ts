@@ -260,10 +260,15 @@ export async function handleMbiyoPayPaymentLink(
   customerPhone: string,
   customerName: string,
   customerEmail: string,
-  operator: string
+  operator: string,
+  payerCountry: string,
+  convertedAmount?: number,
+  convertedCurrency?: string,
+  ownerCurrency?: string
 ): Promise<{ success: boolean; transactionId?: string; mbiyopayTransactionId?: string; redirectUrl?: string; message?: string; error?: string }> {
   try {
-    const country = paymentLink.country || "BJ";
+    // Use payer's country for the payment provider
+    const country = payerCountry || paymentLink.country || "BJ";
     const countryLower = country.toLowerCase();
     
     if (!MBIYOPAY_SUPPORTED_COUNTRIES.includes(countryLower)) {
@@ -271,14 +276,26 @@ export async function handleMbiyoPayPaymentLink(
     }
 
     const customerPaysFee = paymentLink.customerPaysFee === true;
-    const baseAmount = paymentLink.amount;
-    const feeInfo = calculateIncomingFee(baseAmount);
-    const grossAmount = customerPaysFee ? Math.ceil(baseAmount * 1.06) : baseAmount;
-    const currency = getCurrencyForCountry(country);
+    const baseAmount = paymentLink.amount; // Original amount in owner's currency
+    const balanceCurrency = ownerCurrency || "XOF";
+    
+    // Get dynamic fees from database - calculate on base amount
+    const feeConfig = await getFeeFromDatabase(storage, country, operator);
+    const feeInfo = calculateIncomingFee(baseAmount, feeConfig.incoming);
+    
+    // Use converted amount for provider if available, otherwise use base amount
+    const providerCurrency = convertedCurrency || getCurrencyForCountry(country);
+    let providerAmount = convertedAmount ? Math.floor(convertedAmount) : baseAmount;
+    
+    // Apply customer pays fee on provider amount if needed
+    if (customerPaysFee) {
+      const feePercentage = feeConfig.incoming / 10; // Convert from decimal (60 = 6%)
+      providerAmount = Math.ceil(providerAmount * (1 + feePercentage / 100));
+    }
 
     const result = await createMbiyoPayPayin({
-      amount: grossAmount,
-      currency: currency,
+      amount: providerAmount,
+      currency: providerCurrency,
       phone: customerPhone,
       countryCode: country,
       network: operator,
@@ -290,13 +307,14 @@ export async function handleMbiyoPayPaymentLink(
       return { success: false, error: result.error || "Erreur lors du paiement" };
     }
 
+    // Store transaction with owner's currency for balance credit
     const tx = await storage.createTransaction({
       userId: paymentLink.userId,
       type: "payment_link",
-      amount: baseAmount,
+      amount: baseAmount, // Store base amount for balance credit
       fee: feeInfo.feeAmount,
       feePercentage: feeInfo.feePercentage,
-      currency: currency,
+      currency: balanceCurrency, // Owner's currency
       status: "pending",
       country: country.toUpperCase(),
       operator: operator,
@@ -309,8 +327,10 @@ export async function handleMbiyoPayPaymentLink(
         redirectUrl: result.redirectUrl,
         paymentLinkId: paymentLink.id,
         customerPaysFee,
-        grossAmount,
-        baseAmount,
+        providerAmount,
+        providerCurrency,
+        balanceAmount: baseAmount,
+        balanceCurrency,
         provider: "mbiyopay",
       }),
     });
@@ -334,23 +354,35 @@ export async function handleMbiyoPayMerchantLink(
   customerPhone: string,
   customerName: string,
   customerEmail: string,
-  operator: string
+  operator: string,
+  payerCountry: string,
+  originalAmount?: number,
+  originalCurrency?: string
 ): Promise<{ success: boolean; transactionId?: string; mbiyopayTransactionId?: string; redirectUrl?: string; message?: string; error?: string }> {
   try {
-    const country = merchantLink.country || "BJ";
+    // Use payer's country for the payment provider
+    const country = payerCountry || merchantLink.country || "BJ";
     const countryLower = country.toLowerCase();
     
     if (!MBIYOPAY_SUPPORTED_COUNTRIES.includes(countryLower)) {
       return { success: false, error: `Pays non supporte: ${country}` };
     }
 
-    const grossAmount = Math.floor(amount);
-    const feeInfo = calculateIncomingFee(grossAmount);
-    const currency = getCurrencyForCountry(country);
+    // Provider receives the converted amount in payer's currency
+    const providerAmount = Math.floor(amount);
+    const providerCurrency = getCurrencyForCountry(country);
+    
+    // Balance operations use original amount in owner's currency
+    const balanceAmount = originalAmount ? Math.floor(originalAmount) : providerAmount;
+    const balanceCurrency = originalCurrency || providerCurrency;
+    
+    // Get dynamic fees - calculate on balance amount
+    const feeConfig = await getFeeFromDatabase(storage, country, operator);
+    const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming);
 
     const result = await createMbiyoPayPayin({
-      amount: grossAmount,
-      currency: currency,
+      amount: providerAmount,
+      currency: providerCurrency,
       phone: customerPhone,
       countryCode: country,
       network: operator,
@@ -362,13 +394,14 @@ export async function handleMbiyoPayMerchantLink(
       return { success: false, error: result.error || "Erreur lors du paiement" };
     }
 
+    // Store transaction with owner's currency for balance credit
     const tx = await storage.createTransaction({
       userId: merchantLink.userId,
       type: "merchant_link",
-      amount: grossAmount,
+      amount: balanceAmount, // Store balance amount for credit
       fee: feeInfo.feeAmount,
       feePercentage: feeInfo.feePercentage,
-      currency: currency,
+      currency: balanceCurrency, // Owner's currency
       status: "pending",
       country: country.toUpperCase(),
       operator: operator,
@@ -380,7 +413,10 @@ export async function handleMbiyoPayMerchantLink(
         mbiyopayTransactionId: result.transactionId,
         redirectUrl: result.redirectUrl,
         merchantLinkId: merchantLink.id,
-        grossAmount,
+        providerAmount,
+        providerCurrency,
+        balanceAmount,
+        balanceCurrency,
         provider: "mbiyopay",
       }),
     });

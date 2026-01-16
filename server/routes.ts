@@ -3725,14 +3725,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
       } else if (activeProvider === "mbiyopay") {
-        // Use MbiyoPay for payment links
+        // Use MbiyoPay for payment links with cross-currency support
         console.log(`[PAYMENT_LINK] Using MbiyoPay for ${country}/${operator}`);
         const result = await handleMbiyoPayPaymentLink(
           paymentLink,
           customerPhone,
           customerName || "Client",
           "noreply@bkapay.com",
-          operator
+          operator,
+          country, // payer's country
+          amountInPayerCurrency, // converted amount for provider
+          payerCurrency, // payer's currency
+          ownerCurrency // owner's currency for balance credit
         );
 
         if (result.success) {
@@ -3913,15 +3917,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
       } else if (activeProvider === "mbiyopay") {
-        // Use MbiyoPay for merchant links
+        // Use MbiyoPay for merchant links with cross-currency support
         console.log(`[MERCHANT_LINK] Using MbiyoPay for ${country}/${operator}`);
         const result = await handleMbiyoPayMerchantLink(
           merchantLink,
-          amount,
+          amount, // converted amount for provider
           customerPhone,
           customerName || "Client",
           "noreply@bkapay.com",
-          operator
+          operator,
+          country, // payer's country
+          originalAmount || amount, // original amount for balance credit
+          originalCurrency || ownerCurrency // owner's currency
         );
 
         if (result.success) {
