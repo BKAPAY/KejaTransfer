@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,8 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { PaymentLink, User } from "@shared/schema";
 import { COUNTRIES } from "@shared/schema";
+import { CurrencySelector } from "@/components/currency-selector";
+import { hasMultipleCurrencies, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -90,6 +92,7 @@ export default function PaymentLinks() {
   const [successToken, setSuccessToken] = useState<string | null>(null);
   const [successImage, setSuccessImage] = useState<string | null>(null);
   const [amountInput, setAmountInput] = useState<string>("");
+  const [selectedCurrency, setSelectedCurrency] = useState<string>("XOF");
   const { toast } = useToast();
 
   const { data: paymentLinks, isLoading } = useQuery<PaymentLink[]>({
@@ -100,9 +103,22 @@ export default function PaymentLinks() {
     queryKey: ["/api/auth/me"],
   });
 
-  const userBalanceCurrency = user?.country 
-    ? COUNTRIES.find(c => c.code === user.country)?.currency || "XOF"
+  const userCountry = user?.country || "";
+  const userBalanceCurrency = userCountry 
+    ? COUNTRIES.find(c => c.code === userCountry)?.currency || "XOF"
     : "XOF";
+
+  // Set default currency based on user's country
+  useEffect(() => {
+    if (userCountry && hasMultipleCurrencies(userCountry)) {
+      const currencies = getMbiyoPayCurrenciesForCountry(userCountry);
+      if (currencies.length > 0) {
+        setSelectedCurrency(currencies[0]);
+      }
+    } else if (userBalanceCurrency) {
+      setSelectedCurrency(userBalanceCurrency);
+    }
+  }, [userCountry, userBalanceCurrency]);
 
   // Fetch enabled countries for deposits (incoming payments)
   const { data: enabledCountriesOperators } = useQuery<Record<string, string[]>>({
@@ -410,7 +426,7 @@ export default function PaymentLinks() {
                   name="amount"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Montant ({userBalanceCurrency})</FormLabel>
+                      <FormLabel>Montant ({selectedCurrency})</FormLabel>
                       <FormControl>
                         <Input
                           type="text"
@@ -433,6 +449,14 @@ export default function PaymentLinks() {
                     </FormItem>
                   )}
                 />
+
+                {hasMultipleCurrencies(userCountry) && (
+                  <CurrencySelector
+                    countryCode={userCountry}
+                    selectedCurrency={selectedCurrency}
+                    onCurrencyChange={setSelectedCurrency}
+                  />
+                )}
 
                 <div className="space-y-3">
                   <Label>Images du produit (optionnel, max 3)</Label>
