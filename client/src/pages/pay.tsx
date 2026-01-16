@@ -312,10 +312,9 @@ export default function Pay() {
     : adminEnabledCountries;
 
   // Calculer le montant avec frais si customerPaysFee est activé
+  // Les frais sont dynamiques et récupérés du backend
   const baseAmount = paymentLink?.amount || 0;
-  const feePercentage = 6; // 6% fee
-  const feeAmount = Math.ceil(baseAmount * 0.06);
-  const totalAmount = paymentLink?.customerPaysFee ? baseAmount + feeAmount : baseAmount;
+  const totalAmount = baseAmount; // Le montant total sera recalculé côté serveur avec les frais dynamiques
 
   // Handle currency selection when country changes
   useEffect(() => {
@@ -1307,10 +1306,10 @@ export default function Pay() {
                   <div className="space-y-4">
                     <div className="bg-muted p-3 rounded-md">
                       <p className="text-sm text-muted-foreground">Montant à payer</p>
-                      <p className="text-xl font-bold">{totalAmount.toLocaleString()} XOF</p>
+                      <p className="text-xl font-bold">{totalAmount.toLocaleString()} {ownerCurrency}</p>
                       {paymentLink?.customerPaysFee && (
                         <p className="text-xs text-muted-foreground">
-                          ({baseAmount.toLocaleString()} XOF + {feeAmount.toLocaleString()} XOF frais)
+                          (Frais de transaction inclus)
                         </p>
                       )}
                       <p className="text-xs text-muted-foreground mt-1">

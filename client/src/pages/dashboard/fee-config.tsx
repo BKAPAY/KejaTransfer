@@ -109,12 +109,12 @@ export default function FeeConfigPage() {
   };
 
   const formatFeeDisplay = (percentage: number | undefined): string => {
-    if (percentage === undefined) return "6%";
+    if (percentage === undefined) return "-";
     return `${(percentage / 10).toFixed(1)}%`;
   };
 
   const formatFeeInput = (percentage: number | undefined): string => {
-    if (percentage === undefined) return "6";
+    if (percentage === undefined) return "";
     return (percentage / 10).toFixed(1);
   };
 

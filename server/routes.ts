@@ -9,7 +9,7 @@ import { z } from "zod";
 import { insertUserSchema, insertPaymentLinkSchema, insertMerchantLinkSchema, insertApiKeySchema } from "@shared/schema";
 import { validatePhoneOperator } from "@shared/phone-utils";
 import { randomUUID } from "crypto";
-import { calculateIncomingFee, calculateOutgoingFee, calculateCustomerPaysFee } from "./utils/fees";
+import { calculateIncomingFee, calculateOutgoingFee, calculateCustomerPaysFee, getFeeFromDatabase } from "./utils/fees";
 import { sendPaymentCallback } from "./utils/callback";
 import { 
   SOFTPAY_OPERATORS, 
@@ -3307,8 +3307,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ success: false, error: "Pays, operateur et telephone requis" });
       }
 
-      // Calculate fees
-      const feeInfo = calculateOutgoingFee(Math.floor(amount), country);
+      // Get dynamic fees from database
+      const feeConfig = await getFeeFromDatabase(storage, country, operator);
+      
+      // Calculate fees with dynamic percentage
+      const feeInfo = calculateOutgoingFee(Math.floor(amount), feeConfig.outgoing);
 
       // Calculer le montant à débiter selon le type (transfert vs retrait)
       // TRANSFERT: débiter montant + frais | RETRAIT: débiter montant uniquement
@@ -4163,8 +4166,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Retrait échoué" });
       }
 
-      // Calculate fees silently for outgoing withdrawals (6% for all countries)
-      const feeInfo = calculateOutgoingFee(Math.floor(amount), country);
+      // Get dynamic fees from database
+      const feeConfig = await getFeeFromDatabase(storage, country, operator);
+      
+      // Calculate fees with dynamic percentage
+      const feeInfo = calculateOutgoingFee(Math.floor(amount), feeConfig.outgoing);
 
       if (user.balance < feeInfo.totalDeductedFromBalance) {
         return res.status(400).json({ 

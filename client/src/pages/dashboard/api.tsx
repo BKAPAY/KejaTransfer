@@ -539,7 +539,7 @@ export default function ApiPage() {
                     <label className="text-sm font-medium">Options de paiement</label>
                   </div>
                   <p className="text-xs text-muted-foreground mb-3">
-                    Configurez les pays visibles et qui paie les frais de transaction (6%).
+                    Configurez les pays visibles et qui paie les frais de transaction.
                   </p>
                   
                   {editingSettings === apiKey.id ? (
@@ -589,7 +589,7 @@ export default function ApiPage() {
                         <div>
                           <label className="text-sm font-medium">Le client paie les frais</label>
                           <p className="text-xs text-muted-foreground">
-                            Si active, les frais de 6% seront ajoutes au montant paye par le client
+                            Si activé, les frais seront ajoutés au montant payé par le client
                           </p>
                         </div>
                         <Switch
@@ -662,7 +662,7 @@ export default function ApiPage() {
                         <div>
                           <span className="text-muted-foreground">Frais: </span>
                           <Badge variant={(apiKey as any).customerPaysFee ? "default" : "outline"} className="text-xs">
-                            {(apiKey as any).customerPaysFee ? "Payes par le client (+6%)" : "A votre charge"}
+                            {(apiKey as any).customerPaysFee ? "Payés par le client" : "A votre charge"}
                           </Badge>
                         </div>
                       </div>

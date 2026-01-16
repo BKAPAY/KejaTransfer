@@ -34,6 +34,29 @@ export function getFeePercentage(feeValue?: number): number {
 }
 
 /**
+ * Get fee percentages from database for a specific country/operator
+ * Returns incoming and outgoing fee percentages
+ */
+export async function getFeeFromDatabase(
+  storage: any, 
+  country: string, 
+  operator: string
+): Promise<{ incoming: number; outgoing: number }> {
+  try {
+    const config = await storage.getFeeConfig(country.toUpperCase(), operator.toLowerCase());
+    if (config) {
+      return {
+        incoming: config.incomingFeePercentage ?? DEFAULT_FEE_PERCENTAGE,
+        outgoing: config.outgoingFeePercentage ?? DEFAULT_FEE_PERCENTAGE,
+      };
+    }
+  } catch (error) {
+    console.warn(`[FEES] Failed to get fee config for ${country}/${operator}:`, error);
+  }
+  return { incoming: DEFAULT_FEE_PERCENTAGE, outgoing: DEFAULT_FEE_PERCENTAGE };
+}
+
+/**
  * Calculate fees for INCOMING payments (deposits, payment links, etc.)
  * 
  * @param grossAmount - The GROSS amount the client pays (e.g., 2000)
@@ -119,14 +142,17 @@ export function calculateCustomerPaysFee(baseAmount: number, feePercentageValue?
  * - Store grossAmount in transaction.amount (10000)
  * - Display grossAmount in transaction history (10000)
  */
-export function calculateOutgoingFee(grossAmount: number, feePercentageValue?: number): {
+export function calculateOutgoingFee(grossAmount: number, feePercentageValue?: number | string): {
   grossAmount: number;
   feeAmount: number;
   feePercentage: number;
   amountReceived: number;
   totalDeductedFromBalance: number;
 } {
-  const feePercentage = getFeePercentage(feePercentageValue);
+  // Handle case where country string was passed instead of fee percentage (legacy calls)
+  const feePercentage = typeof feePercentageValue === 'string' 
+    ? DEFAULT_FEE_PERCENTAGE 
+    : getFeePercentage(feePercentageValue);
   const feeAmount = Math.floor((grossAmount * feePercentage) / 1000);
   const amountReceived = grossAmount - feeAmount;
   const totalDeductedFromBalance = grossAmount;

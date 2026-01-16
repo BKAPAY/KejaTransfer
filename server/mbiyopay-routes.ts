@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
 import { storage } from "./storage";
 import { randomUUID } from "crypto";
-import { calculateIncomingFee, calculateOutgoingFee } from "./utils/fees";
+import { calculateIncomingFee, calculateOutgoingFee, getFeeFromDatabase } from "./utils/fees";
 import { 
   createMbiyoPayPayin, 
   createMbiyoPayPayout, 
@@ -32,8 +32,11 @@ export async function handleMbiyoPayDeposit(
     }
 
     const grossAmount = Math.floor(amount);
-    const feeInfo = calculateIncomingFee(grossAmount);
     const currency = getCurrencyForCountry(country);
+    
+    // Get dynamic fees from database
+    const feeConfig = await getFeeFromDatabase(storage, country, operator);
+    const feeInfo = calculateIncomingFee(grossAmount, feeConfig.incoming);
 
     const result = await createMbiyoPayPayin({
       amount: grossAmount,

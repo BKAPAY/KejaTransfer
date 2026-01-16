@@ -23,7 +23,7 @@ const faqs = [
   },
   {
     question: "Quels sont les frais appliqués?",
-    answer: "Les frais varient selon le pays : 3% au Bénin et 6% dans les autres pays supportés. Ces frais s'appliquent à tous les paiements entrants et transferts sortants."
+    answer: "Les frais varient selon le pays et l'opérateur. Ces frais s'appliquent à tous les paiements entrants et transferts sortants. Consultez votre administrateur pour connaître les frais applicables."
   },
   {
     question: "Comment effectuer un retrait (transfert)?",

@@ -570,7 +570,7 @@ export default function PaymentLinks() {
                           Frais à la charge du client
                         </FormLabel>
                         <p className="text-sm text-muted-foreground">
-                          Si activé, le client paiera les frais de 6% en plus du montant.
+                          Si activé, le client paiera les frais de transaction en plus du montant.
                         </p>
                       </div>
                       <FormControl>

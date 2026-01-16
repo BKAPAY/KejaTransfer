@@ -496,7 +496,7 @@ export default function Withdrawal() {
                         </span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Frais (6%):</span>
+                        <span className="text-muted-foreground">Frais:</span>
                         <span className="font-medium text-orange-600 dark:text-orange-400" data-testid="text-fee-amount">
                           -{new Intl.NumberFormat("fr-FR", {
                             style: "currency",

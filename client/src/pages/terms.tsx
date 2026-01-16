@@ -108,12 +108,8 @@ export default function Terms() {
               <p>
                 BKApay applique des frais sur les transactions :
               </p>
-              <ul className="list-disc list-inside space-y-2 ml-4">
-                <li>Bénin : 3% sur les transactions entrantes et sortantes</li>
-                <li>Autres pays : 6% sur les transactions entrantes et sortantes</li>
-              </ul>
-              <p className="mt-4">
-                Ces frais sont automatiquement calculés et déduits lors des transactions. BKApay se réserve le droit de modifier ces frais avec un préavis de 30 jours.
+              <p>
+                Les frais varient selon le pays et l'opérateur utilisé. Ces frais sont automatiquement calculés et déduits lors des transactions. BKApay se réserve le droit de modifier ces frais avec un préavis de 30 jours.
               </p>
             </CardContent>
           </Card>
