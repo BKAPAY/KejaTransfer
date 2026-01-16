@@ -54,6 +54,10 @@ export default function Transfer() {
   const { data: user } = useQuery<User>({
     queryKey: ["/api/auth/me"],
   });
+  
+  const userBalanceCurrency = user?.country 
+    ? COUNTRIES.find(c => c.code === user.country)?.currency || "XOF"
+    : "XOF";
 
   const { data: enabledCountriesOperators } = useQuery<Record<string, string[]>>({
     queryKey: ["/api/countries-operators/withdrawals"],
@@ -248,7 +252,7 @@ export default function Transfer() {
     if (user.balance < totalDeducted) {
       toast({
         title: "Solde insuffisant",
-        description: `Vous avez ${user.balance} XOF. Total a deduire: ${totalDeducted} XOF`,
+        description: `Vous avez ${user.balance} ${userBalanceCurrency}. Total a deduire: ${totalDeducted} ${userBalanceCurrency}`,
         variant: "destructive",
       });
       return;
@@ -326,7 +330,7 @@ export default function Transfer() {
           <AlertDescription className="text-xs text-blue-900 dark:text-blue-100">
             <strong>Solde disponible:</strong> {new Intl.NumberFormat("fr-FR", {
               style: "currency",
-              currency: "XOF",
+              currency: userBalanceCurrency,
               minimumFractionDigits: 0,
             }).format(user.balance || 0)}
           </AlertDescription>
