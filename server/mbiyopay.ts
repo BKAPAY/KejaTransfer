@@ -67,9 +67,9 @@ export function formatPhoneForMbiyoPay(phone: string, countryCode: string): stri
   const prefixDigits = prefix ? prefix.replace("+", "") : "";
   const countryLower = countryCode.toLowerCase();
   
-  // If phone already starts with country prefix digits, return as-is (without +)
+  // If phone already starts with country prefix digits, add + and return
   if (prefixDigits && sanitized.startsWith(prefixDigits)) {
-    return sanitized;
+    return "+" + sanitized;
   }
   
   // Countries that KEEP the leading 0 (Benin and Ivory Coast changed their formats)
@@ -82,9 +82,9 @@ export function formatPhoneForMbiyoPay(phone: string, countryCode: string): stri
     sanitized = sanitized.substring(1);
   }
   
-  // Return with country prefix (WITHOUT the +)
-  // Example: 22901234567 for Benin, 2250123456789 for Ivory Coast
-  return prefixDigits + sanitized;
+  // Return with country prefix (WITH the + as per MbiyoPay docs)
+  // Example: +22901234567 for Benin, +2250123456789 for Ivory Coast
+  return prefix + sanitized;
 }
 
 export interface MbiyoPayPayinParams {

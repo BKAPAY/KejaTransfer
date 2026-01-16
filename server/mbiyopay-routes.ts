@@ -456,15 +456,21 @@ export async function handleMbiyoPayWebhook(req: Request, res: Response) {
     // Verify webhook signature if secret is configured
     const webhookSecret = process.env.MBIYOPAY_WEBHOOK_SECRET;
     if (webhookSecret) {
-      const signature = req.headers["x-webhook-signature"] || req.headers["x-signature"] || req.headers["signature"];
+      // MbiyoPay may send signature in various headers
+      const signature = req.headers["x-webhook-signature"] || 
+                       req.headers["x-webhook-secret"] || 
+                       req.headers["x-signature"] || 
+                       req.headers["signature"] ||
+                       req.headers["authorization"]?.replace("Bearer ", "");
       if (signature !== webhookSecret) {
-        console.error("[MbiyoPay Webhook] Invalid signature");
+        console.error("[MbiyoPay Webhook] Invalid signature, received:", signature);
         return res.status(401).json({ error: "Invalid signature" });
       }
       console.log("[MbiyoPay Webhook] Signature verified");
     }
 
-    const { transaction_id, status } = payload;
+    // MbiyoPay webhook format: { event, transaction_id, order_id, status, amount, ... }
+    const { event, transaction_id, status } = payload;
 
     if (!transaction_id) {
       console.error("[MbiyoPay Webhook] Missing transaction_id");
