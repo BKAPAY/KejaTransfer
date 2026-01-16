@@ -357,7 +357,8 @@ export async function handleMbiyoPayMerchantLink(
   operator: string,
   payerCountry: string,
   originalAmount?: number,
-  originalCurrency?: string
+  originalCurrency?: string,
+  payerCurrency?: string // Currency selected by payer (for multi-currency countries like RDC)
 ): Promise<{ success: boolean; transactionId?: string; mbiyopayTransactionId?: string; redirectUrl?: string; message?: string; error?: string }> {
   try {
     // Use payer's country for the payment provider
@@ -369,8 +370,9 @@ export async function handleMbiyoPayMerchantLink(
     }
 
     // Provider receives the converted amount in payer's currency
+    // IMPORTANT: Use payerCurrency if provided (for multi-currency countries like RDC)
     const providerAmount = Math.floor(amount);
-    const providerCurrency = getCurrencyForCountry(country);
+    const providerCurrency = payerCurrency || getCurrencyForCountry(country);
     
     // Balance operations use original amount in owner's currency
     const balanceAmount = originalAmount ? Math.floor(originalAmount) : providerAmount;

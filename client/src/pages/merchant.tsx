@@ -226,8 +226,11 @@ export default function Merchant() {
   const selectedOperator = form.watch("operator");
   
   // Vérifier si l'opérateur sélectionné est Orange (nécessite code OTP)
+  // IMPORTANT: Orange RDC (CD) utilise MbiyoPay qui ne nécessite PAS d'OTP
+  // Seuls certains pays avec Paydunya/FedaPay nécessitent OTP pour Orange
+  const ORANGE_OTP_COUNTRIES = ["SN", "CI", "BF", "ML", "GN", "NE", "BJ", "TG", "CM"]; // Exclure CD
   const isOrangeOperator = selectedOperator?.toLowerCase().includes("orange");
-  const showOrangeOtpOnForm = isOrangeOperator && selectedCountry;
+  const showOrangeOtpOnForm = isOrangeOperator && selectedCountry && ORANGE_OTP_COUNTRIES.includes(selectedCountry);
   
   // Filtrer les opérateurs selon la configuration admin
   const allCountryOperators = selectedCountry

@@ -191,8 +191,11 @@ export default function ApiPay() {
   const noOperatorsAvailable = !isLoadingOperators && !!country && countryOperators.length === 0;
 
   // Vérifier si l'opérateur sélectionné est Orange (nécessite code OTP)
+  // IMPORTANT: Orange RDC (CD) utilise MbiyoPay qui ne nécessite PAS d'OTP
+  // Seuls certains pays avec Paydunya/FedaPay nécessitent OTP pour Orange
+  const ORANGE_OTP_COUNTRIES = ["SN", "CI", "BF", "ML", "GN", "NE", "BJ", "TG", "CM"]; // Exclure CD
   const isOrangeOperator = operator?.toLowerCase().includes("orange");
-  const showOrangeOtpOnForm = isOrangeOperator && country;
+  const showOrangeOtpOnForm = isOrangeOperator && country && ORANGE_OTP_COUNTRIES.includes(country);
 
   const fetchConversion = useCallback(async (amountToConvert: number, toCurrency: string) => {
     if (!amountToConvert || amountToConvert <= 0 || toCurrency === "XOF") {

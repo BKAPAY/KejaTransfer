@@ -3529,7 +3529,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Payment Link Route - Multi-Provider
   app.post("/api/fedapay/payment-link/:token", async (req: Request, res: Response) => {
     try {
-      const { customerName, customerPhone, country, operator } = req.body;
+      const { customerName, customerPhone, country, operator, currency } = req.body;
       const { token } = req.params;
 
       const paymentLink = await storage.getPaymentLinkByToken(token);
@@ -3543,8 +3543,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get owner's currency and payer's currency for cross-currency conversion
+      // IMPORTANT: Use currency from request if provided (for multi-currency countries like RDC)
       const ownerCurrency = owner?.country ? getCurrencyForCountry(owner.country) : "XOF";
-      const payerCurrency = getCurrencyForCountry(country);
+      const payerCurrency = currency || getCurrencyForCountry(country);
       
       // Convert amount if currencies are different
       let amountInPayerCurrency = paymentLink.amount;
@@ -3765,7 +3766,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Merchant Link Route - Multi-Provider
   app.post("/api/fedapay/merchant-link/:token", async (req: Request, res: Response) => {
     try {
-      const { customerName, customerPhone, amount, country, operator, originalAmount, originalCurrency } = req.body;
+      const { customerName, customerPhone, amount, country, operator, currency, originalAmount, originalCurrency } = req.body;
       const { token } = req.params;
 
       const merchantLink = await storage.getMerchantLinkByToken(token);
@@ -3779,7 +3780,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Get owner's currency for balance credit
+      // IMPORTANT: Use currency from request if provided (for multi-currency countries like RDC)
       const ownerCurrency = owner?.country ? getCurrencyForCountry(owner.country) : "XOF";
+      const payerCurrency = currency || getCurrencyForCountry(country);
 
       const activeProvider = await getActiveProviderForDeposit(country, operator);
       
@@ -3918,7 +3921,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       } else if (activeProvider === "mbiyopay") {
         // Use MbiyoPay for merchant links with cross-currency support
-        console.log(`[MERCHANT_LINK] Using MbiyoPay for ${country}/${operator}`);
+        console.log(`[MERCHANT_LINK] Using MbiyoPay for ${country}/${operator} with currency ${payerCurrency}`);
         const result = await handleMbiyoPayMerchantLink(
           merchantLink,
           amount, // converted amount for provider
@@ -3928,7 +3931,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           operator,
           country, // payer's country
           originalAmount || amount, // original amount for balance credit
-          originalCurrency || ownerCurrency // owner's currency
+          originalCurrency || ownerCurrency, // owner's currency
+          payerCurrency // payer's selected currency (USD/CDF for RDC)
         );
 
         if (result.success) {
