@@ -46,6 +46,8 @@ import Cookies from "@/pages/cookies";
 import DocumentationVersion from "@/pages/documentation-version";
 import ForgotPassword from "@/pages/forgot-password";
 import { CURRENT_VERSION } from "@/lib/doc-versions";
+import { COUNTRIES } from "@shared/schema";
+import type { User } from "@shared/schema";
 
 function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [location, setLocation] = useLocation();
@@ -58,10 +60,18 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
     refetchInterval: 5000,
   });
 
+  const { data: user } = useQuery<User>({
+    queryKey: ["/api/auth/me"],
+  });
+
+  const userCurrency = user?.country 
+    ? COUNTRIES.find(c => c.code === user.country)?.currency || "XOF"
+    : "XOF";
+
   const formatAmount = (amount: number) => {
     return new Intl.NumberFormat("fr-FR", {
       style: "currency",
-      currency: "XOF",
+      currency: userCurrency,
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(amount);
