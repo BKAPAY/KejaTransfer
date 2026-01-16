@@ -188,7 +188,7 @@ export default function Withdrawal() {
       if (response.success) {
         toast({
           title: "Retrait initie",
-          description: `Le retrait de ${pendingData?.amount} XOF a ete initie avec succes.`,
+          description: `Le retrait de ${pendingData?.amount} ${userBalanceCurrency} a ete initie avec succes.`,
         });
         form.reset();
         setShowSecurityModal(false);
@@ -618,7 +618,7 @@ export default function Withdrawal() {
             <div className="bg-muted p-3 rounded-md text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Montant:</span>
-                <span className="font-medium">{pendingData?.amount} XOF</span>
+                <span className="font-medium">{pendingData?.amount} {userBalanceCurrency}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Numero:</span>

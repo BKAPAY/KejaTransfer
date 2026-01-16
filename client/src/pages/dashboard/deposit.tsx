@@ -702,10 +702,9 @@ export default function Deposit() {
                         </p>
                         <p className="text-lg font-semibold text-foreground" data-testid="text-net-amount">
                           {new Intl.NumberFormat("fr-FR", {
-                            style: "currency",
-                            currency: "XOF",
-                            minimumFractionDigits: 0,
-                          }).format(netAmount)}
+                            minimumFractionDigits: getCurrencyDecimals(userBalanceCurrency),
+                            maximumFractionDigits: getCurrencyDecimals(userBalanceCurrency),
+                          }).format(netAmount)} {userBalanceCurrency}
                         </p>
                       </div>
                     )}
