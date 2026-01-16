@@ -169,9 +169,18 @@ export async function createMbiyoPayPayin(params: MbiyoPayPayinParams): Promise<
     }
     
     console.error("[MbiyoPay Payin] Error:", data);
+    // Handle various error response formats from MbiyoPay
+    let errorMessage = "Erreur lors de l'initiation du paiement";
+    if (data.message) {
+      errorMessage = typeof data.message === 'string' ? data.message : JSON.stringify(data.message);
+    } else if (data.errors) {
+      errorMessage = Array.isArray(data.errors) ? data.errors.join(', ') : String(data.errors);
+    } else if (data.error) {
+      errorMessage = typeof data.error === 'string' ? data.error : JSON.stringify(data.error);
+    }
     return { 
       success: false, 
-      error: data.message || "Erreur lors de l'initiation du paiement" 
+      error: errorMessage
     };
   } catch (error: any) {
     console.error("[MbiyoPay Payin] Exception:", error);

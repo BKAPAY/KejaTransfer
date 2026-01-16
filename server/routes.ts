@@ -1277,7 +1277,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Initialize API payment
   app.post("/api/api-pay/init", async (req: Request, res: Response) => {
     try {
-      const { publicKey, amount, description, customerName, customerEmail, customerPhone, country, operator, callbackUrl } = req.body;
+      const { publicKey, amount, description, customerName, customerEmail, customerPhone, country, operator, currency: requestCurrency, callbackUrl } = req.body;
 
       if (!publicKey || !amount || !customerPhone || !country || !operator) {
         return res.status(400).json({ error: "Donnees manquantes" });
@@ -1319,9 +1319,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (activeProvider === "mbiyopay") {
         // Use MbiyoPay
         const { createMbiyoPayPayin, getCurrencyForCountry } = await import("./mbiyopay");
-        const currency = getCurrencyForCountry(country);
+        // Use currency from request if provided (for multi-currency countries like RDC), otherwise get default
+        const currency = requestCurrency || getCurrencyForCountry(country);
 
-        console.log(`[API-PAY INIT] Using MbiyoPay for ${country}/${operator}, phone=${customerPhone}`);
+        console.log(`[API-PAY INIT] Using MbiyoPay for ${country}/${operator}, phone=${customerPhone}, currency=${currency}`);
 
         const result = await createMbiyoPayPayin({
           amount: grossAmount,

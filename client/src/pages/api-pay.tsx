@@ -23,6 +23,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { usePaymentCountdown } from "@/hooks/use-payment-countdown";
 import logoImage from "@assets/bkapay-logo.png";
 import { getCurrencyDecimals } from "@/lib/currency";
+import { CurrencySelector, getCurrencyLabel } from "@/components/currency-selector";
+import { hasMultipleCurrencies, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
 
 interface ApiKeyInfo {
   siteName: string;
@@ -148,9 +150,23 @@ export default function ApiPay() {
   const [operator, setOperator] = useState("");
   const [copiedUssd, setCopiedUssd] = useState(false);
   const [conversionData, setConversionData] = useState<ConversionData | null>(null);
+  const [selectedCurrency, setSelectedCurrency] = useState<string>("XOF");
+
+  // Handle currency selection when country changes
+  useEffect(() => {
+    if (country && hasMultipleCurrencies(country)) {
+      const currencies = getMbiyoPayCurrenciesForCountry(country);
+      setSelectedCurrency(currencies[0]);
+    } else if (country) {
+      const countryCurrency = COUNTRIES.find(c => c.code === country)?.currency || "XOF";
+      setSelectedCurrency(countryCurrency);
+    }
+  }, [country]);
 
   // Currency conversion for non-XOF countries
-  const targetCurrency = COUNTRIES.find(c => c.code === country)?.currency || "XOF";
+  const targetCurrency = hasMultipleCurrencies(country) 
+    ? selectedCurrency 
+    : (COUNTRIES.find(c => c.code === country)?.currency || "XOF");
   const needsConversion = targetCurrency !== "XOF";
 
   const copyUssdCode = (code: string) => {
@@ -345,6 +361,7 @@ export default function ApiPay() {
           customerPhone,
           country,
           operator,
+          currency: selectedCurrency, // Include selected currency for multi-currency countries
           callbackUrl: callbackUrl || null,
         }),
       });
@@ -1005,25 +1022,38 @@ export default function ApiPay() {
           </SelectTrigger>
           <SelectContent>
             {(() => {
-              const allCountries = [
-                { code: "BJ", name: "Benin" },
-                { code: "TG", name: "Togo" },
-                { code: "CI", name: "Cote d'Ivoire" },
-                { code: "SN", name: "Senegal" },
-                { code: "GN", name: "Guinee" },
-                { code: "NE", name: "Niger" },
-              ];
+              // Use countries enabled by admin (from API) with flags
+              const adminEnabledCountries = enabledCountriesOperators 
+                ? COUNTRIES.filter(c => Object.keys(enabledCountriesOperators).includes(c.code))
+                : COUNTRIES;
+              
+              // Further filter by API key's allowed countries if specified
               const allowed = apiKeyInfo?.allowedCountries;
               const filteredCountries = (allowed && allowed.length > 0)
-                ? allCountries.filter(c => allowed.includes(c.code))
-                : allCountries;
+                ? adminEnabledCountries.filter(c => allowed.includes(c.code))
+                : adminEnabledCountries;
+              
               return filteredCountries.map(c => (
-                <SelectItem key={c.code} value={c.code}>{c.name}</SelectItem>
+                <SelectItem key={c.code} value={c.code}>
+                  <span className="flex items-center gap-2">
+                    <span>{c.flag}</span>
+                    <span>{c.name}</span>
+                  </span>
+                </SelectItem>
               ));
             })()}
           </SelectContent>
         </Select>
       </div>
+
+      {/* Currency selector for multi-currency countries (e.g., RDC with CDF/USD) */}
+      {country && hasMultipleCurrencies(country) && (
+        <CurrencySelector
+          countryCode={country}
+          selectedCurrency={selectedCurrency}
+          onCurrencyChange={setSelectedCurrency}
+        />
+      )}
 
       <div className="space-y-2">
         <Label htmlFor="customerPhone" className="flex items-center gap-2">
