@@ -453,6 +453,17 @@ export async function handleMbiyoPayWebhook(req: Request, res: Response) {
     const payload = req.body;
     console.log("[MbiyoPay Webhook] Received:", JSON.stringify(payload));
 
+    // Verify webhook signature if secret is configured
+    const webhookSecret = process.env.MBIYOPAY_WEBHOOK_SECRET;
+    if (webhookSecret) {
+      const signature = req.headers["x-webhook-signature"] || req.headers["x-signature"] || req.headers["signature"];
+      if (signature !== webhookSecret) {
+        console.error("[MbiyoPay Webhook] Invalid signature");
+        return res.status(401).json({ error: "Invalid signature" });
+      }
+      console.log("[MbiyoPay Webhook] Signature verified");
+    }
+
     const { transaction_id, status } = payload;
 
     if (!transaction_id) {
