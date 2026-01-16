@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { storage } from "./storage";
 import { NowPaymentsClient, SUPPORTED_CRYPTOCURRENCIES, getCryptoDisplayName, getCryptoMinAmountXOF, CRYPTO_MIN_AMOUNT_XOF, USDT_MIN_AMOUNT_XOF } from "./nowpayments";
+import { convertCurrency } from "./currency-converter";
 import QRCode from "qrcode";
 
 const router = Router();
@@ -33,26 +34,43 @@ router.get("/api/crypto/status", async (req: Request, res: Response) => {
 
 router.get("/api/crypto/currencies", async (req: Request, res: Response) => {
   try {
+    const { currency } = req.query;
+    const targetCurrency = ((currency as string) || "XOF").toUpperCase();
+    
     const enabledCryptos = await storage.getEnabledCryptoCurrencies();
     
-    if (enabledCryptos.length === 0) {
-      const defaultCryptos = SUPPORTED_CRYPTOCURRENCIES.map((c) => ({
-        code: c.code,
-        name: c.name,
-        symbol: c.symbol,
-        isEnabled: true,
-        minAmountXOF: c.minAmountXOF,
+    let cryptosList = enabledCryptos.length === 0 
+      ? SUPPORTED_CRYPTOCURRENCIES.map((c) => ({
+          code: c.code,
+          name: c.name,
+          symbol: c.symbol,
+          isEnabled: true,
+          minAmountXOF: c.minAmountXOF,
+        }))
+      : enabledCryptos.map((crypto: any) => ({
+          ...crypto,
+          minAmountXOF: getCryptoMinAmountXOF(crypto.code),
+        }));
+
+    // Si la devise demandée n'est pas XOF, convertir les minimums
+    if (targetCurrency !== "XOF") {
+      const conversionResult = await convertCurrency(1, "XOF", targetCurrency);
+      const conversionRate = conversionResult.success ? conversionResult.conversionRate : 1;
+      
+      cryptosList = cryptosList.map((crypto: any) => ({
+        ...crypto,
+        minAmount: Math.ceil(crypto.minAmountXOF * conversionRate),
+        minCurrency: targetCurrency,
       }));
-      return res.json(defaultCryptos);
+    } else {
+      cryptosList = cryptosList.map((crypto: any) => ({
+        ...crypto,
+        minAmount: crypto.minAmountXOF,
+        minCurrency: "XOF",
+      }));
     }
 
-    // Ajouter les minimums XOF aux cryptos activées
-    const cryptosWithMinimums = enabledCryptos.map((crypto: any) => ({
-      ...crypto,
-      minAmountXOF: getCryptoMinAmountXOF(crypto.code),
-    }));
-
-    res.json(cryptosWithMinimums);
+    res.json(cryptosList);
   } catch (error: any) {
     console.error("[NOWPayments] Get currencies failed:", error);
     res.status(500).json({ error: "Impossible de récupérer les cryptomonnaies" });

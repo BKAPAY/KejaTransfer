@@ -27,6 +27,8 @@ interface CryptoCurrency {
   symbol: string;
   isEnabled: boolean;
   minAmountXOF: number;
+  minAmount?: number;
+  minCurrency?: string;
 }
 
 interface CryptoPaymentFlowProps {
@@ -82,7 +84,11 @@ export function CryptoPaymentFlow({
   });
 
   const { data: currencies, isLoading: currenciesLoading } = useQuery<CryptoCurrency[]>({
-    queryKey: ["/api/crypto/currencies"],
+    queryKey: ["/api/crypto/currencies", currency],
+    queryFn: async () => {
+      const res = await fetch(`/api/crypto/currencies?currency=${currency}`);
+      return res.json();
+    },
     enabled: cryptoStatus?.available === true,
   });
 
@@ -426,7 +432,9 @@ export function CryptoPaymentFlow({
 
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {enabledCurrencies.map((crypto) => {
-              const isAvailable = amount >= (crypto.minAmountXOF || 0);
+              const minAmount = crypto.minAmount ?? crypto.minAmountXOF ?? 0;
+              const minCurrency = crypto.minCurrency ?? "XOF";
+              const isAvailable = amount >= minAmount;
               return (
                 <button
                   key={crypto.code}
@@ -455,7 +463,7 @@ export function CryptoPaymentFlow({
                     "text-xs mt-1",
                     isAvailable ? "text-muted-foreground" : "text-destructive"
                   )}>
-                    Min: {(crypto.minAmountXOF || 0).toLocaleString("fr-FR")} XOF
+                    Min: {minAmount.toLocaleString("fr-FR")} {minCurrency}
                   </div>
                 </button>
               );
