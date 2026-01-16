@@ -119,10 +119,14 @@ export default function Transfer() {
   }, [selectedCountry]);
 
   // Currency conversion when source and destination currencies differ
-  const targetCurrency = hasMultipleCurrencies(selectedCountry) 
-    ? selectedCurrency 
-    : (COUNTRIES.find(c => c.code === selectedCountry)?.currency || "XOF");
-  const needsConversion = targetCurrency !== userBalanceCurrency;
+  // IMPORTANT: Only calculate target currency if a country is actually selected
+  const targetCurrency = selectedCountry 
+    ? (hasMultipleCurrencies(selectedCountry) 
+        ? selectedCurrency 
+        : (COUNTRIES.find(c => c.code === selectedCountry)?.currency || userBalanceCurrency))
+    : userBalanceCurrency; // Default to user's currency when no country selected
+  // Only need conversion if a country is selected AND its currency differs from user's currency
+  const needsConversion = selectedCountry && targetCurrency !== userBalanceCurrency;
 
   const fetchConversion = useCallback(async (amountToConvert: number, fromCurrency: string, toCurrency: string) => {
     if (!amountToConvert || amountToConvert <= 0 || toCurrency === fromCurrency) {

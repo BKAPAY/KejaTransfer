@@ -121,10 +121,14 @@ export default function Deposit() {
 
   // Currency conversion: user's balance currency -> payment currency (country selected)
   // User enters amount in THEIR currency, we show converted amount in the SELECTED country's currency
-  const paymentCurrency = hasMultipleCurrencies(selectedCountry) 
-    ? selectedCurrency 
-    : (COUNTRIES.find(c => c.code === selectedCountry)?.currency || "XOF");
-  const needsConversion = paymentCurrency !== userBalanceCurrency;
+  // IMPORTANT: Only calculate payment currency if a country is actually selected
+  const paymentCurrency = selectedCountry 
+    ? (hasMultipleCurrencies(selectedCountry) 
+        ? selectedCurrency 
+        : (COUNTRIES.find(c => c.code === selectedCountry)?.currency || userBalanceCurrency))
+    : userBalanceCurrency; // Default to user's currency when no country selected
+  // Only need conversion if a country is selected AND its currency differs from user's currency
+  const needsConversion = selectedCountry && paymentCurrency !== userBalanceCurrency;
 
   const fetchConversion = useCallback(async (amountToConvert: number, fromCurrency: string, toCurrency: string) => {
     if (!amountToConvert || amountToConvert <= 0 || fromCurrency === toCurrency) {

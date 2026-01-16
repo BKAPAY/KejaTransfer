@@ -108,10 +108,14 @@ export default function Withdrawal() {
   }, [userCountry]);
 
   // Currency conversion: user balance currency -> withdrawal currency
-  const withdrawalCurrency = hasMultipleCurrencies(userCountry) 
-    ? selectedCurrency 
-    : (COUNTRIES.find(c => c.code === userCountry)?.currency || "XOF");
-  const needsConversion = withdrawalCurrency !== userBalanceCurrency;
+  // IMPORTANT: Only calculate withdrawal currency if user country is defined
+  const withdrawalCurrency = userCountry 
+    ? (hasMultipleCurrencies(userCountry) 
+        ? selectedCurrency 
+        : (COUNTRIES.find(c => c.code === userCountry)?.currency || userBalanceCurrency))
+    : userBalanceCurrency; // Default to user's currency when country not loaded
+  // Only need conversion if user country is loaded AND currencies differ
+  const needsConversion = userCountry && withdrawalCurrency !== userBalanceCurrency;
 
   const fetchConversion = useCallback(async (amountToConvert: number, fromCurrency: string, toCurrency: string) => {
     if (!amountToConvert || amountToConvert <= 0 || fromCurrency === toCurrency) {
