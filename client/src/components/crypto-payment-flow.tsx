@@ -30,7 +30,8 @@ interface CryptoCurrency {
 }
 
 interface CryptoPaymentFlowProps {
-  amountXof: number;
+  amount: number;
+  currency?: string;
   userId?: string;
   paymentLinkId?: string;
   merchantLinkId?: string;
@@ -56,7 +57,8 @@ interface PaymentDetails {
 }
 
 export function CryptoPaymentFlow({
-  amountXof,
+  amount,
+  currency = "XOF",
   userId,
   paymentLinkId,
   merchantLinkId,
@@ -90,20 +92,21 @@ export function CryptoPaymentFlow({
     priceAmount: number;
     priceCurrency: string;
   }>({
-    queryKey: [`/api/crypto/estimate?amount=${amountXof}&currency=XOF&crypto=${selectedCrypto}`],
-    enabled: !!selectedCrypto && amountXof > 0 && paymentStep === "confirm",
+    queryKey: [`/api/crypto/estimate?amount=${amount}&currency=${currency}&crypto=${selectedCrypto}`],
+    enabled: !!selectedCrypto && amount > 0 && paymentStep === "confirm",
   });
 
   const createPaymentMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", "/api/crypto/create-payment", {
-        amountXof,
+        amount,
+        currency,
         crypto: selectedCrypto,
         userId,
         paymentLinkId,
         merchantLinkId,
         apiKeyId,
-        orderDescription: orderDescription || `Paiement BKApay ${amountXof} XOF`,
+        orderDescription: orderDescription || `Paiement BKApay ${amount} ${currency}`,
         customerName,
         customerEmail,
         customerPhone,
@@ -233,7 +236,7 @@ export function CryptoPaymentFlow({
           <div>
             <p className="text-xl font-semibold text-green-600">Paiement confirme</p>
             <p className="text-muted-foreground">
-              Votre paiement de {amountXof.toLocaleString()} XOF a ete recu.
+              Votre paiement de {amount.toLocaleString()} {currency} a ete recu.
             </p>
           </div>
         </CardContent>
@@ -351,7 +354,7 @@ export function CryptoPaymentFlow({
           <div className="p-4 bg-muted rounded-lg space-y-2">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Montant</span>
-              <span className="font-semibold">{amountXof.toLocaleString()} XOF</span>
+              <span className="font-semibold">{amount.toLocaleString()} {currency}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Crypto</span>
@@ -418,12 +421,12 @@ export function CryptoPaymentFlow({
         <div className="space-y-4">
           <div className="p-3 bg-muted rounded-lg">
             <p className="text-sm text-muted-foreground">Montant a payer</p>
-            <p className="text-xl font-bold">{amountXof.toLocaleString()} XOF</p>
+            <p className="text-xl font-bold">{amount.toLocaleString()} {currency}</p>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {enabledCurrencies.map((crypto) => {
-              const isAvailable = amountXof >= (crypto.minAmountXOF || 0);
+              const isAvailable = amount >= (crypto.minAmountXOF || 0);
               return (
                 <button
                   key={crypto.code}

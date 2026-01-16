@@ -85,11 +85,17 @@ router.get("/api/crypto/estimate", async (req: Request, res: Response) => {
     const amountWithMarkup = baseAmount * (1 + CRYPTO_MARKUP_PERCENT / 100);
 
     let usdAmount = amountWithMarkup;
-    if (sourceCurrency === "XOF") {
+    if (sourceCurrency === "XOF" || sourceCurrency === "XAF") {
       const conversionRate = 0.0015;
       usdAmount = amountWithMarkup * conversionRate;
+    } else if (sourceCurrency === "CDF") {
+      const conversionRate = 0.00035;
+      usdAmount = amountWithMarkup * conversionRate;
+    } else if (sourceCurrency === "GNF") {
+      const conversionRate = 0.00012;
+      usdAmount = amountWithMarkup * conversionRate;
     } else if (sourceCurrency !== "USD") {
-      return res.status(400).json({ error: "Devise non supportée. Utilisez XOF ou USD." });
+      return res.status(400).json({ error: "Devise non supportée." });
     }
 
     const estimate = await client.getEstimate(usdAmount, "usd", crypto as string);
@@ -113,7 +119,8 @@ router.get("/api/crypto/estimate", async (req: Request, res: Response) => {
 router.post("/api/crypto/create-payment", async (req: Request, res: Response) => {
   try {
     const { 
-      amountXof, 
+      amount,
+      currency = "XOF",
       crypto, 
       orderId, 
       orderDescription, 
@@ -126,9 +133,11 @@ router.post("/api/crypto/create-payment", async (req: Request, res: Response) =>
       customerPhone
     } = req.body;
 
-    if (!amountXof || !crypto) {
-      return res.status(400).json({ error: "Paramètres manquants: amountXof, crypto" });
+    if (!amount || !crypto) {
+      return res.status(400).json({ error: "Paramètres manquants: amount, crypto" });
     }
+    
+    const sourceCurrency = (currency as string).toUpperCase();
 
     const client = await getNowPaymentsClient();
     if (!client) {
@@ -169,11 +178,24 @@ router.post("/api/crypto/create-payment", async (req: Request, res: Response) =>
     }
 
     // Montant de base demandé par l'utilisateur
-    const baseAmountXof = parseFloat(amountXof);
+    const baseAmount = parseFloat(amount);
+    
+    // Convertir en XOF pour validation du minimum
+    let baseAmountInXof = baseAmount;
+    let conversionToUsdRate = 0.0015;
+    if (sourceCurrency === "CDF") {
+      baseAmountInXof = baseAmount * 0.00036 * 655.957;
+      conversionToUsdRate = 0.00035;
+    } else if (sourceCurrency === "GNF") {
+      baseAmountInXof = baseAmount * 0.00012 * 655.957;
+      conversionToUsdRate = 0.00012;
+    } else if (sourceCurrency === "XAF") {
+      conversionToUsdRate = 0.0015;
+    }
     
     // Validation du montant minimum en XOF selon la cryptomonnaie
     const minAmountXof = getCryptoMinAmountXOF(crypto);
-    if (baseAmountXof < minAmountXof) {
+    if (baseAmountInXof < minAmountXof) {
       const cryptoName = getCryptoDisplayName(crypto);
       return res.status(400).json({
         error: `Montant minimum pour ${cryptoName}: ${minAmountXof.toLocaleString("fr-FR")} XOF`,
@@ -181,13 +203,13 @@ router.post("/api/crypto/create-payment", async (req: Request, res: Response) =>
     }
     
     // Montant que le client voit (avec les 6% si customerPaysFee=true)
-    const customerAmountXof = customerPaysFee 
-      ? Math.ceil(baseAmountXof * 1.06) 
-      : baseAmountXof;
+    const customerAmount = customerPaysFee 
+      ? Math.ceil(baseAmount * 1.06) 
+      : baseAmount;
     
     // Appliquer le markup de 10% en arrière-plan sur le montant client (le client paie ce montant majoré en crypto)
-    const amountWithMarkupXof = customerAmountXof * (1 + CRYPTO_MARKUP_PERCENT / 100);
-    const usdAmount = amountWithMarkupXof * 0.0015;
+    const amountWithMarkup = customerAmount * (1 + CRYPTO_MARKUP_PERCENT / 100);
+    const usdAmount = amountWithMarkup * conversionToUsdRate;
 
     const baseUrl = process.env.BASE_URL || `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`;
     const ipnCallbackUrl = `${baseUrl}/api/webhooks/nowpayments`;
@@ -214,16 +236,16 @@ router.post("/api/crypto/create-payment", async (req: Request, res: Response) =>
       ? CRYPTO_FEE_PERCENT  // 15% seulement (client a déjà payé les 6%)
       : TOTAL_CRYPTO_FEE_PERCENT; // 21% (15% + 6%)
     
-    const totalFee = Math.floor(baseAmountXof * (effectiveFeePercent / 100));
+    const totalFee = Math.floor(baseAmount * (effectiveFeePercent / 100));
     const feePercentage = effectiveFeePercent * 10;
 
     const transaction = await storage.createTransaction({
       userId: ownerUserId,
       type: "deposit",
-      amount: Math.floor(baseAmountXof),
+      amount: Math.floor(baseAmount),
       fee: totalFee,
       feePercentage: feePercentage,
-      currency: "XOF",
+      currency: sourceCurrency,
       status: "pending",
       country: "CRYPTO",
       operator: crypto,
@@ -250,9 +272,10 @@ router.post("/api/crypto/create-payment", async (req: Request, res: Response) =>
         cryptoFeePercent: CRYPTO_FEE_PERCENT,
         standardFeePercent: customerPaysFee ? 0 : STANDARD_INCOMING_FEE_PERCENT,
         effectiveFeePercent,
-        customerAmountXof: Math.ceil(customerAmountXof),
-        amountWithMarkupXof: Math.ceil(amountWithMarkupXof),
-        baseAmountXof: Math.floor(baseAmountXof),
+        customerAmount: Math.ceil(customerAmount),
+        amountWithMarkup: Math.ceil(amountWithMarkup),
+        baseAmount: Math.floor(baseAmount),
+        originalCurrency: sourceCurrency,
       }),
     });
 
@@ -264,7 +287,8 @@ router.post("/api/crypto/create-payment", async (req: Request, res: Response) =>
       payCurrency: payment.pay_currency,
       priceAmountUsd: payment.price_amount,
       // Afficher le montant avec markup (ce que le client paie en crypto)
-      priceAmountXof: Math.ceil(amountWithMarkupXof),
+      priceAmount: Math.ceil(amountWithMarkup),
+      priceCurrency: sourceCurrency,
       qrCode: qrCodeDataUrl,
       transactionId: transaction.id,
       expiresIn: 1800,

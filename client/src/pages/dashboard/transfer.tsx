@@ -21,9 +21,10 @@ import { useLocation } from "wouter";
 import { CurrencySelector, getCurrencyLabel } from "@/components/currency-selector";
 import { hasMultipleCurrencies, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
 import { useEffect, useCallback } from "react";
+import { useConvertedMinimums } from "@/hooks/use-converted-minimums";
 
 const transferSchema = z.object({
-  amount: z.number().min(500, "Le montant minimum est de 500 XOF"),
+  amount: z.number().min(1, "Veuillez saisir un montant valide"),
   country: z.string().min(1, "Selectionnez un pays"),
   operator: z.string().min(1, "Selectionnez un operateur"),
   phone: z.string().min(7, "Numero de telephone invalide").regex(/^\d+$/, "Le numero doit contenir uniquement des chiffres"),
@@ -58,6 +59,8 @@ export default function Transfer() {
   const userBalanceCurrency = user?.country 
     ? COUNTRIES.find(c => c.code === user.country)?.currency || "XOF"
     : "XOF";
+
+  const { transferMin } = useConvertedMinimums(userBalanceCurrency);
 
   const { data: enabledCountriesOperators } = useQuery<Record<string, string[]>>({
     queryKey: ["/api/countries-operators/withdrawals"],
@@ -114,14 +117,14 @@ export default function Transfer() {
     }
   }, [selectedCountry]);
 
-  // Currency conversion for non-XOF countries
+  // Currency conversion when source and destination currencies differ
   const targetCurrency = hasMultipleCurrencies(selectedCountry) 
     ? selectedCurrency 
     : (COUNTRIES.find(c => c.code === selectedCountry)?.currency || "XOF");
-  const needsConversion = targetCurrency !== "XOF";
+  const needsConversion = targetCurrency !== userBalanceCurrency;
 
-  const fetchConversion = useCallback(async (amountToConvert: number, toCurrency: string) => {
-    if (!amountToConvert || amountToConvert <= 0 || toCurrency === "XOF") {
+  const fetchConversion = useCallback(async (amountToConvert: number, fromCurrency: string, toCurrency: string) => {
+    if (!amountToConvert || amountToConvert <= 0 || toCurrency === fromCurrency) {
       setConversionData(null);
       return;
     }
@@ -132,7 +135,7 @@ export default function Transfer() {
       const res = await fetch("/api/convert-currency", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: amountToConvert, fromCurrency: "XOF", toCurrency }),
+        body: JSON.stringify({ amount: amountToConvert, fromCurrency, toCurrency }),
       });
       
       if (res.ok) {
@@ -155,13 +158,13 @@ export default function Transfer() {
   useEffect(() => {
     if (needsConversion && amount && amount > 0) {
       const debounceTimer = setTimeout(() => {
-        fetchConversion(amount, targetCurrency);
+        fetchConversion(amount, userBalanceCurrency, targetCurrency);
       }, 500);
       return () => clearTimeout(debounceTimer);
     } else {
       setConversionData(null);
     }
-  }, [needsConversion, amount, targetCurrency, fetchConversion, selectedCurrency]);
+  }, [needsConversion, amount, userBalanceCurrency, targetCurrency, fetchConversion, selectedCurrency]);
 
   const transferMutation = useMutation({
     mutationFn: async (data: { formData: TransferFormData; securityCode: string }) => {
@@ -224,6 +227,15 @@ export default function Transfer() {
       toast({
         title: "Erreur",
         description: "Utilisateur non trouve",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (data.amount < transferMin) {
+      toast({
+        title: "Montant insuffisant",
+        description: `Le montant minimum est de ${transferMin.toLocaleString("fr-FR")} ${userBalanceCurrency}`,
         variant: "destructive",
       });
       return;
@@ -363,7 +375,7 @@ export default function Transfer() {
                         }}
                       />
                     </FormControl>
-                    <p className="text-xs text-muted-foreground mt-1">Montant minimum: 500 {userBalanceCurrency}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Montant minimum: {transferMin.toLocaleString("fr-FR")} {userBalanceCurrency}</p>
                     <FormMessage />
                   </FormItem>
                 )}

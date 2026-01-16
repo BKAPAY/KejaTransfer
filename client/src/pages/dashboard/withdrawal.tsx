@@ -19,9 +19,10 @@ import { calculateOutgoingFee, fetchFeeConfig, formatFeePercentage } from "@/lib
 import { useLocation } from "wouter";
 import { CurrencySelector, getCurrencyLabel } from "@/components/currency-selector";
 import { hasMultipleCurrencies, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
+import { useConvertedMinimums } from "@/hooks/use-converted-minimums";
 
 const withdrawalSchema = z.object({
-  amount: z.number().min(1000, "Le montant minimum est de 1000 XOF"),
+  amount: z.number().min(1, "Veuillez saisir un montant valide"),
   withdrawalPhoneIndex: z.number().min(0, "Selectionnez un numero de retrait"),
   operator: z.string().min(1, "Selectionnez un operateur"),
 });
@@ -51,6 +52,8 @@ export default function Withdrawal() {
   const userBalanceCurrency = user?.country 
     ? COUNTRIES.find(c => c.code === user.country)?.currency || "XOF"
     : "XOF";
+
+  const { withdrawalMin } = useConvertedMinimums(userBalanceCurrency);
 
   const { data: enabledCountriesOperators } = useQuery<Record<string, string[]>>({
     queryKey: ["/api/countries-operators/withdrawals"],
@@ -103,14 +106,14 @@ export default function Withdrawal() {
     }
   }, [userCountry]);
 
-  // Currency conversion for non-XOF countries
-  const targetCurrency = hasMultipleCurrencies(userCountry) 
+  // Currency conversion: user balance currency -> withdrawal currency
+  const withdrawalCurrency = hasMultipleCurrencies(userCountry) 
     ? selectedCurrency 
     : (COUNTRIES.find(c => c.code === userCountry)?.currency || "XOF");
-  const needsConversion = targetCurrency !== "XOF";
+  const needsConversion = withdrawalCurrency !== userBalanceCurrency;
 
-  const fetchConversion = useCallback(async (amountToConvert: number, toCurrency: string) => {
-    if (!amountToConvert || amountToConvert <= 0 || toCurrency === "XOF") {
+  const fetchConversion = useCallback(async (amountToConvert: number, fromCurrency: string, toCurrency: string) => {
+    if (!amountToConvert || amountToConvert <= 0 || fromCurrency === toCurrency) {
       setConversionData(null);
       return;
     }
@@ -121,7 +124,7 @@ export default function Withdrawal() {
       const res = await fetch("/api/convert-currency", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: amountToConvert, fromCurrency: "XOF", toCurrency }),
+        body: JSON.stringify({ amount: amountToConvert, fromCurrency, toCurrency }),
       });
       
       if (res.ok) {
@@ -144,13 +147,13 @@ export default function Withdrawal() {
   useEffect(() => {
     if (needsConversion && amount && amount > 0) {
       const debounceTimer = setTimeout(() => {
-        fetchConversion(amount, targetCurrency);
+        fetchConversion(amount, userBalanceCurrency, withdrawalCurrency);
       }, 500);
       return () => clearTimeout(debounceTimer);
     } else {
       setConversionData(null);
     }
-  }, [needsConversion, amount, targetCurrency, fetchConversion, selectedCurrency]);
+  }, [needsConversion, amount, userBalanceCurrency, withdrawalCurrency, fetchConversion, selectedCurrency]);
 
   const withdrawalMutation = useMutation({
     mutationFn: async (data: { formData: WithdrawalFormData; securityCode: string }) => {
@@ -218,6 +221,15 @@ export default function Withdrawal() {
       toast({
         title: "Erreur",
         description: "Utilisateur non trouve",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (data.amount < withdrawalMin) {
+      toast({
+        title: "Montant insuffisant",
+        description: `Le montant minimum est de ${withdrawalMin.toLocaleString("fr-FR")} ${userBalanceCurrency}`,
         variant: "destructive",
       });
       return;
@@ -378,7 +390,7 @@ export default function Withdrawal() {
                         }}
                       />
                     </FormControl>
-                    <p className="text-xs text-muted-foreground mt-1">Montant minimum: 1000 {userBalanceCurrency}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Montant minimum: {withdrawalMin.toLocaleString("fr-FR")} {userBalanceCurrency}</p>
                     <FormMessage />
                   </FormItem>
                 )}

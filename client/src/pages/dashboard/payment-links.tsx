@@ -12,6 +12,7 @@ import { COUNTRIES } from "@shared/schema";
 import { CurrencySelector } from "@/components/currency-selector";
 import { hasMultipleCurrencies, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
 import { useToast } from "@/hooks/use-toast";
+import { useConvertedMinimums } from "@/hooks/use-converted-minimums";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
@@ -75,7 +76,7 @@ const paymentLinkSchema = z.object({
       const num = Number(val);
       return isNaN(num) ? undefined : num;
     },
-    z.number({ invalid_type_error: "Veuillez entrer un montant valide" }).min(500, "Le montant minimum est de 500 XOF")
+    z.number({ invalid_type_error: "Veuillez entrer un montant valide" }).min(1, "Veuillez saisir un montant valide")
   ),
   allowedCountries: z.array(z.string()).default([]),
   customerPaysFee: z.boolean().default(false),
@@ -107,6 +108,8 @@ export default function PaymentLinks() {
   const userBalanceCurrency = userCountry 
     ? COUNTRIES.find(c => c.code === userCountry)?.currency || "XOF"
     : "XOF";
+
+  const { paymentLinkMin } = useConvertedMinimums(userBalanceCurrency);
 
   // Set default currency based on user's country
   useEffect(() => {
@@ -445,6 +448,7 @@ export default function PaymentLinks() {
                           }}
                         />
                       </FormControl>
+                      <p className="text-xs text-muted-foreground mt-1">Montant minimum: {paymentLinkMin.toLocaleString("fr-FR")} {selectedCurrency}</p>
                       <FormMessage />
                     </FormItem>
                   )}

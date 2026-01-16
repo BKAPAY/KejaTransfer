@@ -20,6 +20,7 @@ import { PaymentMethodSelector } from "@/components/payment-method-selector";
 import { CryptoPaymentFlow } from "@/components/crypto-payment-flow";
 import { CurrencySelector, getCurrencyLabel } from "@/components/currency-selector";
 import { hasMultipleCurrencies, getMbiyoPayCurrencyForCountry, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
+import { useConvertedMinimums } from "@/hooks/use-converted-minimums";
 
 interface ConversionData {
   convertedAmount: number;
@@ -62,6 +63,8 @@ export default function Deposit() {
   const userBalanceCurrency = user?.country 
     ? COUNTRIES.find(c => c.code === user.country)?.currency || "XOF"
     : "XOF";
+
+  const { depositMin, cryptoMin } = useConvertedMinimums(userBalanceCurrency);
 
   const { data: enabledCountriesOperators } = useQuery<Record<string, string[]>>({
     queryKey: ["/api/countries-operators/deposits"],
@@ -115,14 +118,14 @@ export default function Deposit() {
     }
   }, [selectedCountry]);
 
-  // Currency conversion for non-XOF countries
-  const targetCurrency = hasMultipleCurrencies(selectedCountry) 
+  // Currency conversion: payment currency (country) -> user's balance currency
+  const paymentCurrency = hasMultipleCurrencies(selectedCountry) 
     ? selectedCurrency 
     : (COUNTRIES.find(c => c.code === selectedCountry)?.currency || "XOF");
-  const needsConversion = targetCurrency !== "XOF";
+  const needsConversion = paymentCurrency !== userBalanceCurrency;
 
-  const fetchConversion = useCallback(async (amountToConvert: number, toCurrency: string) => {
-    if (!amountToConvert || amountToConvert <= 0 || toCurrency === "XOF") {
+  const fetchConversion = useCallback(async (amountToConvert: number, fromCurrency: string, toCurrency: string) => {
+    if (!amountToConvert || amountToConvert <= 0 || fromCurrency === toCurrency) {
       setConversionData(null);
       return;
     }
@@ -133,7 +136,7 @@ export default function Deposit() {
       const res = await fetch("/api/convert-currency", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: amountToConvert, fromCurrency: "XOF", toCurrency }),
+        body: JSON.stringify({ amount: amountToConvert, fromCurrency, toCurrency }),
       });
       
       if (res.ok) {
@@ -156,13 +159,13 @@ export default function Deposit() {
   useEffect(() => {
     if (needsConversion && amount && amount > 0) {
       const debounceTimer = setTimeout(() => {
-        fetchConversion(amount, targetCurrency);
+        fetchConversion(amount, paymentCurrency, userBalanceCurrency);
       }, 500);
       return () => clearTimeout(debounceTimer);
     } else {
       setConversionData(null);
     }
-  }, [needsConversion, amount, targetCurrency, fetchConversion, selectedCurrency]);
+  }, [needsConversion, amount, paymentCurrency, userBalanceCurrency, fetchConversion, selectedCurrency]);
 
   const depositMutation = useMutation({
     mutationFn: async (data: DepositFormData) => {
@@ -338,6 +341,14 @@ export default function Deposit() {
   }, [paymentStep, paymentData.transactionId, toast, form]);
 
   const onSubmit = (data: DepositFormData) => {
+    if (!depositAmount || depositAmount < depositMin) {
+      toast({
+        title: "Montant insuffisant",
+        description: `Le montant minimum est de ${depositMin.toLocaleString("fr-FR")} ${userBalanceCurrency}`,
+        variant: "destructive",
+      });
+      return;
+    }
     depositMutation.mutate(data);
   };
 
@@ -526,16 +537,17 @@ export default function Deposit() {
                   setDepositAmount(val === "" ? undefined : Number(val));
                 }}
               />
-              {depositAmount !== undefined && depositAmount < 100 && (
-                <p className="text-sm text-destructive">Le montant minimum est de 100 {userBalanceCurrency}</p>
+              {depositAmount !== undefined && depositAmount < depositMin && (
+                <p className="text-sm text-destructive">Le montant minimum est de {depositMin.toLocaleString("fr-FR")} {userBalanceCurrency}</p>
               )}
             </div>
 
             <PaymentMethodSelector
               cryptoContent={
-                amount && amount >= 500 ? (
+                amount && amount >= cryptoMin ? (
                   <CryptoPaymentFlow
-                    amountXof={amount}
+                    amount={amount}
+                    currency={userBalanceCurrency}
                     userId={user?.id}
                     orderDescription="Depot BKApay"
                     customerName={user ? `${user.firstName} ${user.lastName}` : undefined}
@@ -548,7 +560,7 @@ export default function Deposit() {
                   />
                 ) : (
                   <div className="p-4 text-center text-muted-foreground">
-                    Entrez un montant d'au moins 500 {userBalanceCurrency} pour payer en crypto
+                    Entrez un montant d'au moins {cryptoMin.toLocaleString("fr-FR")} {userBalanceCurrency} pour payer en crypto
                   </div>
                 )
               }
