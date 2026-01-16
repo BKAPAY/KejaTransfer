@@ -21,6 +21,7 @@ import { PaymentMethodSelector } from "@/components/payment-method-selector";
 import { CryptoPaymentFlow } from "@/components/crypto-payment-flow";
 import { CurrencySelector, getCurrencyLabel } from "@/components/currency-selector";
 import { hasMultipleCurrencies, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
+import { getCurrencyDecimals } from "@/lib/currency";
 
 interface ConversionData {
   convertedAmount: number;
@@ -617,12 +618,13 @@ export default function Merchant() {
     setIsSubmitting(false);
   };
 
-  const formatAmount = (amount: number) => {
+  const formatAmount = (amount: number, currency: string = "XOF") => {
+    const decimals = getCurrencyDecimals(currency);
     return new Intl.NumberFormat("fr-FR", {
       style: "currency",
-      currency: "XOF",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
+      currency: currency,
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
     }).format(amount);
   };
 
@@ -673,7 +675,7 @@ export default function Merchant() {
             <div className="w-full bg-muted rounded-lg p-4 space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-sm text-muted-foreground">Montant</span>
-                <span className="font-semibold text-foreground">{formatAmount(paidAmount)}</span>
+                <span className="font-semibold text-foreground">{formatAmount(paidAmount, "XOF")}</span>
               </div>
             </div>
           </CardContent>
@@ -704,7 +706,7 @@ export default function Merchant() {
             <div className="w-full bg-muted rounded-lg p-4 space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-sm text-muted-foreground">Montant</span>
-                <span className="font-semibold text-foreground">{formatAmount(paidAmount)}</span>
+                <span className="font-semibold text-foreground">{formatAmount(paidAmount, "XOF")}</span>
               </div>
             </div>
 

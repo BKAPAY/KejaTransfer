@@ -21,6 +21,7 @@ import { PaymentMethodSelector } from "@/components/payment-method-selector";
 import { CryptoPaymentFlow } from "@/components/crypto-payment-flow";
 import { CurrencySelector, getCurrencyLabel } from "@/components/currency-selector";
 import { hasMultipleCurrencies, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
+import { getCurrencyDecimals } from "@/lib/currency";
 
 function ImageCarousel({ images, productName }: { images: string[]; productName: string }) {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -681,12 +682,13 @@ export default function Pay() {
     setIsSubmitting(false);
   };
 
-  const formatAmount = (amount: number) => {
+  const formatAmount = (amount: number, currency: string = "XOF") => {
+    const decimals = getCurrencyDecimals(currency);
     return new Intl.NumberFormat("fr-FR", {
       style: "currency",
-      currency: "XOF",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
+      currency: currency,
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
     }).format(amount);
   };
 
@@ -737,7 +739,7 @@ export default function Pay() {
             <div className="w-full bg-muted rounded-lg p-4 space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-sm text-muted-foreground">Montant</span>
-                <span className="font-semibold text-foreground">{formatAmount(paymentLink.amount)}</span>
+                <span className="font-semibold text-foreground">{formatAmount(paymentLink.amount, ownerCurrency)}</span>
               </div>
             </div>
           </CardContent>
@@ -768,7 +770,7 @@ export default function Pay() {
             <div className="w-full bg-muted rounded-lg p-4 space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-sm text-muted-foreground">Montant</span>
-                <span className="font-semibold text-foreground">{formatAmount(paymentLink.amount)}</span>
+                <span className="font-semibold text-foreground">{formatAmount(paymentLink.amount, ownerCurrency)}</span>
               </div>
             </div>
 
@@ -1290,7 +1292,7 @@ export default function Pay() {
             )}
           </div>
           <div className="text-lg sm:text-xl lg:text-2xl font-bold pt-2">
-            {formatAmount(totalAmount)}
+            {formatAmount(totalAmount, ownerCurrency)}
           </div>
         </CardHeader>
         <CardContent className="p-3 sm:p-4 lg:p-6">
