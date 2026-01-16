@@ -361,6 +361,7 @@ export const COUNTRIES = [
   { code: "CF", name: "Centrafrique", flag: "🇨🇫", phoneCode: "+236", phoneDigits: 8, currency: "XAF" },
   { code: "GA", name: "Gabon", flag: "🇬🇦", phoneCode: "+241", phoneDigits: 8, currency: "XAF" },
   { code: "RW", name: "Rwanda", flag: "🇷🇼", phoneCode: "+250", phoneDigits: 9, currency: "RWF" },
+  { code: "GM", name: "Gambie", flag: "🇬🇲", phoneCode: "+220", phoneDigits: 7, currency: "GMD" },
 ] as const;
 
 // Operators by country for AfribaPay (verified from AfribaPay documentation)
@@ -387,6 +388,7 @@ export const OPERATORS = {
     { code: "orange", name: "Orange Money", requiresOtp: true },
     { code: "moov", name: "Moov Money", requiresOtp: false },
     { code: "wave", name: "Wave", requiresOtp: false },
+    { code: "coris", name: "Coris Money", requiresOtp: false },
   ],
   TG: [
     { code: "moov", name: "Moov Money", requiresOtp: false },
@@ -407,12 +409,13 @@ export const OPERATORS = {
   CM: [
     { code: "orange", name: "Orange Money", requiresOtp: false },
     { code: "mtn", name: "MTN Mobile Money", requiresOtp: false },
+    { code: "moov", name: "Moov Money", requiresOtp: false },
   ],
   CD: [
     { code: "orange", name: "Orange Money", requiresOtp: false },
     { code: "airtel", name: "Airtel Money", requiresOtp: false },
-    { code: "mpesa", name: "Mpesa", requiresOtp: false },
-    { code: "africell", name: "Africell", requiresOtp: false },
+    { code: "mpesa", name: "M-Pesa", requiresOtp: false },
+    { code: "afrimoney", name: "Afrimoney", requiresOtp: false },
   ],
   TD: [
     { code: "airtel", name: "Airtel Money", requiresOtp: false },
@@ -434,29 +437,35 @@ export const OPERATORS = {
     { code: "mtn", name: "MTN Mobile Money", requiresOtp: false },
     { code: "airtel", name: "Airtel Money", requiresOtp: false },
   ],
+  GM: [
+    { code: "afrimoney", name: "Afrimoney", requiresOtp: false },
+    { code: "qmoney", name: "QMoney", requiresOtp: false },
+    { code: "wave", name: "Wave", requiresOtp: false },
+  ],
 } as const;
 
-// All countries support both collect (payin) and payout via AfribaPay (14 countries)
-export const COLLECT_COUNTRIES = ["BJ", "CI", "SN", "BF", "TG", "ML", "GN", "NE", "CM", "CD", "TD", "CG", "CF", "GA", "RW"] as const;
-export const PAYOUT_COUNTRIES = ["BJ", "CI", "SN", "BF", "TG", "ML", "GN", "NE", "CM", "CD", "TD", "CG", "CF", "GA", "RW"] as const;
+// All countries support both collect (payin) and payout (16 countries including GM)
+export const COLLECT_COUNTRIES = ["BJ", "CI", "SN", "BF", "TG", "ML", "GN", "NE", "CM", "CD", "TD", "CG", "CF", "GA", "RW", "GM"] as const;
+export const PAYOUT_COUNTRIES = ["BJ", "CI", "SN", "BF", "TG", "ML", "GN", "NE", "CM", "CD", "TD", "CG", "CF", "GA", "RW", "GM"] as const;
 
 // All operators available for collect (payin) by country
 export const COLLECT_OPERATORS: Record<string, string[]> = {
   BJ: ["moov", "mtn", "celtiis"],
   CI: ["orange", "moov", "mtn", "wave"],
   SN: ["orange", "free", "expresso", "wave"],
-  BF: ["orange", "moov", "wave"],
+  BF: ["orange", "moov", "wave", "coris"],
   TG: ["moov", "tmoney", "togocom"],
   ML: ["orange", "moov"],
   GN: ["orange", "mtn"],
   NE: ["airtel"],
-  CM: ["orange", "mtn"],
-  CD: ["orange", "airtel", "mpesa", "africell"],
+  CM: ["orange", "mtn", "moov"],
+  CD: ["orange", "airtel", "mpesa", "afrimoney"],
   TD: ["airtel", "moov"],
   CG: ["airtel", "mtn"],
   CF: ["orange", "telecel"],
   GA: ["airtel", "moov"],
   RW: ["mtn", "airtel"],
+  GM: ["afrimoney", "qmoney", "wave"],
 };
 
 // All operators available for payout by country
@@ -464,16 +473,17 @@ export const PAYOUT_OPERATORS: Record<string, string[]> = {
   BJ: ["moov", "mtn", "celtiis"],
   CI: ["orange", "moov", "mtn", "wave"],
   SN: ["orange", "free", "expresso", "wave"],
-  BF: ["orange", "moov", "wave"],
+  BF: ["orange", "moov", "wave", "coris"],
   TG: ["moov", "tmoney", "togocom"],
   ML: ["orange", "moov"],
   GN: ["orange", "mtn"],
   NE: ["airtel"],
-  CM: ["orange", "mtn"],
-  CD: ["orange", "airtel", "mpesa", "africell"],
+  CM: ["orange", "mtn", "moov"],
+  CD: ["orange", "airtel", "mpesa", "afrimoney"],
   TD: ["airtel", "moov"],
   CG: ["airtel", "mtn"],
   CF: ["orange", "telecel"],
   GA: ["airtel", "moov"],
   RW: ["mtn", "airtel"],
+  GM: ["afrimoney", "qmoney", "wave"],
 };
