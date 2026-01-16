@@ -364,7 +364,7 @@ export default function Withdrawal() {
                 name="amount"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Montant (XOF)</FormLabel>
+                    <FormLabel>Montant ({userBalanceCurrency})</FormLabel>
                     <FormControl>
                       <Input
                         type="number"
@@ -378,7 +378,7 @@ export default function Withdrawal() {
                         }}
                       />
                     </FormControl>
-                    <p className="text-xs text-muted-foreground mt-1">Montant minimum: 1000 XOF</p>
+                    <p className="text-xs text-muted-foreground mt-1">Montant minimum: 1000 {userBalanceCurrency}</p>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -477,7 +477,7 @@ export default function Withdrawal() {
                         <span className="font-medium">
                           {new Intl.NumberFormat("fr-FR", {
                             style: "currency",
-                            currency: "XOF",
+                            currency: userBalanceCurrency,
                             minimumFractionDigits: 0,
                           }).format(amount)}
                         </span>
@@ -487,17 +487,17 @@ export default function Withdrawal() {
                         <span className="font-medium text-orange-600 dark:text-orange-400" data-testid="text-fee-amount">
                           -{new Intl.NumberFormat("fr-FR", {
                             style: "currency",
-                            currency: "XOF",
+                            currency: userBalanceCurrency,
                             minimumFractionDigits: 0,
                           }).format(feeInfo.feeAmount)}
                         </span>
                       </div>
                       <div className="flex justify-between font-semibold text-green-600 dark:text-green-400">
-                        <span>Montant recu (XOF):</span>
+                        <span>Montant recu ({userBalanceCurrency}):</span>
                         <span data-testid="text-amount-received">
                           {new Intl.NumberFormat("fr-FR", {
                             style: "currency",
-                            currency: "XOF",
+                            currency: userBalanceCurrency,
                             minimumFractionDigits: 0,
                           }).format(feeInfo.amountReceived)}
                         </span>
@@ -525,14 +525,14 @@ export default function Withdrawal() {
                         <span className="font-medium text-foreground" data-testid="text-total-deducted">
                           {new Intl.NumberFormat("fr-FR", {
                             style: "currency",
-                            currency: "XOF",
+                            currency: userBalanceCurrency,
                             minimumFractionDigits: 0,
                           }).format(feeInfo.totalDeductedFromBalance)}
                         </span>
                       </div>
                       {needsConversion && conversionData && !conversionData.isLoading && (
                         <p className="text-xs text-muted-foreground">
-                          Taux: 1 XOF = {conversionData.conversionRate.toFixed(6)} {conversionData.targetCurrency}
+                          Taux: 1 {userBalanceCurrency} = {conversionData.conversionRate.toFixed(6)} {conversionData.targetCurrency}
                         </p>
                       )}
                     </div>

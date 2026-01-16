@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Plus, Copy, ExternalLink, Trash2, Image as ImageIcon, Link as LinkIcon, Edit2, Globe, Wallet } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import type { PaymentLink } from "@shared/schema";
+import type { PaymentLink, User } from "@shared/schema";
 import { COUNTRIES } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
@@ -95,6 +95,14 @@ export default function PaymentLinks() {
   const { data: paymentLinks, isLoading } = useQuery<PaymentLink[]>({
     queryKey: ["/api/payment-links"],
   });
+
+  const { data: user } = useQuery<User>({
+    queryKey: ["/api/auth/me"],
+  });
+
+  const userBalanceCurrency = user?.country 
+    ? COUNTRIES.find(c => c.code === user.country)?.currency || "XOF"
+    : "XOF";
 
   // Fetch enabled countries for deposits (incoming payments)
   const { data: enabledCountriesOperators } = useQuery<Record<string, string[]>>({
@@ -402,7 +410,7 @@ export default function PaymentLinks() {
                   name="amount"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Montant (XOF)</FormLabel>
+                      <FormLabel>Montant ({userBalanceCurrency})</FormLabel>
                       <FormControl>
                         <Input
                           type="text"

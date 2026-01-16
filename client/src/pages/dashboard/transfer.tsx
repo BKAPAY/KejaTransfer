@@ -349,7 +349,7 @@ export default function Transfer() {
                 name="amount"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Montant (XOF)</FormLabel>
+                    <FormLabel>Montant ({userBalanceCurrency})</FormLabel>
                     <FormControl>
                       <Input
                         type="number"
@@ -363,7 +363,7 @@ export default function Transfer() {
                         }}
                       />
                     </FormControl>
-                    <p className="text-xs text-muted-foreground mt-1">Montant minimum: 500 XOF</p>
+                    <p className="text-xs text-muted-foreground mt-1">Montant minimum: 500 {userBalanceCurrency}</p>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -486,7 +486,7 @@ export default function Transfer() {
                         <span className="font-medium">
                           {new Intl.NumberFormat("fr-FR", {
                             style: "currency",
-                            currency: "XOF",
+                            currency: userBalanceCurrency,
                             minimumFractionDigits: 0,
                           }).format(amount)}
                         </span>
@@ -496,7 +496,7 @@ export default function Transfer() {
                         <span className="font-medium text-orange-600 dark:text-orange-400" data-testid="text-fee-amount">
                           +{new Intl.NumberFormat("fr-FR", {
                             style: "currency",
-                            currency: "XOF",
+                            currency: userBalanceCurrency,
                             minimumFractionDigits: 0,
                           }).format(feeInfo.feeAmount)}
                         </span>
@@ -506,7 +506,7 @@ export default function Transfer() {
                         <span className="text-foreground" data-testid="text-total-deducted">
                           {new Intl.NumberFormat("fr-FR", {
                             style: "currency",
-                            currency: "XOF",
+                            currency: userBalanceCurrency,
                             minimumFractionDigits: 0,
                           }).format(amount + feeInfo.feeAmount)}
                         </span>
@@ -524,7 +524,7 @@ export default function Transfer() {
                             </span>
                           </div>
                           <p className="text-xs text-muted-foreground mt-1">
-                            Taux: 1 XOF = {conversionData.conversionRate.toFixed(6)} {conversionData.targetCurrency}
+                            Taux: 1 {userBalanceCurrency} = {conversionData.conversionRate.toFixed(6)} {conversionData.targetCurrency}
                           </p>
                         </div>
                       )}

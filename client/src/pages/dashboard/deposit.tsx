@@ -514,7 +514,7 @@ export default function Deposit() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Montant (XOF)</label>
+              <label className="text-sm font-medium">Montant ({userBalanceCurrency})</label>
               <Input
                 type="number"
                 placeholder="10000"
@@ -527,7 +527,7 @@ export default function Deposit() {
                 }}
               />
               {depositAmount !== undefined && depositAmount < 100 && (
-                <p className="text-sm text-destructive">Le montant minimum est de 100 XOF</p>
+                <p className="text-sm text-destructive">Le montant minimum est de 100 {userBalanceCurrency}</p>
               )}
             </div>
 
@@ -548,7 +548,7 @@ export default function Deposit() {
                   />
                 ) : (
                   <div className="p-4 text-center text-muted-foreground">
-                    Entrez un montant d'au moins 500 XOF pour payer en crypto
+                    Entrez un montant d'au moins 500 {userBalanceCurrency} pour payer en crypto
                   </div>
                 )
               }
