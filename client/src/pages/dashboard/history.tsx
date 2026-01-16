@@ -1,7 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useQuery } from "@tanstack/react-query";
-import type { Transaction } from "@shared/schema";
+import type { Transaction, User } from "@shared/schema";
+import { COUNTRIES } from "@shared/schema";
 import { History as HistoryIcon, Search, X } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TransactionDetailsDialog } from "@/components/transaction-details-dialog";
@@ -14,10 +15,18 @@ export default function History() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
+  const { data: user } = useQuery<User>({
+    queryKey: ["/api/auth/me"],
+  });
+
   const { data: transactions, isLoading } = useQuery<Transaction[]>({
     queryKey: ["/api/transactions"],
     refetchInterval: 3000,
   });
+  
+  const userCurrency = user?.country 
+    ? COUNTRIES.find(c => c.code === user.country)?.currency || "XOF"
+    : "XOF";
 
   const filteredTransactions = useMemo(() => {
     if (!transactions) return [];
@@ -54,7 +63,7 @@ export default function History() {
   const formatAmount = (amount: number) => {
     return new Intl.NumberFormat("fr-FR", {
       style: "currency",
-      currency: "XOF",
+      currency: userCurrency,
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(amount);

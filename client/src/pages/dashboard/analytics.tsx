@@ -1,5 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
+import type { User } from "@shared/schema";
+import { COUNTRIES } from "@shared/schema";
 import {
   LineChart,
   Line,
@@ -151,6 +153,7 @@ function StatCard({
   color = "primary",
   delay = 0,
   isCurrency = false,
+  currency = "XOF",
 }: { 
   title: string; 
   value: string | number; 
@@ -159,6 +162,7 @@ function StatCard({
   color?: "primary" | "secondary" | "accent" | "danger";
   delay?: number;
   isCurrency?: boolean;
+  currency?: string;
 }) {
   const colorClasses = {
     primary: "from-emerald-500/20 to-emerald-500/5 border-emerald-500/30",
@@ -177,7 +181,7 @@ function StatCard({
   const formatValue = () => {
     if (typeof value === 'string') return value;
     if (isCurrency) {
-      return new Intl.NumberFormat("fr-FR").format(value) + " XOF";
+      return new Intl.NumberFormat("fr-FR").format(value) + " " + currency;
     }
     return new Intl.NumberFormat("fr-FR").format(value);
   };
@@ -233,13 +237,15 @@ function TransactionTypeCard({
   amount, 
   count, 
   total,
-  index 
+  index,
+  currency = "XOF"
 }: { 
   type: string; 
   amount: number; 
   count: number; 
   total: number;
   index: number;
+  currency?: string;
 }) {
   const Icon = TYPE_ICONS[type] || CreditCard;
   const percentage = total > 0 ? (amount / total) * 100 : 0;
@@ -272,7 +278,7 @@ function TransactionTypeCard({
         <div className="space-y-2">
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Montant</span>
-            <span className="font-semibold">{new Intl.NumberFormat("fr-FR").format(amount)} XOF</span>
+            <span className="font-semibold">{new Intl.NumberFormat("fr-FR").format(amount)} {currency}</span>
           </div>
           <div className="h-2 bg-muted rounded-full overflow-hidden">
             <motion.div
@@ -294,13 +300,15 @@ function CountryCard({
   amount, 
   count, 
   total,
-  index 
+  index,
+  currency = "XOF"
 }: { 
   country: string; 
   amount: number; 
   count: number; 
   total: number;
   index: number;
+  currency?: string;
 }) {
   const percentage = total > 0 ? (amount / total) * 100 : 0;
   const flag = COUNTRY_FLAGS[country] || "🌍";
@@ -342,7 +350,7 @@ function CountryCard({
       </div>
       <div className="text-right">
         <p className="font-semibold text-sm">{new Intl.NumberFormat("fr-FR").format(amount)}</p>
-        <p className="text-xs text-muted-foreground">XOF</p>
+        <p className="text-xs text-muted-foreground">{currency}</p>
       </div>
     </motion.div>
   );
@@ -353,13 +361,15 @@ function OperatorCard({
   amount, 
   count, 
   total,
-  index 
+  index,
+  currency = "XOF"
 }: { 
   operator: string; 
   amount: number; 
   count: number; 
   total: number;
   index: number;
+  currency?: string;
 }) {
   const percentage = total > 0 ? (amount / total) * 100 : 0;
   
@@ -384,7 +394,7 @@ function OperatorCard({
         <p className="text-xs text-muted-foreground">{count} transaction{count > 1 ? 's' : ''}</p>
       </div>
       <div className="text-right">
-        <p className="font-semibold text-sm">{new Intl.NumberFormat("fr-FR").format(amount)} XOF</p>
+        <p className="font-semibold text-sm">{new Intl.NumberFormat("fr-FR").format(amount)} {currency}</p>
         <Badge 
           variant="outline" 
           className="text-xs mt-1"
@@ -398,14 +408,22 @@ function OperatorCard({
 }
 
 export default function Analytics() {
+  const { data: user } = useQuery<User>({
+    queryKey: ["/api/auth/me"],
+  });
+
   const { data: analytics, isLoading } = useQuery<Analytics>({
     queryKey: ["/api/analytics"],
   });
+  
+  const userCurrency = user?.country 
+    ? COUNTRIES.find(c => c.code === user.country)?.currency || "XOF"
+    : "XOF";
 
   const formatAmount = (amount: number) => {
     return new Intl.NumberFormat("fr-FR", {
       style: "currency",
-      currency: "XOF",
+      currency: userCurrency,
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(amount);
@@ -500,6 +518,7 @@ export default function Analytics() {
           color="primary"
           delay={0}
           isCurrency={true}
+          currency={userCurrency}
         />
         <StatCard
           title="Transactions Réussies"
@@ -525,6 +544,7 @@ export default function Analytics() {
           color="primary"
           delay={0.3}
           isCurrency={true}
+          currency={userCurrency}
         />
       </div>
 
@@ -831,6 +851,7 @@ export default function Analytics() {
                     count={item.count}
                     total={analytics.totalRevenue}
                     index={index}
+                    currency={userCurrency}
                   />
                 ))}
               </div>
@@ -856,6 +877,7 @@ export default function Analytics() {
                     count={item.count}
                     total={analytics.totalRevenue}
                     index={index}
+                    currency={userCurrency}
                   />
                 ))}
               </div>
@@ -883,6 +905,7 @@ export default function Analytics() {
                   count={item.count}
                   total={analytics.totalRevenue}
                   index={index}
+                  currency={userCurrency}
                 />
               ))}
             </div>

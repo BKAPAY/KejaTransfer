@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import type { User, Transaction } from "@shared/schema";
+import { COUNTRIES } from "@shared/schema";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
@@ -80,6 +81,17 @@ const COUNTRY_NAMES: Record<string, string> = {
   CI: "Côte d'Ivoire",
   SN: "Sénégal",
   BF: "Burkina Faso",
+  CM: "Cameroun",
+  CD: "RD Congo",
+  CG: "Congo-Brazzaville",
+  ML: "Mali",
+  GN: "Guinée",
+  NE: "Niger",
+  GM: "Gambie",
+  TD: "Tchad",
+  CF: "Centrafrique",
+  GA: "Gabon",
+  RW: "Rwanda",
 };
 
 const COUNTRY_FLAGS: Record<string, string> = {
@@ -88,6 +100,17 @@ const COUNTRY_FLAGS: Record<string, string> = {
   CI: "🇨🇮",
   SN: "🇸🇳",
   BF: "🇧🇫",
+  CM: "🇨🇲",
+  CD: "🇨🇩",
+  CG: "🇨🇬",
+  ML: "🇲🇱",
+  GN: "🇬🇳",
+  NE: "🇳🇪",
+  GM: "🇬🇲",
+  TD: "🇹🇩",
+  CF: "🇨🇫",
+  GA: "🇬🇦",
+  RW: "🇷🇼",
 };
 
 const containerVariants = {
@@ -217,13 +240,15 @@ function CountryItem({
   amount, 
   count, 
   total, 
-  index 
+  index,
+  currency = "XOF"
 }: { 
   country: string; 
   amount: number; 
   count: number;
   total: number; 
   index: number;
+  currency?: string;
 }) {
   const percentage = total > 0 ? (amount / total) * 100 : 0;
   const flag = COUNTRY_FLAGS[country] || "🌍";
@@ -245,7 +270,7 @@ function CountryItem({
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between">
           <span className="text-xs font-medium">{COUNTRY_NAMES[country] || country}</span>
-          <span className="text-xs font-semibold">{new Intl.NumberFormat("fr-FR").format(amount)} XOF</span>
+          <span className="text-xs font-semibold">{new Intl.NumberFormat("fr-FR").format(amount)} {currency}</span>
         </div>
         <div className="flex items-center gap-2 mt-0.5">
           <div className="flex-1 h-1 bg-muted rounded-full overflow-hidden">
@@ -281,10 +306,15 @@ export default function Dashboard() {
     refetchInterval: 10000,
   });
 
+  // Get user's currency based on their country
+  const userCurrency = user?.country 
+    ? COUNTRIES.find(c => c.code === user.country)?.currency || "XOF"
+    : "XOF";
+
   const formatAmount = (amount: number) => {
     return new Intl.NumberFormat("fr-FR", {
       style: "currency",
-      currency: "XOF",
+      currency: userCurrency,
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(amount);
@@ -528,6 +558,7 @@ export default function Dashboard() {
                             count={item.count}
                             total={analytics.totalRevenue}
                             index={index}
+                            currency={userCurrency}
                           />
                         ))}
                       </div>
