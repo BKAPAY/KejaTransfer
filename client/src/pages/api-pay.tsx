@@ -1177,7 +1177,8 @@ export default function ApiPay() {
             cryptoContent={
               amount && amount >= 500 ? (
                 <CryptoPaymentFlow
-                  amountXof={amount}
+                  amount={amount}
+                  currency="XOF"
                   apiKeyId={key}
                   orderDescription={description || `Paiement à ${apiKeyInfo?.siteName}`}
                   customerName={customerName}

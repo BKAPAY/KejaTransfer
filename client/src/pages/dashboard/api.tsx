@@ -37,9 +37,6 @@ const apiKeySchema = z.object({
 
 type ApiKeyFormData = z.infer<typeof apiKeySchema>;
 
-// All countries that support payments via AfribaPay
-const COLLECT_COUNTRIES = COUNTRIES;
-
 export default function ApiPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [visibleKeys, setVisibleKeys] = useState<Record<string, boolean>>({});
@@ -56,6 +53,14 @@ export default function ApiPage() {
   const { data: apiKeys, isLoading } = useQuery<ApiKey[]>({
     queryKey: ["/api/api-keys"],
   });
+
+  const { data: enabledCountriesOperators } = useQuery<Record<string, string[]>>({
+    queryKey: ["/api/countries-operators/deposits"],
+  });
+
+  const activeCountries = enabledCountriesOperators 
+    ? COUNTRIES.filter(c => Object.keys(enabledCountriesOperators).includes(c.code))
+    : COUNTRIES;
 
   const isKycVerified = user?.kycStatus === "verified";
 
@@ -203,10 +208,6 @@ export default function ApiPage() {
     createMutation.mutate(data);
   };
 
-  const getRedirectUrl = (publicKey: string) => {
-    const baseUrl = window.location.origin;
-    return `${baseUrl}/api-pay/${publicKey}?amount=MONTANT&description=DESCRIPTION`;
-  };
 
   return (
     <div className="flex flex-col h-full">
@@ -369,28 +370,6 @@ export default function ApiPage() {
                       <Copy className="w-4 h-4" />
                     </Button>
                   </div>
-                </div>
-
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <label className="text-sm font-medium">URL de redirection</label>
-                  </div>
-                  <div className="flex items-center gap-2 p-3 bg-primary/5 border border-primary/20 rounded-md">
-                    <code className="flex-1 text-xs font-mono truncate text-primary">
-                      {getRedirectUrl(apiKey.publicKey)}
-                    </code>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => copyToClipboard(getRedirectUrl(apiKey.publicKey), "URL de redirection")}
-                      data-testid={`button-copy-url-${apiKey.id}`}
-                    >
-                      <Copy className="w-4 h-4" />
-                    </Button>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Remplacez MONTANT et DESCRIPTION par les valeurs reelles
-                  </p>
                 </div>
 
                 <Separator className="my-4" />
@@ -574,7 +553,7 @@ export default function ApiPage() {
                           Selectionnez les pays que vos clients peuvent utiliser. Si aucun n'est selectionne, tous les pays seront visibles.
                         </p>
                         <div className="grid grid-cols-2 gap-2">
-                          {COLLECT_COUNTRIES.map((country) => {
+                          {activeCountries.map((country) => {
                             const currentData = settingsData[apiKey.id];
                             const isChecked = currentData?.allowedCountries?.includes(country.code) || false;
                             return (

@@ -33,7 +33,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { usePaymentCountdown } from "@/hooks/use-payment-countdown";
 
 const merchantPaymentSchema = z.object({
-  amount: z.number().min(100, "Le montant minimum est de 100 XOF"),
+  amount: z.number().min(100, "Le montant minimum est de 100"),
   customerName: z.string().min(2, "Le nom doit contenir au moins 2 caractères"),
   customerEmail: z.string().email("Email invalide"),
   country: z.string().min(1, "Sélectionnez un pays"),
@@ -263,14 +263,17 @@ export default function Merchant() {
     }
   }, [selectedCountry]);
 
-  // Currency conversion for non-XOF countries
+  // Get the owner's currency (the currency of the merchant link creator)
+  const ownerCurrency = (merchantLink as any)?.ownerCurrency || "XOF";
+  
+  // Currency conversion (ownerCurrency -> Target Currency)
   const targetCurrency = hasMultipleCurrencies(selectedCountry) 
     ? selectedCurrency 
     : (COUNTRIES.find(c => c.code === selectedCountry)?.currency || "XOF");
-  const needsConversion = targetCurrency !== "XOF";
+  const needsConversion = targetCurrency !== ownerCurrency;
   
-  const fetchConversion = useCallback(async (amountToConvert: number, toCurrency: string) => {
-    if (!amountToConvert || amountToConvert <= 0 || toCurrency === "XOF") {
+  const fetchConversion = useCallback(async (amountToConvert: number, fromCurrency: string, toCurrency: string) => {
+    if (!amountToConvert || amountToConvert <= 0 || toCurrency === fromCurrency) {
       setConversionData(null);
       return;
     }
@@ -281,7 +284,7 @@ export default function Merchant() {
       const res = await fetch("/api/convert-currency", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: amountToConvert, fromCurrency: "XOF", toCurrency }),
+        body: JSON.stringify({ amount: amountToConvert, fromCurrency, toCurrency }),
       });
       
       if (res.ok) {
@@ -304,13 +307,13 @@ export default function Merchant() {
   useEffect(() => {
     if (needsConversion && watchedAmount && watchedAmount > 0) {
       const debounceTimer = setTimeout(() => {
-        fetchConversion(watchedAmount, targetCurrency);
+        fetchConversion(watchedAmount, ownerCurrency, targetCurrency);
       }, 500);
       return () => clearTimeout(debounceTimer);
     } else {
       setConversionData(null);
     }
-  }, [needsConversion, watchedAmount, targetCurrency, fetchConversion, selectedCurrency]);
+  }, [needsConversion, watchedAmount, ownerCurrency, targetCurrency, fetchConversion, selectedCurrency]);
 
   // Fonction pour recommencer un nouveau paiement
   const handleNewPayment = () => {
@@ -675,7 +678,7 @@ export default function Merchant() {
             <div className="w-full bg-muted rounded-lg p-4 space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-sm text-muted-foreground">Montant</span>
-                <span className="font-semibold text-foreground">{formatAmount(paidAmount, "XOF")}</span>
+                <span className="font-semibold text-foreground">{formatAmount(paidAmount, ownerCurrency)}</span>
               </div>
             </div>
           </CardContent>
@@ -706,7 +709,7 @@ export default function Merchant() {
             <div className="w-full bg-muted rounded-lg p-4 space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-sm text-muted-foreground">Montant</span>
-                <span className="font-semibold text-foreground">{formatAmount(paidAmount, "XOF")}</span>
+                <span className="font-semibold text-foreground">{formatAmount(paidAmount, ownerCurrency)}</span>
               </div>
             </div>
 
@@ -1008,7 +1011,7 @@ export default function Merchant() {
           name="amount"
           render={({ field }) => (
             <FormItem>
-              <FormLabel className="text-xs sm:text-sm">Montant (XOF)</FormLabel>
+              <FormLabel className="text-xs sm:text-sm">Montant ({ownerCurrency})</FormLabel>
               <FormControl>
                 <Input
                   type="number"
@@ -1250,13 +1253,14 @@ export default function Merchant() {
                 <div className="space-y-4">
                   <div className="bg-muted p-3 rounded-md">
                     <p className="text-sm text-muted-foreground">Montant à payer</p>
-                    <p className="text-xl font-bold">{cryptoCustomerInfo.amount.toLocaleString()} XOF</p>
+                    <p className="text-xl font-bold">{cryptoCustomerInfo.amount.toLocaleString()} {ownerCurrency}</p>
                     <p className="text-xs text-muted-foreground mt-1">
                       {cryptoCustomerInfo.customerName} - {cryptoCustomerInfo.customerEmail}
                     </p>
                   </div>
                   <CryptoPaymentFlow
-                    amountXof={cryptoCustomerInfo.amount}
+                    amount={cryptoCustomerInfo.amount}
+                    currency={ownerCurrency}
                     merchantLinkId={merchantLink.id}
                     orderDescription={`Paiement à ${merchantLink.merchantName} par ${cryptoCustomerInfo.customerName}`}
                     customerName={cryptoCustomerInfo.customerName}
@@ -1287,7 +1291,7 @@ export default function Merchant() {
                   </p>
                   <div className="space-y-3">
                     <div>
-                      <label className="text-xs sm:text-sm font-medium">Montant (XOF)</label>
+                      <label className="text-xs sm:text-sm font-medium">Montant ({ownerCurrency})</label>
                       <Input
                         type="number"
                         placeholder="10000"
@@ -1303,7 +1307,7 @@ export default function Merchant() {
                         }))}
                       />
                       {cryptoCustomerInfo?.amount !== undefined && cryptoCustomerInfo.amount > 0 && cryptoCustomerInfo.amount < 500 && (
-                        <p className="text-xs text-destructive mt-1">Le montant minimum est de 500 XOF</p>
+                        <p className="text-xs text-destructive mt-1">Le montant minimum est de 500 {ownerCurrency}</p>
                       )}
                     </div>
                     <div>

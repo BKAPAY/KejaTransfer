@@ -1062,7 +1062,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Lien non trouvé" });
       }
 
-      res.json(link);
+      // Get owner's currency based on their country
+      const ownerCurrency = owner?.country ? getCurrencyForCountry(owner.country) : "XOF";
+
+      res.json({
+        ...link,
+        ownerCountry: owner?.country || null,
+        ownerCurrency,
+      });
     } catch (error: any) {
       res.status(500).json({ error: "Une erreur est survenue" });
     }

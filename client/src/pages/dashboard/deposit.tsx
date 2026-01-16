@@ -118,7 +118,8 @@ export default function Deposit() {
     }
   }, [selectedCountry]);
 
-  // Currency conversion: payment currency (country) -> user's balance currency
+  // Currency conversion: user's balance currency -> payment currency (country selected)
+  // User enters amount in THEIR currency, we show converted amount in the SELECTED country's currency
   const paymentCurrency = hasMultipleCurrencies(selectedCountry) 
     ? selectedCurrency 
     : (COUNTRIES.find(c => c.code === selectedCountry)?.currency || "XOF");
@@ -159,7 +160,8 @@ export default function Deposit() {
   useEffect(() => {
     if (needsConversion && amount && amount > 0) {
       const debounceTimer = setTimeout(() => {
-        fetchConversion(amount, paymentCurrency, userBalanceCurrency);
+        // Convert FROM user's balance currency TO the payment currency of selected country
+        fetchConversion(amount, userBalanceCurrency, paymentCurrency);
       }, 500);
       return () => clearTimeout(debounceTimer);
     } else {
@@ -664,7 +666,7 @@ export default function Deposit() {
                     {conversionData && (
                       <div className="bg-green-50 dark:bg-green-950 p-3 rounded-md border border-green-200 dark:border-green-800">
                         <p className="text-sm text-green-700 dark:text-green-300 font-medium">
-                          Montant à payer
+                          Montant a payer ({paymentCurrency})
                         </p>
                         {conversionData.isLoading ? (
                           <div className="flex items-center gap-2 mt-1">
@@ -673,7 +675,7 @@ export default function Deposit() {
                           </div>
                         ) : (
                           <p className="text-lg font-bold text-green-800 dark:text-green-200" data-testid="text-converted-amount">
-                            {new Intl.NumberFormat("fr-FR").format(conversionData.convertedAmount)} {conversionData.targetCurrency}
+                            {new Intl.NumberFormat("fr-FR").format(conversionData.convertedAmount)} {paymentCurrency}
                           </p>
                         )}
                       </div>

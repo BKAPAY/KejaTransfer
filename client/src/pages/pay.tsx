@@ -1315,7 +1315,8 @@ export default function Pay() {
                       </p>
                     </div>
                     <CryptoPaymentFlow
-                      amountXof={baseAmount}
+                      amount={baseAmount}
+                      currency={ownerCurrency}
                       paymentLinkId={paymentLink.id}
                       orderDescription={`Paiement ${paymentLink.productName} par ${cryptoCustomerInfo.customerName}`}
                       customerName={cryptoCustomerInfo.customerName}
