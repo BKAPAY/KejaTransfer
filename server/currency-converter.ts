@@ -5,6 +5,22 @@ if (!EXCHANGERATE_API_KEY) {
   console.warn("[CurrencyConverter] EXCHANGERATE_API_KEY not configured");
 }
 
+// Currencies that don't use decimal places (African francs, etc.)
+const NO_DECIMAL_CURRENCIES = ["XOF", "XAF", "CDF", "GNF", "GMD", "RWF"];
+
+function getCurrencyDecimals(currency: string): number {
+  return NO_DECIMAL_CURRENCIES.includes(currency) ? 0 : 2;
+}
+
+function roundToDecimals(amount: number, currency: string): number {
+  const decimals = getCurrencyDecimals(currency);
+  if (decimals === 0) {
+    return Math.round(amount);
+  }
+  const factor = Math.pow(10, decimals);
+  return Math.round(amount * factor) / factor;
+}
+
 export interface ConversionResult {
   success: boolean;
   originalAmount: number;
@@ -39,7 +55,7 @@ export async function convertCurrency(
   const cachedRate = rateCache.get(cacheKey);
   
   if (cachedRate && Date.now() - cachedRate.timestamp < CACHE_DURATION_MS) {
-    const convertedAmount = Math.round(amount * cachedRate.rate);
+    const convertedAmount = roundToDecimals(amount * cachedRate.rate, toCurrency);
     console.log(`[CurrencyConverter] Using cached rate: ${fromCurrency} -> ${toCurrency} = ${cachedRate.rate}`);
     return {
       success: true,
@@ -64,7 +80,7 @@ export async function convertCurrency(
         timestamp: Date.now(),
       });
 
-      const convertedAmount = Math.round(data.conversion_result);
+      const convertedAmount = roundToDecimals(data.conversion_result, toCurrency);
       console.log(`[CurrencyConverter] Converted ${amount} ${fromCurrency} -> ${convertedAmount} ${toCurrency} (rate: ${data.conversion_rate})`);
       
       return {

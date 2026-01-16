@@ -20,6 +20,7 @@ import { useLocation } from "wouter";
 import { CurrencySelector, getCurrencyLabel } from "@/components/currency-selector";
 import { hasMultipleCurrencies, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
 import { useConvertedMinimums } from "@/hooks/use-converted-minimums";
+import { getCurrencyDecimals } from "@/lib/currency";
 
 const withdrawalSchema = z.object({
   amount: z.number().min(1, "Veuillez saisir un montant valide"),
@@ -521,7 +522,8 @@ export default function Withdrawal() {
                             {new Intl.NumberFormat("fr-FR", {
                               style: "currency",
                               currency: conversionData.targetCurrency,
-                              minimumFractionDigits: 0,
+                              minimumFractionDigits: getCurrencyDecimals(conversionData.targetCurrency),
+                              maximumFractionDigits: getCurrencyDecimals(conversionData.targetCurrency),
                             }).format(conversionData.convertedAmount)}
                           </span>
                         </div>

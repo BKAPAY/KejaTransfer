@@ -1249,7 +1249,10 @@ export default function Pay() {
               </div>
             ) : (
               <p className="text-base sm:text-lg font-bold text-green-800 dark:text-green-200" data-testid="text-converted-amount">
-                {new Intl.NumberFormat("fr-FR").format(conversionData.convertedAmount)} {conversionData.targetCurrency}
+                {new Intl.NumberFormat("fr-FR", {
+                  minimumFractionDigits: getCurrencyDecimals(conversionData.targetCurrency),
+                  maximumFractionDigits: getCurrencyDecimals(conversionData.targetCurrency),
+                }).format(conversionData.convertedAmount)} {conversionData.targetCurrency}
               </p>
             )}
           </div>

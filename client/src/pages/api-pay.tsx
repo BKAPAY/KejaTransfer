@@ -22,6 +22,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { usePaymentCountdown } from "@/hooks/use-payment-countdown";
 import logoImage from "@assets/bkapay-logo.png";
+import { getCurrencyDecimals } from "@/lib/currency";
 
 interface ApiKeyInfo {
   siteName: string;
@@ -1116,7 +1117,10 @@ export default function ApiPay() {
             </div>
           ) : (
             <p className="text-lg font-bold text-green-800 dark:text-green-200" data-testid="text-converted-amount">
-              {new Intl.NumberFormat("fr-FR").format(conversionData.convertedAmount)} {conversionData.targetCurrency}
+              {new Intl.NumberFormat("fr-FR", {
+                minimumFractionDigits: getCurrencyDecimals(conversionData.targetCurrency),
+                maximumFractionDigits: getCurrencyDecimals(conversionData.targetCurrency),
+              }).format(conversionData.convertedAmount)} {conversionData.targetCurrency}
             </p>
           )}
         </div>

@@ -22,6 +22,7 @@ import { CurrencySelector, getCurrencyLabel } from "@/components/currency-select
 import { hasMultipleCurrencies, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
 import { useEffect, useCallback } from "react";
 import { useConvertedMinimums } from "@/hooks/use-converted-minimums";
+import { getCurrencyDecimals } from "@/lib/currency";
 
 const transferSchema = z.object({
   amount: z.number().min(1, "Veuillez saisir un montant valide"),
@@ -531,7 +532,8 @@ export default function Transfer() {
                               {new Intl.NumberFormat("fr-FR", {
                                 style: "currency",
                                 currency: conversionData.targetCurrency,
-                                minimumFractionDigits: 0,
+                                minimumFractionDigits: getCurrencyDecimals(conversionData.targetCurrency),
+                                maximumFractionDigits: getCurrencyDecimals(conversionData.targetCurrency),
                               }).format(conversionData.convertedAmount)}
                             </span>
                           </div>

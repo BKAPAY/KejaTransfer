@@ -21,6 +21,7 @@ import { CryptoPaymentFlow } from "@/components/crypto-payment-flow";
 import { CurrencySelector, getCurrencyLabel } from "@/components/currency-selector";
 import { hasMultipleCurrencies, getMbiyoPayCurrencyForCountry, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
 import { useConvertedMinimums } from "@/hooks/use-converted-minimums";
+import { getCurrencyDecimals } from "@/lib/currency";
 
 interface ConversionData {
   convertedAmount: number;
@@ -675,7 +676,10 @@ export default function Deposit() {
                           </div>
                         ) : (
                           <p className="text-lg font-bold text-green-800 dark:text-green-200" data-testid="text-converted-amount">
-                            {new Intl.NumberFormat("fr-FR").format(conversionData.convertedAmount)} {paymentCurrency}
+                            {new Intl.NumberFormat("fr-FR", {
+                              minimumFractionDigits: getCurrencyDecimals(paymentCurrency),
+                              maximumFractionDigits: getCurrencyDecimals(paymentCurrency),
+                            }).format(conversionData.convertedAmount)} {paymentCurrency}
                           </p>
                         )}
                       </div>
