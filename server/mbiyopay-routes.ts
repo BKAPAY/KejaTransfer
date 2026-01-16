@@ -110,6 +110,10 @@ export async function handleMbiyoPayWithdrawal(
       return { success: false, error: "Solde insuffisant" };
     }
 
+    const beneficiaryName = user.firstName && user.lastName 
+      ? `${user.firstName} ${user.lastName}` 
+      : user.email || "BKApay User";
+    
     const result = await createMbiyoPayPayout({
       amount: feeInfo.amountReceived,
       currency: currency,
@@ -118,6 +122,7 @@ export async function handleMbiyoPayWithdrawal(
       network: operator,
       orderId: `BKAPAY-WD-${Date.now()}`,
       callbackUrl: `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/mbiyopay`,
+      beneficiaryName,
     });
 
     if (!result.success) {
@@ -185,6 +190,10 @@ export async function handleMbiyoPayTransfer(
       return { success: false, error: "Solde insuffisant" };
     }
 
+    const beneficiaryName = user.firstName && user.lastName 
+      ? `${user.firstName} ${user.lastName}` 
+      : user.email || "BKApay User";
+    
     const result = await createMbiyoPayPayout({
       amount: netAmount,
       currency: currency,
@@ -193,6 +202,7 @@ export async function handleMbiyoPayTransfer(
       network: operator,
       orderId: `BKAPAY-TF-${Date.now()}`,
       callbackUrl: `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/mbiyopay`,
+      beneficiaryName,
     });
 
     if (!result.success) {

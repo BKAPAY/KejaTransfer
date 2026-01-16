@@ -187,6 +187,7 @@ export interface MbiyoPayPayoutParams {
   network: string;
   orderId?: string;
   callbackUrl?: string;
+  beneficiaryName?: string;
 }
 
 export interface MbiyoPayPayoutResult {
@@ -225,6 +226,7 @@ export async function createMbiyoPayPayout(params: MbiyoPayPayoutParams): Promis
         network: params.network.toLowerCase(),
         phone_number: formattedPhone,
         country_code: params.countryCode.toUpperCase(),
+        beneficiary: params.beneficiaryName || "BKApay User",
       },
     };
     
