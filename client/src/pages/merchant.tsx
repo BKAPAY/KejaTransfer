@@ -368,14 +368,24 @@ export default function Merchant() {
   // FedaPay payment init mutation
   const initMutation = useMutation({
     mutationFn: async (data: MerchantPaymentFormData) => {
+      // Send converted amount to provider, original amount for balance credit
+      const providerAmount = needsConversion && conversionData?.convertedAmount 
+        ? conversionData.convertedAmount 
+        : data.amount;
+      const providerCurrency = needsConversion && conversionData?.targetCurrency
+        ? conversionData.targetCurrency
+        : selectedCurrency;
+      
       const res = await apiRequest("POST", `/api/fedapay/merchant-link/${token}`, {
-        amount: data.amount,
+        amount: providerAmount,
         customerName: data.customerName,
         customerEmail: data.customerEmail,
         customerPhone: data.customerPhone,
         country: data.country,
         operator: data.operator,
-        currency: selectedCurrency,
+        currency: providerCurrency,
+        originalAmount: data.amount,
+        originalCurrency: ownerCurrency,
       });
       return res.json();
     },

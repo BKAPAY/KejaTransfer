@@ -18,7 +18,10 @@ export async function handleMbiyoPayDeposit(
   amount: number,
   country: string,
   operator: string,
-  phone: string
+  phone: string,
+  currency?: string,
+  originalAmount?: number,
+  originalCurrency?: string
 ): Promise<{ success: boolean; transactionId?: string; mbiyopayTransactionId?: string; redirectUrl?: string; message?: string; error?: string }> {
   try {
     const countryLower = country.toLowerCase();
@@ -31,16 +34,19 @@ export async function handleMbiyoPayDeposit(
       return { success: false, error: `Operateur ${operator} non supporte pour ${country}` };
     }
 
-    const grossAmount = Math.floor(amount);
-    const currency = getCurrencyForCountry(country);
+    // Provider gets the converted amount, balance uses original amount
+    const providerAmount = Math.floor(amount);
+    const providerCurrency = currency || getCurrencyForCountry(country);
+    const balanceAmount = originalAmount ? Math.floor(originalAmount) : providerAmount;
+    const userCurrency = originalCurrency || providerCurrency;
     
-    // Get dynamic fees from database
+    // Get dynamic fees from database - calculate fees on the balance amount
     const feeConfig = await getFeeFromDatabase(storage, country, operator);
-    const feeInfo = calculateIncomingFee(grossAmount, feeConfig.incoming);
+    const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming);
 
     const result = await createMbiyoPayPayin({
-      amount: grossAmount,
-      currency: currency,
+      amount: providerAmount,
+      currency: providerCurrency,
       phone: phone,
       countryCode: country,
       network: operator,
@@ -59,17 +65,21 @@ export async function handleMbiyoPayDeposit(
       amount: feeInfo.grossAmount,
       fee: feeInfo.feeAmount,
       feePercentage: feeInfo.feePercentage,
-      currency: currency,
+      currency: userCurrency,
       status: "pending",
       country: country.toUpperCase(),
       operator: operator,
-      description: `Depot de ${grossAmount} ${currency}`,
+      description: `Depot de ${providerAmount} ${providerCurrency}`,
       customerPhone: phone,
       metadata: JSON.stringify({
         mbiyopayTransactionId: result.transactionId,
         redirectUrl: result.redirectUrl,
         phone,
         provider: "mbiyopay",
+        providerAmount,
+        providerCurrency,
+        balanceAmount,
+        balanceCurrency: userCurrency,
       }),
     });
 

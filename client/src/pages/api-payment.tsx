@@ -103,6 +103,14 @@ export default function ApiPayment() {
 
     setIsLoading(true);
     try {
+      // Send converted amount to provider, original amount for balance credit
+      const providerAmount = needsConversion && conversionData?.convertedAmount 
+        ? conversionData.convertedAmount 
+        : transaction?.amount;
+      const providerCurrency = needsConversion && conversionData?.targetCurrency
+        ? conversionData.targetCurrency
+        : selectedCurrency;
+      
       // Call payment API to get payment URL
       const response = await fetch("/api/payments/submit", {
         method: "POST",
@@ -111,7 +119,10 @@ export default function ApiPayment() {
           transactionId,
           country,
           operator,
-          currency: selectedCurrency,
+          currency: providerCurrency,
+          convertedAmount: providerAmount,
+          originalAmount: transaction?.amount,
+          originalCurrency: "XOF",
         }),
       });
 

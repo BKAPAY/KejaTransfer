@@ -432,13 +432,24 @@ export default function Pay() {
   // FedaPay payment init mutation
   const initMutation = useMutation({
     mutationFn: async (data: PaymentFormData) => {
+      // Send converted amount to provider, original amount for balance credit
+      const providerAmount = isConversionNeeded && conversionData?.convertedAmount 
+        ? conversionData.convertedAmount 
+        : totalAmount;
+      const providerCurrency = isConversionNeeded && conversionData?.targetCurrency
+        ? conversionData.targetCurrency
+        : selectedCurrency;
+      
       const res = await apiRequest("POST", `/api/fedapay/payment-link/${token}`, {
         customerName: data.customerName,
         customerEmail: data.customerEmail,
         customerPhone: data.customerPhone,
         country: data.country,
         operator: data.operator,
-        currency: selectedCurrency,
+        currency: providerCurrency,
+        convertedAmount: providerAmount,
+        originalAmount: totalAmount,
+        originalCurrency: ownerCurrency,
       });
       return res.json();
     },

@@ -20,7 +20,10 @@ export async function handleFedaPayDeposit(
   amount: number,
   country: string,
   operator: string,
-  phone: string
+  phone: string,
+  currency?: string,
+  originalAmount?: number,
+  originalCurrency?: string
 ): Promise<{ success: boolean; transactionId?: string; fedapayTransactionId?: number; message?: string; error?: string }> {
   try {
     if (!FEDAPAY_SUPPORTED_COUNTRIES_COLLECT.includes(country.toLowerCase())) {
@@ -32,19 +35,23 @@ export async function handleFedaPayDeposit(
       return { success: false, error: `Operateur ${operator} non supporte pour ${country}` };
     }
 
-    const grossAmount = Math.floor(amount);
+    // Provider gets the converted amount, balance uses original amount
+    const providerAmount = Math.floor(amount);
+    const balanceAmount = originalAmount ? Math.floor(originalAmount) : providerAmount;
+    const providerCurrency = currency || "XOF";
+    const userCurrency = originalCurrency || providerCurrency;
     
-    // Get dynamic fees from database
+    // Get dynamic fees from database - calculate fees on the balance amount
     const feeConfig = await getFeeFromDatabase(storage, country, operator);
-    const feeInfo = calculateIncomingFee(grossAmount, feeConfig.incoming);
+    const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming);
 
     const nameParts = (user.firstName + " " + user.lastName).split(" ");
     const firstName = nameParts[0] || "Client";
     const lastName = nameParts.slice(1).join(" ") || "BKApay";
 
     const result = await createCollect({
-      amount: grossAmount,
-      description: `Depot de ${grossAmount} XOF sur BKApay`,
+      amount: providerAmount,
+      description: `Depot de ${providerAmount} ${providerCurrency} sur BKApay`,
       customerFirstName: firstName,
       customerLastName: lastName,
       customerEmail: user.email,
@@ -65,16 +72,20 @@ export async function handleFedaPayDeposit(
       amount: feeInfo.grossAmount,
       fee: feeInfo.feeAmount,
       feePercentage: feeInfo.feePercentage,
-      currency: "XOF",
+      currency: userCurrency,
       status: "pending",
       country: country.toUpperCase(),
       operator: operator,
-      description: `Depot de ${grossAmount} XOF`,
+      description: `Depot de ${providerAmount} ${providerCurrency}`,
       customerPhone: phone,
       metadata: JSON.stringify({
         fedapayTransactionId: result.transactionId,
         fedapayReference: result.reference,
         phone,
+        providerAmount,
+        providerCurrency,
+        balanceAmount,
+        balanceCurrency: userCurrency,
       }),
     });
 
@@ -268,7 +279,9 @@ export async function handlePaymentLinkPayment(
   customerEmail: string,
   customerPhone: string,
   country: string,
-  operator: string
+  operator: string,
+  convertedAmount?: number,
+  convertedCurrency?: string
 ): Promise<{ success: boolean; transactionId?: string; message?: string; error?: string }> {
   try {
     if (!FEDAPAY_SUPPORTED_COUNTRIES_COLLECT.includes(country.toLowerCase())) {
@@ -280,29 +293,33 @@ export async function handlePaymentLinkPayment(
       return { success: false, error: `Operateur ${operator} non supporte pour ${country}` };
     }
 
-    // Si customerPaysFee est activé, le client paie le montant + frais
-    // Le marchand reçoit toujours le montant de base (paymentLink.amount)
+    // Use converted amount for provider if available, otherwise use original amount
     const baseAmount = paymentLink.amount;
+    const providerAmount = convertedAmount ? Math.floor(convertedAmount) : baseAmount;
+    const providerCurrency = convertedCurrency || "XOF";
     const customerPaysFee = paymentLink.customerPaysFee || false;
+    
+    // Get dynamic fees from database
+    const feeConfig = await getFeeFromDatabase(storage, country, operator);
     
     let grossAmount: number;
     let feeInfo: ReturnType<typeof calculateIncomingFee>;
     
     if (customerPaysFee) {
       // Client paie les frais: on calcule le montant total que le client doit payer
-      const feePercentage = 6; // 6% uniform fee
+      const feePercentage = feeConfig.incoming / 10; // Convert from decimal (60 = 6%)
       const feeAmount = Math.ceil(baseAmount * feePercentage / 100);
-      grossAmount = baseAmount + feeAmount;
+      grossAmount = providerAmount + Math.ceil(providerAmount * feePercentage / 100);
       feeInfo = {
         grossAmount: grossAmount,
-        netAmount: baseAmount, // Le marchand reçoit le montant de base
+        netAmount: baseAmount, // Le marchand reçoit le montant de base (in user's currency)
         feeAmount: feeAmount,
-        feePercentage: feePercentage * 10, // Converti en décimal (60 = 6%)
+        feePercentage: feeConfig.incoming,
       };
     } else {
-      // Marchand paie les frais: logique standard
-      grossAmount = baseAmount;
-      feeInfo = calculateIncomingFee(grossAmount);
+      // Marchand paie les frais: logique standard - calculate fees on base amount
+      grossAmount = providerAmount;
+      feeInfo = calculateIncomingFee(baseAmount, feeConfig.incoming);
     }
 
     const nameParts = customerName.split(" ");
@@ -325,13 +342,15 @@ export async function handlePaymentLinkPayment(
       return { success: false, error: result.error || "Erreur lors du paiement" };
     }
 
+    // Store transaction with user's base currency for balance credit
+    const ownerCurrency = (paymentLink as any)?.ownerCurrency || "XOF";
     const tx = await storage.createTransaction({
       userId: paymentLink.userId,
       type: "payment_link",
-      amount: feeInfo.grossAmount,
+      amount: baseAmount, // Store base amount for balance credit
       fee: feeInfo.feeAmount,
       feePercentage: feeInfo.feePercentage,
-      currency: "XOF",
+      currency: ownerCurrency,
       status: "pending",
       country: country.toUpperCase(),
       operator: operator,
@@ -343,6 +362,10 @@ export async function handlePaymentLinkPayment(
         fedapayTransactionId: result.transactionId,
         fedapayReference: result.reference,
         paymentLinkId: paymentLink.id,
+        providerAmount: grossAmount,
+        providerCurrency: providerCurrency,
+        balanceAmount: baseAmount,
+        balanceCurrency: ownerCurrency,
       }),
     });
 
@@ -364,7 +387,9 @@ export async function handleMerchantLinkPayment(
   customerEmail: string,
   customerPhone: string,
   country: string,
-  operator: string
+  operator: string,
+  originalAmount?: number,
+  originalCurrency?: string
 ): Promise<{ success: boolean; transactionId?: string; message?: string; error?: string }> {
   try {
     if (!FEDAPAY_SUPPORTED_COUNTRIES_COLLECT.includes(country.toLowerCase())) {
@@ -376,15 +401,21 @@ export async function handleMerchantLinkPayment(
       return { success: false, error: `Operateur ${operator} non supporte pour ${country}` };
     }
 
-    const grossAmount = Math.floor(amount);
-    const feeInfo = calculateIncomingFee(grossAmount);
+    // Use converted amount for provider, original amount for balance credit
+    const providerAmount = Math.floor(amount);
+    const balanceAmount = originalAmount ? Math.floor(originalAmount) : providerAmount;
+    const ownerCurrency = originalCurrency || "XOF";
+    
+    // Get dynamic fees from database - calculate fees on the balance amount
+    const feeConfig = await getFeeFromDatabase(storage, country, operator);
+    const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming);
 
     const nameParts = customerName.split(" ");
     const firstName = nameParts[0] || "Client";
     const lastName = nameParts.slice(1).join(" ") || "";
 
     const result = await createCollect({
-      amount: grossAmount,
+      amount: providerAmount,
       description: `Paiement marchand - ${merchantLink.merchantName}`,
       customerFirstName: firstName,
       customerLastName: lastName || "Client",
@@ -402,10 +433,10 @@ export async function handleMerchantLinkPayment(
     const tx = await storage.createTransaction({
       userId: merchantLink.userId,
       type: "merchant_link",
-      amount: feeInfo.grossAmount,
+      amount: balanceAmount, // Store balance amount for credit
       fee: feeInfo.feeAmount,
       feePercentage: feeInfo.feePercentage,
-      currency: "XOF",
+      currency: ownerCurrency,
       status: "pending",
       country: country.toUpperCase(),
       operator: operator,
@@ -417,6 +448,10 @@ export async function handleMerchantLinkPayment(
         fedapayTransactionId: result.transactionId,
         fedapayReference: result.reference,
         merchantLinkId: merchantLink.id,
+        providerAmount: providerAmount,
+        providerCurrency: "XOF",
+        balanceAmount: balanceAmount,
+        balanceCurrency: ownerCurrency,
       }),
     });
 

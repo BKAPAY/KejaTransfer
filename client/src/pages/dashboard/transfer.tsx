@@ -169,14 +169,24 @@ export default function Transfer() {
 
   const transferMutation = useMutation({
     mutationFn: async (data: { formData: TransferFormData; securityCode: string }) => {
+      // Send converted amount to provider, original amount for balance debit
+      const providerAmount = needsConversion && conversionData?.convertedAmount 
+        ? conversionData.convertedAmount 
+        : data.formData.amount;
+      const providerCurrency = needsConversion && conversionData?.targetCurrency
+        ? conversionData.targetCurrency
+        : selectedCurrency;
+      
       const res = await apiRequest("POST", "/api/fedapay/withdrawal", {
-        amount: data.formData.amount,
+        amount: providerAmount,
         phone: data.formData.phone,
         country: data.formData.country,
         operator: data.formData.operator,
         type: "transfer",
         securityCode: data.securityCode,
-        currency: selectedCurrency,
+        currency: providerCurrency,
+        originalAmount: data.formData.amount,
+        originalCurrency: userBalanceCurrency,
       });
       return res.json();
     },

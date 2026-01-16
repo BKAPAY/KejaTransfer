@@ -3049,8 +3049,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Deposit Route - Multi-Provider
   app.post("/api/fedapay/deposit", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { amount, country, operator, phone } = req.body;
+      const { amount, country, operator, phone, currency, originalAmount, originalCurrency } = req.body;
       const user = await storage.getUser(req.session.userId!);
+      
+      // Use converted amount for provider, original amount for balance credit
+      const providerAmount = Math.floor(amount);
+      const balanceAmount = originalAmount ? Math.floor(originalAmount) : providerAmount;
+      const providerCurrency = currency || "XOF";
+      const userCurrency = originalCurrency || providerCurrency;
 
       if (!user) {
         return res.status(404).json({ success: false, error: "Utilisateur non trouve" });
@@ -3082,14 +3088,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`[DEPOSIT] Using provider: ${activeProvider} for ${country}/${operator}`);
 
       if (activeProvider === "fedapay") {
-        // Use FedaPay
+        // Use FedaPay - pass converted amount and original amount
         const result = await handleFedaPayDeposit(
           req.session.userId!,
           user,
-          amount,
+          providerAmount,
           country,
           operator,
-          phone
+          phone,
+          providerCurrency,
+          balanceAmount,
+          userCurrency
         );
 
         if (result.success) {
@@ -3225,15 +3234,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
       } else if (activeProvider === "mbiyopay") {
-        // Use MbiyoPay
+        // Use MbiyoPay - pass converted amount and original amount
         console.log(`[DEPOSIT] Using MbiyoPay for ${country}/${operator}`);
         const result = await handleMbiyoPayDeposit(
           req.session.userId!,
           user,
-          amount,
+          providerAmount,
           country,
           operator,
-          phone
+          phone,
+          providerCurrency,
+          balanceAmount,
+          userCurrency
         );
 
         if (result.success) {
@@ -3562,14 +3574,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (activeProvider === "fedapay") {
-        // handlePaymentLinkPayment(paymentLink, customerName, customerEmail, customerPhone, country, operator)
+        // Pass converted amount and owner currency to handler
+        const paymentLinkWithCurrency = { ...paymentLink, ownerCurrency };
         const result = await handlePaymentLinkPayment(
-          paymentLink,
+          paymentLinkWithCurrency,
           customerName || "Client",
           "noreply@bkapay.com", // Privacy: never send real customer emails to providers
           customerPhone,
           country,
-          operator
+          operator,
+          amountInPayerCurrency, // converted amount for provider
+          payerCurrency // provider's currency
         );
 
         if (result.success) {
@@ -3746,7 +3761,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Merchant Link Route - Multi-Provider
   app.post("/api/fedapay/merchant-link/:token", async (req: Request, res: Response) => {
     try {
-      const { customerName, customerPhone, amount, country, operator } = req.body;
+      const { customerName, customerPhone, amount, country, operator, originalAmount, originalCurrency } = req.body;
       const { token } = req.params;
 
       const merchantLink = await storage.getMerchantLinkByToken(token);
@@ -3758,6 +3773,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (owner?.suspended) {
         return res.status(404).json({ success: false, error: "Ce lien n'existe pas" });
       }
+      
+      // Get owner's currency for balance credit
+      const ownerCurrency = owner?.country ? getCurrencyForCountry(owner.country) : "XOF";
 
       const activeProvider = await getActiveProviderForDeposit(country, operator);
       
@@ -3769,15 +3787,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (activeProvider === "fedapay") {
-        // handleMerchantLinkPayment(merchantLink, amount, customerName, customerEmail, customerPhone, country, operator)
+        // Pass original amount and currency for balance operations
         const result = await handleMerchantLinkPayment(
           merchantLink,
-          amount,
+          amount, // converted amount for provider
           customerName || "Client",
           "noreply@bkapay.com", // Privacy: never send real customer emails to providers
           customerPhone,
           country,
-          operator
+          operator,
+          originalAmount || amount, // original amount for balance credit
+          originalCurrency || ownerCurrency // owner's currency
         );
 
         if (result.success) {

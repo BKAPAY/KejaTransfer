@@ -172,10 +172,20 @@ export default function Deposit() {
 
   const depositMutation = useMutation({
     mutationFn: async (data: DepositFormData) => {
+      // Send converted amount to provider, original amount for balance credit
+      const providerAmount = needsConversion && conversionData?.convertedAmount 
+        ? conversionData.convertedAmount 
+        : depositAmount;
+      const providerCurrency = needsConversion && conversionData?.targetCurrency
+        ? conversionData.targetCurrency
+        : selectedCurrency;
+      
       const res = await apiRequest("POST", "/api/fedapay/deposit", {
         ...data,
-        amount: depositAmount,
-        currency: selectedCurrency,
+        amount: providerAmount,
+        currency: providerCurrency,
+        originalAmount: depositAmount,
+        originalCurrency: userBalanceCurrency,
       });
       return res.json();
     },
