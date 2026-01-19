@@ -5401,8 +5401,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Public endpoint - get enabled countries/operators for deposits (incoming)
-  // Filters by both country-level payinEnabled AND operator-level incomingEnabled
-  // IMPORTANT: Must match provider between country_status and country_operator_config
+  // Returns countries where payin is enabled at country-level, with their enabled operators
+  // Countries appear even if no operators are enabled (empty array) - UI shows "no operators" message
   app.get("/api/countries-operators/deposits", async (req: Request, res: Response) => {
     try {
       const [configs, countryStatuses] = await Promise.all([
@@ -5410,20 +5410,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         storage.getCountryStatuses(),
       ]);
       
-      // Create a map of provider-country combinations where payin is enabled
+      // First: get all countries where payin is enabled at country-level
+      const payinEnabledCountries = new Set<string>();
       const payinEnabledMap = new Map<string, boolean>();
       for (const cs of countryStatuses) {
         if (cs.payinEnabled) {
+          payinEnabledCountries.add(cs.country);
           payinEnabledMap.set(`${cs.provider}-${cs.country}`, true);
         }
       }
       
-      // Filter by matching provider-country payin enabled AND operator-level incoming enabled
+      // Initialize result with all payin-enabled countries (empty arrays)
+      const result: Record<string, string[]> = {};
+      Array.from(payinEnabledCountries).forEach(country => {
+        result[country] = [];
+      });
+      
+      // Add operators that are enabled at operator-level
       const enabledConfigs = configs.filter(
         (c) => c.incomingEnabled && payinEnabledMap.has(`${c.provider}-${c.country}`)
       );
       
-      const result: Record<string, string[]> = {};
       for (const config of enabledConfigs) {
         if (!result[config.country]) {
           result[config.country] = [];
@@ -5441,8 +5448,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Public endpoint - get enabled countries/operators for withdrawals (outgoing)
-  // Filters by both country-level payoutEnabled AND operator-level outgoingEnabled
-  // IMPORTANT: Must match provider between country_status and country_operator_config
+  // Returns countries where payout is enabled at country-level, with their enabled operators
+  // Countries appear even if no operators are enabled (empty array) - UI shows "no operators" message
   app.get("/api/countries-operators/withdrawals", async (req: Request, res: Response) => {
     try {
       const [configs, countryStatuses] = await Promise.all([
@@ -5450,20 +5457,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         storage.getCountryStatuses(),
       ]);
       
-      // Create a map of provider-country combinations where payout is enabled
+      // First: get all countries where payout is enabled at country-level
+      const payoutEnabledCountries = new Set<string>();
       const payoutEnabledMap = new Map<string, boolean>();
       for (const cs of countryStatuses) {
         if (cs.payoutEnabled) {
+          payoutEnabledCountries.add(cs.country);
           payoutEnabledMap.set(`${cs.provider}-${cs.country}`, true);
         }
       }
       
-      // Filter by matching provider-country payout enabled AND operator-level outgoing enabled
+      // Initialize result with all payout-enabled countries (empty arrays)
+      const result: Record<string, string[]> = {};
+      Array.from(payoutEnabledCountries).forEach(country => {
+        result[country] = [];
+      });
+      
+      // Add operators that are enabled at operator-level
       const enabledConfigs = configs.filter(
         (c) => c.outgoingEnabled && payoutEnabledMap.has(`${c.provider}-${c.country}`)
       );
       
-      const result: Record<string, string[]> = {};
       for (const config of enabledConfigs) {
         if (!result[config.country]) {
           result[config.country] = [];

@@ -84,7 +84,8 @@ export default function Deposit() {
   const selectedOperator = form.watch("operator");
   const amount = depositAmount;
 
-  // Filter countries to only show those enabled by admin (have at least one enabled operator)
+  // Filter countries to only show those enabled by admin (country-level payin enabled)
+  // Note: countries may have empty operator lists, UI will show "no operators" message
   const collectCountries = enabledCountriesOperators 
     ? COUNTRIES.filter(c => Object.keys(enabledCountriesOperators).includes(c.code))
     : [];
