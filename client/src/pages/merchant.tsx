@@ -270,10 +270,14 @@ export default function Merchant() {
   const ownerCurrency = (merchantLink as any)?.ownerCurrency || "XOF";
   
   // Currency conversion (ownerCurrency -> Target Currency)
-  const targetCurrency = hasMultipleCurrencies(selectedCountry) 
-    ? selectedCurrency 
-    : (COUNTRIES.find(c => c.code === selectedCountry)?.currency || "XOF");
-  const needsConversion = targetCurrency !== ownerCurrency;
+  // IMPORTANT: Only calculate target currency if a country is selected
+  // This prevents conversion from triggering before user selects a country
+  const targetCurrency = selectedCountry
+    ? (hasMultipleCurrencies(selectedCountry) 
+        ? selectedCurrency 
+        : (COUNTRIES.find(c => c.code === selectedCountry)?.currency || ownerCurrency))
+    : ownerCurrency; // Default to owner's currency when no country selected
+  const needsConversion = selectedCountry && targetCurrency !== ownerCurrency;
   
   const fetchConversion = useCallback(async (amountToConvert: number, fromCurrency: string, toCurrency: string) => {
     if (!amountToConvert || amountToConvert <= 0 || toCurrency === fromCurrency) {

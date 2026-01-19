@@ -334,10 +334,14 @@ export default function Pay() {
   const ownerCurrency = (paymentLink as any)?.ownerCurrency || "XOF";
   
   // conversion (ownerCurrency -> Target Currency)
-  const targetCurrency = hasMultipleCurrencies(selectedCountry) 
-    ? selectedCurrency 
-    : (COUNTRIES.find(c => c.code === selectedCountry)?.currency || "XOF");
-  const isConversionNeeded = targetCurrency !== ownerCurrency;
+  // IMPORTANT: Only calculate target currency if a country is selected
+  // This prevents conversion from triggering before user selects a country
+  const targetCurrency = selectedCountry
+    ? (hasMultipleCurrencies(selectedCountry) 
+        ? selectedCurrency 
+        : (COUNTRIES.find(c => c.code === selectedCountry)?.currency || ownerCurrency))
+    : ownerCurrency; // Default to owner's currency when no country selected
+  const isConversionNeeded = selectedCountry && targetCurrency !== ownerCurrency;
   const isGuinea = selectedCountry === "GN";
   
   const fetchConversion = useCallback(async (amountToConvert: number, fromCurrency: string, toCurrency: string) => {

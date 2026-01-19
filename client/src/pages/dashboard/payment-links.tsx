@@ -642,7 +642,7 @@ export default function PaymentLinks() {
                   </div>
                   <div className="text-right">
                     <p className="text-2xl font-bold">
-                      {new Intl.NumberFormat("fr-FR").format(link.amount)} XOF
+                      {new Intl.NumberFormat("fr-FR").format(link.amount)} {userBalanceCurrency}
                     </p>
                   </div>
                 </div>

@@ -152,6 +152,15 @@ export default function ApiPay() {
   const [conversionData, setConversionData] = useState<ConversionData | null>(null);
   const [selectedCurrency, setSelectedCurrency] = useState<string>("XOF");
 
+  const { data: apiKeyInfo, isLoading: isLoadingKey, error: keyError } = useQuery<ApiKeyInfo>({
+    queryKey: [`/api/api-key-info/${key}`],
+    enabled: !!key,
+  });
+
+  const { data: enabledCountriesOperators, isLoading: isLoadingOperators } = useQuery<Record<string, string[]>>({
+    queryKey: ["/api/countries-operators/deposits"],
+  });
+
   // Handle currency selection when country changes
   useEffect(() => {
     if (country && hasMultipleCurrencies(country)) {
@@ -164,10 +173,15 @@ export default function ApiPay() {
   }, [country]);
 
   // Currency conversion for non-XOF countries
-  const targetCurrency = hasMultipleCurrencies(country) 
-    ? selectedCurrency 
-    : (COUNTRIES.find(c => c.code === country)?.currency || "XOF");
-  const needsConversion = targetCurrency !== "XOF";
+  // IMPORTANT: Only calculate target currency if a country is selected
+  // This prevents conversion from triggering before user selects a country
+  const ownerCurrency = (apiKeyInfo as any)?.ownerCurrency || "XOF";
+  const targetCurrency = country
+    ? (hasMultipleCurrencies(country) 
+        ? selectedCurrency 
+        : (COUNTRIES.find(c => c.code === country)?.currency || ownerCurrency))
+    : ownerCurrency; // Default to owner's currency when no country selected
+  const needsConversion = country && targetCurrency !== ownerCurrency;
 
   const copyUssdCode = (code: string) => {
     navigator.clipboard.writeText(code);
@@ -178,15 +192,6 @@ export default function ApiPay() {
       description: "Le code USSD a été copié dans le presse-papiers",
     });
   };
-
-  const { data: apiKeyInfo, isLoading: isLoadingKey, error: keyError } = useQuery<ApiKeyInfo>({
-    queryKey: [`/api/api-key-info/${key}`],
-    enabled: !!key,
-  });
-
-  const { data: enabledCountriesOperators, isLoading: isLoadingOperators } = useQuery<Record<string, string[]>>({
-    queryKey: ["/api/countries-operators/deposits"],
-  });
 
   const allCountryOperators = country
     ? (OPERATORS[country as keyof typeof OPERATORS] || [])
@@ -213,8 +218,8 @@ export default function ApiPay() {
   const isOrangeOperator = operator?.toLowerCase().includes("orange");
   const showOrangeOtpOnForm = isOrangeOperator && country && ORANGE_OTP_COUNTRIES.includes(country);
 
-  const fetchConversion = useCallback(async (amountToConvert: number, toCurrency: string) => {
-    if (!amountToConvert || amountToConvert <= 0 || toCurrency === "XOF") {
+  const fetchConversion = useCallback(async (amountToConvert: number, fromCurrency: string, toCurrency: string) => {
+    if (!amountToConvert || amountToConvert <= 0 || toCurrency === fromCurrency) {
       setConversionData(null);
       return;
     }
@@ -225,7 +230,7 @@ export default function ApiPay() {
       const res = await fetch("/api/convert-currency", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: amountToConvert, fromCurrency: "XOF", toCurrency }),
+        body: JSON.stringify({ amount: amountToConvert, fromCurrency, toCurrency }),
       });
       
       if (res.ok) {
@@ -248,13 +253,13 @@ export default function ApiPay() {
   useEffect(() => {
     if (needsConversion && amount && amount > 0) {
       const debounceTimer = setTimeout(() => {
-        fetchConversion(amount, targetCurrency);
+        fetchConversion(amount, ownerCurrency, targetCurrency);
       }, 500);
       return () => clearTimeout(debounceTimer);
     } else {
       setConversionData(null);
     }
-  }, [needsConversion, amount, targetCurrency, fetchConversion]);
+  }, [needsConversion, amount, ownerCurrency, targetCurrency, fetchConversion]);
 
   const [shouldStartCountdown, setShouldStartCountdown] = useState(false);
 

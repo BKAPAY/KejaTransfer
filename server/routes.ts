@@ -1263,11 +1263,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!apiKey) {
         return res.status(404).json({ error: "Cle API non trouvee" });
       }
+      
+      // Get owner's currency for proper display
+      const owner = await storage.getUser(apiKey.userId);
+      const ownerCurrency = owner?.country ? getCurrencyForCountry(owner.country) : "XOF";
+      
       res.json({
         siteName: (apiKey as any).siteName || apiKey.name,
         isActive: apiKey.isActive,
         allowedCountries: apiKey.allowedCountries || [],
         customerPaysFee: apiKey.customerPaysFee || false,
+        ownerCurrency,
       });
     } catch (error: any) {
       res.status(500).json({ error: "Une erreur est survenue" });
