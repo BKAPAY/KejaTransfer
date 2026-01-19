@@ -143,7 +143,7 @@ export async function handleMbiyoPayWithdrawal(
     });
 
     if (!result.success) {
-      return { success: false, error: result.error || "Retrait echoue" };
+      return { success: false, error: "Retrait echoue" };
     }
 
     await storage.updateUserBalance(userId, -feeInfo.totalDeductedFromBalance);
@@ -226,7 +226,7 @@ export async function handleMbiyoPayTransfer(
     });
 
     if (!result.success) {
-      return { success: false, error: result.error || "Transfert echoue" };
+      return { success: false, error: "Transfert echoue" };
     }
 
     await storage.updateUserBalance(userId, -totalToDebit);

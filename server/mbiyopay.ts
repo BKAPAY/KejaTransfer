@@ -249,22 +249,13 @@ export async function createMbiyoPayPayin(params: MbiyoPayPayinParams): Promise<
     }
     
     console.error("[MbiyoPay Payin] Error:", data);
-    // Handle various error response formats from MbiyoPay
-    let errorMessage = "Erreur lors de l'initiation du paiement";
-    if (data.message) {
-      errorMessage = typeof data.message === 'string' ? data.message : JSON.stringify(data.message);
-    } else if (data.errors) {
-      errorMessage = Array.isArray(data.errors) ? data.errors.join(', ') : String(data.errors);
-    } else if (data.error) {
-      errorMessage = typeof data.error === 'string' ? data.error : JSON.stringify(data.error);
-    }
     return { 
       success: false, 
-      error: errorMessage
+      error: "Paiement echoue"
     };
   } catch (error: any) {
     console.error("[MbiyoPay Payin] Exception:", error);
-    return { success: false, error: error.message || "Erreur de connexion" };
+    return { success: false, error: "Paiement echoue" };
   }
 }
 
@@ -353,11 +344,11 @@ export async function createMbiyoPayPayout(params: MbiyoPayPayoutParams): Promis
     console.error("[MbiyoPay Payout] Error:", data);
     return { 
       success: false, 
-      error: data.message || "Erreur lors du retrait" 
+      error: "Retrait echoue" 
     };
   } catch (error: any) {
     console.error("[MbiyoPay Payout] Exception:", error);
-    return { success: false, error: error.message || "Erreur de connexion" };
+    return { success: false, error: "Retrait echoue" };
   }
 }
 
