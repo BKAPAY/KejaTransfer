@@ -1,0 +1,19 @@
+# robots.txt for BKApay
+User-agent: *
+Allow: /
+Allow: /login
+Allow: /signup
+Allow: /forgot-password
+Allow: /documentation
+Allow: /terms
+Allow: /privacy
+Allow: /cookies
+
+# Disallow private dashboard areas
+Disallow: /dashboard
+
+# Disallow API endpoints
+Disallow: /api/
+
+# Sitemap location
+Sitemap: https://bkapay.com/sitemap.xml
