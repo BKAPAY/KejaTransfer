@@ -46,6 +46,72 @@ export const COUNTRY_PHONE_PREFIXES: Record<string, string> = {
   gm: "+220",
 };
 
+// Map internal operator codes to MbiyoPay API codes
+// Some operators have different names (e.g., togocom -> tmoney, celtiis -> celtis)
+export const MBIYOPAY_OPERATOR_API_CODES: Record<string, Record<string, string>> = {
+  tg: {
+    togocom: "tmoney",  // Togocel's mobile money service is called T-Money
+    moov: "moov",
+  },
+  bj: {
+    mtn: "mtn",
+    moov: "moov",
+    celtiis: "celtis",  // May need adjustment
+  },
+  bf: {
+    orange: "orange",
+    moov: "moov",
+    coris: "coris",
+  },
+  ci: {
+    orange: "orange",
+    mtn: "mtn",
+    wave: "wave",
+    moov: "moov",
+  },
+  sn: {
+    orange: "orange",
+    free: "free",
+  },
+  ml: {
+    orange: "orange",
+    moov: "moov",
+  },
+  gn: {
+    orange: "orange",
+  },
+  cm: {
+    orange: "orange",
+    moov: "moov",
+  },
+  cg: {
+    mtn: "mtn",
+  },
+  cd: {
+    mpesa: "mpesa",
+    airtel: "airtel",
+    orange: "orange",
+    afrimoney: "afrimoney",
+  },
+  gm: {
+    afrimoney: "afrimoney",
+    qmoney: "qmoney",
+    wave: "wave",
+  },
+};
+
+// Get the MbiyoPay API code for an operator
+export function getMbiyoPayOperatorCode(countryCode: string, operatorCode: string): string {
+  const countryLower = countryCode.toLowerCase();
+  const operatorLower = operatorCode.toLowerCase();
+  const countryMappings = MBIYOPAY_OPERATOR_API_CODES[countryLower];
+  if (countryMappings && countryMappings[operatorLower]) {
+    return countryMappings[operatorLower];
+  }
+  // Default: return the operator code as-is
+  return operatorLower;
+}
+
 async function getMbiyoPayApiKey(): Promise<string | null> {
   try {
     const config = await storage.getProviderConfig("mbiyopay");
@@ -128,7 +194,11 @@ export async function createMbiyoPayPayin(params: MbiyoPayPayinParams): Promise<
     
     const formattedPhone = formatPhoneForMbiyoPay(params.phone, params.countryCode);
     
+    // Get the correct API code for this operator (e.g., togocom -> tmoney)
+    const apiOperatorCode = getMbiyoPayOperatorCode(params.countryCode, params.network);
+    
     console.log(`[MbiyoPay Payin] Phone formatting: input="${params.phone}" -> output="${formattedPhone}" (country=${params.countryCode})`);
+    console.log(`[MbiyoPay Payin] Operator mapping: ${params.network} -> ${apiOperatorCode}`);
     
     // MbiyoPay documentation shows network in UPPERCASE in the example (e.g., "ORANGE")
     const requestBody = {
@@ -138,7 +208,7 @@ export async function createMbiyoPayPayin(params: MbiyoPayPayinParams): Promise<
       order_id: params.orderId || `BKAPAY-${Date.now()}`,
       callback_url: params.callbackUrl || `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/mbiyopay`,
       metadata: {
-        network: params.network.toUpperCase(),
+        network: apiOperatorCode.toUpperCase(),
         phone_number: formattedPhone,
         country_code: params.countryCode.toUpperCase(),
       },
@@ -233,7 +303,11 @@ export async function createMbiyoPayPayout(params: MbiyoPayPayoutParams): Promis
     
     const formattedPhone = formatPhoneForMbiyoPay(params.phone, params.countryCode);
     
+    // Get the correct API code for this operator (e.g., togocom -> tmoney)
+    const apiOperatorCode = getMbiyoPayOperatorCode(params.countryCode, params.network);
+    
     console.log(`[MbiyoPay Payout] Phone formatting: input="${params.phone}" -> output="${formattedPhone}" (country=${params.countryCode})`);
+    console.log(`[MbiyoPay Payout] Operator mapping: ${params.network} -> ${apiOperatorCode}`);
     
     // MbiyoPay documentation shows network in UPPERCASE
     const requestBody = {
@@ -243,7 +317,7 @@ export async function createMbiyoPayPayout(params: MbiyoPayPayoutParams): Promis
       order_id: params.orderId || `BKAPAY-PAYOUT-${Date.now()}`,
       callback_url: params.callbackUrl || `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/mbiyopay`,
       metadata: {
-        network: params.network.toUpperCase(),
+        network: apiOperatorCode.toUpperCase(),
         phone_number: formattedPhone,
         country_code: params.countryCode.toUpperCase(),
         beneficiary: params.beneficiaryName || "BKApay User",
