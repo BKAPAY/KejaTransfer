@@ -25,7 +25,7 @@ export const MBIYOPAY_OPERATORS: Record<string, string[]> = {
   sn: ["orange", "free"],
   tg: ["moov", "togocom"],
   ml: ["orange", "moov"],
-  gn: ["orange", "mtn"],
+  gn: ["orange"],
   cm: ["orange", "moov"],
   cg: ["mtn"],
   cd: ["mpesa", "airtel", "orange", "afrimoney"],
