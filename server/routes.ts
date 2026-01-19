@@ -1376,6 +1376,144 @@ export async function registerRoutes(app: Express): Promise<Server> {
           message: result.message || "Paiement initie. Veuillez valider sur votre telephone.",
           provider: "mbiyopay",
         });
+      } else if (activeProvider === "fedapay") {
+        // Use FedaPay
+        const { createCollect } = await import("./fedapay");
+        const currency = requestCurrency || "XOF";
+
+        console.log(`[API-PAY INIT] Using FedaPay for ${country}/${operator}, phone=${customerPhone}, currency=${currency}`);
+
+        const result = await createCollect({
+          amount: grossAmount,
+          description: description || "Paiement via API",
+          customerFirstName: customerName?.split(" ")[0] || "Client",
+          customerLastName: customerName?.split(" ").slice(1).join(" ") || "BKApay",
+          customerEmail: "noreply@bkapay.com",
+          customerPhone: customerPhone,
+          country: country,
+          operator: operator,
+        });
+
+        if (!result.success) {
+          return res.status(400).json({ success: false, error: "Paiement echoue" });
+        }
+
+        // Create transaction record
+        const tx = await storage.createTransaction({
+          userId: apiKey.userId,
+          type: "api_payment",
+          amount: feeInfo.grossAmount,
+          fee: feeInfo.feeAmount,
+          feePercentage: feeInfo.feePercentage,
+          currency: currency,
+          status: "pending",
+          country: country.toUpperCase(),
+          operator: operator,
+          description: description || "Paiement via API",
+          customerPhone: customerPhone,
+          customerName: customerName || "Client",
+          customerEmail: customerEmail || null,
+          metadata: JSON.stringify({
+            fedapayTransactionId: result.transactionId,
+            fedapayReference: result.reference,
+            apiKeyId: apiKey.id,
+            callbackUrl: callbackUrl || null,
+            provider: "fedapay",
+          }),
+        });
+
+        return res.json({
+          success: true,
+          transactionId: tx.id,
+          token: tx.id,
+          message: result.message || "Paiement initie. Veuillez valider sur votre telephone.",
+          provider: "fedapay",
+        });
+      } else if (activeProvider === "paydunya") {
+        // Use Paydunya
+        console.log(`[API-PAY INIT] Using Paydunya for ${country}/${operator}, phone=${customerPhone}`);
+        
+        const paydunyaData = {
+          invoice: {
+            total_amount: grossAmount,
+            description: description || "Paiement via API",
+            customer: {
+              name: customerName || "Client",
+              email: "noreply@bkapay.com",
+              phone: customerPhone,
+            },
+          },
+          store: {
+            name: "BKApay",
+          },
+          custom_data: {
+            api_key_id: apiKey.id,
+            type: "api_payment",
+            country,
+            operator,
+            phone: customerPhone,
+            callbackUrl: callbackUrl || null,
+          },
+          actions: {
+            callback_url: `${process.env.BASE_URL || 'https://bkapay.com'}/api/webhooks/paydunya`,
+          },
+        };
+
+        const paydunyaResponse = await callPaydunyaAPI("/checkout-invoice/create", paydunyaData);
+
+        if (paydunyaResponse.response_code !== "00" || !paydunyaResponse.token) {
+          return res.status(400).json({ success: false, error: "Paiement echoue" });
+        }
+
+        // Create transaction record
+        const tx = await storage.createTransaction({
+          userId: apiKey.userId,
+          type: "api_payment",
+          amount: feeInfo.grossAmount,
+          fee: feeInfo.feeAmount,
+          feePercentage: feeInfo.feePercentage,
+          currency: "XOF",
+          status: "pending",
+          country: country.toUpperCase(),
+          operator: operator,
+          description: description || "Paiement via API",
+          customerPhone: customerPhone,
+          customerName: customerName || "Client",
+          customerEmail: customerEmail || null,
+          paydunyaToken: paydunyaResponse.token,
+          metadata: JSON.stringify({
+            apiKeyId: apiKey.id,
+            callbackUrl: callbackUrl || null,
+            provider: "paydunya",
+          }),
+        });
+
+        // Now call Softpay to initiate the payment
+        const operatorKey = getOperatorKey(operator, country);
+        if (!operatorKey) {
+          return res.status(400).json({ success: false, error: "Operateur non valide" });
+        }
+
+        const paymentData: SoftpayPaymentData = {
+          customerName: customerName || "Client",
+          customerEmail: "noreply@bkapay.com",
+          phoneNumber: customerPhone.replace(/\s+/g, "").replace(/[^0-9]/g, ""),
+          invoiceToken: paydunyaResponse.token,
+        };
+
+        const softpayResult = await callPaydunyaSoftpay(operator, country, paymentData);
+
+        if (!softpayResult.success) {
+          return res.status(400).json({ success: false, error: "Paiement echoue" });
+        }
+
+        return res.json({
+          success: true,
+          transactionId: tx.id,
+          token: paydunyaResponse.token,
+          message: "Paiement initie. Veuillez valider sur votre telephone.",
+          provider: "paydunya",
+        });
       } else {
         return res.status(503).json({ 
           success: false, 
