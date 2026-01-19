@@ -130,6 +130,7 @@ export async function createMbiyoPayPayin(params: MbiyoPayPayinParams): Promise<
     
     console.log(`[MbiyoPay Payin] Phone formatting: input="${params.phone}" -> output="${formattedPhone}" (country=${params.countryCode})`);
     
+    // MbiyoPay expects network in lowercase (e.g., "mtn", "orange", "moov", "togocom")
     const requestBody = {
       amount: params.amount,
       currency: params.currency,
@@ -137,7 +138,7 @@ export async function createMbiyoPayPayin(params: MbiyoPayPayinParams): Promise<
       order_id: params.orderId || `BKAPAY-${Date.now()}`,
       callback_url: params.callbackUrl || `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/mbiyopay`,
       metadata: {
-        network: params.network.toUpperCase(),
+        network: params.network.toLowerCase(),
         phone_number: formattedPhone,
         country_code: params.countryCode.toUpperCase(),
       },
