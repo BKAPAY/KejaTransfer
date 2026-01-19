@@ -257,6 +257,7 @@ export default function FournisseursPage() {
     fedapay: { apiKey: "", secretKey: "", publicKey: "", masterKey: "", token: "", ipnSecret: "" },
     mbiyopay: { apiKey: "", secretKey: "", publicKey: "", masterKey: "", token: "", ipnSecret: "" },
     nowpayments: { apiKey: "", secretKey: "", publicKey: "", masterKey: "", token: "", ipnSecret: "" },
+    exchangerate: { apiKey: "", secretKey: "", publicKey: "", masterKey: "", token: "", ipnSecret: "" },
   });
 
   const { data: providers, isLoading } = useQuery<ProviderConfig[]>({
@@ -375,7 +376,7 @@ export default function FournisseursPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           {Object.entries(PROVIDER_INFO).map(([key, info]) => {
             const config = getProviderConfig(key);
             return (
