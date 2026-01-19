@@ -106,6 +106,7 @@ export interface MbiyoPayPayinResult {
   error?: string;
   fee?: number;
   chargedAmount?: number;
+  instructions?: string; // Special instructions for Gambia networks
 }
 
 export async function createMbiyoPayPayin(params: MbiyoPayPayinParams): Promise<MbiyoPayPayinResult> {
@@ -157,7 +158,8 @@ export async function createMbiyoPayPayin(params: MbiyoPayPayinParams): Promise<
     
     if (data.status === "success" && data.data) {
       console.log(`[MbiyoPay Payin] Payment created: ${data.data.transaction_id}`);
-      return {
+      // Capture instructions field for Gambia networks
+      const result: MbiyoPayPayinResult = {
         success: true,
         transactionId: data.data.transaction_id,
         status: data.data.status,
@@ -166,6 +168,12 @@ export async function createMbiyoPayPayin(params: MbiyoPayPayinParams): Promise<
         fee: data.data.fee,
         chargedAmount: data.data.charged_amount,
       };
+      // Add instructions for Gambia if present
+      if (data.data.instructions) {
+        result.instructions = data.data.instructions;
+        console.log(`[MbiyoPay Payin] Instructions provided: ${data.data.instructions}`);
+      }
+      return result;
     }
     
     console.error("[MbiyoPay Payin] Error:", data);

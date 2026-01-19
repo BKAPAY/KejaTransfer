@@ -22,7 +22,7 @@ export async function handleMbiyoPayDeposit(
   currency?: string,
   originalAmount?: number,
   originalCurrency?: string
-): Promise<{ success: boolean; transactionId?: string; mbiyopayTransactionId?: string; redirectUrl?: string; message?: string; error?: string }> {
+): Promise<{ success: boolean; transactionId?: string; mbiyopayTransactionId?: string; redirectUrl?: string; message?: string; error?: string; instructions?: string }> {
   try {
     const countryLower = country.toLowerCase();
     if (!MBIYOPAY_SUPPORTED_COUNTRIES.includes(countryLower)) {
@@ -89,6 +89,7 @@ export async function handleMbiyoPayDeposit(
       mbiyopayTransactionId: result.transactionId,
       redirectUrl: result.redirectUrl,
       message: result.message || "Paiement initie. Veuillez valider sur votre telephone.",
+      instructions: result.instructions, // For Gambia networks
     };
   } catch (error: any) {
     console.error("[MbiyoPay Deposit] Error:", error);
