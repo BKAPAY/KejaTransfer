@@ -1377,9 +1377,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           provider: "mbiyopay",
         });
       } else if (activeProvider === "fedapay") {
-        // Use FedaPay
+        // Use FedaPay - always uses XOF currency
         const { createCollect } = await import("./fedapay");
-        const currency = requestCurrency || "XOF";
+        const currency = "XOF"; // FedaPay only supports XOF
 
         console.log(`[API-PAY INIT] Using FedaPay for ${country}/${operator}, phone=${customerPhone}, currency=${currency}`);
 
@@ -1482,9 +1482,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           customerEmail: customerEmail || null,
           paydunyaToken: paydunyaResponse.token,
           metadata: JSON.stringify({
+            paydunyaToken: paydunyaResponse.token,
             apiKeyId: apiKey.id,
             callbackUrl: callbackUrl || null,
             provider: "paydunya",
+            country: country.toUpperCase(),
+            operator: operator,
           }),
         });
 
