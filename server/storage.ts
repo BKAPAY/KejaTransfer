@@ -1239,7 +1239,7 @@ export class DbStorage implements IStorage {
   }
 
   async initializeProviderConfigs(): Promise<void> {
-    const providers = ["afribapay", "paydunya", "fedapay", "mbiyopay", "nowpayments"];
+    const providers = ["afribapay", "paydunya", "fedapay", "mbiyopay", "nowpayments", "exchangerate"];
     const existing = await this.getProviderConfigs();
     const existingSet = new Set(existing.map(p => p.provider));
 
