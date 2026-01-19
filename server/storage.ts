@@ -101,6 +101,7 @@ export interface IStorage {
   getCountryOperatorConfigsByProvider(provider: string): Promise<CountryOperatorConfig[]>;
   getCountryOperatorConfig(provider: string, country: string, operator: string): Promise<CountryOperatorConfig | undefined>;
   updateCountryOperatorConfig(provider: string, country: string, operator: string, config: UpdateCountryOperatorConfig): Promise<CountryOperatorConfig | undefined>;
+  disableOperatorForOtherProviders(provider: string, country: string, operator: string, type: "incoming" | "outgoing"): Promise<void>;
   disableCountryForOtherProviders(provider: string, country: string, type: "incoming" | "outgoing"): Promise<void>;
   initializeCountryOperatorConfigs(): Promise<void>;
   
@@ -972,7 +973,35 @@ export class DbStorage implements IStorage {
     return results[0];
   }
 
-  // Disable same country for other providers (mutual exclusivity)
+  // Disable same OPERATOR for other providers (mutual exclusivity at operator level)
+  // An operator (e.g., MTN Benin) can only be active for ONE provider at a time
+  async disableOperatorForOtherProviders(
+    provider: string,
+    country: string,
+    operator: string,
+    type: "incoming" | "outgoing"
+  ): Promise<void> {
+    const updateField = type === "incoming" ? { incomingEnabled: false } : { outgoingEnabled: false };
+    
+    // Only disable the specific operator for other providers, not the whole country
+    await db
+      .update(schema.countryOperatorConfig)
+      .set({
+        ...updateField,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(schema.countryOperatorConfig.country, country),
+          eq(schema.countryOperatorConfig.operator, operator),
+          sql`${schema.countryOperatorConfig.provider} != ${provider}`
+        )
+      );
+    
+    console.log(`[MutualExclusivity] Disabled ${operator} in ${country} for ${type} on all providers except ${provider}`);
+  }
+  
+  // Legacy function - disable entire country for other providers
   async disableCountryForOtherProviders(
     provider: string,
     country: string,
@@ -990,20 +1019,6 @@ export class DbStorage implements IStorage {
         and(
           eq(schema.countryOperatorConfig.country, country),
           sql`${schema.countryOperatorConfig.provider} != ${provider}`
-        )
-      );
-    
-    // Also disable at country status level for other providers
-    await db
-      .update(schema.countryStatus)
-      .set({
-        ...(type === "incoming" ? { payinEnabled: false } : { payoutEnabled: false }),
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(schema.countryStatus.country, country),
-          sql`${schema.countryStatus.provider} != ${provider}`
         )
       );
   }

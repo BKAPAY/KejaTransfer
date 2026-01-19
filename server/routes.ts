@@ -5374,12 +5374,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { provider, country, operator } = req.params;
       const { incomingEnabled, outgoingEnabled } = req.body;
 
-      // If enabling, disable same country for other providers (mutual exclusivity)
+      // Operator-level mutual exclusivity: if enabling an operator for one provider,
+      // auto-disable the SAME operator for all OTHER providers
+      // This allows different operators in the same country to be active on different providers
       if (incomingEnabled === true) {
-        await storage.disableCountryForOtherProviders(provider, country, "incoming");
+        await storage.disableOperatorForOtherProviders(provider, country, operator, "incoming");
       }
       if (outgoingEnabled === true) {
-        await storage.disableCountryForOtherProviders(provider, country, "outgoing");
+        await storage.disableOperatorForOtherProviders(provider, country, operator, "outgoing");
       }
 
       const config = await storage.updateCountryOperatorConfig(provider, country, operator, {

@@ -172,10 +172,11 @@ export default function CountryOperatorConfigPage() {
           <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
           <div>
             <p className="text-sm font-medium text-amber-700 dark:text-amber-400">
-              Exclusivité mutuelle par pays
+              Exclusivite mutuelle par operateur
             </p>
             <p className="text-sm text-muted-foreground mt-1">
-              Activer un pays pour les paiements entrants ou sortants le désactivera automatiquement chez les autres fournisseurs.
+              Activer un operateur (ex: MTN Benin) pour un fournisseur le desactivera automatiquement chez les autres fournisseurs.
+              Vous pouvez activer differents operateurs du meme pays chez differents fournisseurs.
             </p>
           </div>
         </div>
@@ -244,18 +245,48 @@ export default function CountryOperatorConfigPage() {
                     const countryConfigs = groupedConfigs[countryCode] || [];
                     const countryStatus = countryStatusMap[countryCode];
                     const isExpanded = expandedCountry === `${provider.id}-${countryCode}`;
+                    
+                    // Count active operators for payin and payout
+                    const activePayinOperators = countryConfigs.filter(c => c.incomingEnabled).length;
+                    const activePayoutOperators = countryConfigs.filter(c => c.outgoingEnabled).length;
+                    const hasPayinActive = countryStatus?.payinEnabled && activePayinOperators > 0;
+                    const hasPayoutActive = countryStatus?.payoutEnabled && activePayoutOperators > 0;
+                    const noPayinOperators = countryStatus?.payinEnabled && activePayinOperators === 0;
+                    const noPayoutOperators = countryStatus?.payoutEnabled && activePayoutOperators === 0;
 
                     return (
                       <Card key={`${provider.id}-${countryCode}`} className="overflow-hidden">
                         <div className="p-4 border-b bg-muted/30">
                           <div className="flex items-center justify-between flex-wrap gap-2">
                             <div className="flex items-center gap-3">
-                              <span className="text-2xl">{countryInfo.flag}</span>
+                              <Globe className="w-6 h-6 text-muted-foreground" />
                               <div>
-                                <h3 className="font-semibold text-foreground">{countryInfo.name}</h3>
-                                <p className="text-sm text-muted-foreground">
-                                  {countryInfo.operators.length} opérateur{countryInfo.operators.length > 1 ? "s" : ""} - {countryInfo.currency}
-                                </p>
+                                <h3 className="font-semibold text-foreground">{countryInfo.name} ({countryCode})</h3>
+                                <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
+                                  <span>{countryInfo.operators.length} operateur{countryInfo.operators.length > 1 ? "s" : ""}</span>
+                                  <span>-</span>
+                                  <span>{countryInfo.currency}</span>
+                                  {hasPayinActive && (
+                                    <Badge variant="secondary" className="text-xs bg-green-500/10 text-green-600">
+                                      {activePayinOperators} payin actif{activePayinOperators > 1 ? "s" : ""}
+                                    </Badge>
+                                  )}
+                                  {hasPayoutActive && (
+                                    <Badge variant="secondary" className="text-xs bg-blue-500/10 text-blue-600">
+                                      {activePayoutOperators} payout actif{activePayoutOperators > 1 ? "s" : ""}
+                                    </Badge>
+                                  )}
+                                  {noPayinOperators && (
+                                    <Badge variant="outline" className="text-xs text-orange-600 border-orange-300">
+                                      Aucun operateur payin
+                                    </Badge>
+                                  )}
+                                  {noPayoutOperators && (
+                                    <Badge variant="outline" className="text-xs text-orange-600 border-orange-300">
+                                      Aucun operateur payout
+                                    </Badge>
+                                  )}
+                                </div>
                               </div>
                             </div>
 
