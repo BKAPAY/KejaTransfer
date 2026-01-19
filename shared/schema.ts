@@ -170,9 +170,10 @@ export const insertCryptoCurrencySchema = createInsertSchema(cryptoCurrencies).o
 });
 export type InsertCryptoCurrency = z.infer<typeof insertCryptoCurrencySchema>;
 
-// Fee configuration per country/operator
+// Fee configuration per provider/country/operator
 export const feeConfigs = pgTable("fee_configs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  provider: text("provider").notNull().default("default"), // "mbiyopay", "fedapay", "afribapay", "paydunya", "default"
   country: text("country").notNull(), // "BJ", "TG", "CI", "SN", "BF", etc.
   operator: text("operator").notNull(), // "orange", "mtn", "moov", "wave", etc.
   incomingFeePercentage: integer("incoming_fee_percentage").notNull().default(60), // 60 = 6%, 40 = 4%, etc.

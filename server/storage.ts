@@ -20,6 +20,10 @@ import type {
   InsertFeeConfig,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
+import { MBIYOPAY_COUNTRIES } from "@shared/mbiyopay-countries";
+import { FEDAPAY_COUNTRIES } from "@shared/fedapay-countries";
+import { AFRIBAPAY_COUNTRIES } from "@shared/afribapay-countries";
+import { PAYDUNYA_COUNTRIES } from "@shared/paydunya-countries";
 
 if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL environment variable is not set");
@@ -139,10 +143,11 @@ export interface IStorage {
 
   // Fee Configuration
   getAllFeeConfigs(): Promise<FeeConfig[]>;
-  getFeeConfig(country: string, operator: string): Promise<FeeConfig | undefined>;
+  getFeeConfigsByProvider(provider: string): Promise<FeeConfig[]>;
+  getFeeConfig(provider: string, country: string, operator: string): Promise<FeeConfig | undefined>;
   getFeeConfigsByCountry(country: string): Promise<FeeConfig[]>;
   createOrUpdateFeeConfig(config: InsertFeeConfig): Promise<FeeConfig>;
-  updateFeeConfig(country: string, operator: string, updates: { incomingFeePercentage?: number; outgoingFeePercentage?: number }): Promise<FeeConfig | undefined>;
+  updateFeeConfig(provider: string, country: string, operator: string, updates: { incomingFeePercentage?: number; outgoingFeePercentage?: number }): Promise<FeeConfig | undefined>;
   initializeFeeConfigs(): Promise<void>;
 }
 
@@ -1379,11 +1384,19 @@ export class DbStorage implements IStorage {
     return db.select().from(schema.feeConfigs);
   }
 
-  async getFeeConfig(country: string, operator: string): Promise<FeeConfig | undefined> {
+  async getFeeConfigsByProvider(provider: string): Promise<FeeConfig[]> {
+    return db
+      .select()
+      .from(schema.feeConfigs)
+      .where(eq(schema.feeConfigs.provider, provider));
+  }
+
+  async getFeeConfig(provider: string, country: string, operator: string): Promise<FeeConfig | undefined> {
     const results = await db
       .select()
       .from(schema.feeConfigs)
       .where(and(
+        eq(schema.feeConfigs.provider, provider),
         eq(schema.feeConfigs.country, country),
         eq(schema.feeConfigs.operator, operator)
       ))
@@ -1399,7 +1412,8 @@ export class DbStorage implements IStorage {
   }
 
   async createOrUpdateFeeConfig(config: InsertFeeConfig): Promise<FeeConfig> {
-    const existing = await this.getFeeConfig(config.country, config.operator);
+    const provider = config.provider || "default";
+    const existing = await this.getFeeConfig(provider, config.country, config.operator);
     if (existing) {
       const results = await db
         .update(schema.feeConfigs)
@@ -1409,21 +1423,23 @@ export class DbStorage implements IStorage {
           updatedAt: new Date() 
         })
         .where(and(
+          eq(schema.feeConfigs.provider, provider),
           eq(schema.feeConfigs.country, config.country),
           eq(schema.feeConfigs.operator, config.operator)
         ))
         .returning();
       return results[0];
     }
-    const results = await db.insert(schema.feeConfigs).values(config).returning();
+    const results = await db.insert(schema.feeConfigs).values({ ...config, provider }).returning();
     return results[0];
   }
 
-  async updateFeeConfig(country: string, operator: string, updates: { incomingFeePercentage?: number; outgoingFeePercentage?: number }): Promise<FeeConfig | undefined> {
+  async updateFeeConfig(provider: string, country: string, operator: string, updates: { incomingFeePercentage?: number; outgoingFeePercentage?: number }): Promise<FeeConfig | undefined> {
     const results = await db
       .update(schema.feeConfigs)
       .set({ ...updates, updatedAt: new Date() })
       .where(and(
+        eq(schema.feeConfigs.provider, provider),
         eq(schema.feeConfigs.country, country),
         eq(schema.feeConfigs.operator, operator)
       ))
@@ -1438,14 +1454,53 @@ export class DbStorage implements IStorage {
       return;
     }
 
-    // Initialize with default 6% (60) for all countries and operators from OPERATORS
-    const allOperators = schema.OPERATORS;
     const configs: InsertFeeConfig[] = [];
 
-    for (const [country, operators] of Object.entries(allOperators)) {
-      for (const op of operators) {
+    // MbiyoPay countries
+    for (const country of MBIYOPAY_COUNTRIES) {
+      for (const op of country.operators) {
         configs.push({
-          country,
+          provider: "mbiyopay",
+          country: country.code,
+          operator: op.code,
+          incomingFeePercentage: 60,
+          outgoingFeePercentage: 60,
+        });
+      }
+    }
+
+    // FedaPay countries
+    for (const country of FEDAPAY_COUNTRIES) {
+      for (const op of country.operators) {
+        configs.push({
+          provider: "fedapay",
+          country: country.code,
+          operator: op.code,
+          incomingFeePercentage: 60,
+          outgoingFeePercentage: 60,
+        });
+      }
+    }
+
+    // AfribaPay countries
+    for (const country of AFRIBAPAY_COUNTRIES) {
+      for (const op of country.operators) {
+        configs.push({
+          provider: "afribapay",
+          country: country.code,
+          operator: op.code,
+          incomingFeePercentage: 60,
+          outgoingFeePercentage: 60,
+        });
+      }
+    }
+
+    // Paydunya countries
+    for (const country of PAYDUNYA_COUNTRIES) {
+      for (const op of country.operators) {
+        configs.push({
+          provider: "paydunya",
+          country: country.code,
           operator: op.code,
           incomingFeePercentage: 60,
           outgoingFeePercentage: 60,

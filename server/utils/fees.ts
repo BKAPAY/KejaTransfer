@@ -34,16 +34,17 @@ export function getFeePercentage(feeValue?: number): number {
 }
 
 /**
- * Get fee percentages from database for a specific country/operator
+ * Get fee percentages from database for a specific provider/country/operator
  * Returns incoming and outgoing fee percentages
  */
 export async function getFeeFromDatabase(
   storage: any, 
+  provider: string,
   country: string, 
   operator: string
 ): Promise<{ incoming: number; outgoing: number }> {
   try {
-    const config = await storage.getFeeConfig(country.toUpperCase(), operator.toLowerCase());
+    const config = await storage.getFeeConfig(provider.toLowerCase(), country.toUpperCase(), operator.toLowerCase());
     if (config) {
       return {
         incoming: config.incomingFeePercentage ?? DEFAULT_FEE_PERCENTAGE,
@@ -51,7 +52,7 @@ export async function getFeeFromDatabase(
       };
     }
   } catch (error) {
-    console.warn(`[FEES] Failed to get fee config for ${country}/${operator}:`, error);
+    console.warn(`[FEES] Failed to get fee config for ${provider}/${country}/${operator}:`, error);
   }
   return { incoming: DEFAULT_FEE_PERCENTAGE, outgoing: DEFAULT_FEE_PERCENTAGE };
 }

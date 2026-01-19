@@ -40,8 +40,8 @@ export async function handleMbiyoPayDeposit(
     const balanceAmount = originalAmount ? Math.floor(originalAmount) : providerAmount;
     const userCurrency = originalCurrency || providerCurrency;
     
-    // Get dynamic fees from database - calculate fees on the balance amount
-    const feeConfig = await getFeeFromDatabase(storage, country, operator);
+    // Get dynamic fees from database for mbiyopay - calculate fees on the balance amount
+    const feeConfig = await getFeeFromDatabase(storage, "mbiyopay", country, operator);
     const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming);
 
     const result = await createMbiyoPayPayin({
@@ -117,8 +117,11 @@ export async function handleMbiyoPayWithdrawal(
     }
 
     const grossAmount = Math.floor(amount);
-    const feeInfo = calculateOutgoingFee(grossAmount);
     const currency = getCurrencyForCountry(country);
+    
+    // Get dynamic fees from database for mbiyopay
+    const feeConfig = await getFeeFromDatabase(storage, "mbiyopay", country, operator);
+    const feeInfo = calculateOutgoingFee(grossAmount, feeConfig.outgoing);
 
     if (user.balance < feeInfo.totalDeductedFromBalance) {
       return { success: false, error: "Solde insuffisant" };
@@ -196,8 +199,11 @@ export async function handleMbiyoPayTransfer(
     }
 
     const netAmount = Math.floor(amount);
-    const feeInfo = calculateOutgoingFee(netAmount);
     const currency = getCurrencyForCountry(country);
+    
+    // Get dynamic fees from database for mbiyopay
+    const feeConfig = await getFeeFromDatabase(storage, "mbiyopay", country, operator);
+    const feeInfo = calculateOutgoingFee(netAmount, feeConfig.outgoing);
     const totalToDebit = netAmount + feeInfo.feeAmount;
 
     if (user.balance < totalToDebit) {
@@ -280,8 +286,8 @@ export async function handleMbiyoPayPaymentLink(
     const baseAmount = paymentLink.amount; // Original amount in owner's currency
     const balanceCurrency = ownerCurrency || "XOF";
     
-    // Get dynamic fees from database - calculate on base amount
-    const feeConfig = await getFeeFromDatabase(storage, country, operator);
+    // Get dynamic fees from database for mbiyopay - calculate on base amount
+    const feeConfig = await getFeeFromDatabase(storage, "mbiyopay", country, operator);
     const feeInfo = calculateIncomingFee(baseAmount, feeConfig.incoming);
     
     // Use converted amount for provider if available, otherwise use base amount
@@ -379,8 +385,8 @@ export async function handleMbiyoPayMerchantLink(
     const balanceAmount = originalAmount ? Math.floor(originalAmount) : providerAmount;
     const balanceCurrency = originalCurrency || providerCurrency;
     
-    // Get dynamic fees - calculate on balance amount
-    const feeConfig = await getFeeFromDatabase(storage, country, operator);
+    // Get dynamic fees for mbiyopay - calculate on balance amount
+    const feeConfig = await getFeeFromDatabase(storage, "mbiyopay", country, operator);
     const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming);
 
     const result = await createMbiyoPayPayin({

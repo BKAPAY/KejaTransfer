@@ -3320,8 +3320,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ success: false, error: "Pays, operateur et telephone requis" });
       }
 
-      // Get dynamic fees from database
-      const feeConfig = await getFeeFromDatabase(storage, country, operator);
+      // Determine which provider to use
+      const activeProvider = await getActiveProviderForWithdrawal(country, operator);
+      
+      if (!activeProvider) {
+        console.log(`[WITHDRAWAL] No active provider found for ${country}/${operator}`);
+        return res.status(503).json({ 
+          success: false, 
+          error: "Aucun fournisseur n'est configure pour les retraits vers ce pays et operateur" 
+        });
+      }
+
+      // Get dynamic fees from database for the active provider
+      const feeConfig = await getFeeFromDatabase(storage, activeProvider, country, operator);
       
       // Calculate fees with dynamic percentage
       const feeInfo = calculateOutgoingFee(Math.floor(amount), feeConfig.outgoing);
@@ -3338,17 +3349,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ 
           success: false, 
           error: "Solde insuffisant" 
-        });
-      }
-
-      // Determine which provider to use
-      const activeProvider = await getActiveProviderForWithdrawal(country, operator);
-      
-      if (!activeProvider) {
-        console.log(`[WITHDRAWAL] No active provider found for ${country}/${operator}`);
-        return res.status(503).json({ 
-          success: false, 
-          error: "Aucun fournisseur n'est configure pour les retraits vers ce pays et operateur" 
         });
       }
 
@@ -4198,8 +4198,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Retrait échoué" });
       }
 
-      // Get dynamic fees from database
-      const feeConfig = await getFeeFromDatabase(storage, country, operator);
+      // Get dynamic fees from database (using paydunya as provider for this route)
+      const feeConfig = await getFeeFromDatabase(storage, "paydunya", country, operator);
       
       // Calculate fees with dynamic percentage
       const feeInfo = calculateOutgoingFee(Math.floor(amount), feeConfig.outgoing);
@@ -5545,6 +5545,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/admin/fee-configs/provider/:provider", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { provider } = req.params;
+      const configs = await storage.getFeeConfigsByProvider(provider);
+      res.json(configs);
+    } catch (error: any) {
+      console.error("Get fee configs by provider error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
   app.get("/api/admin/fee-configs/:country", requireAdmin, async (req: Request, res: Response) => {
     try {
       const { country } = req.params;
@@ -5556,9 +5567,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/admin/fee-configs/:country/:operator", requireAdmin, async (req: Request, res: Response) => {
+  app.put("/api/admin/fee-configs/:provider/:country/:operator", requireAdmin, async (req: Request, res: Response) => {
     try {
-      const { country, operator } = req.params;
+      const { provider, country, operator } = req.params;
       const { incomingFeePercentage, outgoingFeePercentage } = req.body;
 
       // Validate fee percentages (0-100 as whole number, stored as 0-1000)
@@ -5570,16 +5581,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Check if config exists, create if not
-      let config = await storage.getFeeConfig(country, operator);
+      let config = await storage.getFeeConfig(provider, country, operator);
       if (!config) {
         config = await storage.createOrUpdateFeeConfig({
+          provider,
           country,
           operator,
           incomingFeePercentage: incomingFeePercentage ?? 60,
           outgoingFeePercentage: outgoingFeePercentage ?? 60,
         });
       } else {
-        config = await storage.updateFeeConfig(country, operator, {
+        config = await storage.updateFeeConfig(provider, country, operator, {
           incomingFeePercentage,
           outgoingFeePercentage,
         });
@@ -5592,11 +5604,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Public endpoint to get fee for a specific country/operator
-  app.get("/api/fees/:country/:operator", async (req: Request, res: Response) => {
+  // Public endpoint to get fee for a specific provider/country/operator
+  app.get("/api/fees/:provider/:country/:operator", async (req: Request, res: Response) => {
     try {
-      const { country, operator } = req.params;
-      const config = await storage.getFeeConfig(country.toUpperCase(), operator.toLowerCase());
+      const { provider, country, operator } = req.params;
+      const config = await storage.getFeeConfig(provider.toLowerCase(), country.toUpperCase(), operator.toLowerCase());
       
       if (config) {
         res.json({

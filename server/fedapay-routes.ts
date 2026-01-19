@@ -41,8 +41,8 @@ export async function handleFedaPayDeposit(
     const providerCurrency = currency || "XOF";
     const userCurrency = originalCurrency || providerCurrency;
     
-    // Get dynamic fees from database - calculate fees on the balance amount
-    const feeConfig = await getFeeFromDatabase(storage, country, operator);
+    // Get dynamic fees from database for fedapay - calculate fees on the balance amount
+    const feeConfig = await getFeeFromDatabase(storage, "fedapay", country, operator);
     const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming);
 
     const nameParts = (user.firstName + " " + user.lastName).split(" ");
@@ -126,7 +126,10 @@ export async function handleFedaPayWithdrawal(
     }
 
     const grossAmount = Math.floor(amount);
-    const feeInfo = calculateOutgoingFee(grossAmount);
+    
+    // Get dynamic fees from database for fedapay
+    const feeConfig = await getFeeFromDatabase(storage, "fedapay", country, operator);
+    const feeInfo = calculateOutgoingFee(grossAmount, feeConfig.outgoing);
 
     if (user.balance < feeInfo.totalDeductedFromBalance) {
       return { success: false, error: "Solde insuffisant" };
@@ -212,7 +215,10 @@ export async function handleFedaPayTransfer(
     }
 
     const netAmount = Math.floor(amount);
-    const feePercentage = 60; // 6%
+    
+    // Get dynamic fees from database for fedapay transfers
+    const feeConfig = await getFeeFromDatabase(storage, "fedapay", country, operator);
+    const feePercentage = feeConfig.outgoing;
     const feeAmount = Math.floor((netAmount * feePercentage) / 1000);
     const totalDeductedFromBalance = netAmount + feeAmount;
 
@@ -299,8 +305,8 @@ export async function handlePaymentLinkPayment(
     const providerCurrency = convertedCurrency || "XOF";
     const customerPaysFee = paymentLink.customerPaysFee || false;
     
-    // Get dynamic fees from database
-    const feeConfig = await getFeeFromDatabase(storage, country, operator);
+    // Get dynamic fees from database for fedapay
+    const feeConfig = await getFeeFromDatabase(storage, "fedapay", country, operator);
     
     let grossAmount: number;
     let feeInfo: ReturnType<typeof calculateIncomingFee>;
@@ -406,8 +412,8 @@ export async function handleMerchantLinkPayment(
     const balanceAmount = originalAmount ? Math.floor(originalAmount) : providerAmount;
     const ownerCurrency = originalCurrency || "XOF";
     
-    // Get dynamic fees from database - calculate fees on the balance amount
-    const feeConfig = await getFeeFromDatabase(storage, country, operator);
+    // Get dynamic fees from database for fedapay - calculate fees on the balance amount
+    const feeConfig = await getFeeFromDatabase(storage, "fedapay", country, operator);
     const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming);
 
     const nameParts = customerName.split(" ");
