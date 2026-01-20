@@ -536,13 +536,12 @@ export default function ApiPay() {
     setIsSubmitting(false);
   };
 
-  const formatAmount = (amt: number) => {
+  const formatAmount = (amt: number, currency: string = ownerCurrency) => {
+    const decimals = getCurrencyDecimals(currency);
     return new Intl.NumberFormat("fr-FR", {
-      style: "currency",
-      currency: "XOF",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amt);
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+    }).format(amt) + " " + currency;
   };
 
   if (isLoadingKey) {
@@ -595,7 +594,7 @@ export default function ApiPay() {
                 <div>
                   <p className="font-semibold text-foreground">Montant invalide</p>
                   <p className="text-sm text-muted-foreground">
-                    Le montant doit etre superieur a 100 XOF
+                    Le montant doit etre superieur a 100 {ownerCurrency}
                   </p>
                 </div>
               </div>
@@ -777,7 +776,7 @@ export default function ApiPay() {
             <div className="text-center p-4 bg-muted rounded-lg">
               <p className="text-sm text-muted-foreground">Montant a payer</p>
               <p className="text-2xl font-bold text-primary">
-                {apiKeyInfo?.customerPaysFee ? Math.ceil(amount * 1.06).toLocaleString() : amount.toLocaleString()} FCFA
+                {apiKeyInfo?.customerPaysFee ? Math.ceil(amount * 1.06).toLocaleString() : amount.toLocaleString()} {ownerCurrency}
               </p>
             </div>
             
@@ -1177,7 +1176,7 @@ export default function ApiPay() {
             Traitement...
           </>
         ) : (
-          `Payer ${apiKeyInfo?.customerPaysFee ? Math.ceil(amount * 1.06).toLocaleString() : amount.toLocaleString()} XOF`
+          `Payer ${apiKeyInfo?.customerPaysFee ? Math.ceil(amount * 1.06).toLocaleString() : amount.toLocaleString()} ${ownerCurrency}`
         )}
       </Button>
     </div>
@@ -1203,7 +1202,7 @@ export default function ApiPay() {
             <div>
               <p className="text-sm text-muted-foreground mb-1">Montant a payer</p>
               <p className="text-3xl font-bold text-primary">
-                {apiKeyInfo?.customerPaysFee ? Math.ceil(amount * 1.06).toLocaleString() : amount.toLocaleString()} <span className="text-lg">XOF</span>
+                {apiKeyInfo?.customerPaysFee ? Math.ceil(amount * 1.06).toLocaleString() : amount.toLocaleString()} <span className="text-lg">{ownerCurrency}</span>
               </p>
             </div>
             <div>
@@ -1220,7 +1219,7 @@ export default function ApiPay() {
               amount && amount >= 500 ? (
                 <CryptoPaymentFlow
                   amount={amount}
-                  currency="XOF"
+                  currency={ownerCurrency}
                   apiKeyId={key}
                   orderDescription={description || `Paiement à ${apiKeyInfo?.siteName}`}
                   customerName={customerName}
@@ -1232,7 +1231,7 @@ export default function ApiPay() {
                 />
               ) : (
                 <div className="p-4 text-center text-muted-foreground">
-                  Le montant minimum pour payer en crypto est de 500 XOF
+                  Le montant minimum pour payer en crypto est de 500 {ownerCurrency}
                 </div>
               )
             }
