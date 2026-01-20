@@ -370,9 +370,14 @@ echo json_encode(['received' => true]);
           <div className="space-y-3">
             <h4 className="font-semibold">Parametres</h4>
             <div className="grid gap-2 text-sm">
-              <div className="flex gap-2">
-                <Badge variant="outline">amount</Badge>
-                <span className="text-muted-foreground">Montant dans votre devise (minimum 200)</span>
+              <div className="flex flex-col gap-1">
+                <div className="flex gap-2">
+                  <Badge variant="outline">amount</Badge>
+                  <span className="text-muted-foreground">Montant minimum 200</span>
+                </div>
+                <p className="text-xs text-muted-foreground ml-2 pl-2 border-l-2 border-primary/30">
+                  Utilisez la devise affichee sur votre tableau de bord apres inscription (XOF, XAF ou CDF selon votre pays)
+                </p>
               </div>
               <div className="flex gap-2">
                 <Badge variant="outline">description</Badge>
