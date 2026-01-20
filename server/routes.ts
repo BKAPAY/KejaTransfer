@@ -1313,26 +1313,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // Get owner's currency (the API key owner's currency)
+      const owner = await storage.getUser(apiKey.userId);
+      const ownerCurrency = owner?.country ? getCurrencyForCountry(owner.country) : "XOF";
+      
       const grossAmount = Math.floor(Number(amount));
       if (grossAmount < 100) {
-        return res.status(400).json({ error: "Montant minimum: 100 XOF" });
+        return res.status(400).json({ error: "Montant minimum: 100" });
       }
 
-      // Calculate fees
+      // Calculate fees on the amount in owner's currency
       const { calculateIncomingFee } = await import("./utils/fees");
       const feeInfo = calculateIncomingFee(grossAmount);
 
       if (activeProvider === "mbiyopay") {
         // Use MbiyoPay
-        const { createMbiyoPayPayin, getCurrencyForCountry } = await import("./mbiyopay");
-        // Use currency from request if provided (for multi-currency countries like RDC), otherwise get default
-        const currency = requestCurrency || getCurrencyForCountry(country);
+        const { createMbiyoPayPayin, getCurrencyForCountry: getMbiyoCurrency } = await import("./mbiyopay");
+        // Provider currency is based on the payer's country
+        const providerCurrency = requestCurrency || getMbiyoCurrency(country);
+        
+        // CRITICAL: Convert amount from owner's currency to provider currency if different
+        let amountForProvider = grossAmount;
+        if (ownerCurrency !== providerCurrency) {
+          const { convertCurrency } = await import("./currency-converter");
+          const conversionResult = await convertCurrency(grossAmount, ownerCurrency, providerCurrency);
+          if (conversionResult.success) {
+            amountForProvider = Math.floor(conversionResult.convertedAmount);
+            console.log(`[API-PAY INIT] Currency conversion: ${grossAmount} ${ownerCurrency} -> ${amountForProvider} ${providerCurrency}`);
+          } else {
+            console.error("[API-PAY INIT] Currency conversion failed:", conversionResult.error);
+            return res.status(500).json({ error: "Erreur de conversion de devise" });
+          }
+        }
 
-        console.log(`[API-PAY INIT] Using MbiyoPay for ${country}/${operator}, phone=${customerPhone}, currency=${currency}`);
+        console.log(`[API-PAY INIT] Using MbiyoPay for ${country}/${operator}, phone=${customerPhone}, providerCurrency=${providerCurrency}`);
 
         const result = await createMbiyoPayPayin({
-          amount: grossAmount,
-          currency: currency,
+          amount: amountForProvider, // ALWAYS send converted amount to provider
+          currency: providerCurrency,
           phone: customerPhone,
           countryCode: country,
           network: operator,
@@ -1344,14 +1362,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ success: false, error: result.error || "Erreur lors du paiement" });
         }
 
-        // Create transaction record
+        // Create transaction record - store in owner's currency for balance credit
         const tx = await storage.createTransaction({
           userId: apiKey.userId,
           type: "api_payment",
-          amount: feeInfo.grossAmount,
+          amount: grossAmount, // Store in owner's currency
           fee: feeInfo.feeAmount,
           feePercentage: feeInfo.feePercentage,
-          currency: currency,
+          currency: ownerCurrency, // Store in owner's currency
           status: "pending",
           country: country.toUpperCase(),
           operator: operator,
@@ -1365,6 +1383,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             apiKeyId: apiKey.id,
             callbackUrl: callbackUrl || null,
             provider: "mbiyopay",
+            providerAmount: amountForProvider,
+            providerCurrency: providerCurrency,
+            balanceAmount: grossAmount,
+            balanceCurrency: ownerCurrency,
           }),
         });
 
@@ -1379,12 +1401,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else if (activeProvider === "fedapay") {
         // Use FedaPay - always uses XOF currency
         const { createCollect } = await import("./fedapay");
-        const currency = "XOF"; // FedaPay only supports XOF
+        const providerCurrency = "XOF"; // FedaPay only supports XOF
 
-        console.log(`[API-PAY INIT] Using FedaPay for ${country}/${operator}, phone=${customerPhone}, currency=${currency}`);
+        // CRITICAL: Convert amount from owner's currency to XOF if different
+        let amountForProvider = grossAmount;
+        if (ownerCurrency !== providerCurrency) {
+          const { convertCurrency } = await import("./currency-converter");
+          const conversionResult = await convertCurrency(grossAmount, ownerCurrency, providerCurrency);
+          if (conversionResult.success) {
+            amountForProvider = Math.floor(conversionResult.convertedAmount);
+            console.log(`[API-PAY INIT] Currency conversion: ${grossAmount} ${ownerCurrency} -> ${amountForProvider} ${providerCurrency}`);
+          } else {
+            console.error("[API-PAY INIT] Currency conversion failed:", conversionResult.error);
+            return res.status(500).json({ error: "Erreur de conversion de devise" });
+          }
+        }
+
+        console.log(`[API-PAY INIT] Using FedaPay for ${country}/${operator}, phone=${customerPhone}, providerCurrency=${providerCurrency}`);
 
         const result = await createCollect({
-          amount: grossAmount,
+          amount: amountForProvider, // ALWAYS send converted amount to provider
           description: description || "Paiement via API",
           customerFirstName: customerName?.split(" ")[0] || "Client",
           customerLastName: customerName?.split(" ").slice(1).join(" ") || "BKApay",
@@ -1398,14 +1434,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ success: false, error: "Paiement echoue" });
         }
 
-        // Create transaction record
+        // Create transaction record - store in owner's currency for balance credit
         const tx = await storage.createTransaction({
           userId: apiKey.userId,
           type: "api_payment",
-          amount: feeInfo.grossAmount,
+          amount: grossAmount, // Store in owner's currency
           fee: feeInfo.feeAmount,
           feePercentage: feeInfo.feePercentage,
-          currency: currency,
+          currency: ownerCurrency, // Store in owner's currency
           status: "pending",
           country: country.toUpperCase(),
           operator: operator,
@@ -1419,6 +1455,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             apiKeyId: apiKey.id,
             callbackUrl: callbackUrl || null,
             provider: "fedapay",
+            providerAmount: amountForProvider,
+            providerCurrency: providerCurrency,
+            balanceAmount: grossAmount,
+            balanceCurrency: ownerCurrency,
           }),
         });
 
@@ -1431,11 +1471,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       } else if (activeProvider === "paydunya") {
         // Use Paydunya
-        console.log(`[API-PAY INIT] Using Paydunya for ${country}/${operator}, phone=${customerPhone}`);
+        const providerCurrency = "XOF"; // Paydunya only accepts XOF
+        
+        // CRITICAL: Convert amount from owner's currency to XOF if different
+        let amountForProvider = grossAmount;
+        if (ownerCurrency !== providerCurrency) {
+          const { convertCurrency } = await import("./currency-converter");
+          const conversionResult = await convertCurrency(grossAmount, ownerCurrency, providerCurrency);
+          if (conversionResult.success) {
+            amountForProvider = Math.floor(conversionResult.convertedAmount);
+            console.log(`[API-PAY INIT] Currency conversion: ${grossAmount} ${ownerCurrency} -> ${amountForProvider} ${providerCurrency}`);
+          } else {
+            console.error("[API-PAY INIT] Currency conversion failed:", conversionResult.error);
+            return res.status(500).json({ error: "Erreur de conversion de devise" });
+          }
+        }
+        
+        console.log(`[API-PAY INIT] Using Paydunya for ${country}/${operator}, phone=${customerPhone}, providerAmount=${amountForProvider}`);
         
         const paydunyaData = {
           invoice: {
-            total_amount: grossAmount,
+            total_amount: amountForProvider, // ALWAYS send converted amount to provider
             description: description || "Paiement via API",
             customer: {
               name: customerName || "Client",
@@ -1465,14 +1521,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ success: false, error: "Paiement echoue" });
         }
 
-        // Create transaction record
+        // Create transaction record - store in owner's currency for balance credit
         const tx = await storage.createTransaction({
           userId: apiKey.userId,
           type: "api_payment",
-          amount: feeInfo.grossAmount,
+          amount: grossAmount, // Store in owner's currency
           fee: feeInfo.feeAmount,
           feePercentage: feeInfo.feePercentage,
-          currency: "XOF",
+          currency: ownerCurrency, // Store in owner's currency
           status: "pending",
           country: country.toUpperCase(),
           operator: operator,
@@ -1488,6 +1544,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             provider: "paydunya",
             country: country.toUpperCase(),
             operator: operator,
+            providerAmount: amountForProvider,
+            providerCurrency: providerCurrency,
+            balanceAmount: grossAmount,
+            balanceCurrency: ownerCurrency,
           }),
         });
 
@@ -1860,11 +1920,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Ce lien n'existe pas ou a été supprimé" });
       }
 
+      // Get owner's currency and payer's currency
+      const ownerCurrency = owner?.country ? getCurrencyForCountry(owner.country) : "XOF";
+      const payerCurrency = getCurrencyForCountry(country) || "XOF";
+      const providerCurrency = "XOF"; // Paydunya only accepts XOF
+
       // Calculate amount to send to provider based on customerPaysFee setting
       let amountForProvider: number;
       let feeAmount: number;
       let feePercentage: number;
       let netAmountForUser: number;
+      let baseAmountInOwnerCurrency = paymentLink.amount;
       
       if (paymentLink.customerPaysFee) {
         // Customer pays fee: send TOTAL (base + fees) to provider, user receives base amount
@@ -1888,11 +1954,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         netAmountForUser = feeInfo.netAmount;
       }
 
+      // CRITICAL: Convert amount to provider currency (XOF) if owner's currency is different
+      let convertedAmountForProvider = amountForProvider;
+      if (ownerCurrency !== providerCurrency) {
+        const { convertCurrency } = await import("./currency-converter");
+        const conversionResult = await convertCurrency(amountForProvider, ownerCurrency, providerCurrency);
+        if (conversionResult.success) {
+          convertedAmountForProvider = Math.floor(conversionResult.convertedAmount);
+          console.log(`[PAYMENT_LINK] Currency conversion: ${amountForProvider} ${ownerCurrency} -> ${convertedAmountForProvider} ${providerCurrency}`);
+        } else {
+          console.error("[PAYMENT_LINK] Currency conversion failed:", conversionResult.error);
+          return res.status(500).json({ error: "Erreur de conversion de devise" });
+        }
+      }
+
       // Call Paydunya API to create checkout invoice with customer info
       // Note: Use generic email for privacy - never send real customer emails to providers
       const paydunyaData = {
         invoice: {
-          total_amount: amountForProvider,
+          total_amount: convertedAmountForProvider, // ALWAYS send converted amount to provider
           description: `Paiement - ${paymentLink.productName}`,
           customer: {
             name: customerName || "Client",
@@ -1924,15 +2004,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const paydunyaResponse = await callPaydunyaAPI("/checkout-invoice/create", paydunyaData);
 
       if (paydunyaResponse.response_code === "00") {
-        // Create transaction
+        // Create transaction - store in owner's currency for balance credit
         const transactionId = randomUUID();
         await storage.createTransaction({
           userId: paymentLink.userId,
           type: "payment_link",
-          amount: amountForProvider, // Store what client actually pays
+          amount: baseAmountInOwnerCurrency, // Store base amount in owner's currency for balance
           fee: feeAmount,
           feePercentage: feePercentage,
-          currency: "XOF",
+          currency: ownerCurrency, // Store in owner's currency
           status: "pending",
           country,
           operator,
@@ -1946,6 +2026,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             customerPaysFee: paymentLink.customerPaysFee,
             baseAmount: paymentLink.amount,
             netAmountForUser: netAmountForUser,
+            providerAmount: convertedAmountForProvider,
+            providerCurrency: providerCurrency,
+            balanceAmount: baseAmountInOwnerCurrency,
+            balanceCurrency: ownerCurrency,
           }),
         });
 
@@ -1993,11 +2077,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Ce lien n'existe pas ou a été supprimé" });
       }
 
+      // Get owner's currency and provider currency
+      const ownerCurrency = owner?.country ? getCurrencyForCountry(owner.country) : "XOF";
+      const providerCurrency = "XOF"; // Paydunya only accepts XOF
+      const baseAmountInOwnerCurrency = Math.floor(amount);
+
+      // CRITICAL: Convert amount to provider currency (XOF) if owner's currency is different
+      let convertedAmountForProvider = baseAmountInOwnerCurrency;
+      if (ownerCurrency !== providerCurrency) {
+        const { convertCurrency } = await import("./currency-converter");
+        const conversionResult = await convertCurrency(baseAmountInOwnerCurrency, ownerCurrency, providerCurrency);
+        if (conversionResult.success) {
+          convertedAmountForProvider = Math.floor(conversionResult.convertedAmount);
+          console.log(`[MERCHANT_LINK] Currency conversion: ${baseAmountInOwnerCurrency} ${ownerCurrency} -> ${convertedAmountForProvider} ${providerCurrency}`);
+        } else {
+          console.error("[MERCHANT_LINK] Currency conversion failed:", conversionResult.error);
+          return res.status(500).json({ error: "Erreur de conversion de devise" });
+        }
+      }
+
       // Call Paydunya API with customer info
       // Note: Use generic email for privacy - never send real customer emails to providers
       const paydunyaData = {
         invoice: {
-          total_amount: amount,
+          total_amount: convertedAmountForProvider, // ALWAYS send converted amount to provider
           description: `Paiement marchand - ${merchantLink.merchantName}`,
           customer: {
             name: customerName || "Client",
@@ -2028,19 +2131,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const paydunyaResponse = await callPaydunyaAPI("/checkout-invoice/create", paydunyaData);
 
       if (paydunyaResponse.response_code === "00") {
-        // Calculate fees for INCOMING payment (client pays GROSS)
-        const grossAmount = Math.floor(amount);
-        const feeInfo = calculateIncomingFee(grossAmount);
+        // Calculate fees for INCOMING payment (on base amount in owner's currency)
+        const feeInfo = calculateIncomingFee(baseAmountInOwnerCurrency);
         
-        // Create transaction with GROSS amount (what client pays)
+        // Create transaction - store in owner's currency for balance credit
         const transactionId = randomUUID();
         await storage.createTransaction({
           userId: merchantLink.userId,
           type: "merchant_link",
-          amount: feeInfo.grossAmount, // Store GROSS amount (e.g., 2000)
-          fee: feeInfo.feeAmount, // Store fee (e.g., 60)
-          feePercentage: feeInfo.feePercentage, // Store percentage (30 or 60)
-          currency: "XOF",
+          amount: baseAmountInOwnerCurrency, // Store in owner's currency for balance
+          fee: feeInfo.feeAmount,
+          feePercentage: feeInfo.feePercentage,
+          currency: ownerCurrency, // Store in owner's currency
           status: "pending",
           country,
           operator,
@@ -2051,6 +2153,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           paydunyaToken: paydunyaResponse.token, // Store in dedicated column
           metadata: JSON.stringify({
             merchantLinkId: merchantLink.id,
+            providerAmount: convertedAmountForProvider,
+            providerCurrency: providerCurrency,
+            balanceAmount: baseAmountInOwnerCurrency,
+            balanceCurrency: ownerCurrency,
           }),
         });
 
@@ -3499,13 +3605,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      console.log(`[WITHDRAWAL] Using provider: ${activeProvider} for ${country}/${operator}`);
+      // Get user's currency for conversion
+      const userCurrency = user.country ? getCurrencyForCountry(user.country) : "XOF";
+      
+      console.log(`[WITHDRAWAL] Using provider: ${activeProvider} for ${country}/${operator}, userCurrency=${userCurrency}`);
 
       if (activeProvider === "fedapay") {
-        // Use FedaPay
+        // Use FedaPay - pass user's currency for conversion
         const result = isTransfer 
-          ? await handleFedaPayTransfer(req.session.userId!, user, amount, country, operator, phone)
-          : await handleFedaPayWithdrawal(req.session.userId!, user, amount, country, operator, phone);
+          ? await handleFedaPayTransfer(req.session.userId!, user, amount, country, operator, phone, userCurrency)
+          : await handleFedaPayWithdrawal(req.session.userId!, user, amount, country, operator, phone, userCurrency);
 
         if (result.success) {
           return res.json({
@@ -3570,10 +3679,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Logique différente pour transfert vs retrait
         // TRANSFERT: L'utilisateur écrit 1000 → débité 1060 → fournisseur reçoit 1000 → destinataire reçoit 1000
         // RETRAIT: L'utilisateur écrit 1000 → débité 1000 → fournisseur reçoit 940 → utilisateur reçoit 940
-        const amountForProvider = isTransfer ? Math.floor(amount) : feeInfo.amountReceived;
+        const providerCurrency = "XOF"; // Paydunya only uses XOF
+        const amountInUserCurrency = isTransfer ? Math.floor(amount) : feeInfo.amountReceived;
         const amountToDebit = isTransfer ? (Math.floor(amount) + feeInfo.feeAmount) : feeInfo.totalDeductedFromBalance;
 
-        // Step 1: Get disburse invoice
+        // CRITICAL: Convert amount from user's currency to provider currency if different
+        let amountForProvider = amountInUserCurrency;
+        if (userCurrency !== providerCurrency) {
+          const { convertCurrency } = await import("./currency-converter");
+          const conversionResult = await convertCurrency(amountInUserCurrency, userCurrency, providerCurrency);
+          if (conversionResult.success) {
+            amountForProvider = Math.floor(conversionResult.convertedAmount);
+            console.log(`[WITHDRAWAL PAYDUNYA] Currency conversion: ${amountInUserCurrency} ${userCurrency} -> ${amountForProvider} ${providerCurrency}`);
+          } else {
+            console.error("[WITHDRAWAL PAYDUNYA] Currency conversion failed:", conversionResult.error);
+            return res.status(500).json({ success: false, error: "Erreur de conversion de devise" });
+          }
+        }
+
+        // Step 1: Get disburse invoice - ALWAYS send converted amount to provider
         const getInvoiceData = {
           account_alias: cleanPhone,
           amount: amountForProvider,
@@ -3605,32 +3729,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Success - Deduct balance (montant différent pour transfert vs retrait)
           await storage.updateUserBalance(req.session.userId!, -amountToDebit);
           
-          // Create transaction record
+          // Create transaction record - store in user's currency for balance
           const tx = await storage.createTransaction({
             userId: req.session.userId!,
             type: isTransfer ? "transfer" : "withdrawal",
-            amount: Math.floor(amount),
+            amount: Math.floor(amount), // Store in user's currency
             fee: feeInfo.feeAmount,
             feePercentage: feeInfo.feePercentage,
-            currency: "XOF",
+            currency: userCurrency, // Store in user's currency
             status: "completed",
             country,
             operator,
             customerPhone: cleanPhone,
             description: isTransfer 
-              ? `Transfert de ${Math.floor(amount)} XOF vers ${cleanPhone}` 
-              : `Retrait de ${Math.floor(amount)} XOF (recu: ${feeInfo.amountReceived} XOF)`,
+              ? `Transfert de ${Math.floor(amount)} ${userCurrency} (envoye: ${amountForProvider} ${providerCurrency})` 
+              : `Retrait de ${Math.floor(amount)} ${userCurrency} (recu: ${amountForProvider} ${providerCurrency})`,
             paydunyaToken: getInvoiceResponse.disburse_token,
             metadata: JSON.stringify({
               paydunyaTransactionId: submitResponse.transaction_id,
               disburseId: submitData.disburse_id,
               provider: "paydunya",
-              amountSentToProvider: amountForProvider,
+              providerAmount: amountForProvider,
+              providerCurrency: providerCurrency,
+              balanceAmount: Math.floor(amount),
+              balanceCurrency: userCurrency,
               amountDebitedFromBalance: amountToDebit,
             }),
           });
 
-          console.log(`[${isTransfer ? 'TRANSFER' : 'WITHDRAWAL'} PAYDUNYA] Success - Balance deducted: ${amountToDebit}, Sent to provider: ${amountForProvider}`);
+          console.log(`[${isTransfer ? 'TRANSFER' : 'WITHDRAWAL'} PAYDUNYA] Success - Balance deducted: ${amountToDebit} ${userCurrency}, Sent to provider: ${amountForProvider} ${providerCurrency}`);
 
           return res.json({
             success: true,
@@ -3644,12 +3771,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ success: false, error: errorMsg });
         }
       } else if (activeProvider === "mbiyopay") {
-        // Use MbiyoPay for withdrawals/transfers
-        console.log(`[WITHDRAWAL] Using MbiyoPay for ${country}/${operator}`);
+        // Use MbiyoPay for withdrawals/transfers - pass user's currency for conversion
+        console.log(`[WITHDRAWAL] Using MbiyoPay for ${country}/${operator}, userCurrency=${userCurrency}`);
         
         const result = isTransfer 
-          ? await handleMbiyoPayTransfer(req.session.userId!, user, amount, country, operator, phone)
-          : await handleMbiyoPayWithdrawal(req.session.userId!, user, amount, country, operator, phone);
+          ? await handleMbiyoPayTransfer(req.session.userId!, user, amount, country, operator, phone, userCurrency)
+          : await handleMbiyoPayWithdrawal(req.session.userId!, user, amount, country, operator, phone, userCurrency);
 
         if (result.success) {
           return res.json({

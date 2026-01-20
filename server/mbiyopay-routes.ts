@@ -103,7 +103,8 @@ export async function handleMbiyoPayWithdrawal(
   amount: number,
   country: string,
   operator: string,
-  phone: string
+  phone: string,
+  userCurrency?: string
 ): Promise<{ success: boolean; transactionId?: string; message?: string; error?: string }> {
   try {
     const countryLower = country.toLowerCase();
@@ -117,7 +118,8 @@ export async function handleMbiyoPayWithdrawal(
     }
 
     const grossAmount = Math.floor(amount);
-    const currency = getCurrencyForCountry(country);
+    const providerCurrency = getCurrencyForCountry(country);
+    const balanceCurrency = userCurrency || providerCurrency;
     
     // Get dynamic fees from database for mbiyopay
     const feeConfig = await getFeeFromDatabase(storage, "mbiyopay", country, operator);
@@ -127,13 +129,28 @@ export async function handleMbiyoPayWithdrawal(
       return { success: false, error: "Solde insuffisant" };
     }
 
+    // CRITICAL: Convert amount from user's currency to provider currency if different
+    let amountForProvider = feeInfo.amountReceived;
+    if (balanceCurrency !== providerCurrency) {
+      const { convertCurrency } = await import("./currency-converter");
+      const conversionResult = await convertCurrency(feeInfo.amountReceived, balanceCurrency, providerCurrency);
+      if (conversionResult.success) {
+        amountForProvider = Math.floor(conversionResult.convertedAmount);
+        console.log(`[MbiyoPay Withdrawal] Currency conversion: ${feeInfo.amountReceived} ${balanceCurrency} -> ${amountForProvider} ${providerCurrency}`);
+      } else {
+        console.error("[MbiyoPay Withdrawal] Currency conversion failed:", conversionResult.error);
+        return { success: false, error: "Erreur de conversion de devise" };
+      }
+    }
+
     const beneficiaryName = user.firstName && user.lastName 
       ? `${user.firstName} ${user.lastName}` 
       : user.email || "BKApay User";
     
+    // ALWAYS send converted amount to provider
     const result = await createMbiyoPayPayout({
-      amount: feeInfo.amountReceived,
-      currency: currency,
+      amount: amountForProvider,
+      currency: providerCurrency,
       phone: phone,
       countryCode: country,
       network: operator,
@@ -154,17 +171,21 @@ export async function handleMbiyoPayWithdrawal(
       amount: grossAmount,
       fee: feeInfo.feeAmount,
       feePercentage: feeInfo.feePercentage,
-      currency: currency,
+      currency: balanceCurrency, // Store in user's currency
       status: "pending",
       country: country.toUpperCase(),
       operator: operator,
-      description: `Retrait de ${grossAmount} ${currency} (recu: ${feeInfo.amountReceived} ${currency})`,
+      description: `Retrait de ${grossAmount} ${balanceCurrency} (recu: ${amountForProvider} ${providerCurrency})`,
       customerPhone: phone,
       metadata: JSON.stringify({
         mbiyopayTransactionId: result.transactionId,
         phone,
         deductedFromBalance: feeInfo.totalDeductedFromBalance,
         amountReceived: feeInfo.amountReceived,
+        providerAmount: amountForProvider,
+        providerCurrency: providerCurrency,
+        balanceAmount: grossAmount,
+        balanceCurrency: balanceCurrency,
         provider: "mbiyopay",
       }),
     });
@@ -186,7 +207,8 @@ export async function handleMbiyoPayTransfer(
   amount: number,
   country: string,
   operator: string,
-  phone: string
+  phone: string,
+  userCurrency?: string
 ): Promise<{ success: boolean; transactionId?: string; message?: string; error?: string }> {
   try {
     const countryLower = country.toLowerCase();
@@ -199,7 +221,8 @@ export async function handleMbiyoPayTransfer(
     }
 
     const netAmount = Math.floor(amount);
-    const currency = getCurrencyForCountry(country);
+    const providerCurrency = getCurrencyForCountry(country);
+    const balanceCurrency = userCurrency || providerCurrency;
     
     // Get dynamic fees from database for mbiyopay
     const feeConfig = await getFeeFromDatabase(storage, "mbiyopay", country, operator);
@@ -210,13 +233,28 @@ export async function handleMbiyoPayTransfer(
       return { success: false, error: "Solde insuffisant" };
     }
 
+    // CRITICAL: Convert amount from user's currency to provider currency if different
+    let amountForProvider = netAmount;
+    if (balanceCurrency !== providerCurrency) {
+      const { convertCurrency } = await import("./currency-converter");
+      const conversionResult = await convertCurrency(netAmount, balanceCurrency, providerCurrency);
+      if (conversionResult.success) {
+        amountForProvider = Math.floor(conversionResult.convertedAmount);
+        console.log(`[MbiyoPay Transfer] Currency conversion: ${netAmount} ${balanceCurrency} -> ${amountForProvider} ${providerCurrency}`);
+      } else {
+        console.error("[MbiyoPay Transfer] Currency conversion failed:", conversionResult.error);
+        return { success: false, error: "Erreur de conversion de devise" };
+      }
+    }
+
     const beneficiaryName = user.firstName && user.lastName 
       ? `${user.firstName} ${user.lastName}` 
       : user.email || "BKApay User";
     
+    // ALWAYS send converted amount to provider
     const result = await createMbiyoPayPayout({
-      amount: netAmount,
-      currency: currency,
+      amount: amountForProvider,
+      currency: providerCurrency,
       phone: phone,
       countryCode: country,
       network: operator,
@@ -237,16 +275,20 @@ export async function handleMbiyoPayTransfer(
       amount: netAmount,
       fee: feeInfo.feeAmount,
       feePercentage: feeInfo.feePercentage,
-      currency: currency,
+      currency: balanceCurrency, // Store in user's currency
       status: "pending",
       country: country.toUpperCase(),
       operator: operator,
-      description: `Transfert de ${netAmount} ${currency}`,
+      description: `Transfert de ${netAmount} ${balanceCurrency} (envoye: ${amountForProvider} ${providerCurrency})`,
       customerPhone: phone,
       metadata: JSON.stringify({
         mbiyopayTransactionId: result.transactionId,
         phone,
         totalDebited: totalToDebit,
+        providerAmount: amountForProvider,
+        providerCurrency: providerCurrency,
+        balanceAmount: netAmount,
+        balanceCurrency: balanceCurrency,
         provider: "mbiyopay",
       }),
     });

@@ -107,7 +107,8 @@ export async function handleFedaPayWithdrawal(
   amount: number,
   country: string,
   operator: string,
-  phone: string
+  phone: string,
+  userCurrency?: string
 ): Promise<{ success: boolean; transactionId?: string; message?: string; error?: string }> {
   try {
     if (!FEDAPAY_SUPPORTED_COUNTRIES_PAYOUT.includes(country.toLowerCase())) {
@@ -126,6 +127,8 @@ export async function handleFedaPayWithdrawal(
     }
 
     const grossAmount = Math.floor(amount);
+    const providerCurrency = "XOF"; // FedaPay only uses XOF
+    const balanceCurrency = userCurrency || providerCurrency;
     
     // Get dynamic fees from database for fedapay
     const feeConfig = await getFeeFromDatabase(storage, "fedapay", country, operator);
@@ -135,13 +138,27 @@ export async function handleFedaPayWithdrawal(
       return { success: false, error: "Solde insuffisant" };
     }
 
+    // CRITICAL: Convert amount from user's currency to provider currency if different
+    let amountForProvider = feeInfo.amountReceived;
+    if (balanceCurrency !== providerCurrency) {
+      const { convertCurrency } = await import("./currency-converter");
+      const conversionResult = await convertCurrency(feeInfo.amountReceived, balanceCurrency, providerCurrency);
+      if (conversionResult.success) {
+        amountForProvider = Math.floor(conversionResult.convertedAmount);
+        console.log(`[FedaPay Withdrawal] Currency conversion: ${feeInfo.amountReceived} ${balanceCurrency} -> ${amountForProvider} ${providerCurrency}`);
+      } else {
+        console.error("[FedaPay Withdrawal] Currency conversion failed:", conversionResult.error);
+        return { success: false, error: "Erreur de conversion de devise" };
+      }
+    }
+
     const nameParts = (user.firstName + " " + user.lastName).split(" ");
     const firstName = nameParts[0] || "Client";
     const lastName = nameParts.slice(1).join(" ") || "BKApay";
 
-    // Envoyer le montant recu (montant - frais) au provider
+    // ALWAYS send converted amount to provider
     const result = await createPayout({
-      amount: feeInfo.amountReceived,
+      amount: amountForProvider,
       customerFirstName: firstName,
       customerLastName: lastName,
       customerEmail: user.email,
@@ -160,14 +177,14 @@ export async function handleFedaPayWithdrawal(
     const tx = await storage.createTransaction({
       userId: userId,
       type: "withdrawal",
-      amount: grossAmount, // Montant saisi par l'utilisateur
+      amount: grossAmount, // Montant saisi par l'utilisateur dans sa devise
       fee: feeInfo.feeAmount,
       feePercentage: feeInfo.feePercentage,
-      currency: "XOF",
+      currency: balanceCurrency, // Store in user's currency
       status: "pending",
       country: country.toUpperCase(),
       operator: operator,
-      description: `Retrait de ${grossAmount} XOF (recu: ${feeInfo.amountReceived} XOF)`,
+      description: `Retrait de ${grossAmount} ${balanceCurrency} (recu: ${amountForProvider} ${providerCurrency})`,
       customerPhone: phone,
       metadata: JSON.stringify({
         fedapayPayoutId: result.payoutId,
@@ -175,6 +192,10 @@ export async function handleFedaPayWithdrawal(
         phone,
         deductedFromBalance: feeInfo.totalDeductedFromBalance,
         amountReceived: feeInfo.amountReceived,
+        providerAmount: amountForProvider,
+        providerCurrency: providerCurrency,
+        balanceAmount: grossAmount,
+        balanceCurrency: balanceCurrency,
       }),
     });
 
@@ -189,14 +210,15 @@ export async function handleFedaPayWithdrawal(
   }
 }
 
-// Fonction pour les TRANSFERTS (ancienne logique: montant envoye = montant saisi, frais ajoutes au solde debite)
+// Fonction pour les TRANSFERTS (montant envoye = montant saisi, frais ajoutes au solde debite)
 export async function handleFedaPayTransfer(
   userId: string,
   user: any,
   amount: number,
   country: string,
   operator: string,
-  phone: string
+  phone: string,
+  userCurrency?: string
 ): Promise<{ success: boolean; transactionId?: string; message?: string; error?: string }> {
   try {
     if (!FEDAPAY_SUPPORTED_COUNTRIES_PAYOUT.includes(country.toLowerCase())) {
@@ -215,6 +237,8 @@ export async function handleFedaPayTransfer(
     }
 
     const netAmount = Math.floor(amount);
+    const providerCurrency = "XOF"; // FedaPay only uses XOF
+    const balanceCurrency = userCurrency || providerCurrency;
     
     // Get dynamic fees from database for fedapay transfers
     const feeConfig = await getFeeFromDatabase(storage, "fedapay", country, operator);
@@ -226,13 +250,27 @@ export async function handleFedaPayTransfer(
       return { success: false, error: "Solde insuffisant" };
     }
 
+    // CRITICAL: Convert amount from user's currency to provider currency if different
+    let amountForProvider = netAmount;
+    if (balanceCurrency !== providerCurrency) {
+      const { convertCurrency } = await import("./currency-converter");
+      const conversionResult = await convertCurrency(netAmount, balanceCurrency, providerCurrency);
+      if (conversionResult.success) {
+        amountForProvider = Math.floor(conversionResult.convertedAmount);
+        console.log(`[FedaPay Transfer] Currency conversion: ${netAmount} ${balanceCurrency} -> ${amountForProvider} ${providerCurrency}`);
+      } else {
+        console.error("[FedaPay Transfer] Currency conversion failed:", conversionResult.error);
+        return { success: false, error: "Erreur de conversion de devise" };
+      }
+    }
+
     const nameParts = (user.firstName + " " + user.lastName).split(" ");
     const firstName = nameParts[0] || "Client";
     const lastName = nameParts.slice(1).join(" ") || "BKApay";
 
-    // Envoyer le montant saisi (netAmount) au provider
+    // ALWAYS send converted amount to provider
     const result = await createPayout({
-      amount: netAmount,
+      amount: amountForProvider,
       customerFirstName: firstName,
       customerLastName: lastName,
       customerEmail: user.email,
@@ -254,17 +292,21 @@ export async function handleFedaPayTransfer(
       amount: netAmount,
       fee: feeAmount,
       feePercentage: feePercentage,
-      currency: "XOF",
+      currency: balanceCurrency, // Store in user's currency
       status: "pending",
       country: country.toUpperCase(),
       operator: operator,
-      description: `Transfert de ${netAmount} XOF`,
+      description: `Transfert de ${netAmount} ${balanceCurrency} (envoye: ${amountForProvider} ${providerCurrency})`,
       customerPhone: phone,
       metadata: JSON.stringify({
         fedapayPayoutId: result.payoutId,
         fedapayReference: result.reference,
         phone,
         deductedFromBalance: totalDeductedFromBalance,
+        providerAmount: amountForProvider,
+        providerCurrency: providerCurrency,
+        balanceAmount: netAmount,
+        balanceCurrency: balanceCurrency,
       }),
     });
 
