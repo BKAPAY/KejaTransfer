@@ -169,7 +169,7 @@ export default function DocumentationVersion({ version }: DocumentationVersionPr
 
   const htmlExample = `<!-- Bouton de paiement BKApay -->
 <a href="${baseUrl}/api-pay/pk_live_VOTRE_CLE?amount=5000&description=Achat%20produit&callback=https://votresite.com/success">
-  <button>Payer 5 000 XOF</button>
+  <button>Payer 5 000</button>
 </a>`;
 
   const jsExample = `// Rediriger vers la page de paiement BKApay
@@ -372,7 +372,7 @@ echo json_encode(['received' => true]);
             <div className="grid gap-2 text-sm">
               <div className="flex gap-2">
                 <Badge variant="outline">amount</Badge>
-                <span className="text-muted-foreground">Montant en XOF (minimum 100)</span>
+                <span className="text-muted-foreground">Montant dans votre devise (minimum 200)</span>
               </div>
               <div className="flex gap-2">
                 <Badge variant="outline">description</Badge>
@@ -514,7 +514,7 @@ echo json_encode(['received' => true]);
             </div>
             <div className="flex gap-2">
               <Badge variant="outline">amount</Badge>
-              <span className="text-muted-foreground">Montant paye en XOF</span>
+              <span className="text-muted-foreground">Montant paye</span>
             </div>
           </div>
 
@@ -666,55 +666,6 @@ echo json_encode(['received' => true]);
         </Card>
       )}
 
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2">
-            <Globe className="w-5 h-5" />
-            Pays et operateurs supportes
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid md:grid-cols-2 gap-4">
-            <div className="border rounded-lg p-4 bg-background">
-              <p className="font-bold text-sm mb-2">Senegal (SN)</p>
-              <p className="text-xs text-muted-foreground">
-                Orange, Free, Expresso, Wave, Wizall
-              </p>
-            </div>
-            <div className="border rounded-lg p-4 bg-background">
-              <p className="font-bold text-sm mb-2">Cote d'Ivoire (CI)</p>
-              <p className="text-xs text-muted-foreground">
-                Orange, MTN, Moov, Wave
-              </p>
-            </div>
-            <div className="border rounded-lg p-4 bg-background">
-              <p className="font-bold text-sm mb-2">Burkina Faso (BF)</p>
-              <p className="text-xs text-muted-foreground">
-                Orange, Moov
-              </p>
-            </div>
-            <div className="border rounded-lg p-4 bg-background">
-              <p className="font-bold text-sm mb-2">Benin (BJ)</p>
-              <p className="text-xs text-muted-foreground">
-                Moov, MTN
-              </p>
-            </div>
-            <div className="border rounded-lg p-4 bg-background">
-              <p className="font-bold text-sm mb-2">Togo (TG)</p>
-              <p className="text-xs text-muted-foreground">
-                T-Money, Moov
-              </p>
-            </div>
-            <div className="border rounded-lg p-4 bg-background">
-              <p className="font-bold text-sm mb-2">Mali (ML)</p>
-              <p className="text-xs text-muted-foreground">
-                Orange, Moov
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-      
       <div className="text-center py-8 border-t">
         <p className="text-sm text-muted-foreground">
           Documentation API BKApay - Version {docVersion.version}

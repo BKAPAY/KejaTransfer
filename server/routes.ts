@@ -1318,8 +1318,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const ownerCurrency = owner?.country ? getCurrencyForCountry(owner.country) : "XOF";
       
       const grossAmount = Math.floor(Number(amount));
-      if (grossAmount < 100) {
-        return res.status(400).json({ error: "Montant minimum: 100" });
+      if (grossAmount < 200) {
+        return res.status(400).json({ error: "Montant minimum: 200" });
       }
 
       // Calculate fees on the amount in owner's currency

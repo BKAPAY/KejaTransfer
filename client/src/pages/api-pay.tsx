@@ -582,7 +582,7 @@ export default function ApiPay() {
     );
   }
 
-  if (!amount || amount < 100) {
+  if (!amount || amount < 200) {
     return (
       <div className="w-full min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-accent/5 p-4">
         <Card className="w-full max-w-md">
@@ -594,7 +594,7 @@ export default function ApiPay() {
                 <div>
                   <p className="font-semibold text-foreground">Montant invalide</p>
                   <p className="text-sm text-muted-foreground">
-                    Le montant doit etre superieur a 100 {ownerCurrency}
+                    Le montant doit etre superieur a 200 {ownerCurrency}
                   </p>
                 </div>
               </div>
