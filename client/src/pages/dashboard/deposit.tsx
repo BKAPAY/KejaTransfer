@@ -302,43 +302,62 @@ export default function Deposit() {
   useEffect(() => {
     if (paymentStep !== "polling" || !paymentData.transactionId) return;
 
-    const interval = setInterval(async () => {
+    const checkPaymentStatus = async () => {
       try {
+        // First, trigger backend verification to update status
+        await fetch("/api/softpay/verify-payment", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ 
+            transactionId: paymentData.transactionId,
+            invoiceToken: paymentData.paydunyaToken 
+          }),
+        });
+
+        // Then fetch the updated transaction status
         const res = await fetch(`/api/transactions/${paymentData.transactionId}`);
         if (res.ok) {
           const tx = await res.json();
           if (tx.status === "completed") {
             setPollingStatus("completed");
             setPaymentStep("completed");
-            clearInterval(interval);
             
             toast({
               title: "Paiement reussi",
               description: "Votre depot a ete complete",
             });
 
+            queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+
             setTimeout(() => {
-              queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
-              queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
               form.reset();
               setPaymentData({});
               setPollingStatus(null);
               setPaymentStep("form");
             }, 3000);
+            return true;
           } else if (tx.status === "failed") {
             setPaymentStep("form");
-            clearInterval(interval);
             toast({
               title: "Paiement echoue",
               description: "Le paiement n'a pas abouti",
               variant: "destructive",
             });
+            return true;
           }
         }
       } catch (error) {
         console.error("Payment verification error:", error);
       }
-    }, 5000);
+      return false;
+    };
+
+    const interval = setInterval(async () => {
+      const isDone = await checkPaymentStatus();
+      if (isDone) clearInterval(interval);
+    }, 3000);
 
     const timeout = setTimeout(() => {
       clearInterval(interval);

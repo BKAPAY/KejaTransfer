@@ -153,8 +153,14 @@ export function CryptoPaymentFlow({
     payAmount: number;
   }>({
     queryKey: ["/api/crypto/payment-status", paymentDetails?.paymentId],
+    queryFn: async () => {
+      if (!paymentDetails?.paymentId) return null;
+      const res = await fetch(`/api/crypto/payment-status/${paymentDetails.paymentId}`);
+      if (!res.ok) throw new Error("Failed to fetch status");
+      return res.json();
+    },
     enabled: paymentStep === "waiting" && !!paymentDetails?.paymentId,
-    refetchInterval: 10000,
+    refetchInterval: 5000,
   });
 
   useEffect(() => {
