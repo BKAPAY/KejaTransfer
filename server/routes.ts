@@ -1567,16 +1567,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const softpayResult = await callPaydunyaSoftpay(operator, country, paymentData);
 
         if (!softpayResult.success) {
-          return res.status(400).json({ success: false, error: "Paiement echoue" });
+          return res.status(400).json({ success: false, error: softpayResult.message || "Paiement echoue" });
         }
 
-        return res.json({
+        // Get operator configuration for flags
+        const opConfig = SOFTPAY_OPERATORS[operatorKey];
+        const needsOTP = opConfig?.requiresOTP || false;
+        const needsTwoStep = opConfig?.requiresTwoStep || false;
+        const ussdInstruction = opConfig?.ussdInstruction || null;
+
+        // Build response with all necessary flags for Wave redirect and Orange OTP
+        const response: any = {
           success: true,
           transactionId: tx.id,
           token: paydunyaResponse.token,
-          message: "Paiement initie. Veuillez valider sur votre telephone.",
+          message: softpayResult.message || "Paiement initie. Veuillez valider sur votre telephone.",
           provider: "paydunya",
-        });
+        };
+
+        // Wave redirect URL
+        if (softpayResult.url) {
+          response.redirectUrl = softpayResult.url;
+          console.log(`[API-PAY INIT] Wave redirect URL: ${softpayResult.url}`);
+        }
+
+        // Orange Money and other OTP flows
+        if (needsOTP) {
+          response.requiresOTP = true;
+          response.ussdInstruction = ussdInstruction;
+          console.log(`[API-PAY INIT] Operator ${operatorKey} requires OTP`);
+        }
+
+        // Wizall two-step flow
+        if (needsTwoStep) {
+          response.requiresTwoStep = true;
+          response.ussdInstruction = ussdInstruction;
+          console.log(`[API-PAY INIT] Operator ${operatorKey} requires two-step`);
+        }
+
+        return res.json(response);
       } else {
         return res.status(503).json({ 
           success: false, 
