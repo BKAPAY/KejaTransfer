@@ -6,6 +6,7 @@ import {
   createMbiyoPayPayin, 
   createMbiyoPayPayout, 
   getMbiyoPayTransactionStatus,
+  resendMbiyoPayWebhook,
   MBIYOPAY_SUPPORTED_COUNTRIES,
   MBIYOPAY_OPERATORS,
   getCurrencyForCountry,
@@ -160,7 +161,7 @@ export async function handleMbiyoPayWithdrawal(
     });
 
     if (!result.success) {
-      return { success: false, error: "Retrait echoue" };
+      return { success: false, error: result.error || "Retrait echoue" };
     }
 
     await storage.updateUserBalance(userId, -feeInfo.totalDeductedFromBalance);
@@ -264,7 +265,9 @@ export async function handleMbiyoPayTransfer(
     });
 
     if (!result.success) {
-      return { success: false, error: "Transfert echoue" };
+      // Replace "Retrait" with "Transfert" in error message
+      const errorMsg = result.error ? result.error.replace("Retrait", "Transfert") : "Transfert echoue";
+      return { success: false, error: errorMsg };
     }
 
     await storage.updateUserBalance(userId, -totalToDebit);
@@ -655,5 +658,40 @@ export async function pollMbiyoPayTransaction(transactionId: string): Promise<{ 
   } catch (error) {
     console.error("[MbiyoPay Poll] Error:", error);
     return { status: "pending", completed: false };
+  }
+}
+
+// Admin endpoint to resend webhook for stuck transactions
+export async function handleMbiyoPayResendWebhook(req: Request, res: Response) {
+  try {
+    const { transactionId, mbiyopayTransactionId } = req.body;
+    
+    if (!mbiyopayTransactionId) {
+      return res.status(400).json({ success: false, error: "ID transaction MbiyoPay requis" });
+    }
+    
+    // Verify admin session
+    const session = req.session as any;
+    if (!session?.userId) {
+      return res.status(401).json({ success: false, error: "Non authentifie" });
+    }
+    
+    const user = await storage.getUser(session.userId);
+    if (!user?.isAdmin) {
+      return res.status(403).json({ success: false, error: "Acces refuse" });
+    }
+    
+    console.log(`[MbiyoPay] Admin ${user.email} requesting webhook resend for: ${mbiyopayTransactionId}`);
+    
+    const result = await resendMbiyoPayWebhook(mbiyopayTransactionId);
+    
+    if (result.success) {
+      res.json({ success: true, message: result.message });
+    } else {
+      res.status(400).json({ success: false, error: result.error });
+    }
+  } catch (error: any) {
+    console.error("[MbiyoPay Resend Webhook] Error:", error);
+    res.status(500).json({ success: false, error: "Erreur serveur" });
   }
 }

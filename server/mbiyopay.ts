@@ -249,13 +249,28 @@ export async function createMbiyoPayPayin(params: MbiyoPayPayinParams): Promise<
     }
     
     console.error("[MbiyoPay Payin] Error:", data);
+    
+    // Handle specific MbiyoPay error messages professionally
+    let errorMessage = "Paiement echoue";
+    const apiMessage = data.message?.toLowerCase() || "";
+    
+    if (apiMessage.includes("invalid") && apiMessage.includes("phone")) {
+      errorMessage = "Paiement echoue: Numero de telephone invalide.";
+    } else if (apiMessage.includes("network") || apiMessage.includes("operator")) {
+      errorMessage = "Paiement echoue: Operateur non supporte pour ce pays.";
+    } else if (apiMessage.includes("amount")) {
+      errorMessage = "Paiement echoue: Montant invalide.";
+    } else if (data.message) {
+      errorMessage = `Paiement echoue: ${data.message}`;
+    }
+    
     return { 
       success: false, 
-      error: "Paiement echoue"
+      error: errorMessage
     };
   } catch (error: any) {
     console.error("[MbiyoPay Payin] Exception:", error);
-    return { success: false, error: "Paiement echoue" };
+    return { success: false, error: "Paiement echoue: Erreur de connexion au service de paiement." };
   }
 }
 
@@ -342,13 +357,30 @@ export async function createMbiyoPayPayout(params: MbiyoPayPayoutParams): Promis
     }
     
     console.error("[MbiyoPay Payout] Error:", data);
+    
+    // Handle specific MbiyoPay error messages professionally
+    let errorMessage = "Retrait echoue";
+    const apiMessage = data.message?.toLowerCase() || "";
+    
+    if (apiMessage.includes("insufficient balance") || apiMessage.includes("balance")) {
+      errorMessage = "Retrait echoue: Insuffisance de solde dans le wallet de paiement. Veuillez reessayer plus tard.";
+    } else if (apiMessage.includes("kyc")) {
+      errorMessage = "Retrait echoue: Verification KYC requise par le fournisseur.";
+    } else if (apiMessage.includes("invalid") && apiMessage.includes("phone")) {
+      errorMessage = "Retrait echoue: Numero de telephone invalide.";
+    } else if (apiMessage.includes("network") || apiMessage.includes("operator")) {
+      errorMessage = "Retrait echoue: Operateur non supporte pour ce pays.";
+    } else if (data.message) {
+      errorMessage = `Retrait echoue: ${data.message}`;
+    }
+    
     return { 
       success: false, 
-      error: "Retrait echoue" 
+      error: errorMessage 
     };
   } catch (error: any) {
     console.error("[MbiyoPay Payout] Exception:", error);
-    return { success: false, error: "Retrait echoue" };
+    return { success: false, error: "Retrait echoue: Erreur de connexion au service de paiement." };
   }
 }
 
@@ -409,4 +441,43 @@ export function getOperatorsForCountry(countryCode: string): string[] {
 
 export function getCurrencyForCountry(countryCode: string): string {
   return MBIYOPAY_COUNTRY_CURRENCIES[countryCode.toLowerCase()] || "XOF";
+}
+
+// Resend webhook notification for a specific transaction
+export async function resendMbiyoPayWebhook(transactionId: string): Promise<{ success: boolean; message?: string; error?: string }> {
+  try {
+    const apiKey = await getMbiyoPayApiKey();
+    if (!apiKey) {
+      return { success: false, error: "MbiyoPay non configure ou desactive" };
+    }
+    
+    console.log(`[MbiyoPay] Resending webhook for transaction: ${transactionId}`);
+    
+    const response = await fetch(`${MBIYOPAY_BASE_URL}/merchant/transactions/${transactionId}/resend-webhook`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+    });
+    
+    const data = await response.json();
+    
+    if (data.status === "success") {
+      console.log(`[MbiyoPay] Webhook resent successfully for: ${transactionId}`);
+      return {
+        success: true,
+        message: data.message || "Webhook renvoye avec succes",
+      };
+    }
+    
+    console.error("[MbiyoPay] Resend webhook error:", data);
+    return { 
+      success: false, 
+      error: data.message || "Impossible de renvoyer le webhook" 
+    };
+  } catch (error: any) {
+    console.error("[MbiyoPay] Resend webhook exception:", error);
+    return { success: false, error: "Erreur de connexion au service de paiement." };
+  }
 }

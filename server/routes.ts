@@ -49,6 +49,7 @@ import {
   handleMbiyoPayMerchantLink,
   handleMbiyoPayApiPayment,
   handleMbiyoPayWebhook,
+  handleMbiyoPayResendWebhook,
 } from "./mbiyopay-routes";
 import {
   MBIYOPAY_SUPPORTED_COUNTRIES,
@@ -3206,6 +3207,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ===== MbiyoPay Webhook =====
   app.post("/api/webhooks/mbiyopay", handleMbiyoPayWebhook);
+  
+  // Admin endpoint to resend MbiyoPay webhook for stuck transactions
+  app.post("/api/admin/mbiyopay/resend-webhook", handleMbiyoPayResendWebhook);
 
   // ===== Currency Conversion Route =====
   app.post("/api/convert-currency", async (req: Request, res: Response) => {
