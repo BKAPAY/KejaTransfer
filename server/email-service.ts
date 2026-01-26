@@ -1,16 +1,24 @@
 import nodemailer from "nodemailer";
 
 function createTransporter() {
-  if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
+  const gmailUser = process.env.GMAIL_USER;
+  const gmailPassword = process.env.GMAIL_APP_PASSWORD;
+  
+  if (!gmailUser || !gmailPassword) {
+    console.log("[Email] Configuration manquante - GMAIL_USER:", !!gmailUser, "GMAIL_APP_PASSWORD:", !!gmailPassword);
     return null;
   }
+  
+  console.log("[Email] Création du transporteur pour:", gmailUser);
   
   return nodemailer.createTransport({
     service: "gmail",
     auth: {
-      user: process.env.GMAIL_USER,
-      pass: process.env.GMAIL_APP_PASSWORD,
+      user: gmailUser,
+      pass: gmailPassword,
     },
+    debug: true,
+    logger: false,
   });
 }
 
@@ -254,14 +262,18 @@ https://bkapay.com`;
     `;
 
   try {
+    console.log(`[Email] Tentative d'envoi de code ${type} à ${to}...`);
+    
     const transporter = createTransporter();
     
     if (!transporter) {
-      console.error("[Email] GMAIL_USER ou GMAIL_APP_PASSWORD non configure");
+      console.error("[Email] GMAIL_USER ou GMAIL_APP_PASSWORD non configure - envoi impossible");
       return false;
     }
 
-    await transporter.sendMail({
+    console.log(`[Email] Transporteur créé, envoi en cours...`);
+    
+    const result = await transporter.sendMail({
       from: {
         name: "BKApay",
         address: process.env.GMAIL_USER!,
@@ -278,10 +290,15 @@ https://bkapay.com`;
       },
     });
     
-    console.log(`[Email] Code de verification envoye a ${to} (type: ${type})`);
+    console.log(`[Email] ✅ Code de verification envoye a ${to} (type: ${type}) - MessageId: ${result.messageId}`);
     return true;
-  } catch (error) {
-    console.error("[Email] Erreur lors de l'envoi:", error);
+  } catch (error: any) {
+    console.error("[Email] ❌ Erreur lors de l'envoi:", error?.message || error);
+    console.error("[Email] Détails de l'erreur:", JSON.stringify({
+      code: error?.code,
+      command: error?.command,
+      responseCode: error?.responseCode,
+    }));
     return false;
   }
 }
