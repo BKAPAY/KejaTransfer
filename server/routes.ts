@@ -454,6 +454,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     temporarySuspensions.set(email.toLowerCase(), suspendUntil);
   }
 
+  function clearTemporarySuspension(email: string): void {
+    temporarySuspensions.delete(email.toLowerCase());
+    loginAttempts.delete(`code:${email.toLowerCase()}`);
+  }
+
   function checkRateLimit(key: string, maxAttempts: number): { allowed: boolean; remainingTime?: number; shouldSuspend?: boolean; currentCount?: number } {
     const now = Date.now();
     const record = loginAttempts.get(key);
@@ -5562,6 +5567,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!user) {
         return res.status(404).json({ error: "Utilisateur non trouvé" });
       }
+      
+      // Also clear any temporary login suspension for this user
+      clearTemporarySuspension(user.email);
+      
       res.json(user);
     } catch (error: any) {
       console.error("Unsuspend user error:", error);
