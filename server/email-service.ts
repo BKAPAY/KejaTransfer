@@ -417,3 +417,20 @@ export async function isEmailServiceConfigured(gmailType?: GmailType): Promise<b
          !!(passwordConfig.gmailUser && passwordConfig.gmailPassword) ||
          !!(tfaConfig.gmailUser && tfaConfig.gmailPassword);
 }
+
+export async function isEmailSendingEnabled(gmailType: GmailType): Promise<boolean> {
+  const providerName = getProviderNameForType(gmailType);
+  
+  try {
+    const { storage } = await import("./storage");
+    const config = await storage.getProviderConfig(providerName);
+    
+    if (config && config.isActive && config.apiKey && config.secretKey) {
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.log(`[Email] Erreur lors de la vérification si ${providerName} est activé:`, error);
+    return false;
+  }
+}

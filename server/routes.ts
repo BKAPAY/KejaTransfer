@@ -59,6 +59,7 @@ import {
   generateVerificationCode,
   sendVerificationEmail,
   isEmailServiceConfigured,
+  isEmailSendingEnabled,
   clearGmailConfigCache,
   testEmailConnection,
   GmailType,
@@ -532,10 +533,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Email requis" });
       }
 
-      // Check if email service is configured
-      if (!(await isEmailServiceConfigured())) {
-        return res.status(503).json({ 
-          error: "Le service d'envoi d'email n'est pas configuré. Contactez l'administrateur." 
+      // Check if email sending is enabled for signup
+      const emailEnabled = await isEmailSendingEnabled("signup");
+      if (!emailEnabled) {
+        // If email sending is disabled, allow signup without code
+        console.log(`[Signup] Email sending disabled for signup, skipping verification for ${email}`);
+        return res.json({ 
+          success: true, 
+          message: "Inscription sans vérification email",
+          skipVerification: true 
         });
       }
       
@@ -554,7 +560,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({ error: "Erreur lors de l'envoi du code de vérification" });
       }
 
-      res.json({ success: true, message: "Code de vérification envoyé" });
+      res.json({ success: true, message: "Code de vérification envoyé", skipVerification: false });
     } catch (error: any) {
       console.error("[Signup] Error sending code:", error);
       res.status(500).json({ error: "Erreur lors de l'envoi du code" });
@@ -567,8 +573,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { verificationCode, ...userData } = req.body;
       const validatedData = insertUserSchema.parse(userData);
       
-      // Check if email service is configured - if not, skip verification
-      const skipVerification = !(await isEmailServiceConfigured());
+      // Check if email sending is enabled - if not, skip verification
+      const skipVerification = !(await isEmailSendingEnabled("signup"));
       
       if (!skipVerification) {
         // Verify the code
@@ -618,10 +624,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Email requis" });
       }
 
-      // Check if email service is configured
-      if (!(await isEmailServiceConfigured())) {
+      // Check if email sending is enabled for password reset
+      const emailEnabled = await isEmailSendingEnabled("password");
+      if (!emailEnabled) {
         return res.status(503).json({ 
-          error: "Le service d'envoi d'email n'est pas configuré. Contactez l'administrateur." 
+          error: "La réinitialisation de mot de passe par email est désactivée. Contactez l'administrateur." 
         });
       }
       
@@ -757,11 +764,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Email ou mot de passe incorrect" });
       }
 
-      // Administrators don't need 2FA - connect them directly
-      console.log(`[Login] Checking admin status for ${email}: isAdmin=${user.isAdmin}`);
-      if (user.isAdmin) {
+      // Check if 2FA email sending is enabled
+      const tfaEnabled = await isEmailSendingEnabled("2fa");
+      console.log(`[Login] 2FA email enabled: ${tfaEnabled}, isAdmin: ${user.isAdmin}`);
+
+      // If 2FA is disabled OR user is admin, connect directly without code
+      if (!tfaEnabled || user.isAdmin) {
         req.session.userId = user.id;
-        console.log(`[Login] Admin ${user.email} connecté directement sans 2FA`);
+        console.log(`[Login] ${user.email} connecté directement (2FA disabled: ${!tfaEnabled}, isAdmin: ${user.isAdmin})`);
         return res.json({
           success: true,
           message: "Connexion réussie",
@@ -773,13 +783,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             isAdmin: user.isAdmin,
             balance: user.balance,
           }
-        });
-      }
-
-      // Check if email service is configured
-      if (!(await isEmailServiceConfigured("2fa"))) {
-        return res.status(503).json({ 
-          error: "Le service d'envoi d'email n'est pas configuré. Contactez l'administrateur." 
         });
       }
 
