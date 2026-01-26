@@ -127,8 +127,11 @@ export default function Login() {
       return response;
     },
     onSuccess: async (response: any, data) => {
-      // Administrators don't need 2FA - they are logged in directly
-      if (response.requiresCode === false) {
+      console.log("[Login] Response received:", JSON.stringify(response));
+      
+      // If 2FA is disabled or user is admin - they are logged in directly
+      if (response.requiresCode === false || !response.requiresCode) {
+        console.log("[Login] Direct login - redirecting to dashboard");
         await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
         toast({
           title: "Connexion reussie",
