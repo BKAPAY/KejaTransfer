@@ -743,6 +743,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Rate limiting for code requests (1 minute cooldown between resends)
 
       const user = await storage.getUserByEmail(email);
+      console.log(`[Login] send-code: email=${email}, userFound=${!!user}, isAdmin=${user?.isAdmin}`);
       if (!user) {
         return res.status(401).json({ error: "Email ou mot de passe incorrect" });
       }
@@ -757,6 +758,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Administrators don't need 2FA - connect them directly
+      console.log(`[Login] Checking admin status for ${email}: isAdmin=${user.isAdmin}`);
       if (user.isAdmin) {
         req.session.userId = user.id;
         console.log(`[Login] Admin ${user.email} connecté directement sans 2FA`);
