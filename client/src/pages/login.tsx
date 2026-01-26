@@ -215,8 +215,8 @@ export default function Login() {
         });
       } else {
         toast({
-          title: "Code envoy\u00e9",
-          description: "Un code de connexion a \u00e9t\u00e9 envoy\u00e9 \u00e0 votre email",
+          title: "Code envoyé",
+          description: "Un code de connexion a été envoyé à votre email",
         });
       }
     },
@@ -250,7 +250,7 @@ export default function Login() {
       }
       await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
       toast({
-        title: "Connexion r\u00e9ussie",
+        title: "Connexion réussie",
         description: "Bienvenue sur BKApay",
       });
       setLocation("/dashboard");
@@ -258,7 +258,7 @@ export default function Login() {
     onError: (error: any) => {
       toast({
         title: "Erreur de connexion",
-        description: error.message || "Code de connexion invalide ou expir\u00e9",
+        description: error.message || "Code de connexion invalide ou expiré",
         variant: "destructive",
       });
     },
@@ -266,7 +266,7 @@ export default function Login() {
 
   const resendCodeMutation = useMutation({
     mutationFn: async () => {
-      if (!credentials) throw new Error("Donn\u00e9es de connexion manquantes");
+      if (!credentials) throw new Error("Données de connexion manquantes");
       const response = await apiRequest("POST", "/api/auth/login/send-code", credentials);
       return response;
     },
@@ -290,7 +290,7 @@ export default function Login() {
       if (response.isLastAttempt && response.suspendedUntil) {
         saveToStorage(email, "suspendedUntil", response.suspendedUntil);
         toast({
-          title: "Dernier code envoy\u00e9",
+          title: "Dernier code envoyé",
           description: "C'est votre dernier code. Votre compte sera suspendu si vous n'entrez pas le bon code.",
           variant: "destructive",
         });
@@ -298,8 +298,8 @@ export default function Login() {
         // Use server-provided remaining count
         const remaining = response.resendsRemaining ?? (MAX_RESENDS - serverResendsUsed);
         toast({
-          title: "Code renvoy\u00e9",
-          description: `Un nouveau code a \u00e9t\u00e9 envoy\u00e9.${remaining > 0 ? ` Il vous reste ${remaining} renvoi(s).` : ""}`,
+          title: "Code renvoyé",
+          description: `Un nouveau code a été envoyé.${remaining > 0 ? ` Il vous reste ${remaining} renvoi(s).` : ""}`,
         });
       }
     },
@@ -330,7 +330,7 @@ export default function Login() {
         setSuspendedUntil(suspendTime);
         toast({
           title: "Compte suspendu",
-          description: "Veuillez attendre que la suspension soit lev\u00e9e.",
+          description: "Veuillez attendre que la suspension soit levée.",
           variant: "destructive",
         });
         return;
@@ -340,7 +340,7 @@ export default function Login() {
     if (suspendedUntil && Date.now() < suspendedUntil) {
       toast({
         title: "Compte suspendu",
-        description: `Veuillez attendre ${suspendedTimeRemaining} avant de r\u00e9essayer.`,
+        description: `Veuillez attendre ${suspendedTimeRemaining} avant de réessayer.`,
         variant: "destructive",
       });
       return;
@@ -368,7 +368,7 @@ export default function Login() {
     if (resendsUsed >= MAX_RESENDS) {
       toast({
         title: "Limite atteinte",
-        description: "Vous avez utilis\u00e9 tous vos renvois de code.",
+        description: "Vous avez utilisé tous vos renvois de code.",
         variant: "destructive",
       });
       return;
@@ -391,8 +391,8 @@ export default function Login() {
           <CardTitle className="text-lg sm:text-xl lg:text-2xl font-bold">Se connecter</CardTitle>
           <CardDescription className="text-xs sm:text-sm">
             {step === "credentials" 
-              ? "Acc\u00e9dez \u00e0 votre tableau de bord" 
-              : "Entrez le code envoy\u00e9 \u00e0 votre email"}
+              ? "Accédez à votre tableau de bord" 
+              : "Entrez le code envoyé à votre email"}
           </CardDescription>
         </CardHeader>
         <CardContent className="p-3 sm:p-4 lg:p-6">
@@ -403,8 +403,8 @@ export default function Login() {
                 <div className="text-sm">
                   <p className="font-medium text-destructive">Compte suspendu temporairement</p>
                   <p className="text-muted-foreground mt-1">
-                    Tentative de connexion suspecte d\u00e9tect\u00e9e. 
-                    Veuillez r\u00e9essayer dans <span className="font-medium text-foreground">{suspendedTimeRemaining}</span>.
+                    Tentative de connexion suspecte détectée. 
+                    Veuillez réessayer dans <span className="font-medium text-foreground">{suspendedTimeRemaining}</span>.
                   </p>
                 </div>
               </div>
@@ -449,7 +449,7 @@ export default function Login() {
                       <FormControl>
                         <Input
                           type="password"
-                          placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"
+                          placeholder="••••••••"
                           data-testid="input-password"
                           disabled={!!isSuspended}
                           {...field}
@@ -466,7 +466,7 @@ export default function Login() {
                       className="text-primary hover:underline cursor-pointer" 
                       data-testid="link-forgot-password"
                     >
-                      Mot de passe oubli\u00e9 ?
+                      Mot de passe oublié ?
                     </span>
                   </Link>
                 </div>
@@ -477,7 +477,7 @@ export default function Login() {
                   disabled={sendCodeMutation.isPending || !!isSuspended}
                   data-testid="button-submit"
                 >
-                  {sendCodeMutation.isPending ? "V\u00e9rification..." : "Continuer"}
+                  {sendCodeMutation.isPending ? "Vérification..." : "Continuer"}
                 </Button>
               </form>
             </Form>
@@ -489,7 +489,7 @@ export default function Login() {
                     <KeyRound className="h-6 w-6 text-primary" />
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    Un code \u00e0 6 chiffres a \u00e9t\u00e9 envoy\u00e9 \u00e0<br />
+                    Un code à 6 chiffres a été envoyé à<br />
                     <span className="font-medium text-foreground">{credentials?.email}</span>
                   </p>
                 </div>
