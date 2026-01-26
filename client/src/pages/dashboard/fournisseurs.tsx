@@ -424,13 +424,13 @@ export default function FournisseursPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-9">
+        <TabsList className="flex flex-wrap h-auto gap-1 p-1">
           {Object.entries(PROVIDER_INFO).map(([key, info]) => {
             const config = getProviderConfig(key);
             return (
-              <TabsTrigger key={key} value={key} className="relative gap-2" data-testid={`tab-provider-${key}`}>
-                <span className={`w-2 h-2 rounded-full ${config?.isActive ? "bg-green-500" : "bg-gray-400"}`} />
-                {info.name}
+              <TabsTrigger key={key} value={key} className="relative gap-1 px-3 py-2 text-xs sm:text-sm whitespace-nowrap" data-testid={`tab-provider-${key}`}>
+                <span className={`w-2 h-2 rounded-full shrink-0 ${config?.isActive ? "bg-green-500" : "bg-gray-400"}`} />
+                <span className="truncate">{info.name}</span>
               </TabsTrigger>
             );
           })}
