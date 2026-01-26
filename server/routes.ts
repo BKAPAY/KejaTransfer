@@ -61,6 +61,7 @@ import {
   isEmailServiceConfigured,
   clearGmailConfigCache,
   testEmailConnection,
+  GmailType,
 } from "./email-service";
 import nowpaymentsRoutes from "./nowpayments-routes";
 
@@ -6171,9 +6172,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Clear Gmail config cache when Gmail settings are updated
-      if (provider === "gmail") {
-        clearGmailConfigCache();
-        console.log("[Admin] Configuration Gmail mise à jour - cache vidé");
+      if (provider === "gmail_signup") {
+        clearGmailConfigCache("signup");
+        console.log("[Admin] Configuration gmail_signup mise à jour - cache vidé");
+      } else if (provider === "gmail_password") {
+        clearGmailConfigCache("password");
+        console.log("[Admin] Configuration gmail_password mise à jour - cache vidé");
+      } else if (provider === "gmail_2fa") {
+        clearGmailConfigCache("2fa");
+        console.log("[Admin] Configuration gmail_2fa mise à jour - cache vidé");
       }
 
       // Mask keys in response
@@ -6194,13 +6201,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Test email connection
   app.post("/api/admin/test-email", requireAdmin, async (req: Request, res: Response) => {
     try {
-      clearGmailConfigCache();
-      const success = await testEmailConnection();
+      const { gmailType } = req.body as { gmailType?: GmailType };
+      const type: GmailType = gmailType || "signup";
+      
+      clearGmailConfigCache(type);
+      const success = await testEmailConnection(type);
+      
+      const providerNames: Record<GmailType, string> = {
+        signup: "Gmail - Inscription",
+        password: "Gmail - Mot de passe",
+        "2fa": "Gmail - Connexion 2FA",
+      };
       
       if (success) {
-        res.json({ success: true, message: "Connexion Gmail réussie" });
+        res.json({ success: true, message: `Connexion ${providerNames[type]} réussie` });
       } else {
-        res.status(400).json({ success: false, error: "Impossible de se connecter à Gmail. Vérifiez vos identifiants." });
+        res.status(400).json({ success: false, error: `Impossible de se connecter à ${providerNames[type]}. Vérifiez vos identifiants.` });
       }
     } catch (error: any) {
       console.error("[Admin] Test email error:", error);

@@ -87,12 +87,26 @@ const PROVIDER_INFO = {
     fields: ["apiKey"],
     countries: "Global - Conversion XOF, XAF, CDF, USD",
   },
-  gmail: {
-    name: "Gmail SMTP",
-    description: "Service d'envoi d'emails pour les codes de verification 2FA",
+  gmail_signup: {
+    name: "Gmail - Inscription",
+    description: "Envoi des codes de verification lors de l'inscription",
     color: "bg-red-500",
     fields: ["apiKey", "secretKey"],
-    countries: "Global - Envoi de codes de connexion par email",
+    countries: "Global - Verification email inscription",
+  },
+  gmail_password: {
+    name: "Gmail - Mot de passe",
+    description: "Envoi des codes pour la reinitialisation de mot de passe",
+    color: "bg-pink-500",
+    fields: ["apiKey", "secretKey"],
+    countries: "Global - Recuperation mot de passe",
+  },
+  gmail_2fa: {
+    name: "Gmail - Connexion 2FA",
+    description: "Envoi des codes de confirmation lors de la connexion",
+    color: "bg-rose-500",
+    fields: ["apiKey", "secretKey"],
+    countries: "Global - Double authentification",
   },
 };
 
@@ -122,7 +136,7 @@ const getFieldLabel = (provider: string, field: string): string => {
   if (provider === "exchangerate") {
     if (field === "apiKey") return "Clé API ExchangeRate (exchangerate-api.com)";
   }
-  if (provider === "gmail") {
+  if (provider === "gmail_signup" || provider === "gmail_password" || provider === "gmail_2fa") {
     switch (field) {
       case "apiKey": return "Adresse Gmail (ex: votre-email@gmail.com)";
       case "secretKey": return "Mot de passe d'application Google (16 caracteres)";
@@ -300,8 +314,8 @@ export default function FournisseursPage() {
   });
 
   const testEmailMutation = useMutation({
-    mutationFn: async () => {
-      return apiRequest("POST", "/api/admin/test-email", {});
+    mutationFn: async (gmailType: "signup" | "password" | "2fa") => {
+      return apiRequest("POST", "/api/admin/test-email", { gmailType });
     },
     onSuccess: () => {
       toast({
@@ -410,7 +424,7 @@ export default function FournisseursPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-7">
+        <TabsList className="grid w-full grid-cols-9">
           {Object.entries(PROVIDER_INFO).map(([key, info]) => {
             const config = getProviderConfig(key);
             return (
@@ -685,13 +699,16 @@ export default function FournisseursPage() {
                           )}
                           Enregistrer les clés
                         </Button>
-                        {provider === "gmail" && (
+                        {(provider === "gmail_signup" || provider === "gmail_password" || provider === "gmail_2fa") && (
                           <Button
                             variant="outline"
-                            onClick={() => testEmailMutation.mutate()}
+                            onClick={() => {
+                              const gmailType = provider === "gmail_signup" ? "signup" : provider === "gmail_password" ? "password" : "2fa";
+                              testEmailMutation.mutate(gmailType as "signup" | "password" | "2fa");
+                            }}
                             disabled={testEmailMutation.isPending}
                             className="gap-2"
-                            data-testid="test-gmail-connection"
+                            data-testid={`test-gmail-connection-${provider}`}
                           >
                             {testEmailMutation.isPending ? (
                               <Loader2 className="w-4 h-4 animate-spin" />
@@ -705,7 +722,7 @@ export default function FournisseursPage() {
                     </div>
                   </div>
 
-                  {provider === "gmail" && (
+                  {(provider === "gmail_signup" || provider === "gmail_password" || provider === "gmail_2fa") && (
                     <div className="border-t pt-4 mt-4">
                       <Alert>
                         <AlertCircle className="h-4 w-4" />
