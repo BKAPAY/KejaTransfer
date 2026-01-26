@@ -492,14 +492,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
       secret: process.env.SESSION_SECRET!,
       resave: false,
       saveUninitialized: false,
+      rolling: true, // Reset expiration on each request (activity extends session)
       cookie: {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: "lax", // Changed from "strict" to "lax" for better compatibility
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        sameSite: "lax",
+        maxAge: 10 * 60 * 1000, // 10 minutes - session expires after 10 minutes of inactivity
       },
     })
   );
+
+  // ===== Simple Rate Limiting for Auth Endpoints =====
+  const loginAttempts = new Map<string, { count: number; lastAttempt: number }>();
+  const RATE_LIMIT_WINDOW = 15 * 60 * 1000; // 15 minutes
+  const MAX_LOGIN_ATTEMPTS = 5; // Max attempts per window
+  const MAX_CODE_REQUESTS = 3; // Max code requests per window
+
+  function checkRateLimit(key: string, maxAttempts: number): { allowed: boolean; remainingTime?: number } {
+    const now = Date.now();
+    const record = loginAttempts.get(key);
+    
+    if (!record) {
+      loginAttempts.set(key, { count: 1, lastAttempt: now });
+      return { allowed: true };
+    }
+    
+    // Reset if window has passed
+    if (now - record.lastAttempt > RATE_LIMIT_WINDOW) {
+      loginAttempts.set(key, { count: 1, lastAttempt: now });
+      return { allowed: true };
+    }
+    
+    // Check if limit exceeded
+    if (record.count >= maxAttempts) {
+      const remainingTime = Math.ceil((RATE_LIMIT_WINDOW - (now - record.lastAttempt)) / 1000 / 60);
+      return { allowed: false, remainingTime };
+    }
+    
+    // Increment counter
+    record.count++;
+    record.lastAttempt = now;
+    return { allowed: true };
+  }
+
+  function resetRateLimit(key: string): void {
+    loginAttempts.delete(key);
+  }
+
+  // Cleanup old rate limit entries every 5 minutes
+  setInterval(() => {
+    const now = Date.now();
+    for (const [key, record] of loginAttempts.entries()) {
+      if (now - record.lastAttempt > RATE_LIMIT_WINDOW) {
+        loginAttempts.delete(key);
+      }
+    }
+  }, 5 * 60 * 1000);
 
   // ===== NOWPayments Routes =====
   app.use(nowpaymentsRoutes);
@@ -705,10 +753,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  // Login
-  app.post("/api/auth/login", async (req: Request, res: Response) => {
+  // Login Step 1: Validate credentials and send verification code
+  app.post("/api/auth/login/send-code", async (req: Request, res: Response) => {
     try {
       const { email, password } = req.body;
+
+      if (!email || !password) {
+        return res.status(400).json({ error: "Email et mot de passe requis" });
+      }
+
+      // Rate limiting for code requests (prevent email flooding)
+      const codeRateLimitKey = `code:${email.toLowerCase()}`;
+      const codeRateCheck = checkRateLimit(codeRateLimitKey, MAX_CODE_REQUESTS);
+      if (!codeRateCheck.allowed) {
+        return res.status(429).json({ 
+          error: `Trop de demandes de code. Veuillez réessayer dans ${codeRateCheck.remainingTime} minutes.` 
+        });
+      }
 
       const user = await storage.getUserByEmail(email);
       if (!user) {
@@ -724,9 +785,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Email ou mot de passe incorrect" });
       }
 
+      // Check if email service is configured
+      if (!isEmailServiceConfigured()) {
+        return res.status(503).json({ 
+          error: "Le service d'envoi d'email n'est pas configuré. Contactez l'administrateur." 
+        });
+      }
+
+      // Generate and send login code
+      const code = generateVerificationCode();
+      await storage.createVerificationCode(email, code, "login");
+      
+      const sent = await sendVerificationEmail(email, code, "login");
+      if (!sent) {
+        return res.status(500).json({ error: "Erreur lors de l'envoi du code de connexion" });
+      }
+
+      res.json({ 
+        success: true, 
+        message: "Code de connexion envoyé à votre email",
+        requiresCode: true 
+      });
+    } catch (error: any) {
+      console.error("[Login] Error sending code:", error);
+      res.status(500).json({ error: "Erreur lors de la connexion" });
+    }
+  });
+
+  // Login Step 2: Verify code and create session
+  app.post("/api/auth/login", async (req: Request, res: Response) => {
+    try {
+      const { email, password, verificationCode } = req.body;
+
+      if (!email || !password) {
+        return res.status(400).json({ error: "Email et mot de passe requis" });
+      }
+
+      // Rate limiting for login attempts (prevent brute force)
+      const loginRateLimitKey = `login:${email.toLowerCase()}`;
+      const loginRateCheck = checkRateLimit(loginRateLimitKey, MAX_LOGIN_ATTEMPTS);
+      if (!loginRateCheck.allowed) {
+        return res.status(429).json({ 
+          error: `Trop de tentatives de connexion. Veuillez réessayer dans ${loginRateCheck.remainingTime} minutes.` 
+        });
+      }
+
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        return res.status(401).json({ error: "Email ou mot de passe incorrect" });
+      }
+
+      if (user.suspended) {
+        return res.status(403).json({ error: "Votre compte a été suspendu. Veuillez contacter le support." });
+      }
+
+      const validPassword = await bcrypt.compare(password, user.password);
+      if (!validPassword) {
+        return res.status(401).json({ error: "Email ou mot de passe incorrect" });
+      }
+
+      // Verify the login code
+      if (!verificationCode || typeof verificationCode !== "string") {
+        return res.status(400).json({ error: "Code de vérification requis" });
+      }
+
+      const isValid = await storage.verifyCode(email, verificationCode, "login");
+      if (!isValid) {
+        return res.status(400).json({ error: "Code de connexion invalide ou expiré" });
+      }
+
+      // Mark code as used
+      await storage.markCodeAsUsed(email, verificationCode, "login");
+
+      // Reset rate limits on successful login
+      resetRateLimit(loginRateLimitKey);
+      resetRateLimit(`code:${email.toLowerCase()}`);
+
       req.session.userId = user.id;
       res.json({ success: true, user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName } });
     } catch (error: any) {
+      console.error("[Login] Error:", error);
       res.status(500).json({ error: "Erreur lors de la connexion" });
     }
   });

@@ -127,9 +127,9 @@ export interface IStorage {
   }>;
 
   // Verification Codes
-  createVerificationCode(email: string, code: string, type: "signup" | "password_reset"): Promise<void>;
-  verifyCode(email: string, code: string, type: "signup" | "password_reset"): Promise<boolean>;
-  markCodeAsUsed(email: string, code: string, type: "signup" | "password_reset"): Promise<void>;
+  createVerificationCode(email: string, code: string, type: "signup" | "password_reset" | "login"): Promise<void>;
+  verifyCode(email: string, code: string, type: "signup" | "password_reset" | "login"): Promise<boolean>;
+  markCodeAsUsed(email: string, code: string, type: "signup" | "password_reset" | "login"): Promise<void>;
   cleanupExpiredCodes(): Promise<void>;
 
   // Crypto Currencies
@@ -1277,7 +1277,7 @@ export class DbStorage implements IStorage {
   }
 
   // Verification Codes
-  async createVerificationCode(email: string, code: string, type: "signup" | "password_reset"): Promise<void> {
+  async createVerificationCode(email: string, code: string, type: "signup" | "password_reset" | "login"): Promise<void> {
     // Delete any existing unused codes for this email and type
     await db
       .delete(schema.verificationCodes)
@@ -1300,7 +1300,7 @@ export class DbStorage implements IStorage {
     });
   }
 
-  async verifyCode(email: string, code: string, type: "signup" | "password_reset"): Promise<boolean> {
+  async verifyCode(email: string, code: string, type: "signup" | "password_reset" | "login"): Promise<boolean> {
     const results = await db
       .select()
       .from(schema.verificationCodes)
@@ -1326,7 +1326,7 @@ export class DbStorage implements IStorage {
     return true;
   }
 
-  async markCodeAsUsed(email: string, code: string, type: "signup" | "password_reset"): Promise<void> {
+  async markCodeAsUsed(email: string, code: string, type: "signup" | "password_reset" | "login"): Promise<void> {
     await db
       .update(schema.verificationCodes)
       .set({ used: true })
