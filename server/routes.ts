@@ -123,125 +123,37 @@ async function requireApiKey(req: Request, res: Response, next: Function) {
   }
 }
 
-// Configuration Paydunya - Les clés doivent être définies dans les variables d'environnement
-const PAYDUNYA_CONFIG = {
-  masterKey: process.env.PAYDUNYA_MASTER_KEY!,
-  publicKey: process.env.PAYDUNYA_PUBLIC_KEY!,
-  privateKey: process.env.PAYDUNYA_PRIVATE_KEY!,
-  token: process.env.PAYDUNYA_TOKEN!,
-  apiUrl: "https://app.paydunya.com/api/v1",
-};
+import { 
+  callPaydunyaAPI, 
+  callPaydunyaAPIGet, 
+  callPaydunyaAPIv2,
+  getPaydunyaConfig,
+  getNowPaymentsConfig,
+  isProviderActive
+} from "./provider-config";
 
-// Vérifier que les clés Paydunya sont configurées
-if (!PAYDUNYA_CONFIG.masterKey || !PAYDUNYA_CONFIG.publicKey || !PAYDUNYA_CONFIG.privateKey || !PAYDUNYA_CONFIG.token) {
-  console.error("ERREUR: Les clés API Paydunya doivent être configurées dans les variables d'environnement");
-  console.error("Veuillez définir: PAYDUNYA_MASTER_KEY, PAYDUNYA_PUBLIC_KEY, PAYDUNYA_PRIVATE_KEY, PAYDUNYA_TOKEN");
-}
+console.log("[Paydunya] Using dynamic configuration from database");
 
-// Helper function to call Paydunya API (v1) - POST requests
-async function callPaydunyaAPI(endpoint: string, data: any) {
-  try {
-    const response = await fetch(`${PAYDUNYA_CONFIG.apiUrl}${endpoint}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "PAYDUNYA-MASTER-KEY": PAYDUNYA_CONFIG.masterKey,
-        "PAYDUNYA-PRIVATE-KEY": PAYDUNYA_CONFIG.privateKey,
-        "PAYDUNYA-TOKEN": PAYDUNYA_CONFIG.token,
-      },
-      body: JSON.stringify(data),
-    });
+const PAYDUNYA_API_URL = "https://app.paydunya.com/api/v1";
+const PAYDUNYA_API_URL_V2 = "https://app.paydunya.com/api/v2";
 
-    const result = await response.json();
-    console.log(`[Paydunya API] ${endpoint} - Status: ${response.status}`, result);
-    return result;
-  } catch (error) {
-    console.error(`[Paydunya API Error] ${endpoint}:`, error);
-    throw error;
-  }
-}
-
-// Helper function to call Paydunya API (v1) - GET requests (for status checks)
-async function callPaydunyaAPIGet(endpoint: string) {
-  try {
-    const url = `${PAYDUNYA_CONFIG.apiUrl}${endpoint}`;
-    console.log(`[Paydunya API GET] Calling: ${url}`);
-    
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        "PAYDUNYA-MASTER-KEY": PAYDUNYA_CONFIG.masterKey,
-        "PAYDUNYA-PRIVATE-KEY": PAYDUNYA_CONFIG.privateKey,
-        "PAYDUNYA-TOKEN": PAYDUNYA_CONFIG.token,
-      },
-    });
-
-    const responseText = await response.text();
-    console.log(`[Paydunya API GET] ${endpoint} - Status: ${response.status}, Response: ${responseText.substring(0, 500)}`);
-    
-    try {
-      const result = JSON.parse(responseText);
-      return result;
-    } catch (e) {
-      console.error(`[Paydunya API GET] Received non-JSON response:`, responseText.substring(0, 500));
-      throw new Error(`Paydunya API error: ${responseText.substring(0, 200)}`);
-    }
-  } catch (error) {
-    console.error(`[Paydunya API GET Error] ${endpoint}:`, error);
-    throw error;
-  }
-}
-
-// Helper function to call Paydunya API v2 (for disbursements/withdrawals)
-async function callPaydunyaAPIv2(endpoint: string, data: any) {
-  try {
-    const url = `https://app.paydunya.com/api/v2${endpoint}`;
-    console.log(`[Paydunya APIv2] Calling: ${url}`);
-    console.log(`[Paydunya APIv2] Data:`, data);
-
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "PAYDUNYA-MASTER-KEY": PAYDUNYA_CONFIG.masterKey,
-        "PAYDUNYA-PRIVATE-KEY": PAYDUNYA_CONFIG.privateKey,
-        "PAYDUNYA-TOKEN": PAYDUNYA_CONFIG.token,
-      },
-      body: JSON.stringify(data),
-    });
-
-    // Read response text first to handle both JSON and HTML errors
-    const responseText = await response.text();
-    console.log(`[Paydunya APIv2] Response Status: ${response.status}, Text: ${responseText.substring(0, 500)}`);
-
-    try {
-      const result = JSON.parse(responseText);
-      return result;
-    } catch (e) {
-      // If response is HTML, likely an error from Paydunya
-      console.error(`[Paydunya APIv2] Received non-JSON response:`, responseText.substring(0, 500));
-      throw new Error(`Paydunya API error: ${responseText.substring(0, 200)}`);
-    }
-  } catch (error) {
-    console.error(`[Paydunya APIv2 Error] ${endpoint}:`, error);
-    throw error;
-  }
-}
-
-// Helper function to call Paydunya API v2 GET (for invoice status check)
 async function callPaydunyaAPIv2Get(endpoint: string) {
+  const config = await getPaydunyaConfig();
+  if (!config) {
+    throw new Error("Paydunya n'est pas configure. Veuillez configurer les cles API dans l'interface administrateur.");
+  }
+  
   try {
-    const url = `https://app.paydunya.com/api/v2${endpoint}`;
+    const url = `${PAYDUNYA_API_URL_V2}${endpoint}`;
     console.log(`[Paydunya APIv2 GET] Calling: ${url}`);
 
     const response = await fetch(url, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
-        "PAYDUNYA-MASTER-KEY": PAYDUNYA_CONFIG.masterKey,
-        "PAYDUNYA-PRIVATE-KEY": PAYDUNYA_CONFIG.privateKey,
-        "PAYDUNYA-TOKEN": PAYDUNYA_CONFIG.token,
+        "PAYDUNYA-MASTER-KEY": config.masterKey,
+        "PAYDUNYA-PRIVATE-KEY": config.privateKey,
+        "PAYDUNYA-TOKEN": config.token,
       },
     });
 
@@ -272,20 +184,24 @@ function sanitizePaymentMessage(msg: string | undefined, fallback: string = "Err
   return capped.trim() || fallback;
 }
 
-// Helper function to confirm Wizall two-step payment
 async function confirmWizallPayment(
   authorizationCode: string,
   phoneNumber: string,
   transactionId: string
 ): Promise<{ success: boolean; message: string; data?: any }> {
+  const paydunyaConfig = await getPaydunyaConfig();
+  if (!paydunyaConfig) {
+    return { success: false, message: "Paydunya n'est pas configure" };
+  }
+  
   try {
-    const confirmResponse = await fetch(`${PAYDUNYA_CONFIG.apiUrl}/softpay/wizall-money-senegal/confirm`, {
+    const confirmResponse = await fetch(`${PAYDUNYA_API_URL}/softpay/wizall-money-senegal/confirm`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "PAYDUNYA-MASTER-KEY": PAYDUNYA_CONFIG.masterKey,
-        "PAYDUNYA-PRIVATE-KEY": PAYDUNYA_CONFIG.privateKey,
-        "PAYDUNYA-TOKEN": PAYDUNYA_CONFIG.token,
+        "PAYDUNYA-MASTER-KEY": paydunyaConfig.masterKey,
+        "PAYDUNYA-PRIVATE-KEY": paydunyaConfig.privateKey,
+        "PAYDUNYA-TOKEN": paydunyaConfig.token,
       },
       body: JSON.stringify({
         authorization_code: authorizationCode,
@@ -338,19 +254,22 @@ async function confirmWizallPayment(
   }
 }
 
-// Helper function to call Paydunya SOFTPAY API (operator-specific OTP endpoints)
 async function callPaydunyaSoftpay(
   operator: string,
   country: string,
   paymentData: SoftpayPaymentData
 ): Promise<{ success: boolean; message: string; data?: any; fees?: number; currency?: string; url?: string; transactionId?: string }> {
+  const paydunyaConfig = await getPaydunyaConfig();
+  if (!paydunyaConfig) {
+    return { success: false, message: "Paydunya n'est pas configure. Veuillez configurer les cles API." };
+  }
+  
   try {
-    // Get operator configuration key
     const operatorKey = getOperatorKey(operator, country);
     if (!operatorKey) {
       return {
         success: false,
-        message: `Opérateur non supporté pour ce pays`,
+        message: `Operateur non supporte pour ce pays`,
       };
     }
 
@@ -358,24 +277,21 @@ async function callPaydunyaSoftpay(
     if (!config) {
       return {
         success: false,
-        message: `Configuration introuvable pour cet opérateur`,
+        message: `Configuration introuvable pour cet operateur`,
       };
     }
 
-    // Build request parameters using operator-specific mapping
     const requestData = config.parameterMapping(paymentData);
 
-    // Log without sensitive data (OTP codes, passwords, tokens)
     console.log(`[SOFTPAY] Calling ${config.endpoint} for ${operatorKey} - phone: ${paymentData.phoneNumber?.slice(-4) || 'N/A'}`);
 
-    // Call the operator-specific SOFTPAY endpoint
-    const response = await fetch(`${PAYDUNYA_CONFIG.apiUrl}${config.endpoint}`, {
+    const response = await fetch(`${PAYDUNYA_API_URL}${config.endpoint}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "PAYDUNYA-MASTER-KEY": PAYDUNYA_CONFIG.masterKey,
-        "PAYDUNYA-PRIVATE-KEY": PAYDUNYA_CONFIG.privateKey,
-        "PAYDUNYA-TOKEN": PAYDUNYA_CONFIG.token,
+        "PAYDUNYA-MASTER-KEY": paydunyaConfig.masterKey,
+        "PAYDUNYA-PRIVATE-KEY": paydunyaConfig.privateKey,
+        "PAYDUNYA-TOKEN": paydunyaConfig.token,
       },
       body: JSON.stringify(requestData),
     });
@@ -2139,14 +2055,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Jeton non disponible" });
       }
 
-      // Return PSR response format
       const response: any = {
         success: true,
         token: metadata.paydunyaToken,
       };
 
-      // Add mode if in test environment
-      if (PAYDUNYA_CONFIG.publicKey.includes("test")) {
+      const paydunyaConfig = await getPaydunyaConfig();
+      if (paydunyaConfig?.publicKey?.includes("test")) {
         response.mode = "test";
       }
 
