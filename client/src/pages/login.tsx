@@ -25,8 +25,7 @@ const codeSchema = z.object({
 type LoginFormData = z.infer<typeof loginSchema>;
 type CodeFormData = z.infer<typeof codeSchema>;
 
-const RESEND_COOLDOWN = 5 * 60; // 5 minutes in seconds
-const MAX_RESENDS = 3; // 3 resends allowed (separate from initial send)
+const RESEND_COOLDOWN = 60; // 1 minute in seconds
 const STORAGE_KEY_PREFIX = "bkapay_login_";
 
 function getStorageKey(email: string, suffix: string): string {
@@ -65,28 +64,14 @@ export default function Login() {
   const [step, setStep] = useState<"credentials" | "verification">("credentials");
   const [credentials, setCredentials] = useState<LoginFormData | null>(null);
   const [resendCooldown, setResendCooldown] = useState(0);
-  const [resendsUsed, setResendsUsed] = useState(0);
-  const [suspendedUntil, setSuspendedUntil] = useState<number | null>(null);
-  const [suspendedTimeRemaining, setSuspendedTimeRemaining] = useState<string>("");
   const [verificationCode, setVerificationCode] = useState("");
 
-  // Load persisted state when credentials change
+  // Load persisted cooldown state when credentials change
   useEffect(() => {
     if (!credentials?.email) return;
     
     const email = credentials.email;
-    const storedSuspendedUntil = getFromStorage(email, "suspendedUntil");
     const storedCooldownEnd = getFromStorage(email, "cooldownEnd");
-    const storedResendCount = getFromStorage(email, "resendsUsed");
-    
-    if (storedSuspendedUntil) {
-      const suspendTime = parseInt(storedSuspendedUntil, 10);
-      if (suspendTime > Date.now()) {
-        setSuspendedUntil(suspendTime);
-      } else {
-        localStorage.removeItem(getStorageKey(email, "suspendedUntil"));
-      }
-    }
     
     if (storedCooldownEnd) {
       const cooldownEnd = parseInt(storedCooldownEnd, 10);
@@ -96,10 +81,6 @@ export default function Login() {
       } else {
         localStorage.removeItem(getStorageKey(email, "cooldownEnd"));
       }
-    }
-    
-    if (storedResendCount) {
-      setResendsUsed(parseInt(storedResendCount, 10));
     }
   }, [credentials?.email]);
 
@@ -120,46 +101,9 @@ export default function Login() {
     return () => clearInterval(timer);
   }, [resendCooldown]);
 
-  // Countdown timer for suspension
-  useEffect(() => {
-    if (!suspendedUntil) return;
-    
-    const updateSuspensionTime = () => {
-      const now = Date.now();
-      const remaining = suspendedUntil - now;
-      
-      if (remaining <= 0) {
-        setSuspendedUntil(null);
-        setSuspendedTimeRemaining("");
-        setResendsUsed(0);
-        if (credentials?.email) {
-          clearStorage(credentials.email);
-        }
-        return;
-      }
-      
-      const hours = Math.floor(remaining / (1000 * 60 * 60));
-      const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
-      const seconds = Math.floor((remaining % (1000 * 60)) / 1000);
-      
-      if (hours > 0) {
-        setSuspendedTimeRemaining(`${hours}h ${minutes}min ${seconds}s`);
-      } else if (minutes > 0) {
-        setSuspendedTimeRemaining(`${minutes}min ${seconds}s`);
-      } else {
-        setSuspendedTimeRemaining(`${seconds}s`);
-      }
-    };
-    
-    updateSuspensionTime();
-    const timer = setInterval(updateSuspensionTime, 1000);
-    return () => clearInterval(timer);
-  }, [suspendedUntil, credentials?.email]);
-
   const formatCooldownTime = useCallback((seconds: number) => {
-    const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
+    return `${secs}s`;
   }, []);
 
   const loginForm = useForm<LoginFormData>({
@@ -176,16 +120,6 @@ export default function Login() {
       verificationCode: "",
     },
   });
-
-  const handleSuspension = (email: string, suspendedUntilTime?: number) => {
-    const suspendTime = suspendedUntilTime || (Date.now() + 3 * 60 * 60 * 1000);
-    setSuspendedUntil(suspendTime);
-    saveToStorage(email, "suspendedUntil", suspendTime);
-    setStep("credentials");
-    setCredentials(null);
-    setResendsUsed(0);
-    setResendCooldown(0);
-  };
 
   const sendCodeMutation = useMutation({
     mutationFn: async (data: LoginFormData) => {
@@ -207,41 +141,17 @@ export default function Login() {
       setCredentials(data);
       setStep("verification");
       
-      // Set cooldown timer
+      // Set cooldown timer (1 minute)
       const cooldownEnd = Date.now() + RESEND_COOLDOWN * 1000;
       setResendCooldown(RESEND_COOLDOWN);
       saveToStorage(data.email, "cooldownEnd", cooldownEnd);
       
-      // Update resend count from server (0 for initial send is valid)
-      const serverResendsUsed = response.resendsUsed ?? 0;
-      setResendsUsed(serverResendsUsed);
-      saveToStorage(data.email, "resendsUsed", serverResendsUsed);
-      
-      // Check if this was the last attempt
-      if (response.isLastAttempt && response.suspendedUntil) {
-        saveToStorage(data.email, "suspendedUntil", response.suspendedUntil);
-        toast({
-          title: "Attention",
-          description: "C'est votre dernier code. Votre compte sera suspendu si vous n'entrez pas le bon code.",
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Code envoye",
-          description: "Un code de connexion a ete envoye a votre email",
-        });
-      }
+      toast({
+        title: "Code envoye",
+        description: "Un code de connexion a ete envoye a votre email",
+      });
     },
     onError: (error: any) => {
-      const email = loginForm.getValues("email");
-      
-      // Check for suspension from server
-      if (error.suspendedUntil) {
-        handleSuspension(email, error.suspendedUntil);
-      } else if (error.isSuspension || error.message?.includes("suspendu")) {
-        handleSuspension(email);
-      }
-      
       toast({
         title: "Erreur",
         description: error.message || "Email ou mot de passe incorrect",
@@ -282,49 +192,23 @@ export default function Login() {
       const response = await apiRequest("POST", "/api/auth/login/send-code", credentials);
       return response;
     },
-    onSuccess: (response: any) => {
+    onSuccess: () => {
       const email = credentials?.email || "";
       
-      // Set cooldown timer
+      // Set cooldown timer (1 minute)
       const cooldownEnd = Date.now() + RESEND_COOLDOWN * 1000;
       setResendCooldown(RESEND_COOLDOWN);
       saveToStorage(email, "cooldownEnd", cooldownEnd);
       
-      // Update resend count from server
-      const serverResendsUsed = response.resendsUsed ?? resendsUsed + 1;
-      setResendsUsed(serverResendsUsed);
-      saveToStorage(email, "resendsUsed", serverResendsUsed);
-      
       // Reset code field
       setVerificationCode("");
       
-      // Check if this was the last attempt
-      if (response.isLastAttempt && response.suspendedUntil) {
-        saveToStorage(email, "suspendedUntil", response.suspendedUntil);
-        toast({
-          title: "Dernier code envoyé",
-          description: "C'est votre dernier code. Votre compte sera suspendu si vous n'entrez pas le bon code.",
-          variant: "destructive",
-        });
-      } else {
-        // Use server-provided remaining count
-        const remaining = response.resendsRemaining ?? (MAX_RESENDS - serverResendsUsed);
-        toast({
-          title: "Code renvoyé",
-          description: `Un nouveau code a été envoyé.${remaining > 0 ? ` Il vous reste ${remaining} renvoi(s).` : ""}`,
-        });
-      }
+      toast({
+        title: "Code renvoye",
+        description: "Un nouveau code a ete envoye a votre email",
+      });
     },
     onError: (error: any) => {
-      const email = credentials?.email || "";
-      
-      // Check for suspension from server
-      if (error.suspendedUntil) {
-        handleSuspension(email, error.suspendedUntil);
-      } else if (error.isSuspension || error.message?.includes("suspendu")) {
-        handleSuspension(email);
-      }
-      
       toast({
         title: "Erreur",
         description: error.message || "Erreur lors de l'envoi du code",
@@ -334,29 +218,6 @@ export default function Login() {
   });
 
   const onSubmitCredentials = (data: LoginFormData) => {
-    // Check for persisted suspension
-    const storedSuspendedUntil = getFromStorage(data.email, "suspendedUntil");
-    if (storedSuspendedUntil) {
-      const suspendTime = parseInt(storedSuspendedUntil, 10);
-      if (suspendTime > Date.now()) {
-        setSuspendedUntil(suspendTime);
-        toast({
-          title: "Compte suspendu",
-          description: "Veuillez attendre que la suspension soit levée.",
-          variant: "destructive",
-        });
-        return;
-      }
-    }
-    
-    if (suspendedUntil && Date.now() < suspendedUntil) {
-      toast({
-        title: "Compte suspendu",
-        description: `Veuillez attendre ${suspendedTimeRemaining} avant de réessayer.`,
-        variant: "destructive",
-      });
-      return;
-    }
     sendCodeMutation.mutate(data);
   };
 
@@ -386,19 +247,10 @@ export default function Login() {
 
   const handleResendCode = () => {
     if (resendCooldown > 0) return;
-    if (resendsUsed >= MAX_RESENDS) {
-      toast({
-        title: "Limite atteinte",
-        description: "Vous avez utilisé tous vos renvois de code.",
-        variant: "destructive",
-      });
-      return;
-    }
     resendCodeMutation.mutate();
   };
 
-  const canResend = resendCooldown === 0 && resendsUsed < MAX_RESENDS;
-  const isSuspended = suspendedUntil && Date.now() < suspendedUntil;
+  const canResend = resendCooldown === 0;
 
   return (
     <div className="w-full min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center p-4 overflow-hidden">
@@ -417,21 +269,6 @@ export default function Login() {
           </CardDescription>
         </CardHeader>
         <CardContent className="p-3 sm:p-4 lg:p-6">
-          {isSuspended && (
-            <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
-              <div className="flex items-start gap-2">
-                <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
-                <div className="text-sm">
-                  <p className="font-medium text-destructive">Compte suspendu temporairement</p>
-                  <p className="text-muted-foreground mt-1">
-                    Tentative de connexion suspecte détectée. 
-                    Veuillez réessayer dans <span className="font-medium text-foreground">{suspendedTimeRemaining}</span>.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
           {step === "credentials" ? (
             <Form {...loginForm}>
               <form onSubmit={loginForm.handleSubmit(onSubmitCredentials)} className="space-y-2 sm:space-y-3 lg:space-y-4">
@@ -449,7 +286,6 @@ export default function Login() {
                           type="email"
                           placeholder="jean.dupont@example.com"
                           data-testid="input-email"
-                          disabled={!!isSuspended}
                           {...field}
                         />
                       </FormControl>
@@ -472,7 +308,6 @@ export default function Login() {
                           type="password"
                           placeholder="••••••••"
                           data-testid="input-password"
-                          disabled={!!isSuspended}
                           {...field}
                         />
                       </FormControl>
@@ -495,7 +330,7 @@ export default function Login() {
                 <Button
                   type="submit"
                   className="w-full"
-                  disabled={sendCodeMutation.isPending || !!isSuspended}
+                  disabled={sendCodeMutation.isPending}
                   data-testid="button-submit"
                 >
                   {sendCodeMutation.isPending ? "Vérification..." : "Continuer"}
@@ -563,10 +398,8 @@ export default function Login() {
                       "Envoi en cours..."
                     ) : resendCooldown > 0 ? (
                       `Renvoyer le code (${formatCooldownTime(resendCooldown)})`
-                    ) : resendsUsed >= MAX_RESENDS ? (
-                      "Limite de renvois atteinte"
                     ) : (
-                      `Renvoyer le code (${MAX_RESENDS - resendsUsed} restant${MAX_RESENDS - resendsUsed > 1 ? "s" : ""})`
+                      "Renvoyer le code"
                     )}
                   </Button>
 

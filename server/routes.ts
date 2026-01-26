@@ -740,27 +740,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Rate limiting for code requests (prevent email flooding)
-      const codeRateLimitKey = `code:${email.toLowerCase()}`;
-      const codeRateCheck = checkRateLimit(codeRateLimitKey, MAX_CODE_REQUESTS);
-      if (!codeRateCheck.allowed) {
-        // Apply 3-hour suspension after max code requests
-        if (codeRateCheck.shouldSuspend) {
-          applyTemporarySuspension(email);
-          const suspendedUntil = Date.now() + SUSPENSION_DURATION;
-          return res.status(403).json({ 
-            error: `Compte suspendu temporairement suite à une tentative de connexion suspecte. Veuillez réessayer dans 3h.`,
-            suspendedUntil,
-            isSuspension: true
-          });
-        }
-        return res.status(429).json({ 
-          error: `Trop de demandes de code. Veuillez réessayer dans ${codeRateCheck.remainingTime} minutes.` 
-        });
-      }
-      
-      // If this was the 3rd (last) allowed code request, send the code but then apply suspension
-      const willSuspendAfterThis = codeRateCheck.shouldSuspend;
+      // Rate limiting for code requests (1 minute cooldown between resends)
 
       const user = await storage.getUserByEmail(email);
       if (!user) {
@@ -810,34 +790,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({ error: "Erreur lors de l'envoi du code de connexion" });
       }
 
-      // If this was the 4th request (3rd resend), apply suspension now (after sending the code)
-      if (willSuspendAfterThis) {
-        applyTemporarySuspension(email);
-        const suspendedUntilTs = Date.now() + SUSPENSION_DURATION;
-        return res.json({ 
-          success: true, 
-          message: "Dernier code envoyé. Votre compte sera suspendu si vous ne vous connectez pas.",
-          requiresCode: true,
-          isLastAttempt: true,
-          suspendedUntil: suspendedUntilTs,
-          resendsUsed: MAX_CODE_REQUESTS - 1, // All 3 resends used
-          resendsRemaining: 0,
-          maxResends: MAX_CODE_REQUESTS - 1
-        });
-      }
-
-      // Calculate remaining resends (initial send doesn't count as a resend)
-      const currentCount = codeRateCheck.currentCount || 1;
-      const resendsUsed = Math.max(0, currentCount - 1); // First one is initial send
-      const resendsRemaining = MAX_CODE_REQUESTS - 1 - resendsUsed; // -1 for initial send
-      
       res.json({ 
         success: true, 
         message: "Code de connexion envoyé à votre email",
-        requiresCode: true,
-        resendsUsed,
-        resendsRemaining,
-        maxResends: MAX_CODE_REQUESTS - 1 // 3 resends allowed
+        requiresCode: true
       });
     } catch (error: any) {
       console.error("[Login] Error sending code:", error);
