@@ -87,6 +87,13 @@ const PROVIDER_INFO = {
     fields: ["apiKey"],
     countries: "Global - Conversion XOF, XAF, CDF, USD",
   },
+  gmail: {
+    name: "Gmail SMTP",
+    description: "Service d'envoi d'emails pour les codes de verification 2FA",
+    color: "bg-red-500",
+    fields: ["apiKey", "secretKey"],
+    countries: "Global - Envoi de codes de connexion par email",
+  },
 };
 
 const getFieldLabel = (provider: string, field: string): string => {
@@ -114,6 +121,13 @@ const getFieldLabel = (provider: string, field: string): string => {
   }
   if (provider === "exchangerate") {
     if (field === "apiKey") return "Clé API ExchangeRate (exchangerate-api.com)";
+  }
+  if (provider === "gmail") {
+    switch (field) {
+      case "apiKey": return "Adresse Gmail (ex: votre-email@gmail.com)";
+      case "secretKey": return "Mot de passe d'application Google (16 caracteres)";
+      default: return field;
+    }
   }
   switch (field) {
     case "apiKey": return "Clé API";
@@ -258,6 +272,7 @@ export default function FournisseursPage() {
     mbiyopay: { apiKey: "", secretKey: "", publicKey: "", masterKey: "", token: "", ipnSecret: "" },
     nowpayments: { apiKey: "", secretKey: "", publicKey: "", masterKey: "", token: "", ipnSecret: "" },
     exchangerate: { apiKey: "", secretKey: "", publicKey: "", masterKey: "", token: "", ipnSecret: "" },
+    gmail: { apiKey: "", secretKey: "", publicKey: "", masterKey: "", token: "", ipnSecret: "" },
   });
 
   const { data: providers, isLoading } = useQuery<ProviderConfig[]>({
@@ -279,6 +294,25 @@ export default function FournisseursPage() {
       toast({
         title: "Erreur",
         description: error.message || "Impossible de mettre à jour",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const testEmailMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", "/api/admin/test-email", {});
+    },
+    onSuccess: () => {
+      toast({
+        title: "Connexion reussie",
+        description: "La connexion Gmail a ete verifiee avec succes",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Echec de la connexion",
+        description: error.message || "Impossible de se connecter a Gmail. Verifiez vos identifiants.",
         variant: "destructive",
       });
     },
@@ -376,7 +410,7 @@ export default function FournisseursPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-7">
           {Object.entries(PROVIDER_INFO).map(([key, info]) => {
             const config = getProviderConfig(key);
             return (
@@ -637,7 +671,7 @@ export default function FournisseursPage() {
                         </div>
                       )}
 
-                      <div className="pt-4">
+                      <div className="pt-4 flex gap-2 flex-wrap">
                         <Button
                           onClick={() => saveKeys(provider)}
                           disabled={updateMutation.isPending}
@@ -651,9 +685,43 @@ export default function FournisseursPage() {
                           )}
                           Enregistrer les clés
                         </Button>
+                        {provider === "gmail" && (
+                          <Button
+                            variant="outline"
+                            onClick={() => testEmailMutation.mutate()}
+                            disabled={testEmailMutation.isPending}
+                            className="gap-2"
+                            data-testid="test-gmail-connection"
+                          >
+                            {testEmailMutation.isPending ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Check className="w-4 h-4" />
+                            )}
+                            Tester la connexion
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </div>
+
+                  {provider === "gmail" && (
+                    <div className="border-t pt-4 mt-4">
+                      <Alert>
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription className="text-sm">
+                          <strong>Comment obtenir un mot de passe d'application Google :</strong>
+                          <ol className="list-decimal ml-4 mt-2 space-y-1">
+                            <li>Connectez-vous a votre compte Google</li>
+                            <li>Allez dans Securite {">"} Validation en deux etapes</li>
+                            <li>En bas, cliquez sur "Mots de passe des applications"</li>
+                            <li>Selectionnez "Autre" et entrez "BKApay"</li>
+                            <li>Copiez le mot de passe de 16 caracteres genere</li>
+                          </ol>
+                        </AlertDescription>
+                      </Alert>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 

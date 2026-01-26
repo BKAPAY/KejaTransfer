@@ -1,17 +1,66 @@
 import nodemailer from "nodemailer";
 
-function createTransporter() {
-  const gmailUser = process.env.GMAIL_USER;
-  const gmailPassword = process.env.GMAIL_APP_PASSWORD;
+interface GmailCredentials {
+  gmailUser: string | null;
+  gmailPassword: string | null;
+}
+
+let cachedGmailConfig: GmailCredentials | null = null;
+let lastConfigFetch: number = 0;
+const CONFIG_CACHE_TTL = 30000;
+
+async function getGmailCredentialsFromDB(): Promise<GmailCredentials> {
+  const now = Date.now();
+  if (cachedGmailConfig && (now - lastConfigFetch) < CONFIG_CACHE_TTL) {
+    return cachedGmailConfig;
+  }
+  
+  try {
+    const { storage } = await import("./storage");
+    const config = await storage.getProviderConfig("gmail");
+    
+    if (config && config.isActive && config.apiKey && config.secretKey) {
+      cachedGmailConfig = {
+        gmailUser: config.apiKey,
+        gmailPassword: config.secretKey,
+      };
+      lastConfigFetch = now;
+      console.log("[Email] Configuration Gmail chargée depuis la base de données");
+      return cachedGmailConfig;
+    }
+  } catch (error) {
+    console.log("[Email] Erreur lors de la lecture de la config Gmail depuis la BD:", error);
+  }
+  
+  const fallback = {
+    gmailUser: process.env.GMAIL_USER || null,
+    gmailPassword: process.env.GMAIL_APP_PASSWORD || null,
+  };
+  
+  if (fallback.gmailUser && fallback.gmailPassword) {
+    console.log("[Email] Configuration Gmail chargée depuis les variables d'environnement");
+  }
+  
+  return fallback;
+}
+
+export function clearGmailConfigCache(): void {
+  cachedGmailConfig = null;
+  lastConfigFetch = 0;
+  console.log("[Email] Cache de configuration Gmail vidé");
+}
+
+async function createTransporter(): Promise<{ transporter: nodemailer.Transporter | null; gmailUser: string | null }> {
+  const { gmailUser, gmailPassword } = await getGmailCredentialsFromDB();
   
   if (!gmailUser || !gmailPassword) {
     console.log("[Email] Configuration manquante - GMAIL_USER:", !!gmailUser, "GMAIL_APP_PASSWORD:", !!gmailPassword);
-    return null;
+    return { transporter: null, gmailUser: null };
   }
   
   console.log("[Email] Création du transporteur pour:", gmailUser);
   
-  return nodemailer.createTransport({
+  const transporter = nodemailer.createTransport({
     service: "gmail",
     auth: {
       user: gmailUser,
@@ -20,6 +69,8 @@ function createTransporter() {
     debug: true,
     logger: false,
   });
+  
+  return { transporter, gmailUser };
 }
 
 export function generateVerificationCode(): string {
@@ -264,9 +315,9 @@ https://bkapay.com`;
   try {
     console.log(`[Email] Tentative d'envoi de code ${type} à ${to}...`);
     
-    const transporter = createTransporter();
+    const { transporter, gmailUser } = await createTransporter();
     
-    if (!transporter) {
+    if (!transporter || !gmailUser) {
       console.error("[Email] GMAIL_USER ou GMAIL_APP_PASSWORD non configure - envoi impossible");
       return false;
     }
@@ -276,9 +327,9 @@ https://bkapay.com`;
     const result = await transporter.sendMail({
       from: {
         name: "BKApay",
-        address: process.env.GMAIL_USER!,
+        address: gmailUser,
       },
-      replyTo: process.env.GMAIL_USER,
+      replyTo: gmailUser,
       to,
       subject,
       text: textContent,
@@ -286,7 +337,7 @@ https://bkapay.com`;
       headers: {
         "X-Priority": "1",
         "X-Mailer": "BKApay Mailer",
-        "List-Unsubscribe": `<mailto:${process.env.GMAIL_USER}?subject=unsubscribe>`,
+        "List-Unsubscribe": `<mailto:${gmailUser}?subject=unsubscribe>`,
       },
     });
     
@@ -305,7 +356,7 @@ https://bkapay.com`;
 
 export async function testEmailConnection(): Promise<boolean> {
   try {
-    const transporter = createTransporter();
+    const { transporter } = await createTransporter();
     
     if (!transporter) {
       console.log("[Email] Test ignore - GMAIL_USER ou GMAIL_APP_PASSWORD non configure");
@@ -321,6 +372,7 @@ export async function testEmailConnection(): Promise<boolean> {
   }
 }
 
-export function isEmailServiceConfigured(): boolean {
-  return !!(process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD);
+export async function isEmailServiceConfigured(): Promise<boolean> {
+  const { gmailUser, gmailPassword } = await getGmailCredentialsFromDB();
+  return !!(gmailUser && gmailPassword);
 }

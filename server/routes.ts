@@ -59,6 +59,8 @@ import {
   generateVerificationCode,
   sendVerificationEmail,
   isEmailServiceConfigured,
+  clearGmailConfigCache,
+  testEmailConnection,
 } from "./email-service";
 import nowpaymentsRoutes from "./nowpayments-routes";
 
@@ -530,7 +532,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Check if email service is configured
-      if (!isEmailServiceConfigured()) {
+      if (!(await isEmailServiceConfigured())) {
         return res.status(503).json({ 
           error: "Le service d'envoi d'email n'est pas configuré. Contactez l'administrateur." 
         });
@@ -565,7 +567,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = insertUserSchema.parse(userData);
       
       // Check if email service is configured - if not, skip verification
-      const skipVerification = !isEmailServiceConfigured();
+      const skipVerification = !(await isEmailServiceConfigured());
       
       if (!skipVerification) {
         // Verify the code
@@ -616,7 +618,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Check if email service is configured
-      if (!isEmailServiceConfigured()) {
+      if (!(await isEmailServiceConfigured())) {
         return res.status(503).json({ 
           error: "Le service d'envoi d'email n'est pas configuré. Contactez l'administrateur." 
         });
@@ -712,10 +714,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Check if email verification is required
-  app.get("/api/auth/email-verification-status", (req: Request, res: Response) => {
+  app.get("/api/auth/email-verification-status", async (req: Request, res: Response) => {
+    const configured = await isEmailServiceConfigured();
     res.json({ 
-      required: isEmailServiceConfigured(),
-      configured: isEmailServiceConfigured()
+      required: configured,
+      configured: configured
     });
   });
 
@@ -773,7 +776,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Check if email service is configured
-      if (!isEmailServiceConfigured()) {
+      if (!(await isEmailServiceConfigured())) {
         return res.status(503).json({ 
           error: "Le service d'envoi d'email n'est pas configuré. Contactez l'administrateur." 
         });
@@ -6167,6 +6170,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Fournisseur non trouvé" });
       }
 
+      // Clear Gmail config cache when Gmail settings are updated
+      if (provider === "gmail") {
+        clearGmailConfigCache();
+        console.log("[Admin] Configuration Gmail mise à jour - cache vidé");
+      }
+
       // Mask keys in response
       res.json({
         ...config,
@@ -6179,6 +6188,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Update provider config error:", error);
       res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
+  // Test email connection
+  app.post("/api/admin/test-email", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      clearGmailConfigCache();
+      const success = await testEmailConnection();
+      
+      if (success) {
+        res.json({ success: true, message: "Connexion Gmail réussie" });
+      } else {
+        res.status(400).json({ success: false, error: "Impossible de se connecter à Gmail. Vérifiez vos identifiants." });
+      }
+    } catch (error: any) {
+      console.error("[Admin] Test email error:", error);
+      res.status(500).json({ success: false, error: error.message || "Erreur lors du test" });
     }
   });
 
