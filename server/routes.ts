@@ -1480,9 +1480,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Montant minimum: 200" });
       }
 
-      // Calculate fees on the amount in owner's currency
-      const { calculateIncomingFee } = await import("./utils/fees");
-      const feeInfo = calculateIncomingFee(grossAmount);
+      // Calculate fees on the amount in owner's currency with dynamic fee from database
+      const { calculateIncomingFee, getFeeFromDatabase } = await import("./utils/fees");
+      const apiInitFeeConfig = await getFeeFromDatabase(storage, activeProvider, country, operator);
+      const feeInfo = calculateIncomingFee(grossAmount, apiInitFeeConfig.incoming);
 
       if (activeProvider === "mbiyopay") {
         // Use MbiyoPay
@@ -2430,9 +2431,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const paydunyaResponse = await callPaydunyaAPI("/checkout-invoice/create", paydunyaData);
 
       if (paydunyaResponse.response_code === "00" && paydunyaResponse.token) {
-        // Calculate fees for INCOMING payment (client pays GROSS)
+        // Calculate fees for INCOMING payment with dynamic fee from database
         const grossAmount = Math.floor(amount);
-        const feeInfo = calculateIncomingFee(grossAmount);
+        const depositFeeConfig = await getFeeFromDatabase(storage, "paydunya", country, operator);
+        const feeInfo = calculateIncomingFee(grossAmount, depositFeeConfig.incoming);
         
         // Create transaction with GROSS amount (what client pays)
         const transactionId = randomUUID();
@@ -2694,9 +2696,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const paydunyaResponse = await callPaydunyaAPI("/checkout-invoice/create", paydunyaData);
 
       if (paydunyaResponse.response_code === "00" && paydunyaResponse.token) {
-        // Calculate fees for INCOMING payment
+        // Calculate fees for INCOMING payment with dynamic fee from database
         const grossAmount = paymentLink.amount;
-        const feeInfo = calculateIncomingFee(grossAmount);
+        const linkFeeConfig = await getFeeFromDatabase(storage, "paydunya", country, operator);
+        const feeInfo = calculateIncomingFee(grossAmount, linkFeeConfig.incoming);
         
         // Create transaction
         const transactionId = randomUUID();
@@ -3594,7 +3597,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         if (paydunyaResponse.response_code === "00" && paydunyaResponse.token) {
           const grossAmount = Math.floor(amount);
-          const feeInfo = calculateIncomingFee(grossAmount);
+          const depositPaydunyaFeeConfig = await getFeeFromDatabase(storage, "paydunya", country, operator);
+          const feeInfo = calculateIncomingFee(grossAmount, depositPaydunyaFeeConfig.incoming);
           
           const transactionId = randomUUID();
           await storage.createTransaction({
@@ -4077,14 +4081,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         let feePercentage: number;
         let netAmountForUser: number;
         
+        // Get dynamic fee configuration from database
+        const apiLinkFeeConfig = await getFeeFromDatabase(storage, "paydunya", country, operator);
+        
         if (paymentLink.customerPaysFee) {
-          const feeInfo = calculateCustomerPaysFee(amountInPayerCurrency);
+          const feeInfo = calculateCustomerPaysFee(amountInPayerCurrency, apiLinkFeeConfig.incoming);
           amountForProvider = feeInfo.totalForProvider;
           feeAmount = feeInfo.feeAmount;
           feePercentage = feeInfo.feePercentage;
           netAmountForUser = feeInfo.baseAmount;
         } else {
-          const feeInfo = calculateIncomingFee(amountInPayerCurrency);
+          const feeInfo = calculateIncomingFee(amountInPayerCurrency, apiLinkFeeConfig.incoming);
           amountForProvider = feeInfo.grossAmount;
           feeAmount = feeInfo.feeAmount;
           feePercentage = feeInfo.feePercentage;
@@ -4320,7 +4327,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         if (paydunyaResponse.response_code === "00" && paydunyaResponse.token) {
           const grossAmount = Math.floor(amount);
-          const feeInfo = calculateIncomingFee(grossAmount);
+          const merchantPaydunyaFeeConfig = await getFeeFromDatabase(storage, "paydunya", country, operator);
+          const feeInfo = calculateIncomingFee(grossAmount, merchantPaydunyaFeeConfig.incoming);
           
           const transactionId = randomUUID();
           await storage.createTransaction({
@@ -4898,9 +4906,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Clé API invalide ou inactive" });
       }
 
-      // Calculate fees for INCOMING payment
+      // Calculate fees for INCOMING payment with dynamic fee from database
       const grossAmount = Math.floor(amount);
-      const feeInfo = calculateIncomingFee(grossAmount, paymentCountry);
+      const apiFeeConfig = await getFeeFromDatabase(storage, "paydunya", paymentCountry, operator || "wave");
+      const feeInfo = calculateIncomingFee(grossAmount, apiFeeConfig.incoming);
       
       // Call Paydunya API to create checkout invoice with customer info
       const paydunyaData = {
@@ -5144,10 +5153,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Use MbiyoPay for payment
         console.log(`[PAYMENT_SUBMIT] Using MbiyoPay for ${country}/${operator}, phone=${customerPhone}`);
         const { createMbiyoPayPayin, getCurrencyForCountry } = await import("./mbiyopay");
-        const { calculateIncomingFee } = await import("./utils/fees");
+        const { calculateIncomingFee, getFeeFromDatabase } = await import("./utils/fees");
         
         const grossAmount = transaction.amount;
-        const feeInfo = calculateIncomingFee(grossAmount);
+        const mbiyoSubmitFeeConfig = await getFeeFromDatabase(storage, "mbiyopay", country, operator);
+        const feeInfo = calculateIncomingFee(grossAmount, mbiyoSubmitFeeConfig.incoming);
         const txCurrency = currency || getCurrencyForCountry(country);
 
         const result = await createMbiyoPayPayin({
