@@ -2118,9 +2118,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let netAmountForUser: number;
       let baseAmountInOwnerCurrency = paymentLink.amount;
       
+      // Get dynamic fee configuration from database
+      const feeConfig = await getFeeFromDatabase(storage, "paydunya", country, operator);
+      
       if (paymentLink.customerPaysFee) {
         // Customer pays fee: send TOTAL (base + fees) to provider, user receives base amount
-        const feeInfo = calculateCustomerPaysFee(paymentLink.amount);
+        const feeInfo = calculateCustomerPaysFee(paymentLink.amount, feeConfig.incoming);
         amountForProvider = feeInfo.totalForProvider;
         feeAmount = feeInfo.feeAmount;
         feePercentage = feeInfo.feePercentage;
@@ -2133,7 +2136,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       } else {
         // User pays fee: send base amount, user receives net (base - fees)
-        const feeInfo = calculateIncomingFee(paymentLink.amount, country);
+        const feeInfo = calculateIncomingFee(paymentLink.amount, feeConfig.incoming);
         amountForProvider = feeInfo.grossAmount;
         feeAmount = feeInfo.feeAmount;
         feePercentage = feeInfo.feePercentage;
@@ -2317,8 +2320,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const paydunyaResponse = await callPaydunyaAPI("/checkout-invoice/create", paydunyaData);
 
       if (paydunyaResponse.response_code === "00") {
-        // Calculate fees for INCOMING payment (on base amount in owner's currency)
-        const feeInfo = calculateIncomingFee(baseAmountInOwnerCurrency);
+        // Calculate fees for INCOMING payment with dynamic fee from database
+        const feeConfig = await getFeeFromDatabase(storage, "paydunya", country, operator);
+        const feeInfo = calculateIncomingFee(baseAmountInOwnerCurrency, feeConfig.incoming);
         
         // Create transaction - store in owner's currency for balance credit
         const transactionId = randomUUID();
