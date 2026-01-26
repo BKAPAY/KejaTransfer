@@ -192,7 +192,18 @@ export default function Login() {
       const response = await apiRequest("POST", "/api/auth/login/send-code", data);
       return response;
     },
-    onSuccess: (response: any, data) => {
+    onSuccess: async (response: any, data) => {
+      // Administrators don't need 2FA - they are logged in directly
+      if (response.requiresCode === false) {
+        await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+        toast({
+          title: "Connexion reussie",
+          description: "Bienvenue sur BKApay",
+        });
+        setLocation("/dashboard");
+        return;
+      }
+      
       setCredentials(data);
       setStep("verification");
       
@@ -216,8 +227,8 @@ export default function Login() {
         });
       } else {
         toast({
-          title: "Code envoyé",
-          description: "Un code de connexion a été envoyé à votre email",
+          title: "Code envoye",
+          description: "Un code de connexion a ete envoye a votre email",
         });
       }
     },

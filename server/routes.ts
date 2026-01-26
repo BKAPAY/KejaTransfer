@@ -776,8 +776,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Email ou mot de passe incorrect" });
       }
 
+      // Administrators don't need 2FA - connect them directly
+      if (user.isAdmin) {
+        req.session.userId = user.id;
+        console.log(`[Login] Admin ${user.email} connecté directement sans 2FA`);
+        return res.json({
+          success: true,
+          message: "Connexion réussie",
+          requiresCode: false,
+          user: {
+            id: user.id,
+            email: user.email,
+            fullName: user.fullName,
+            isAdmin: user.isAdmin,
+            balance: user.balance,
+          }
+        });
+      }
+
       // Check if email service is configured
-      if (!(await isEmailServiceConfigured())) {
+      if (!(await isEmailServiceConfigured("2fa"))) {
         return res.status(503).json({ 
           error: "Le service d'envoi d'email n'est pas configuré. Contactez l'administrateur." 
         });
