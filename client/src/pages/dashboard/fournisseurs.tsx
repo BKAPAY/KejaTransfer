@@ -438,7 +438,7 @@ export default function FournisseursPage() {
 
         {Object.entries(PROVIDER_INFO).map(([provider, info]) => {
           const config = getProviderConfig(provider);
-          const form = forms[provider];
+          const form = forms[provider] || { apiKey: "", secretKey: "", publicKey: "", privateKey: "", masterKey: "", token: "", appId: "", merchantId: "", smtpHost: "", smtpPort: "", smtpEmail: "", smtpPassword: "", isSandbox: false };
 
           return (
             <TabsContent key={provider} value={provider} className="space-y-4 mt-4">
