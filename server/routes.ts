@@ -457,6 +457,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   function clearTemporarySuspension(email: string): void {
     temporarySuspensions.delete(email.toLowerCase());
     loginAttempts.delete(`code:${email.toLowerCase()}`);
+    loginAttempts.delete(`login:${email.toLowerCase()}`);
   }
 
   function checkRateLimit(key: string, maxAttempts: number): { allowed: boolean; remainingTime?: number; shouldSuspend?: boolean; currentCount?: number } {
