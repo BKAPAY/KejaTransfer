@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,7 +11,7 @@ import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Mail, Lock, KeyRound, ArrowLeft } from "lucide-react";
+import { Mail, Lock, KeyRound, ArrowLeft, AlertTriangle } from "lucide-react";
 
 const loginSchema = z.object({
   email: z.string().email("Email invalide"),
@@ -25,11 +25,141 @@ const codeSchema = z.object({
 type LoginFormData = z.infer<typeof loginSchema>;
 type CodeFormData = z.infer<typeof codeSchema>;
 
+const RESEND_COOLDOWN = 5 * 60; // 5 minutes in seconds
+const MAX_RESENDS = 3; // 3 resends allowed (separate from initial send)
+const STORAGE_KEY_PREFIX = "bkapay_login_";
+
+function getStorageKey(email: string, suffix: string): string {
+  return `${STORAGE_KEY_PREFIX}${email.toLowerCase()}_${suffix}`;
+}
+
+function saveToStorage(email: string, key: string, value: string | number): void {
+  try {
+    localStorage.setItem(getStorageKey(email, key), String(value));
+  } catch (e) {
+    // Storage not available
+  }
+}
+
+function getFromStorage(email: string, key: string): string | null {
+  try {
+    return localStorage.getItem(getStorageKey(email, key));
+  } catch (e) {
+    return null;
+  }
+}
+
+function clearStorage(email: string): void {
+  try {
+    localStorage.removeItem(getStorageKey(email, "cooldownEnd"));
+    localStorage.removeItem(getStorageKey(email, "resendsUsed"));
+    localStorage.removeItem(getStorageKey(email, "suspendedUntil"));
+  } catch (e) {
+    // Storage not available
+  }
+}
+
 export default function Login() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [step, setStep] = useState<"credentials" | "verification">("credentials");
   const [credentials, setCredentials] = useState<LoginFormData | null>(null);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [resendsUsed, setResendsUsed] = useState(0);
+  const [suspendedUntil, setSuspendedUntil] = useState<number | null>(null);
+  const [suspendedTimeRemaining, setSuspendedTimeRemaining] = useState<string>("");
+
+  // Load persisted state when credentials change
+  useEffect(() => {
+    if (!credentials?.email) return;
+    
+    const email = credentials.email;
+    const storedSuspendedUntil = getFromStorage(email, "suspendedUntil");
+    const storedCooldownEnd = getFromStorage(email, "cooldownEnd");
+    const storedResendCount = getFromStorage(email, "resendsUsed");
+    
+    if (storedSuspendedUntil) {
+      const suspendTime = parseInt(storedSuspendedUntil, 10);
+      if (suspendTime > Date.now()) {
+        setSuspendedUntil(suspendTime);
+      } else {
+        localStorage.removeItem(getStorageKey(email, "suspendedUntil"));
+      }
+    }
+    
+    if (storedCooldownEnd) {
+      const cooldownEnd = parseInt(storedCooldownEnd, 10);
+      const remainingCooldown = Math.ceil((cooldownEnd - Date.now()) / 1000);
+      if (remainingCooldown > 0) {
+        setResendCooldown(remainingCooldown);
+      } else {
+        localStorage.removeItem(getStorageKey(email, "cooldownEnd"));
+      }
+    }
+    
+    if (storedResendCount) {
+      setResendsUsed(parseInt(storedResendCount, 10));
+    }
+  }, [credentials?.email]);
+
+  // Countdown timer for resend button
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    
+    const timer = setInterval(() => {
+      setResendCooldown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
+
+  // Countdown timer for suspension
+  useEffect(() => {
+    if (!suspendedUntil) return;
+    
+    const updateSuspensionTime = () => {
+      const now = Date.now();
+      const remaining = suspendedUntil - now;
+      
+      if (remaining <= 0) {
+        setSuspendedUntil(null);
+        setSuspendedTimeRemaining("");
+        setResendsUsed(0);
+        if (credentials?.email) {
+          clearStorage(credentials.email);
+        }
+        return;
+      }
+      
+      const hours = Math.floor(remaining / (1000 * 60 * 60));
+      const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((remaining % (1000 * 60)) / 1000);
+      
+      if (hours > 0) {
+        setSuspendedTimeRemaining(`${hours}h ${minutes}min ${seconds}s`);
+      } else if (minutes > 0) {
+        setSuspendedTimeRemaining(`${minutes}min ${seconds}s`);
+      } else {
+        setSuspendedTimeRemaining(`${seconds}s`);
+      }
+    };
+    
+    updateSuspensionTime();
+    const timer = setInterval(updateSuspensionTime, 1000);
+    return () => clearInterval(timer);
+  }, [suspendedUntil, credentials?.email]);
+
+  const formatCooldownTime = useCallback((seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  }, []);
 
   const loginForm = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -46,20 +176,60 @@ export default function Login() {
     },
   });
 
+  const handleSuspension = (email: string, suspendedUntilTime?: number) => {
+    const suspendTime = suspendedUntilTime || (Date.now() + 3 * 60 * 60 * 1000);
+    setSuspendedUntil(suspendTime);
+    saveToStorage(email, "suspendedUntil", suspendTime);
+    setStep("credentials");
+    setCredentials(null);
+    setResendsUsed(0);
+    setResendCooldown(0);
+  };
+
   const sendCodeMutation = useMutation({
     mutationFn: async (data: LoginFormData) => {
       const response = await apiRequest("POST", "/api/auth/login/send-code", data);
       return response;
     },
-    onSuccess: (_, data) => {
+    onSuccess: (response: any, data) => {
       setCredentials(data);
       setStep("verification");
-      toast({
-        title: "Code envoyé",
-        description: "Un code de connexion a été envoyé à votre email",
-      });
+      
+      // Set cooldown timer
+      const cooldownEnd = Date.now() + RESEND_COOLDOWN * 1000;
+      setResendCooldown(RESEND_COOLDOWN);
+      saveToStorage(data.email, "cooldownEnd", cooldownEnd);
+      
+      // Update resend count from server (0 for initial send is valid)
+      const serverResendsUsed = response.resendsUsed ?? 0;
+      setResendsUsed(serverResendsUsed);
+      saveToStorage(data.email, "resendsUsed", serverResendsUsed);
+      
+      // Check if this was the last attempt
+      if (response.isLastAttempt && response.suspendedUntil) {
+        saveToStorage(data.email, "suspendedUntil", response.suspendedUntil);
+        toast({
+          title: "Attention",
+          description: "C'est votre dernier code. Votre compte sera suspendu si vous n'entrez pas le bon code.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Code envoy\u00e9",
+          description: "Un code de connexion a \u00e9t\u00e9 envoy\u00e9 \u00e0 votre email",
+        });
+      }
     },
     onError: (error: any) => {
+      const email = loginForm.getValues("email");
+      
+      // Check for suspension from server
+      if (error.suspendedUntil) {
+        handleSuspension(email, error.suspendedUntil);
+      } else if (error.isSuspension || error.message?.includes("suspendu")) {
+        handleSuspension(email);
+      }
+      
       toast({
         title: "Erreur",
         description: error.message || "Email ou mot de passe incorrect",
@@ -74,9 +244,13 @@ export default function Login() {
       return response;
     },
     onSuccess: async () => {
+      // Clear all login state on successful login
+      if (credentials?.email) {
+        clearStorage(credentials.email);
+      }
       await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
       toast({
-        title: "Connexion réussie",
+        title: "Connexion r\u00e9ussie",
         description: "Bienvenue sur BKApay",
       });
       setLocation("/dashboard");
@@ -84,7 +258,7 @@ export default function Login() {
     onError: (error: any) => {
       toast({
         title: "Erreur de connexion",
-        description: error.message || "Code de connexion invalide ou expiré",
+        description: error.message || "Code de connexion invalide ou expir\u00e9",
         variant: "destructive",
       });
     },
@@ -92,17 +266,53 @@ export default function Login() {
 
   const resendCodeMutation = useMutation({
     mutationFn: async () => {
-      if (!credentials) throw new Error("Données de connexion manquantes");
+      if (!credentials) throw new Error("Donn\u00e9es de connexion manquantes");
       const response = await apiRequest("POST", "/api/auth/login/send-code", credentials);
       return response;
     },
-    onSuccess: () => {
-      toast({
-        title: "Code renvoyé",
-        description: "Un nouveau code a été envoyé à votre email",
-      });
+    onSuccess: (response: any) => {
+      const email = credentials?.email || "";
+      
+      // Set cooldown timer
+      const cooldownEnd = Date.now() + RESEND_COOLDOWN * 1000;
+      setResendCooldown(RESEND_COOLDOWN);
+      saveToStorage(email, "cooldownEnd", cooldownEnd);
+      
+      // Update resend count from server
+      const serverResendsUsed = response.resendsUsed ?? resendsUsed + 1;
+      setResendsUsed(serverResendsUsed);
+      saveToStorage(email, "resendsUsed", serverResendsUsed);
+      
+      // Reset code field
+      codeForm.reset({ verificationCode: "" });
+      
+      // Check if this was the last attempt
+      if (response.isLastAttempt && response.suspendedUntil) {
+        saveToStorage(email, "suspendedUntil", response.suspendedUntil);
+        toast({
+          title: "Dernier code envoy\u00e9",
+          description: "C'est votre dernier code. Votre compte sera suspendu si vous n'entrez pas le bon code.",
+          variant: "destructive",
+        });
+      } else {
+        // Use server-provided remaining count
+        const remaining = response.resendsRemaining ?? (MAX_RESENDS - serverResendsUsed);
+        toast({
+          title: "Code renvoy\u00e9",
+          description: `Un nouveau code a \u00e9t\u00e9 envoy\u00e9.${remaining > 0 ? ` Il vous reste ${remaining} renvoi(s).` : ""}`,
+        });
+      }
     },
     onError: (error: any) => {
+      const email = credentials?.email || "";
+      
+      // Check for suspension from server
+      if (error.suspendedUntil) {
+        handleSuspension(email, error.suspendedUntil);
+      } else if (error.isSuspension || error.message?.includes("suspendu")) {
+        handleSuspension(email);
+      }
+      
       toast({
         title: "Erreur",
         description: error.message || "Erreur lors de l'envoi du code",
@@ -112,6 +322,29 @@ export default function Login() {
   });
 
   const onSubmitCredentials = (data: LoginFormData) => {
+    // Check for persisted suspension
+    const storedSuspendedUntil = getFromStorage(data.email, "suspendedUntil");
+    if (storedSuspendedUntil) {
+      const suspendTime = parseInt(storedSuspendedUntil, 10);
+      if (suspendTime > Date.now()) {
+        setSuspendedUntil(suspendTime);
+        toast({
+          title: "Compte suspendu",
+          description: "Veuillez attendre que la suspension soit lev\u00e9e.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+    
+    if (suspendedUntil && Date.now() < suspendedUntil) {
+      toast({
+        title: "Compte suspendu",
+        description: `Veuillez attendre ${suspendedTimeRemaining} avant de r\u00e9essayer.`,
+        variant: "destructive",
+      });
+      return;
+    }
     sendCodeMutation.mutate(data);
   };
 
@@ -126,8 +359,25 @@ export default function Login() {
   const handleBack = () => {
     setStep("credentials");
     setCredentials(null);
-    codeForm.reset();
+    codeForm.reset({ verificationCode: "" });
+    setResendCooldown(0);
   };
+
+  const handleResendCode = () => {
+    if (resendCooldown > 0) return;
+    if (resendsUsed >= MAX_RESENDS) {
+      toast({
+        title: "Limite atteinte",
+        description: "Vous avez utilis\u00e9 tous vos renvois de code.",
+        variant: "destructive",
+      });
+      return;
+    }
+    resendCodeMutation.mutate();
+  };
+
+  const canResend = resendCooldown === 0 && resendsUsed < MAX_RESENDS;
+  const isSuspended = suspendedUntil && Date.now() < suspendedUntil;
 
   return (
     <div className="w-full min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center p-4 overflow-hidden">
@@ -141,11 +391,26 @@ export default function Login() {
           <CardTitle className="text-lg sm:text-xl lg:text-2xl font-bold">Se connecter</CardTitle>
           <CardDescription className="text-xs sm:text-sm">
             {step === "credentials" 
-              ? "Accédez à votre tableau de bord" 
-              : "Entrez le code envoyé à votre email"}
+              ? "Acc\u00e9dez \u00e0 votre tableau de bord" 
+              : "Entrez le code envoy\u00e9 \u00e0 votre email"}
           </CardDescription>
         </CardHeader>
         <CardContent className="p-3 sm:p-4 lg:p-6">
+          {isSuspended && (
+            <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+                <div className="text-sm">
+                  <p className="font-medium text-destructive">Compte suspendu temporairement</p>
+                  <p className="text-muted-foreground mt-1">
+                    Tentative de connexion suspecte d\u00e9tect\u00e9e. 
+                    Veuillez r\u00e9essayer dans <span className="font-medium text-foreground">{suspendedTimeRemaining}</span>.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {step === "credentials" ? (
             <Form {...loginForm}>
               <form onSubmit={loginForm.handleSubmit(onSubmitCredentials)} className="space-y-2 sm:space-y-3 lg:space-y-4">
@@ -163,6 +428,7 @@ export default function Login() {
                           type="email"
                           placeholder="jean.dupont@example.com"
                           data-testid="input-email"
+                          disabled={!!isSuspended}
                           {...field}
                         />
                       </FormControl>
@@ -183,8 +449,9 @@ export default function Login() {
                       <FormControl>
                         <Input
                           type="password"
-                          placeholder="••••••••"
+                          placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"
                           data-testid="input-password"
+                          disabled={!!isSuspended}
                           {...field}
                         />
                       </FormControl>
@@ -199,7 +466,7 @@ export default function Login() {
                       className="text-primary hover:underline cursor-pointer" 
                       data-testid="link-forgot-password"
                     >
-                      Mot de passe oublié ?
+                      Mot de passe oubli\u00e9 ?
                     </span>
                   </Link>
                 </div>
@@ -207,10 +474,10 @@ export default function Login() {
                 <Button
                   type="submit"
                   className="w-full"
-                  disabled={sendCodeMutation.isPending}
+                  disabled={sendCodeMutation.isPending || !!isSuspended}
                   data-testid="button-submit"
                 >
-                  {sendCodeMutation.isPending ? "Vérification..." : "Continuer"}
+                  {sendCodeMutation.isPending ? "V\u00e9rification..." : "Continuer"}
                 </Button>
               </form>
             </Form>
@@ -222,7 +489,7 @@ export default function Login() {
                     <KeyRound className="h-6 w-6 text-primary" />
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    Un code à 6 chiffres a été envoyé à<br />
+                    Un code \u00e0 6 chiffres a \u00e9t\u00e9 envoy\u00e9 \u00e0<br />
                     <span className="font-medium text-foreground">{credentials?.email}</span>
                   </p>
                 </div>
@@ -236,11 +503,19 @@ export default function Login() {
                       <FormControl>
                         <Input
                           type="text"
-                          placeholder="000000"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          placeholder=""
                           maxLength={6}
+                          autoComplete="one-time-code"
+                          autoFocus
                           className="text-center text-lg tracking-widest font-mono"
                           data-testid="input-verification-code"
-                          {...field}
+                          onChange={(e) => {
+                            const value = e.target.value.replace(/[^0-9]/g, "");
+                            field.onChange(value);
+                          }}
+                          value={field.value}
                         />
                       </FormControl>
                       <FormMessage />
@@ -267,11 +542,19 @@ export default function Login() {
                     variant="ghost"
                     size="sm"
                     className="w-full"
-                    onClick={() => resendCodeMutation.mutate()}
-                    disabled={resendCodeMutation.isPending}
+                    onClick={handleResendCode}
+                    disabled={resendCodeMutation.isPending || !canResend}
                     data-testid="button-resend-code"
                   >
-                    {resendCodeMutation.isPending ? "Envoi en cours..." : "Renvoyer le code"}
+                    {resendCodeMutation.isPending ? (
+                      "Envoi en cours..."
+                    ) : resendCooldown > 0 ? (
+                      `Renvoyer le code (${formatCooldownTime(resendCooldown)})`
+                    ) : resendsUsed >= MAX_RESENDS ? (
+                      "Limite de renvois atteinte"
+                    ) : (
+                      `Renvoyer le code (${MAX_RESENDS - resendsUsed} restant${MAX_RESENDS - resendsUsed > 1 ? "s" : ""})`
+                    )}
                   </Button>
 
                   <Button

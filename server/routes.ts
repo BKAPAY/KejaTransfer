@@ -504,49 +504,93 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ===== Simple Rate Limiting for Auth Endpoints =====
   const loginAttempts = new Map<string, { count: number; lastAttempt: number }>();
+  const temporarySuspensions = new Map<string, number>(); // email -> suspension end timestamp
   const RATE_LIMIT_WINDOW = 15 * 60 * 1000; // 15 minutes
   const MAX_LOGIN_ATTEMPTS = 5; // Max attempts per window
-  const MAX_CODE_REQUESTS = 3; // Max code requests per window
+  const MAX_CODE_REQUESTS = 4; // 1 initial + 3 resends = 4 total (triggers 3h suspension after 3 resends)
+  const SUSPENSION_DURATION = 3 * 60 * 60 * 1000; // 3 hours suspension
 
-  function checkRateLimit(key: string, maxAttempts: number): { allowed: boolean; remainingTime?: number } {
+  function checkTemporarySuspension(email: string): { suspended: boolean; remainingTime?: string } {
+    const suspendedUntil = temporarySuspensions.get(email.toLowerCase());
+    if (!suspendedUntil) return { suspended: false };
+    
+    const now = Date.now();
+    if (now >= suspendedUntil) {
+      temporarySuspensions.delete(email.toLowerCase());
+      return { suspended: false };
+    }
+    
+    const remaining = suspendedUntil - now;
+    const hours = Math.floor(remaining / (1000 * 60 * 60));
+    const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((remaining % (1000 * 60)) / 1000);
+    
+    let timeString = "";
+    if (hours > 0) timeString += `${hours}h `;
+    if (minutes > 0) timeString += `${minutes}min `;
+    if (seconds > 0 && hours === 0) timeString += `${seconds}s`;
+    
+    return { suspended: true, remainingTime: timeString.trim() };
+  }
+
+  function applyTemporarySuspension(email: string): void {
+    const suspendUntil = Date.now() + SUSPENSION_DURATION;
+    temporarySuspensions.set(email.toLowerCase(), suspendUntil);
+  }
+
+  function checkRateLimit(key: string, maxAttempts: number): { allowed: boolean; remainingTime?: number; shouldSuspend?: boolean; currentCount?: number } {
     const now = Date.now();
     const record = loginAttempts.get(key);
     
     if (!record) {
       loginAttempts.set(key, { count: 1, lastAttempt: now });
-      return { allowed: true };
+      return { allowed: true, currentCount: 1 };
     }
     
     // Reset if window has passed
     if (now - record.lastAttempt > RATE_LIMIT_WINDOW) {
       loginAttempts.set(key, { count: 1, lastAttempt: now });
-      return { allowed: true };
+      return { allowed: true, currentCount: 1 };
     }
     
-    // Check if limit exceeded
-    if (record.count >= maxAttempts) {
-      const remainingTime = Math.ceil((RATE_LIMIT_WINDOW - (now - record.lastAttempt)) / 1000 / 60);
-      return { allowed: false, remainingTime };
-    }
-    
-    // Increment counter
+    // Increment counter first
     record.count++;
     record.lastAttempt = now;
-    return { allowed: true };
+    
+    // Check if limit exceeded (suspend on the 3rd attempt for code requests)
+    if (record.count > maxAttempts) {
+      const remainingTime = Math.ceil((RATE_LIMIT_WINDOW - (now - record.lastAttempt)) / 1000 / 60);
+      // For code requests, trigger suspension after max attempts exceeded
+      const shouldSuspend = key.startsWith("code:");
+      return { allowed: false, remainingTime, shouldSuspend, currentCount: record.count };
+    }
+    
+    // Check if this is the last allowed attempt (for code requests, trigger suspension exactly on max)
+    if (key.startsWith("code:") && record.count === maxAttempts) {
+      // This is the 3rd code request - allow it but mark for suspension after
+      return { allowed: true, shouldSuspend: true, currentCount: record.count };
+    }
+    
+    return { allowed: true, currentCount: record.count };
   }
 
   function resetRateLimit(key: string): void {
     loginAttempts.delete(key);
   }
 
-  // Cleanup old rate limit entries every 5 minutes
+  // Cleanup old rate limit entries and expired suspensions every 5 minutes
   setInterval(() => {
     const now = Date.now();
-    for (const [key, record] of loginAttempts.entries()) {
+    loginAttempts.forEach((record, key) => {
       if (now - record.lastAttempt > RATE_LIMIT_WINDOW) {
         loginAttempts.delete(key);
       }
-    }
+    });
+    temporarySuspensions.forEach((suspendedUntil, email) => {
+      if (now >= suspendedUntil) {
+        temporarySuspensions.delete(email);
+      }
+    });
   }, 5 * 60 * 1000);
 
   // ===== NOWPayments Routes =====
@@ -762,14 +806,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Email et mot de passe requis" });
       }
 
+      // Check for temporary suspension first
+      const suspensionCheck = checkTemporarySuspension(email);
+      if (suspensionCheck.suspended) {
+        return res.status(403).json({ 
+          error: `Compte suspendu temporairement suite à une tentative de connexion suspecte. Veuillez réessayer dans ${suspensionCheck.remainingTime}.` 
+        });
+      }
+
       // Rate limiting for code requests (prevent email flooding)
       const codeRateLimitKey = `code:${email.toLowerCase()}`;
       const codeRateCheck = checkRateLimit(codeRateLimitKey, MAX_CODE_REQUESTS);
       if (!codeRateCheck.allowed) {
+        // Apply 3-hour suspension after max code requests
+        if (codeRateCheck.shouldSuspend) {
+          applyTemporarySuspension(email);
+          const suspendedUntil = Date.now() + SUSPENSION_DURATION;
+          return res.status(403).json({ 
+            error: `Compte suspendu temporairement suite à une tentative de connexion suspecte. Veuillez réessayer dans 3h.`,
+            suspendedUntil,
+            isSuspension: true
+          });
+        }
         return res.status(429).json({ 
           error: `Trop de demandes de code. Veuillez réessayer dans ${codeRateCheck.remainingTime} minutes.` 
         });
       }
+      
+      // If this was the 3rd (last) allowed code request, send the code but then apply suspension
+      const willSuspendAfterThis = codeRateCheck.shouldSuspend;
 
       const user = await storage.getUserByEmail(email);
       if (!user) {
@@ -801,10 +866,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({ error: "Erreur lors de l'envoi du code de connexion" });
       }
 
+      // If this was the 4th request (3rd resend), apply suspension now (after sending the code)
+      if (willSuspendAfterThis) {
+        applyTemporarySuspension(email);
+        const suspendedUntilTs = Date.now() + SUSPENSION_DURATION;
+        return res.json({ 
+          success: true, 
+          message: "Dernier code envoyé. Votre compte sera suspendu si vous ne vous connectez pas.",
+          requiresCode: true,
+          isLastAttempt: true,
+          suspendedUntil: suspendedUntilTs,
+          resendsUsed: MAX_CODE_REQUESTS - 1, // All 3 resends used
+          resendsRemaining: 0,
+          maxResends: MAX_CODE_REQUESTS - 1
+        });
+      }
+
+      // Calculate remaining resends (initial send doesn't count as a resend)
+      const currentCount = codeRateCheck.currentCount || 1;
+      const resendsUsed = Math.max(0, currentCount - 1); // First one is initial send
+      const resendsRemaining = MAX_CODE_REQUESTS - 1 - resendsUsed; // -1 for initial send
+      
       res.json({ 
         success: true, 
         message: "Code de connexion envoyé à votre email",
-        requiresCode: true 
+        requiresCode: true,
+        resendsUsed,
+        resendsRemaining,
+        maxResends: MAX_CODE_REQUESTS - 1 // 3 resends allowed
       });
     } catch (error: any) {
       console.error("[Login] Error sending code:", error);
@@ -819,6 +908,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!email || !password) {
         return res.status(400).json({ error: "Email et mot de passe requis" });
+      }
+
+      // Check for temporary suspension first
+      const suspensionCheck = checkTemporarySuspension(email);
+      if (suspensionCheck.suspended) {
+        return res.status(403).json({ 
+          error: `Compte suspendu temporairement suite à une tentative de connexion suspecte. Veuillez réessayer dans ${suspensionCheck.remainingTime}.` 
+        });
       }
 
       // Rate limiting for login attempts (prevent brute force)
