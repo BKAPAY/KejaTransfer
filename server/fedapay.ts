@@ -1,14 +1,28 @@
 import { FedaPay, Transaction, Payout } from "fedapay";
+import { storage } from "./storage";
 
-if (!process.env.FEDAPAY_SECRET_KEY) {
-  console.error("ERREUR: FEDAPAY_SECRET_KEY doit etre configure dans les variables d'environnement");
+async function ensureFedaPayConfigured(): Promise<boolean> {
+  const config = await storage.getProviderConfig("fedapay");
+  
+  if (!config || !config.isActive) {
+    console.log("[FedaPay] Provider not active or not configured");
+    return false;
+  }
+  
+  const secretKey = config.secretKey || config.apiKey;
+  if (!secretKey) {
+    console.log("[FedaPay] No API key configured");
+    return false;
+  }
+  
+  const isLive = secretKey.startsWith("sk_live_");
+  FedaPay.setApiKey(secretKey);
+  FedaPay.setEnvironment(isLive ? "live" : "sandbox");
+  
+  return true;
 }
 
-const isLiveKey = process.env.FEDAPAY_SECRET_KEY?.startsWith("sk_live_");
-FedaPay.setApiKey(process.env.FEDAPAY_SECRET_KEY || "");
-FedaPay.setEnvironment(isLiveKey ? "live" : "sandbox");
-
-console.log(`[FedaPay] Initialized in ${isLiveKey ? "PRODUCTION" : "SANDBOX"} mode`);
+console.log("[FedaPay] Module loaded - will use dynamic configuration from database");
 
 export interface FedaPayOperator {
   code: string;
@@ -112,6 +126,11 @@ export interface CollectResult {
 
 export async function createCollect(params: CreateCollectParams): Promise<CollectResult> {
   try {
+    const configured = await ensureFedaPayConfigured();
+    if (!configured) {
+      return { success: false, error: "FedaPay n'est pas configure. Veuillez configurer les cles API dans l'interface administrateur." };
+    }
+    
     const operatorCode = getCollectOperatorCode(params.operator, params.country);
     if (!operatorCode) {
       return { success: false, error: `Operateur ${params.operator} non supporte pour ${params.country}` };
@@ -233,6 +252,11 @@ export interface PayoutResult {
 
 export async function createPayout(params: CreatePayoutParams): Promise<PayoutResult> {
   try {
+    const configured = await ensureFedaPayConfigured();
+    if (!configured) {
+      return { success: false, error: "FedaPay n'est pas configure. Veuillez configurer les cles API dans l'interface administrateur." };
+    }
+    
     const operatorCode = getPayoutOperatorCode(params.operator, params.country);
     if (!operatorCode) {
       console.error(`[FedaPay Payout] Unsupported operator: ${params.operator} for ${params.country}`);
@@ -367,6 +391,11 @@ export async function createPayout(params: CreatePayoutParams): Promise<PayoutRe
 
 export async function getTransactionStatus(transactionId: number): Promise<{ status: string; transaction?: any }> {
   try {
+    const configured = await ensureFedaPayConfigured();
+    if (!configured) {
+      return { status: "error" };
+    }
+    
     const transaction = await Transaction.retrieve(transactionId);
     return { status: transaction.status || "unknown", transaction };
   } catch (error: any) {
@@ -377,6 +406,11 @@ export async function getTransactionStatus(transactionId: number): Promise<{ sta
 
 export async function getPayoutStatus(payoutId: number): Promise<{ status: string; payout?: any }> {
   try {
+    const configured = await ensureFedaPayConfigured();
+    if (!configured) {
+      return { status: "error" };
+    }
+    
     const payout = await Payout.retrieve(payoutId);
     return { status: payout.status || "unknown", payout };
   } catch (error: any) {
