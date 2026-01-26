@@ -504,18 +504,16 @@ export default function Login() {
                         <Input
                           type="text"
                           inputMode="numeric"
-                          pattern="[0-9]*"
-                          placeholder=""
                           maxLength={6}
                           autoComplete="one-time-code"
                           autoFocus
                           className="text-center text-lg tracking-widest font-mono"
                           data-testid="input-verification-code"
+                          {...field}
                           onChange={(e) => {
-                            const value = e.target.value.replace(/[^0-9]/g, "");
+                            const value = e.target.value.replace(/[^0-9]/g, "").slice(0, 6);
                             field.onChange(value);
                           }}
-                          value={field.value}
                         />
                       </FormControl>
                       <FormMessage />
