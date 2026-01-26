@@ -68,6 +68,7 @@ export default function Login() {
   const [resendsUsed, setResendsUsed] = useState(0);
   const [suspendedUntil, setSuspendedUntil] = useState<number | null>(null);
   const [suspendedTimeRemaining, setSuspendedTimeRemaining] = useState<string>("");
+  const [verificationCode, setVerificationCode] = useState("");
 
   // Load persisted state when credentials change
   useEffect(() => {
@@ -284,7 +285,7 @@ export default function Login() {
       saveToStorage(email, "resendsUsed", serverResendsUsed);
       
       // Reset code field
-      codeForm.reset({ verificationCode: "" });
+      setVerificationCode("");
       
       // Check if this was the last attempt
       if (response.isLastAttempt && response.suspendedUntil) {
@@ -348,18 +349,27 @@ export default function Login() {
     sendCodeMutation.mutate(data);
   };
 
-  const onSubmitCode = (data: CodeFormData) => {
+  const onSubmitCode = (e: React.FormEvent) => {
+    e.preventDefault();
     if (!credentials) return;
+    if (verificationCode.length !== 6) {
+      toast({
+        title: "Code invalide",
+        description: "Le code doit contenir 6 chiffres",
+        variant: "destructive",
+      });
+      return;
+    }
     loginMutation.mutate({
       ...credentials,
-      verificationCode: data.verificationCode,
+      verificationCode,
     });
   };
 
   const handleBack = () => {
     setStep("credentials");
     setCredentials(null);
-    codeForm.reset({ verificationCode: "" });
+    setVerificationCode("");
     setResendCooldown(0);
   };
 
@@ -482,56 +492,50 @@ export default function Login() {
               </form>
             </Form>
           ) : (
-            <Form {...codeForm}>
-              <form onSubmit={codeForm.handleSubmit(onSubmitCode)} className="space-y-2 sm:space-y-3 lg:space-y-4">
-                <div className="text-center mb-4">
-                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 mb-3">
-                    <KeyRound className="h-6 w-6 text-primary" />
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    Un code à 6 chiffres a été envoyé à<br />
-                    <span className="font-medium text-foreground">{credentials?.email}</span>
-                  </p>
+            <form onSubmit={onSubmitCode} className="space-y-2 sm:space-y-3 lg:space-y-4">
+              <div className="text-center mb-4">
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 mb-3">
+                  <KeyRound className="h-6 w-6 text-primary" />
                 </div>
-
-                <FormField
-                  control={codeForm.control}
-                  name="verificationCode"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Code de connexion</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="text"
-                          inputMode="numeric"
-                          maxLength={6}
-                          autoComplete="one-time-code"
-                          autoFocus
-                          className="text-center text-lg tracking-widest font-mono"
-                          data-testid="input-verification-code"
-                          {...field}
-                          onChange={(e) => {
-                            const value = e.target.value.replace(/[^0-9]/g, "").slice(0, 6);
-                            field.onChange(value);
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <p className="text-xs text-muted-foreground text-center">
-                  Ce code est valable pendant 10 minutes
+                <p className="text-sm text-muted-foreground">
+                  Un code à 6 chiffres a été envoyé à<br />
+                  <span className="font-medium text-foreground">{credentials?.email}</span>
                 </p>
+              </div>
 
-                <Button
-                  type="submit"
-                  className="w-full"
-                  disabled={loginMutation.isPending}
-                  data-testid="button-verify"
-                >
-                  {loginMutation.isPending ? "Connexion..." : "Se connecter"}
+              <div className="space-y-2">
+                <label htmlFor="verification-code" className="text-sm font-medium">
+                  Code de connexion
+                </label>
+                <Input
+                  id="verification-code"
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  autoComplete="one-time-code"
+                  autoFocus
+                  placeholder=""
+                  className="text-center text-lg tracking-widest font-mono"
+                  data-testid="input-verification-code"
+                  value={verificationCode}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/[^0-9]/g, "").slice(0, 6);
+                    setVerificationCode(value);
+                  }}
+                />
+              </div>
+
+              <p className="text-xs text-muted-foreground text-center">
+                Ce code est valable pendant 10 minutes
+              </p>
+
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={loginMutation.isPending || verificationCode.length !== 6}
+                data-testid="button-verify"
+              >
+                {loginMutation.isPending ? "Connexion..." : "Se connecter"}
                 </Button>
 
                 <div className="flex flex-col gap-2 pt-2">
@@ -566,9 +570,8 @@ export default function Login() {
                     <ArrowLeft className="h-4 w-4 mr-2" />
                     Retour
                   </Button>
-                </div>
-              </form>
-            </Form>
+              </div>
+            </form>
           )}
 
           <div className="mt-6 text-center text-sm">
