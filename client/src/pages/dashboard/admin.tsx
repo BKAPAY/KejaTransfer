@@ -728,26 +728,27 @@ export default function Admin() {
                   {paginatedTransactions.map((tx) => (
                     <div
                       key={tx.id}
-                      className="p-4 flex items-center justify-between gap-4 hover:bg-muted/50 cursor-pointer"
+                      className="grid grid-cols-[1fr_auto] sm:grid-cols-[1fr_130px] gap-3 p-4 hover:bg-muted/50 cursor-pointer items-start"
                       data-testid={`transaction-row-${tx.id}`}
                       onClick={() => {
                         setSelectedTransaction(tx);
                         setTransactionDialogOpen(true);
                       }}
                     >
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <div className="min-w-0 space-y-1">
+                        <p className="font-medium text-sm truncate">
+                          {tx.type === "deposit" ? "Dépôt" : tx.type === "withdrawal" ? "Retrait" : tx.type === "transfer" ? "Transfert" : tx.type === "payment_link" ? "Lien paiement" : tx.type === "merchant_link" ? "Lien marchand" : tx.type === "api_payment" ? "Paiement API" : tx.type}
+                          {tx.description && ` - ${tx.description}`}
+                        </p>
+                        <div className="flex items-center gap-2 flex-wrap">
                           <Badge
                             variant={tx.status === "completed" ? "default" : tx.status === "pending" ? "secondary" : "destructive"}
-                            className="text-xs"
+                            className="text-xs shrink-0"
                           >
                             {tx.status === "completed" ? "Complète" : tx.status === "pending" ? "En attente" : tx.status === "failed" ? "Échouée" : "Annulée"}
                           </Badge>
-                          <span className="text-sm font-medium">
-                            {tx.type === "deposit" ? "Dépôt" : tx.type === "withdrawal" ? "Retrait" : tx.type === "transfer" ? "Transfert" : tx.type === "payment_link" ? "Lien paiement" : tx.type === "merchant_link" ? "Lien marchand" : tx.type === "api_payment" ? "Paiement API" : tx.type}
-                          </span>
                           {tx.country && (
-                            <span className="text-sm">
+                            <span className="text-xs text-muted-foreground">
                               {COUNTRY_FLAGS[tx.country] || tx.country}
                             </span>
                           )}
@@ -757,23 +758,7 @@ export default function Admin() {
                             </span>
                           )}
                         </div>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
-                          {tx.user && (
-                            <span className="font-medium">
-                              {tx.user.firstName} {tx.user.lastName}
-                            </span>
-                          )}
-                          {tx.customerName && (
-                            <span className="text-xs">| Client: {tx.customerName}</span>
-                          )}
-                          {tx.customerEmail && (
-                            <span className="text-xs truncate max-w-[150px]">| {tx.customerEmail}</span>
-                          )}
-                          {tx.customerPhone && (
-                            <span className="text-xs">| {tx.customerPhone}</span>
-                          )}
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-1">
+                        <p className="text-xs text-muted-foreground">
                           {new Date(tx.createdAt).toLocaleDateString("fr-FR", {
                             year: "numeric",
                             month: "short",
@@ -781,27 +766,15 @@ export default function Admin() {
                             hour: "2-digit",
                             minute: "2-digit",
                           })}
+                          {tx.user && ` • ${tx.user.firstName} ${tx.user.lastName}`}
+                          {tx.customerPhone && ` • ${tx.customerPhone}`}
                         </p>
                       </div>
-                      <div className="text-right flex items-center gap-3">
-                        <div>
-                          <p className="font-semibold text-sm">
-                            {formatAmount(tx.amount)}
-                          </p>
-                          <p className="text-xs text-muted-foreground">{tx.currency || "XOF"}</p>
-                        </div>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedTransaction(tx);
-                            setTransactionDialogOpen(true);
-                          }}
-                          data-testid={`button-view-tx-${tx.id}`}
-                        >
-                          <Eye className="w-4 h-4" />
-                        </Button>
+                      <div className="text-right shrink-0">
+                        <p className="font-bold text-base tabular-nums">
+                          {formatAmount(tx.amount)}
+                        </p>
+                        <p className="text-xs text-muted-foreground">{tx.currency || "XOF"}</p>
                       </div>
                     </div>
                   ))}
