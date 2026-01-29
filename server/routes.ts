@@ -6110,57 +6110,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Public endpoint to get fee for a country/operator (auto-detect active providers for payin and payout)
+  // Public endpoint to get fee for a country/operator (uses SAME logic as deposit/withdrawal)
   app.get("/api/fees/:country/:operator", async (req: Request, res: Response) => {
     try {
       const { country, operator } = req.params;
       const countryUpper = country.toUpperCase();
       const operatorLower = operator.toLowerCase();
       
-      const countryStatuses = await storage.getCountryStatuses();
-      
-      // Find the active provider for INCOMING payments (payinEnabled)
-      const payinStatus = countryStatuses.find(status => 
-        status.country === countryUpper && 
-        status.payinEnabled === true
-      );
-      
-      // Find the active provider for OUTGOING payments (payoutEnabled)
-      const payoutStatus = countryStatuses.find(status => 
-        status.country === countryUpper && 
-        status.payoutEnabled === true
-      );
-      
       let incomingFeePercentage = 60; // Default 6%
       let outgoingFeePercentage = 60; // Default 6%
       let payinProvider = null;
       let payoutProvider = null;
       
-      // Get incoming fee from payin provider
-      if (payinStatus && payinStatus.provider) {
-        payinProvider = payinStatus.provider;
+      // Use the SAME logic as getActiveProviderForDeposit to find the correct payin provider
+      const depositProvider = await getActiveProviderForDeposit(countryUpper, operatorLower);
+      if (depositProvider) {
+        payinProvider = depositProvider;
         const feeConfig = await storage.getFeeConfig(
-          payinStatus.provider.toLowerCase(), 
+          depositProvider.toLowerCase(), 
           countryUpper, 
           operatorLower
         );
         if (feeConfig) {
           incomingFeePercentage = feeConfig.incomingFeePercentage ?? 60;
-          console.log(`[Fees] Incoming fee from ${payinStatus.provider}/${countryUpper}/${operatorLower}: ${incomingFeePercentage}`);
+          console.log(`[Fees] Incoming fee from ${depositProvider}/${countryUpper}/${operatorLower}: ${incomingFeePercentage}`);
         }
       }
       
-      // Get outgoing fee from payout provider
-      if (payoutStatus && payoutStatus.provider) {
-        payoutProvider = payoutStatus.provider;
+      // Use the SAME logic as getActiveProviderForWithdrawal to find the correct payout provider
+      const withdrawalProvider = await getActiveProviderForWithdrawal(countryUpper, operatorLower);
+      if (withdrawalProvider) {
+        payoutProvider = withdrawalProvider;
         const feeConfig = await storage.getFeeConfig(
-          payoutStatus.provider.toLowerCase(), 
+          withdrawalProvider.toLowerCase(), 
           countryUpper, 
           operatorLower
         );
         if (feeConfig) {
           outgoingFeePercentage = feeConfig.outgoingFeePercentage ?? 60;
-          console.log(`[Fees] Outgoing fee from ${payoutStatus.provider}/${countryUpper}/${operatorLower}: ${outgoingFeePercentage}`);
+          console.log(`[Fees] Outgoing fee from ${withdrawalProvider}/${countryUpper}/${operatorLower}: ${outgoingFeePercentage}`);
         }
       }
       
