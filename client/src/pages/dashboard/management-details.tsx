@@ -131,44 +131,42 @@ export function HistoryDialog({ userId, onOpenChange }: { userId: string; onOpen
           </div>
         ) : filteredTransactions.length > 0 ? (
           <ScrollArea className="h-[400px]">
-            <div className="space-y-1 pr-4">
+            <div className="divide-y pr-4">
               {filteredTransactions.map((tx) => (
                 <div
                   key={tx.id}
-                  className="flex items-center justify-between gap-4 py-4 border-b last:border-0 hover-elevate rounded-md px-3 cursor-pointer"
+                  className="grid grid-cols-[1fr_auto] sm:grid-cols-[1fr_120px] gap-3 py-4 hover-elevate rounded-md px-3 cursor-pointer items-start"
                   onClick={() => setSelectedTx(tx)}
                   data-testid={`transaction-card-${tx.id}`}
                 >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap mb-1">
-                      <p className="font-medium text-sm">
-                        {tx.description || getTypeText(tx.type)}
-                      </p>
-                      <Badge variant={getStatusBadge(tx.status)} className="text-xs">
+                  <div className="min-w-0 space-y-1">
+                    <p className="font-medium text-sm truncate">
+                      {tx.description || getTypeText(tx.type)}
+                    </p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Badge variant={getStatusBadge(tx.status)} className="text-xs shrink-0">
                         {getStatusText(tx.status)}
                       </Badge>
-                    </div>
-                    <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-                      <span>
-                        {new Date(tx.createdAt).toLocaleDateString("fr-FR", {
-                          year: "numeric",
-                          month: "short",
-                          day: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </span>
-                      {tx.customerName && <span>{tx.customerName}</span>}
-                      {tx.customerEmail && <span>{tx.customerEmail}</span>}
-                      {tx.customerPhone && <span>{tx.customerPhone}</span>}
-                      {tx.country && <span>{tx.country}</span>}
+                      {tx.country && (
+                        <span className="text-xs text-muted-foreground">{tx.country}</span>
+                      )}
                       {tx.operator && (
-                        <span className="capitalize">{tx.operator}</span>
+                        <span className="text-xs text-muted-foreground capitalize">{tx.operator}</span>
                       )}
                     </div>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(tx.createdAt).toLocaleDateString("fr-FR", {
+                        year: "numeric",
+                        month: "short",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                      {tx.customerPhone && ` • ${tx.customerPhone}`}
+                    </p>
                   </div>
-                  <div className="text-right">
-                    <p className="font-semibold">
+                  <div className="text-right shrink-0">
+                    <p className="font-bold text-base tabular-nums">
                       {formatAmount(tx.amount)}
                     </p>
                     <p className="text-xs text-muted-foreground">{tx.currency}</p>
