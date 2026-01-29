@@ -15,7 +15,7 @@ export default function AdminUserLinks() {
   const { toast } = useToast();
 
   const { data: user } = useQuery<User>({
-    queryKey: [`/api/admin/user/${userId}`],
+    queryKey: [`/api/admin/user/${userId}/profile`],
     enabled: !!userId,
   });
 

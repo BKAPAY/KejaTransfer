@@ -17,7 +17,7 @@ export default function AdminUserApi() {
   const [visibleKeys, setVisibleKeys] = useState<Record<string, boolean>>({});
 
   const { data: user } = useQuery<User>({
-    queryKey: [`/api/admin/user/${userId}`],
+    queryKey: [`/api/admin/user/${userId}/profile`],
     enabled: !!userId,
   });
 

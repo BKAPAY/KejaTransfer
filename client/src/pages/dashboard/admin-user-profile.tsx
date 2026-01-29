@@ -23,7 +23,7 @@ export default function AdminUserProfile() {
   const userId = params.userId;
 
   const { data: user, isLoading } = useQuery<UserType>({
-    queryKey: [`/api/admin/user/${userId}`],
+    queryKey: [`/api/admin/user/${userId}/profile`],
     enabled: !!userId,
   });
 
