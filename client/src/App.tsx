@@ -34,6 +34,11 @@ import CountryOperatorConfig from "@/pages/dashboard/country-operator-config";
 import FeeConfig from "@/pages/dashboard/fee-config";
 import Diagnostic from "@/pages/dashboard/diagnostic";
 import Fournisseurs from "@/pages/dashboard/fournisseurs";
+import AdminUserProfile from "@/pages/dashboard/admin-user-profile";
+import AdminUserHistory from "@/pages/dashboard/admin-user-history";
+import AdminUserLinks from "@/pages/dashboard/admin-user-links";
+import AdminUserMerchant from "@/pages/dashboard/admin-user-merchant";
+import AdminUserApi from "@/pages/dashboard/admin-user-api";
 import Pay from "@/pages/pay";
 import Merchant from "@/pages/merchant";
 import ApiPayment from "@/pages/api-payment";
@@ -164,6 +169,11 @@ function Router() {
           <Route path="/dashboard/fee-config" component={FeeConfig} />
           <Route path="/dashboard/diagnostic" component={Diagnostic} />
           <Route path="/dashboard/fournisseurs" component={Fournisseurs} />
+          <Route path="/dashboard/admin/user/:userId/profile" component={AdminUserProfile} />
+          <Route path="/dashboard/admin/user/:userId/history" component={AdminUserHistory} />
+          <Route path="/dashboard/admin/user/:userId/links" component={AdminUserLinks} />
+          <Route path="/dashboard/admin/user/:userId/merchant" component={AdminUserMerchant} />
+          <Route path="/dashboard/admin/user/:userId/api" component={AdminUserApi} />
           <Route component={NotFound} />
         </Switch>
       </DashboardLayout>

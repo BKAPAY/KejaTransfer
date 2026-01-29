@@ -519,7 +519,7 @@ export default function Management() {
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => setProfileViewUserId(user.id)}
+                        onClick={() => navigate(`/dashboard/admin/user/${user.id}/profile`)}
                         data-testid={`button-view-profile-${user.id}`}
                       >
                         <UserIcon className="w-4 h-4 mr-1" />
@@ -528,7 +528,7 @@ export default function Management() {
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => setHistoryViewUserId(user.id)}
+                        onClick={() => navigate(`/dashboard/admin/user/${user.id}/history`)}
                         data-testid={`button-view-history-${user.id}`}
                       >
                         <History className="w-4 h-4 mr-1" />
@@ -537,7 +537,7 @@ export default function Management() {
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => setPaymentLinksViewUserId(user.id)}
+                        onClick={() => navigate(`/dashboard/admin/user/${user.id}/links`)}
                         data-testid={`button-view-payment-links-${user.id}`}
                       >
                         <LinkIcon className="w-4 h-4 mr-1" />
@@ -546,7 +546,7 @@ export default function Management() {
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => setMerchantLinksViewUserId(user.id)}
+                        onClick={() => navigate(`/dashboard/admin/user/${user.id}/merchant`)}
                         data-testid={`button-view-merchant-${user.id}`}
                       >
                         <Store className="w-4 h-4 mr-1" />
@@ -555,7 +555,7 @@ export default function Management() {
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => setApiKeysViewUserId(user.id)}
+                        onClick={() => navigate(`/dashboard/admin/user/${user.id}/api`)}
                         data-testid={`button-view-api-${user.id}`}
                       >
                         <Key className="w-4 h-4 mr-1" />
