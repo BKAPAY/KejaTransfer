@@ -115,11 +115,6 @@ export function AppSidebar() {
     queryKey: ["/api/auth/me"],
   });
 
-  const { data: pendingKycCount } = useQuery<number>({
-    queryKey: ["/api/admin/pending-kyc-count"],
-    enabled: !!user?.isAdmin,
-    refetchInterval: 30000,
-  });
 
   const handleMenuClick = () => {
     if (isMobile) {
@@ -185,12 +180,7 @@ export function AppSidebar() {
                   >
                     <Link href={item.url} onClick={handleMenuClick}>
                       <item.icon className="w-4 h-4" />
-                      <span className="flex-1">{item.title}</span>
-                      {item.url === "/dashboard/kyc" && user?.isAdmin && pendingKycCount && pendingKycCount > 0 && (
-                        <Badge variant="destructive" className="ml-auto text-xs px-1.5 py-0.5 min-w-[20px] flex items-center justify-center">
-                          {pendingKycCount}
-                        </Badge>
-                      )}
+                      <span>{item.title}</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

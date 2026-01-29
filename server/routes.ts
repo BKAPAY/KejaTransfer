@@ -5664,11 +5664,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // Get all KYC history (submitted, verified, rejected) - sorted with pending first
       const submissions = await storage.getKycHistory();
-      // Sort: pending first, then by date descending
+      // Sort: submitted first (pending verification), then by date descending
       const sorted = submissions.sort((a: any, b: any) => {
-        // Pending status comes first
-        if (a.kycStatus === 'pending' && b.kycStatus !== 'pending') return -1;
-        if (a.kycStatus !== 'pending' && b.kycStatus === 'pending') return 1;
+        // Submitted status comes first (awaiting verification)
+        if (a.kycStatus === 'submitted' && b.kycStatus !== 'submitted') return -1;
+        if (a.kycStatus !== 'submitted' && b.kycStatus === 'submitted') return 1;
         // Then sort by date descending
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       });
@@ -5682,7 +5682,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/admin/pending-kyc-count", requireAdmin, async (req: Request, res: Response) => {
     try {
       const submissions = await storage.getKycHistory();
-      const pendingCount = submissions.filter((s: any) => s.kycStatus === 'pending').length;
+      const pendingCount = submissions.filter((s: any) => s.kycStatus === 'submitted').length;
       res.json(pendingCount);
     } catch (error: any) {
       console.error("Get pending KYC count error:", error);

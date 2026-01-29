@@ -67,6 +67,11 @@ export default function Management() {
     refetchInterval: 10000,
   });
 
+  const { data: pendingKycCount } = useQuery<number>({
+    queryKey: ["/api/admin/pending-kyc-count"],
+    refetchInterval: 30000,
+  });
+
   const validateTransactionMutation = useMutation({
     mutationFn: async (transactionId: string) => {
       return apiRequest("POST", "/api/admin/validate-transaction", { transactionId });
@@ -383,6 +388,11 @@ export default function Management() {
             >
               <FileCheck className="w-4 h-4 mr-2" />
               KYC
+              {pendingKycCount && pendingKycCount > 0 && (
+                <Badge variant="destructive" className="ml-2 h-5 px-1.5 text-xs">
+                  {pendingKycCount}
+                </Badge>
+              )}
             </Button>
             <Button
               variant="outline"
