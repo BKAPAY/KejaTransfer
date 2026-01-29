@@ -6084,7 +6084,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Public endpoint to get fee for a specific provider/country/operator
+  // Public endpoint to get fee for a specific provider/country/operator (3 params - must be first)
   app.get("/api/fees/:provider/:country/:operator", async (req: Request, res: Response) => {
     try {
       const { provider, country, operator } = req.params;
@@ -6102,6 +6102,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
           outgoingFeePercentage: 60,
         });
       }
+    } catch (error: any) {
+      console.error("Get fee error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
+  // Public endpoint to get fee for a country/operator (auto-detect active provider, 2 params)
+  app.get("/api/fees/:country/:operator", async (req: Request, res: Response) => {
+    try {
+      const { country, operator } = req.params;
+      const countryUpper = country.toUpperCase();
+      const operatorLower = operator.toLowerCase();
+      
+      // Find the active provider for this country (provider with payinEnabled)
+      const countryStatuses = await storage.getCountryStatuses();
+      const activeStatus = countryStatuses.find(status => 
+        status.country === countryUpper && 
+        status.payinEnabled === true
+      );
+      
+      if (activeStatus && activeStatus.provider) {
+        // Get fee config for the active provider
+        const feeConfig = await storage.getFeeConfig(
+          activeStatus.provider.toLowerCase(), 
+          countryUpper, 
+          operatorLower
+        );
+        
+        if (feeConfig) {
+          console.log(`[Fees] Found fee config for ${activeStatus.provider}/${countryUpper}/${operatorLower}: incoming=${feeConfig.incomingFeePercentage}, outgoing=${feeConfig.outgoingFeePercentage}`);
+          return res.json({
+            incomingFeePercentage: feeConfig.incomingFeePercentage,
+            outgoingFeePercentage: feeConfig.outgoingFeePercentage,
+            provider: activeStatus.provider,
+          });
+        }
+      }
+      
+      // Default to 6% if no config exists
+      console.log(`[Fees] No fee config found for ${countryUpper}/${operatorLower}, using default 6%`);
+      res.json({
+        incomingFeePercentage: 60,
+        outgoingFeePercentage: 60,
+        provider: null,
+      });
     } catch (error: any) {
       console.error("Get fee error:", error);
       res.status(500).json({ error: "Une erreur est survenue" });
