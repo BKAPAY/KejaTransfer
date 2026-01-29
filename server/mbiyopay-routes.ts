@@ -507,8 +507,11 @@ export async function handleMbiyoPayApiPayment(
     }
 
     const grossAmount = Math.floor(amount);
-    const feeInfo = calculateIncomingFee(grossAmount);
     const currency = getCurrencyForCountry(country);
+    
+    // Get dynamic fees from database for mbiyopay
+    const feeConfig = await getFeeFromDatabase(storage, "mbiyopay", country, operator);
+    const feeInfo = calculateIncomingFee(grossAmount, feeConfig.incoming);
 
     const result = await createMbiyoPayPayin({
       amount: grossAmount,

@@ -3,6 +3,7 @@ import { storage } from "./storage";
 import { NowPaymentsClient, SUPPORTED_CRYPTOCURRENCIES, getCryptoDisplayName, getCryptoMinAmountXOF, CRYPTO_MIN_AMOUNT_XOF, USDT_MIN_AMOUNT_XOF } from "./nowpayments";
 import { convertCurrency } from "./currency-converter";
 import QRCode from "qrcode";
+import { getFeeFromDatabase } from "./utils/fees";
 
 const router = Router();
 
@@ -80,8 +81,7 @@ router.get("/api/crypto/currencies", async (req: Request, res: Response) => {
 // Configuration des frais crypto (en arrière-plan, invisible pour les utilisateurs)
 const CRYPTO_MARKUP_PERCENT = 10; // 10% markup sur le montant crypto
 const CRYPTO_FEE_PERCENT = 15; // 15% frais crypto supplémentaires
-const STANDARD_INCOMING_FEE_PERCENT = 6; // 6% frais standard incoming
-const TOTAL_CRYPTO_FEE_PERCENT = CRYPTO_FEE_PERCENT + STANDARD_INCOMING_FEE_PERCENT; // 21% total
+// Note: Le frais standard incoming est maintenant récupéré dynamiquement depuis la base de données
 
 router.get("/api/crypto/estimate", async (req: Request, res: Response) => {
   try {
@@ -220,9 +220,13 @@ router.post("/api/crypto/create-payment", async (req: Request, res: Response) =>
       });
     }
     
-    // Montant que le client voit (avec les 6% si customerPaysFee=true)
+    // Récupérer les frais standard depuis la base de données pour nowpayments
+    const feeConfig = await getFeeFromDatabase(storage, "nowpayments", "CRYPTO", crypto);
+    const standardFeePercent = feeConfig.incoming / 10; // Convert from decimal (60 = 6%)
+    
+    // Montant que le client voit (avec les frais standard si customerPaysFee=true)
     const customerAmount = customerPaysFee 
-      ? Math.ceil(baseAmount * 1.06) 
+      ? Math.ceil(baseAmount * (1 + standardFeePercent / 100)) 
       : baseAmount;
     
     // Appliquer le markup de 10% en arrière-plan sur le montant client (le client paie ce montant majoré en crypto)
@@ -249,10 +253,11 @@ router.post("/api/crypto/create-payment", async (req: Request, res: Response) =>
 
     // Calculer les frais crypto:
     // - 15% crypto TOUJOURS prélevés
-    // - 6% standard SEULEMENT si customerPaysFee est désactivé
+    // - frais standard (dynamique) SEULEMENT si customerPaysFee est désactivé
+    const totalCryptoFeePercent = CRYPTO_FEE_PERCENT + standardFeePercent;
     const effectiveFeePercent = customerPaysFee 
-      ? CRYPTO_FEE_PERCENT  // 15% seulement (client a déjà payé les 6%)
-      : TOTAL_CRYPTO_FEE_PERCENT; // 21% (15% + 6%)
+      ? CRYPTO_FEE_PERCENT  // 15% seulement (client a déjà payé les frais standard)
+      : totalCryptoFeePercent; // 15% + frais standard dynamique
     
     const totalFee = Math.floor(baseAmount * (effectiveFeePercent / 100));
     const feePercentage = effectiveFeePercent * 10;
@@ -288,7 +293,7 @@ router.post("/api/crypto/create-payment", async (req: Request, res: Response) =>
         customerPaysFee,
         cryptoMarkupPercent: CRYPTO_MARKUP_PERCENT,
         cryptoFeePercent: CRYPTO_FEE_PERCENT,
-        standardFeePercent: customerPaysFee ? 0 : STANDARD_INCOMING_FEE_PERCENT,
+        standardFeePercent: customerPaysFee ? 0 : standardFeePercent,
         effectiveFeePercent,
         customerAmount: Math.ceil(customerAmount),
         amountWithMarkup: Math.ceil(amountWithMarkup),

@@ -539,24 +539,27 @@ export async function handleApiPayment(
     const baseAmount = Math.floor(amount);
     const customerPaysFee = apiKey.customerPaysFee || false;
     
+    // Get dynamic fees from database for fedapay
+    const feeConfig = await getFeeFromDatabase(storage, "fedapay", country, operator);
+    
     let grossAmount: number;
     let feeInfo: ReturnType<typeof calculateIncomingFee>;
     
     if (customerPaysFee) {
       // Client paie les frais: on calcule le montant total que le client doit payer
-      const feePercentage = 6; // 6% uniform fee
+      const feePercentage = feeConfig.incoming / 10; // Convert from decimal (60 = 6%)
       const feeAmount = Math.ceil(baseAmount * feePercentage / 100);
       grossAmount = baseAmount + feeAmount;
       feeInfo = {
         grossAmount: grossAmount,
         netAmount: baseAmount, // Le marchand reçoit le montant de base
         feeAmount: feeAmount,
-        feePercentage: feePercentage * 10, // Converti en décimal (60 = 6%)
+        feePercentage: feeConfig.incoming,
       };
     } else {
       // Marchand paie les frais: logique standard
       grossAmount = baseAmount;
-      feeInfo = calculateIncomingFee(grossAmount);
+      feeInfo = calculateIncomingFee(grossAmount, feeConfig.incoming);
     }
 
     const nameParts = customerName.split(" ");
