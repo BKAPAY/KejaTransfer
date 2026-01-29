@@ -162,6 +162,7 @@ export function HistoryDialog({ userId, onOpenChange }: { userId: string; onOpen
                         hour: "2-digit",
                         minute: "2-digit",
                       })}
+                      {tx.customerName && ` • ${tx.customerName}`}
                       {tx.customerPhone && ` • ${tx.customerPhone}`}
                     </p>
                   </div>

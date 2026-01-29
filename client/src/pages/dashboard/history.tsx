@@ -221,6 +221,7 @@ export default function History() {
                           hour: "2-digit",
                           minute: "2-digit",
                         })}
+                        {transaction.customerName && ` • ${transaction.customerName}`}
                         {transaction.customerPhone && ` • ${transaction.customerPhone}`}
                       </p>
                     </div>
