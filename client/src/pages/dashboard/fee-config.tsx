@@ -288,11 +288,11 @@ export default function FeeConfigPage() {
       </div>
 
       <Tabs value={activeProvider} onValueChange={setActiveProvider}>
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="flex flex-wrap h-auto gap-1 p-1">
           {PROVIDERS.map((info) => (
-            <TabsTrigger key={info.id} value={info.id} className="gap-2" data-testid={`tab-fee-${info.id}`}>
-              <span className={`w-2 h-2 rounded-full ${info.color}`} />
-              {info.name}
+            <TabsTrigger key={info.id} value={info.id} className="gap-1 px-3 py-2 text-xs sm:text-sm whitespace-nowrap" data-testid={`tab-fee-${info.id}`}>
+              <span className={`w-2 h-2 rounded-full shrink-0 ${info.color}`} />
+              <span className="truncate">{info.name}</span>
             </TabsTrigger>
           ))}
         </TabsList>

@@ -183,18 +183,18 @@ export default function CountryOperatorConfigPage() {
       </div>
 
       <Tabs value={activeProvider} onValueChange={setActiveProvider}>
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="flex flex-wrap h-auto gap-1 p-1">
           {PROVIDERS.map((provider) => {
             const isActive = isProviderActive(provider.id);
             return (
               <TabsTrigger 
                 key={provider.id} 
                 value={provider.id} 
-                className="relative gap-2"
+                className="relative gap-1 px-3 py-2 text-xs sm:text-sm whitespace-nowrap"
                 data-testid={`tab-provider-${provider.id}`}
               >
-                <span className={`w-2 h-2 rounded-full ${isActive ? "bg-green-500" : "bg-gray-400"}`} />
-                {provider.name}
+                <span className={`w-2 h-2 rounded-full shrink-0 ${isActive ? "bg-green-500" : "bg-gray-400"}`} />
+                <span className="truncate">{provider.name}</span>
                 {!isActive && (
                   <Badge variant="outline" className="ml-1 text-xs">Inactif</Badge>
                 )}
