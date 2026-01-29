@@ -35,58 +35,139 @@ export function getFeePercentage(feeValue?: number): number {
 
 /**
  * Get the active provider for INCOMING payments (deposits, payment links, etc.)
- * Uses country_status.payinEnabled to find the active provider
+ * Uses BOTH operator-level (incomingEnabled) AND country-level (payinEnabled) checks
  * Returns the provider name (lowercase) or 'paydunya' as default
  */
-export async function getActiveProviderForCountry(storage: any, country: string): Promise<string> {
+export async function getActiveProviderForCountry(storage: any, country: string, operator?: string): Promise<string> {
   try {
-    const countryStatuses = await storage.getCountryStatuses();
+    const [configs, countryStatuses, providerConfigs] = await Promise.all([
+      storage.getCountryOperatorConfigs(),
+      storage.getCountryStatuses(),
+      storage.getProviderConfigs(),
+    ]);
+    
+    // First check which providers are globally active
+    const activeProviders = new Set(
+      providerConfigs.filter((p: any) => p.isActive).map((p: any) => p.provider)
+    );
+    
+    // If operator is provided, check operator-level config first
+    if (operator) {
+      const enabledConfigs = configs.filter((c: any) => 
+        c.country.toUpperCase() === country.toUpperCase() &&
+        c.operator.toLowerCase() === operator.toLowerCase() &&
+        c.incomingEnabled &&
+        activeProviders.has(c.provider)
+      );
+      
+      const enabledCountries = countryStatuses.filter((cs: any) =>
+        cs.country.toUpperCase() === country.toUpperCase() &&
+        cs.payinEnabled &&
+        activeProviders.has(cs.provider)
+      );
+      
+      // Find provider that has both operator-level and country-level enabled
+      for (const config of enabledConfigs) {
+        const hasCountryLevel = enabledCountries.some((c: any) => c.provider === config.provider);
+        if (hasCountryLevel) {
+          return config.provider.toLowerCase();
+        }
+      }
+      
+      // If only operator-level is configured, use that
+      if (enabledConfigs.length > 0) {
+        return enabledConfigs[0].provider.toLowerCase();
+      }
+    }
+    
+    // Fallback to country-level only
     const activeStatus = countryStatuses.find((status: any) => 
       status.country === country.toUpperCase() && 
-      status.payinEnabled === true
+      status.payinEnabled === true &&
+      activeProviders.has(status.provider)
     );
     
     if (activeStatus && activeStatus.provider) {
       return activeStatus.provider.toLowerCase();
     }
   } catch (error) {
-    console.warn(`[FEES] Failed to get active payin provider for ${country}:`, error);
+    console.warn(`[FEES] Failed to get active payin provider for ${country}/${operator}:`, error);
   }
   return 'paydunya'; // Default fallback
 }
 
 /**
  * Get the active provider for OUTGOING payments (withdrawals, transfers)
- * Uses country_status.payoutEnabled to find the active provider
+ * Uses BOTH operator-level (outgoingEnabled) AND country-level (payoutEnabled) checks
  * Returns the provider name (lowercase) or 'paydunya' as default
  */
-export async function getActivePayoutProviderForCountry(storage: any, country: string): Promise<string> {
+export async function getActivePayoutProviderForCountry(storage: any, country: string, operator?: string): Promise<string> {
   try {
-    const countryStatuses = await storage.getCountryStatuses();
+    const [configs, countryStatuses, providerConfigs] = await Promise.all([
+      storage.getCountryOperatorConfigs(),
+      storage.getCountryStatuses(),
+      storage.getProviderConfigs(),
+    ]);
+    
+    const activeProviders = new Set(
+      providerConfigs.filter((p: any) => p.isActive).map((p: any) => p.provider)
+    );
+    
+    // If operator is provided, check operator-level config first
+    if (operator) {
+      const enabledConfigs = configs.filter((c: any) => 
+        c.country.toUpperCase() === country.toUpperCase() &&
+        c.operator.toLowerCase() === operator.toLowerCase() &&
+        c.outgoingEnabled &&
+        activeProviders.has(c.provider)
+      );
+      
+      const enabledCountries = countryStatuses.filter((cs: any) =>
+        cs.country.toUpperCase() === country.toUpperCase() &&
+        cs.payoutEnabled &&
+        activeProviders.has(cs.provider)
+      );
+      
+      // Find provider that has both operator-level and country-level enabled
+      for (const config of enabledConfigs) {
+        const hasCountryLevel = enabledCountries.some((c: any) => c.provider === config.provider);
+        if (hasCountryLevel) {
+          return config.provider.toLowerCase();
+        }
+      }
+      
+      // If only operator-level is configured, use that
+      if (enabledConfigs.length > 0) {
+        return enabledConfigs[0].provider.toLowerCase();
+      }
+    }
+    
+    // Fallback to country-level only
     const activeStatus = countryStatuses.find((status: any) => 
       status.country === country.toUpperCase() && 
-      status.payoutEnabled === true
+      status.payoutEnabled === true &&
+      activeProviders.has(status.provider)
     );
     
     if (activeStatus && activeStatus.provider) {
       return activeStatus.provider.toLowerCase();
     }
   } catch (error) {
-    console.warn(`[FEES] Failed to get active payout provider for ${country}:`, error);
+    console.warn(`[FEES] Failed to get active payout provider for ${country}/${operator}:`, error);
   }
   return 'paydunya'; // Default fallback
 }
 
 /**
  * Get fees for INCOMING payments (deposits, payment links, merchant links, API)
- * Automatically detects the active payin provider
+ * Automatically detects the active payin provider using operator-level config
  */
 export async function getDynamicFees(
   storage: any,
   country: string,
   operator: string
 ): Promise<{ incoming: number; outgoing: number; provider: string }> {
-  const provider = await getActiveProviderForCountry(storage, country);
+  const provider = await getActiveProviderForCountry(storage, country, operator);
   const fees = await getFeeFromDatabase(storage, provider, country, operator);
   return {
     ...fees,
@@ -96,14 +177,14 @@ export async function getDynamicFees(
 
 /**
  * Get fees for OUTGOING payments (withdrawals, transfers)
- * Automatically detects the active payout provider
+ * Automatically detects the active payout provider using operator-level config
  */
 export async function getDynamicOutgoingFees(
   storage: any,
   country: string,
   operator: string
 ): Promise<{ incoming: number; outgoing: number; provider: string }> {
-  const provider = await getActivePayoutProviderForCountry(storage, country);
+  const provider = await getActivePayoutProviderForCountry(storage, country, operator);
   const fees = await getFeeFromDatabase(storage, provider, country, operator);
   return {
     ...fees,
