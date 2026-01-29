@@ -9,7 +9,7 @@ import { z } from "zod";
 import { insertUserSchema, insertPaymentLinkSchema, insertMerchantLinkSchema, insertApiKeySchema } from "@shared/schema";
 import { validatePhoneOperator } from "@shared/phone-utils";
 import { randomUUID } from "crypto";
-import { calculateIncomingFee, calculateOutgoingFee, calculateCustomerPaysFee, getFeeFromDatabase } from "./utils/fees";
+import { calculateIncomingFee, calculateOutgoingFee, calculateCustomerPaysFee, getFeeFromDatabase, getDynamicFees, getActiveProviderForCountry } from "./utils/fees";
 import { sendPaymentCallback } from "./utils/callback";
 import { 
   SOFTPAY_OPERATORS, 
@@ -2102,8 +2102,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let netAmountForUser: number;
       let baseAmountInOwnerCurrency = paymentLink.amount;
       
-      // Get dynamic fee configuration from database
-      const feeConfig = await getFeeFromDatabase(storage, "paydunya", country, operator);
+      // Get dynamic fee configuration from database (auto-detect active provider)
+      const feeConfig = await getDynamicFees(storage, country, operator);
       
       if (paymentLink.customerPaysFee) {
         // Customer pays fee: send TOTAL (base + fees) to provider, user receives base amount
@@ -2304,8 +2304,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const paydunyaResponse = await callPaydunyaAPI("/checkout-invoice/create", paydunyaData);
 
       if (paydunyaResponse.response_code === "00") {
-        // Calculate fees for INCOMING payment with dynamic fee from database
-        const feeConfig = await getFeeFromDatabase(storage, "paydunya", country, operator);
+        // Calculate fees for INCOMING payment with dynamic fee from database (auto-detect active provider)
+        const feeConfig = await getDynamicFees(storage, country, operator);
         const feeInfo = calculateIncomingFee(baseAmountInOwnerCurrency, feeConfig.incoming);
         
         // Create transaction - store in owner's currency for balance credit
@@ -2414,9 +2414,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const paydunyaResponse = await callPaydunyaAPI("/checkout-invoice/create", paydunyaData);
 
       if (paydunyaResponse.response_code === "00" && paydunyaResponse.token) {
-        // Calculate fees for INCOMING payment with dynamic fee from database
+        // Calculate fees for INCOMING payment with dynamic fee from database (auto-detect active provider)
         const grossAmount = Math.floor(amount);
-        const depositFeeConfig = await getFeeFromDatabase(storage, "paydunya", country, operator);
+        const depositFeeConfig = await getDynamicFees(storage, country, operator);
         const feeInfo = calculateIncomingFee(grossAmount, depositFeeConfig.incoming);
         
         // Create transaction with GROSS amount (what client pays)
@@ -2679,9 +2679,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const paydunyaResponse = await callPaydunyaAPI("/checkout-invoice/create", paydunyaData);
 
       if (paydunyaResponse.response_code === "00" && paydunyaResponse.token) {
-        // Calculate fees for INCOMING payment with dynamic fee from database
+        // Calculate fees for INCOMING payment with dynamic fee from database (auto-detect active provider)
         const grossAmount = paymentLink.amount;
-        const linkFeeConfig = await getFeeFromDatabase(storage, "paydunya", country, operator);
+        const linkFeeConfig = await getDynamicFees(storage, country, operator);
         const feeInfo = calculateIncomingFee(grossAmount, linkFeeConfig.incoming);
         
         // Create transaction
@@ -3579,8 +3579,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const paydunyaResponse = await callPaydunyaAPI("/checkout-invoice/create", paydunyaData);
 
         if (paydunyaResponse.response_code === "00" && paydunyaResponse.token) {
+          // Calculate fees for INCOMING payment with dynamic fee from database (auto-detect active provider)
           const grossAmount = Math.floor(amount);
-          const depositPaydunyaFeeConfig = await getFeeFromDatabase(storage, "paydunya", country, operator);
+          const depositPaydunyaFeeConfig = await getDynamicFees(storage, country, operator);
           const feeInfo = calculateIncomingFee(grossAmount, depositPaydunyaFeeConfig.incoming);
           
           const transactionId = randomUUID();
@@ -4064,8 +4065,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         let feePercentage: number;
         let netAmountForUser: number;
         
-        // Get dynamic fee configuration from database
-        const apiLinkFeeConfig = await getFeeFromDatabase(storage, "paydunya", country, operator);
+        // Get dynamic fee configuration from database (auto-detect active provider)
+        const apiLinkFeeConfig = await getDynamicFees(storage, country, operator);
         
         if (paymentLink.customerPaysFee) {
           const feeInfo = calculateCustomerPaysFee(amountInPayerCurrency, apiLinkFeeConfig.incoming);
@@ -4309,8 +4310,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const paydunyaResponse = await callPaydunyaAPI("/checkout-invoice/create", paydunyaData);
 
         if (paydunyaResponse.response_code === "00" && paydunyaResponse.token) {
+          // Calculate fees for INCOMING payment with dynamic fee from database (auto-detect active provider)
           const grossAmount = Math.floor(amount);
-          const merchantPaydunyaFeeConfig = await getFeeFromDatabase(storage, "paydunya", country, operator);
+          const merchantPaydunyaFeeConfig = await getDynamicFees(storage, country, operator);
           const feeInfo = calculateIncomingFee(grossAmount, merchantPaydunyaFeeConfig.incoming);
           
           const transactionId = randomUUID();
@@ -4656,8 +4658,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Retrait échoué" });
       }
 
-      // Get dynamic fees from database (using paydunya as provider for this route)
-      const feeConfig = await getFeeFromDatabase(storage, "paydunya", country, operator);
+      // Get dynamic fees from database (auto-detect active provider)
+      const feeConfig = await getDynamicFees(storage, country, operator);
       
       // Calculate fees with dynamic percentage
       const feeInfo = calculateOutgoingFee(Math.floor(amount), feeConfig.outgoing);
@@ -4889,9 +4891,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Clé API invalide ou inactive" });
       }
 
-      // Calculate fees for INCOMING payment with dynamic fee from database
+      // Calculate fees for INCOMING payment with dynamic fee from database (auto-detect active provider)
       const grossAmount = Math.floor(amount);
-      const apiFeeConfig = await getFeeFromDatabase(storage, "paydunya", paymentCountry, operator || "wave");
+      const apiFeeConfig = await getDynamicFees(storage, paymentCountry, operator || "wave");
       const feeInfo = calculateIncomingFee(grossAmount, apiFeeConfig.incoming);
       
       // Call Paydunya API to create checkout invoice with customer info

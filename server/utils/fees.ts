@@ -34,6 +34,44 @@ export function getFeePercentage(feeValue?: number): number {
 }
 
 /**
+ * Get the active provider for a country from country_status table
+ * Returns the provider name (lowercase) or 'paydunya' as default
+ */
+export async function getActiveProviderForCountry(storage: any, country: string): Promise<string> {
+  try {
+    const countryStatuses = await storage.getCountryStatuses();
+    const activeStatus = countryStatuses.find((status: any) => 
+      status.country === country.toUpperCase() && 
+      status.payinEnabled === true
+    );
+    
+    if (activeStatus && activeStatus.provider) {
+      return activeStatus.provider.toLowerCase();
+    }
+  } catch (error) {
+    console.warn(`[FEES] Failed to get active provider for ${country}:`, error);
+  }
+  return 'paydunya'; // Default fallback
+}
+
+/**
+ * Get fees for a country/operator, automatically detecting the active provider
+ * This is the recommended function to use for all fee calculations
+ */
+export async function getDynamicFees(
+  storage: any,
+  country: string,
+  operator: string
+): Promise<{ incoming: number; outgoing: number; provider: string }> {
+  const provider = await getActiveProviderForCountry(storage, country);
+  const fees = await getFeeFromDatabase(storage, provider, country, operator);
+  return {
+    ...fees,
+    provider,
+  };
+}
+
+/**
  * Get fee percentages from database for a specific provider/country/operator
  * Returns incoming and outgoing fee percentages
  */
