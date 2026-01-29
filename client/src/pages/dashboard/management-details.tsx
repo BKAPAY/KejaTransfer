@@ -6,10 +6,13 @@ import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Copy, Eye, EyeOff, Search, X } from "lucide-react";
+import { Copy, Eye, EyeOff, Search, X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import type { User, Transaction, PaymentLink, MerchantLink, ApiKey } from "@shared/schema";
+
+const ITEMS_PER_PAGE_OPTIONS = [10, 20, 50, 100];
 
 // History Dialog Component
 export function HistoryDialog({ userId, onOpenChange }: { userId: string; onOpenChange: () => void }) {
@@ -18,6 +21,8 @@ export function HistoryDialog({ userId, onOpenChange }: { userId: string; onOpen
   });
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
   const { toast } = useToast();
 
   const getStatusBadge = (status: string) => {
@@ -84,15 +89,28 @@ export function HistoryDialog({ userId, onOpenChange }: { userId: string; onOpen
     });
   }, [transactions, searchQuery]);
 
+  const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedTransactions = filteredTransactions.slice(startIndex, startIndex + itemsPerPage);
+
+  const handleItemsPerPageChange = (value: string) => {
+    setItemsPerPage(parseInt(value));
+    setCurrentPage(1);
+  };
+
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
+
   if (selectedTx) {
     return <TransactionDetailDialog transaction={selectedTx} onOpenChange={() => setSelectedTx(null)} />;
   }
 
   return (
     <Dialog open={true} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[80vh]">
+      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>Historique des transactions</DialogTitle>
+          <DialogTitle>Historique des transactions ({filteredTransactions.length})</DialogTitle>
         </DialogHeader>
         
         <div className="relative mb-4">
@@ -108,8 +126,8 @@ export function HistoryDialog({ userId, onOpenChange }: { userId: string; onOpen
           {searchQuery && (
             <Button
               variant="ghost"
-              size="icon"
-              className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
+              size="sm"
+              className="absolute right-1 top-1/2 -translate-y-1/2"
               onClick={() => setSearchQuery("")}
             >
               <X className="h-4 w-4" />
@@ -129,53 +147,118 @@ export function HistoryDialog({ userId, onOpenChange }: { userId: string; onOpen
               <Skeleton key={i} className="h-20 w-full" />
             ))}
           </div>
-        ) : filteredTransactions.length > 0 ? (
-          <ScrollArea className="h-[400px]">
-            <div className="divide-y pr-4">
-              {filteredTransactions.map((tx) => (
-                <div
-                  key={tx.id}
-                  className="grid grid-cols-[1fr_auto] sm:grid-cols-[1fr_120px] gap-3 py-4 hover-elevate rounded-md px-3 cursor-pointer items-start"
-                  onClick={() => setSelectedTx(tx)}
-                  data-testid={`transaction-card-${tx.id}`}
-                >
-                  <div className="min-w-0 space-y-1">
-                    <p className="font-medium text-sm truncate">
-                      {tx.description || getTypeText(tx.type)}
-                    </p>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Badge variant={getStatusBadge(tx.status)} className="text-xs shrink-0">
-                        {getStatusText(tx.status)}
-                      </Badge>
-                      {tx.country && (
-                        <span className="text-xs text-muted-foreground">{tx.country}</span>
-                      )}
-                      {tx.operator && (
-                        <span className="text-xs text-muted-foreground capitalize">{tx.operator}</span>
-                      )}
+        ) : paginatedTransactions.length > 0 ? (
+          <div className="flex-1 overflow-hidden flex flex-col">
+            <ScrollArea className="flex-1">
+              <div className="divide-y pr-4">
+                {paginatedTransactions.map((tx) => (
+                  <div
+                    key={tx.id}
+                    className="grid grid-cols-[1fr_auto] sm:grid-cols-[1fr_120px] gap-3 py-4 hover-elevate rounded-md px-3 cursor-pointer items-start"
+                    onClick={() => setSelectedTx(tx)}
+                    data-testid={`transaction-card-${tx.id}`}
+                  >
+                    <div className="min-w-0 space-y-1">
+                      <p className="font-medium text-sm truncate">
+                        {tx.description || getTypeText(tx.type)}
+                      </p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge variant={getStatusBadge(tx.status)} className="text-xs shrink-0">
+                          {getStatusText(tx.status)}
+                        </Badge>
+                        {tx.country && (
+                          <span className="text-xs text-muted-foreground">{tx.country}</span>
+                        )}
+                        {tx.operator && (
+                          <span className="text-xs text-muted-foreground capitalize">{tx.operator}</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(tx.createdAt).toLocaleDateString("fr-FR", {
+                          year: "numeric",
+                          month: "short",
+                          day: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                        {tx.customerName && ` • ${tx.customerName}`}
+                        {tx.customerPhone && ` • ${tx.customerPhone}`}
+                      </p>
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      {new Date(tx.createdAt).toLocaleDateString("fr-FR", {
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                      {tx.customerName && ` • ${tx.customerName}`}
-                      {tx.customerPhone && ` • ${tx.customerPhone}`}
-                    </p>
+                    <div className="text-right shrink-0">
+                      <p className="font-bold text-base tabular-nums">
+                        {formatAmount(tx.amount)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{tx.currency}</p>
+                    </div>
                   </div>
-                  <div className="text-right shrink-0">
-                    <p className="font-bold text-base tabular-nums">
-                      {formatAmount(tx.amount)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">{tx.currency}</p>
-                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+
+            {totalPages > 1 && (
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-4 pt-4 border-t">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <span>Afficher</span>
+                  <Select value={itemsPerPage.toString()} onValueChange={handleItemsPerPageChange}>
+                    <SelectTrigger className="w-20 h-8" data-testid="select-items-per-page-admin">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ITEMS_PER_PAGE_OPTIONS.map((option) => (
+                        <SelectItem key={option} value={option.toString()}>
+                          {option}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <span>par page</span>
                 </div>
-              ))}
-            </div>
-          </ScrollArea>
+
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(1)}
+                    disabled={currentPage === 1}
+                    data-testid="button-first-page-admin"
+                  >
+                    <ChevronsLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    data-testid="button-prev-page-admin"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <span className="px-3 text-sm">
+                    Page {currentPage} sur {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                    data-testid="button-next-page-admin"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(totalPages)}
+                    disabled={currentPage === totalPages}
+                    data-testid="button-last-page-admin"
+                  >
+                    <ChevronsRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
         ) : searchQuery ? (
           <div className="text-center py-8">
             <Search className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
