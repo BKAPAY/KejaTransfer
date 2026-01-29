@@ -158,15 +158,6 @@ export function TransactionDetailsDialog({
                 </p>
               </div>
 
-              {transaction.fee > 0 && (
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">Frais appliqués</p>
-                  <p className="text-sm font-medium text-orange-600 dark:text-orange-400">
-                    {formatAmount(transaction.fee)} ({transaction.feePercentage ? (transaction.feePercentage / 10).toFixed(1) : "0"}%)
-                  </p>
-                </div>
-              )}
-
               {transaction.country && (
                 <div className="space-y-1">
                   <p className="text-xs text-muted-foreground">Pays</p>
@@ -264,50 +255,6 @@ export function TransactionDetailsDialog({
             </div>
           )}
 
-          {metadata && (metadata.providerAmount || metadata.provider) && !isCryptoPayment && (
-            <div className="space-y-4 border-t pt-4">
-              <h3 className="font-semibold text-lg">Informations du fournisseur</h3>
-
-              <div className="grid grid-cols-2 gap-3">
-                {metadata.provider && (
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">Fournisseur</p>
-                    <p className="text-sm font-medium capitalize">{metadata.provider}</p>
-                  </div>
-                )}
-
-                {metadata.providerAmount && metadata.providerCurrency && (
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">Montant envoyé au fournisseur</p>
-                    <p className="text-sm font-medium">
-                      {formatAmount(metadata.providerAmount, metadata.providerCurrency)}
-                    </p>
-                  </div>
-                )}
-
-                {metadata.conversionRate && (
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">Taux de conversion</p>
-                    <p className="text-sm font-medium">{metadata.conversionRate.toFixed(4)}</p>
-                  </div>
-                )}
-
-                {metadata.fedapayTransactionId && (
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">ID FedaPay</p>
-                    <p className="text-xs font-mono">{metadata.fedapayTransactionId}</p>
-                  </div>
-                )}
-
-                {metadata.wizallTransactionId && (
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">ID Wizall</p>
-                    <p className="text-xs font-mono">{metadata.wizallTransactionId}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
 
           {(transaction.customerName || transaction.customerEmail || transaction.customerPhone) && (
             <div className="space-y-4 border-t pt-4">
