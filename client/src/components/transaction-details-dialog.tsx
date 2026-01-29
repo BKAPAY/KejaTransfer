@@ -6,14 +6,33 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import type { Transaction } from "@shared/schema";
-import { Copy, Mail, Phone } from "lucide-react";
+import { Copy, Mail, Phone, Wallet, Bitcoin } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
+import { useMemo } from "react";
 
 interface TransactionDetailsDialogProps {
   transaction: Transaction | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+}
+
+interface TransactionMetadata {
+  payAddress?: string;
+  cryptoCurrency?: string;
+  cryptoAmount?: number;
+  paymentId?: string;
+  nowpaymentsId?: string;
+  fedapayTransactionId?: number;
+  wizallTransactionId?: string;
+  operatorKey?: string;
+  provider?: string;
+  providerAmount?: number;
+  providerCurrency?: string;
+  balanceAmount?: number;
+  balanceCurrency?: string;
+  conversionRate?: number;
+  [key: string]: any;
 }
 
 export function TransactionDetailsDialog({
@@ -23,14 +42,23 @@ export function TransactionDetailsDialog({
 }: TransactionDetailsDialogProps) {
   const { toast } = useToast();
 
+  const metadata = useMemo<TransactionMetadata | null>(() => {
+    if (!transaction?.metadata) return null;
+    try {
+      return JSON.parse(transaction.metadata as string);
+    } catch {
+      return null;
+    }
+  }, [transaction?.metadata]);
+
   if (!transaction) return null;
 
-  const formatAmount = (amount: number) => {
+  const formatAmount = (amount: number, currency?: string) => {
     return new Intl.NumberFormat("fr-FR", {
       style: "currency",
-      currency: transaction.currency || "XOF",
+      currency: currency || transaction.currency || "XOF",
       minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
+      maximumFractionDigits: currency === "USD" ? 2 : 0,
     }).format(amount);
   };
 
@@ -57,6 +85,7 @@ export function TransactionDetailsDialog({
   const getTypeText = (type: string) => {
     const types: Record<string, string> = {
       deposit: "Dépôt",
+      withdrawal: "Retrait",
       transfer: "Transfert",
       payment_link: "Lien de paiement",
       merchant_link: "Lien marchand",
@@ -69,9 +98,11 @@ export function TransactionDetailsDialog({
     navigator.clipboard.writeText(text);
     toast({
       title: "Copié",
-      description: `${label} copié à presse-papiers`,
+      description: `${label} copié dans le presse-papiers`,
     });
   };
+
+  const isCryptoPayment = metadata?.payAddress || metadata?.cryptoCurrency;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -81,13 +112,21 @@ export function TransactionDetailsDialog({
         </DialogHeader>
 
         <div className="space-y-6">
-          {/* Transaction ID - Highlighted */}
           <div className="bg-muted p-3 rounded-md border border-border">
             <label className="text-xs font-medium text-muted-foreground block mb-2">ID Transaction</label>
-            <code className="text-xs font-mono break-all">{transaction.id}</code>
+            <div className="flex items-center gap-2">
+              <code className="text-xs font-mono break-all flex-1">{transaction.id}</code>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => copyToClipboard(transaction.id, "ID Transaction")}
+                data-testid="button-copy-tx-id"
+              >
+                <Copy className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
 
-          {/* Transaction Details */}
           <div className="space-y-4">
             <h3 className="font-semibold text-lg">Informations de la transaction</h3>
 
@@ -118,6 +157,15 @@ export function TransactionDetailsDialog({
                   })}
                 </p>
               </div>
+
+              {transaction.fee > 0 && (
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">Frais appliqués</p>
+                  <p className="text-sm font-medium text-orange-600 dark:text-orange-400">
+                    {formatAmount(transaction.fee)} ({transaction.feePercentage ? (transaction.feePercentage / 10).toFixed(1) : "0"}%)
+                  </p>
+                </div>
+              )}
 
               {transaction.country && (
                 <div className="space-y-1">
@@ -161,22 +209,133 @@ export function TransactionDetailsDialog({
             </div>
           </div>
 
-          {/* Customer Details */}
+          {isCryptoPayment && metadata && (
+            <div className="space-y-4 border-t pt-4">
+              <h3 className="font-semibold text-lg flex items-center gap-2">
+                <Bitcoin className="w-5 h-5" />
+                Informations Cryptomonnaie
+              </h3>
+
+              <div className="grid grid-cols-1 gap-3">
+                {metadata.cryptoCurrency && (
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">Cryptomonnaie</p>
+                    <p className="text-sm font-medium uppercase">{metadata.cryptoCurrency}</p>
+                  </div>
+                )}
+
+                {metadata.cryptoAmount && (
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">Montant en crypto</p>
+                    <p className="text-sm font-medium">
+                      {metadata.cryptoAmount} {metadata.cryptoCurrency?.toUpperCase()}
+                    </p>
+                  </div>
+                )}
+
+                {metadata.payAddress && (
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Wallet className="w-3 h-3" /> Adresse de paiement
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <code className="text-xs font-mono bg-muted p-2 rounded flex-1 break-all">
+                        {metadata.payAddress}
+                      </code>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => copyToClipboard(metadata.payAddress!, "Adresse crypto")}
+                        data-testid="button-copy-crypto-address"
+                      >
+                        <Copy className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {metadata.paymentId && (
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">ID Paiement NOWPayments</p>
+                    <p className="text-xs font-mono bg-muted p-2 rounded">{metadata.paymentId}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {metadata && (metadata.providerAmount || metadata.provider) && !isCryptoPayment && (
+            <div className="space-y-4 border-t pt-4">
+              <h3 className="font-semibold text-lg">Informations du fournisseur</h3>
+
+              <div className="grid grid-cols-2 gap-3">
+                {metadata.provider && (
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">Fournisseur</p>
+                    <p className="text-sm font-medium capitalize">{metadata.provider}</p>
+                  </div>
+                )}
+
+                {metadata.providerAmount && metadata.providerCurrency && (
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">Montant envoyé au fournisseur</p>
+                    <p className="text-sm font-medium">
+                      {formatAmount(metadata.providerAmount, metadata.providerCurrency)}
+                    </p>
+                  </div>
+                )}
+
+                {metadata.conversionRate && (
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">Taux de conversion</p>
+                    <p className="text-sm font-medium">{metadata.conversionRate.toFixed(4)}</p>
+                  </div>
+                )}
+
+                {metadata.fedapayTransactionId && (
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">ID FedaPay</p>
+                    <p className="text-xs font-mono">{metadata.fedapayTransactionId}</p>
+                  </div>
+                )}
+
+                {metadata.wizallTransactionId && (
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">ID Wizall</p>
+                    <p className="text-xs font-mono">{metadata.wizallTransactionId}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {(transaction.customerName || transaction.customerEmail || transaction.customerPhone) && (
             <div className="space-y-4 border-t pt-4">
               <h3 className="font-semibold text-lg">Informations du client</h3>
 
-              <div className="space-y-3">
+              <div className="grid grid-cols-1 gap-3">
                 {transaction.customerName && (
                   <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">Nom du client</p>
-                    <p className="text-sm font-medium">{transaction.customerName}</p>
+                    <p className="text-xs text-muted-foreground">Nom complet</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium">{transaction.customerName}</p>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => copyToClipboard(transaction.customerName!, "Nom")}
+                        data-testid="button-copy-name"
+                      >
+                        <Copy className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
                 )}
 
                 {transaction.customerEmail && (
                   <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">Email</p>
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Mail className="w-3 h-3" /> Email
+                    </p>
                     <div className="flex items-center gap-2">
                       <a
                         href={`mailto:${transaction.customerEmail}`}
@@ -199,7 +358,9 @@ export function TransactionDetailsDialog({
 
                 {transaction.customerPhone && (
                   <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">Téléphone</p>
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Phone className="w-3 h-3" /> Téléphone
+                    </p>
                     <div className="flex items-center gap-2">
                       <a
                         href={`tel:${transaction.customerPhone}`}

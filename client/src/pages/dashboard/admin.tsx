@@ -3,11 +3,11 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
-import { Users, UserCheck, TrendingDown, TrendingUp, Search, Settings, Globe, RefreshCw, Database, AlertCircle, CheckCircle2, Eye, History, MapPin, Mail, Phone, CreditCard, Percent, Lock } from "lucide-react";
+import { Users, UserCheck, TrendingDown, TrendingUp, Search, Settings, Globe, RefreshCw, Database, AlertCircle, CheckCircle2, Eye, History, MapPin, Mail, Phone, CreditCard, Percent, Lock, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import type { User, Transaction } from "@shared/schema";
@@ -19,6 +19,9 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+const ITEMS_PER_PAGE_OPTIONS = [10, 20, 50, 100];
 
 const ADMIN_ACCESS_CODE = "19992025";
 
@@ -87,6 +90,9 @@ export default function Admin() {
   const [accessCodeDialogOpen, setAccessCodeDialogOpen] = useState(false);
   const [accessCode, setAccessCode] = useState("");
   const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
+  const [txCurrentPage, setTxCurrentPage] = useState(1);
+  const [txItemsPerPage, setTxItemsPerPage] = useState(20);
+  const [txSearchQuery, setTxSearchQuery] = useState("");
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
@@ -218,6 +224,57 @@ export default function Admin() {
   // Display filtered results if searching, otherwise show all users
   const displayedUsers = searchQuery.length > 0 ? searchResults : allUsers;
   const isLoading = searchQuery.length > 0 ? searchLoading : usersLoading;
+
+  // Filter and paginate transactions
+  const filteredTransactions = useMemo(() => {
+    if (!allTransactions) return [];
+    if (!txSearchQuery.trim()) return allTransactions;
+
+    const query = txSearchQuery.toLowerCase().trim();
+    return allTransactions.filter((tx) => {
+      const customerName = (tx.customerName || "").toLowerCase();
+      const customerEmail = (tx.customerEmail || "").toLowerCase();
+      const customerPhone = (tx.customerPhone || "").toLowerCase();
+      const paydunyaToken = (tx.paydunyaToken || "").toLowerCase();
+      const txId = tx.id.toLowerCase();
+      const description = (tx.description || "").toLowerCase();
+      const userName = tx.user ? `${tx.user.firstName} ${tx.user.lastName}`.toLowerCase() : "";
+      
+      return (
+        customerName.includes(query) ||
+        customerEmail.includes(query) ||
+        customerPhone.includes(query) ||
+        paydunyaToken.includes(query) ||
+        txId.includes(query) ||
+        description.includes(query) ||
+        userName.includes(query)
+      );
+    });
+  }, [allTransactions, txSearchQuery]);
+
+  const txTotalPages = Math.ceil(filteredTransactions.length / txItemsPerPage);
+
+  const paginatedTransactions = useMemo(() => {
+    const startIndex = (txCurrentPage - 1) * txItemsPerPage;
+    const endIndex = startIndex + txItemsPerPage;
+    return filteredTransactions.slice(startIndex, endIndex);
+  }, [filteredTransactions, txCurrentPage, txItemsPerPage]);
+
+  const handleTxSearchChange = (value: string) => {
+    setTxSearchQuery(value);
+    setTxCurrentPage(1);
+  };
+
+  const handleTxItemsPerPageChange = (value: string) => {
+    setTxItemsPerPage(parseInt(value));
+    setTxCurrentPage(1);
+  };
+
+  const goToTxPage = (page: number) => {
+    if (page >= 1 && page <= txTotalPages) {
+      setTxCurrentPage(page);
+    }
+  };
 
   const formatAmount = (amount: number) => {
     return new Intl.NumberFormat("fr-FR", {
@@ -634,10 +691,27 @@ export default function Admin() {
       {mainTab === "transactions" && (
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2">
-              <History className="w-5 h-5" />
-              Toutes les Transactions ({allTransactions.length})
-            </CardTitle>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <CardTitle className="flex items-center gap-2">
+                <History className="w-5 h-5" />
+                Toutes les Transactions ({allTransactions.length})
+              </CardTitle>
+              <div className="relative w-full sm:w-80">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Rechercher transactions..."
+                  value={txSearchQuery}
+                  onChange={(e) => handleTxSearchChange(e.target.value)}
+                  className="pl-9"
+                  data-testid="input-search-admin-transactions"
+                />
+              </div>
+            </div>
+            {txSearchQuery && (
+              <p className="text-xs text-muted-foreground mt-2">
+                {filteredTransactions.length} résultat(s) pour "{txSearchQuery}"
+              </p>
+            )}
           </CardHeader>
           <CardContent>
             {transactionsLoading ? (
@@ -648,10 +722,10 @@ export default function Admin() {
                   </div>
                 ))}
               </div>
-            ) : allTransactions.length > 0 ? (
-              <ScrollArea className="h-[600px] border rounded-lg">
-                <div className="divide-y pr-4">
-                  {allTransactions.map((tx) => (
+            ) : paginatedTransactions.length > 0 ? (
+              <>
+                <div className="border rounded-lg divide-y">
+                  {paginatedTransactions.map((tx) => (
                     <div
                       key={tx.id}
                       className="p-4 flex items-center justify-between gap-4 hover:bg-muted/50 cursor-pointer"
@@ -667,10 +741,10 @@ export default function Admin() {
                             variant={tx.status === "completed" ? "default" : tx.status === "pending" ? "secondary" : "destructive"}
                             className="text-xs"
                           >
-                            {tx.status === "completed" ? "Complete" : tx.status === "pending" ? "En attente" : "Echoue"}
+                            {tx.status === "completed" ? "Complète" : tx.status === "pending" ? "En attente" : tx.status === "failed" ? "Échouée" : "Annulée"}
                           </Badge>
                           <span className="text-sm font-medium">
-                            {tx.type === "deposit" ? "Depot" : tx.type === "transfer" ? "Transfert" : tx.type === "payment_link" ? "Lien paiement" : tx.type === "merchant_link" ? "Lien marchand" : tx.type === "api_payment" ? "Paiement API" : tx.type}
+                            {tx.type === "deposit" ? "Dépôt" : tx.type === "withdrawal" ? "Retrait" : tx.type === "transfer" ? "Transfert" : tx.type === "payment_link" ? "Lien paiement" : tx.type === "merchant_link" ? "Lien marchand" : tx.type === "api_payment" ? "Paiement API" : tx.type}
                           </span>
                           {tx.country && (
                             <span className="text-sm">
@@ -683,7 +757,7 @@ export default function Admin() {
                             </span>
                           )}
                         </div>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
                           {tx.user && (
                             <span className="font-medium">
                               {tx.user.firstName} {tx.user.lastName}
@@ -732,7 +806,91 @@ export default function Admin() {
                     </div>
                   ))}
                 </div>
-              </ScrollArea>
+
+                {txTotalPages > 1 && (
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <span>Afficher</span>
+                      <Select value={txItemsPerPage.toString()} onValueChange={handleTxItemsPerPageChange}>
+                        <SelectTrigger className="w-20 h-8" data-testid="select-admin-items-per-page">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {ITEMS_PER_PAGE_OPTIONS.map((option) => (
+                            <SelectItem key={option} value={option.toString()}>
+                              {option}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <span>par page</span>
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => goToTxPage(1)}
+                        disabled={txCurrentPage === 1}
+                        data-testid="button-admin-first-page"
+                      >
+                        <ChevronsLeft className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => goToTxPage(txCurrentPage - 1)}
+                        disabled={txCurrentPage === 1}
+                        data-testid="button-admin-prev-page"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      
+                      <div className="flex items-center gap-1 px-2">
+                        <span className="text-sm font-medium">
+                          Page {txCurrentPage} sur {txTotalPages}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          ({filteredTransactions.length} transactions)
+                        </span>
+                      </div>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => goToTxPage(txCurrentPage + 1)}
+                        disabled={txCurrentPage === txTotalPages}
+                        data-testid="button-admin-next-page"
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => goToTxPage(txTotalPages)}
+                        disabled={txCurrentPage === txTotalPages}
+                        data-testid="button-admin-last-page"
+                      >
+                        <ChevronsRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {txTotalPages <= 1 && filteredTransactions.length > 0 && (
+                  <div className="text-center text-xs text-muted-foreground mt-4 pt-4 border-t">
+                    {filteredTransactions.length} transaction(s) au total
+                  </div>
+                )}
+              </>
+            ) : txSearchQuery ? (
+              <div className="text-center py-8">
+                <Search className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                <p className="text-muted-foreground">Aucune transaction trouvée pour "{txSearchQuery}"</p>
+                <Button variant="ghost" onClick={() => setTxSearchQuery("")} className="mt-2">
+                  Effacer la recherche
+                </Button>
+              </div>
             ) : (
               <div className="text-center py-8">
                 <p className="text-muted-foreground">Aucune transaction sur la plateforme</p>

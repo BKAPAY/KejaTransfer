@@ -3,17 +3,22 @@ import { Badge } from "@/components/ui/badge";
 import { useQuery } from "@tanstack/react-query";
 import type { Transaction, User } from "@shared/schema";
 import { COUNTRIES } from "@shared/schema";
-import { History as HistoryIcon, Search, X } from "lucide-react";
+import { History as HistoryIcon, Search, X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TransactionDetailsDialog } from "@/components/transaction-details-dialog";
 import { useState, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+const ITEMS_PER_PAGE_OPTIONS = [10, 20, 50, 100];
 
 export default function History() {
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
 
   const { data: user } = useQuery<User>({
     queryKey: ["/api/auth/me"],
@@ -40,16 +45,26 @@ export default function History() {
       const customerPhone = (transaction.customerPhone || "").toLowerCase();
       const paydunyaToken = (transaction.paydunyaToken || "").toLowerCase();
       const txId = transaction.id.toLowerCase();
+      const description = (transaction.description || "").toLowerCase();
       
       return (
         customerName.includes(query) ||
         customerEmail.includes(query) ||
         customerPhone.includes(query) ||
         paydunyaToken.includes(query) ||
-        txId.includes(query)
+        txId.includes(query) ||
+        description.includes(query)
       );
     });
   }, [transactions, searchQuery]);
+
+  const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
+  
+  const paginatedTransactions = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return filteredTransactions.slice(startIndex, endIndex);
+  }, [filteredTransactions, currentPage, itemsPerPage]);
 
   const handleTransactionClick = (transaction: Transaction) => {
     setSelectedTransaction(transaction);
@@ -58,6 +73,23 @@ export default function History() {
 
   const clearSearch = () => {
     setSearchQuery("");
+    setCurrentPage(1);
+  };
+
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+    setCurrentPage(1);
+  };
+
+  const handleItemsPerPageChange = (value: string) => {
+    setItemsPerPage(parseInt(value));
+    setCurrentPage(1);
+  };
+
+  const goToPage = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
   };
 
   const formatAmount = (amount: number) => {
@@ -81,17 +113,17 @@ export default function History() {
 
   const getStatusText = (status: string) => {
     const texts: Record<string, string> = {
-      completed: "Complete",
+      completed: "Complète",
       pending: "En attente",
-      failed: "Echoue",
-      cancelled: "Annule",
+      failed: "Échouée",
+      cancelled: "Annulée",
     };
     return texts[status] || status;
   };
 
   const getTypeText = (type: string) => {
     const types: Record<string, string> = {
-      deposit: "Depot",
+      deposit: "Dépôt",
       withdrawal: "Retrait",
       transfer: "Transfert",
       payment_link: "Lien de paiement",
@@ -117,9 +149,9 @@ export default function History() {
             <div className="relative w-full sm:w-80">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Rechercher par token, nom, email ou telephone..."
+                placeholder="Rechercher par token, nom, email ou téléphone..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => handleSearchChange(e.target.value)}
                 className="pl-9 pr-9"
                 data-testid="input-search-transactions"
               />
@@ -138,7 +170,7 @@ export default function History() {
           </div>
           {searchQuery && (
             <p className="text-xs text-muted-foreground mt-2">
-              {filteredTransactions.length} resultat(s) pour "{searchQuery}"
+              {filteredTransactions.length} résultat(s) pour "{searchQuery}"
             </p>
           )}
         </CardHeader>
@@ -156,56 +188,134 @@ export default function History() {
                 </div>
               ))}
             </div>
-          ) : filteredTransactions.length > 0 ? (
-            <div className="space-y-1">
-              {filteredTransactions.map((transaction) => (
-                <div
-                  key={transaction.id}
-                  className="flex items-center justify-between gap-4 py-4 border-b last:border-0 hover-elevate rounded-md px-3 cursor-pointer"
-                  data-testid={`transaction-${transaction.id}`}
-                  onClick={() => handleTransactionClick(transaction)}
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap mb-1">
-                      <p className="font-medium text-sm">
-                        {transaction.description || getTypeText(transaction.type)}
-                      </p>
-                      <Badge variant={getStatusBadge(transaction.status)} className="text-xs">
-                        {getStatusText(transaction.status)}
-                      </Badge>
+          ) : paginatedTransactions.length > 0 ? (
+            <>
+              <div className="space-y-1">
+                {paginatedTransactions.map((transaction) => (
+                  <div
+                    key={transaction.id}
+                    className="flex items-center justify-between gap-4 py-4 border-b last:border-0 hover-elevate rounded-md px-3 cursor-pointer"
+                    data-testid={`transaction-${transaction.id}`}
+                    onClick={() => handleTransactionClick(transaction)}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                        <p className="font-medium text-sm">
+                          {transaction.description || getTypeText(transaction.type)}
+                        </p>
+                        <Badge variant={getStatusBadge(transaction.status)} className="text-xs">
+                          {getStatusText(transaction.status)}
+                        </Badge>
+                      </div>
+                      <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+                        <span>
+                          {new Date(transaction.createdAt).toLocaleDateString("fr-FR", {
+                            year: "numeric",
+                            month: "short",
+                            day: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </span>
+                        {transaction.customerName && <span>{transaction.customerName}</span>}
+                        {transaction.customerEmail && <span>{transaction.customerEmail}</span>}
+                        {transaction.customerPhone && <span>{transaction.customerPhone}</span>}
+                        {transaction.country && <span>{transaction.country}</span>}
+                        {transaction.operator && (
+                          <span className="capitalize">{transaction.operator}</span>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-                      <span>
-                        {new Date(transaction.createdAt).toLocaleDateString("fr-FR", {
-                          year: "numeric",
-                          month: "short",
-                          day: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </span>
-                      {transaction.customerName && <span>{transaction.customerName}</span>}
-                      {transaction.customerEmail && <span>{transaction.customerEmail}</span>}
-                      {transaction.customerPhone && <span>{transaction.customerPhone}</span>}
-                      {transaction.country && <span>{transaction.country}</span>}
-                      {transaction.operator && (
-                        <span className="capitalize">{transaction.operator}</span>
-                      )}
+                    <div className="text-right">
+                      <p className="font-semibold">
+                        {formatAmount(transaction.amount)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{transaction.currency}</p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-semibold">
-                      {formatAmount(transaction.amount)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">{transaction.currency}</p>
+                ))}
+              </div>
+
+              {totalPages > 1 && (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <span>Afficher</span>
+                    <Select value={itemsPerPage.toString()} onValueChange={handleItemsPerPageChange}>
+                      <SelectTrigger className="w-20 h-8" data-testid="select-items-per-page">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ITEMS_PER_PAGE_OPTIONS.map((option) => (
+                          <SelectItem key={option} value={option.toString()}>
+                            {option}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <span>par page</span>
+                  </div>
+
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => goToPage(1)}
+                      disabled={currentPage === 1}
+                      data-testid="button-first-page"
+                    >
+                      <ChevronsLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => goToPage(currentPage - 1)}
+                      disabled={currentPage === 1}
+                      data-testid="button-prev-page"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    
+                    <div className="flex items-center gap-1 px-2">
+                      <span className="text-sm font-medium">
+                        Page {currentPage} sur {totalPages}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        ({filteredTransactions.length} transactions)
+                      </span>
+                    </div>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => goToPage(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                      data-testid="button-next-page"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => goToPage(totalPages)}
+                      disabled={currentPage === totalPages}
+                      data-testid="button-last-page"
+                    >
+                      <ChevronsRight className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
-              ))}
-            </div>
+              )}
+
+              {totalPages <= 1 && filteredTransactions.length > 0 && (
+                <div className="text-center text-xs text-muted-foreground mt-4 pt-4 border-t">
+                  {filteredTransactions.length} transaction(s) au total
+                </div>
+              )}
+            </>
           ) : searchQuery ? (
             <div className="text-center py-12">
               <Search className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-              <p className="text-muted-foreground">Aucune transaction trouvee pour "{searchQuery}"</p>
+              <p className="text-muted-foreground">Aucune transaction trouvée pour "{searchQuery}"</p>
               <Button variant="ghost" onClick={clearSearch} className="mt-2">
                 Effacer la recherche
               </Button>
