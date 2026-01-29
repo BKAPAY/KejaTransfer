@@ -5662,11 +5662,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/admin/kyc-submissions", requireAdmin, async (req: Request, res: Response) => {
     try {
-      // Get all KYC history (submitted, verified, rejected)
+      // Get all KYC history (submitted, verified, rejected) - sorted with pending first
       const submissions = await storage.getKycHistory();
-      res.json(submissions);
+      // Sort: pending first, then by date descending
+      const sorted = submissions.sort((a: any, b: any) => {
+        // Pending status comes first
+        if (a.kycStatus === 'pending' && b.kycStatus !== 'pending') return -1;
+        if (a.kycStatus !== 'pending' && b.kycStatus === 'pending') return 1;
+        // Then sort by date descending
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+      res.json(sorted);
     } catch (error: any) {
       console.error("Get KYC submissions error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
+  app.get("/api/admin/pending-kyc-count", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const submissions = await storage.getKycHistory();
+      const pendingCount = submissions.filter((s: any) => s.kycStatus === 'pending').length;
+      res.json(pendingCount);
+    } catch (error: any) {
+      console.error("Get pending KYC count error:", error);
       res.status(500).json({ error: "Une erreur est survenue" });
     }
   });

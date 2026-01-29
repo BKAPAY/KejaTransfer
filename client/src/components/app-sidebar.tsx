@@ -32,6 +32,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { User as UserType } from "@shared/schema";
 import logoImage from "@assets/bkapay-logo.png";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -114,6 +115,12 @@ export function AppSidebar() {
     queryKey: ["/api/auth/me"],
   });
 
+  const { data: pendingKycCount } = useQuery<number>({
+    queryKey: ["/api/admin/pending-kyc-count"],
+    enabled: !!user?.isAdmin,
+    refetchInterval: 30000,
+  });
+
   const handleMenuClick = () => {
     if (isMobile) {
       setOpenMobile(false);
@@ -178,7 +185,12 @@ export function AppSidebar() {
                   >
                     <Link href={item.url} onClick={handleMenuClick}>
                       <item.icon className="w-4 h-4" />
-                      <span>{item.title}</span>
+                      <span className="flex-1">{item.title}</span>
+                      {item.url === "/dashboard/kyc" && user?.isAdmin && pendingKycCount && pendingKycCount > 0 && (
+                        <Badge variant="destructive" className="ml-auto text-xs px-1.5 py-0.5 min-w-[20px] flex items-center justify-center">
+                          {pendingKycCount}
+                        </Badge>
+                      )}
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
