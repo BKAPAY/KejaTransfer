@@ -494,7 +494,7 @@ export default function Withdrawal() {
                 )}
               />
 
-              {amount && userCountry && feeInfo && (
+              {amount && userCountry && selectedOperator && feeInfo && (
                 <div className="bg-muted p-4 rounded-md border space-y-3">
                   <div className="flex items-start gap-3">
                     <Info className="h-4 w-4 mt-0.5 text-muted-foreground flex-shrink-0" />

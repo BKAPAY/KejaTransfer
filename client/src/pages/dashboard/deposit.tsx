@@ -719,7 +719,7 @@ export default function Deposit() {
                       </div>
                     )}
 
-                    {amount && selectedCountry && netAmount > 0 && (
+                    {amount && selectedCountry && selectedOperator && netAmount > 0 && (
                       <div className="bg-muted p-3 rounded-md border">
                         <p className="text-sm text-muted-foreground">
                           Vous recevrez
