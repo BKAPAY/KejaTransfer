@@ -34,7 +34,8 @@ export function getFeePercentage(feeValue?: number): number {
 }
 
 /**
- * Get the active provider for a country from country_status table
+ * Get the active provider for INCOMING payments (deposits, payment links, etc.)
+ * Uses country_status.payinEnabled to find the active provider
  * Returns the provider name (lowercase) or 'paydunya' as default
  */
 export async function getActiveProviderForCountry(storage: any, country: string): Promise<string> {
@@ -49,14 +50,36 @@ export async function getActiveProviderForCountry(storage: any, country: string)
       return activeStatus.provider.toLowerCase();
     }
   } catch (error) {
-    console.warn(`[FEES] Failed to get active provider for ${country}:`, error);
+    console.warn(`[FEES] Failed to get active payin provider for ${country}:`, error);
   }
   return 'paydunya'; // Default fallback
 }
 
 /**
- * Get fees for a country/operator, automatically detecting the active provider
- * This is the recommended function to use for all fee calculations
+ * Get the active provider for OUTGOING payments (withdrawals, transfers)
+ * Uses country_status.payoutEnabled to find the active provider
+ * Returns the provider name (lowercase) or 'paydunya' as default
+ */
+export async function getActivePayoutProviderForCountry(storage: any, country: string): Promise<string> {
+  try {
+    const countryStatuses = await storage.getCountryStatuses();
+    const activeStatus = countryStatuses.find((status: any) => 
+      status.country === country.toUpperCase() && 
+      status.payoutEnabled === true
+    );
+    
+    if (activeStatus && activeStatus.provider) {
+      return activeStatus.provider.toLowerCase();
+    }
+  } catch (error) {
+    console.warn(`[FEES] Failed to get active payout provider for ${country}:`, error);
+  }
+  return 'paydunya'; // Default fallback
+}
+
+/**
+ * Get fees for INCOMING payments (deposits, payment links, merchant links, API)
+ * Automatically detects the active payin provider
  */
 export async function getDynamicFees(
   storage: any,
@@ -64,6 +87,23 @@ export async function getDynamicFees(
   operator: string
 ): Promise<{ incoming: number; outgoing: number; provider: string }> {
   const provider = await getActiveProviderForCountry(storage, country);
+  const fees = await getFeeFromDatabase(storage, provider, country, operator);
+  return {
+    ...fees,
+    provider,
+  };
+}
+
+/**
+ * Get fees for OUTGOING payments (withdrawals, transfers)
+ * Automatically detects the active payout provider
+ */
+export async function getDynamicOutgoingFees(
+  storage: any,
+  country: string,
+  operator: string
+): Promise<{ incoming: number; outgoing: number; provider: string }> {
+  const provider = await getActivePayoutProviderForCountry(storage, country);
   const fees = await getFeeFromDatabase(storage, provider, country, operator);
   return {
     ...fees,

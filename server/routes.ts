@@ -9,7 +9,7 @@ import { z } from "zod";
 import { insertUserSchema, insertPaymentLinkSchema, insertMerchantLinkSchema, insertApiKeySchema } from "@shared/schema";
 import { validatePhoneOperator } from "@shared/phone-utils";
 import { randomUUID } from "crypto";
-import { calculateIncomingFee, calculateOutgoingFee, calculateCustomerPaysFee, getFeeFromDatabase, getDynamicFees, getActiveProviderForCountry } from "./utils/fees";
+import { calculateIncomingFee, calculateOutgoingFee, calculateCustomerPaysFee, getFeeFromDatabase, getDynamicFees, getDynamicOutgoingFees, getActiveProviderForCountry, getActivePayoutProviderForCountry } from "./utils/fees";
 import { sendPaymentCallback } from "./utils/callback";
 import { 
   SOFTPAY_OPERATORS, 
@@ -4658,8 +4658,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Retrait échoué" });
       }
 
-      // Get dynamic fees from database (auto-detect active provider)
-      const feeConfig = await getDynamicFees(storage, country, operator);
+      // Get dynamic fees from database (auto-detect active payout provider)
+      const feeConfig = await getDynamicOutgoingFees(storage, country, operator);
       
       // Calculate fees with dynamic percentage
       const feeInfo = calculateOutgoingFee(Math.floor(amount), feeConfig.outgoing);
@@ -6110,44 +6110,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Public endpoint to get fee for a country/operator (auto-detect active provider, 2 params)
+  // Public endpoint to get fee for a country/operator (auto-detect active providers for payin and payout)
   app.get("/api/fees/:country/:operator", async (req: Request, res: Response) => {
     try {
       const { country, operator } = req.params;
       const countryUpper = country.toUpperCase();
       const operatorLower = operator.toLowerCase();
       
-      // Find the active provider for this country (provider with payinEnabled)
       const countryStatuses = await storage.getCountryStatuses();
-      const activeStatus = countryStatuses.find(status => 
+      
+      // Find the active provider for INCOMING payments (payinEnabled)
+      const payinStatus = countryStatuses.find(status => 
         status.country === countryUpper && 
         status.payinEnabled === true
       );
       
-      if (activeStatus && activeStatus.provider) {
-        // Get fee config for the active provider
+      // Find the active provider for OUTGOING payments (payoutEnabled)
+      const payoutStatus = countryStatuses.find(status => 
+        status.country === countryUpper && 
+        status.payoutEnabled === true
+      );
+      
+      let incomingFeePercentage = 60; // Default 6%
+      let outgoingFeePercentage = 60; // Default 6%
+      let payinProvider = null;
+      let payoutProvider = null;
+      
+      // Get incoming fee from payin provider
+      if (payinStatus && payinStatus.provider) {
+        payinProvider = payinStatus.provider;
         const feeConfig = await storage.getFeeConfig(
-          activeStatus.provider.toLowerCase(), 
+          payinStatus.provider.toLowerCase(), 
           countryUpper, 
           operatorLower
         );
-        
         if (feeConfig) {
-          console.log(`[Fees] Found fee config for ${activeStatus.provider}/${countryUpper}/${operatorLower}: incoming=${feeConfig.incomingFeePercentage}, outgoing=${feeConfig.outgoingFeePercentage}`);
-          return res.json({
-            incomingFeePercentage: feeConfig.incomingFeePercentage,
-            outgoingFeePercentage: feeConfig.outgoingFeePercentage,
-            provider: activeStatus.provider,
-          });
+          incomingFeePercentage = feeConfig.incomingFeePercentage ?? 60;
+          console.log(`[Fees] Incoming fee from ${payinStatus.provider}/${countryUpper}/${operatorLower}: ${incomingFeePercentage}`);
         }
       }
       
-      // Default to 6% if no config exists
-      console.log(`[Fees] No fee config found for ${countryUpper}/${operatorLower}, using default 6%`);
+      // Get outgoing fee from payout provider
+      if (payoutStatus && payoutStatus.provider) {
+        payoutProvider = payoutStatus.provider;
+        const feeConfig = await storage.getFeeConfig(
+          payoutStatus.provider.toLowerCase(), 
+          countryUpper, 
+          operatorLower
+        );
+        if (feeConfig) {
+          outgoingFeePercentage = feeConfig.outgoingFeePercentage ?? 60;
+          console.log(`[Fees] Outgoing fee from ${payoutStatus.provider}/${countryUpper}/${operatorLower}: ${outgoingFeePercentage}`);
+        }
+      }
+      
       res.json({
-        incomingFeePercentage: 60,
-        outgoingFeePercentage: 60,
-        provider: null,
+        incomingFeePercentage,
+        outgoingFeePercentage,
+        payinProvider,
+        payoutProvider,
       });
     } catch (error: any) {
       console.error("Get fee error:", error);
