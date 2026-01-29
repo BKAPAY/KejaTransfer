@@ -689,10 +689,13 @@ export class DbStorage implements IStorage {
         t.status === "completed" &&
         ["deposit", "payment_link", "merchant_link", "api_payment"].includes(t.type)
     );
-    const completedWithdrawals = allTransactions.filter((t) => t.status === "completed" && t.type === "withdrawal");
+    // Include both withdrawals and transfers as outgoing money
+    const completedOutgoing = allTransactions.filter(
+      (t) => t.status === "completed" && ["withdrawal", "transfer"].includes(t.type)
+    );
 
     const totalDeposits = completedDeposits.reduce((sum, t) => sum + t.amount, 0);
-    const totalWithdrawals = completedWithdrawals.reduce((sum, t) => sum + t.amount, 0);
+    const totalWithdrawals = completedOutgoing.reduce((sum, t) => sum + t.amount, 0);
 
     return {
       totalUsers: allUsers.length,
