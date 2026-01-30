@@ -1,6 +1,6 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { eq, desc, or, and, sql } from "drizzle-orm";
+import { eq, desc, or, and, sql, gte } from "drizzle-orm";
 import * as schema from "@shared/schema";
 import type {
   User,
@@ -82,6 +82,8 @@ export interface IStorage {
   getTransactions(userId: string, limit?: number): Promise<Transaction[]>;
   getTransactionByPaydunyaToken(paydunyaToken: string): Promise<Transaction | undefined>;
   getTransactionByFedapayId(fedapayId: number): Promise<Transaction | undefined>;
+  getTransactionByOrderId(orderId: string, userId: string): Promise<Transaction | undefined>;
+  getRecentApiPaymentByPhoneAmount(userId: string, phone: string, amount: number, secondsAgo: number): Promise<Transaction | undefined>;
   getAllPendingTransactions(): Promise<(Transaction & { user?: User })[]>;
   getAllTransactionsForAdmin(limit?: number): Promise<(Transaction & { user?: User })[]>;
   createTransaction(transaction: InsertTransaction): Promise<Transaction>;
@@ -536,6 +538,51 @@ export class DbStorage implements IStorage {
       }
     }
     return undefined;
+  }
+
+  async getTransactionByOrderId(orderId: string, userId: string): Promise<Transaction | undefined> {
+    // Search for transaction with matching orderId in metadata for this user
+    const userTransactions = await db
+      .select()
+      .from(schema.transactions)
+      .where(and(
+        eq(schema.transactions.userId, userId),
+        eq(schema.transactions.type, "api_payment")
+      ))
+      .orderBy(desc(schema.transactions.createdAt))
+      .limit(100);
+    
+    for (const tx of userTransactions) {
+      if (tx.metadata) {
+        try {
+          const metadata = JSON.parse(tx.metadata);
+          if (metadata.orderId === orderId) {
+            return tx;
+          }
+        } catch {}
+      }
+    }
+    return undefined;
+  }
+
+  async getRecentApiPaymentByPhoneAmount(userId: string, phone: string, amount: number, secondsAgo: number): Promise<Transaction | undefined> {
+    // Find recent api_payment transaction with same phone and amount within the time threshold
+    const cutoffTime = new Date(Date.now() - secondsAgo * 1000);
+    
+    const results = await db
+      .select()
+      .from(schema.transactions)
+      .where(and(
+        eq(schema.transactions.userId, userId),
+        eq(schema.transactions.type, "api_payment"),
+        eq(schema.transactions.customerPhone, phone),
+        eq(schema.transactions.amount, amount),
+        gte(schema.transactions.createdAt, cutoffTime)
+      ))
+      .orderBy(desc(schema.transactions.createdAt))
+      .limit(1);
+    
+    return results[0];
   }
 
   async getAllPendingTransactions(): Promise<(Transaction & { user?: User })[]> {

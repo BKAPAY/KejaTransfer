@@ -1424,7 +1424,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Initialize API payment
   app.post("/api/api-pay/init", async (req: Request, res: Response) => {
     try {
-      const { publicKey, amount, description, customerName, customerEmail, customerPhone, country, operator, currency: requestCurrency, callbackUrl } = req.body;
+      const { publicKey, amount, description, customerName, customerEmail, customerPhone, country, operator, currency: requestCurrency, callbackUrl, orderId } = req.body;
 
       if (!publicKey || !amount || !customerPhone || !country || !operator) {
         return res.status(400).json({ error: "Donnees manquantes" });
@@ -1434,6 +1434,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const apiKey = await storage.getApiKeyByPublicKey(publicKey);
       if (!apiKey || !apiKey.isActive) {
         return res.status(401).json({ error: "Cle API invalide ou inactive" });
+      }
+
+      // DEDUPLICATION: Check for duplicate transactions to prevent double payments
+      // If orderId is provided, check for existing transaction with same orderId
+      if (orderId) {
+        const existingByOrderId = await storage.getTransactionByOrderId(orderId, apiKey.userId);
+        if (existingByOrderId) {
+          console.log(`[API-PAY INIT] Duplicate detected - orderId ${orderId} already exists: ${existingByOrderId.id}`);
+          // Parse metadata to return provider-specific fields
+          let metadata: any = {};
+          try { metadata = JSON.parse(existingByOrderId.metadata || "{}"); } catch {}
+          
+          // Return the existing transaction with full response shape
+          return res.json({
+            success: true,
+            transactionId: existingByOrderId.id,
+            token: existingByOrderId.paydunyaToken || existingByOrderId.id,
+            status: existingByOrderId.status,
+            redirectUrl: metadata.redirectUrl || null,
+            provider: metadata.provider || "unknown",
+            message: "Transaction existante retournee (orderId deja utilise)",
+            duplicate: true,
+          });
+        }
+      }
+
+      // DEDUPLICATION: Check for recent transaction with same phone/amount (within 30 seconds)
+      const recentDuplicate = await storage.getRecentApiPaymentByPhoneAmount(
+        apiKey.userId, 
+        customerPhone, 
+        Math.floor(Number(amount)), 
+        30 // 30 seconds threshold
+      );
+      if (recentDuplicate) {
+        console.log(`[API-PAY INIT] Duplicate detected - recent transaction for ${customerPhone}/${amount}: ${recentDuplicate.id}`);
+        // Parse metadata to return provider-specific fields
+        let metadata: any = {};
+        try { metadata = JSON.parse(recentDuplicate.metadata || "{}"); } catch {}
+        
+        return res.json({
+          success: true,
+          transactionId: recentDuplicate.id,
+          token: recentDuplicate.paydunyaToken || recentDuplicate.id,
+          status: recentDuplicate.status,
+          redirectUrl: metadata.redirectUrl || null,
+          provider: metadata.provider || "unknown",
+          message: "Transaction recente retournee (meme telephone/montant dans les 30 dernieres secondes)",
+          duplicate: true,
+        });
       }
 
       // Check if country is allowed
@@ -1523,7 +1572,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             mbiyopayTransactionId: result.transactionId,
             redirectUrl: result.redirectUrl,
             apiKeyId: apiKey.id,
+            apiKeyPublicKey: publicKey,
             callbackUrl: callbackUrl || null,
+            orderId: orderId || null,
             provider: "mbiyopay",
             providerAmount: amountForProvider,
             providerCurrency: providerCurrency,
@@ -1595,7 +1646,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             fedapayTransactionId: result.transactionId,
             fedapayReference: result.reference,
             apiKeyId: apiKey.id,
+            apiKeyPublicKey: publicKey,
             callbackUrl: callbackUrl || null,
+            orderId: orderId || null,
             provider: "fedapay",
             providerAmount: amountForProvider,
             providerCurrency: providerCurrency,
@@ -1682,7 +1735,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           metadata: JSON.stringify({
             paydunyaToken: paydunyaResponse.token,
             apiKeyId: apiKey.id,
+            apiKeyPublicKey: publicKey,
             callbackUrl: callbackUrl || null,
+            orderId: orderId || null,
             provider: "paydunya",
             country: country.toUpperCase(),
             operator: operator,
