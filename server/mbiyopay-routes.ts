@@ -567,7 +567,8 @@ export async function handleMbiyoPayApiPayment(
 export async function handleMbiyoPayWebhook(req: Request, res: Response) {
   try {
     const payload = req.body;
-    console.log("[MbiyoPay Webhook] Received:", JSON.stringify(payload));
+    const clientIP = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    console.log("[MbiyoPay Webhook] Received:", { transaction_id: payload.transaction_id, status: payload.status, ip: clientIP });
 
     // Verify webhook signature if secret is configured
     const webhookSecret = process.env.MBIYOPAY_WEBHOOK_SECRET;
@@ -579,7 +580,7 @@ export async function handleMbiyoPayWebhook(req: Request, res: Response) {
                        req.headers["signature"] ||
                        req.headers["authorization"]?.replace("Bearer ", "");
       if (signature !== webhookSecret) {
-        console.error("[MbiyoPay Webhook] Invalid signature, received:", signature);
+        console.error(`[SECURITY] MbiyoPay webhook invalid signature from IP: ${clientIP}`);
         return res.status(401).json({ error: "Invalid signature" });
       }
       console.log("[MbiyoPay Webhook] Signature verified");
@@ -589,7 +590,7 @@ export async function handleMbiyoPayWebhook(req: Request, res: Response) {
     const { event, transaction_id, status } = payload;
 
     if (!transaction_id) {
-      console.error("[MbiyoPay Webhook] Missing transaction_id");
+      console.warn(`[SECURITY] MbiyoPay webhook without transaction_id from IP: ${clientIP}`);
       return res.status(400).json({ error: "Missing transaction_id" });
     }
 
@@ -604,7 +605,7 @@ export async function handleMbiyoPayWebhook(req: Request, res: Response) {
     });
     
     if (!tx) {
-      console.error(`[MbiyoPay Webhook] Transaction not found: ${transaction_id}`);
+      console.warn(`[SECURITY] MbiyoPay webhook for unknown transaction from IP ${clientIP}: ${transaction_id}`);
       return res.status(404).json({ error: "Transaction not found" });
     }
 
@@ -613,17 +614,45 @@ export async function handleMbiyoPayWebhook(req: Request, res: Response) {
       return res.json({ success: true, message: "Already processed" });
     }
 
+    // SECURITY: ALWAYS verify with MbiyoPay API before crediting - NEVER trust webhook status alone
     if (status === "successful") {
+      console.log(`[SECURITY] Verifying payment with MbiyoPay API for transaction ${tx.id}...`);
+      
+      const apiVerification = await getMbiyoPayTransactionStatus(transaction_id);
+      
+      if (!apiVerification.success) {
+        console.error(`[SECURITY] ⚠️ MbiyoPay API verification FAILED for transaction ${tx.id}`);
+        console.error(`[SECURITY] Webhook claimed: successful, API error: ${apiVerification.error}, IP: ${clientIP}`);
+        // Do NOT credit - let polling handle it if payment is real
+        return res.json({ success: true, message: "Webhook received, verification pending" });
+      }
+      
+      const apiStatus = (apiVerification.status || "").toLowerCase();
+      const isVerified = apiStatus === "completed" || apiStatus === "success" || apiStatus === "successful" || apiStatus === "approved";
+      
+      if (!isVerified) {
+        console.error(`[SECURITY] ⚠️ PAYMENT VERIFICATION FAILED for transaction ${tx.id}`);
+        console.error(`[SECURITY] Webhook claimed: successful, but API returned: ${apiStatus}, IP: ${clientIP}`);
+        // Do NOT credit - let polling handle it if payment becomes real
+        return res.json({ success: true, message: "Webhook received, verification pending" });
+      }
+      
+      console.log(`[SECURITY] ✅ Payment VERIFIED by MbiyoPay API for transaction ${tx.id}`);
+      
       if (tx.type === "deposit" || tx.type === "payment_link" || tx.type === "merchant_link" || tx.type === "api_payment") {
-        const netAmount = tx.amount - tx.fee;
-        await storage.updateUserBalance(tx.userId, netAmount);
-        await storage.updateTransactionStatus(tx.id, "completed");
-        console.log(`[MbiyoPay Webhook] Deposit completed: ${tx.id}, credited ${netAmount}`);
+        // Use atomic finalizeIncomingTransaction to prevent double-credit race with polling
+        const result = await storage.finalizeIncomingTransaction(tx.id, {});
+        if (result) {
+          console.log(`[MbiyoPay Webhook] Deposit completed: ${tx.id}, credited=${result.credited}, netAmount=${result.transaction.amount - (result.transaction.fee || 0)}`);
+        } else {
+          console.log(`[MbiyoPay Webhook] Transaction ${tx.id} already processed by polling - skipping`);
+        }
       } else if (tx.type === "withdrawal" || tx.type === "transfer") {
         await storage.updateTransactionStatus(tx.id, "completed");
         console.log(`[MbiyoPay Webhook] Withdrawal/Transfer completed: ${tx.id}`);
       }
     } else if (status === "failed" || status === "cancelled") {
+      // For failed transactions, we can trust the webhook (no risk of fraud)
       if (tx.type === "withdrawal" || tx.type === "transfer") {
         const metadata = JSON.parse(tx.metadata || "{}");
         const refundAmount = metadata.deductedFromBalance || metadata.totalDebited || tx.amount;

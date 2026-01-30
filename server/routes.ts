@@ -3217,11 +3217,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ===== Paydunya Webhook Routes =====
+  // SECURITY: Helper function to verify payment status directly with Paydunya API
+  async function verifyPaydunyaPaymentStatus(token: string): Promise<{ verified: boolean; status?: string; receiptUrl?: string; amount?: number }> {
+    try {
+      const config = await getPaydunyaConfig();
+      if (!config) {
+        console.error("[SECURITY] Paydunya config not found for verification");
+        return { verified: false };
+      }
+      
+      const response = await fetch(`https://app.paydunya.com/api/v1/checkout-invoice/confirm/${token}`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          "PAYDUNYA-MASTER-KEY": config.masterKey,
+          "PAYDUNYA-PRIVATE-KEY": config.privateKey,
+          "PAYDUNYA-TOKEN": config.token,
+        },
+      });
+
+      if (!response.ok) {
+        console.error(`[SECURITY] Paydunya API returned status ${response.status} for token ${token}`);
+        return { verified: false };
+      }
+
+      const data = await response.json();
+      const invoiceStatus = data.status || data.invoice?.status;
+      const isCompleted = data.response_code === "00" && invoiceStatus === "completed";
+      
+      console.log(`[SECURITY] Paydunya API verification for token ${token}:`, {
+        responseCode: data.response_code,
+        status: invoiceStatus,
+        verified: isCompleted
+      });
+      
+      return {
+        verified: isCompleted,
+        status: invoiceStatus,
+        receiptUrl: data.invoice?.receipt_url,
+        amount: data.invoice?.total_amount
+      };
+    } catch (error) {
+      console.error(`[SECURITY] Error verifying Paydunya payment:`, error);
+      return { verified: false };
+    }
+  }
+
   app.post("/api/webhooks/paydunya", async (req: Request, res: Response) => {
     try {
       const { token, status, custom_data, data } = req.body;
+      const clientIP = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
 
-      console.log("[WEBHOOK] Paydunya webhook received:", req.body);
+      console.log("[WEBHOOK] Paydunya webhook received:", { token: token || data?.token, status: status || data?.status, ip: clientIP });
 
       // Handle PSR format (data.status) or direct format (status)
       const webhookToken = token || data?.token;
@@ -3231,6 +3278,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const receiptUrl = data?.receipt_url;
 
       if (!webhookToken) {
+        console.warn(`[SECURITY] Webhook without token from IP: ${clientIP}`);
         return res.status(400).json({ error: "Token manquant" });
       }
 
@@ -3250,15 +3298,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Transaction should always exist now (created as pending before Paydunya call)
       if (!transaction) {
-        console.log("[WEBHOOK] Transaction not found for token:", webhookToken);
-        console.log("[WEBHOOK] This should not happen - all flows create pending transactions");
+        console.warn(`[SECURITY] Webhook for unknown token from IP ${clientIP}: ${webhookToken}`);
         return res.status(200).json({ success: true, message: "Transaction not found, but webhook acknowledged" });
       }
 
-      // Update transaction status based on webhook status
+      // SECURITY: ALWAYS verify with Paydunya API before crediting - NEVER trust webhook status alone
       if (webhookStatus === "completed" || webhookStatus === "approved") {
+        console.log(`[SECURITY] Verifying payment with Paydunya API for transaction ${transaction.id}...`);
+        
+        const verification = await verifyPaydunyaPaymentStatus(webhookToken);
+        
+        if (!verification.verified) {
+          console.error(`[SECURITY] ⚠️ PAYMENT VERIFICATION FAILED for transaction ${transaction.id}`);
+          console.error(`[SECURITY] Webhook claimed status: ${webhookStatus}, but API verification failed`);
+          console.error(`[SECURITY] API returned status: ${verification.status}, IP: ${clientIP}`);
+          // Do NOT credit - let polling handle it if payment is real
+          return res.json({ success: true, message: "Webhook received, verification pending" });
+        }
+        
+        console.log(`[SECURITY] ✅ Payment VERIFIED by Paydunya API for transaction ${transaction.id}`);
+        
         const result = await storage.finalizeIncomingTransaction(transaction.id, {
-          paydunyaReceiptUrl: receiptUrl || `https://paydunya.com/receipt/${webhookToken}`,
+          paydunyaReceiptUrl: verification.receiptUrl || receiptUrl || `https://paydunya.com/receipt/${webhookToken}`,
         });
         
         if (result) {
