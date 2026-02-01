@@ -331,12 +331,12 @@ export default function Admin() {
             Frais
           </Button>
           <Button
-            onClick={() => setLocation("/dashboard/management")}
+            onClick={() => handleProtectedNavigation("/dashboard/management")}
             data-testid="button-management"
             className="gap-2"
             variant="outline"
           >
-            <Settings className="w-4 h-4" />
+            <Lock className="w-4 h-4" />
             Gestionnaire
           </Button>
         </div>
