@@ -65,6 +65,26 @@ import {
   GmailType,
 } from "./email-service";
 import nowpaymentsRoutes from "./nowpayments-routes";
+import afribaPayRoutes from "./afribapay-routes";
+import {
+  handleAfribaPayDeposit,
+  handleAfribaPayWithdrawal,
+  handleAfribaPayTransfer,
+  handleAfribaPayPaymentLink,
+  handleAfribaPayMerchantLink,
+  handleAfribaPayApiPayment,
+} from "./afribapay-routes";
+import {
+  createAfribaPayPayin,
+  createAfribaPayPayout,
+  getAfribaPayTransaction,
+  verifyAfribaPayPayment,
+  operatorRequiresOtp,
+  getOtpInstructions,
+  mapAfribaPayStatus,
+  getAfribaPayConfig,
+} from "./afribapay";
+import { AFRIBAPAY_COUNTRIES, getCurrencyForCountry as getAfribaCurrency, getPaymentInstructions as getAfribaPaymentInstructions } from "@shared/afribapay-countries";
 
 declare module "express-session" {
   interface SessionData {
@@ -521,6 +541,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ===== NOWPayments Routes =====
   app.use(nowpaymentsRoutes);
+  app.use("/api/afribapay", afribaPayRoutes);
 
   // ===== Auth Routes =====
   
@@ -3810,6 +3831,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } else {
           return res.status(400).json({ success: false, error: result.error });
         }
+      } else if (activeProvider === "afribapay") {
+        // Use AfribaPay for deposit
+        console.log(`[DEPOSIT] Using AfribaPay for ${country}/${operator}`);
+        const { otpCode } = req.body;
+        
+        const result = await handleAfribaPayDeposit(
+          req.session.userId!,
+          user,
+          providerAmount,
+          country,
+          operator,
+          phone,
+          otpCode,
+          providerCurrency,
+          balanceAmount,
+          userCurrency
+        );
+
+        if (result.requiresOtp) {
+          return res.status(400).json({
+            success: false,
+            error: result.error,
+            requiresOtp: true,
+            otpInstructions: result.otpInstructions,
+          });
+        }
+
+        if (result.success) {
+          return res.json({
+            success: true,
+            transactionId: result.transactionId,
+            providerLink: result.providerLink,
+            message: result.message || "Paiement initie avec succes",
+            provider: "afribapay",
+          });
+        } else {
+          return res.status(400).json({ success: false, error: result.error });
+        }
       } else {
         return res.status(503).json({ 
           success: false, 
@@ -4085,6 +4144,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } else {
           return res.status(400).json({ success: false, error: result.error });
         }
+      } else if (activeProvider === "afribapay") {
+        // Use AfribaPay for withdrawals/transfers
+        console.log(`[WITHDRAWAL] Using AfribaPay for ${country}/${operator}, userCurrency=${userCurrency}`);
+        
+        const result = isTransfer 
+          ? await handleAfribaPayTransfer(req.session.userId!, user, amount, country, operator, phone, userCurrency)
+          : await handleAfribaPayWithdrawal(req.session.userId!, user, amount, country, operator, phone, userCurrency);
+
+        if (result.success) {
+          return res.json({
+            success: true,
+            transactionId: result.transactionId,
+            message: result.message || (isTransfer ? "Transfert effectue avec succes" : "Retrait effectue avec succes"),
+            provider: "afribapay",
+          });
+        } else {
+          return res.status(400).json({ success: false, error: result.error });
+        }
       } else {
         return res.status(503).json({ 
           success: false, 
@@ -4326,6 +4403,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } else {
           return res.status(400).json({ success: false, error: result.error });
         }
+      } else if (activeProvider === "afribapay") {
+        // Use AfribaPay for payment links
+        console.log(`[PAYMENT_LINK] Using AfribaPay for ${country}/${operator}`);
+        const { otpCode } = req.body;
+        
+        const result = await handleAfribaPayPaymentLink(
+          paymentLink,
+          amountInPayerCurrency,
+          customerPhone,
+          country,
+          operator,
+          otpCode
+        );
+
+        if (result.requiresOtp) {
+          return res.status(400).json({
+            success: false,
+            error: result.error,
+            requiresOtp: true,
+            otpInstructions: result.otpInstructions,
+          });
+        }
+
+        if (result.success) {
+          return res.json({
+            success: true,
+            transactionId: result.transactionId,
+            providerLink: result.providerLink,
+            message: result.message || "Paiement initie avec succes",
+            provider: "afribapay",
+          });
+        } else {
+          return res.status(400).json({ success: false, error: result.error });
+        }
       } else {
         return res.status(503).json({
           success: false,
@@ -4523,6 +4634,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } else {
           return res.status(400).json({ success: false, error: result.error });
         }
+      } else if (activeProvider === "afribapay") {
+        // Use AfribaPay for merchant links
+        console.log(`[MERCHANT_LINK] Using AfribaPay for ${country}/${operator}`);
+        const { otpCode } = req.body;
+        
+        const result = await handleAfribaPayMerchantLink(
+          merchantLink,
+          amount,
+          customerPhone,
+          country,
+          operator,
+          otpCode
+        );
+
+        if (result.requiresOtp) {
+          return res.status(400).json({
+            success: false,
+            error: result.error,
+            requiresOtp: true,
+            otpInstructions: result.otpInstructions,
+          });
+        }
+
+        if (result.success) {
+          return res.json({
+            success: true,
+            transactionId: result.transactionId,
+            providerLink: result.providerLink,
+            message: result.message || "Paiement initie avec succes",
+            provider: "afribapay",
+          });
+        } else {
+          return res.status(400).json({ success: false, error: result.error });
+        }
       } else {
         return res.status(503).json({
           success: false,
@@ -4703,6 +4848,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
             transactionId: transaction.id,
             message: result.message || "Demande de paiement envoyee",
             provider: "mbiyopay",
+          });
+        } else {
+          return res.status(400).json({ success: false, error: result.error });
+        }
+      } else if (activeProvider === "afribapay") {
+        // Use AfribaPay for API payments
+        console.log(`[API_PAYMENT] Using AfribaPay for ${country}/${operator}`);
+        const { otpCode } = req.body;
+        
+        const result = await handleAfribaPayApiPayment(
+          apiKey,
+          transaction,
+          customerPhone || transaction.customerPhone || "",
+          country,
+          operator,
+          otpCode
+        );
+
+        if (result.requiresOtp) {
+          return res.status(400).json({
+            success: false,
+            error: result.error,
+            requiresOtp: true,
+            otpInstructions: result.otpInstructions,
+          });
+        }
+
+        if (result.success) {
+          await storage.updateTransaction(transaction.id, {
+            country,
+            operator,
+            metadata: JSON.stringify({
+              ...JSON.parse(transaction.metadata || "{}"),
+              provider: "afribapay",
+              afribapayTransactionId: result.afribapayTransactionId,
+            }),
+          });
+
+          return res.json({
+            success: true,
+            transactionId: transaction.id,
+            providerLink: result.providerLink,
+            message: result.message || "Paiement initie avec succes",
+            provider: "afribapay",
           });
         } else {
           return res.status(400).json({ success: false, error: result.error });

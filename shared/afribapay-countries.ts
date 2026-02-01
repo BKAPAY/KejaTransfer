@@ -4,7 +4,31 @@ export interface AfribaPayOperator {
   requiresOtp: boolean;
   payin: boolean;
   payout: boolean;
+  otpInstructions?: string;
+  paymentInstructions?: string;
 }
+
+export const OTP_INSTRUCTIONS: Record<string, Record<string, string>> = {
+  CI: {
+    orange: "Pour generer votre code OTP Orange Money:\n1. Composez *144*82#\n2. Choisissez l'option 2 (Paiement marchand)\n3. Selectionnez 'Generer un code'\n4. Entrez votre code secret\n5. Un code OTP a 6 chiffres vous sera envoye par SMS",
+  },
+  SN: {
+    orange: "Pour generer votre code OTP Orange Money:\n1. Composez *144#\n2. Selectionnez 'Paiement marchand'\n3. Choisissez 'Generer un code'\n4. Entrez votre code secret\n5. Un code OTP a 6 chiffres vous sera envoye par SMS",
+  },
+  BF: {
+    orange: "Pour generer votre code OTP Orange Money:\n1. Composez *144#\n2. Selectionnez 'Payer'\n3. Choisissez 'Marchand'\n4. Selectionnez 'Generer un code'\n5. Entrez votre code secret\n6. Un code OTP a 4-6 chiffres vous sera envoye par SMS",
+  },
+  GN: {
+    orange: "Pour generer votre code OTP Orange Money:\n1. Composez *144#\n2. Selectionnez 'Paiement'\n3. Choisissez 'Generer code OTP'\n4. Entrez votre code secret\n5. Un code OTP vous sera envoye par SMS",
+  },
+};
+
+export const WAVE_INSTRUCTIONS: Record<string, string> = {
+  CI: "Vous serez redirige vers Wave pour scanner un QR code. Ouvrez l'application Wave sur votre telephone et scannez le code pour valider le paiement.",
+  SN: "Vous serez redirige vers Wave pour scanner un QR code. Ouvrez l'application Wave sur votre telephone et scannez le code pour valider le paiement.",
+  BF: "Vous serez redirige vers Wave pour scanner un QR code. Ouvrez l'application Wave sur votre telephone et scannez le code pour valider le paiement.",
+  ML: "Vous serez redirige vers Wave pour scanner un QR code. Ouvrez l'application Wave sur votre telephone et scannez le code pour valider le paiement.",
+};
 
 export interface AfribaPayCountry {
   code: string;
@@ -252,4 +276,57 @@ export const CURRENCY_INFO: Record<string, { symbol: string; name: string }> = {
   GNF: { symbol: "GNF", name: "Franc Guinéen" },
   CDF: { symbol: "CDF", name: "Franc Congolais" },
   RWF: { symbol: "RWF", name: "Franc Rwandais" },
+};
+
+export const getOtpInstructionsForOperator = (countryCode: string, operatorCode: string): string | null => {
+  const country = countryCode.toUpperCase();
+  const operator = operatorCode.toLowerCase();
+  return OTP_INSTRUCTIONS[country]?.[operator] || null;
+};
+
+export const getWaveInstructions = (countryCode: string): string | null => {
+  return WAVE_INSTRUCTIONS[countryCode.toUpperCase()] || null;
+};
+
+export const operatorRequiresOtpForCountry = (countryCode: string, operatorCode: string): boolean => {
+  const country = getCountryByCode(countryCode.toUpperCase());
+  if (!country) return false;
+  const operator = country.operators.find(op => op.code === operatorCode.toLowerCase());
+  return operator?.requiresOtp || false;
+};
+
+export const getPaymentInstructions = (countryCode: string, operatorCode: string): { 
+  requiresOtp: boolean; 
+  otpInstructions: string | null; 
+  waveInstructions: string | null;
+  generalInstructions: string;
+} => {
+  const country = countryCode.toUpperCase();
+  const operator = operatorCode.toLowerCase();
+  const requiresOtp = operatorRequiresOtpForCountry(country, operator);
+  
+  if (operator === "wave") {
+    return {
+      requiresOtp: false,
+      otpInstructions: null,
+      waveInstructions: getWaveInstructions(country),
+      generalInstructions: "Vous recevrez un lien pour valider votre paiement via l'application Wave.",
+    };
+  }
+  
+  if (requiresOtp) {
+    return {
+      requiresOtp: true,
+      otpInstructions: getOtpInstructionsForOperator(country, operator),
+      waveInstructions: null,
+      generalInstructions: "Veuillez generer un code OTP avant de continuer le paiement.",
+    };
+  }
+  
+  return {
+    requiresOtp: false,
+    otpInstructions: null,
+    waveInstructions: null,
+    generalInstructions: "Vous recevrez une notification sur votre telephone pour valider le paiement.",
+  };
 };

@@ -82,6 +82,7 @@ export interface IStorage {
   getTransactions(userId: string, limit?: number): Promise<Transaction[]>;
   getTransactionByPaydunyaToken(paydunyaToken: string): Promise<Transaction | undefined>;
   getTransactionByFedapayId(fedapayId: number): Promise<Transaction | undefined>;
+  getTransactionByAfribaPayId(afribaPayId: string): Promise<Transaction | undefined>;
   getTransactionByOrderId(orderId: string, userId: string): Promise<Transaction | undefined>;
   getRecentApiPaymentByPhoneAmount(userId: string, phone: string, amount: number, secondsAgo: number): Promise<Transaction | undefined>;
   getAllPendingTransactions(): Promise<(Transaction & { user?: User })[]>;
@@ -532,6 +533,27 @@ export class DbStorage implements IStorage {
         try {
           const metadata = JSON.parse(tx.metadata as string);
           if (metadata.fedapayTransactionId === fedapayId || metadata.fedapayPayoutId === fedapayId) {
+            return tx;
+          }
+        } catch {}
+      }
+    }
+    return undefined;
+  }
+
+  async getTransactionByAfribaPayId(afribaPayId: string): Promise<Transaction | undefined> {
+    // Search in metadata for AfribaPay transaction ID
+    const recentTransactions = await db
+      .select()
+      .from(schema.transactions)
+      .orderBy(desc(schema.transactions.createdAt))
+      .limit(200);
+    
+    for (const tx of recentTransactions) {
+      if (tx.metadata) {
+        try {
+          const metadata = JSON.parse(tx.metadata as string);
+          if (metadata.afribaPayTransactionId === afribaPayId) {
             return tx;
           }
         } catch {}
