@@ -800,7 +800,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           user: {
             id: user.id,
             email: user.email,
-            fullName: user.fullName,
+            fullName: `${user.firstName} ${user.lastName}`,
             isAdmin: user.isAdmin,
             balance: user.balance,
           }
@@ -4859,7 +4859,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         const result = await handleAfribaPayApiPayment(
           apiKey,
-          transaction,
+          transaction.amount,
+          transaction.description || "Paiement via API",
+          customerName || transaction.customerName || "Client",
+          "noreply@bkapay.com",
           customerPhone || transaction.customerPhone || "",
           country,
           operator,
@@ -4882,7 +4885,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             metadata: JSON.stringify({
               ...JSON.parse(transaction.metadata || "{}"),
               provider: "afribapay",
-              afribapayTransactionId: result.afribapayTransactionId,
+              afribaPayTransactionId: result.afribaPayTransactionId,
             }),
           });
 
@@ -5194,6 +5197,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const apiOwner = await storage.getUser(apiKey.userId);
       if (apiOwner?.suspended) {
         return res.status(401).json({ error: "Clé API invalide ou inactive" });
+      }
+
+      // ANTI-DUPLICATE: Check for existing transaction with same description in last 5 minutes
+      // This prevents double payments when clients click multiple times
+      if (description) {
+        const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+        const existingTransactions = await storage.getRecentTransactionsByDescription(
+          apiKey.userId,
+          description,
+          fiveMinutesAgo
+        );
+        
+        if (existingTransactions && existingTransactions.length > 0) {
+          const existingTx = existingTransactions[0];
+          console.log(`[API_PAYMENT] Duplicate detected - description: "${description}", existing transaction: ${existingTx.id}`);
+          
+          // Return the existing transaction instead of creating a new one
+          return res.json({
+            success: true,
+            transactionId: existingTx.id,
+            message: "Transaction existante retournee (doublon detecte)",
+            duplicate: true,
+            paymentUrl: existingTx.paydunyaReceiptUrl || null,
+          });
+        }
       }
 
       // Calculate fees for INCOMING payment with dynamic fee from database (auto-detect active provider)

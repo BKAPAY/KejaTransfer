@@ -85,6 +85,7 @@ export interface IStorage {
   getTransactionByAfribaPayId(afribaPayId: string): Promise<Transaction | undefined>;
   getTransactionByOrderId(orderId: string, userId: string): Promise<Transaction | undefined>;
   getRecentApiPaymentByPhoneAmount(userId: string, phone: string, amount: number, secondsAgo: number): Promise<Transaction | undefined>;
+  getRecentTransactionsByDescription(userId: string, description: string, since: Date): Promise<Transaction[]>;
   getAllPendingTransactions(): Promise<(Transaction & { user?: User })[]>;
   getAllTransactionsForAdmin(limit?: number): Promise<(Transaction & { user?: User })[]>;
   createTransaction(transaction: InsertTransaction): Promise<Transaction>;
@@ -605,6 +606,21 @@ export class DbStorage implements IStorage {
       .limit(1);
     
     return results[0];
+  }
+
+  async getRecentTransactionsByDescription(userId: string, description: string, since: Date): Promise<Transaction[]> {
+    // Find recent transactions with same description for duplicate detection
+    const results = await db
+      .select()
+      .from(schema.transactions)
+      .where(and(
+        eq(schema.transactions.userId, userId),
+        eq(schema.transactions.description, description),
+        gte(schema.transactions.createdAt, since)
+      ))
+      .orderBy(desc(schema.transactions.createdAt));
+    
+    return results;
   }
 
   async getAllPendingTransactions(): Promise<(Transaction & { user?: User })[]> {
