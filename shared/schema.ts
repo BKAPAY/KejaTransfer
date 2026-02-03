@@ -195,6 +195,28 @@ export const updateFeeConfigSchema = z.object({
   outgoingFeePercentage: z.number().min(0).max(100).optional(),
 });
 
+// Support settings table - configurable by admin
+export const supportSettings = pgTable("support_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  supportEmail: text("support_email").notNull().default("support@bkapay.com"),
+  supportPhone: text("support_phone").notNull().default("+229 01 46 44 73 19"),
+  whatsappLink: text("whatsapp_link").notNull().default("https://chat.whatsapp.com/DRe55FMRXCt87VxNvjF1EF"),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export type SupportSettings = typeof supportSettings.$inferSelect;
+export const insertSupportSettingsSchema = createInsertSchema(supportSettings).omit({
+  id: true,
+  updatedAt: true,
+});
+export type InsertSupportSettings = z.infer<typeof insertSupportSettingsSchema>;
+
+export const updateSupportSettingsSchema = z.object({
+  supportEmail: z.string().email("Email invalide").optional(),
+  supportPhone: z.string().min(8, "Numéro de téléphone invalide").optional(),
+  whatsappLink: z.string().url("Lien WhatsApp invalide").optional(),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,

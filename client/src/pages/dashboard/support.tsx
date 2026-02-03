@@ -1,8 +1,10 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Mail, Phone, ChevronDown, Users } from "lucide-react";
+import { Mail, Phone, ChevronDown, Loader2 } from "lucide-react";
 import { SiWhatsapp } from "react-icons/si";
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import type { SupportSettings } from "@shared/schema";
 
 const faqs = [
   {
@@ -60,6 +62,14 @@ function FAQItem({ question, answer }: { question: string; answer: string }) {
 }
 
 export default function Support() {
+  const { data: settings, isLoading } = useQuery<SupportSettings>({
+    queryKey: ["/api/support-settings"],
+  });
+
+  const supportEmail = settings?.supportEmail || "support@bkapay.com";
+  const supportPhone = settings?.supportPhone || "+229 01 46 44 73 19";
+  const whatsappLink = settings?.whatsappLink || "https://chat.whatsapp.com/DRe55FMRXCt87VxNvjF1EF";
+
   return (
     <div className="space-y-6">
       <div>
@@ -80,10 +90,22 @@ export default function Support() {
           </CardHeader>
           <CardContent className="text-xs space-y-2">
             <p className="text-muted-foreground">Réponse en 24h</p>
-            <Button variant="outline" size="sm" className="w-full" data-testid="button-email-support">
-              <Mail className="w-3 h-3 mr-1" />
-              support@bkapay.com
-            </Button>
+            {isLoading ? (
+              <div className="flex items-center justify-center h-8">
+                <Loader2 className="w-4 h-4 animate-spin" />
+              </div>
+            ) : (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="w-full" 
+                data-testid="button-email-support"
+                onClick={() => window.location.href = `mailto:${supportEmail}`}
+              >
+                <Mail className="w-3 h-3 mr-1" />
+                {supportEmail}
+              </Button>
+            )}
           </CardContent>
         </Card>
 
@@ -99,10 +121,22 @@ export default function Support() {
           </CardHeader>
           <CardContent className="text-xs space-y-2">
             <p className="text-muted-foreground">Lun-Ven 9h-18h</p>
-            <Button variant="outline" size="sm" className="w-full" data-testid="button-phone">
-              <Phone className="w-3 h-3 mr-1" />
-              +229 01 46 44 73 19
-            </Button>
+            {isLoading ? (
+              <div className="flex items-center justify-center h-8">
+                <Loader2 className="w-4 h-4 animate-spin" />
+              </div>
+            ) : (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="w-full" 
+                data-testid="button-phone"
+                onClick={() => window.location.href = `tel:${supportPhone.replace(/\s/g, '')}`}
+              >
+                <Phone className="w-3 h-3 mr-1" />
+                {supportPhone}
+              </Button>
+            )}
           </CardContent>
         </Card>
 
@@ -118,16 +152,22 @@ export default function Support() {
           </CardHeader>
           <CardContent className="text-xs space-y-2">
             <p className="text-muted-foreground">Échangez avec la communauté</p>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="w-full bg-green-50 hover:bg-green-100 border-green-200 text-green-700 dark:bg-green-950 dark:hover:bg-green-900 dark:border-green-800 dark:text-green-400" 
-              data-testid="button-whatsapp-community"
-              onClick={() => window.open("https://chat.whatsapp.com/DRe55FMRXCt87VxNvjF1EF", "_blank")}
-            >
-              <SiWhatsapp className="w-3 h-3 mr-1" />
-              Rejoindre le groupe
-            </Button>
+            {isLoading ? (
+              <div className="flex items-center justify-center h-8">
+                <Loader2 className="w-4 h-4 animate-spin" />
+              </div>
+            ) : (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="w-full bg-green-50 hover:bg-green-100 border-green-200 text-green-700 dark:bg-green-950 dark:hover:bg-green-900 dark:border-green-800 dark:text-green-400" 
+                data-testid="button-whatsapp-community"
+                onClick={() => window.open(whatsappLink, "_blank")}
+              >
+                <SiWhatsapp className="w-3 h-3 mr-1" />
+                Rejoindre le groupe
+              </Button>
+            )}
           </CardContent>
         </Card>
       </div>

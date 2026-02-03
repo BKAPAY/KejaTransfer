@@ -18,6 +18,7 @@ import type {
   UpdateCountryOperatorConfig,
   FeeConfig,
   InsertFeeConfig,
+  SupportSettings,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { MBIYOPAY_COUNTRIES } from "@shared/mbiyopay-countries";
@@ -154,6 +155,10 @@ export interface IStorage {
   createOrUpdateFeeConfig(config: InsertFeeConfig): Promise<FeeConfig>;
   updateFeeConfig(provider: string, country: string, operator: string, updates: { incomingFeePercentage?: number; outgoingFeePercentage?: number }): Promise<FeeConfig | undefined>;
   initializeFeeConfigs(): Promise<void>;
+
+  // Support Settings
+  getSupportSettings(): Promise<SupportSettings | undefined>;
+  updateSupportSettings(updates: { supportEmail?: string; supportPhone?: string; whatsappLink?: string }): Promise<SupportSettings>;
 }
 
 export class DbStorage implements IStorage {
@@ -1614,6 +1619,38 @@ export class DbStorage implements IStorage {
     if (configs.length > 0) {
       await db.insert(schema.feeConfigs).values(configs);
       console.log(`[FeeConfigs] Initialized ${configs.length} fee configurations with default 6%`);
+    }
+  }
+
+  // Support Settings
+  async getSupportSettings(): Promise<SupportSettings | undefined> {
+    const results = await db.select().from(schema.supportSettings).limit(1);
+    return results[0];
+  }
+
+  async updateSupportSettings(updates: { supportEmail?: string; supportPhone?: string; whatsappLink?: string }): Promise<SupportSettings> {
+    const existing = await this.getSupportSettings();
+    
+    if (existing) {
+      const results = await db
+        .update(schema.supportSettings)
+        .set({
+          ...updates,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.supportSettings.id, existing.id))
+        .returning();
+      return results[0];
+    } else {
+      const results = await db
+        .insert(schema.supportSettings)
+        .values({
+          supportEmail: updates.supportEmail || "support@bkapay.com",
+          supportPhone: updates.supportPhone || "+229 01 46 44 73 19",
+          whatsappLink: updates.whatsappLink || "https://chat.whatsapp.com/DRe55FMRXCt87VxNvjF1EF",
+        })
+        .returning();
+      return results[0];
     }
   }
 }

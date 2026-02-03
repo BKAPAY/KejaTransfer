@@ -339,6 +339,15 @@ export default function Admin() {
             <Lock className="w-4 h-4" />
             Gestionnaire
           </Button>
+          <Button
+            onClick={() => handleProtectedNavigation("/dashboard/support-config")}
+            data-testid="button-support-config"
+            className="gap-2"
+            variant="outline"
+          >
+            <Lock className="w-4 h-4" />
+            Infos Support
+          </Button>
         </div>
       </div>
 

@@ -6635,6 +6635,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Support Settings - Public endpoint (for all users to see support info)
+  app.get("/api/support-settings", async (req: Request, res: Response) => {
+    try {
+      let settings = await storage.getSupportSettings();
+      
+      // If no settings exist, create default settings
+      if (!settings) {
+        settings = await storage.updateSupportSettings({
+          supportEmail: "support@bkapay.com",
+          supportPhone: "+229 01 46 44 73 19",
+          whatsappLink: "https://chat.whatsapp.com/DRe55FMRXCt87VxNvjF1EF",
+        });
+      }
+      
+      res.json(settings);
+    } catch (error: any) {
+      console.error("[SupportSettings] Get error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
+  // Support Settings - Admin update endpoint
+  app.put("/api/admin/support-settings", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { supportEmail, supportPhone, whatsappLink } = req.body;
+      
+      // Validate inputs
+      if (supportEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(supportEmail)) {
+        return res.status(400).json({ error: "Email invalide" });
+      }
+      if (supportPhone && supportPhone.length < 8) {
+        return res.status(400).json({ error: "Numéro de téléphone invalide" });
+      }
+      if (whatsappLink && !/^https?:\/\//.test(whatsappLink)) {
+        return res.status(400).json({ error: "Lien WhatsApp invalide" });
+      }
+      
+      const settings = await storage.updateSupportSettings({
+        supportEmail,
+        supportPhone,
+        whatsappLink,
+      });
+      
+      console.log("[SupportSettings] Updated by admin:", settings);
+      res.json({ success: true, settings });
+    } catch (error: any) {
+      console.error("[SupportSettings] Update error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
