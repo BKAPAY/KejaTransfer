@@ -17,12 +17,24 @@ const BASE_MINIMUMS_XOF = {
   paymentLink: 500,
 };
 
+const BASE_MINIMUMS_CDF = {
+  withdrawal: 4000,
+  transfer: 2000,
+  deposit: 400,
+  crypto: 2000,
+  paymentLink: 2000,
+};
+
 export function useConvertedMinimums(userBalanceCurrency: string): ConvertedMinimums {
   const { data, isLoading } = useQuery({
     queryKey: ["/api/convert-minimums", userBalanceCurrency],
     queryFn: async () => {
       if (userBalanceCurrency === "XOF") {
         return BASE_MINIMUMS_XOF;
+      }
+      
+      if (userBalanceCurrency === "CDF") {
+        return BASE_MINIMUMS_CDF;
       }
 
       const conversions = await Promise.all([

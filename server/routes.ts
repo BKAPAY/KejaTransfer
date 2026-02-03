@@ -3919,26 +3919,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get user's currency for minimum validation
-      const userCurrency = user.country ? getCurrencyForCountry(user.country) : "XOF";
+      const userCurrencyForMin = user.country ? getCurrencyForCountry(user.country) : "XOF";
       
-      // Minimum amounts in XOF: 500 for transfers, 1000 for withdrawals
+      // Minimum amounts - special case for RDC (CD) with fixed CDF minimums
       const isTransferType = type === "transfer";
-      const minAmountXOF = isTransferType ? 500 : 1000;
+      let minAmountInUserCurrency: number;
       
-      // Convert minimum to user's currency if different
-      let minAmountInUserCurrency = minAmountXOF;
-      if (userCurrency !== "XOF") {
-        const { convertCurrency } = await import("./currency-converter");
-        const conversionResult = await convertCurrency(minAmountXOF, "XOF", userCurrency);
-        if (conversionResult.success) {
-          minAmountInUserCurrency = Math.ceil(conversionResult.convertedAmount);
-        }
+      if (user.country === "CD") {
+        // RDC users: fixed minimums in CDF
+        minAmountInUserCurrency = isTransferType ? 2000 : 4000; // 2000 CDF transfer, 4000 CDF withdrawal
+      } else {
+        // Other users: minimums in XOF (500 transfer, 1000 withdrawal)
+        minAmountInUserCurrency = isTransferType ? 500 : 1000;
       }
       
       if (amount < minAmountInUserCurrency) {
         return res.status(400).json({ 
           success: false, 
-          error: `Montant minimum: ${minAmountInUserCurrency.toLocaleString()} ${userCurrency}` 
+          error: `Montant minimum: ${minAmountInUserCurrency.toLocaleString()} ${userCurrencyForMin}` 
         });
       }
 
