@@ -3918,11 +3918,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ success: false, error: "Montant invalide" });
       }
 
-      // Minimum amounts: 500 XOF for transfers, 1000 XOF for withdrawals
+      // Get user's currency for minimum validation
+      const userCurrency = user.country ? getCurrencyForCountry(user.country) : "XOF";
+      
+      // Minimum amounts in XOF: 500 for transfers, 1000 for withdrawals
       const isTransferType = type === "transfer";
-      const minAmount = isTransferType ? 500 : 1000;
-      if (amount < minAmount) {
-        return res.status(400).json({ success: false, error: `Montant minimum: ${minAmount} XOF` });
+      const minAmountXOF = isTransferType ? 500 : 1000;
+      
+      // Convert minimum to user's currency if different
+      let minAmountInUserCurrency = minAmountXOF;
+      if (userCurrency !== "XOF") {
+        const { convertCurrency } = await import("./currency-converter");
+        const conversionResult = await convertCurrency(minAmountXOF, "XOF", userCurrency);
+        if (conversionResult.success) {
+          minAmountInUserCurrency = Math.ceil(conversionResult.convertedAmount);
+        }
+      }
+      
+      if (amount < minAmountInUserCurrency) {
+        return res.status(400).json({ 
+          success: false, 
+          error: `Montant minimum: ${minAmountInUserCurrency.toLocaleString()} ${userCurrency}` 
+        });
       }
 
       if (!country || !operator || !phone) {
