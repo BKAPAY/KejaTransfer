@@ -343,19 +343,29 @@ export default function Management() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold text-foreground mb-1">Gestion des Utilisateurs</h1>
           <p className="text-sm text-muted-foreground">Administrer les utilisateurs de la plateforme</p>
         </div>
-        <Button
-          variant="outline"
-          onClick={handleLockAccess}
-          data-testid="button-lock-access"
-        >
-          <Lock className="w-4 h-4 mr-2" />
-          Verrouiller l'accès
-        </Button>
+        <div className="flex gap-2 flex-wrap">
+          <Button
+            variant="outline"
+            onClick={() => navigate("/dashboard/support-config")}
+            data-testid="button-support-config"
+          >
+            <Users className="w-4 h-4 mr-2" />
+            Infos Support
+          </Button>
+          <Button
+            variant="outline"
+            onClick={handleLockAccess}
+            data-testid="button-lock-access"
+          >
+            <Lock className="w-4 h-4 mr-2" />
+            Verrouiller l'accès
+          </Button>
+        </div>
       </div>
 
       <Card>
