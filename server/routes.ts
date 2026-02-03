@@ -3884,7 +3884,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Transfer/Withdrawal Route - Multi-Provider
   app.post("/api/fedapay/withdrawal", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { amount, country, operator, phone, type, securityCode } = req.body;
+      const { amount, country, operator, phone, type, securityCode, originalAmount, originalCurrency } = req.body;
       const user = await storage.getUser(req.session.userId!);
 
       if (!user) {
@@ -3921,6 +3921,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get user's currency for minimum validation
       const userCurrencyForMin = user.country ? getCurrencyForCountry(user.country) : "XOF";
       
+      // For cross-currency transfers, use originalAmount (in user's currency) for minimum validation
+      // The 'amount' field may contain the converted amount for the provider
+      const amountForValidation = originalAmount && originalCurrency === userCurrencyForMin 
+        ? originalAmount 
+        : amount;
+      
       // Minimum amounts - special case for RDC (CD) with fixed CDF minimums
       const isTransferType = type === "transfer";
       let minAmountInUserCurrency: number;
@@ -3933,10 +3939,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         minAmountInUserCurrency = isTransferType ? 500 : 1000;
       }
       
-      if (amount < minAmountInUserCurrency) {
+      console.log(`[WITHDRAWAL] User ${user.country}, amount=${amount}, originalAmount=${originalAmount}, amountForValidation=${amountForValidation}, min=${minAmountInUserCurrency}, type=${type}, isTransfer=${isTransferType}`);
+      
+      if (amountForValidation < minAmountInUserCurrency) {
+        console.log(`[WITHDRAWAL] Amount ${amountForValidation} < minimum ${minAmountInUserCurrency} - rejecting`);
         return res.status(400).json({ 
           success: false, 
-          error: `Montant minimum: ${minAmountInUserCurrency.toLocaleString()} ${userCurrencyForMin}` 
+          error: `Montant minimum: ${minAmountInUserCurrency.toLocaleString("fr-FR")} ${userCurrencyForMin}` 
         });
       }
 
