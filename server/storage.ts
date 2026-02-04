@@ -732,7 +732,20 @@ export class DbStorage implements IStorage {
     }
     
     const transaction = results[0];
-    const netAmount = transaction.amount - (transaction.fee || 0);
+    
+    // Check if customerPaysFee is enabled in transaction metadata
+    let customerPaysFee = false;
+    if (transaction.metadata) {
+      try {
+        const metadata = JSON.parse(transaction.metadata);
+        customerPaysFee = metadata.customerPaysFee === true;
+      } catch (e) {}
+    }
+    
+    // If customerPaysFee is true, the client already paid the fees,
+    // so the merchant receives the full base amount (no deduction)
+    // If customerPaysFee is false, deduct the fees from the merchant's credited amount
+    const netAmount = customerPaysFee ? transaction.amount : (transaction.amount - (transaction.fee || 0));
     
     const user = await this.getUser(transaction.userId);
     if (user) {
@@ -741,7 +754,7 @@ export class DbStorage implements IStorage {
         .set({ balance: user.balance + netAmount })
         .where(eq(schema.users.id, transaction.userId));
       
-      console.log(`[Storage] Finalized transaction ${id}: credited ${netAmount} to user ${transaction.userId}`);
+      console.log(`[Storage] Finalized transaction ${id}: credited ${netAmount} to user ${transaction.userId} (customerPaysFee: ${customerPaysFee})`);
       return { transaction, credited: true };
     }
     
