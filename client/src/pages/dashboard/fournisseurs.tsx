@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -280,10 +280,11 @@ export default function FournisseursPage() {
     queryKey: ["/api/admin/providers"],
   });
 
-  // Initialize mailtrap toggles from database
+  // Initialize mailtrap toggles from database when data loads
   const mailtrapConfig = providers?.find(p => p.provider === "mailtrap");
-  const initMailtrapToggles = () => {
-    if (mailtrapConfig && forms.mailtrap.masterKey === "" && forms.mailtrap.token === "" && forms.mailtrap.ipnSecret === "") {
+  
+  useEffect(() => {
+    if (mailtrapConfig) {
       setForms(prev => ({
         ...prev,
         mailtrap: {
@@ -294,10 +295,7 @@ export default function FournisseursPage() {
         }
       }));
     }
-  };
-  if (mailtrapConfig && forms.mailtrap.masterKey === "") {
-    initMailtrapToggles();
-  }
+  }, [mailtrapConfig?.masterKey, mailtrapConfig?.token, mailtrapConfig?.ipnSecret]);
 
   // Auto-save toggle for mailtrap email types
   const saveMailtrapToggle = async (field: "masterKey" | "token" | "ipnSecret", value: string) => {
