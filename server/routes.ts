@@ -6548,14 +6548,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const configs = await storage.getProviderConfigs();
       // Mask API keys for security - only show first/last chars
-      const masked = configs.map(c => ({
-        ...c,
-        apiKey: c.apiKey ? `${c.apiKey.slice(0, 8)}...${c.apiKey.slice(-4)}` : null,
-        secretKey: c.secretKey ? `${c.secretKey.slice(0, 8)}...${c.secretKey.slice(-4)}` : null,
-        publicKey: c.publicKey ? `${c.publicKey.slice(0, 8)}...${c.publicKey.slice(-4)}` : null,
-        masterKey: c.masterKey ? `${c.masterKey.slice(0, 8)}...${c.masterKey.slice(-4)}` : null,
-        token: c.token ? `${c.token.slice(0, 8)}...${c.token.slice(-4)}` : null,
-      }));
+      // For mailtrap: masterKey, token, ipnSecret are boolean toggles ("true"/"false"), don't mask
+      const masked = configs.map(c => {
+        const isMailtrap = c.provider === "mailtrap";
+        return {
+          ...c,
+          apiKey: c.apiKey ? `${c.apiKey.slice(0, 8)}...${c.apiKey.slice(-4)}` : null,
+          secretKey: isMailtrap ? c.secretKey : (c.secretKey ? `${c.secretKey.slice(0, 8)}...${c.secretKey.slice(-4)}` : null),
+          publicKey: isMailtrap ? c.publicKey : (c.publicKey ? `${c.publicKey.slice(0, 8)}...${c.publicKey.slice(-4)}` : null),
+          masterKey: isMailtrap ? c.masterKey : (c.masterKey ? `${c.masterKey.slice(0, 8)}...${c.masterKey.slice(-4)}` : null),
+          token: isMailtrap ? c.token : (c.token ? `${c.token.slice(0, 8)}...${c.token.slice(-4)}` : null),
+          ipnSecret: isMailtrap ? c.ipnSecret : (c.ipnSecret ? `${c.ipnSecret.slice(0, 8)}...${c.ipnSecret.slice(-4)}` : null),
+        };
+      });
       res.json(masked);
     } catch (error: any) {
       console.error("Get provider configs error:", error);
@@ -6566,7 +6571,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/admin/providers/:provider", requireAdmin, async (req: Request, res: Response) => {
     try {
       const { provider } = req.params;
-      const { isActive, apiKey, secretKey, publicKey, masterKey, token } = req.body;
+      const { isActive, apiKey, secretKey, publicKey, masterKey, token, ipnSecret } = req.body;
 
       const updates: any = { updatedAt: new Date() };
       if (typeof isActive === "boolean") updates.isActive = isActive;
@@ -6575,6 +6580,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (publicKey !== undefined) updates.publicKey = publicKey || null;
       if (masterKey !== undefined) updates.masterKey = masterKey || null;
       if (token !== undefined) updates.token = token || null;
+      if (ipnSecret !== undefined) updates.ipnSecret = ipnSecret || null;
 
       const config = await storage.updateProviderConfig(provider, updates);
 
@@ -6588,14 +6594,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log("[Admin] Configuration mailtrap mise à jour - cache vidé");
       }
 
-      // Mask keys in response
+      // Mask keys in response (except mailtrap toggles)
+      const isMailtrap = provider === "mailtrap";
       res.json({
         ...config,
         apiKey: config.apiKey ? `${config.apiKey.slice(0, 8)}...${config.apiKey.slice(-4)}` : null,
-        secretKey: config.secretKey ? `${config.secretKey.slice(0, 8)}...${config.secretKey.slice(-4)}` : null,
-        publicKey: config.publicKey ? `${config.publicKey.slice(0, 8)}...${config.publicKey.slice(-4)}` : null,
-        masterKey: config.masterKey ? `${config.masterKey.slice(0, 8)}...${config.masterKey.slice(-4)}` : null,
-        token: config.token ? `${config.token.slice(0, 8)}...${config.token.slice(-4)}` : null,
+        secretKey: isMailtrap ? config.secretKey : (config.secretKey ? `${config.secretKey.slice(0, 8)}...${config.secretKey.slice(-4)}` : null),
+        publicKey: isMailtrap ? config.publicKey : (config.publicKey ? `${config.publicKey.slice(0, 8)}...${config.publicKey.slice(-4)}` : null),
+        masterKey: isMailtrap ? config.masterKey : (config.masterKey ? `${config.masterKey.slice(0, 8)}...${config.masterKey.slice(-4)}` : null),
+        token: isMailtrap ? config.token : (config.token ? `${config.token.slice(0, 8)}...${config.token.slice(-4)}` : null),
+        ipnSecret: isMailtrap ? config.ipnSecret : (config.ipnSecret ? `${config.ipnSecret.slice(0, 8)}...${config.ipnSecret.slice(-4)}` : null),
       });
     } catch (error: any) {
       console.error("Update provider config error:", error);
