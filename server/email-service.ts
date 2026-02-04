@@ -5,6 +5,9 @@ interface MailtrapConfig {
   enableSignup: boolean;
   enablePasswordReset: boolean;
   enableLogin: boolean;
+  enableKycSubmitted: boolean;
+  enableKycVerified: boolean;
+  enableKycRejected: boolean;
 }
 
 let cachedMailtrapConfig: MailtrapConfig | null = null;
@@ -29,6 +32,9 @@ async function getMailtrapConfigFromDB(): Promise<MailtrapConfig> {
         enableSignup: config.masterKey === "true",
         enablePasswordReset: config.token === "true",
         enableLogin: config.ipnSecret === "true",
+        enableKycSubmitted: (config as any).enableKycSubmitted === "true",
+        enableKycVerified: (config as any).enableKycVerified === "true",
+        enableKycRejected: (config as any).enableKycRejected === "true",
       };
       lastConfigFetch = now;
       console.log("[Email] Configuration Mailtrap chargee depuis la base de donnees");
@@ -45,6 +51,9 @@ async function getMailtrapConfigFromDB(): Promise<MailtrapConfig> {
     enableSignup: false,
     enablePasswordReset: false,
     enableLogin: false,
+    enableKycSubmitted: false,
+    enableKycVerified: false,
+    enableKycRejected: false,
   };
 }
 
@@ -436,6 +445,13 @@ export async function sendKycSubmittedEmail(
   to: string,
   firstName: string
 ): Promise<boolean> {
+  const config = await getMailtrapConfigFromDB();
+  
+  if (!config.enableKycSubmitted) {
+    console.log("[Email] Envoi d'email KYC soumis desactive");
+    return false;
+  }
+
   const subject = "BKApay - Votre verification KYC a ete soumise";
 
   const textContent = `BKApay - Verification KYC
@@ -462,6 +478,13 @@ export async function sendKycVerifiedEmail(
   to: string,
   firstName: string
 ): Promise<boolean> {
+  const config = await getMailtrapConfigFromDB();
+  
+  if (!config.enableKycVerified) {
+    console.log("[Email] Envoi d'email KYC verifie desactive");
+    return false;
+  }
+
   const subject = "BKApay - Votre compte a ete verifie avec succes";
 
   const textContent = `BKApay - Compte verifie
@@ -492,6 +515,13 @@ export async function sendKycRejectedEmail(
   firstName: string,
   reason: string
 ): Promise<boolean> {
+  const config = await getMailtrapConfigFromDB();
+  
+  if (!config.enableKycRejected) {
+    console.log("[Email] Envoi d'email KYC rejete desactive");
+    return false;
+  }
+
   const subject = "BKApay - Votre verification KYC a ete rejetee";
 
   const textContent = `BKApay - Verification KYC rejetee

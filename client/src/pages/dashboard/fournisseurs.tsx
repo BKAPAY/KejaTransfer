@@ -273,7 +273,7 @@ export default function FournisseursPage() {
     mbiyopay: { apiKey: "", secretKey: "", publicKey: "", masterKey: "", token: "", ipnSecret: "" },
     nowpayments: { apiKey: "", secretKey: "", publicKey: "", masterKey: "", token: "", ipnSecret: "" },
     exchangerate: { apiKey: "", secretKey: "", publicKey: "", masterKey: "", token: "", ipnSecret: "" },
-    mailtrap: { apiKey: "", secretKey: "", publicKey: "", masterKey: "", token: "", ipnSecret: "" },
+    mailtrap: { apiKey: "", secretKey: "", publicKey: "", masterKey: "", token: "", ipnSecret: "", enableKycSubmitted: "", enableKycVerified: "", enableKycRejected: "" },
   });
 
   const { data: providers, isLoading } = useQuery<ProviderConfig[]>({
@@ -292,13 +292,16 @@ export default function FournisseursPage() {
           masterKey: mailtrapConfig.masterKey || "false",
           token: mailtrapConfig.token || "false",
           ipnSecret: mailtrapConfig.ipnSecret || "false",
+          enableKycSubmitted: (mailtrapConfig as any).enableKycSubmitted || "false",
+          enableKycVerified: (mailtrapConfig as any).enableKycVerified || "false",
+          enableKycRejected: (mailtrapConfig as any).enableKycRejected || "false",
         }
       }));
     }
-  }, [mailtrapConfig?.masterKey, mailtrapConfig?.token, mailtrapConfig?.ipnSecret]);
+  }, [mailtrapConfig?.masterKey, mailtrapConfig?.token, mailtrapConfig?.ipnSecret, (mailtrapConfig as any)?.enableKycSubmitted, (mailtrapConfig as any)?.enableKycVerified, (mailtrapConfig as any)?.enableKycRejected]);
 
   // Auto-save toggle for mailtrap email types
-  const saveMailtrapToggle = async (field: "masterKey" | "token" | "ipnSecret", value: string) => {
+  const saveMailtrapToggle = async (field: "masterKey" | "token" | "ipnSecret" | "enableKycSubmitted" | "enableKycVerified" | "enableKycRejected", value: string) => {
     const updates: Partial<ProviderConfig> = { [field]: value };
     try {
       await apiRequest("PUT", "/api/admin/providers/mailtrap", updates);
@@ -805,6 +808,56 @@ export default function FournisseursPage() {
                                 saveMailtrapToggle("ipnSecret", value);
                               }}
                               data-testid="toggle-email-login"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="space-y-3">
+                        <h4 className="font-medium text-sm">Notifications KYC</h4>
+                        <div className="grid gap-3">
+                          <div className="flex items-center justify-between p-3 border rounded-md">
+                            <div>
+                              <Label className="font-medium">KYC soumis</Label>
+                              <p className="text-xs text-muted-foreground">Email envoye quand un utilisateur soumet sa verification</p>
+                            </div>
+                            <Switch
+                              checked={forms.mailtrap.enableKycSubmitted === "true"}
+                              onCheckedChange={(checked) => {
+                                const value = checked ? "true" : "false";
+                                setForms(prev => ({...prev, mailtrap: {...prev.mailtrap, enableKycSubmitted: value}}));
+                                saveMailtrapToggle("enableKycSubmitted", value);
+                              }}
+                              data-testid="toggle-email-kyc-submitted"
+                            />
+                          </div>
+                          <div className="flex items-center justify-between p-3 border rounded-md">
+                            <div>
+                              <Label className="font-medium">KYC verifie</Label>
+                              <p className="text-xs text-muted-foreground">Email envoye quand la verification est approuvee</p>
+                            </div>
+                            <Switch
+                              checked={forms.mailtrap.enableKycVerified === "true"}
+                              onCheckedChange={(checked) => {
+                                const value = checked ? "true" : "false";
+                                setForms(prev => ({...prev, mailtrap: {...prev.mailtrap, enableKycVerified: value}}));
+                                saveMailtrapToggle("enableKycVerified", value);
+                              }}
+                              data-testid="toggle-email-kyc-verified"
+                            />
+                          </div>
+                          <div className="flex items-center justify-between p-3 border rounded-md">
+                            <div>
+                              <Label className="font-medium">KYC rejete</Label>
+                              <p className="text-xs text-muted-foreground">Email envoye quand la verification est rejetee</p>
+                            </div>
+                            <Switch
+                              checked={forms.mailtrap.enableKycRejected === "true"}
+                              onCheckedChange={(checked) => {
+                                const value = checked ? "true" : "false";
+                                setForms(prev => ({...prev, mailtrap: {...prev.mailtrap, enableKycRejected: value}}));
+                                saveMailtrapToggle("enableKycRejected", value);
+                              }}
+                              data-testid="toggle-email-kyc-rejected"
                             />
                           </div>
                         </div>

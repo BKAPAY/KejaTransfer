@@ -145,6 +145,9 @@ export const providerConfigs = pgTable("provider_configs", {
   masterKey: text("master_key"), // Master key for Paydunya
   token: text("token"), // Token for Paydunya
   ipnSecret: text("ipn_secret"), // IPN secret for NOWPayments webhooks
+  enableKycSubmitted: text("enable_kyc_submitted"), // Enable KYC submitted email
+  enableKycVerified: text("enable_kyc_verified"), // Enable KYC verified email
+  enableKycRejected: text("enable_kyc_rejected"), // Enable KYC rejected email
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
