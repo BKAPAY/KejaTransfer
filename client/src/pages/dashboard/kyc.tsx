@@ -320,7 +320,6 @@ export default function KYC() {
             ref={frontInputRef}
             type="file"
             accept="image/*"
-            capture="environment"
             onChange={handleFileSelect("front")}
             className="hidden"
             data-testid="input-file-front"
@@ -359,7 +358,6 @@ export default function KYC() {
             ref={backInputRef}
             type="file"
             accept="image/*"
-            capture="environment"
             onChange={handleFileSelect("back")}
             className="hidden"
             data-testid="input-file-back"
@@ -398,7 +396,6 @@ export default function KYC() {
             ref={selfieInputRef}
             type="file"
             accept="image/*"
-            capture="user"
             onChange={handleFileSelect("selfie")}
             className="hidden"
             data-testid="input-file-selfie"
