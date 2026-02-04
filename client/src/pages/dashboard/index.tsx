@@ -17,6 +17,7 @@ import {
   BarChart3,
   CreditCard,
   Zap,
+  XCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
@@ -49,6 +50,8 @@ interface Analytics {
   totalRevenue: number;
   completedTransactions: number;
   pendingTransactions: number;
+  failedTransactions: number;
+  totalTransactions: number;
 }
 
 const COLORS = [
@@ -320,7 +323,7 @@ export default function Dashboard() {
     }).format(amount);
   };
 
-  const totalTransactions = analytics ? analytics.completedTransactions + analytics.pendingTransactions : 0;
+  const totalTransactions = analytics ? analytics.totalTransactions : 0;
   const successRate = totalTransactions > 0 && analytics ? (analytics.completedTransactions / totalTransactions) * 100 : 0;
 
   return (
@@ -451,25 +454,32 @@ export default function Dashboard() {
                     delay={0}
                   />
                   <MiniStatCard
-                    title="Transactions réussies"
+                    title="Total transactions"
+                    value={analytics.totalTransactions}
+                    icon={BarChart3}
+                    color="#8B5CF6"
+                    delay={0.1}
+                  />
+                  <MiniStatCard
+                    title="Réussies"
                     value={analytics.completedTransactions}
                     icon={CheckCircle2}
                     color="#3B82F6"
-                    delay={0.1}
+                    delay={0.2}
                   />
                   <MiniStatCard
                     title="En attente"
                     value={analytics.pendingTransactions}
                     icon={Clock}
                     color="#F59E0B"
-                    delay={0.2}
+                    delay={0.3}
                   />
                   <MiniStatCard
-                    title="Total transactions"
-                    value={totalTransactions}
-                    icon={BarChart3}
-                    color="#8B5CF6"
-                    delay={0.3}
+                    title="Échouées"
+                    value={analytics.failedTransactions}
+                    icon={XCircle}
+                    color="#EF4444"
+                    delay={0.4}
                   />
                 </div>
 
