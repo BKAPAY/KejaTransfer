@@ -199,7 +199,7 @@ export default function ApiPage() {
     if (!isKycVerified) {
       toast({
         title: "Verification requise",
-        description: "Rendez-vous dans Parametres pour verifier votre compte et acceder a toutes les fonctionnalites.",
+        description: "Rendez-vous dans la section Verification KYC pour verifier votre compte et acceder a toutes les fonctionnalites.",
         variant: "destructive",
       });
       setDialogOpen(false);
