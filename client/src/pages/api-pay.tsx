@@ -152,6 +152,7 @@ export default function ApiPay() {
   const [conversionData, setConversionData] = useState<ConversionData | null>(null);
   const [selectedCurrency, setSelectedCurrency] = useState<string>("XOF");
   const [dynamicFee, setDynamicFee] = useState<{ feePercentage: number; feeAmount: number } | null>(null);
+  const [isLoadingFees, setIsLoadingFees] = useState(false);
 
   const { data: apiKeyInfo, isLoading: isLoadingKey, error: keyError } = useQuery<ApiKeyInfo>({
     queryKey: [`/api/api-key-info/${key}`],
@@ -167,9 +168,11 @@ export default function ApiPay() {
     const fetchDynamicFee = async () => {
       if (!country || !operator || !amount || amount <= 0) {
         setDynamicFee(null);
+        setIsLoadingFees(false);
         return;
       }
       
+      setIsLoadingFees(true);
       try {
         const res = await fetch(`/api/fees/${country}/${operator}`);
         if (res.ok) {
@@ -177,16 +180,23 @@ export default function ApiPay() {
           const feePercentage = data.incomingFeePercentage || 60; // Default 6%
           const feeAmount = Math.floor((amount * feePercentage) / 1000);
           setDynamicFee({ feePercentage, feeAmount });
+        } else {
+          // Fallback to default 6% if endpoint fails
+          const feeAmount = Math.floor((amount * 60) / 1000);
+          setDynamicFee({ feePercentage: 60, feeAmount });
         }
       } catch (error) {
         console.error("Failed to fetch dynamic fees:", error);
         // Fallback to default 6%
         const feeAmount = Math.floor((amount * 60) / 1000);
         setDynamicFee({ feePercentage: 60, feeAmount });
+      } finally {
+        setIsLoadingFees(false);
       }
     };
     
-    fetchDynamicFee();
+    const debounceTimer = setTimeout(fetchDynamicFee, 300);
+    return () => clearTimeout(debounceTimer);
   }, [country, operator, amount]);
 
   // Handle currency selection when country changes
@@ -279,7 +289,9 @@ export default function ApiPay() {
   }, []);
 
   // Calcul du montant total à convertir (avec frais dynamiques si customerPaysFee est activé)
-  const totalWithFees = dynamicFee ? amount + dynamicFee.feeAmount : Math.ceil(amount * 1.06);
+  // Utilise les frais dynamiques si disponibles, sinon calcule avec 6% par défaut (même formule que le backend)
+  const defaultFeeAmount = Math.floor((amount * 60) / 1000); // 6% = 60/1000
+  const totalWithFees = dynamicFee ? amount + dynamicFee.feeAmount : amount + defaultFeeAmount;
   const amountToConvert = apiKeyInfo?.customerPaysFee ? totalWithFees : amount;
   
   useEffect(() => {
