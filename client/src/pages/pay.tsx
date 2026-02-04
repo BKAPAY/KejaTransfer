@@ -213,6 +213,8 @@ export default function Pay() {
   const [copiedUssd, setCopiedUssd] = useState(false);
   const [conversionData, setConversionData] = useState<ConversionData | null>(null);
   const [selectedCurrency, setSelectedCurrency] = useState<string>("XOF");
+  const [dynamicFee, setDynamicFee] = useState<{ feePercentage: number; feeAmount: number } | null>(null);
+  const [isLoadingFees, setIsLoadingFees] = useState(false);
   const { toast } = useToast();
 
   const copyUssdCode = (code: string) => {
@@ -275,6 +277,41 @@ export default function Pay() {
 
   const selectedCountry = form.watch("country");
   const selectedOperator = form.watch("operator");
+
+  // Fetch dynamic fees when country and operator are selected
+  useEffect(() => {
+    const fetchDynamicFee = async () => {
+      if (!selectedCountry || !selectedOperator || !paymentLink?.amount || paymentLink.amount <= 0) {
+        setDynamicFee(null);
+        setIsLoadingFees(false);
+        return;
+      }
+      
+      setIsLoadingFees(true);
+      try {
+        const res = await fetch(`/api/fees/${selectedCountry}/${selectedOperator}`);
+        if (res.ok) {
+          const data = await res.json();
+          const feePercentage = data.incomingFeePercentage || 60; // Default 6%
+          const feeAmount = Math.floor((paymentLink.amount * feePercentage) / 1000);
+          setDynamicFee({ feePercentage, feeAmount });
+        } else {
+          // Fallback to default 6%
+          const feeAmount = Math.floor((paymentLink.amount * 60) / 1000);
+          setDynamicFee({ feePercentage: 60, feeAmount });
+        }
+      } catch (error) {
+        console.error("Failed to fetch dynamic fees:", error);
+        const feeAmount = Math.floor((paymentLink.amount * 60) / 1000);
+        setDynamicFee({ feePercentage: 60, feeAmount });
+      } finally {
+        setIsLoadingFees(false);
+      }
+    };
+    
+    const debounceTimer = setTimeout(fetchDynamicFee, 300);
+    return () => clearTimeout(debounceTimer);
+  }, [selectedCountry, selectedOperator, paymentLink?.amount]);
   
   // Vérifier si l'opérateur sélectionné est Orange (nécessite code OTP)
   // IMPORTANT: Orange RDC (CD) utilise MbiyoPay qui ne nécessite PAS d'OTP
@@ -315,9 +352,13 @@ export default function Pay() {
     : adminEnabledCountries;
 
   // Calculer le montant avec frais si customerPaysFee est activé
-  // Les frais sont à 6% et inclus dans le montant si le client paie les frais
+  // Les frais dynamiques ne s'affichent que lorsque le pays ET l'opérateur sont sélectionnés
   const baseAmount = paymentLink?.amount || 0;
-  const totalAmount = paymentLink?.customerPaysFee ? Math.ceil(baseAmount * 1.06) : baseAmount;
+  const hasOperatorSelected = selectedCountry && selectedOperator;
+  const totalAmount = (paymentLink?.customerPaysFee && hasOperatorSelected && dynamicFee) 
+    ? baseAmount + dynamicFee.feeAmount 
+    : baseAmount;
+  const displayAmount = totalAmount;
 
   // Handle currency selection when country changes
   useEffect(() => {
@@ -901,8 +942,18 @@ export default function Pay() {
               <div className="text-center p-4 bg-muted rounded-lg">
                 <p className="text-sm text-muted-foreground">Montant à payer</p>
                 <p className="text-2xl font-bold text-primary">
-                  {paymentLink.amount.toLocaleString()} FCFA
+                  {displayAmount.toLocaleString()} {ownerCurrency}
                 </p>
+                {paymentLink?.customerPaysFee && hasOperatorSelected && dynamicFee && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    (Frais de {(dynamicFee.feePercentage / 10).toFixed(1)}% inclus: {dynamicFee.feeAmount.toLocaleString()} {ownerCurrency})
+                  </p>
+                )}
+                {paymentLink?.customerPaysFee && !hasOperatorSelected && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    (Sélectionnez un pays et opérateur pour voir les frais)
+                  </p>
+                )}
               </div>
             )}
             
