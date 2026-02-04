@@ -243,6 +243,10 @@ function generateSignupHtml(code: string): string {
               </tr>
               <tr>
                 <td style="padding: 20px 40px; border-top: 1px solid #e5e7eb;">
+                  <p style="margin: 0 0 10px; color: #9ca3af; font-family: Arial, sans-serif; font-size: 12px; text-align: center;">
+                    Pour toute question, contactez notre support:<br>
+                    <a href="mailto:support@bkapay.com" style="color: #2563eb; text-decoration: none;">support@bkapay.com</a>
+                  </p>
                   <p style="margin: 0; color: #9ca3af; font-family: Arial, sans-serif; font-size: 12px; text-align: center;">
                     BKApay - Votre plateforme de paiement mobile money<br>
                     <a href="https://bkapay.com" style="color: #2563eb; text-decoration: none;">bkapay.com</a>
@@ -303,6 +307,10 @@ function generateLoginHtml(code: string): string {
               </tr>
               <tr>
                 <td style="padding: 20px 40px; border-top: 1px solid #e5e7eb;">
+                  <p style="margin: 0 0 10px; color: #9ca3af; font-family: Arial, sans-serif; font-size: 12px; text-align: center;">
+                    Pour toute question, contactez notre support:<br>
+                    <a href="mailto:support@bkapay.com" style="color: #2563eb; text-decoration: none;">support@bkapay.com</a>
+                  </p>
                   <p style="margin: 0; color: #9ca3af; font-family: Arial, sans-serif; font-size: 12px; text-align: center;">
                     BKApay - Votre plateforme de paiement mobile money<br>
                     <a href="https://bkapay.com" style="color: #2563eb; text-decoration: none;">bkapay.com</a>
@@ -363,6 +371,10 @@ function generatePasswordResetHtml(code: string): string {
               </tr>
               <tr>
                 <td style="padding: 20px 40px; border-top: 1px solid #e5e7eb;">
+                  <p style="margin: 0 0 10px; color: #9ca3af; font-family: Arial, sans-serif; font-size: 12px; text-align: center;">
+                    Pour toute question, contactez notre support:<br>
+                    <a href="mailto:support@bkapay.com" style="color: #2563eb; text-decoration: none;">support@bkapay.com</a>
+                  </p>
                   <p style="margin: 0; color: #9ca3af; font-family: Arial, sans-serif; font-size: 12px; text-align: center;">
                     BKApay - Votre plateforme de paiement mobile money<br>
                     <a href="https://bkapay.com" style="color: #2563eb; text-decoration: none;">bkapay.com</a>
@@ -549,6 +561,10 @@ function generateKycSubmittedHtml(firstName: string): string {
               </tr>
               <tr>
                 <td style="padding: 20px 40px; border-top: 1px solid #e5e7eb;">
+                  <p style="margin: 0 0 10px; color: #9ca3af; font-family: Arial, sans-serif; font-size: 12px; text-align: center;">
+                    Pour toute question, contactez notre support:<br>
+                    <a href="mailto:support@bkapay.com" style="color: #2563eb; text-decoration: none;">support@bkapay.com</a>
+                  </p>
                   <p style="margin: 0; color: #9ca3af; font-family: Arial, sans-serif; font-size: 12px; text-align: center;">
                     BKApay - Votre plateforme de paiement mobile money<br>
                     <a href="https://bkapay.com" style="color: #2563eb; text-decoration: none;">bkapay.com</a>
@@ -619,6 +635,10 @@ function generateKycVerifiedHtml(firstName: string): string {
               </tr>
               <tr>
                 <td style="padding: 20px 40px; border-top: 1px solid #e5e7eb;">
+                  <p style="margin: 0 0 10px; color: #9ca3af; font-family: Arial, sans-serif; font-size: 12px; text-align: center;">
+                    Pour toute question, contactez notre support:<br>
+                    <a href="mailto:support@bkapay.com" style="color: #2563eb; text-decoration: none;">support@bkapay.com</a>
+                  </p>
                   <p style="margin: 0; color: #9ca3af; font-family: Arial, sans-serif; font-size: 12px; text-align: center;">
                     BKApay - Votre plateforme de paiement mobile money<br>
                     <a href="https://bkapay.com" style="color: #2563eb; text-decoration: none;">bkapay.com</a>
@@ -675,11 +695,14 @@ function generateKycRejectedHtml(firstName: string, reason: string): string {
               <tr>
                 <td style="padding: 25px 40px 40px;">
                   <p style="margin: 0 0 10px; color: #4b5563; font-family: Arial, sans-serif; font-size: 14px; line-height: 1.5;">Vous pouvez soumettre une nouvelle demande en vous assurant que vos documents sont conformes aux exigences.</p>
-                  <p style="margin: 0; color: #6b7280; font-family: Arial, sans-serif; font-size: 14px; line-height: 1.5;">Si vous avez des questions, n'hesitez pas a nous contacter.</p>
                 </td>
               </tr>
               <tr>
                 <td style="padding: 20px 40px; border-top: 1px solid #e5e7eb;">
+                  <p style="margin: 0 0 10px; color: #9ca3af; font-family: Arial, sans-serif; font-size: 12px; text-align: center;">
+                    Pour toute question, contactez notre support:<br>
+                    <a href="mailto:support@bkapay.com" style="color: #2563eb; text-decoration: none;">support@bkapay.com</a>
+                  </p>
                   <p style="margin: 0; color: #9ca3af; font-family: Arial, sans-serif; font-size: 12px; text-align: center;">
                     BKApay - Votre plateforme de paiement mobile money<br>
                     <a href="https://bkapay.com" style="color: #2563eb; text-decoration: none;">bkapay.com</a>
