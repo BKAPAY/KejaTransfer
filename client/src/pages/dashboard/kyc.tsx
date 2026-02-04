@@ -5,7 +5,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Upload, CheckCircle2, Clock, AlertCircle, X, Camera, Shield, ArrowRight, ArrowLeft, User, FileText, PenTool, Trash2 } from "lucide-react";
+import { CheckCircle2, Clock, AlertCircle, X, Camera, Shield, ArrowRight, ArrowLeft, User, FileText, PenTool, Trash2, Loader2 } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 
 const COUNTRY_DATA: Record<string, { name: string; flag: string }> = {
   BJ: { name: "Benin", flag: "🇧🇯" },
@@ -25,6 +26,14 @@ const COUNTRY_DATA: Record<string, { name: string; flag: string }> = {
 };
 
 type CameraMode = "front" | "back" | "selfie" | null;
+type UploadStatus = "idle" | "uploading" | "done" | "error";
+
+interface UploadState {
+  front: { status: UploadStatus; progress: number };
+  back: { status: UploadStatus; progress: number };
+  selfie: { status: UploadStatus; progress: number };
+  signature: { status: UploadStatus; progress: number };
+}
 
 export default function KYC() {
   const { user } = useAuth();
@@ -39,10 +48,60 @@ export default function KYC() {
   const [isDrawing, setIsDrawing] = useState(false);
   const [cameraMode, setCameraMode] = useState<CameraMode>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
+  const [uploadState, setUploadState] = useState<UploadState>({
+    front: { status: "idle", progress: 0 },
+    back: { status: "idle", progress: 0 },
+    selfie: { status: "idle", progress: 0 },
+    signature: { status: "idle", progress: 0 },
+  });
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const captureCanvasRef = useRef<HTMLCanvasElement>(null);
+
+  const uploadDocument = async (type: "front" | "back" | "selfie" | "signature", data: string) => {
+    setUploadState(prev => ({
+      ...prev,
+      [type]: { status: "uploading", progress: 0 }
+    }));
+
+    const interval = setInterval(() => {
+      setUploadState(prev => {
+        const current = prev[type].progress;
+        if (current < 90) {
+          return { ...prev, [type]: { ...prev[type], progress: current + 10 } };
+        }
+        return prev;
+      });
+    }, 100);
+
+    try {
+      await apiRequest("POST", "/api/kyc/upload", { type, data });
+      
+      clearInterval(interval);
+      setUploadState(prev => ({
+        ...prev,
+        [type]: { status: "done", progress: 100 }
+      }));
+      
+      toast({
+        title: "Document telecharge",
+        description: "Le document a ete enregistre avec succes",
+      });
+    } catch (error) {
+      clearInterval(interval);
+      setUploadState(prev => ({
+        ...prev,
+        [type]: { status: "error", progress: 0 }
+      }));
+      
+      toast({
+        title: "Erreur",
+        description: "Erreur lors du telechargement",
+        variant: "destructive",
+      });
+    }
+  };
 
   const stopCamera = useCallback(() => {
     if (stream) {
@@ -84,7 +143,7 @@ export default function KYC() {
     }
   }, [stream]);
 
-  const capturePhoto = () => {
+  const capturePhoto = async () => {
     if (!videoRef.current || !captureCanvasRef.current || !cameraMode) return;
     
     const video = videoRef.current;
@@ -98,21 +157,19 @@ export default function KYC() {
     ctx.drawImage(video, 0, 0);
     
     const imageData = canvas.toDataURL("image/jpeg", 0.8);
+    const currentMode = cameraMode;
     
-    if (cameraMode === "front") {
+    if (currentMode === "front") {
       setIdFrontData(imageData);
-    } else if (cameraMode === "back") {
+    } else if (currentMode === "back") {
       setIdBackData(imageData);
-    } else if (cameraMode === "selfie") {
+    } else if (currentMode === "selfie") {
       setSelfieData(imageData);
     }
     
     stopCamera();
     
-    toast({
-      title: "Photo capturee",
-      description: "La photo a ete enregistree avec succes",
-    });
+    await uploadDocument(currentMode, imageData);
   };
 
   useEffect(() => {
@@ -141,10 +198,13 @@ export default function KYC() {
   const resetCapture = (type: "front" | "back" | "selfie") => {
     if (type === "front") {
       setIdFrontData(null);
+      setUploadState(prev => ({ ...prev, front: { status: "idle", progress: 0 } }));
     } else if (type === "back") {
       setIdBackData(null);
+      setUploadState(prev => ({ ...prev, back: { status: "idle", progress: 0 } }));
     } else if (type === "selfie") {
       setSelfieData(null);
+      setUploadState(prev => ({ ...prev, selfie: { status: "idle", progress: 0 } }));
     }
   };
 
@@ -202,19 +262,23 @@ export default function KYC() {
       ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
     setSignatureData(null);
+    setUploadState(prev => ({ ...prev, signature: { status: "idle", progress: 0 } }));
   };
 
-  const saveSignature = () => {
+  const saveSignature = async () => {
     const canvas = canvasRef.current;
     if (canvas) {
       const data = canvas.toDataURL("image/png");
       setSignatureData(data);
-      toast({
-        title: "Signature enregistree",
-        description: "Votre signature a ete enregistree avec succes",
-      });
+      await uploadDocument("signature", data);
     }
   };
+
+  const allUploaded = 
+    uploadState.front.status === "done" &&
+    uploadState.back.status === "done" &&
+    uploadState.selfie.status === "done" &&
+    uploadState.signature.status === "done";
 
   const submitKycMutation = useMutation({
     mutationFn: async () => {
@@ -240,6 +304,12 @@ export default function KYC() {
       setSignatureData(null);
       setCurrentStep(1);
       setIsResubmitting(false);
+      setUploadState({
+        front: { status: "idle", progress: 0 },
+        back: { status: "idle", progress: 0 },
+        selfie: { status: "idle", progress: 0 },
+        signature: { status: "idle", progress: 0 },
+      });
       queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
     },
     onError: (error: any) => {
@@ -286,6 +356,44 @@ export default function KYC() {
 
   const getCountryInfo = (code: string) => {
     return COUNTRY_DATA[code] || { name: code, flag: "" };
+  };
+
+  const renderUploadStatus = (type: "front" | "back" | "selfie" | "signature") => {
+    const state = uploadState[type];
+    
+    if (state.status === "idle") return null;
+    
+    if (state.status === "uploading") {
+      return (
+        <div className="mt-2 space-y-1">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Loader2 className="w-3 h-3 animate-spin" />
+            <span>Telechargement en cours...</span>
+          </div>
+          <Progress value={state.progress} className="h-1" />
+        </div>
+      );
+    }
+    
+    if (state.status === "done") {
+      return (
+        <div className="mt-2 flex items-center gap-2 text-xs text-green-600 dark:text-green-400">
+          <CheckCircle2 className="w-3 h-3" />
+          <span>Telecharge avec succes</span>
+        </div>
+      );
+    }
+    
+    if (state.status === "error") {
+      return (
+        <div className="mt-2 flex items-center gap-2 text-xs text-red-600 dark:text-red-400">
+          <AlertCircle className="w-3 h-3" />
+          <span>Erreur de telechargement</span>
+        </div>
+      );
+    }
+    
+    return null;
   };
 
   const renderStepIndicator = () => (
@@ -441,6 +549,7 @@ export default function KYC() {
               >
                 <X className="w-4 h-4" />
               </button>
+              {renderUploadStatus("front")}
             </div>
           ) : (
             <Button
@@ -471,6 +580,7 @@ export default function KYC() {
               >
                 <X className="w-4 h-4" />
               </button>
+              {renderUploadStatus("back")}
             </div>
           ) : (
             <Button
@@ -501,6 +611,7 @@ export default function KYC() {
               >
                 <X className="w-4 h-4" />
               </button>
+              {renderUploadStatus("selfie")}
             </div>
           ) : (
             <Button
@@ -537,7 +648,7 @@ export default function KYC() {
         <Button
           className="flex-1"
           onClick={() => setCurrentStep(3)}
-          disabled={!idFrontData || !idBackData || !selfieData}
+          disabled={uploadState.front.status !== "done" || uploadState.back.status !== "done" || uploadState.selfie.status !== "done"}
           data-testid="button-next-step-2"
         >
           Etape suivante
@@ -585,18 +696,24 @@ export default function KYC() {
             size="sm"
             onClick={saveSignature}
             className="flex-1"
+            disabled={uploadState.signature.status === "uploading"}
             data-testid="button-save-signature"
           >
-            <CheckCircle2 className="w-4 h-4 mr-1" />
+            {uploadState.signature.status === "uploading" ? (
+              <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+            ) : (
+              <CheckCircle2 className="w-4 h-4 mr-1" />
+            )}
             Enregistrer
           </Button>
         </div>
+        {renderUploadStatus("signature")}
       </div>
 
-      {signatureData && (
+      {uploadState.signature.status === "done" && (
         <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-900 rounded-lg">
           <CheckCircle2 className="w-4 h-4 text-green-600" />
-          <span className="text-sm text-green-700 dark:text-green-300">Signature enregistree</span>
+          <span className="text-sm text-green-700 dark:text-green-300">Signature enregistree et telechargee</span>
         </div>
       )}
 
@@ -619,10 +736,17 @@ export default function KYC() {
         <Button
           className="flex-1"
           onClick={() => submitKycMutation.mutate()}
-          disabled={!signatureData || submitKycMutation.isPending}
+          disabled={!allUploaded || submitKycMutation.isPending}
           data-testid="button-submit-kyc"
         >
-          {submitKycMutation.isPending ? "Envoi en cours..." : "Soumettre"}
+          {submitKycMutation.isPending ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Finalisation...
+            </>
+          ) : (
+            "Soumettre"
+          )}
         </Button>
       </div>
     </div>
@@ -635,6 +759,12 @@ export default function KYC() {
     setIdBackData(null);
     setSelfieData(null);
     setSignatureData(null);
+    setUploadState({
+      front: { status: "idle", progress: 0 },
+      back: { status: "idle", progress: 0 },
+      selfie: { status: "idle", progress: 0 },
+      signature: { status: "idle", progress: 0 },
+    });
   };
 
   return (
@@ -687,7 +817,6 @@ export default function KYC() {
                 className="w-full"
                 data-testid="button-resubmit-kyc"
               >
-                <Upload className="w-4 h-4 mr-2" />
                 Soumettre a nouveau
               </Button>
             </div>

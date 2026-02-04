@@ -997,7 +997,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // KYC Submit - No file size or type restrictions
+  // KYC Upload single document
+  app.post("/api/kyc/upload", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { type, data } = req.body;
+
+      if (!type || !data) {
+        return res.status(400).json({ error: "Type et donnees requis" });
+      }
+
+      const validTypes = ["front", "back", "selfie", "signature"];
+      if (!validTypes.includes(type)) {
+        return res.status(400).json({ error: "Type de document invalide" });
+      }
+
+      const fieldMap: Record<string, string> = {
+        front: "kycIdFront",
+        back: "kycIdBack",
+        selfie: "kycSelfie",
+        signature: "kycSignature",
+      };
+
+      const updateData: any = {};
+      updateData[fieldMap[type]] = data;
+
+      await storage.updateKycDocument(req.session.userId!, updateData);
+      
+      res.json({ success: true, type });
+    } catch (error: any) {
+      console.error("KYC upload error:", error);
+      res.status(500).json({ error: "Erreur lors du telechargement" });
+    }
+  });
+
+  // KYC Final Submit - just changes status to submitted
   app.post("/api/kyc/submit", requireAuth, async (req: Request, res: Response) => {
     try {
       const { kycIdFront, kycIdBack, kycSelfie, kycSignature } = req.body;

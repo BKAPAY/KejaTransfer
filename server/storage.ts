@@ -42,6 +42,7 @@ export interface IStorage {
   updateUserBalance(id: string, amount: number): Promise<User | undefined>;
   updateUserPassword(id: string, hashedPassword: string): Promise<User | undefined>;
   submitKyc(userId: string, kycData: { kycIdFront: string; kycIdBack: string; kycSelfie: string; kycSignature: string }): Promise<User | undefined>;
+  updateKycDocument(userId: string, data: Partial<{ kycIdFront: string; kycIdBack: string; kycSelfie: string; kycSignature: string }>): Promise<void>;
   approveKyc(userId: string): Promise<User | undefined>;
   rejectKyc(userId: string, reason?: string): Promise<User | undefined>;
   getPendingKycSubmissions(): Promise<User[]>;
@@ -216,6 +217,13 @@ export class DbStorage implements IStorage {
       .where(eq(schema.users.id, userId))
       .returning();
     return results[0];
+  }
+
+  async updateKycDocument(userId: string, data: Partial<{ kycIdFront: string; kycIdBack: string; kycSelfie: string; kycSignature: string }>): Promise<void> {
+    await db
+      .update(schema.users)
+      .set(data)
+      .where(eq(schema.users.id, userId));
   }
 
   async approveKyc(userId: string): Promise<User | undefined> {
