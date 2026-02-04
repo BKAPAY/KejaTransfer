@@ -48,12 +48,12 @@ async function getMailtrapConfigFromDB(): Promise<MailtrapConfig> {
     apiToken: null,
     senderEmail: null,
     senderName: null,
-    enableSignup: false,
-    enablePasswordReset: false,
-    enableLogin: false,
-    enableKycSubmitted: false,
-    enableKycVerified: false,
-    enableKycRejected: false,
+    enableSignup: true,
+    enablePasswordReset: true,
+    enableLogin: true,
+    enableKycSubmitted: true,
+    enableKycVerified: true,
+    enableKycRejected: true,
   };
 }
 
