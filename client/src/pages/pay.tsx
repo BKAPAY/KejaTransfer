@@ -315,9 +315,9 @@ export default function Pay() {
     : adminEnabledCountries;
 
   // Calculer le montant avec frais si customerPaysFee est activé
-  // Les frais sont dynamiques et récupérés du backend
+  // Les frais sont à 6% et inclus dans le montant si le client paie les frais
   const baseAmount = paymentLink?.amount || 0;
-  const totalAmount = baseAmount; // Le montant total sera recalculé côté serveur avec les frais dynamiques
+  const totalAmount = paymentLink?.customerPaysFee ? Math.ceil(baseAmount * 1.06) : baseAmount;
 
   // Handle currency selection when country changes
   useEffect(() => {

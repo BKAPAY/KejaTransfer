@@ -250,16 +250,19 @@ export default function ApiPay() {
     }
   }, []);
 
+  // Calcul du montant total à convertir (avec frais si customerPaysFee est activé)
+  const amountToConvert = apiKeyInfo?.customerPaysFee ? Math.ceil(amount * 1.06) : amount;
+  
   useEffect(() => {
-    if (needsConversion && amount && amount > 0) {
+    if (needsConversion && amountToConvert && amountToConvert > 0) {
       const debounceTimer = setTimeout(() => {
-        fetchConversion(amount, ownerCurrency, targetCurrency);
+        fetchConversion(amountToConvert, ownerCurrency, targetCurrency);
       }, 500);
       return () => clearTimeout(debounceTimer);
     } else {
       setConversionData(null);
     }
-  }, [needsConversion, amount, ownerCurrency, targetCurrency, fetchConversion]);
+  }, [needsConversion, amountToConvert, ownerCurrency, targetCurrency, fetchConversion]);
 
   const [shouldStartCountdown, setShouldStartCountdown] = useState(false);
 
