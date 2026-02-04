@@ -280,6 +280,25 @@ export default function FournisseursPage() {
     queryKey: ["/api/admin/providers"],
   });
 
+  // Initialize mailtrap toggles from database
+  const mailtrapConfig = providers?.find(p => p.provider === "mailtrap");
+  const initMailtrapToggles = () => {
+    if (mailtrapConfig && forms.mailtrap.masterKey === "" && forms.mailtrap.token === "" && forms.mailtrap.ipnSecret === "") {
+      setForms(prev => ({
+        ...prev,
+        mailtrap: {
+          ...prev.mailtrap,
+          masterKey: mailtrapConfig.masterKey || "false",
+          token: mailtrapConfig.token || "false",
+          ipnSecret: mailtrapConfig.ipnSecret || "false",
+        }
+      }));
+    }
+  };
+  if (mailtrapConfig && forms.mailtrap.masterKey === "") {
+    initMailtrapToggles();
+  }
+
   const updateMutation = useMutation({
     mutationFn: async (payload: { provider: string; updates: Partial<ProviderConfig> }) => {
       return apiRequest("PUT", `/api/admin/providers/${payload.provider}`, payload.updates);
@@ -347,10 +366,25 @@ export default function FournisseursPage() {
     }
 
     updateMutation.mutate({ provider, updates });
-    setForms(prev => ({
-      ...prev,
-      [provider]: { apiKey: "", secretKey: "", publicKey: "", masterKey: "", token: "", ipnSecret: "" },
-    }));
+    // For mailtrap, preserve toggle values; for others, clear all fields
+    if (provider === "mailtrap") {
+      setForms(prev => ({
+        ...prev,
+        mailtrap: { 
+          apiKey: "", 
+          secretKey: "", 
+          publicKey: "", 
+          masterKey: prev.mailtrap.masterKey, 
+          token: prev.mailtrap.token, 
+          ipnSecret: prev.mailtrap.ipnSecret 
+        },
+      }));
+    } else {
+      setForms(prev => ({
+        ...prev,
+        [provider]: { apiKey: "", secretKey: "", publicKey: "", masterKey: "", token: "", ipnSecret: "" },
+      }));
+    }
   };
 
   const updateForm = (provider: string, field: keyof ProviderForm, value: string) => {
