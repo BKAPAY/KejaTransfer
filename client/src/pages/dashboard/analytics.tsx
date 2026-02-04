@@ -50,7 +50,8 @@ interface Analytics {
   totalRevenue: number;
   completedTransactions: number;
   pendingTransactions: number;
-  failedTransactions?: number;
+  failedTransactions: number;
+  totalTransactions: number;
   monthlyData?: { month: string; deposits: number; withdrawals: number; transfers: number; total: number }[];
   averageTransactionAmount?: number;
   successRate?: number;
@@ -480,7 +481,7 @@ export default function Analytics() {
     );
   }
 
-  const totalTransactions = analytics.completedTransactions + analytics.pendingTransactions + (analytics.failedTransactions || 0);
+  const totalTransactions = analytics.totalTransactions;
   const successRate = totalTransactions > 0 ? (analytics.completedTransactions / totalTransactions) * 100 : 0;
   const avgTransaction = analytics.completedTransactions > 0 ? analytics.totalRevenue / analytics.completedTransactions : 0;
 
@@ -509,11 +510,11 @@ export default function Analytics() {
       </motion.div>
 
       {/* Main Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <StatCard
           title="Revenus Totaux"
           value={analytics.totalRevenue}
-          subtitle="Total des transactions complétées"
+          subtitle="Total des transactions entrantes"
           icon={Wallet}
           color="primary"
           delay={0}
@@ -521,20 +522,12 @@ export default function Analytics() {
           currency={userCurrency}
         />
         <StatCard
-          title="Transactions Réussies"
-          value={analytics.completedTransactions}
-          subtitle={`Taux de réussite: ${successRate.toFixed(1)}%`}
-          icon={CheckCircle2}
+          title="Total Transactions"
+          value={analytics.totalTransactions}
+          subtitle="Transactions entrantes"
+          icon={Activity}
           color="secondary"
           delay={0.1}
-        />
-        <StatCard
-          title="En Attente"
-          value={analytics.pendingTransactions}
-          subtitle="Transactions en cours"
-          icon={Clock}
-          color="accent"
-          delay={0.2}
         />
         <StatCard
           title="Montant Moyen"
@@ -542,9 +535,37 @@ export default function Analytics() {
           subtitle="Par transaction"
           icon={Target}
           color="primary"
-          delay={0.3}
+          delay={0.2}
           isCurrency={true}
           currency={userCurrency}
+        />
+      </div>
+
+      {/* Transaction Status Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <StatCard
+          title="Réussies"
+          value={analytics.completedTransactions}
+          subtitle={`Taux: ${successRate.toFixed(1)}%`}
+          icon={CheckCircle2}
+          color="primary"
+          delay={0.3}
+        />
+        <StatCard
+          title="En Attente"
+          value={analytics.pendingTransactions}
+          subtitle="Transactions en cours"
+          icon={Clock}
+          color="accent"
+          delay={0.4}
+        />
+        <StatCard
+          title="Échouées"
+          value={analytics.failedTransactions}
+          subtitle="Transactions échouées"
+          icon={XCircle}
+          color="danger"
+          delay={0.5}
         />
       </div>
 
@@ -583,12 +604,14 @@ export default function Analytics() {
                 <AlertCircle className="h-3 w-3 text-amber-500" />
                 {analytics.pendingTransactions} en attente
               </span>
-              {analytics.failedTransactions !== undefined && (
-                <span className="flex items-center gap-1">
-                  <XCircle className="h-3 w-3 text-red-500" />
-                  {analytics.failedTransactions} échouées
-                </span>
-              )}
+              <span className="flex items-center gap-1">
+                <XCircle className="h-3 w-3 text-red-500" />
+                {analytics.failedTransactions} échouées
+              </span>
+              <span className="flex items-center gap-1">
+                <Activity className="h-3 w-3 text-blue-500" />
+                {analytics.totalTransactions} total
+              </span>
             </div>
           </CardContent>
         </Card>

@@ -949,9 +949,12 @@ export class DbStorage implements IStorage {
     totalRevenue: number;
     completedTransactions: number;
     pendingTransactions: number;
+    failedTransactions: number;
+    totalTransactions: number;
   }> {
     const transactions = await this.getTransactions(userId, 500);
     const completed = transactions.filter((t) => t.status === "completed");
+    const failed = transactions.filter((t) => t.status === "failed");
     
     // Only count incoming transactions (deposits, payments received) - not outgoing (withdrawals, transfers)
     const incomingTypes = ["deposit", "api_payment", "payment_link", "merchant_link"];
@@ -1010,6 +1013,7 @@ export class DbStorage implements IStorage {
 
     const totalRevenue = incomingCompleted.reduce((sum, t) => sum + t.amount, 0);
     const pendingTransactions = transactions.filter((t) => t.status === "pending").length;
+    const incomingFailed = failed.filter(t => incomingTypes.includes(t.type));
 
     return {
       revenueByDate,
@@ -1017,8 +1021,10 @@ export class DbStorage implements IStorage {
       revenueByCountry,
       revenueByType,
       totalRevenue,
-      completedTransactions: completed.length,
+      completedTransactions: incomingCompleted.length,
       pendingTransactions,
+      failedTransactions: incomingFailed.length,
+      totalTransactions: incomingCompleted.length + incomingFailed.length + pendingTransactions,
     };
   }
 
