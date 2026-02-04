@@ -22,6 +22,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import type { User, Transaction } from "@shared/schema";
+import { COUNTRIES } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
@@ -44,8 +45,8 @@ export default function Management() {
   // Dialog states
   const [promoteDialog, setPromoteDialog] = useState<{ open: boolean; userId?: string; userName?: string }>({ open: false });
   const [removeAdminDialog, setRemoveAdminDialog] = useState<{ open: boolean; userId?: string; userName?: string }>({ open: false });
-  const [addFundsDialog, setAddFundsDialog] = useState<{ open: boolean; userId?: string; userName?: string; amount?: number }>({ open: false });
-  const [subtractFundsDialog, setSubtractFundsDialog] = useState<{ open: boolean; userId?: string; userName?: string; amount?: number }>({ open: false });
+  const [addFundsDialog, setAddFundsDialog] = useState<{ open: boolean; userId?: string; userName?: string; amount?: number; currency?: string }>({ open: false });
+  const [subtractFundsDialog, setSubtractFundsDialog] = useState<{ open: boolean; userId?: string; userName?: string; amount?: number; currency?: string }>({ open: false });
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; userId?: string; userName?: string }>({ open: false });
   const [suspendDialog, setSuspendDialog] = useState<{ open: boolean; userId?: string; userName?: string }>({ open: false });
   const [unsuspendDialog, setUnsuspendDialog] = useState<{ open: boolean; userId?: string; userName?: string }>({ open: false });
@@ -323,13 +324,15 @@ export default function Management() {
   });
 
 
-  const formatAmount = (amount: number) => {
-    return new Intl.NumberFormat("fr-FR", {
-      style: "currency",
-      currency: "XOF",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
+  // Helper function to get currency for a user's country
+  const getCurrencyForUser = (user: User) => {
+    return user?.country 
+      ? COUNTRIES.find(c => c.code === user.country)?.currency || "XOF"
+      : "XOF";
+  };
+
+  const formatAmount = (amount: number, currency: string = "XOF") => {
+    return `${amount.toLocaleString("fr-FR")} ${currency}`;
   };
 
   const handleLockAccess = () => {
@@ -486,7 +489,7 @@ export default function Management() {
                           Créé le {new Date(user.createdAt).toLocaleDateString("fr-FR")}
                         </p>
                         <p className="font-semibold text-sm mt-2" data-testid={`balance-${user.id}`}>
-                          Solde: {formatAmount(user.balance)}
+                          Solde: {formatAmount(user.balance, getCurrencyForUser(user))}
                         </p>
                       </div>
                     </div>
@@ -508,7 +511,7 @@ export default function Management() {
                         onClick={() => {
                           const amount = parseInt(fundAmount[user.id] || "0");
                           if (amount > 0) {
-                            setAddFundsDialog({ open: true, userId: user.id, userName: `${user.firstName} ${user.lastName}`, amount });
+                            setAddFundsDialog({ open: true, userId: user.id, userName: `${user.firstName} ${user.lastName}`, amount, currency: getCurrencyForUser(user) });
                           }
                         }}
                         disabled={!fundAmount[user.id] || parseInt(fundAmount[user.id]) <= 0 || addFundsMutation.isPending}
@@ -523,7 +526,7 @@ export default function Management() {
                         onClick={() => {
                           const amount = parseInt(fundAmount[user.id] || "0");
                           if (amount > 0) {
-                            setSubtractFundsDialog({ open: true, userId: user.id, userName: `${user.firstName} ${user.lastName}`, amount });
+                            setSubtractFundsDialog({ open: true, userId: user.id, userName: `${user.firstName} ${user.lastName}`, amount, currency: getCurrencyForUser(user) });
                           }
                         }}
                         disabled={!fundAmount[user.id] || parseInt(fundAmount[user.id]) <= 0 || subtractFundsMutation.isPending}
@@ -749,7 +752,7 @@ export default function Management() {
           <AlertDialogHeader>
             <AlertDialogTitle>Ajouter des fonds</AlertDialogTitle>
             <AlertDialogDescription>
-              Êtes-vous sûr de vouloir ajouter <strong>{formatAmount(addFundsDialog.amount || 0)}</strong> au compte de <strong>{addFundsDialog.userName}</strong>?
+              Êtes-vous sûr de vouloir ajouter <strong>{formatAmount(addFundsDialog.amount || 0, addFundsDialog.currency || "XOF")}</strong> au compte de <strong>{addFundsDialog.userName}</strong>?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="flex gap-2">
@@ -775,7 +778,7 @@ export default function Management() {
           <AlertDialogHeader>
             <AlertDialogTitle>Retirer des fonds</AlertDialogTitle>
             <AlertDialogDescription>
-              Êtes-vous sûr de vouloir retirer <strong>{formatAmount(subtractFundsDialog.amount || 0)}</strong> du compte de <strong>{subtractFundsDialog.userName}</strong>?
+              Êtes-vous sûr de vouloir retirer <strong>{formatAmount(subtractFundsDialog.amount || 0, subtractFundsDialog.currency || "XOF")}</strong> du compte de <strong>{subtractFundsDialog.userName}</strong>?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="flex gap-2">
@@ -934,7 +937,7 @@ export default function Management() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap mb-1">
                             <span className="font-semibold text-sm">
-                              {formatAmount(tx.amount)}
+                              {formatAmount(tx.amount, tx.currency || (tx.user ? getCurrencyForUser(tx.user) : "XOF"))}
                             </span>
                             <Badge variant="secondary" className="text-xs">
                               {typeLabels[tx.type] || tx.type}
@@ -968,7 +971,7 @@ export default function Management() {
                           )}
                           {isWithdrawal && (
                             <p className="text-xs text-muted-foreground">
-                              Frais: {formatAmount(tx.fee)} | Total déduit: {formatAmount(tx.amount + tx.fee)}
+                              Frais: {formatAmount(tx.fee, tx.currency || "XOF")} | Total déduit: {formatAmount(tx.amount + tx.fee, tx.currency || "XOF")}
                             </p>
                           )}
                           <p className="text-xs text-muted-foreground">

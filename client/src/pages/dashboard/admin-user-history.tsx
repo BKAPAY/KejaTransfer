@@ -9,6 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Search, X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, History } from "lucide-react";
 import type { Transaction, User } from "@shared/schema";
+import { COUNTRIES } from "@shared/schema";
 import { useState } from "react";
 import { TransactionDetailsDialog } from "@/components/transaction-details-dialog";
 
@@ -67,13 +68,14 @@ export default function AdminUserHistory() {
     return types[type] || type;
   };
 
-  const formatAmount = (amount: number) => {
-    return new Intl.NumberFormat("fr-FR", {
-      style: "currency",
-      currency: "XOF",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
+  // Get user's currency based on their country
+  const userCurrency = user?.country 
+    ? COUNTRIES.find(c => c.code === user.country)?.currency || "XOF"
+    : "XOF";
+
+  const formatAmount = (amount: number, currency?: string) => {
+    const currencyCode = currency || userCurrency;
+    return `${amount.toLocaleString("fr-FR")} ${currencyCode}`;
   };
 
   const filteredTransactions = React.useMemo(() => {
