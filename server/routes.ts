@@ -789,10 +789,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const tfaEnabled = await isEmailSendingEnabled("login");
       console.log(`[Login] 2FA email enabled: ${tfaEnabled}, isAdmin: ${user.isAdmin}`);
 
-      // If 2FA is disabled OR user is admin, connect directly without code
-      if (!tfaEnabled || user.isAdmin) {
+      // If 2FA is disabled, connect directly without code (applies to all users including admins)
+      if (!tfaEnabled) {
         req.session.userId = user.id;
-        console.log(`[Login] ${user.email} connecté directement (2FA disabled: ${!tfaEnabled}, isAdmin: ${user.isAdmin})`);
+        console.log(`[Login] ${user.email} connecté directement (2FA disabled)`);
         return res.json({
           success: true,
           message: "Connexion réussie",
