@@ -55,6 +55,7 @@ export default function KYC() {
   const startCamera = async (mode: CameraMode) => {
     try {
       stopCamera();
+      setCameraMode(mode);
       
       const facingMode = mode === "selfie" ? "user" : "environment";
       const mediaStream = await navigator.mediaDevices.getUserMedia({
@@ -63,14 +64,9 @@ export default function KYC() {
       });
       
       setStream(mediaStream);
-      setCameraMode(mode);
-      
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-        videoRef.current.play();
-      }
     } catch (error) {
       console.error("Camera error:", error);
+      setCameraMode(null);
       toast({
         title: "Erreur",
         description: "Impossible d'acceder a la camera. Verifiez les permissions.",
@@ -78,6 +74,15 @@ export default function KYC() {
       });
     }
   };
+
+  useEffect(() => {
+    if (stream && videoRef.current) {
+      videoRef.current.srcObject = stream;
+      videoRef.current.onloadedmetadata = () => {
+        videoRef.current?.play().catch(console.error);
+      };
+    }
+  }, [stream]);
 
   const capturePhoto = () => {
     if (!videoRef.current || !captureCanvasRef.current || !cameraMode) return;
