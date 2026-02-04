@@ -395,7 +395,7 @@ export async function isEmailServiceConfigured(): Promise<boolean> {
   return !!(config.apiToken && config.senderEmail);
 }
 
-export async function isEmailSendingEnabled(emailType: "signup" | "password" | "2fa"): Promise<boolean> {
+export async function isEmailSendingEnabled(emailType: "signup" | "password_reset" | "login"): Promise<boolean> {
   const config = await getMailtrapConfigFromDB();
   
   if (!config.apiToken || !config.senderEmail) {
@@ -405,17 +405,17 @@ export async function isEmailSendingEnabled(emailType: "signup" | "password" | "
   switch (emailType) {
     case "signup":
       return config.enableSignup;
-    case "password":
+    case "password_reset":
       return config.enablePasswordReset;
-    case "2fa":
+    case "login":
       return config.enableLogin;
     default:
       return false;
   }
 }
 
-export type GmailType = "signup" | "password" | "2fa";
+export type EmailType = "signup" | "password_reset" | "login";
 
-export function clearGmailConfigCache(gmailType?: GmailType): void {
+export function clearEmailConfigCache(): void {
   clearMailtrapConfigCache();
 }

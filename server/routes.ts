@@ -60,9 +60,9 @@ import {
   sendVerificationEmail,
   isEmailServiceConfigured,
   isEmailSendingEnabled,
-  clearGmailConfigCache,
+  clearEmailConfigCache,
   testEmailConnection,
-  GmailType,
+  EmailType,
 } from "./email-service";
 import nowpaymentsRoutes from "./nowpayments-routes";
 import afribaPayRoutes from "./afribapay-routes";
@@ -646,7 +646,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Check if email sending is enabled for password reset
-      const emailEnabled = await isEmailSendingEnabled("password");
+      const emailEnabled = await isEmailSendingEnabled("password_reset");
       if (!emailEnabled) {
         return res.status(503).json({ 
           error: "La réinitialisation de mot de passe par email est désactivée. Contactez l'administrateur." 
@@ -786,7 +786,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Check if 2FA email sending is enabled
-      const tfaEnabled = await isEmailSendingEnabled("2fa");
+      const tfaEnabled = await isEmailSendingEnabled("login");
       console.log(`[Login] 2FA email enabled: ${tfaEnabled}, isAdmin: ${user.isAdmin}`);
 
       // If 2FA is disabled OR user is admin, connect directly without code
@@ -6582,16 +6582,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Fournisseur non trouvé" });
       }
 
-      // Clear Gmail config cache when Gmail settings are updated
-      if (provider === "gmail_signup") {
-        clearGmailConfigCache("signup");
-        console.log("[Admin] Configuration gmail_signup mise à jour - cache vidé");
-      } else if (provider === "gmail_password") {
-        clearGmailConfigCache("password");
-        console.log("[Admin] Configuration gmail_password mise à jour - cache vidé");
-      } else if (provider === "gmail_2fa") {
-        clearGmailConfigCache("2fa");
-        console.log("[Admin] Configuration gmail_2fa mise à jour - cache vidé");
+      // Clear Mailtrap config cache when settings are updated
+      if (provider === "mailtrap") {
+        clearEmailConfigCache();
+        console.log("[Admin] Configuration mailtrap mise à jour - cache vidé");
       }
 
       // Mask keys in response
@@ -6612,22 +6606,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Test email connection
   app.post("/api/admin/test-email", requireAdmin, async (req: Request, res: Response) => {
     try {
-      const { gmailType } = req.body as { gmailType?: GmailType };
-      const type: GmailType = gmailType || "signup";
-      
-      clearGmailConfigCache(type);
-      const success = await testEmailConnection(type);
-      
-      const providerNames: Record<GmailType, string> = {
-        signup: "Gmail - Inscription",
-        password: "Gmail - Mot de passe",
-        "2fa": "Gmail - Connexion 2FA",
-      };
+      clearEmailConfigCache();
+      const success = await testEmailConnection();
       
       if (success) {
-        res.json({ success: true, message: `Connexion ${providerNames[type]} réussie` });
+        res.json({ success: true, message: "Connexion Mailtrap réussie" });
       } else {
-        res.status(400).json({ success: false, error: `Impossible de se connecter à ${providerNames[type]}. Vérifiez vos identifiants.` });
+        res.status(400).json({ success: false, error: "Impossible de se connecter à Mailtrap. Vérifiez vos identifiants." });
       }
     } catch (error: any) {
       console.error("[Admin] Test email error:", error);

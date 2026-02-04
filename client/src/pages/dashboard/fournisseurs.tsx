@@ -87,26 +87,12 @@ const PROVIDER_INFO = {
     fields: ["apiKey"],
     countries: "Global - Conversion XOF, XAF, CDF, USD",
   },
-  gmail_signup: {
-    name: "Gmail - Inscription",
-    description: "Envoi des codes de verification lors de l'inscription",
-    color: "bg-red-500",
-    fields: ["apiKey", "secretKey"],
-    countries: "Global - Verification email inscription",
-  },
-  gmail_password: {
-    name: "Gmail - Mot de passe",
-    description: "Envoi des codes pour la reinitialisation de mot de passe",
-    color: "bg-pink-500",
-    fields: ["apiKey", "secretKey"],
-    countries: "Global - Recuperation mot de passe",
-  },
-  gmail_2fa: {
-    name: "Gmail - Connexion 2FA",
-    description: "Envoi des codes de confirmation lors de la connexion",
-    color: "bg-rose-500",
-    fields: ["apiKey", "secretKey"],
-    countries: "Global - Double authentification",
+  mailtrap: {
+    name: "Mailtrap",
+    description: "Service d'envoi d'emails transactionnels (inscription, mot de passe, connexion)",
+    color: "bg-indigo-500",
+    fields: ["apiKey", "secretKey", "publicKey", "masterKey", "token", "ipnSecret"],
+    countries: "Global - Emails transactionnels",
   },
 };
 
@@ -136,10 +122,14 @@ const getFieldLabel = (provider: string, field: string): string => {
   if (provider === "exchangerate") {
     if (field === "apiKey") return "Clé API ExchangeRate (exchangerate-api.com)";
   }
-  if (provider === "gmail_signup" || provider === "gmail_password" || provider === "gmail_2fa") {
+  if (provider === "mailtrap") {
     switch (field) {
-      case "apiKey": return "Adresse Gmail (ex: votre-email@gmail.com)";
-      case "secretKey": return "Mot de passe d'application Google (16 caracteres)";
+      case "apiKey": return "API Token Mailtrap";
+      case "secretKey": return "Email expediteur (ex: noreply@votredomaine.com)";
+      case "publicKey": return "Nom expediteur (ex: BKApay)";
+      case "masterKey": return "Activer emails inscription (true/false)";
+      case "token": return "Activer emails mot de passe (true/false)";
+      case "ipnSecret": return "Activer emails connexion (true/false)";
       default: return field;
     }
   }
@@ -286,7 +276,7 @@ export default function FournisseursPage() {
     mbiyopay: { apiKey: "", secretKey: "", publicKey: "", masterKey: "", token: "", ipnSecret: "" },
     nowpayments: { apiKey: "", secretKey: "", publicKey: "", masterKey: "", token: "", ipnSecret: "" },
     exchangerate: { apiKey: "", secretKey: "", publicKey: "", masterKey: "", token: "", ipnSecret: "" },
-    gmail: { apiKey: "", secretKey: "", publicKey: "", masterKey: "", token: "", ipnSecret: "" },
+    mailtrap: { apiKey: "", secretKey: "", publicKey: "", masterKey: "", token: "", ipnSecret: "" },
   });
 
   const { data: providers, isLoading } = useQuery<ProviderConfig[]>({
@@ -314,19 +304,19 @@ export default function FournisseursPage() {
   });
 
   const testEmailMutation = useMutation({
-    mutationFn: async (gmailType: "signup" | "password" | "2fa") => {
-      return apiRequest("POST", "/api/admin/test-email", { gmailType });
+    mutationFn: async () => {
+      return apiRequest("POST", "/api/admin/test-email", {});
     },
     onSuccess: () => {
       toast({
         title: "Connexion reussie",
-        description: "La connexion Gmail a ete verifiee avec succes",
+        description: "La connexion Mailtrap a ete verifiee avec succes",
       });
     },
     onError: (error: any) => {
       toast({
         title: "Echec de la connexion",
-        description: error.message || "Impossible de se connecter a Gmail. Verifiez vos identifiants.",
+        description: error.message || "Impossible de se connecter a Mailtrap. Verifiez vos identifiants.",
         variant: "destructive",
       });
     },
@@ -699,16 +689,13 @@ export default function FournisseursPage() {
                           )}
                           Enregistrer les clés
                         </Button>
-                        {(provider === "gmail_signup" || provider === "gmail_password" || provider === "gmail_2fa") && (
+                        {provider === "mailtrap" && (
                           <Button
                             variant="outline"
-                            onClick={() => {
-                              const gmailType = provider === "gmail_signup" ? "signup" : provider === "gmail_password" ? "password" : "2fa";
-                              testEmailMutation.mutate(gmailType as "signup" | "password" | "2fa");
-                            }}
+                            onClick={() => testEmailMutation.mutate()}
                             disabled={testEmailMutation.isPending}
                             className="gap-2"
-                            data-testid={`test-gmail-connection-${provider}`}
+                            data-testid="test-mailtrap-connection"
                           >
                             {testEmailMutation.isPending ? (
                               <Loader2 className="w-4 h-4 animate-spin" />
@@ -722,19 +709,27 @@ export default function FournisseursPage() {
                     </div>
                   </div>
 
-                  {(provider === "gmail_signup" || provider === "gmail_password" || provider === "gmail_2fa") && (
+                  {provider === "mailtrap" && (
                     <div className="border-t pt-4 mt-4">
                       <Alert>
                         <AlertCircle className="h-4 w-4" />
                         <AlertDescription className="text-sm">
-                          <strong>Comment obtenir un mot de passe d'application Google :</strong>
+                          <strong>Comment configurer Mailtrap :</strong>
                           <ol className="list-decimal ml-4 mt-2 space-y-1">
-                            <li>Connectez-vous a votre compte Google</li>
-                            <li>Allez dans Securite {">"} Validation en deux etapes</li>
-                            <li>En bas, cliquez sur "Mots de passe des applications"</li>
-                            <li>Selectionnez "Autre" et entrez "BKApay"</li>
-                            <li>Copiez le mot de passe de 16 caracteres genere</li>
+                            <li>Creez un compte sur <a href="https://mailtrap.io" target="_blank" rel="noopener noreferrer" className="text-primary underline">mailtrap.io</a></li>
+                            <li>Allez dans Settings {">"} API Tokens</li>
+                            <li>Generez un nouveau token API</li>
+                            <li>Verifiez votre domaine d'envoi dans Email Sending {">"} Sending Domains</li>
+                            <li>Utilisez l'email verifie comme expediteur</li>
                           </ol>
+                          <div className="mt-3 space-y-1">
+                            <p><strong>Options d'activation :</strong></p>
+                            <ul className="list-disc ml-4 space-y-1">
+                              <li><strong>Inscription :</strong> Entrez "true" pour activer les emails lors de l'inscription</li>
+                              <li><strong>Mot de passe :</strong> Entrez "true" pour activer les emails de reinitialisation</li>
+                              <li><strong>Connexion :</strong> Entrez "true" pour activer les emails de verification a la connexion</li>
+                            </ul>
+                          </div>
                         </AlertDescription>
                       </Alert>
                     </div>
