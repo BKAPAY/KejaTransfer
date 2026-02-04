@@ -1050,6 +1050,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Utilisateur non trouvé" });
       }
 
+      // Send KYC submitted email
+      try {
+        const { sendKycSubmittedEmail } = await import("./email-service");
+        await sendKycSubmittedEmail(user.email, user.firstName);
+      } catch (emailError) {
+        console.error("Error sending KYC submitted email:", emailError);
+      }
+
       const { password, ...userWithoutPassword } = user;
       res.json(userWithoutPassword);
     } catch (error: any) {
@@ -6059,6 +6067,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!user) {
         return res.status(404).json({ error: "Utilisateur non trouvé" });
       }
+
+      // Send KYC verified email
+      try {
+        const { sendKycVerifiedEmail } = await import("./email-service");
+        await sendKycVerifiedEmail(user.email, user.firstName);
+      } catch (emailError) {
+        console.error("Error sending KYC verified email:", emailError);
+      }
+
       res.json(user);
     } catch (error: any) {
       console.error("Approve KYC error:", error);
@@ -6081,6 +6098,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!user) {
         return res.status(404).json({ error: "Utilisateur non trouvé" });
       }
+
+      // Send KYC rejected email
+      try {
+        const { sendKycRejectedEmail } = await import("./email-service");
+        await sendKycRejectedEmail(user.email, user.firstName, reason || "Raison non specifiee");
+      } catch (emailError) {
+        console.error("Error sending KYC rejected email:", emailError);
+      }
+
       res.json(user);
     } catch (error: any) {
       console.error("Reject KYC error:", error);

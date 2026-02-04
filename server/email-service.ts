@@ -419,3 +419,278 @@ export type EmailType = "signup" | "password_reset" | "login";
 export function clearEmailConfigCache(): void {
   clearMailtrapConfigCache();
 }
+
+export async function sendKycSubmittedEmail(
+  to: string,
+  firstName: string
+): Promise<boolean> {
+  const subject = "BKApay - Votre verification KYC a ete soumise";
+
+  const textContent = `BKApay - Verification KYC
+
+Bonjour ${firstName},
+
+Votre demande de verification KYC a ete soumise avec succes.
+
+Nos equipes vont examiner vos documents dans les plus brefs delais. Vous recevrez un email des que la verification sera terminee.
+
+Statut actuel: En cours de verification
+
+--
+BKApay - Votre plateforme de paiement mobile money
+https://bkapay.com`;
+
+  const htmlContent = generateKycSubmittedHtml(firstName);
+
+  console.log(`[Email] Envoi notification KYC soumis a ${to}...`);
+  return await sendMailtrapEmail(to, subject, textContent, htmlContent);
+}
+
+export async function sendKycVerifiedEmail(
+  to: string,
+  firstName: string
+): Promise<boolean> {
+  const subject = "BKApay - Votre compte a ete verifie avec succes";
+
+  const textContent = `BKApay - Compte verifie
+
+Bonjour ${firstName},
+
+Felicitations! Votre verification KYC a ete approuvee.
+
+Vous avez maintenant acces a toutes les fonctionnalites de BKApay:
+- Effectuer des retraits
+- Creer des liens de paiement
+- Utiliser l'API BKApay
+
+Merci de faire confiance a BKApay!
+
+--
+BKApay - Votre plateforme de paiement mobile money
+https://bkapay.com`;
+
+  const htmlContent = generateKycVerifiedHtml(firstName);
+
+  console.log(`[Email] Envoi notification KYC verifie a ${to}...`);
+  return await sendMailtrapEmail(to, subject, textContent, htmlContent);
+}
+
+export async function sendKycRejectedEmail(
+  to: string,
+  firstName: string,
+  reason: string
+): Promise<boolean> {
+  const subject = "BKApay - Votre verification KYC a ete rejetee";
+
+  const textContent = `BKApay - Verification KYC rejetee
+
+Bonjour ${firstName},
+
+Malheureusement, votre demande de verification KYC a ete rejetee.
+
+Raison du rejet: ${reason}
+
+Vous pouvez soumettre une nouvelle demande en vous assurant que vos documents sont conformes aux exigences.
+
+Si vous avez des questions, n'hesitez pas a nous contacter.
+
+--
+BKApay - Votre plateforme de paiement mobile money
+https://bkapay.com`;
+
+  const htmlContent = generateKycRejectedHtml(firstName, reason);
+
+  console.log(`[Email] Envoi notification KYC rejete a ${to}...`);
+  return await sendMailtrapEmail(to, subject, textContent, htmlContent);
+}
+
+function generateKycSubmittedHtml(firstName: string): string {
+  return `
+    <!DOCTYPE html>
+    <html lang="fr">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>BKApay - KYC Soumis</title>
+    </head>
+    <body style="margin: 0; padding: 0; background-color: #f9fafb;">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f9fafb;">
+        <tr>
+          <td align="center" style="padding: 40px 20px;">
+            <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+              <tr>
+                <td style="padding: 40px 40px 20px; text-align: center;">
+                  <h1 style="margin: 0; color: #2563eb; font-family: Arial, sans-serif; font-size: 28px; font-weight: bold;">BKApay</h1>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 0 40px;">
+                  <h2 style="margin: 0 0 20px; color: #1f2937; font-family: Arial, sans-serif; font-size: 20px; text-align: center;">Verification KYC soumise</h2>
+                  <p style="margin: 0 0 15px; color: #4b5563; font-family: Arial, sans-serif; font-size: 16px; line-height: 1.5;">Bonjour ${firstName},</p>
+                  <p style="margin: 0 0 25px; color: #4b5563; font-family: Arial, sans-serif; font-size: 16px; line-height: 1.5;">Votre demande de verification KYC a ete soumise avec succes.</p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 0 40px;">
+                  <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                    <tr>
+                      <td style="background-color: #fef3c7; padding: 20px; text-align: center; border-radius: 8px; border-left: 4px solid #f59e0b;">
+                        <p style="margin: 0; color: #92400e; font-family: Arial, sans-serif; font-size: 14px; font-weight: bold;">En cours de verification</p>
+                        <p style="margin: 10px 0 0; color: #b45309; font-family: Arial, sans-serif; font-size: 14px;">Nos equipes examinent vos documents</p>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 25px 40px 40px;">
+                  <p style="margin: 0; color: #6b7280; font-family: Arial, sans-serif; font-size: 14px; line-height: 1.5;">Vous recevrez un email des que la verification sera terminee.</p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 20px 40px; border-top: 1px solid #e5e7eb;">
+                  <p style="margin: 0; color: #9ca3af; font-family: Arial, sans-serif; font-size: 12px; text-align: center;">
+                    BKApay - Votre plateforme de paiement mobile money<br>
+                    <a href="https://bkapay.com" style="color: #2563eb; text-decoration: none;">bkapay.com</a>
+                  </p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+  `;
+}
+
+function generateKycVerifiedHtml(firstName: string): string {
+  return `
+    <!DOCTYPE html>
+    <html lang="fr">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>BKApay - KYC Verifie</title>
+    </head>
+    <body style="margin: 0; padding: 0; background-color: #f9fafb;">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f9fafb;">
+        <tr>
+          <td align="center" style="padding: 40px 20px;">
+            <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+              <tr>
+                <td style="padding: 40px 40px 20px; text-align: center;">
+                  <h1 style="margin: 0; color: #2563eb; font-family: Arial, sans-serif; font-size: 28px; font-weight: bold;">BKApay</h1>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 0 40px;">
+                  <h2 style="margin: 0 0 20px; color: #1f2937; font-family: Arial, sans-serif; font-size: 20px; text-align: center;">Compte verifie avec succes</h2>
+                  <p style="margin: 0 0 15px; color: #4b5563; font-family: Arial, sans-serif; font-size: 16px; line-height: 1.5;">Bonjour ${firstName},</p>
+                  <p style="margin: 0 0 25px; color: #4b5563; font-family: Arial, sans-serif; font-size: 16px; line-height: 1.5;">Felicitations! Votre verification KYC a ete approuvee.</p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 0 40px;">
+                  <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                    <tr>
+                      <td style="background-color: #d1fae5; padding: 20px; text-align: center; border-radius: 8px; border-left: 4px solid #10b981;">
+                        <p style="margin: 0; color: #065f46; font-family: Arial, sans-serif; font-size: 14px; font-weight: bold;">Compte verifie</p>
+                        <p style="margin: 10px 0 0; color: #047857; font-family: Arial, sans-serif; font-size: 14px;">Vous avez acces a toutes les fonctionnalites</p>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 25px 40px;">
+                  <p style="margin: 0 0 10px; color: #4b5563; font-family: Arial, sans-serif; font-size: 14px; line-height: 1.5;">Vous pouvez maintenant:</p>
+                  <ul style="margin: 0; padding-left: 20px; color: #4b5563; font-family: Arial, sans-serif; font-size: 14px; line-height: 1.8;">
+                    <li>Effectuer des retraits</li>
+                    <li>Creer des liens de paiement</li>
+                    <li>Utiliser l'API BKApay</li>
+                  </ul>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 0 40px 40px;">
+                  <p style="margin: 0; color: #6b7280; font-family: Arial, sans-serif; font-size: 14px; line-height: 1.5;">Merci de faire confiance a BKApay!</p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 20px 40px; border-top: 1px solid #e5e7eb;">
+                  <p style="margin: 0; color: #9ca3af; font-family: Arial, sans-serif; font-size: 12px; text-align: center;">
+                    BKApay - Votre plateforme de paiement mobile money<br>
+                    <a href="https://bkapay.com" style="color: #2563eb; text-decoration: none;">bkapay.com</a>
+                  </p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+  `;
+}
+
+function generateKycRejectedHtml(firstName: string, reason: string): string {
+  return `
+    <!DOCTYPE html>
+    <html lang="fr">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>BKApay - KYC Rejete</title>
+    </head>
+    <body style="margin: 0; padding: 0; background-color: #f9fafb;">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f9fafb;">
+        <tr>
+          <td align="center" style="padding: 40px 20px;">
+            <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+              <tr>
+                <td style="padding: 40px 40px 20px; text-align: center;">
+                  <h1 style="margin: 0; color: #2563eb; font-family: Arial, sans-serif; font-size: 28px; font-weight: bold;">BKApay</h1>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 0 40px;">
+                  <h2 style="margin: 0 0 20px; color: #1f2937; font-family: Arial, sans-serif; font-size: 20px; text-align: center;">Verification KYC rejetee</h2>
+                  <p style="margin: 0 0 15px; color: #4b5563; font-family: Arial, sans-serif; font-size: 16px; line-height: 1.5;">Bonjour ${firstName},</p>
+                  <p style="margin: 0 0 25px; color: #4b5563; font-family: Arial, sans-serif; font-size: 16px; line-height: 1.5;">Malheureusement, votre demande de verification KYC a ete rejetee.</p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 0 40px;">
+                  <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                    <tr>
+                      <td style="background-color: #fee2e2; padding: 20px; border-radius: 8px; border-left: 4px solid #ef4444;">
+                        <p style="margin: 0 0 10px; color: #991b1b; font-family: Arial, sans-serif; font-size: 14px; font-weight: bold;">Raison du rejet:</p>
+                        <p style="margin: 0; color: #b91c1c; font-family: Arial, sans-serif; font-size: 14px;">${reason}</p>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 25px 40px 40px;">
+                  <p style="margin: 0 0 10px; color: #4b5563; font-family: Arial, sans-serif; font-size: 14px; line-height: 1.5;">Vous pouvez soumettre une nouvelle demande en vous assurant que vos documents sont conformes aux exigences.</p>
+                  <p style="margin: 0; color: #6b7280; font-family: Arial, sans-serif; font-size: 14px; line-height: 1.5;">Si vous avez des questions, n'hesitez pas a nous contacter.</p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 20px 40px; border-top: 1px solid #e5e7eb;">
+                  <p style="margin: 0; color: #9ca3af; font-family: Arial, sans-serif; font-size: 12px; text-align: center;">
+                    BKApay - Votre plateforme de paiement mobile money<br>
+                    <a href="https://bkapay.com" style="color: #2563eb; text-decoration: none;">bkapay.com</a>
+                  </p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+  `;
+}
