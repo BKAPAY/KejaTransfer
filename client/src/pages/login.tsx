@@ -124,7 +124,7 @@ export default function Login() {
   const sendCodeMutation = useMutation({
     mutationFn: async (data: LoginFormData) => {
       const response = await apiRequest("POST", "/api/auth/login/send-code", data);
-      return response;
+      return await response.json();
     },
     onSuccess: async (response: any, data) => {
       console.log("[Login] Response received:", JSON.stringify(response));
