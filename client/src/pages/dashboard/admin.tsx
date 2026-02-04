@@ -33,6 +33,13 @@ const COUNTRY_NAMES: Record<string, string> = {
   BF: "Burkina Faso",
   GN: "Guinée",
   NE: "Niger",
+  ML: "Mali",
+  CM: "Cameroun",
+  TD: "Tchad",
+  CG: "Congo-Brazzaville",
+  CF: "Centrafrique",
+  GA: "Gabon",
+  CD: "RD Congo",
 };
 
 const COUNTRY_FLAGS: Record<string, string> = {
@@ -43,6 +50,30 @@ const COUNTRY_FLAGS: Record<string, string> = {
   BF: "🇧🇫",
   GN: "🇬🇳",
   NE: "🇳🇪",
+  ML: "🇲🇱",
+  CM: "🇨🇲",
+  TD: "🇹🇩",
+  CG: "🇨🇬",
+  CF: "🇨🇫",
+  GA: "🇬🇦",
+  CD: "🇨🇩",
+};
+
+const COUNTRY_CURRENCIES: Record<string, string> = {
+  BJ: "XOF",
+  TG: "XOF",
+  CI: "XOF",
+  SN: "XOF",
+  BF: "XOF",
+  GN: "XOF",
+  NE: "XOF",
+  ML: "XOF",
+  CM: "XAF",
+  TD: "XAF",
+  CG: "XAF",
+  CF: "XAF",
+  GA: "XAF",
+  CD: "CDF",
 };
 
 interface DiagnosticResult {
@@ -276,13 +307,16 @@ export default function Admin() {
     }
   };
 
-  const formatAmount = (amount: number) => {
+  const formatAmount = (amount: number, currency: string = "XOF") => {
     return new Intl.NumberFormat("fr-FR", {
-      style: "currency",
-      currency: "XOF",
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
-    }).format(amount);
+    }).format(amount) + " " + currency;
+  };
+
+  const getUserCurrency = (country: string | null | undefined): string => {
+    if (!country) return "XOF";
+    return COUNTRY_CURRENCIES[country] || "XOF";
   };
 
   return (
@@ -657,14 +691,22 @@ export default function Admin() {
                         <p className="text-sm text-muted-foreground truncate" data-testid={`email-${user.id}`}>
                           {user.email}
                         </p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Cree le {new Date(user.createdAt).toLocaleDateString("fr-FR")}
-                        </p>
+                        <div className="flex items-center gap-2 mt-1">
+                          {user.country && (
+                            <span className="text-xs flex items-center gap-1" data-testid={`country-${user.id}`}>
+                              <span>{COUNTRY_FLAGS[user.country] || ""}</span>
+                              <span className="text-muted-foreground">{COUNTRY_NAMES[user.country] || user.country}</span>
+                            </span>
+                          )}
+                          <span className="text-xs text-muted-foreground">
+                            - Cree le {new Date(user.createdAt).toLocaleDateString("fr-FR")}
+                          </span>
+                        </div>
                       </div>
                       <div className="text-right flex items-center gap-3">
                         <div>
                           <p className="font-semibold text-sm" data-testid={`balance-${user.id}`}>
-                            {formatAmount(user.balance)}
+                            {formatAmount(user.balance, getUserCurrency(user.country))}
                           </p>
                           <p className="text-xs text-muted-foreground">Solde</p>
                         </div>
@@ -935,7 +977,7 @@ export default function Admin() {
                   <p className="text-xs text-muted-foreground flex items-center gap-1">
                     <CreditCard className="w-3 h-3" /> Solde
                   </p>
-                  <p className="text-lg font-bold">{formatAmount(selectedUser.balance)}</p>
+                  <p className="text-lg font-bold">{formatAmount(selectedUser.balance, getUserCurrency(selectedUser.country))}</p>
                 </div>
                 <div className="space-y-1">
                   <p className="text-xs text-muted-foreground">Statut KYC</p>
