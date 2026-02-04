@@ -10,6 +10,13 @@ interface MailtrapConfig {
   enableKycRejected: boolean;
 }
 
+const BASE_URL = process.env.BASE_URL || "https://bkapay.com";
+const LOGO_URL = `${BASE_URL}/bkapay-logo.png`;
+
+function getEmailLogoHeader(): string {
+  return `<img src="${LOGO_URL}" alt="BKApay" style="height: 50px; width: auto; max-width: 200px;" />`;
+}
+
 let cachedMailtrapConfig: MailtrapConfig | null = null;
 let lastConfigFetch = 0;
 const CONFIG_CACHE_TTL = 30000;
@@ -223,7 +230,7 @@ function generateSignupHtml(code: string): string {
             <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
               <tr>
                 <td style="padding: 40px 40px 20px; text-align: center;">
-                  <h1 style="margin: 0; color: #2563eb; font-family: Arial, sans-serif; font-size: 28px; font-weight: bold;">BKApay</h1>
+                  ${getEmailLogoHeader()}
                 </td>
               </tr>
               <tr>
@@ -287,7 +294,7 @@ function generateLoginHtml(code: string): string {
             <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
               <tr>
                 <td style="padding: 40px 40px 20px; text-align: center;">
-                  <h1 style="margin: 0; color: #2563eb; font-family: Arial, sans-serif; font-size: 28px; font-weight: bold;">BKApay</h1>
+                  ${getEmailLogoHeader()}
                 </td>
               </tr>
               <tr>
@@ -351,7 +358,7 @@ function generatePasswordResetHtml(code: string): string {
             <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
               <tr>
                 <td style="padding: 40px 40px 20px; text-align: center;">
-                  <h1 style="margin: 0; color: #2563eb; font-family: Arial, sans-serif; font-size: 28px; font-weight: bold;">BKApay</h1>
+                  ${getEmailLogoHeader()}
                 </td>
               </tr>
               <tr>
@@ -562,7 +569,7 @@ function generateKycSubmittedHtml(firstName: string): string {
             <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
               <tr>
                 <td style="padding: 40px 40px 20px; text-align: center;">
-                  <h1 style="margin: 0; color: #2563eb; font-family: Arial, sans-serif; font-size: 28px; font-weight: bold;">BKApay</h1>
+                  ${getEmailLogoHeader()}
                 </td>
               </tr>
               <tr>
@@ -626,7 +633,7 @@ function generateKycVerifiedHtml(firstName: string): string {
             <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
               <tr>
                 <td style="padding: 40px 40px 20px; text-align: center;">
-                  <h1 style="margin: 0; color: #2563eb; font-family: Arial, sans-serif; font-size: 28px; font-weight: bold;">BKApay</h1>
+                  ${getEmailLogoHeader()}
                 </td>
               </tr>
               <tr>
@@ -700,7 +707,7 @@ function generateKycRejectedHtml(firstName: string, reason: string): string {
             <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
               <tr>
                 <td style="padding: 40px 40px 20px; text-align: center;">
-                  <h1 style="margin: 0; color: #2563eb; font-family: Arial, sans-serif; font-size: 28px; font-weight: bold;">BKApay</h1>
+                  ${getEmailLogoHeader()}
                 </td>
               </tr>
               <tr>
