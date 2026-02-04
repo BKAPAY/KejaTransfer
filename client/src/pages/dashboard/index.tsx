@@ -432,7 +432,7 @@ export default function Dashboard() {
           <CardContent className="space-y-4">
             {statsLoading || analyticsLoading ? (
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {[1, 2, 3, 4].map((i) => (
                     <Skeleton key={i} className="h-20 rounded-xl" />
                   ))}
@@ -442,7 +442,7 @@ export default function Dashboard() {
             ) : analytics ? (
               <>
                 {/* Mini Stats Grid */}
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <MiniStatCard
                     title="Revenus totaux"
                     value={analytics.totalRevenue}
