@@ -116,12 +116,13 @@ export const SOFTPAY_OPERATORS: Record<string, SoftpayOperatorConfig> = {
   },
 
   // MALI OPERATORS
+  // Orange Money Mali - Push notification
   "orange_ml": {
     endpoint: "/softpay/orange-money-mali",
     requiresOTP: false,
     requiresTwoStep: false,
-    requiresRedirect: true,
-    ussdInstruction: "Scannez le QR Code ou cliquez sur le lien pour payer avec Orange Money",
+    requiresRedirect: false,
+    ussdInstruction: "Vous recevrez une notification sur votre téléphone. Validez le paiement en entrant votre code secret.",
     parameterMapping: (data) => ({
       orange_money_mali_customer_fullname: data.customerName,
       orange_money_mali_email: BKAPAY_GENERIC_EMAIL,
@@ -131,12 +132,13 @@ export const SOFTPAY_OPERATORS: Record<string, SoftpayOperatorConfig> = {
     })
   },
 
+  // Moov Mali - Push notification
   "moov_ml": {
     endpoint: "/softpay/moov-mali",
     requiresOTP: false,
     requiresTwoStep: false,
-    requiresRedirect: true,
-    ussdInstruction: "Scannez le QR Code ou cliquez sur le lien pour payer avec Moov",
+    requiresRedirect: false,
+    ussdInstruction: "Vous recevrez une notification sur votre téléphone. Validez le paiement en entrant votre code secret.",
     parameterMapping: (data) => ({
       moov_ml_customer_fullname: data.customerName,
       moov_ml_email: BKAPAY_GENERIC_EMAIL,
@@ -150,12 +152,13 @@ export const SOFTPAY_OPERATORS: Record<string, SoftpayOperatorConfig> = {
   // Seuls Orange Money et Moov sont supportés au Mali
 
   // BENIN OPERATORS
+  // MTN Bénin - Push notification + SMS de validation
   "mtn_bj": {
     endpoint: "/softpay/mtn-benin",
     requiresOTP: false,
     requiresTwoStep: false,
-    requiresRedirect: true,
-    ussdInstruction: "Scannez le QR Code ou cliquez sur le lien pour payer avec MTN",
+    requiresRedirect: false,
+    ussdInstruction: "Vous recevrez un SMS de validation. Confirmez le paiement sur votre téléphone.",
     parameterMapping: (data) => ({
       mtn_benin_customer_fullname: data.customerName,
       mtn_benin_email: BKAPAY_GENERIC_EMAIL,
@@ -165,12 +168,13 @@ export const SOFTPAY_OPERATORS: Record<string, SoftpayOperatorConfig> = {
     })
   },
 
+  // Moov Bénin - Push notification
   "moov_bj": {
     endpoint: "/softpay/moov-benin",
     requiresOTP: false,
     requiresTwoStep: false,
-    requiresRedirect: true,
-    ussdInstruction: "Scannez le QR Code ou cliquez sur le lien pour payer avec Moov",
+    requiresRedirect: false,
+    ussdInstruction: "Vous recevrez une notification sur votre téléphone. Validez le paiement en entrant votre code secret.",
     parameterMapping: (data) => ({
       moov_benin_customer_fullname: data.customerName,
       moov_benin_email: BKAPAY_GENERIC_EMAIL,
@@ -180,12 +184,13 @@ export const SOFTPAY_OPERATORS: Record<string, SoftpayOperatorConfig> = {
   },
 
   // TOGO OPERATORS
+  // T-Money Togo - SMS de validation
   "tmoney_tg": {
     endpoint: "/softpay/t-money-togo",
     requiresOTP: false,
     requiresTwoStep: false,
-    requiresRedirect: true,
-    ussdInstruction: "Scannez le QR Code ou cliquez sur le lien pour payer avec T-Money",
+    requiresRedirect: false,
+    ussdInstruction: "Vous recevrez un SMS de validation. Confirmez le paiement sur votre téléphone.",
     parameterMapping: (data) => ({
       name_t_money: data.customerName,
       email_t_money: BKAPAY_GENERIC_EMAIL,
@@ -194,12 +199,13 @@ export const SOFTPAY_OPERATORS: Record<string, SoftpayOperatorConfig> = {
     })
   },
 
+  // Moov Togo - Push notification
   "moov_tg": {
     endpoint: "/softpay/moov-togo",
     requiresOTP: false,
     requiresTwoStep: false,
-    requiresRedirect: true,
-    ussdInstruction: "Scannez le QR Code ou cliquez sur le lien pour payer avec Moov",
+    requiresRedirect: false,
+    ussdInstruction: "Vous recevrez une notification sur votre téléphone. Validez le paiement en entrant votre code secret.",
     parameterMapping: (data) => ({
       moov_togo_customer_fullname: data.customerName,
       moov_togo_email: BKAPAY_GENERIC_EMAIL,
@@ -210,26 +216,29 @@ export const SOFTPAY_OPERATORS: Record<string, SoftpayOperatorConfig> = {
   },
 
   // CÔTE D'IVOIRE OPERATORS
+  // Orange Money CI nécessite un OTP généré via #144*82# option 2
   "orange_ci": {
     endpoint: "/softpay/orange-money-ci",
-    requiresOTP: false,
+    requiresOTP: true,
     requiresTwoStep: false,
-    requiresRedirect: true,
-    ussdInstruction: "Scannez le QR Code ou cliquez sur le lien pour payer avec Orange Money",
+    requiresRedirect: false,
+    ussdInstruction: "Composez #144*82# puis choisissez l'option 2 pour obtenir votre code de paiement",
     parameterMapping: (data) => ({
       orange_money_ci_customer_fullname: data.customerName,
       orange_money_ci_email: BKAPAY_GENERIC_EMAIL,
       orange_money_ci_phone_number: data.phoneNumber,
+      orange_money_ci_otp: data.authorizationCode,
       payment_token: data.invoiceToken
     })
   },
 
+  // MTN CI - Push notification au téléphone
   "mtn_ci": {
     endpoint: "/softpay/mtn-ci",
     requiresOTP: false,
     requiresTwoStep: false,
-    requiresRedirect: true,
-    ussdInstruction: "Scannez le QR Code ou cliquez sur le lien pour payer avec MTN",
+    requiresRedirect: false,
+    ussdInstruction: "Vous recevrez une notification sur votre téléphone. Validez le paiement en entrant votre code secret.",
     parameterMapping: (data) => ({
       mtn_ci_customer_fullname: data.customerName,
       mtn_ci_email: BKAPAY_GENERIC_EMAIL,
@@ -239,12 +248,13 @@ export const SOFTPAY_OPERATORS: Record<string, SoftpayOperatorConfig> = {
     })
   },
 
+  // Moov CI - Push notification automatique
   "moov_ci": {
     endpoint: "/softpay/moov-ci",
     requiresOTP: false,
     requiresTwoStep: false,
-    requiresRedirect: true,
-    ussdInstruction: "Scannez le QR Code ou cliquez sur le lien pour payer avec Moov",
+    requiresRedirect: false,
+    ussdInstruction: "Un popup s'ouvrira automatiquement sur votre téléphone. Entrez votre code secret dans les 30 secondes.",
     parameterMapping: (data) => ({
       moov_ci_customer_fullname: data.customerName,
       moov_ci_email: BKAPAY_GENERIC_EMAIL,
@@ -253,12 +263,13 @@ export const SOFTPAY_OPERATORS: Record<string, SoftpayOperatorConfig> = {
     })
   },
 
+  // Wave CI - Redirection vers Wave
   "wave_ci": {
     endpoint: "/softpay/wave-ci",
     requiresOTP: false,
     requiresTwoStep: false,
     requiresRedirect: true,
-    ussdInstruction: "Scannez le QR Code ou cliquez sur le lien pour payer avec Wave",
+    ussdInstruction: "Vous serez redirigé vers Wave pour compléter le paiement",
     parameterMapping: (data) => ({
       wave_ci_fullName: data.customerName,
       wave_ci_email: BKAPAY_GENERIC_EMAIL,
@@ -268,26 +279,29 @@ export const SOFTPAY_OPERATORS: Record<string, SoftpayOperatorConfig> = {
   },
 
   // BURKINA FASO OPERATORS
+  // Orange Money BF nécessite un OTP généré via *144*4*6*MONTANT#
   "orange_bf": {
     endpoint: "/softpay/orange-money-burkina",
-    requiresOTP: false,
+    requiresOTP: true,
     requiresTwoStep: false,
-    requiresRedirect: true,
-    ussdInstruction: "Scannez le QR Code ou cliquez sur le lien pour payer avec Orange Money",
+    requiresRedirect: false,
+    ussdInstruction: "Composez *144*4*6*MONTANT# pour obtenir votre code OTP",
     parameterMapping: (data) => ({
       name_bf: data.customerName,
       email_bf: BKAPAY_GENERIC_EMAIL,
       phone_bf: data.phoneNumber,
+      otp_code: data.authorizationCode,
       payment_token: data.invoiceToken
     })
   },
 
+  // Moov BF - Compose *555*6# pour valider
   "moov_bf": {
     endpoint: "/softpay/moov-burkina",
     requiresOTP: false,
     requiresTwoStep: false,
-    requiresRedirect: true,
-    ussdInstruction: "Scannez le QR Code ou cliquez sur le lien pour payer avec Moov",
+    requiresRedirect: false,
+    ussdInstruction: "Composez *555*6# puis entrez votre code secret pour finaliser le paiement",
     parameterMapping: (data) => ({
       moov_burkina_faso_fullName: data.customerName,
       moov_burkina_faso_email: BKAPAY_GENERIC_EMAIL,
