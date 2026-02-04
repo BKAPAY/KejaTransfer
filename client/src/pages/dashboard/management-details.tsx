@@ -397,14 +397,14 @@ function TransactionDetailDialog({ transaction, onOpenChange }: { transaction: T
             </div>
 
             {/* Client Info Section */}
-            {(transaction.customerEmail || transaction.customerPhone) && (
+            {(transaction.customerName || transaction.customerEmail || transaction.customerPhone) && (
               <div className="space-y-3">
                 <h3 className="font-semibold text-sm">Informations du client</h3>
                 
-                {transaction.customerEmail && (
+                {transaction.customerName && (
                   <div>
-                    <label className="text-xs font-medium text-muted-foreground">Email</label>
-                    <div className="p-2 bg-muted rounded-md text-sm mt-1 break-all">{transaction.customerEmail}</div>
+                    <label className="text-xs font-medium text-muted-foreground">Nom complet</label>
+                    <div className="p-2 bg-muted rounded-md text-sm mt-1">{transaction.customerName}</div>
                   </div>
                 )}
 
@@ -412,6 +412,13 @@ function TransactionDetailDialog({ transaction, onOpenChange }: { transaction: T
                   <div>
                     <label className="text-xs font-medium text-muted-foreground">Téléphone</label>
                     <div className="p-2 bg-muted rounded-md text-sm mt-1">{transaction.customerPhone}</div>
+                  </div>
+                )}
+
+                {transaction.customerEmail && (
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground">Email</label>
+                    <div className="p-2 bg-muted rounded-md text-sm mt-1 break-all">{transaction.customerEmail}</div>
                   </div>
                 )}
               </div>

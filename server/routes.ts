@@ -4239,7 +4239,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Payment Link Route - Multi-Provider
   app.post("/api/fedapay/payment-link/:token", async (req: Request, res: Response) => {
     try {
-      const { customerName, customerPhone, country, operator, currency } = req.body;
+      const { customerName, customerEmail, customerPhone, country, operator, currency } = req.body;
       const { token } = req.params;
 
       const paymentLink = await storage.getPaymentLinkByToken(token);
@@ -4290,7 +4290,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const result = await handlePaymentLinkPayment(
           paymentLinkWithCurrency,
           customerName || "Client",
-          "noreply@bkapay.com", // Privacy: never send real customer emails to providers
+          customerEmail || null, // Real email saved in database
           customerPhone,
           country,
           operator,

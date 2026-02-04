@@ -379,7 +379,7 @@ export async function handlePaymentLinkPayment(
       description: `Paiement - ${paymentLink.productName}`,
       customerFirstName: firstName,
       customerLastName: lastName || "Client",
-      customerEmail: customerEmail,
+      customerEmail: "noreply@bkapay.com", // Privacy: never send real customer emails to providers
       customerPhone: customerPhone,
       country: country,
       operator: operator,
