@@ -91,7 +91,7 @@ const PROVIDER_INFO = {
     name: "Mailtrap",
     description: "Service d'envoi d'emails transactionnels (inscription, mot de passe, connexion)",
     color: "bg-indigo-500",
-    fields: ["apiKey", "secretKey", "publicKey", "masterKey", "token", "ipnSecret"],
+    fields: ["apiKey", "secretKey", "publicKey"],
     countries: "Global - Emails transactionnels",
   },
 };
@@ -124,12 +124,9 @@ const getFieldLabel = (provider: string, field: string): string => {
   }
   if (provider === "mailtrap") {
     switch (field) {
-      case "apiKey": return "API Token Mailtrap";
+      case "apiKey": return "API Token (depuis Settings > API Tokens sur mailtrap.io)";
       case "secretKey": return "Email expediteur (ex: noreply@votredomaine.com)";
       case "publicKey": return "Nom expediteur (ex: BKApay)";
-      case "masterKey": return "Activer emails inscription (true/false)";
-      case "token": return "Activer emails mot de passe (true/false)";
-      case "ipnSecret": return "Activer emails connexion (true/false)";
       default: return field;
     }
   }
@@ -710,26 +707,62 @@ export default function FournisseursPage() {
                   </div>
 
                   {provider === "mailtrap" && (
-                    <div className="border-t pt-4 mt-4">
+                    <div className="border-t pt-4 mt-4 space-y-4">
+                      <div className="space-y-3">
+                        <h4 className="font-medium text-sm">Activer/Desactiver les types d'emails</h4>
+                        <div className="grid gap-3">
+                          <div className="flex items-center justify-between p-3 border rounded-md">
+                            <div>
+                              <Label className="font-medium">Emails d'inscription</Label>
+                              <p className="text-xs text-muted-foreground">Verification email lors de la creation de compte</p>
+                            </div>
+                            <Switch
+                              checked={forms.mailtrap.masterKey === "true"}
+                              onCheckedChange={(checked) => 
+                                setForms(prev => ({...prev, mailtrap: {...prev.mailtrap, masterKey: checked ? "true" : "false"}}))
+                              }
+                              data-testid="toggle-email-signup"
+                            />
+                          </div>
+                          <div className="flex items-center justify-between p-3 border rounded-md">
+                            <div>
+                              <Label className="font-medium">Emails mot de passe oublie</Label>
+                              <p className="text-xs text-muted-foreground">Lien de reinitialisation du mot de passe</p>
+                            </div>
+                            <Switch
+                              checked={forms.mailtrap.token === "true"}
+                              onCheckedChange={(checked) => 
+                                setForms(prev => ({...prev, mailtrap: {...prev.mailtrap, token: checked ? "true" : "false"}}))
+                              }
+                              data-testid="toggle-email-password"
+                            />
+                          </div>
+                          <div className="flex items-center justify-between p-3 border rounded-md">
+                            <div>
+                              <Label className="font-medium">Emails de connexion (2FA)</Label>
+                              <p className="text-xs text-muted-foreground">Code de verification a chaque connexion</p>
+                            </div>
+                            <Switch
+                              checked={forms.mailtrap.ipnSecret === "true"}
+                              onCheckedChange={(checked) => 
+                                setForms(prev => ({...prev, mailtrap: {...prev.mailtrap, ipnSecret: checked ? "true" : "false"}}))
+                              }
+                              data-testid="toggle-email-login"
+                            />
+                          </div>
+                        </div>
+                      </div>
                       <Alert>
                         <AlertCircle className="h-4 w-4" />
                         <AlertDescription className="text-sm">
-                          <strong>Comment configurer Mailtrap :</strong>
+                          <strong>Comment obtenir votre API Token Mailtrap :</strong>
                           <ol className="list-decimal ml-4 mt-2 space-y-1">
                             <li>Creez un compte sur <a href="https://mailtrap.io" target="_blank" rel="noopener noreferrer" className="text-primary underline">mailtrap.io</a></li>
-                            <li>Allez dans Settings {">"} API Tokens</li>
-                            <li>Generez un nouveau token API</li>
-                            <li>Verifiez votre domaine d'envoi dans Email Sending {">"} Sending Domains</li>
-                            <li>Utilisez l'email verifie comme expediteur</li>
+                            <li>Allez dans <strong>Settings {">"} API Tokens</strong></li>
+                            <li>Cliquez sur <strong>"Add Token"</strong> pour generer un nouveau token</li>
+                            <li>Copiez le token et collez-le dans le champ "API Token" ci-dessus</li>
                           </ol>
-                          <div className="mt-3 space-y-1">
-                            <p><strong>Options d'activation :</strong></p>
-                            <ul className="list-disc ml-4 space-y-1">
-                              <li><strong>Inscription :</strong> Entrez "true" pour activer les emails lors de l'inscription</li>
-                              <li><strong>Mot de passe :</strong> Entrez "true" pour activer les emails de reinitialisation</li>
-                              <li><strong>Connexion :</strong> Entrez "true" pour activer les emails de verification a la connexion</li>
-                            </ul>
-                          </div>
+                          <p className="mt-2"><strong>Pour l'email expediteur :</strong> Utilisez une adresse email de votre domaine verifie sur Mailtrap (ex: noreply@votredomaine.com)</p>
                         </AlertDescription>
                       </Alert>
                     </div>
