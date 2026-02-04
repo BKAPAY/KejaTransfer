@@ -4,8 +4,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { useState, useRef, useEffect } from "react";
-import { Upload, CheckCircle2, Clock, AlertCircle, X, Image, Shield, ArrowRight, ArrowLeft, User, FileText, PenTool, Trash2 } from "lucide-react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { Upload, CheckCircle2, Clock, AlertCircle, X, Camera, Shield, ArrowRight, ArrowLeft, User, FileText, PenTool, Trash2 } from "lucide-react";
 
 const COUNTRY_DATA: Record<string, { name: string; flag: string }> = {
   BJ: { name: "Benin", flag: "🇧🇯" },
@@ -24,6 +24,8 @@ const COUNTRY_DATA: Record<string, { name: string; flag: string }> = {
   CD: { name: "RD Congo", flag: "🇨🇩" },
 };
 
+type CameraMode = "front" | "back" | "selfie" | null;
+
 export default function KYC() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -35,11 +37,86 @@ export default function KYC() {
   const [signatureData, setSignatureData] = useState<string | null>(null);
   const [isResubmitting, setIsResubmitting] = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
+  const [cameraMode, setCameraMode] = useState<CameraMode>(null);
+  const [stream, setStream] = useState<MediaStream | null>(null);
   
-  const frontInputRef = useRef<HTMLInputElement>(null);
-  const backInputRef = useRef<HTMLInputElement>(null);
-  const selfieInputRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const captureCanvasRef = useRef<HTMLCanvasElement>(null);
+
+  const stopCamera = useCallback(() => {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      setStream(null);
+    }
+    setCameraMode(null);
+  }, [stream]);
+
+  const startCamera = async (mode: CameraMode) => {
+    try {
+      stopCamera();
+      
+      const facingMode = mode === "selfie" ? "user" : "environment";
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false,
+      });
+      
+      setStream(mediaStream);
+      setCameraMode(mode);
+      
+      if (videoRef.current) {
+        videoRef.current.srcObject = mediaStream;
+        videoRef.current.play();
+      }
+    } catch (error) {
+      console.error("Camera error:", error);
+      toast({
+        title: "Erreur",
+        description: "Impossible d'acceder a la camera. Verifiez les permissions.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const capturePhoto = () => {
+    if (!videoRef.current || !captureCanvasRef.current || !cameraMode) return;
+    
+    const video = videoRef.current;
+    const canvas = captureCanvasRef.current;
+    const ctx = canvas.getContext("2d");
+    
+    if (!ctx) return;
+    
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    ctx.drawImage(video, 0, 0);
+    
+    const imageData = canvas.toDataURL("image/jpeg", 0.8);
+    
+    if (cameraMode === "front") {
+      setIdFrontData(imageData);
+    } else if (cameraMode === "back") {
+      setIdBackData(imageData);
+    } else if (cameraMode === "selfie") {
+      setSelfieData(imageData);
+    }
+    
+    stopCamera();
+    
+    toast({
+      title: "Photo capturee",
+      description: "La photo a ete enregistree avec succes",
+    });
+  };
+
+  useEffect(() => {
+    return () => {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, [stream]);
 
   useEffect(() => {
     if (currentStep === 3 && canvasRef.current) {
@@ -56,30 +133,13 @@ export default function KYC() {
     }
   }, [currentStep]);
 
-  const handleFileSelect = (type: "front" | "back" | "selfie") => (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const fileData = event.target?.result as string;
-      if (type === "front") setIdFrontData(fileData);
-      else if (type === "back") setIdBackData(fileData);
-      else if (type === "selfie") setSelfieData(fileData);
-    };
-    reader.readAsDataURL(file);
-  };
-
   const resetCapture = (type: "front" | "back" | "selfie") => {
     if (type === "front") {
       setIdFrontData(null);
-      if (frontInputRef.current) frontInputRef.current.value = "";
     } else if (type === "back") {
       setIdBackData(null);
-      if (backInputRef.current) backInputRef.current.value = "";
     } else if (type === "selfie") {
       setSelfieData(null);
-      if (selfieInputRef.current) selfieInputRef.current.value = "";
     }
   };
 
@@ -246,6 +306,56 @@ export default function KYC() {
     </div>
   );
 
+  const renderCameraView = () => {
+    if (!cameraMode) return null;
+    
+    const labels: Record<string, string> = {
+      front: "Recto de la piece d'identite",
+      back: "Verso de la piece d'identite",
+      selfie: "Photo avec piece en main",
+    };
+    
+    return (
+      <div className="fixed inset-0 z-50 bg-black flex flex-col">
+        <div className="flex items-center justify-between p-4 bg-black/80">
+          <h3 className="text-white font-medium">{labels[cameraMode]}</h3>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={stopCamera}
+            className="text-white hover:bg-white/20"
+            data-testid="button-close-camera"
+          >
+            <X className="w-6 h-6" />
+          </Button>
+        </div>
+        
+        <div className="flex-1 flex items-center justify-center overflow-hidden">
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            className="max-w-full max-h-full object-contain"
+          />
+        </div>
+        
+        <div className="p-6 bg-black/80 flex justify-center">
+          <Button
+            size="lg"
+            onClick={capturePhoto}
+            className="rounded-full w-16 h-16 bg-white hover:bg-gray-200"
+            data-testid="button-capture-photo"
+          >
+            <Camera className="w-8 h-8 text-black" />
+          </Button>
+        </div>
+        
+        <canvas ref={captureCanvasRef} className="hidden" />
+      </div>
+    );
+  };
+
   const renderStep1 = () => (
     <div className="space-y-6">
       <div className="text-center mb-4">
@@ -308,7 +418,7 @@ export default function KYC() {
       <div className="text-center mb-4">
         <FileText className="w-10 h-10 mx-auto mb-2 text-primary" />
         <h3 className="text-lg font-semibold">Etape 2: Documents d'identite</h3>
-        <p className="text-sm text-muted-foreground">Fournissez vos pieces d'identite</p>
+        <p className="text-sm text-muted-foreground">Prenez en photo vos pieces d'identite</p>
       </div>
 
       <div className="space-y-4">
@@ -316,14 +426,6 @@ export default function KYC() {
           <label className="text-sm font-medium text-foreground mb-2 block">
             Photo du recto de la piece d'identite
           </label>
-          <input
-            ref={frontInputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleFileSelect("front")}
-            className="hidden"
-            data-testid="input-file-front"
-          />
           {idFrontData ? (
             <div className="relative">
               <img src={idFrontData} alt="Recto" className="w-full h-40 object-cover rounded-lg border" />
@@ -339,12 +441,12 @@ export default function KYC() {
             <Button
               variant="outline"
               className="w-full h-24 border-dashed"
-              onClick={() => frontInputRef.current?.click()}
-              data-testid="button-upload-front"
+              onClick={() => startCamera("front")}
+              data-testid="button-camera-front"
             >
               <div className="flex flex-col items-center gap-2">
-                <Image className="w-6 h-6 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">Choisir une photo</span>
+                <Camera className="w-6 h-6 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Prendre une photo</span>
               </div>
             </Button>
           )}
@@ -354,14 +456,6 @@ export default function KYC() {
           <label className="text-sm font-medium text-foreground mb-2 block">
             Photo du verso de la piece d'identite
           </label>
-          <input
-            ref={backInputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleFileSelect("back")}
-            className="hidden"
-            data-testid="input-file-back"
-          />
           {idBackData ? (
             <div className="relative">
               <img src={idBackData} alt="Verso" className="w-full h-40 object-cover rounded-lg border" />
@@ -377,12 +471,12 @@ export default function KYC() {
             <Button
               variant="outline"
               className="w-full h-24 border-dashed"
-              onClick={() => backInputRef.current?.click()}
-              data-testid="button-upload-back"
+              onClick={() => startCamera("back")}
+              data-testid="button-camera-back"
             >
               <div className="flex flex-col items-center gap-2">
-                <Image className="w-6 h-6 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">Choisir une photo</span>
+                <Camera className="w-6 h-6 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Prendre une photo</span>
               </div>
             </Button>
           )}
@@ -392,14 +486,6 @@ export default function KYC() {
           <label className="text-sm font-medium text-foreground mb-2 block">
             Photo de vous avec la piece d'identite en main
           </label>
-          <input
-            ref={selfieInputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleFileSelect("selfie")}
-            className="hidden"
-            data-testid="input-file-selfie"
-          />
           {selfieData ? (
             <div className="relative">
               <img src={selfieData} alt="Selfie" className="w-full h-40 object-cover rounded-lg border" />
@@ -415,12 +501,12 @@ export default function KYC() {
             <Button
               variant="outline"
               className="w-full h-24 border-dashed"
-              onClick={() => selfieInputRef.current?.click()}
-              data-testid="button-upload-selfie"
+              onClick={() => startCamera("selfie")}
+              data-testid="button-camera-selfie"
             >
               <div className="flex flex-col items-center gap-2">
-                <Image className="w-6 h-6 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">Choisir une photo</span>
+                <Camera className="w-6 h-6 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Prendre une photo</span>
               </div>
             </Button>
           )}
@@ -548,6 +634,8 @@ export default function KYC() {
 
   return (
     <div className="space-y-6">
+      {renderCameraView()}
+      
       <div>
         <h1 className="text-2xl font-bold text-foreground mb-1 flex items-center gap-2">
           <Shield className="h-6 w-6" />
