@@ -29,7 +29,8 @@ export function useConvertedMinimums(userBalanceCurrency: string): ConvertedMini
   const { data, isLoading } = useQuery({
     queryKey: ["/api/convert-minimums", userBalanceCurrency],
     queryFn: async () => {
-      if (userBalanceCurrency === "XOF") {
+      // XOF and XAF have the same value (1:1 rate)
+      if (userBalanceCurrency === "XOF" || userBalanceCurrency === "XAF") {
         return BASE_MINIMUMS_XOF;
       }
       
