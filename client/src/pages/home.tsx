@@ -266,24 +266,33 @@ export default function Home() {
               </ul>
             </div>
           </div>
-          <div className="border-t pt-4 sm:pt-6 lg:pt-8 flex flex-col sm:flex-row flex-wrap justify-between items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
-            <p>© 2025 BKApay</p>
-            <div className="flex gap-3 sm:gap-6">
-              <Link href="/terms">
-                <span className="hover:text-foreground cursor-pointer transition-colors" data-testid="link-terms">
-                  Conditions
-                </span>
-              </Link>
-              <Link href="/privacy">
-                <span className="hover:text-foreground cursor-pointer transition-colors" data-testid="link-privacy">
-                  Confidentialité
-                </span>
-              </Link>
-              <Link href="/cookies">
-                <span className="hover:text-foreground cursor-pointer transition-colors" data-testid="link-cookies">
-                  Cookies
-                </span>
-              </Link>
+          <div className="border-t pt-4 sm:pt-6 lg:pt-8 flex flex-col items-center gap-3 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
+            <a 
+              href="mailto:support@bkapay.com" 
+              className="text-primary hover:text-primary/80 font-medium transition-colors"
+              data-testid="link-footer-email"
+            >
+              support@bkapay.com
+            </a>
+            <div className="flex flex-col sm:flex-row flex-wrap justify-between items-center gap-2 sm:gap-4 w-full">
+              <p>© 2025 BKApay</p>
+              <div className="flex gap-3 sm:gap-6">
+                <Link href="/terms">
+                  <span className="hover:text-foreground cursor-pointer transition-colors" data-testid="link-terms">
+                    Conditions
+                  </span>
+                </Link>
+                <Link href="/privacy">
+                  <span className="hover:text-foreground cursor-pointer transition-colors" data-testid="link-privacy">
+                    Confidentialité
+                  </span>
+                </Link>
+                <Link href="/cookies">
+                  <span className="hover:text-foreground cursor-pointer transition-colors" data-testid="link-cookies">
+                    Cookies
+                  </span>
+                </Link>
+              </div>
             </div>
           </div>
         </div>
