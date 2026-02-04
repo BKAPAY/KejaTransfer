@@ -1042,10 +1042,7 @@ export default function ApiPay() {
               
               return filteredCountries.map(c => (
                 <SelectItem key={c.code} value={c.code}>
-                  <span className="flex items-center gap-2">
-                    <span>{c.flag}</span>
-                    <span>{c.name}</span>
-                  </span>
+                  {c.flag} {c.name}
                 </SelectItem>
               ));
             })()}
