@@ -1607,15 +1607,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const owner = await storage.getUser(apiKey.userId);
       const ownerCurrency = owner?.country ? getCurrencyForCountry(owner.country) : "XOF";
       
-      const grossAmount = Math.floor(Number(amount));
-      if (grossAmount < 200) {
+      const baseAmount = Math.floor(Number(amount));
+      if (baseAmount < 200) {
         return res.status(400).json({ error: "Montant minimum: 200" });
       }
 
       // Calculate fees on the amount in owner's currency with dynamic fee from database
-      const { calculateIncomingFee, getFeeFromDatabase } = await import("./utils/fees");
+      const { calculateIncomingFee, calculateCustomerPaysFee, getFeeFromDatabase } = await import("./utils/fees");
       const apiInitFeeConfig = await getFeeFromDatabase(storage, activeProvider, country, operator);
-      const feeInfo = calculateIncomingFee(grossAmount, apiInitFeeConfig.incoming);
+      
+      // Handle customerPaysFee logic like payment links
+      let amountForProvider: number;
+      let feeAmount: number;
+      let feePercentage: number;
+      let netAmountForUser: number;
+      
+      if (apiKey.customerPaysFee) {
+        // Customer pays fee: send TOTAL (base + fees) to provider, user receives base amount
+        const feeInfo = calculateCustomerPaysFee(baseAmount, apiInitFeeConfig.incoming);
+        amountForProvider = feeInfo.totalForProvider;
+        feeAmount = feeInfo.feeAmount;
+        feePercentage = feeInfo.feePercentage;
+        netAmountForUser = feeInfo.baseAmount;
+        console.log("[API-PAY INIT] Customer pays fee - sending total to provider:", {
+          baseAmount: baseAmount,
+          fee: feeAmount,
+          totalForProvider: amountForProvider,
+          userReceives: netAmountForUser,
+        });
+      } else {
+        // User pays fee: send base amount, user receives net (base - fees)
+        const feeInfo = calculateIncomingFee(baseAmount, apiInitFeeConfig.incoming);
+        amountForProvider = feeInfo.grossAmount;
+        feeAmount = feeInfo.feeAmount;
+        feePercentage = feeInfo.feePercentage;
+        netAmountForUser = feeInfo.netAmount;
+      }
 
       if (activeProvider === "mbiyopay") {
         // Use MbiyoPay
@@ -1624,23 +1651,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const providerCurrency = requestCurrency || getMbiyoCurrency(country);
         
         // CRITICAL: Convert amount from owner's currency to provider currency if different
-        let amountForProvider = grossAmount;
+        let convertedAmountForProvider = amountForProvider;
         if (ownerCurrency !== providerCurrency) {
           const { convertCurrency } = await import("./currency-converter");
-          const conversionResult = await convertCurrency(grossAmount, ownerCurrency, providerCurrency);
+          const conversionResult = await convertCurrency(amountForProvider, ownerCurrency, providerCurrency);
           if (conversionResult.success) {
-            amountForProvider = Math.floor(conversionResult.convertedAmount);
-            console.log(`[API-PAY INIT] Currency conversion: ${grossAmount} ${ownerCurrency} -> ${amountForProvider} ${providerCurrency}`);
+            convertedAmountForProvider = Math.floor(conversionResult.convertedAmount);
+            console.log(`[API-PAY INIT] Currency conversion: ${amountForProvider} ${ownerCurrency} -> ${convertedAmountForProvider} ${providerCurrency}`);
           } else {
             console.error("[API-PAY INIT] Currency conversion failed:", conversionResult.error);
             return res.status(500).json({ error: "Erreur de conversion de devise" });
           }
         }
 
-        console.log(`[API-PAY INIT] Using MbiyoPay for ${country}/${operator}, phone=${customerPhone}, providerCurrency=${providerCurrency}`);
+        console.log(`[API-PAY INIT] Using MbiyoPay for ${country}/${operator}, phone=${customerPhone}, providerCurrency=${providerCurrency}, customerPaysFee=${apiKey.customerPaysFee}`);
 
         const result = await createMbiyoPayPayin({
-          amount: amountForProvider, // ALWAYS send converted amount to provider
+          amount: convertedAmountForProvider, // ALWAYS send converted amount to provider
           currency: providerCurrency,
           phone: customerPhone,
           countryCode: country,
@@ -1653,13 +1680,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ success: false, error: result.error || "Erreur lors du paiement" });
         }
 
-        // Create transaction record - store in owner's currency for balance credit
+        // Create transaction record - store base amount for user balance credit
         const tx = await storage.createTransaction({
           userId: apiKey.userId,
           type: "api_payment",
-          amount: grossAmount, // Store in owner's currency
-          fee: feeInfo.feeAmount,
-          feePercentage: feeInfo.feePercentage,
+          amount: baseAmount, // Store base amount in owner's currency
+          fee: feeAmount,
+          feePercentage: feePercentage,
           currency: ownerCurrency, // Store in owner's currency
           status: "pending",
           country: country.toUpperCase(),
@@ -1676,10 +1703,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             callbackUrl: callbackUrl || null,
             orderId: orderId || null,
             provider: "mbiyopay",
-            providerAmount: amountForProvider,
+            providerAmount: convertedAmountForProvider,
             providerCurrency: providerCurrency,
-            balanceAmount: grossAmount,
+            balanceAmount: netAmountForUser,
             balanceCurrency: ownerCurrency,
+            customerPaysFee: apiKey.customerPaysFee,
+            feeAmount: feeAmount,
           }),
         });
 
@@ -1697,23 +1726,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const providerCurrency = "XOF"; // FedaPay only supports XOF
 
         // CRITICAL: Convert amount from owner's currency to XOF if different
-        let amountForProvider = grossAmount;
+        let convertedAmountForProvider = amountForProvider;
         if (ownerCurrency !== providerCurrency) {
           const { convertCurrency } = await import("./currency-converter");
-          const conversionResult = await convertCurrency(grossAmount, ownerCurrency, providerCurrency);
+          const conversionResult = await convertCurrency(amountForProvider, ownerCurrency, providerCurrency);
           if (conversionResult.success) {
-            amountForProvider = Math.floor(conversionResult.convertedAmount);
-            console.log(`[API-PAY INIT] Currency conversion: ${grossAmount} ${ownerCurrency} -> ${amountForProvider} ${providerCurrency}`);
+            convertedAmountForProvider = Math.floor(conversionResult.convertedAmount);
+            console.log(`[API-PAY INIT] Currency conversion: ${amountForProvider} ${ownerCurrency} -> ${convertedAmountForProvider} ${providerCurrency}`);
           } else {
             console.error("[API-PAY INIT] Currency conversion failed:", conversionResult.error);
             return res.status(500).json({ error: "Erreur de conversion de devise" });
           }
         }
 
-        console.log(`[API-PAY INIT] Using FedaPay for ${country}/${operator}, phone=${customerPhone}, providerCurrency=${providerCurrency}`);
+        console.log(`[API-PAY INIT] Using FedaPay for ${country}/${operator}, phone=${customerPhone}, providerCurrency=${providerCurrency}, customerPaysFee=${apiKey.customerPaysFee}`);
 
         const result = await createCollect({
-          amount: amountForProvider, // ALWAYS send converted amount to provider
+          amount: convertedAmountForProvider, // ALWAYS send converted amount to provider
           description: description || "Paiement via API",
           customerFirstName: customerName?.split(" ")[0] || "Client",
           customerLastName: customerName?.split(" ").slice(1).join(" ") || "BKApay",
@@ -1727,13 +1756,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ success: false, error: "Paiement echoue" });
         }
 
-        // Create transaction record - store in owner's currency for balance credit
+        // Create transaction record - store base amount for user balance credit
         const tx = await storage.createTransaction({
           userId: apiKey.userId,
           type: "api_payment",
-          amount: grossAmount, // Store in owner's currency
-          fee: feeInfo.feeAmount,
-          feePercentage: feeInfo.feePercentage,
+          amount: baseAmount, // Store base amount in owner's currency
+          fee: feeAmount,
+          feePercentage: feePercentage,
           currency: ownerCurrency, // Store in owner's currency
           status: "pending",
           country: country.toUpperCase(),
@@ -1750,10 +1779,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             callbackUrl: callbackUrl || null,
             orderId: orderId || null,
             provider: "fedapay",
-            providerAmount: amountForProvider,
+            providerAmount: convertedAmountForProvider,
             providerCurrency: providerCurrency,
-            balanceAmount: grossAmount,
+            balanceAmount: netAmountForUser,
             balanceCurrency: ownerCurrency,
+            customerPaysFee: apiKey.customerPaysFee,
+            feeAmount: feeAmount,
           }),
         });
 
@@ -1769,24 +1800,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const providerCurrency = "XOF"; // Paydunya only accepts XOF
         
         // CRITICAL: Convert amount from owner's currency to XOF if different
-        let amountForProvider = grossAmount;
+        let convertedAmountForProvider = amountForProvider;
         if (ownerCurrency !== providerCurrency) {
           const { convertCurrency } = await import("./currency-converter");
-          const conversionResult = await convertCurrency(grossAmount, ownerCurrency, providerCurrency);
+          const conversionResult = await convertCurrency(amountForProvider, ownerCurrency, providerCurrency);
           if (conversionResult.success) {
-            amountForProvider = Math.floor(conversionResult.convertedAmount);
-            console.log(`[API-PAY INIT] Currency conversion: ${grossAmount} ${ownerCurrency} -> ${amountForProvider} ${providerCurrency}`);
+            convertedAmountForProvider = Math.floor(conversionResult.convertedAmount);
+            console.log(`[API-PAY INIT] Currency conversion: ${amountForProvider} ${ownerCurrency} -> ${convertedAmountForProvider} ${providerCurrency}`);
           } else {
             console.error("[API-PAY INIT] Currency conversion failed:", conversionResult.error);
             return res.status(500).json({ error: "Erreur de conversion de devise" });
           }
         }
         
-        console.log(`[API-PAY INIT] Using Paydunya for ${country}/${operator}, phone=${customerPhone}, providerAmount=${amountForProvider}`);
+        console.log(`[API-PAY INIT] Using Paydunya for ${country}/${operator}, phone=${customerPhone}, providerAmount=${convertedAmountForProvider}, customerPaysFee=${apiKey.customerPaysFee}`);
         
         const paydunyaData = {
           invoice: {
-            total_amount: amountForProvider, // ALWAYS send converted amount to provider
+            total_amount: convertedAmountForProvider, // ALWAYS send converted amount to provider
             description: description || "Paiement via API",
             customer: {
               name: customerName || "Client",
@@ -1804,6 +1835,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             operator,
             phone: customerPhone,
             callbackUrl: callbackUrl || null,
+            customerPaysFee: apiKey.customerPaysFee,
           },
           actions: {
             callback_url: `${process.env.BASE_URL || 'https://bkapay.com'}/api/webhooks/paydunya`,
@@ -1816,13 +1848,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ success: false, error: "Paiement echoue" });
         }
 
-        // Create transaction record - store in owner's currency for balance credit
+        // Create transaction record - store base amount for user balance credit
         const tx = await storage.createTransaction({
           userId: apiKey.userId,
           type: "api_payment",
-          amount: grossAmount, // Store in owner's currency
-          fee: feeInfo.feeAmount,
-          feePercentage: feeInfo.feePercentage,
+          amount: baseAmount, // Store base amount in owner's currency
+          fee: feeAmount,
+          feePercentage: feePercentage,
           currency: ownerCurrency, // Store in owner's currency
           status: "pending",
           country: country.toUpperCase(),
@@ -1841,10 +1873,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             provider: "paydunya",
             country: country.toUpperCase(),
             operator: operator,
-            providerAmount: amountForProvider,
+            providerAmount: convertedAmountForProvider,
             providerCurrency: providerCurrency,
-            balanceAmount: grossAmount,
+            balanceAmount: netAmountForUser,
             balanceCurrency: ownerCurrency,
+            customerPaysFee: apiKey.customerPaysFee,
+            feeAmount: feeAmount,
           }),
         });
 

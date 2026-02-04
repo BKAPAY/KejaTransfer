@@ -151,6 +151,7 @@ export default function ApiPay() {
   const [copiedUssd, setCopiedUssd] = useState(false);
   const [conversionData, setConversionData] = useState<ConversionData | null>(null);
   const [selectedCurrency, setSelectedCurrency] = useState<string>("XOF");
+  const [dynamicFee, setDynamicFee] = useState<{ feePercentage: number; feeAmount: number } | null>(null);
 
   const { data: apiKeyInfo, isLoading: isLoadingKey, error: keyError } = useQuery<ApiKeyInfo>({
     queryKey: [`/api/api-key-info/${key}`],
@@ -160,6 +161,33 @@ export default function ApiPay() {
   const { data: enabledCountriesOperators, isLoading: isLoadingOperators } = useQuery<Record<string, string[]>>({
     queryKey: ["/api/countries-operators/deposits"],
   });
+
+  // Fetch dynamic fees when country and operator are selected
+  useEffect(() => {
+    const fetchDynamicFee = async () => {
+      if (!country || !operator || !amount || amount <= 0) {
+        setDynamicFee(null);
+        return;
+      }
+      
+      try {
+        const res = await fetch(`/api/fees/${country}/${operator}`);
+        if (res.ok) {
+          const data = await res.json();
+          const feePercentage = data.incomingFeePercentage || 60; // Default 6%
+          const feeAmount = Math.floor((amount * feePercentage) / 1000);
+          setDynamicFee({ feePercentage, feeAmount });
+        }
+      } catch (error) {
+        console.error("Failed to fetch dynamic fees:", error);
+        // Fallback to default 6%
+        const feeAmount = Math.floor((amount * 60) / 1000);
+        setDynamicFee({ feePercentage: 60, feeAmount });
+      }
+    };
+    
+    fetchDynamicFee();
+  }, [country, operator, amount]);
 
   // Handle currency selection when country changes
   useEffect(() => {
@@ -250,8 +278,9 @@ export default function ApiPay() {
     }
   }, []);
 
-  // Calcul du montant total à convertir (avec frais si customerPaysFee est activé)
-  const amountToConvert = apiKeyInfo?.customerPaysFee ? Math.ceil(amount * 1.06) : amount;
+  // Calcul du montant total à convertir (avec frais dynamiques si customerPaysFee est activé)
+  const totalWithFees = dynamicFee ? amount + dynamicFee.feeAmount : Math.ceil(amount * 1.06);
+  const amountToConvert = apiKeyInfo?.customerPaysFee ? totalWithFees : amount;
   
   useEffect(() => {
     if (needsConversion && amountToConvert && amountToConvert > 0) {
@@ -779,8 +808,13 @@ export default function ApiPay() {
             <div className="text-center p-4 bg-muted rounded-lg">
               <p className="text-sm text-muted-foreground">Montant a payer</p>
               <p className="text-2xl font-bold text-primary">
-                {apiKeyInfo?.customerPaysFee ? Math.ceil(amount * 1.06).toLocaleString() : amount.toLocaleString()} {ownerCurrency}
+                {apiKeyInfo?.customerPaysFee ? totalWithFees.toLocaleString() : amount.toLocaleString()} {ownerCurrency}
               </p>
+              {apiKeyInfo?.customerPaysFee && dynamicFee && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  (Frais de {(dynamicFee.feePercentage / 10).toFixed(1)}% inclus: {dynamicFee.feeAmount.toLocaleString()} {ownerCurrency})
+                </p>
+              )}
             </div>
             
             <Button
@@ -1176,7 +1210,7 @@ export default function ApiPay() {
             Traitement...
           </>
         ) : (
-          `Payer ${apiKeyInfo?.customerPaysFee ? Math.ceil(amount * 1.06).toLocaleString() : amount.toLocaleString()} ${ownerCurrency}`
+          `Payer ${apiKeyInfo?.customerPaysFee ? totalWithFees.toLocaleString() : amount.toLocaleString()} ${ownerCurrency}`
         )}
       </Button>
     </div>
@@ -1202,8 +1236,13 @@ export default function ApiPay() {
             <div>
               <p className="text-sm text-muted-foreground mb-1">Montant a payer</p>
               <p className="text-3xl font-bold text-primary">
-                {apiKeyInfo?.customerPaysFee ? Math.ceil(amount * 1.06).toLocaleString() : amount.toLocaleString()} <span className="text-lg">{ownerCurrency}</span>
+                {apiKeyInfo?.customerPaysFee ? totalWithFees.toLocaleString() : amount.toLocaleString()} <span className="text-lg">{ownerCurrency}</span>
               </p>
+              {apiKeyInfo?.customerPaysFee && dynamicFee && (
+                <p className="text-xs text-muted-foreground">
+                  (Frais de {(dynamicFee.feePercentage / 10).toFixed(1)}% inclus: {dynamicFee.feeAmount.toLocaleString()} {ownerCurrency})
+                </p>
+              )}
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Completez votre paiement en remplissant les informations</p>
