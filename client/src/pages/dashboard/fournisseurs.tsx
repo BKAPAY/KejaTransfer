@@ -810,11 +810,6 @@ export default function FournisseursPage() {
                               data-testid="toggle-email-login"
                             />
                           </div>
-                        </div>
-                      </div>
-                      <div className="space-y-3">
-                        <h4 className="font-medium text-sm">Notifications KYC</h4>
-                        <div className="grid gap-3">
                           <div className="flex items-center justify-between p-3 border rounded-md">
                             <div>
                               <Label className="font-medium">KYC soumis</Label>
