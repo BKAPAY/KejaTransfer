@@ -1004,7 +1004,10 @@ export class DbStorage implements IStorage {
       .map(([type, { amount, count }]) => ({ type, amount, count }))
       .sort((a, b) => b.amount - a.amount);
 
-    const totalRevenue = completed.reduce((sum, t) => sum + t.amount, 0);
+    // Only count incoming transactions (deposits, payments received) - not outgoing (withdrawals, transfers)
+    const incomingTypes = ["deposit", "api_payment", "payment_link", "merchant_link"];
+    const incomingTransactions = completed.filter(t => incomingTypes.includes(t.type));
+    const totalRevenue = incomingTransactions.reduce((sum, t) => sum + t.amount, 0);
     const pendingTransactions = transactions.filter((t) => t.status === "pending").length;
 
     return {
