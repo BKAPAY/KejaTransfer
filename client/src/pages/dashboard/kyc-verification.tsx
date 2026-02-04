@@ -92,46 +92,134 @@ export default function KycVerificationPage() {
     },
   });
 
-  const downloadPdf = (user: User) => {
+  const downloadPdf = async (user: User) => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
     let y = 20;
     
+    const getStatusText = (status: string) => {
+      switch (status) {
+        case "verified": return "Verifie";
+        case "rejected": return "Rejete";
+        case "submitted": return "En attente";
+        default: return status;
+      }
+    };
+    
     doc.setFontSize(20);
+    doc.setFont("helvetica", "bold");
     doc.text("Verification KYC - BKApay", pageWidth / 2, y, { align: "center" });
-    y += 15;
+    y += 5;
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Genere le ${new Date().toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })}`, pageWidth / 2, y + 5, { align: "center" });
+    y += 20;
     
-    doc.setFontSize(12);
-    doc.text(`Utilisateur: ${user.firstName} ${user.lastName}`, 20, y);
-    y += 8;
-    doc.text(`Email: ${user.email}`, 20, y);
-    y += 8;
-    doc.text(`Statut: ${user.kycStatus}`, 20, y);
-    y += 8;
-    doc.text(`Date de soumission: ${new Date(user.createdAt).toLocaleDateString("fr-FR")}`, 20, y);
-    y += 8;
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("Informations du profil", 20, y);
+    y += 10;
     
-    if (user.kycRejectionReason) {
-      doc.text(`Raison de rejet: ${user.kycRejectionReason}`, 20, y);
-      y += 8;
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "normal");
+    const infoLines = [
+      `Nom complet: ${user.firstName} ${user.lastName}`,
+      `Email: ${user.email}`,
+      `Pays: ${user.country || "Non defini"}`,
+      `Solde: ${new Intl.NumberFormat("fr-FR").format(user.balance)} XOF`,
+      `Statut KYC: ${getStatusText(user.kycStatus)}`,
+      `Date d'inscription: ${new Date(user.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}`,
+      `Administrateur: ${user.isAdmin ? "Oui" : "Non"}`,
+      `Compte suspendu: ${user.suspended ? "Oui" : "Non"}`,
+    ];
+    
+    if (user.withdrawalPhones && user.withdrawalPhones.length > 0) {
+      infoLines.push(`Numeros de retrait: ${user.withdrawalPhones.join(", ")}`);
     }
     
+    if (user.kycRejectionReason) {
+      infoLines.push(`Raison de rejet: ${user.kycRejectionReason}`);
+    }
+    
+    infoLines.forEach((line) => {
+      doc.text(line, 20, y);
+      y += 7;
+    });
+    
     y += 10;
-    doc.setFontSize(16);
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
     doc.text("Documents fournis", 20, y);
     y += 10;
     
-    doc.setFontSize(12);
-    if (user.kycIdFront) {
-      doc.text("Piece d'identite (Recto): Fournie", 20, y);
-      y += 8;
-    }
-    if (user.kycIdBack) {
-      doc.text("Piece d'identite (Verso): Fournie", 20, y);
-      y += 8;
-    }
-    if (user.kycSelfie) {
-      doc.text("Selfie: Fourni", 20, y);
+    const addImageToPdf = async (imageUrl: string, label: string): Promise<void> => {
+      return new Promise((resolve) => {
+        if (!imageUrl) {
+          resolve();
+          return;
+        }
+        
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+          if (y > pageHeight - 100) {
+            doc.addPage();
+            y = 20;
+          }
+          
+          doc.setFontSize(11);
+          doc.setFont("helvetica", "bold");
+          doc.text(label, 20, y);
+          y += 5;
+          
+          const maxWidth = 170;
+          const maxHeight = 100;
+          let width = img.width;
+          let height = img.height;
+          
+          if (width > maxWidth) {
+            height = (height * maxWidth) / width;
+            width = maxWidth;
+          }
+          if (height > maxHeight) {
+            width = (width * maxHeight) / height;
+            height = maxHeight;
+          }
+          
+          try {
+            doc.addImage(img, "JPEG", 20, y, width, height);
+            y += height + 10;
+          } catch (e) {
+            doc.setFont("helvetica", "normal");
+            doc.text("Image non disponible", 20, y);
+            y += 10;
+          }
+          resolve();
+        };
+        img.onerror = () => {
+          doc.setFontSize(11);
+          doc.setFont("helvetica", "normal");
+          doc.text(`${label}: Image non disponible`, 20, y);
+          y += 10;
+          resolve();
+        };
+        img.src = imageUrl;
+      });
+    };
+    
+    try {
+      if (user.kycIdFront) {
+        await addImageToPdf(user.kycIdFront, "Piece d'identite (Recto)");
+      }
+      if (user.kycIdBack) {
+        await addImageToPdf(user.kycIdBack, "Piece d'identite (Verso)");
+      }
+      if (user.kycSelfie) {
+        await addImageToPdf(user.kycSelfie, "Selfie");
+      }
+    } catch (e) {
+      console.error("Erreur lors de l'ajout des images:", e);
     }
     
     doc.save(`KYC_${user.email}_${new Date().getTime()}.pdf`);
@@ -255,6 +343,64 @@ export default function KycVerificationPage() {
                 </Button>
               </div>
             </CardHeader>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Informations du profil</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">Nom complet</p>
+                  <p className="text-sm font-medium">{selectedUserDetails.firstName} {selectedUserDetails.lastName}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">Email</p>
+                  <p className="text-sm font-medium">{selectedUserDetails.email}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">Pays</p>
+                  <p className="text-sm font-medium">{selectedUserDetails.country || "Non defini"}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">Solde</p>
+                  <p className="text-sm font-medium">{new Intl.NumberFormat("fr-FR").format(selectedUserDetails.balance)} XOF</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">Statut KYC</p>
+                  <div className="mt-1">{getStatusBadge(selectedUserDetails.kycStatus)}</div>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">Date d'inscription</p>
+                  <p className="text-sm font-medium">{new Date(selectedUserDetails.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">Administrateur</p>
+                  <p className="text-sm font-medium">{selectedUserDetails.isAdmin ? "Oui" : "Non"}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">Compte suspendu</p>
+                  <p className="text-sm font-medium">{selectedUserDetails.suspended ? "Oui" : "Non"}</p>
+                </div>
+                {selectedUserDetails.withdrawalPhones && selectedUserDetails.withdrawalPhones.length > 0 && (
+                  <div className="md:col-span-2 lg:col-span-3">
+                    <p className="text-xs font-medium text-muted-foreground">Numeros de retrait</p>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {selectedUserDetails.withdrawalPhones.map((phone, index) => (
+                        <Badge key={index} variant="outline">{phone}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {selectedUserDetails.kycRejectionReason && (
+                  <div className="md:col-span-2 lg:col-span-3">
+                    <p className="text-xs font-medium text-muted-foreground">Raison du rejet KYC</p>
+                    <p className="text-sm text-red-600 dark:text-red-400">{selectedUserDetails.kycRejectionReason}</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
           </Card>
 
           <div className="space-y-4">
