@@ -226,6 +226,8 @@ export default function KYC() {
     };
   };
 
+  const lastPosRef = useRef<{ x: number; y: number } | null>(null);
+
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     e.preventDefault();
     setIsDrawing(true);
@@ -233,8 +235,11 @@ export default function KYC() {
     const ctx = canvas?.getContext("2d");
     if (ctx) {
       const pos = getMousePos(e);
+      lastPosRef.current = pos;
       ctx.beginPath();
       ctx.moveTo(pos.x, pos.y);
+      ctx.arc(pos.x, pos.y, 1, 0, Math.PI * 2);
+      ctx.fill();
     }
   };
 
@@ -245,13 +250,19 @@ export default function KYC() {
     const ctx = canvas?.getContext("2d");
     if (ctx) {
       const pos = getMousePos(e);
-      ctx.lineTo(pos.x, pos.y);
-      ctx.stroke();
+      if (lastPosRef.current) {
+        ctx.beginPath();
+        ctx.moveTo(lastPosRef.current.x, lastPosRef.current.y);
+        ctx.lineTo(pos.x, pos.y);
+        ctx.stroke();
+      }
+      lastPosRef.current = pos;
     }
   };
 
   const stopDrawing = () => {
     setIsDrawing(false);
+    lastPosRef.current = null;
   };
 
   const clearSignature = () => {
