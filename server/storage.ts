@@ -952,10 +952,14 @@ export class DbStorage implements IStorage {
   }> {
     const transactions = await this.getTransactions(userId, 500);
     const completed = transactions.filter((t) => t.status === "completed");
+    
+    // Only count incoming transactions (deposits, payments received) - not outgoing (withdrawals, transfers)
+    const incomingTypes = ["deposit", "api_payment", "payment_link", "merchant_link"];
+    const incomingCompleted = completed.filter(t => incomingTypes.includes(t.type));
 
-    // Revenue by date
+    // Revenue by date (incoming only)
     const revenueByDateMap = new Map<string, number>();
-    completed.forEach((t) => {
+    incomingCompleted.forEach((t) => {
       const date = new Date(t.createdAt).toLocaleDateString("fr-FR");
       revenueByDateMap.set(date, (revenueByDateMap.get(date) || 0) + t.amount);
     });
@@ -963,9 +967,9 @@ export class DbStorage implements IStorage {
       .map(([date, amount]) => ({ date, amount }))
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-    // Revenue by operator
+    // Revenue by operator (incoming only)
     const revenueByOperatorMap = new Map<string, { amount: number; count: number }>();
-    completed.forEach((t) => {
+    incomingCompleted.forEach((t) => {
       const op = t.operator || "Unknown";
       const current = revenueByOperatorMap.get(op) || { amount: 0, count: 0 };
       revenueByOperatorMap.set(op, {
@@ -977,9 +981,9 @@ export class DbStorage implements IStorage {
       .map(([operator, { amount, count }]) => ({ operator, amount, count }))
       .sort((a, b) => b.amount - a.amount);
 
-    // Revenue by country
+    // Revenue by country (incoming only)
     const revenueByCountryMap = new Map<string, { amount: number; count: number }>();
-    completed.forEach((t) => {
+    incomingCompleted.forEach((t) => {
       const country = t.country || "Unknown";
       const current = revenueByCountryMap.get(country) || { amount: 0, count: 0 };
       revenueByCountryMap.set(country, {
@@ -991,9 +995,9 @@ export class DbStorage implements IStorage {
       .map(([country, { amount, count }]) => ({ country, amount, count }))
       .sort((a, b) => b.amount - a.amount);
 
-    // Revenue by type
+    // Revenue by type (incoming only)
     const revenueByTypeMap = new Map<string, { amount: number; count: number }>();
-    completed.forEach((t) => {
+    incomingCompleted.forEach((t) => {
       const current = revenueByTypeMap.get(t.type) || { amount: 0, count: 0 };
       revenueByTypeMap.set(t.type, {
         amount: current.amount + t.amount,
@@ -1004,10 +1008,7 @@ export class DbStorage implements IStorage {
       .map(([type, { amount, count }]) => ({ type, amount, count }))
       .sort((a, b) => b.amount - a.amount);
 
-    // Only count incoming transactions (deposits, payments received) - not outgoing (withdrawals, transfers)
-    const incomingTypes = ["deposit", "api_payment", "payment_link", "merchant_link"];
-    const incomingTransactions = completed.filter(t => incomingTypes.includes(t.type));
-    const totalRevenue = incomingTransactions.reduce((sum, t) => sum + t.amount, 0);
+    const totalRevenue = incomingCompleted.reduce((sum, t) => sum + t.amount, 0);
     const pendingTransactions = transactions.filter((t) => t.status === "pending").length;
 
     return {
