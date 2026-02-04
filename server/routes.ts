@@ -93,10 +93,23 @@ declare module "express-session" {
 }
 
 // Middleware pour vérifier l'authentification par session
-function requireAuth(req: Request, res: Response, next: Function) {
+async function requireAuth(req: Request, res: Response, next: Function) {
   if (!req.session.userId) {
     return res.status(401).json({ error: "Non authentifié" });
   }
+  
+  // Check if user account is suspended - auto logout if suspended
+  const user = await storage.getUser(req.session.userId);
+  if (!user) {
+    req.session.destroy(() => {});
+    return res.status(401).json({ error: "Non authentifié" });
+  }
+  
+  if (user.suspended) {
+    req.session.destroy(() => {});
+    return res.status(403).json({ error: "Votre compte a été suspendu. Veuillez contacter le support." });
+  }
+  
   next();
 }
 
@@ -106,7 +119,18 @@ async function requireAdmin(req: Request, res: Response, next: Function) {
     return res.status(401).json({ error: "Non authentifié" });
   }
   const user = await storage.getUser(req.session.userId);
-  if (!user || !user.isAdmin) {
+  if (!user) {
+    req.session.destroy(() => {});
+    return res.status(401).json({ error: "Non authentifié" });
+  }
+  
+  // Admin accounts can still be suspended (for security)
+  if (user.suspended) {
+    req.session.destroy(() => {});
+    return res.status(403).json({ error: "Votre compte a été suspendu. Veuillez contacter le support." });
+  }
+  
+  if (!user.isAdmin) {
     return res.status(403).json({ error: "Accès administrateur requis" });
   }
   next();
