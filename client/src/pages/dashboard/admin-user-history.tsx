@@ -202,9 +202,20 @@ export default function AdminUserHistory() {
                           hour: "2-digit",
                           minute: "2-digit",
                         })}
-                        {tx.customerName && ` • ${tx.customerName}`}
-                        {tx.customerPhone && ` • ${tx.customerPhone}`}
                       </p>
+                      {(tx.customerName || tx.customerPhone || tx.customerEmail) && (
+                        <div className="text-xs text-muted-foreground space-y-0.5 mt-1">
+                          {tx.customerName && (
+                            <p><span className="font-medium">Client:</span> {tx.customerName}</p>
+                          )}
+                          {tx.customerPhone && (
+                            <p><span className="font-medium">Tél:</span> {tx.customerPhone}</p>
+                          )}
+                          {tx.customerEmail && (
+                            <p><span className="font-medium">Email:</span> {tx.customerEmail}</p>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <div className="text-right shrink-0">
                       <p className="font-bold text-base tabular-nums">

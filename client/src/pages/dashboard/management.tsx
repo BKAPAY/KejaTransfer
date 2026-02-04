@@ -953,10 +953,18 @@ export default function Management() {
                           <p className="text-sm text-muted-foreground truncate">
                             {tx.user ? `${tx.user.firstName} ${tx.user.lastName}` : "Utilisateur inconnu"}
                           </p>
-                          {tx.customerName && (
-                            <p className="text-xs text-muted-foreground">
-                              Client: {tx.customerName} {tx.customerPhone && `- ${tx.customerPhone}`}
-                            </p>
+                          {(tx.customerName || tx.customerPhone || tx.customerEmail) && (
+                            <div className="text-xs text-muted-foreground space-y-0.5">
+                              {tx.customerName && (
+                                <p><span className="font-medium">Client:</span> {tx.customerName}</p>
+                              )}
+                              {tx.customerPhone && (
+                                <p><span className="font-medium">Tél:</span> {tx.customerPhone}</p>
+                              )}
+                              {tx.customerEmail && (
+                                <p><span className="font-medium">Email:</span> {tx.customerEmail}</p>
+                              )}
+                            </div>
                           )}
                           {isWithdrawal && (
                             <p className="text-xs text-muted-foreground">

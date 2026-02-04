@@ -221,9 +221,20 @@ export default function History() {
                           hour: "2-digit",
                           minute: "2-digit",
                         })}
-                        {transaction.customerName && ` • ${transaction.customerName}`}
-                        {transaction.customerPhone && ` • ${transaction.customerPhone}`}
                       </p>
+                      {(transaction.customerName || transaction.customerPhone || transaction.customerEmail) && (
+                        <div className="text-xs text-muted-foreground space-y-0.5 mt-1">
+                          {transaction.customerName && (
+                            <p><span className="font-medium">Client:</span> {transaction.customerName}</p>
+                          )}
+                          {transaction.customerPhone && (
+                            <p><span className="font-medium">Tél:</span> {transaction.customerPhone}</p>
+                          )}
+                          {transaction.customerEmail && (
+                            <p><span className="font-medium">Email:</span> {transaction.customerEmail}</p>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <div className="text-right shrink-0">
                       <p className="font-bold text-base tabular-nums">
