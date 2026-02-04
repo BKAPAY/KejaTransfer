@@ -299,6 +299,25 @@ export default function FournisseursPage() {
     initMailtrapToggles();
   }
 
+  // Auto-save toggle for mailtrap email types
+  const saveMailtrapToggle = async (field: "masterKey" | "token" | "ipnSecret", value: string) => {
+    const updates: Partial<ProviderConfig> = { [field]: value };
+    try {
+      await apiRequest("PUT", "/api/admin/providers/mailtrap", updates);
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/providers"] });
+      toast({
+        title: "Configuration mise a jour",
+        description: value === "true" ? "Email active" : "Email desactive",
+      });
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de sauvegarder la configuration",
+        variant: "destructive",
+      });
+    }
+  };
+
   const updateMutation = useMutation({
     mutationFn: async (payload: { provider: string; updates: Partial<ProviderConfig> }) => {
       return apiRequest("PUT", `/api/admin/providers/${payload.provider}`, payload.updates);
@@ -752,9 +771,11 @@ export default function FournisseursPage() {
                             </div>
                             <Switch
                               checked={forms.mailtrap.masterKey === "true"}
-                              onCheckedChange={(checked) => 
-                                setForms(prev => ({...prev, mailtrap: {...prev.mailtrap, masterKey: checked ? "true" : "false"}}))
-                              }
+                              onCheckedChange={(checked) => {
+                                const value = checked ? "true" : "false";
+                                setForms(prev => ({...prev, mailtrap: {...prev.mailtrap, masterKey: value}}));
+                                saveMailtrapToggle("masterKey", value);
+                              }}
                               data-testid="toggle-email-signup"
                             />
                           </div>
@@ -765,9 +786,11 @@ export default function FournisseursPage() {
                             </div>
                             <Switch
                               checked={forms.mailtrap.token === "true"}
-                              onCheckedChange={(checked) => 
-                                setForms(prev => ({...prev, mailtrap: {...prev.mailtrap, token: checked ? "true" : "false"}}))
-                              }
+                              onCheckedChange={(checked) => {
+                                const value = checked ? "true" : "false";
+                                setForms(prev => ({...prev, mailtrap: {...prev.mailtrap, token: value}}));
+                                saveMailtrapToggle("token", value);
+                              }}
                               data-testid="toggle-email-password"
                             />
                           </div>
@@ -778,9 +801,11 @@ export default function FournisseursPage() {
                             </div>
                             <Switch
                               checked={forms.mailtrap.ipnSecret === "true"}
-                              onCheckedChange={(checked) => 
-                                setForms(prev => ({...prev, mailtrap: {...prev.mailtrap, ipnSecret: checked ? "true" : "false"}}))
-                              }
+                              onCheckedChange={(checked) => {
+                                const value = checked ? "true" : "false";
+                                setForms(prev => ({...prev, mailtrap: {...prev.mailtrap, ipnSecret: value}}));
+                                saveMailtrapToggle("ipnSecret", value);
+                              }}
                               data-testid="toggle-email-login"
                             />
                           </div>
