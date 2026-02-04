@@ -257,7 +257,11 @@ export default function Home() {
               <ul className="space-y-1 sm:space-y-2 text-xs sm:text-sm text-muted-foreground">
                 <li>Centre d'aide</li>
                 <li>Documentation</li>
-                <li>Contact</li>
+                <li>
+                  <a href="mailto:support@bkapay.com" className="hover:text-foreground transition-colors" data-testid="link-support-email">
+                    support@bkapay.com
+                  </a>
+                </li>
                 <li>Statut</li>
               </ul>
             </div>
