@@ -289,9 +289,10 @@ export default function ApiPay() {
   }, []);
 
   // Calcul du montant total à convertir (avec frais dynamiques si customerPaysFee est activé)
-  // Utilise les frais dynamiques si disponibles, sinon calcule avec 6% par défaut (même formule que le backend)
-  const defaultFeeAmount = Math.floor((amount * 60) / 1000); // 6% = 60/1000
-  const totalWithFees = dynamicFee ? amount + dynamicFee.feeAmount : amount + defaultFeeAmount;
+  // Les frais ne s'affichent que lorsque le pays ET l'opérateur sont sélectionnés
+  const hasOperatorSelected = country && operator;
+  const totalWithFees = (hasOperatorSelected && dynamicFee) ? amount + dynamicFee.feeAmount : amount;
+  const displayAmount = (apiKeyInfo?.customerPaysFee && hasOperatorSelected && dynamicFee) ? totalWithFees : amount;
   const amountToConvert = apiKeyInfo?.customerPaysFee ? totalWithFees : amount;
   
   useEffect(() => {
@@ -820,11 +821,16 @@ export default function ApiPay() {
             <div className="text-center p-4 bg-muted rounded-lg">
               <p className="text-sm text-muted-foreground">Montant a payer</p>
               <p className="text-2xl font-bold text-primary">
-                {apiKeyInfo?.customerPaysFee ? totalWithFees.toLocaleString() : amount.toLocaleString()} {ownerCurrency}
+                {displayAmount.toLocaleString()} {ownerCurrency}
               </p>
-              {apiKeyInfo?.customerPaysFee && dynamicFee && (
+              {apiKeyInfo?.customerPaysFee && hasOperatorSelected && dynamicFee && (
                 <p className="text-xs text-muted-foreground mt-1">
                   (Frais de {(dynamicFee.feePercentage / 10).toFixed(1)}% inclus: {dynamicFee.feeAmount.toLocaleString()} {ownerCurrency})
+                </p>
+              )}
+              {apiKeyInfo?.customerPaysFee && !hasOperatorSelected && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  (Selectionnez un pays et operateur pour voir les frais)
                 </p>
               )}
             </div>
@@ -1222,7 +1228,7 @@ export default function ApiPay() {
             Traitement...
           </>
         ) : (
-          `Payer ${apiKeyInfo?.customerPaysFee ? totalWithFees.toLocaleString() : amount.toLocaleString()} ${ownerCurrency}`
+          `Payer ${displayAmount.toLocaleString()} ${ownerCurrency}`
         )}
       </Button>
     </div>
@@ -1248,11 +1254,16 @@ export default function ApiPay() {
             <div>
               <p className="text-sm text-muted-foreground mb-1">Montant a payer</p>
               <p className="text-3xl font-bold text-primary">
-                {apiKeyInfo?.customerPaysFee ? totalWithFees.toLocaleString() : amount.toLocaleString()} <span className="text-lg">{ownerCurrency}</span>
+                {displayAmount.toLocaleString()} <span className="text-lg">{ownerCurrency}</span>
               </p>
-              {apiKeyInfo?.customerPaysFee && dynamicFee && (
+              {apiKeyInfo?.customerPaysFee && hasOperatorSelected && dynamicFee && (
                 <p className="text-xs text-muted-foreground">
                   (Frais de {(dynamicFee.feePercentage / 10).toFixed(1)}% inclus: {dynamicFee.feeAmount.toLocaleString()} {ownerCurrency})
+                </p>
+              )}
+              {apiKeyInfo?.customerPaysFee && !hasOperatorSelected && (
+                <p className="text-xs text-muted-foreground">
+                  (Selectionnez un pays et operateur pour voir les frais)
                 </p>
               )}
             </div>
