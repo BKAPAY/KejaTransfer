@@ -370,11 +370,7 @@ export default function Withdrawal() {
       {user && (
         <Alert className="py-2 border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800">
           <AlertDescription className="text-xs text-blue-900 dark:text-blue-100">
-            <strong>Solde disponible:</strong> {new Intl.NumberFormat("fr-FR", {
-              style: "currency",
-              currency: userBalanceCurrency,
-              minimumFractionDigits: 0,
-            }).format(user.balance || 0)}
+            <strong>Solde disponible:</strong> {new Intl.NumberFormat("fr-FR").format(user.balance || 0)} {userBalanceCurrency}
           </AlertDescription>
         </Alert>
       )}
