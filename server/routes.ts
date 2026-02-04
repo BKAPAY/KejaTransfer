@@ -437,7 +437,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
-        maxAge: 24 * 60 * 60 * 1000, // 24 hours - session expires after 24 hours of inactivity
+        maxAge: 5 * 60 * 60 * 1000, // 5 hours - session expires after 5 hours of inactivity
       },
     })
   );
