@@ -629,7 +629,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.markCodeAsUsed(validatedData.email, verificationCode, "signup");
       }
 
-      res.json({ success: true, message: "Compte créé avec succès" });
+      // Auto-login: Create session for the new user
+      req.session.userId = user.id;
+      
+      res.json({ 
+        success: true, 
+        message: "Compte créé avec succès",
+        user: {
+          id: user.id,
+          email: user.email,
+          fullName: `${user.firstName} ${user.lastName}`,
+          isAdmin: user.isAdmin,
+          balance: user.balance,
+        }
+      });
     } catch (error: any) {
       console.error("[Signup] Error:", error);
       res.status(400).json({ error: "Erreur lors de l'inscription" });
