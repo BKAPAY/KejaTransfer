@@ -1,111 +1,110 @@
-import nodemailer from "nodemailer";
-
-interface GmailCredentials {
-  gmailUser: string | null;
-  gmailPassword: string | null;
+interface MailtrapConfig {
+  apiToken: string | null;
+  senderEmail: string | null;
+  senderName: string | null;
+  enableSignup: boolean;
+  enablePasswordReset: boolean;
+  enableLogin: boolean;
 }
 
-export type GmailType = "signup" | "password" | "2fa";
-
-const cachedGmailConfigs: Record<GmailType, GmailCredentials | null> = {
-  signup: null,
-  password: null,
-  "2fa": null,
-};
-const lastConfigFetches: Record<GmailType, number> = {
-  signup: 0,
-  password: 0,
-  "2fa": 0,
-};
+let cachedMailtrapConfig: MailtrapConfig | null = null;
+let lastConfigFetch = 0;
 const CONFIG_CACHE_TTL = 30000;
 
-function getProviderNameForType(type: GmailType): string {
-  switch (type) {
-    case "signup": return "gmail_signup";
-    case "password": return "gmail_password";
-    case "2fa": return "gmail_2fa";
-  }
-}
-
-async function getGmailCredentialsFromDB(gmailType: GmailType): Promise<GmailCredentials> {
+async function getMailtrapConfigFromDB(): Promise<MailtrapConfig> {
   const now = Date.now();
-  if (cachedGmailConfigs[gmailType] && (now - lastConfigFetches[gmailType]) < CONFIG_CACHE_TTL) {
-    return cachedGmailConfigs[gmailType]!;
+  if (cachedMailtrapConfig && (now - lastConfigFetch) < CONFIG_CACHE_TTL) {
+    return cachedMailtrapConfig;
   }
-  
-  const providerName = getProviderNameForType(gmailType);
   
   try {
     const { storage } = await import("./storage");
-    const config = await storage.getProviderConfig(providerName);
+    const config = await storage.getProviderConfig("mailtrap");
     
-    if (config && config.isActive && config.apiKey && config.secretKey) {
-      cachedGmailConfigs[gmailType] = {
-        gmailUser: config.apiKey,
-        gmailPassword: config.secretKey,
+    if (config && config.isActive && config.apiKey) {
+      cachedMailtrapConfig = {
+        apiToken: config.apiKey,
+        senderEmail: config.secretKey || "noreply@bkapay.com",
+        senderName: config.publicKey || "BKApay",
+        enableSignup: config.masterKey === "true",
+        enablePasswordReset: config.token === "true",
+        enableLogin: config.ipnSecret === "true",
       };
-      lastConfigFetches[gmailType] = now;
-      console.log(`[Email] Configuration ${providerName} chargée depuis la base de données`);
-      return cachedGmailConfigs[gmailType]!;
+      lastConfigFetch = now;
+      console.log("[Email] Configuration Mailtrap chargee depuis la base de donnees");
+      return cachedMailtrapConfig;
     }
   } catch (error) {
-    console.log(`[Email] Erreur lors de la lecture de la config ${providerName} depuis la BD:`, error);
+    console.log("[Email] Erreur lors de la lecture de la config Mailtrap depuis la BD:", error);
   }
   
-  const fallback = {
-    gmailUser: process.env.GMAIL_USER || null,
-    gmailPassword: process.env.GMAIL_APP_PASSWORD || null,
+  return {
+    apiToken: null,
+    senderEmail: null,
+    senderName: null,
+    enableSignup: false,
+    enablePasswordReset: false,
+    enableLogin: false,
   };
-  
-  if (fallback.gmailUser && fallback.gmailPassword) {
-    console.log(`[Email] Configuration ${providerName} utilise le fallback variables d'environnement`);
-  }
-  
-  return fallback;
 }
 
-export function clearGmailConfigCache(gmailType?: GmailType): void {
-  if (gmailType) {
-    cachedGmailConfigs[gmailType] = null;
-    lastConfigFetches[gmailType] = 0;
-    console.log(`[Email] Cache de configuration ${getProviderNameForType(gmailType)} vidé`);
-  } else {
-    cachedGmailConfigs.signup = null;
-    cachedGmailConfigs.password = null;
-    cachedGmailConfigs["2fa"] = null;
-    lastConfigFetches.signup = 0;
-    lastConfigFetches.password = 0;
-    lastConfigFetches["2fa"] = 0;
-    console.log("[Email] Cache de configuration Gmail (tous types) vidé");
-  }
-}
-
-async function createTransporter(gmailType: GmailType): Promise<{ transporter: nodemailer.Transporter | null; gmailUser: string | null }> {
-  const { gmailUser, gmailPassword } = await getGmailCredentialsFromDB(gmailType);
-  const providerName = getProviderNameForType(gmailType);
-  
-  if (!gmailUser || !gmailPassword) {
-    console.log(`[Email] Configuration ${providerName} manquante - GMAIL_USER:`, !!gmailUser, "GMAIL_APP_PASSWORD:", !!gmailPassword);
-    return { transporter: null, gmailUser: null };
-  }
-  
-  console.log(`[Email] Création du transporteur ${providerName} pour:`, gmailUser);
-  
-  const transporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-      user: gmailUser,
-      pass: gmailPassword,
-    },
-    debug: true,
-    logger: false,
-  });
-  
-  return { transporter, gmailUser };
+export function clearMailtrapConfigCache(): void {
+  cachedMailtrapConfig = null;
+  lastConfigFetch = 0;
+  console.log("[Email] Cache de configuration Mailtrap vide");
 }
 
 export function generateVerificationCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+async function sendMailtrapEmail(
+  to: string,
+  subject: string,
+  textContent: string,
+  htmlContent: string
+): Promise<boolean> {
+  const config = await getMailtrapConfigFromDB();
+  
+  if (!config.apiToken || !config.senderEmail) {
+    console.error("[Email] Configuration Mailtrap non configuree - envoi impossible");
+    return false;
+  }
+  
+  try {
+    console.log(`[Email] Envoi via Mailtrap a ${to}...`);
+    
+    const response = await fetch("https://send.api.mailtrap.io/api/send", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Api-Token": config.apiToken,
+      },
+      body: JSON.stringify({
+        from: {
+          name: config.senderName || "BKApay",
+          email: config.senderEmail,
+        },
+        to: [{ email: to }],
+        subject,
+        text: textContent,
+        html: htmlContent,
+      }),
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("[Email] Erreur Mailtrap:", response.status, errorText);
+      return false;
+    }
+    
+    const result = await response.json();
+    console.log(`[Email] Email envoye avec succes a ${to}:`, result);
+    return true;
+  } catch (error: any) {
+    console.error("[Email] Erreur lors de l'envoi Mailtrap:", error?.message || error);
+    return false;
+  }
 }
 
 export async function sendVerificationEmail(
@@ -113,6 +112,21 @@ export async function sendVerificationEmail(
   code: string,
   type: "signup" | "password_reset" | "login"
 ): Promise<boolean> {
+  const config = await getMailtrapConfigFromDB();
+  
+  if (type === "signup" && !config.enableSignup) {
+    console.log("[Email] Envoi d'email inscription desactive");
+    return false;
+  }
+  if (type === "password_reset" && !config.enablePasswordReset) {
+    console.log("[Email] Envoi d'email mot de passe oublie desactive");
+    return false;
+  }
+  if (type === "login" && !config.enableLogin) {
+    console.log("[Email] Envoi d'email connexion desactive");
+    return false;
+  }
+  
   const subject = type === "signup" 
     ? "BKApay - Code de verification de votre compte"
     : type === "login"
@@ -166,271 +180,242 @@ Si vous n'avez pas demande cette reinitialisation, ignorez cet email.
 --
 BKApay - Votre plateforme de paiement mobile money
 https://bkapay.com`;
-    
-  const loginHtml = `
-      <!DOCTYPE html>
-      <html lang="fr">
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>BKApay - Code de connexion</title>
-      </head>
-      <body style="margin: 0; padding: 0; background-color: #f9fafb;">
-        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f9fafb;">
-          <tr>
-            <td align="center" style="padding: 40px 20px;">
-              <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-                <tr>
-                  <td style="padding: 40px 40px 20px; text-align: center;">
-                    <h1 style="margin: 0; color: #2563eb; font-family: Arial, sans-serif; font-size: 28px; font-weight: bold;">BKApay</h1>
-                  </td>
-                </tr>
-                <tr>
-                  <td style="padding: 0 40px;">
-                    <h2 style="margin: 0 0 20px; color: #1f2937; font-family: Arial, sans-serif; font-size: 20px; text-align: center;">Code de connexion</h2>
-                    <p style="margin: 0 0 15px; color: #4b5563; font-family: Arial, sans-serif; font-size: 16px; line-height: 1.5;">Bonjour,</p>
-                    <p style="margin: 0 0 25px; color: #4b5563; font-family: Arial, sans-serif; font-size: 16px; line-height: 1.5;">Une tentative de connexion a ete detectee sur votre compte BKApay. Voici votre code de connexion :</p>
-                  </td>
-                </tr>
-                <tr>
-                  <td style="padding: 0 40px;">
-                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
-                      <tr>
-                        <td style="background-color: #f3f4f6; padding: 25px; text-align: center; border-radius: 8px;">
-                          <span style="font-family: 'Courier New', monospace; font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #1f2937;">${code}</span>
-                        </td>
-                      </tr>
-                    </table>
-                  </td>
-                </tr>
-                <tr>
-                  <td style="padding: 25px 40px 40px;">
-                    <p style="margin: 0 0 10px; color: #4b5563; font-family: Arial, sans-serif; font-size: 14px; line-height: 1.5;">Ce code est valable pendant <strong>10 minutes</strong>.</p>
-                    <p style="margin: 0; color: #6b7280; font-family: Arial, sans-serif; font-size: 14px; line-height: 1.5;">Si vous n'etes pas a l'origine de cette demande, ignorez cet email et securisez votre compte.</p>
-                  </td>
-                </tr>
-                <tr>
-                  <td style="padding: 20px 40px; border-top: 1px solid #e5e7eb;">
-                    <p style="margin: 0; color: #9ca3af; font-family: Arial, sans-serif; font-size: 12px; text-align: center;">
-                      BKApay - Votre plateforme de paiement mobile money<br>
-                      <a href="https://bkapay.com" style="color: #2563eb; text-decoration: none;">bkapay.com</a>
-                    </p>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-        </table>
-      </body>
-      </html>
-    `;
 
   const htmlContent = type === "signup"
-    ? `
-      <!DOCTYPE html>
-      <html lang="fr">
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>BKApay - Verification</title>
-      </head>
-      <body style="margin: 0; padding: 0; background-color: #f9fafb;">
-        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f9fafb;">
-          <tr>
-            <td align="center" style="padding: 40px 20px;">
-              <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-                <tr>
-                  <td style="padding: 40px 40px 20px; text-align: center;">
-                    <h1 style="margin: 0; color: #2563eb; font-family: Arial, sans-serif; font-size: 28px; font-weight: bold;">BKApay</h1>
-                  </td>
-                </tr>
-                <tr>
-                  <td style="padding: 0 40px;">
-                    <h2 style="margin: 0 0 20px; color: #1f2937; font-family: Arial, sans-serif; font-size: 20px; text-align: center;">Verification de votre adresse email</h2>
-                    <p style="margin: 0 0 15px; color: #4b5563; font-family: Arial, sans-serif; font-size: 16px; line-height: 1.5;">Bonjour,</p>
-                    <p style="margin: 0 0 25px; color: #4b5563; font-family: Arial, sans-serif; font-size: 16px; line-height: 1.5;">Merci de vous etre inscrit sur BKApay. Voici votre code de verification :</p>
-                  </td>
-                </tr>
-                <tr>
-                  <td style="padding: 0 40px;">
-                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
-                      <tr>
-                        <td style="background-color: #f3f4f6; padding: 25px; text-align: center; border-radius: 8px;">
-                          <span style="font-family: 'Courier New', monospace; font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #1f2937;">${code}</span>
-                        </td>
-                      </tr>
-                    </table>
-                  </td>
-                </tr>
-                <tr>
-                  <td style="padding: 25px 40px 40px;">
-                    <p style="margin: 0 0 10px; color: #4b5563; font-family: Arial, sans-serif; font-size: 14px; line-height: 1.5;">Ce code est valable pendant <strong>10 minutes</strong>.</p>
-                    <p style="margin: 0; color: #6b7280; font-family: Arial, sans-serif; font-size: 14px; line-height: 1.5;">Si vous n'avez pas cree de compte, ignorez cet email.</p>
-                  </td>
-                </tr>
-                <tr>
-                  <td style="padding: 20px 40px; border-top: 1px solid #e5e7eb;">
-                    <p style="margin: 0; color: #9ca3af; font-family: Arial, sans-serif; font-size: 12px; text-align: center;">
-                      BKApay - Votre plateforme de paiement mobile money<br>
-                      <a href="https://bkapay.com" style="color: #2563eb; text-decoration: none;">bkapay.com</a>
-                    </p>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-        </table>
-      </body>
-      </html>
-    `
+    ? generateSignupHtml(code)
     : type === "login"
-    ? loginHtml
-    : `
-      <!DOCTYPE html>
-      <html lang="fr">
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>BKApay - Reinitialisation</title>
-      </head>
-      <body style="margin: 0; padding: 0; background-color: #f9fafb;">
-        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f9fafb;">
-          <tr>
-            <td align="center" style="padding: 40px 20px;">
-              <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-                <tr>
-                  <td style="padding: 40px 40px 20px; text-align: center;">
-                    <h1 style="margin: 0; color: #2563eb; font-family: Arial, sans-serif; font-size: 28px; font-weight: bold;">BKApay</h1>
-                  </td>
-                </tr>
-                <tr>
-                  <td style="padding: 0 40px;">
-                    <h2 style="margin: 0 0 20px; color: #1f2937; font-family: Arial, sans-serif; font-size: 20px; text-align: center;">Reinitialisation de votre mot de passe</h2>
-                    <p style="margin: 0 0 15px; color: #4b5563; font-family: Arial, sans-serif; font-size: 16px; line-height: 1.5;">Bonjour,</p>
-                    <p style="margin: 0 0 25px; color: #4b5563; font-family: Arial, sans-serif; font-size: 16px; line-height: 1.5;">Vous avez demande la reinitialisation de votre mot de passe. Voici votre code de verification :</p>
-                  </td>
-                </tr>
-                <tr>
-                  <td style="padding: 0 40px;">
-                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
-                      <tr>
-                        <td style="background-color: #f3f4f6; padding: 25px; text-align: center; border-radius: 8px;">
-                          <span style="font-family: 'Courier New', monospace; font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #1f2937;">${code}</span>
-                        </td>
-                      </tr>
-                    </table>
-                  </td>
-                </tr>
-                <tr>
-                  <td style="padding: 25px 40px 40px;">
-                    <p style="margin: 0 0 10px; color: #4b5563; font-family: Arial, sans-serif; font-size: 14px; line-height: 1.5;">Ce code est valable pendant <strong>10 minutes</strong>.</p>
-                    <p style="margin: 0; color: #6b7280; font-family: Arial, sans-serif; font-size: 14px; line-height: 1.5;">Si vous n'avez pas demande cette reinitialisation, ignorez cet email.</p>
-                  </td>
-                </tr>
-                <tr>
-                  <td style="padding: 20px 40px; border-top: 1px solid #e5e7eb;">
-                    <p style="margin: 0; color: #9ca3af; font-family: Arial, sans-serif; font-size: 12px; text-align: center;">
-                      BKApay - Votre plateforme de paiement mobile money<br>
-                      <a href="https://bkapay.com" style="color: #2563eb; text-decoration: none;">bkapay.com</a>
-                    </p>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-        </table>
-      </body>
-      </html>
-    `;
+    ? generateLoginHtml(code)
+    : generatePasswordResetHtml(code);
 
-  try {
-    console.log(`[Email] Tentative d'envoi de code ${type} à ${to}...`);
-    
-    const gmailType: GmailType = type === "signup" ? "signup" : type === "password_reset" ? "password" : "2fa";
-    const { transporter, gmailUser } = await createTransporter(gmailType);
-    
-    if (!transporter || !gmailUser) {
-      console.error(`[Email] Configuration ${getProviderNameForType(gmailType)} non configuree - envoi impossible`);
-      return false;
-    }
-
-    console.log(`[Email] Transporteur créé, envoi en cours...`);
-    
-    const result = await transporter.sendMail({
-      from: {
-        name: "BKApay",
-        address: gmailUser,
-      },
-      replyTo: gmailUser,
-      to,
-      subject,
-      text: textContent,
-      html: htmlContent,
-      headers: {
-        "X-Priority": "1",
-        "X-Mailer": "BKApay Mailer",
-        "List-Unsubscribe": `<mailto:${gmailUser}?subject=unsubscribe>`,
-      },
-    });
-    
-    console.log(`[Email] ✅ Code de verification envoye a ${to} (type: ${type}) - MessageId: ${result.messageId}`);
-    return true;
-  } catch (error: any) {
-    console.error("[Email] ❌ Erreur lors de l'envoi:", error?.message || error);
-    console.error("[Email] Détails de l'erreur:", JSON.stringify({
-      code: error?.code,
-      command: error?.command,
-      responseCode: error?.responseCode,
-    }));
-    return false;
-  }
-}
-
-export async function testEmailConnection(gmailType: GmailType = "signup"): Promise<boolean> {
-  try {
-    const { transporter } = await createTransporter(gmailType);
-    const providerName = getProviderNameForType(gmailType);
-    
-    if (!transporter) {
-      console.log(`[Email] Test ignore - ${providerName} non configure`);
-      return false;
-    }
-    
-    await transporter.verify();
-    console.log(`[Email] Connexion ${providerName} verifiee avec succes`);
-    return true;
-  } catch (error) {
-    console.error(`[Email] Erreur de connexion ${getProviderNameForType(gmailType)}:`, error);
-    return false;
-  }
-}
-
-export async function isEmailServiceConfigured(gmailType?: GmailType): Promise<boolean> {
-  if (gmailType) {
-    const { gmailUser, gmailPassword } = await getGmailCredentialsFromDB(gmailType);
-    return !!(gmailUser && gmailPassword);
-  }
-  const signupConfig = await getGmailCredentialsFromDB("signup");
-  const passwordConfig = await getGmailCredentialsFromDB("password");
-  const tfaConfig = await getGmailCredentialsFromDB("2fa");
-  return !!(signupConfig.gmailUser && signupConfig.gmailPassword) ||
-         !!(passwordConfig.gmailUser && passwordConfig.gmailPassword) ||
-         !!(tfaConfig.gmailUser && tfaConfig.gmailPassword);
-}
-
-export async function isEmailSendingEnabled(gmailType: GmailType): Promise<boolean> {
-  const providerName = getProviderNameForType(gmailType);
+  console.log(`[Email] Tentative d'envoi de code ${type} a ${to}...`);
   
-  try {
-    const { storage } = await import("./storage");
-    const config = await storage.getProviderConfig(providerName);
-    
-    if (config && config.isActive && config.apiKey && config.secretKey) {
-      return true;
-    }
-    return false;
-  } catch (error) {
-    console.log(`[Email] Erreur lors de la vérification si ${providerName} est activé:`, error);
+  const result = await sendMailtrapEmail(to, subject, textContent, htmlContent);
+  
+  if (result) {
+    console.log(`[Email] Code de verification envoye a ${to} (type: ${type})`);
+  }
+  
+  return result;
+}
+
+function generateSignupHtml(code: string): string {
+  return `
+    <!DOCTYPE html>
+    <html lang="fr">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>BKApay - Verification</title>
+    </head>
+    <body style="margin: 0; padding: 0; background-color: #f9fafb;">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f9fafb;">
+        <tr>
+          <td align="center" style="padding: 40px 20px;">
+            <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+              <tr>
+                <td style="padding: 40px 40px 20px; text-align: center;">
+                  <h1 style="margin: 0; color: #2563eb; font-family: Arial, sans-serif; font-size: 28px; font-weight: bold;">BKApay</h1>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 0 40px;">
+                  <h2 style="margin: 0 0 20px; color: #1f2937; font-family: Arial, sans-serif; font-size: 20px; text-align: center;">Verification de votre adresse email</h2>
+                  <p style="margin: 0 0 15px; color: #4b5563; font-family: Arial, sans-serif; font-size: 16px; line-height: 1.5;">Bonjour,</p>
+                  <p style="margin: 0 0 25px; color: #4b5563; font-family: Arial, sans-serif; font-size: 16px; line-height: 1.5;">Merci de vous etre inscrit sur BKApay. Voici votre code de verification :</p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 0 40px;">
+                  <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                    <tr>
+                      <td style="background-color: #f3f4f6; padding: 25px; text-align: center; border-radius: 8px;">
+                        <span style="font-family: 'Courier New', monospace; font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #1f2937;">${code}</span>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 25px 40px 40px;">
+                  <p style="margin: 0 0 10px; color: #4b5563; font-family: Arial, sans-serif; font-size: 14px; line-height: 1.5;">Ce code est valable pendant <strong>10 minutes</strong>.</p>
+                  <p style="margin: 0; color: #6b7280; font-family: Arial, sans-serif; font-size: 14px; line-height: 1.5;">Si vous n'avez pas cree de compte, ignorez cet email.</p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 20px 40px; border-top: 1px solid #e5e7eb;">
+                  <p style="margin: 0; color: #9ca3af; font-family: Arial, sans-serif; font-size: 12px; text-align: center;">
+                    BKApay - Votre plateforme de paiement mobile money<br>
+                    <a href="https://bkapay.com" style="color: #2563eb; text-decoration: none;">bkapay.com</a>
+                  </p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+  `;
+}
+
+function generateLoginHtml(code: string): string {
+  return `
+    <!DOCTYPE html>
+    <html lang="fr">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>BKApay - Code de connexion</title>
+    </head>
+    <body style="margin: 0; padding: 0; background-color: #f9fafb;">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f9fafb;">
+        <tr>
+          <td align="center" style="padding: 40px 20px;">
+            <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+              <tr>
+                <td style="padding: 40px 40px 20px; text-align: center;">
+                  <h1 style="margin: 0; color: #2563eb; font-family: Arial, sans-serif; font-size: 28px; font-weight: bold;">BKApay</h1>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 0 40px;">
+                  <h2 style="margin: 0 0 20px; color: #1f2937; font-family: Arial, sans-serif; font-size: 20px; text-align: center;">Code de connexion</h2>
+                  <p style="margin: 0 0 15px; color: #4b5563; font-family: Arial, sans-serif; font-size: 16px; line-height: 1.5;">Bonjour,</p>
+                  <p style="margin: 0 0 25px; color: #4b5563; font-family: Arial, sans-serif; font-size: 16px; line-height: 1.5;">Une tentative de connexion a ete detectee sur votre compte BKApay. Voici votre code de connexion :</p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 0 40px;">
+                  <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                    <tr>
+                      <td style="background-color: #f3f4f6; padding: 25px; text-align: center; border-radius: 8px;">
+                        <span style="font-family: 'Courier New', monospace; font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #1f2937;">${code}</span>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 25px 40px 40px;">
+                  <p style="margin: 0 0 10px; color: #4b5563; font-family: Arial, sans-serif; font-size: 14px; line-height: 1.5;">Ce code est valable pendant <strong>10 minutes</strong>.</p>
+                  <p style="margin: 0; color: #6b7280; font-family: Arial, sans-serif; font-size: 14px; line-height: 1.5;">Si vous n'etes pas a l'origine de cette demande, ignorez cet email et securisez votre compte.</p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 20px 40px; border-top: 1px solid #e5e7eb;">
+                  <p style="margin: 0; color: #9ca3af; font-family: Arial, sans-serif; font-size: 12px; text-align: center;">
+                    BKApay - Votre plateforme de paiement mobile money<br>
+                    <a href="https://bkapay.com" style="color: #2563eb; text-decoration: none;">bkapay.com</a>
+                  </p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+  `;
+}
+
+function generatePasswordResetHtml(code: string): string {
+  return `
+    <!DOCTYPE html>
+    <html lang="fr">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>BKApay - Reinitialisation</title>
+    </head>
+    <body style="margin: 0; padding: 0; background-color: #f9fafb;">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f9fafb;">
+        <tr>
+          <td align="center" style="padding: 40px 20px;">
+            <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+              <tr>
+                <td style="padding: 40px 40px 20px; text-align: center;">
+                  <h1 style="margin: 0; color: #2563eb; font-family: Arial, sans-serif; font-size: 28px; font-weight: bold;">BKApay</h1>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 0 40px;">
+                  <h2 style="margin: 0 0 20px; color: #1f2937; font-family: Arial, sans-serif; font-size: 20px; text-align: center;">Reinitialisation de votre mot de passe</h2>
+                  <p style="margin: 0 0 15px; color: #4b5563; font-family: Arial, sans-serif; font-size: 16px; line-height: 1.5;">Bonjour,</p>
+                  <p style="margin: 0 0 25px; color: #4b5563; font-family: Arial, sans-serif; font-size: 16px; line-height: 1.5;">Vous avez demande la reinitialisation de votre mot de passe. Voici votre code de verification :</p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 0 40px;">
+                  <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                    <tr>
+                      <td style="background-color: #f3f4f6; padding: 25px; text-align: center; border-radius: 8px;">
+                        <span style="font-family: 'Courier New', monospace; font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #1f2937;">${code}</span>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 25px 40px 40px;">
+                  <p style="margin: 0 0 10px; color: #4b5563; font-family: Arial, sans-serif; font-size: 14px; line-height: 1.5;">Ce code est valable pendant <strong>10 minutes</strong>.</p>
+                  <p style="margin: 0; color: #6b7280; font-family: Arial, sans-serif; font-size: 14px; line-height: 1.5;">Si vous n'avez pas demande cette reinitialisation, ignorez cet email.</p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 20px 40px; border-top: 1px solid #e5e7eb;">
+                  <p style="margin: 0; color: #9ca3af; font-family: Arial, sans-serif; font-size: 12px; text-align: center;">
+                    BKApay - Votre plateforme de paiement mobile money<br>
+                    <a href="https://bkapay.com" style="color: #2563eb; text-decoration: none;">bkapay.com</a>
+                  </p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+  `;
+}
+
+export async function testEmailConnection(): Promise<boolean> {
+  const config = await getMailtrapConfigFromDB();
+  
+  if (!config.apiToken) {
+    console.log("[Email] Test ignore - Mailtrap non configure");
     return false;
   }
+  
+  console.log("[Email] Configuration Mailtrap verifiee");
+  return true;
+}
+
+export async function isEmailServiceConfigured(): Promise<boolean> {
+  const config = await getMailtrapConfigFromDB();
+  return !!(config.apiToken && config.senderEmail);
+}
+
+export async function isEmailSendingEnabled(emailType: "signup" | "password" | "2fa"): Promise<boolean> {
+  const config = await getMailtrapConfigFromDB();
+  
+  if (!config.apiToken || !config.senderEmail) {
+    return false;
+  }
+  
+  switch (emailType) {
+    case "signup":
+      return config.enableSignup;
+    case "password":
+      return config.enablePasswordReset;
+    case "2fa":
+      return config.enableLogin;
+    default:
+      return false;
+  }
+}
+
+export type GmailType = "signup" | "password" | "2fa";
+
+export function clearGmailConfigCache(gmailType?: GmailType): void {
+  clearMailtrapConfigCache();
 }
