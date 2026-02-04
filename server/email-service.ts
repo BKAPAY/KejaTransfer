@@ -39,9 +39,9 @@ async function getMailtrapConfigFromDB(): Promise<MailtrapConfig> {
         enableSignup: config.masterKey === "true",
         enablePasswordReset: config.token === "true",
         enableLogin: config.ipnSecret === "true",
-        enableKycSubmitted: (config as any).enableKycSubmitted === "true",
-        enableKycVerified: (config as any).enableKycVerified === "true",
-        enableKycRejected: (config as any).enableKycRejected === "true",
+        enableKycSubmitted: (config as any).enableKycSubmitted === "true" || (config as any).enableKycSubmitted === true,
+        enableKycVerified: (config as any).enableKycVerified === "true" || (config as any).enableKycVerified === true,
+        enableKycRejected: (config as any).enableKycRejected === "true" || (config as any).enableKycRejected === true,
       };
       lastConfigFetch = now;
       console.log("[Email] Configuration Mailtrap chargee depuis la base de donnees");
