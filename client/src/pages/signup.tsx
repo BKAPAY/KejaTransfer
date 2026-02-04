@@ -11,7 +11,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ALLOWED_REGISTRATION_COUNTRIES } from "@shared/schema";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { Loader2, Mail, ArrowLeft } from "lucide-react";
@@ -116,12 +116,13 @@ export default function Signup() {
       });
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
       toast({
         title: "Compte créé avec succès",
-        description: "Vous pouvez maintenant vous connecter",
+        description: "Bienvenue sur BKApay",
       });
-      setLocation("/login");
+      setLocation("/dashboard");
     },
     onError: (error: any) => {
       toast({
