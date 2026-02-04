@@ -23,6 +23,7 @@ export const users = pgTable("users", {
   kycIdFront: text("kyc_id_front"), // Base64 encoded or URL
   kycIdBack: text("kyc_id_back"), // Base64 encoded or URL
   kycSelfie: text("kyc_selfie"), // Base64 encoded or URL
+  kycSignature: text("kyc_signature"), // Base64 encoded signature
   kycRejectionReason: text("kyc_rejection_reason"), // Reason for KYC rejection
   withdrawalPhones: text("withdrawal_phones").array().default([]), // Up to 3 withdrawal phone numbers
   securityCode: text("security_code"), // 6-digit security code for transfers/withdrawals
@@ -266,6 +267,7 @@ export const submitKycSchema = z.object({
   kycIdFront: z.string().min(1, "Photo recto requise"),
   kycIdBack: z.string().min(1, "Photo verso requise"),
   kycSelfie: z.string().min(1, "Selfie requis"),
+  kycSignature: z.string().min(1, "Signature requise"),
 });
 
 export const insertPaymentLinkSchema = createInsertSchema(paymentLinks).omit({

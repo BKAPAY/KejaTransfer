@@ -41,7 +41,7 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   updateUserBalance(id: string, amount: number): Promise<User | undefined>;
   updateUserPassword(id: string, hashedPassword: string): Promise<User | undefined>;
-  submitKyc(userId: string, kycData: { kycIdFront: string; kycIdBack: string; kycSelfie: string }): Promise<User | undefined>;
+  submitKyc(userId: string, kycData: { kycIdFront: string; kycIdBack: string; kycSelfie: string; kycSignature: string }): Promise<User | undefined>;
   approveKyc(userId: string): Promise<User | undefined>;
   rejectKyc(userId: string, reason?: string): Promise<User | undefined>;
   getPendingKycSubmissions(): Promise<User[]>;
@@ -203,7 +203,7 @@ export class DbStorage implements IStorage {
     return results[0];
   }
 
-  async submitKyc(userId: string, kycData: { kycIdFront: string; kycIdBack: string; kycSelfie: string }): Promise<User | undefined> {
+  async submitKyc(userId: string, kycData: { kycIdFront: string; kycIdBack: string; kycSelfie: string; kycSignature: string }): Promise<User | undefined> {
     const results = await db
       .update(schema.users)
       .set({
@@ -211,6 +211,7 @@ export class DbStorage implements IStorage {
         kycIdFront: kycData.kycIdFront,
         kycIdBack: kycData.kycIdBack,
         kycSelfie: kycData.kycSelfie,
+        kycSignature: kycData.kycSignature,
       })
       .where(eq(schema.users.id, userId))
       .returning();

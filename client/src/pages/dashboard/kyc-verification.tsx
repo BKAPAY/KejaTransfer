@@ -216,7 +216,10 @@ export default function KycVerificationPage() {
         await addImageToPdf(user.kycIdBack, "Piece d'identite (Verso)");
       }
       if (user.kycSelfie) {
-        await addImageToPdf(user.kycSelfie, "Selfie");
+        await addImageToPdf(user.kycSelfie, "Photo avec piece en main");
+      }
+      if (user.kycSignature) {
+        await addImageToPdf(user.kycSignature, "Signature");
       }
     } catch (e) {
       console.error("Erreur lors de l'ajout des images:", e);
@@ -429,11 +432,21 @@ export default function KycVerificationPage() {
                 )}
                 {selectedUserDetails.kycSelfie && (
                   <div className="border rounded-lg p-4">
-                    <p className="text-sm font-medium mb-3">Selfie</p>
+                    <p className="text-sm font-medium mb-3">Photo avec piece en main</p>
                     <img
                       src={selectedUserDetails.kycSelfie}
                       alt="Selfie"
                       className="w-full h-64 object-contain rounded"
+                    />
+                  </div>
+                )}
+                {selectedUserDetails.kycSignature && (
+                  <div className="border rounded-lg p-4">
+                    <p className="text-sm font-medium mb-3">Signature</p>
+                    <img
+                      src={selectedUserDetails.kycSignature}
+                      alt="Signature"
+                      className="w-full h-32 object-contain rounded bg-white"
                     />
                   </div>
                 )}

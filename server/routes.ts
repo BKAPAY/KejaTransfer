@@ -1000,9 +1000,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // KYC Submit - No file size or type restrictions
   app.post("/api/kyc/submit", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { kycIdFront, kycIdBack, kycSelfie } = req.body;
+      const { kycIdFront, kycIdBack, kycSelfie, kycSignature } = req.body;
 
-      if (!kycIdFront || !kycIdBack || !kycSelfie) {
+      if (!kycIdFront || !kycIdBack || !kycSelfie || !kycSignature) {
         return res.status(400).json({ error: "Tous les documents sont requis" });
       }
 
@@ -1010,6 +1010,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         kycIdFront,
         kycIdBack,
         kycSelfie,
+        kycSignature,
       });
 
       if (!user) {
