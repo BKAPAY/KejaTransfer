@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Copy, ExternalLink, Trash2, Image as ImageIcon, Link as LinkIcon, Edit2, Globe, Wallet } from "lucide-react";
+import { Plus, Copy, ExternalLink, Trash2, Image as ImageIcon, Link as LinkIcon, Edit2, Globe, Wallet, Video } from "lucide-react";
+import { VideoUploader } from "@/components/video-uploader";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { PaymentLink, User } from "@shared/schema";
@@ -90,6 +91,7 @@ export default function PaymentLinks() {
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [existingImages, setExistingImages] = useState<string[]>([]);
   const [newImageFiles, setNewImageFiles] = useState<File[]>([]);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [successToken, setSuccessToken] = useState<string | null>(null);
   const [successImage, setSuccessImage] = useState<string | null>(null);
   const [amountInput, setAmountInput] = useState<string>("");
@@ -158,6 +160,7 @@ export default function PaymentLinks() {
     setExistingImages(images);
     setImagePreviews([]);
     setNewImageFiles([]);
+    setVideoUrl(link.videoUrl || null);
     setDialogOpen(true);
   };
 
@@ -203,6 +206,7 @@ export default function PaymentLinks() {
         description: data.description,
         amount: data.amount,
         imageUrls: allImages,
+        videoUrl: videoUrl,
         allowedCountries: data.allowedCountries,
         customerPaysFee: data.customerPaysFee,
       });
@@ -218,6 +222,7 @@ export default function PaymentLinks() {
       setImagePreviews([]);
       setNewImageFiles([]);
       setExistingImages([]);
+      setVideoUrl(null);
       form.reset();
     },
     onError: (error: any) => {
@@ -238,6 +243,7 @@ export default function PaymentLinks() {
         description: data.description,
         amount: data.amount,
         imageUrls: allImages,
+        videoUrl: videoUrl,
         allowedCountries: data.allowedCountries,
         customerPaysFee: data.customerPaysFee,
       });
@@ -254,6 +260,7 @@ export default function PaymentLinks() {
       setImagePreviews([]);
       setNewImageFiles([]);
       setExistingImages([]);
+      setVideoUrl(null);
       form.reset();
     },
     onError: (error: any) => {
@@ -369,6 +376,7 @@ export default function PaymentLinks() {
             setExistingImages([]);
             setImagePreviews([]);
             setNewImageFiles([]);
+            setVideoUrl(null);
           }
           setDialogOpen(open);
         }}>
@@ -511,6 +519,21 @@ export default function PaymentLinks() {
                   </div>
                   <p className="text-xs text-muted-foreground">
                     {existingImages.length + imagePreviews.length}/3 images. Les images défilent automatiquement sur la page de paiement.
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  <Label className="flex items-center gap-2">
+                    <Video className="w-4 h-4" />
+                    Vidéo du produit (optionnel)
+                  </Label>
+                  <VideoUploader
+                    videoUrl={videoUrl}
+                    onVideoChange={setVideoUrl}
+                    maxDuration={30}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Ajoutez une vidéo de 30 secondes maximum. Elle sera lue automatiquement en boucle sur la page de paiement.
                   </p>
                 </div>
 
@@ -728,6 +751,7 @@ export default function PaymentLinks() {
                     setExistingImages([]);
                     setImagePreviews([]);
                     setNewImageFiles([]);
+                    setVideoUrl(null);
                     setDialogOpen(true);
                   }} data-testid="button-create-first">
                     <Plus className="w-4 h-4 mr-2" />
