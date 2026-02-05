@@ -443,13 +443,13 @@ export default function Admin() {
             ) : (
               <div className="space-y-1" data-testid="stat-total-deposits">
                 {stats?.depositsByCurrency?.XOF ? (
-                  <div className="text-lg font-bold">{formatAmount(stats.depositsByCurrency.XOF)} XOF</div>
+                  <div className="text-lg font-bold">{formatAmount(stats.depositsByCurrency.XOF, "XOF")}</div>
                 ) : null}
                 {stats?.depositsByCurrency?.XAF ? (
-                  <div className="text-lg font-bold">{formatAmount(stats.depositsByCurrency.XAF)} XAF</div>
+                  <div className="text-lg font-bold">{formatAmount(stats.depositsByCurrency.XAF, "XAF")}</div>
                 ) : null}
                 {stats?.depositsByCurrency?.CDF ? (
-                  <div className="text-lg font-bold">{formatAmount(stats.depositsByCurrency.CDF)} CDF</div>
+                  <div className="text-lg font-bold">{formatAmount(stats.depositsByCurrency.CDF, "CDF")}</div>
                 ) : null}
                 {!stats?.depositsByCurrency?.XOF && !stats?.depositsByCurrency?.XAF && !stats?.depositsByCurrency?.CDF && (
                   <div className="text-lg font-bold">0 XOF</div>
@@ -472,13 +472,13 @@ export default function Admin() {
             ) : (
               <div className="space-y-1" data-testid="stat-total-withdrawals">
                 {stats?.withdrawalsByCurrency?.XOF ? (
-                  <div className="text-lg font-bold">{formatAmount(stats.withdrawalsByCurrency.XOF)} XOF</div>
+                  <div className="text-lg font-bold">{formatAmount(stats.withdrawalsByCurrency.XOF, "XOF")}</div>
                 ) : null}
                 {stats?.withdrawalsByCurrency?.XAF ? (
-                  <div className="text-lg font-bold">{formatAmount(stats.withdrawalsByCurrency.XAF)} XAF</div>
+                  <div className="text-lg font-bold">{formatAmount(stats.withdrawalsByCurrency.XAF, "XAF")}</div>
                 ) : null}
                 {stats?.withdrawalsByCurrency?.CDF ? (
-                  <div className="text-lg font-bold">{formatAmount(stats.withdrawalsByCurrency.CDF)} CDF</div>
+                  <div className="text-lg font-bold">{formatAmount(stats.withdrawalsByCurrency.CDF, "CDF")}</div>
                 ) : null}
                 {!stats?.withdrawalsByCurrency?.XOF && !stats?.withdrawalsByCurrency?.XAF && !stats?.withdrawalsByCurrency?.CDF && (
                   <div className="text-lg font-bold">0 XOF</div>
