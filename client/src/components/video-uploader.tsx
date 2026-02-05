@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { Video, X, Scissors, Play, Pause, Check, Loader2 } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Video, X, Scissors, Play, Pause, Check, Loader2, Upload } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 interface VideoUploaderProps {
@@ -12,6 +13,7 @@ interface VideoUploaderProps {
 
 export function VideoUploader({ videoUrl, onVideoChange, maxDuration = 30 }: VideoUploaderProps) {
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [showTrimmer, setShowTrimmer] = useState(false);
   const [originalVideo, setOriginalVideo] = useState<string | null>(null);
   const [videoDuration, setVideoDuration] = useState(0);
@@ -34,9 +36,14 @@ export function VideoUploader({ videoUrl, onVideoChange, maxDuration = 30 }: Vid
     }
 
     setIsUploading(true);
+    setUploadProgress(0);
 
     try {
-      const videoDataUrl = await readFileAsDataURL(file);
+      const videoDataUrl = await readFileAsDataURL(file, (progress) => {
+        setUploadProgress(progress);
+      });
+      
+      setUploadProgress(100);
       const duration = await getVideoDuration(videoDataUrl);
 
       if (duration > maxDuration) {
@@ -53,15 +60,22 @@ export function VideoUploader({ videoUrl, onVideoChange, maxDuration = 30 }: Vid
       alert("Erreur lors du chargement de la vidéo");
     } finally {
       setIsUploading(false);
+      setUploadProgress(0);
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
     }
   };
 
-  const readFileAsDataURL = (file: File): Promise<string> => {
+  const readFileAsDataURL = (file: File, onProgress?: (progress: number) => void): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
+      reader.onprogress = (event) => {
+        if (event.lengthComputable && onProgress) {
+          const progress = Math.round((event.loaded / event.total) * 100);
+          onProgress(progress);
+        }
+      };
       reader.onload = () => resolve(reader.result as string);
       reader.onerror = reject;
       reader.readAsDataURL(file);
@@ -273,6 +287,22 @@ export function VideoUploader({ videoUrl, onVideoChange, maxDuration = 30 }: Vid
             <X className="h-4 w-4" />
           </Button>
         </div>
+      ) : isUploading ? (
+        <div className="w-full p-4 border rounded-lg bg-muted/50 space-y-3">
+          <div className="flex items-center gap-3">
+            <Upload className="h-5 w-5 text-primary animate-pulse" />
+            <div className="flex-1">
+              <div className="flex justify-between text-sm mb-1">
+                <span>Téléchargement en cours...</span>
+                <span className="font-medium">{uploadProgress}%</span>
+              </div>
+              <Progress value={uploadProgress} className="h-2" />
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground text-center">
+            Veuillez patienter pendant le chargement de la vidéo
+          </p>
+        </div>
       ) : (
         <Button
           type="button"
@@ -282,17 +312,8 @@ export function VideoUploader({ videoUrl, onVideoChange, maxDuration = 30 }: Vid
           disabled={isUploading}
           data-testid="btn-add-video"
         >
-          {isUploading ? (
-            <>
-              <Loader2 className="h-6 w-6 animate-spin" />
-              <span className="text-sm">Chargement...</span>
-            </>
-          ) : (
-            <>
-              <Video className="h-6 w-6" />
-              <span className="text-sm">Ajouter une vidéo (max {maxDuration}s)</span>
-            </>
-          )}
+          <Video className="h-6 w-6" />
+          <span className="text-sm">Ajouter une vidéo (max {maxDuration}s)</span>
         </Button>
       )}
 

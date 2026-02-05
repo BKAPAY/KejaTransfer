@@ -470,74 +470,90 @@ export default function PaymentLinks() {
                   />
                 )}
 
-                <div className="space-y-4 border rounded-lg p-4 bg-muted/30">
+                {/* Section Photos - désactivée si vidéo existe */}
+                <div className={`space-y-4 border rounded-lg p-4 ${videoUrl ? 'bg-muted/50 opacity-60' : 'bg-muted/30'}`}>
                   <div className="flex items-center gap-2">
                     <ImageIcon className="w-5 h-5 text-primary" />
                     <Label className="text-base font-medium">Photos du produit</Label>
                     <span className="text-xs text-muted-foreground ml-auto">({existingImages.length + imagePreviews.length}/3)</span>
                   </div>
                   
-                  <div className="flex flex-wrap gap-2">
-                    {existingImages.map((img, index) => (
-                      <div key={`existing-${index}`} className="relative w-20 h-20">
-                        <img src={img} alt={`Image ${index + 1}`} className="w-full h-full object-cover rounded-md border" />
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="destructive"
-                          className="absolute -top-2 -right-2 h-5 w-5"
-                          onClick={() => removeExistingImage(index)}
-                          data-testid={`btn-remove-existing-image-${index}`}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
+                  {videoUrl ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      Vous avez déjà ajouté une vidéo. Supprimez la vidéo pour ajouter des photos.
+                    </p>
+                  ) : (
+                    <>
+                      <div className="flex flex-wrap gap-2">
+                        {existingImages.map((img, index) => (
+                          <div key={`existing-${index}`} className="relative w-20 h-20">
+                            <img src={img} alt={`Image ${index + 1}`} className="w-full h-full object-cover rounded-md border" />
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="destructive"
+                              className="absolute -top-2 -right-2 h-5 w-5"
+                              onClick={() => removeExistingImage(index)}
+                              data-testid={`btn-remove-existing-image-${index}`}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        ))}
+                        {imagePreviews.map((img, index) => (
+                          <div key={`new-${index}`} className="relative w-20 h-20">
+                            <img src={img} alt={`Nouvelle ${index + 1}`} className="w-full h-full object-cover rounded-md border" />
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="destructive"
+                              className="absolute -top-2 -right-2 h-5 w-5"
+                              onClick={() => removeNewImage(index)}
+                              data-testid={`btn-remove-new-image-${index}`}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                    {imagePreviews.map((img, index) => (
-                      <div key={`new-${index}`} className="relative w-20 h-20">
-                        <img src={img} alt={`Nouvelle ${index + 1}`} className="w-full h-full object-cover rounded-md border" />
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="destructive"
-                          className="absolute -top-2 -right-2 h-5 w-5"
-                          onClick={() => removeNewImage(index)}
-                          data-testid={`btn-remove-new-image-${index}`}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                  
-                  {existingImages.length + imagePreviews.length < 3 && (
-                    <label className="w-full h-12 border-2 border-dashed rounded-md flex items-center justify-center gap-2 cursor-pointer hover:bg-muted/50">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        className="hidden"
-                        data-testid="input-image-files"
-                        onChange={(e) => handleImageAdd(e.target.files)}
-                      />
-                      <Plus className="h-5 w-5 text-muted-foreground" />
-                      <span className="text-sm text-muted-foreground">Ajouter des photos</span>
-                    </label>
+                      
+                      {existingImages.length + imagePreviews.length < 3 && (
+                        <label className="w-full h-12 border-2 border-dashed rounded-md flex items-center justify-center gap-2 cursor-pointer hover:bg-muted/50">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            className="hidden"
+                            data-testid="input-image-files"
+                            onChange={(e) => handleImageAdd(e.target.files)}
+                          />
+                          <Plus className="h-5 w-5 text-muted-foreground" />
+                          <span className="text-sm text-muted-foreground">Ajouter des photos</span>
+                        </label>
+                      )}
+                    </>
                   )}
                 </div>
 
-                <div className="space-y-4 border rounded-lg p-4 bg-muted/30">
+                {/* Section Vidéo - désactivée si photos existent */}
+                <div className={`space-y-4 border rounded-lg p-4 ${(existingImages.length + imagePreviews.length) > 0 ? 'bg-muted/50 opacity-60' : 'bg-muted/30'}`}>
                   <div className="flex items-center gap-2">
                     <Video className="w-5 h-5 text-primary" />
                     <Label className="text-base font-medium">Vidéo du produit</Label>
                     <span className="text-xs text-muted-foreground ml-auto">(max 30s)</span>
                   </div>
                   
-                  <VideoUploader
-                    videoUrl={videoUrl}
-                    onVideoChange={setVideoUrl}
-                    maxDuration={30}
-                  />
+                  {(existingImages.length + imagePreviews.length) > 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      Vous avez déjà ajouté des photos. Supprimez les photos pour ajouter une vidéo.
+                    </p>
+                  ) : (
+                    <VideoUploader
+                      videoUrl={videoUrl}
+                      onVideoChange={setVideoUrl}
+                      maxDuration={30}
+                    />
+                  )}
                 </div>
 
                 {/* Pays autorisés */}
