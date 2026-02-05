@@ -18,6 +18,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { calculateOutgoingFee, fetchFeeConfig, formatFeePercentage } from "@/lib/fees";
 import { useLocation } from "wouter";
 import { CurrencySelector, getCurrencyLabel } from "@/components/currency-selector";
+import { OperatorSelector } from "@/components/operator-selector";
 import { hasMultipleCurrencies, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
 import { useConvertedMinimums } from "@/hooks/use-converted-minimums";
 import { getCurrencyDecimals } from "@/lib/currency";
@@ -470,20 +471,11 @@ export default function Withdrawal() {
                         Aucun operateur disponible pour votre pays
                       </div>
                     ) : (
-                      <Select value={field.value} onValueChange={field.onChange}>
-                        <FormControl>
-                          <SelectTrigger data-testid="select-withdrawal-operator">
-                            <SelectValue placeholder="Selectionnez un operateur" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {countryOperators.map((op) => (
-                            <SelectItem key={op.code} value={op.code}>
-                              {op.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <OperatorSelector
+                        operators={countryOperators}
+                        selectedOperator={field.value}
+                        onSelect={field.onChange}
+                      />
                     )}
                     <FormMessage />
                   </FormItem>
