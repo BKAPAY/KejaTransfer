@@ -470,8 +470,13 @@ export default function PaymentLinks() {
                   />
                 )}
 
-                <div className="space-y-3">
-                  <Label>Images du produit (optionnel, max 3)</Label>
+                <div className="space-y-4 border rounded-lg p-4 bg-muted/30">
+                  <div className="flex items-center gap-2">
+                    <ImageIcon className="w-5 h-5 text-primary" />
+                    <Label className="text-base font-medium">Photos du produit</Label>
+                    <span className="text-xs text-muted-foreground ml-auto">({existingImages.length + imagePreviews.length}/3)</span>
+                  </div>
+                  
                   <div className="flex flex-wrap gap-2">
                     {existingImages.map((img, index) => (
                       <div key={`existing-${index}`} className="relative w-20 h-20">
@@ -503,38 +508,36 @@ export default function PaymentLinks() {
                         </Button>
                       </div>
                     ))}
-                    {existingImages.length + imagePreviews.length < 3 && (
-                      <label className="w-20 h-20 border-2 border-dashed rounded-md flex items-center justify-center cursor-pointer hover:bg-muted/50">
-                        <input
-                          type="file"
-                          accept="image/*"
-                          multiple
-                          className="hidden"
-                          data-testid="input-image-files"
-                          onChange={(e) => handleImageAdd(e.target.files)}
-                        />
-                        <Plus className="h-6 w-6 text-muted-foreground" />
-                      </label>
-                    )}
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    {existingImages.length + imagePreviews.length}/3 images. Les images défilent automatiquement sur la page de paiement.
-                  </p>
+                  
+                  {existingImages.length + imagePreviews.length < 3 && (
+                    <label className="w-full h-12 border-2 border-dashed rounded-md flex items-center justify-center gap-2 cursor-pointer hover:bg-muted/50">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        data-testid="input-image-files"
+                        onChange={(e) => handleImageAdd(e.target.files)}
+                      />
+                      <Plus className="h-5 w-5 text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">Ajouter des photos</span>
+                    </label>
+                  )}
                 </div>
 
-                <div className="space-y-3">
-                  <Label className="flex items-center gap-2">
-                    <Video className="w-4 h-4" />
-                    Vidéo du produit (optionnel)
-                  </Label>
+                <div className="space-y-4 border rounded-lg p-4 bg-muted/30">
+                  <div className="flex items-center gap-2">
+                    <Video className="w-5 h-5 text-primary" />
+                    <Label className="text-base font-medium">Vidéo du produit</Label>
+                    <span className="text-xs text-muted-foreground ml-auto">(max 30s)</span>
+                  </div>
+                  
                   <VideoUploader
                     videoUrl={videoUrl}
                     onVideoChange={setVideoUrl}
                     maxDuration={30}
                   />
-                  <p className="text-xs text-muted-foreground">
-                    Ajoutez une vidéo de 30 secondes maximum. Elle sera lue automatiquement en boucle sur la page de paiement.
-                  </p>
                 </div>
 
                 {/* Pays autorisés */}
