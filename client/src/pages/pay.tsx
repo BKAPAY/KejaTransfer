@@ -83,7 +83,6 @@ function ImageCarousel({ images, productName }: { images: string[]; productName:
 
 function ProductVideo({ videoUrl }: { videoUrl: string }) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [isMuted, setIsMuted] = useState(true);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -93,14 +92,12 @@ function ProductVideo({ videoUrl }: { videoUrl: string }) {
       video.muted = false;
       try {
         await video.play();
-        setIsMuted(false);
       } catch {
         video.muted = true;
-        setIsMuted(true);
         try {
           await video.play();
         } catch (e) {
-          console.log("Autoplay bloqué");
+          console.log("Autoplay bloqué par le navigateur");
         }
       }
     };
@@ -108,18 +105,8 @@ function ProductVideo({ videoUrl }: { videoUrl: string }) {
     tryPlayWithSound();
   }, [videoUrl]);
 
-  const toggleMute = () => {
-    const video = videoRef.current;
-    if (!video) return;
-    video.muted = !video.muted;
-    setIsMuted(video.muted);
-  };
-
   return (
-    <div 
-      className="relative w-full max-w-[280px] sm:max-w-[320px] mx-auto rounded-xl overflow-hidden border bg-muted cursor-pointer"
-      onClick={toggleMute}
-    >
+    <div className="relative w-full max-w-[280px] sm:max-w-[320px] mx-auto rounded-xl overflow-hidden border bg-muted">
       <video
         ref={videoRef}
         src={videoUrl}
@@ -128,11 +115,6 @@ function ProductVideo({ videoUrl }: { videoUrl: string }) {
         playsInline
         data-testid="video-product"
       />
-      {isMuted && (
-        <div className="absolute bottom-2 right-2 bg-black/60 rounded-full p-1.5">
-          <VolumeX className="h-4 w-4 text-white" />
-        </div>
-      )}
     </div>
   );
 }
