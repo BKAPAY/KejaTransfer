@@ -42,6 +42,7 @@ export const paymentLinks = pgTable("payment_links", {
   amount: integer("amount").notNull(), // Amount in XOF
   imageUrl: text("image_url"), // Legacy single image (kept for backward compatibility)
   imageUrls: text("image_urls").array().default([]), // Up to 3 product images
+  videoUrl: text("video_url"), // Product video (max 30 seconds, base64 encoded)
   token: text("token").notNull().unique(), // Unique token for the payment link
   isActive: boolean("is_active").notNull().default(true),
   allowedCountries: text("allowed_countries").array().default([]), // Empty array = all countries allowed
@@ -286,6 +287,7 @@ export const updatePaymentLinkSchema = z.object({
   amount: z.number().min(1, "Le montant doit être supérieur à 0").optional(),
   imageUrl: z.string().optional(),
   imageUrls: z.array(z.string()).optional(),
+  videoUrl: z.string().nullable().optional(),
   isActive: z.boolean().optional(),
   allowedCountries: z.array(z.string()).optional(),
   customerPaysFee: z.boolean().optional(),
