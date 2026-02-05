@@ -15,8 +15,8 @@ import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { useEffect, useState, useCallback } from "react";
-import { CheckCircle2, Clock, Loader2, AlertCircle, XCircle, RefreshCw, ExternalLink, Copy, Check, ChevronLeft, ChevronRight } from "lucide-react";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { CheckCircle2, Clock, Loader2, AlertCircle, XCircle, RefreshCw, ExternalLink, Copy, Check, ChevronLeft, ChevronRight, Volume2, VolumeX } from "lucide-react";
 import { PaymentMethodSelector } from "@/components/payment-method-selector";
 import { CryptoPaymentFlow } from "@/components/crypto-payment-flow";
 import { CurrencySelector, getCurrencyLabel } from "@/components/currency-selector";
@@ -77,6 +77,62 @@ function ImageCarousel({ images, productName }: { images: string[]; productName:
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+function ProductVideo({ videoUrl }: { videoUrl: string }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [isMuted, setIsMuted] = useState(true);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const tryPlayWithSound = async () => {
+      video.muted = false;
+      try {
+        await video.play();
+        setIsMuted(false);
+      } catch {
+        video.muted = true;
+        setIsMuted(true);
+        try {
+          await video.play();
+        } catch (e) {
+          console.log("Autoplay bloqué");
+        }
+      }
+    };
+
+    tryPlayWithSound();
+  }, [videoUrl]);
+
+  const toggleMute = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.muted = !video.muted;
+    setIsMuted(video.muted);
+  };
+
+  return (
+    <div 
+      className="relative w-full max-w-[280px] sm:max-w-[320px] mx-auto rounded-xl overflow-hidden border bg-muted cursor-pointer"
+      onClick={toggleMute}
+    >
+      <video
+        ref={videoRef}
+        src={videoUrl}
+        className="w-full h-auto object-contain"
+        loop
+        playsInline
+        data-testid="video-product"
+      />
+      {isMuted && (
+        <div className="absolute bottom-2 right-2 bg-black/60 rounded-full p-1.5">
+          <VolumeX className="h-4 w-4 text-white" />
+        </div>
+      )}
     </div>
   );
 }
