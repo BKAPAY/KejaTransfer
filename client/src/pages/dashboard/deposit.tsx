@@ -84,6 +84,34 @@ export default function Deposit() {
   const selectedOperator = form.watch("operator");
   const amount = depositAmount;
 
+  // Auto-detect country from IP address
+  useEffect(() => {
+    const detectCountry = async () => {
+      // Only auto-detect if no country is selected yet
+      if (selectedCountry) return;
+      
+      try {
+        const response = await fetch("/api/detect-country");
+        if (response.ok) {
+          const data = await response.json();
+          if (data.detected && data.country && enabledCountriesOperators) {
+            // Only set if the detected country is enabled
+            if (Object.keys(enabledCountriesOperators).includes(data.country)) {
+              form.setValue("country", data.country);
+              console.log(`[GeoIP] Auto-selected country: ${data.country}`);
+            }
+          }
+        }
+      } catch (error) {
+        console.error("[GeoIP] Failed to detect country:", error);
+      }
+    };
+    
+    if (enabledCountriesOperators && !selectedCountry) {
+      detectCountry();
+    }
+  }, [enabledCountriesOperators, selectedCountry, form]);
+
   // Filter countries to only show those enabled by admin (country-level payin enabled)
   // Note: countries may have empty operator lists, UI will show "no operators" message
   const collectCountries = enabledCountriesOperators 

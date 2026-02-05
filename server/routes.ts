@@ -567,6 +567,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(nowpaymentsRoutes);
   app.use("/api/afribapay", afribaPayRoutes);
 
+  // ===== IP Geolocation Route =====
+  // Detect country from IP address for auto-selecting country on payment pages
+  app.get("/api/detect-country", async (req: Request, res: Response) => {
+    try {
+      // Get client IP from various headers (for reverse proxy support)
+      const clientIP = 
+        (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
+        (req.headers["x-real-ip"] as string) ||
+        req.socket.remoteAddress ||
+        "";
+      
+      // List of supported country codes
+      const SUPPORTED_COUNTRIES = ["BJ", "TG", "SN", "CI", "ML", "CM", "CD", "GN", "NE"];
+      
+      // Use ip-api.com (free, no API key required for non-commercial use)
+      const response = await fetch(`http://ip-api.com/json/${clientIP}?fields=countryCode,status`);
+      
+      if (!response.ok) {
+        return res.json({ country: null, detected: false });
+      }
+      
+      const data = await response.json();
+      
+      if (data.status === "success" && data.countryCode) {
+        const countryCode = data.countryCode;
+        
+        // Check if the detected country is in our supported list
+        if (SUPPORTED_COUNTRIES.includes(countryCode)) {
+          console.log(`[GeoIP] Detected country ${countryCode} for IP ${clientIP}`);
+          return res.json({ country: countryCode, detected: true });
+        } else {
+          console.log(`[GeoIP] Country ${countryCode} not supported for IP ${clientIP}`);
+          return res.json({ country: null, detected: false, detectedCountry: countryCode });
+        }
+      }
+      
+      return res.json({ country: null, detected: false });
+    } catch (error) {
+      console.error("[GeoIP] Error detecting country:", error);
+      return res.json({ country: null, detected: false });
+    }
+  });
+
   // ===== Auth Routes =====
   
   // Step 1: Send verification code for signup
