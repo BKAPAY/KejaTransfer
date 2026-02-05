@@ -226,6 +226,8 @@ export default function Admin() {
     verifiedUsers: number;
     totalDeposits: number;
     totalWithdrawals: number;
+    depositsByCurrency?: { XOF: number; XAF: number; CDF: number };
+    withdrawalsByCurrency?: { XOF: number; XAF: number; CDF: number };
   }>({
     queryKey: ["/api/admin/stats"],
     refetchInterval: 5000,
@@ -439,12 +441,21 @@ export default function Admin() {
             {statsLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
-              <>
-                <div className="text-2xl font-bold" data-testid="stat-total-deposits">
-                  {formatAmount(stats?.totalDeposits || 0)}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">Argent entrant</p>
-              </>
+              <div className="space-y-1" data-testid="stat-total-deposits">
+                {stats?.depositsByCurrency?.XOF ? (
+                  <div className="text-lg font-bold">{formatAmount(stats.depositsByCurrency.XOF)} XOF</div>
+                ) : null}
+                {stats?.depositsByCurrency?.XAF ? (
+                  <div className="text-lg font-bold">{formatAmount(stats.depositsByCurrency.XAF)} XAF</div>
+                ) : null}
+                {stats?.depositsByCurrency?.CDF ? (
+                  <div className="text-lg font-bold">{formatAmount(stats.depositsByCurrency.CDF)} CDF</div>
+                ) : null}
+                {!stats?.depositsByCurrency?.XOF && !stats?.depositsByCurrency?.XAF && !stats?.depositsByCurrency?.CDF && (
+                  <div className="text-lg font-bold">0 XOF</div>
+                )}
+                <p className="text-xs text-muted-foreground">Argent entrant</p>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -459,12 +470,21 @@ export default function Admin() {
             {statsLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
-              <>
-                <div className="text-2xl font-bold" data-testid="stat-total-withdrawals">
-                  {formatAmount(stats?.totalWithdrawals || 0)}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">Argent sortant</p>
-              </>
+              <div className="space-y-1" data-testid="stat-total-withdrawals">
+                {stats?.withdrawalsByCurrency?.XOF ? (
+                  <div className="text-lg font-bold">{formatAmount(stats.withdrawalsByCurrency.XOF)} XOF</div>
+                ) : null}
+                {stats?.withdrawalsByCurrency?.XAF ? (
+                  <div className="text-lg font-bold">{formatAmount(stats.withdrawalsByCurrency.XAF)} XAF</div>
+                ) : null}
+                {stats?.withdrawalsByCurrency?.CDF ? (
+                  <div className="text-lg font-bold">{formatAmount(stats.withdrawalsByCurrency.CDF)} CDF</div>
+                ) : null}
+                {!stats?.withdrawalsByCurrency?.XOF && !stats?.withdrawalsByCurrency?.XAF && !stats?.withdrawalsByCurrency?.CDF && (
+                  <div className="text-lg font-bold">0 XOF</div>
+                )}
+                <p className="text-xs text-muted-foreground">Argent sortant</p>
+              </div>
             )}
           </CardContent>
         </Card>

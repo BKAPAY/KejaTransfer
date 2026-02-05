@@ -808,9 +808,26 @@ export class DbStorage implements IStorage {
     verifiedUsers: number;
     totalDeposits: number;
     totalWithdrawals: number;
+    depositsByCurrency: { XOF: number; XAF: number; CDF: number };
+    withdrawalsByCurrency: { XOF: number; XAF: number; CDF: number };
   }> {
     const allUsers = await db.select().from(schema.users);
     const verifiedUsers = allUsers.filter((u) => u.kycStatus === "verified").length;
+
+    // Create a map of userId to currency based on user's country
+    const userCurrencyMap = new Map<string, string>();
+    const COUNTRY_CURRENCIES: Record<string, string> = {
+      "BJ": "XOF", // Bénin
+      "TG": "XOF", // Togo
+      "SN": "XOF", // Sénégal
+      "CI": "XOF", // Côte d'Ivoire
+      "ML": "XOF", // Mali
+      "CM": "XAF", // Cameroun
+      "CD": "CDF", // RDC
+    };
+    allUsers.forEach(u => {
+      userCurrencyMap.set(u.id, u.country ? COUNTRY_CURRENCIES[u.country] || "XOF" : "XOF");
+    });
 
     const allTransactions = await db.select().from(schema.transactions);
     const completedDeposits = allTransactions.filter(
@@ -826,11 +843,31 @@ export class DbStorage implements IStorage {
     const totalDeposits = completedDeposits.reduce((sum, t) => sum + t.amount, 0);
     const totalWithdrawals = completedOutgoing.reduce((sum, t) => sum + t.amount, 0);
 
+    // Calculate deposits by currency
+    const depositsByCurrency = { XOF: 0, XAF: 0, CDF: 0 };
+    completedDeposits.forEach(t => {
+      const currency = t.currency || userCurrencyMap.get(t.userId) || "XOF";
+      if (currency === "XOF") depositsByCurrency.XOF += t.amount;
+      else if (currency === "XAF") depositsByCurrency.XAF += t.amount;
+      else if (currency === "CDF") depositsByCurrency.CDF += t.amount;
+    });
+
+    // Calculate withdrawals by currency
+    const withdrawalsByCurrency = { XOF: 0, XAF: 0, CDF: 0 };
+    completedOutgoing.forEach(t => {
+      const currency = t.currency || userCurrencyMap.get(t.userId) || "XOF";
+      if (currency === "XOF") withdrawalsByCurrency.XOF += t.amount;
+      else if (currency === "XAF") withdrawalsByCurrency.XAF += t.amount;
+      else if (currency === "CDF") withdrawalsByCurrency.CDF += t.amount;
+    });
+
     return {
       totalUsers: allUsers.length,
       verifiedUsers,
       totalDeposits,
       totalWithdrawals,
+      depositsByCurrency,
+      withdrawalsByCurrency,
     };
   }
 
