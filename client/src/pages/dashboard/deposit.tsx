@@ -19,6 +19,7 @@ import { useState, useEffect, useCallback } from "react";
 import { PaymentMethodSelector } from "@/components/payment-method-selector";
 import { CryptoPaymentFlow } from "@/components/crypto-payment-flow";
 import { CurrencySelector, getCurrencyLabel } from "@/components/currency-selector";
+import { OperatorSelector } from "@/components/operator-selector";
 import { hasMultipleCurrencies, getMbiyoPayCurrencyForCountry, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
 import { useConvertedMinimums } from "@/hooks/use-converted-minimums";
 import { getCurrencyDecimals } from "@/lib/currency";
@@ -67,7 +68,7 @@ export default function Deposit() {
 
   const { depositMin, cryptoMin } = useConvertedMinimums(userBalanceCurrency);
 
-  const { data: enabledCountriesOperators } = useQuery<Record<string, string[]>>({
+  const { data: enabledCountriesOperators, isLoading: isLoadingOperators } = useQuery<Record<string, string[]>>({
     queryKey: ["/api/countries-operators/deposits"],
   });
 
@@ -679,20 +680,12 @@ export default function Deposit() {
                                 Aucun operateur disponible pour ce pays
                               </div>
                             ) : (
-                              <Select value={field.value} onValueChange={field.onChange}>
-                                <FormControl>
-                                  <SelectTrigger data-testid="select-operator">
-                                    <SelectValue placeholder="Selectionnez un operateur" />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                  {countryOperators.map((op) => (
-                                    <SelectItem key={op.code} value={op.code}>
-                                      {op.name}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
+                              <OperatorSelector
+                                operators={countryOperators}
+                                selectedOperator={field.value}
+                                onSelect={field.onChange}
+                                isLoading={isLoadingOperators}
+                              />
                             )}
                             <FormMessage />
                           </FormItem>

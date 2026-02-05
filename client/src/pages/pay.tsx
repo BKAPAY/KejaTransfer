@@ -22,6 +22,7 @@ import { CryptoPaymentFlow } from "@/components/crypto-payment-flow";
 import { CurrencySelector, getCurrencyLabel } from "@/components/currency-selector";
 import { hasMultipleCurrencies, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
 import { getCurrencyDecimals } from "@/lib/currency";
+import { OperatorSelector } from "@/components/operator-selector";
 
 function ImageCarousel({ images, productName }: { images: string[]; productName: string }) {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -1263,24 +1264,13 @@ export default function Pay() {
                   </AlertDescription>
                 </Alert>
               ) : (
-                <Select 
-                  value={field.value} 
-                  onValueChange={field.onChange}
+                <OperatorSelector
+                  operators={countryOperators}
+                  selectedOperator={field.value}
+                  onSelect={field.onChange}
                   disabled={isLoadingOperators}
-                >
-                  <FormControl>
-                    <SelectTrigger data-testid="select-operator">
-                      <SelectValue placeholder={isLoadingOperators ? "Chargement..." : "Sélectionnez votre opérateur"} />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {countryOperators.map((op) => (
-                      <SelectItem key={op.code} value={op.code}>
-                        {op.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  isLoading={isLoadingOperators}
+                />
               )}
               <FormMessage />
             </FormItem>

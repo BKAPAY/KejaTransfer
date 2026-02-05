@@ -24,6 +24,7 @@ import { usePaymentCountdown } from "@/hooks/use-payment-countdown";
 import logoImage from "@assets/bkapay-logo.png";
 import { getCurrencyDecimals } from "@/lib/currency";
 import { CurrencySelector, getCurrencyLabel } from "@/components/currency-selector";
+import { OperatorSelector } from "@/components/operator-selector";
 import { hasMultipleCurrencies, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
 
 interface ApiKeyInfo {
@@ -1162,18 +1163,13 @@ export default function ApiPay() {
             </AlertDescription>
           </Alert>
         ) : (
-          <Select value={operator} onValueChange={setOperator} disabled={!country || isLoadingOperators}>
-            <SelectTrigger id="operator" data-testid="select-operator">
-              <SelectValue placeholder={isLoadingOperators ? "Chargement..." : (country ? "Selectionnez un operateur" : "Choisissez un pays d'abord")} />
-            </SelectTrigger>
-            <SelectContent>
-              {countryOperators.map((op) => (
-                <SelectItem key={op.code} value={op.code}>
-                  {op.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <OperatorSelector
+            operators={countryOperators}
+            selectedOperator={operator}
+            onSelect={setOperator}
+            disabled={!country || isLoadingOperators}
+            isLoading={isLoadingOperators}
+          />
         )}
       </div>
 

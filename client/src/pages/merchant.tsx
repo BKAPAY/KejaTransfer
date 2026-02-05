@@ -20,6 +20,7 @@ import { CheckCircle2, Clock, Loader2, AlertCircle, XCircle, RefreshCw, External
 import { PaymentMethodSelector } from "@/components/payment-method-selector";
 import { CryptoPaymentFlow } from "@/components/crypto-payment-flow";
 import { CurrencySelector, getCurrencyLabel } from "@/components/currency-selector";
+import { OperatorSelector } from "@/components/operator-selector";
 import { hasMultipleCurrencies, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
 import { getCurrencyDecimals } from "@/lib/currency";
 
@@ -1171,24 +1172,13 @@ export default function Merchant() {
                   </AlertDescription>
                 </Alert>
               ) : (
-                <Select 
-                  value={field.value} 
-                  onValueChange={field.onChange}
+                <OperatorSelector
+                  operators={countryOperators}
+                  selectedOperator={field.value}
+                  onSelect={field.onChange}
                   disabled={isLoadingOperators}
-                >
-                  <FormControl>
-                    <SelectTrigger data-testid="select-operator">
-                      <SelectValue placeholder={isLoadingOperators ? "Chargement..." : "Sélectionnez votre opérateur"} />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {countryOperators.map((op) => (
-                      <SelectItem key={op.code} value={op.code}>
-                        {op.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  isLoading={isLoadingOperators}
+                />
               )}
               <FormMessage />
             </FormItem>
