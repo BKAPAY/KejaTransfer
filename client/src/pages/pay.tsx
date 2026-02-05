@@ -1371,17 +1371,7 @@ export default function Pay() {
             <img src={logoImage} alt="BKApay" className="h-8 sm:h-10 lg:h-12 w-auto" />
           </div>
           {paymentLink.videoUrl && (
-            <div className="relative w-full max-w-[280px] sm:max-w-[320px] mx-auto rounded-xl overflow-hidden border bg-muted">
-              <video
-                src={paymentLink.videoUrl}
-                className="w-full h-auto object-contain"
-                autoPlay
-                loop
-                muted
-                playsInline
-                data-testid="video-product"
-              />
-            </div>
+            <ProductVideo videoUrl={paymentLink.videoUrl} />
           )}
           <ImageCarousel 
             images={paymentLink.imageUrls?.length ? paymentLink.imageUrls : (paymentLink.imageUrl ? [paymentLink.imageUrl] : [])}
