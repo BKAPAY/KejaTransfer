@@ -154,14 +154,47 @@ export default function Merchant() {
   const [selectedCurrency, setSelectedCurrency] = useState<string>("XOF");
   const { toast } = useToast();
   
-  // État pour le flux crypto en 2 étapes
-  const [cryptoStep, setCryptoStep] = useState<"info" | "payment">("info");
+  // État pour le flux crypto en 2 étapes - restauré depuis localStorage si paiement en cours
+  const [cryptoStep, setCryptoStep] = useState<"info" | "payment">(() => {
+    if (!token) return "info";
+    try {
+      const keys = Object.keys(localStorage);
+      const cryptoKey = keys.find(k => k.startsWith("bkapay_crypto_"));
+      if (cryptoKey) {
+        const data = JSON.parse(localStorage.getItem(cryptoKey) || "{}");
+        if (data.paymentDetails && data.createdAt && data.cryptoCustomerInfo) {
+          const elapsed = Math.floor((Date.now() - data.createdAt) / 1000);
+          const remaining = (data.expiresIn || 1800) - elapsed;
+          if (remaining > 0) return "payment";
+        }
+      }
+    } catch {}
+    return "info";
+  });
   const [cryptoCustomerInfo, setCryptoCustomerInfo] = useState<{
     amount: number;
     customerName: string;
     customerEmail: string;
     customerPhone: string;
-  } | null>(null);
+  } | null>(() => {
+    if (!token) return null;
+    try {
+      const keys = Object.keys(localStorage);
+      const cryptoKey = keys.find(k => k.startsWith("bkapay_crypto_"));
+      if (cryptoKey) {
+        const data = JSON.parse(localStorage.getItem(cryptoKey) || "{}");
+        if (data.paymentDetails && data.createdAt && data.cryptoCustomerInfo) {
+          const elapsed = Math.floor((Date.now() - data.createdAt) / 1000);
+          const remaining = (data.expiresIn || 1800) - elapsed;
+          if (remaining > 0) return {
+            amount: data.amount || 0,
+            ...data.cryptoCustomerInfo,
+          };
+        }
+      }
+    } catch {}
+    return null;
+  });
 
   const copyUssdCode = (code: string) => {
     navigator.clipboard.writeText(code);
@@ -1285,6 +1318,7 @@ export default function Merchant() {
         </CardHeader>
         <CardContent className="p-3 sm:p-4 lg:p-6">
           <PaymentMethodSelector
+            defaultMethod={cryptoStep === "payment" && cryptoCustomerInfo ? "crypto" : "mobile_money"}
             mobileMoneyContent={mobileMoneyForm}
             cryptoContent={
               cryptoStep === "payment" && cryptoCustomerInfo ? (

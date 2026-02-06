@@ -263,13 +263,43 @@ export default function Pay() {
   const [savedCountry, setSavedCountry] = useState<string>("");
   const [savedOperator, setSavedOperator] = useState<string>("");
   
-  // État pour le flux crypto en 2 étapes
-  const [cryptoStep, setCryptoStep] = useState<"info" | "payment">("info");
+  // État pour le flux crypto en 2 étapes - restauré depuis localStorage si paiement en cours
+  const [cryptoStep, setCryptoStep] = useState<"info" | "payment">(() => {
+    if (!token) return "info";
+    try {
+      const keys = Object.keys(localStorage);
+      const cryptoKey = keys.find(k => k.startsWith("bkapay_crypto_"));
+      if (cryptoKey) {
+        const data = JSON.parse(localStorage.getItem(cryptoKey) || "{}");
+        if (data.paymentDetails && data.createdAt && data.cryptoCustomerInfo) {
+          const elapsed = Math.floor((Date.now() - data.createdAt) / 1000);
+          const remaining = (data.expiresIn || 1800) - elapsed;
+          if (remaining > 0) return "payment";
+        }
+      }
+    } catch {}
+    return "info";
+  });
   const [cryptoCustomerInfo, setCryptoCustomerInfo] = useState<{
     customerName: string;
     customerEmail: string;
     customerPhone: string;
-  } | null>(null);
+  } | null>(() => {
+    if (!token) return null;
+    try {
+      const keys = Object.keys(localStorage);
+      const cryptoKey = keys.find(k => k.startsWith("bkapay_crypto_"));
+      if (cryptoKey) {
+        const data = JSON.parse(localStorage.getItem(cryptoKey) || "{}");
+        if (data.paymentDetails && data.createdAt && data.cryptoCustomerInfo) {
+          const elapsed = Math.floor((Date.now() - data.createdAt) / 1000);
+          const remaining = (data.expiresIn || 1800) - elapsed;
+          if (remaining > 0) return data.cryptoCustomerInfo;
+        }
+      }
+    } catch {}
+    return null;
+  });
   const [copiedUssd, setCopiedUssd] = useState(false);
   const [conversionData, setConversionData] = useState<ConversionData | null>(null);
   const [selectedCurrency, setSelectedCurrency] = useState<string>("XOF");
@@ -1448,6 +1478,7 @@ export default function Pay() {
         </CardHeader>
         <CardContent className="p-3 sm:p-4 lg:p-6">
           <PaymentMethodSelector
+            defaultMethod={cryptoStep === "payment" && cryptoCustomerInfo ? "crypto" : "mobile_money"}
             mobileMoneyContent={mobileMoneyForm}
             cryptoContent={
               baseAmount >= 500 ? (

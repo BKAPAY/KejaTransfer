@@ -184,6 +184,11 @@ export function CryptoPaymentFlow({
           expiresIn: expires,
           amount,
           currency,
+          cryptoCustomerInfo: {
+            customerName: customerName || "",
+            customerEmail: customerEmail || "",
+            customerPhone: customerPhone || "",
+          },
         }));
         toast({
           title: "Paiement cree",
