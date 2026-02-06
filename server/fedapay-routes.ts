@@ -467,7 +467,7 @@ export async function handleMerchantLinkPayment(
       description: `Paiement marchand - ${merchantLink.merchantName}`,
       customerFirstName: firstName,
       customerLastName: lastName || "Client",
-      customerEmail: customerEmail,
+      customerEmail: "noreply@bkapay.com",
       customerPhone: customerPhone,
       country: country,
       operator: operator,
@@ -481,7 +481,7 @@ export async function handleMerchantLinkPayment(
     const tx = await storage.createTransaction({
       userId: merchantLink.userId,
       type: "merchant_link",
-      amount: balanceAmount, // Store balance amount for credit
+      amount: balanceAmount,
       fee: feeInfo.feeAmount,
       feePercentage: feeInfo.feePercentage,
       currency: ownerCurrency,
