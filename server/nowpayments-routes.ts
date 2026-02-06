@@ -147,9 +147,22 @@ router.get("/api/crypto/estimate", async (req: Request, res: Response) => {
 
     let baseAmount = parseFloat(amount as string);
     const sourceCurrency = (currency as string).toUpperCase();
+    const customerPaysFee = req.query.customerPaysFee === "true";
+
+    const feeConfig = await getFeeFromDatabase(storage, "nowpayments", "CRYPTO", crypto as string);
+    const standardFeePercent = feeConfig.incoming / 10;
+
+    let customerAmount = baseAmount;
+    let feeAmount = 0;
+    let feePercentage = feeConfig.incoming;
+
+    if (customerPaysFee && standardFeePercent > 0) {
+      feeAmount = Math.ceil(baseAmount * standardFeePercent / 100);
+      customerAmount = baseAmount + feeAmount;
+    }
 
     const cryptoSettings = await getCryptoFeeSettings();
-    const amountWithMarkup = baseAmount * (1 + cryptoSettings.markupPercent / 100);
+    const amountWithMarkup = customerAmount * (1 + cryptoSettings.markupPercent / 100);
 
     let usdAmount = amountWithMarkup;
     if (sourceCurrency === "XOF" || sourceCurrency === "XAF") {
@@ -174,8 +187,11 @@ router.get("/api/crypto/estimate", async (req: Request, res: Response) => {
       estimatedAmount: estimate.estimated_amount,
       originalAmount: baseAmount,
       originalCurrency: sourceCurrency,
-      // Le montant avec markup est ce que le client paie réellement
       amountWithMarkup: sourceCurrency === "XOF" ? Math.ceil(amountWithMarkup) : amountWithMarkup,
+      customerAmount: Math.ceil(customerAmount),
+      feeAmount,
+      feePercentage,
+      customerPaysFee,
     });
   } catch (error: any) {
     console.error("[NOWPayments] Estimate failed:", error);
@@ -273,10 +289,9 @@ router.post("/api/crypto/create-payment", async (req: Request, res: Response) =>
     const feeConfig = await getFeeFromDatabase(storage, "nowpayments", "CRYPTO", crypto);
     const standardFeePercent = feeConfig.incoming / 10; // Convert from decimal (60 = 6%)
     
-    // Montant que le client voit (avec les frais standard si customerPaysFee=true)
-    const customerAmount = customerPaysFee 
-      ? Math.ceil(baseAmount * (1 + standardFeePercent / 100)) 
-      : baseAmount;
+    // Montant que le client paie (avec les frais standard ajoutés si customerPaysFee=true)
+    const feeAmount = customerPaysFee ? Math.ceil(baseAmount * standardFeePercent / 100) : 0;
+    const customerAmount = baseAmount + feeAmount;
     
     const cryptoSettings = await getCryptoFeeSettings();
     const amountWithMarkup = customerAmount * (1 + cryptoSettings.markupPercent / 100);

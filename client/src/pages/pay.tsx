@@ -1455,7 +1455,7 @@ export default function Pay() {
                   <div className="space-y-4">
                     <div className="bg-muted p-3 rounded-md">
                       <p className="text-sm text-muted-foreground">Montant à payer</p>
-                      <p className="text-xl font-bold">{totalAmount.toLocaleString()} {ownerCurrency}</p>
+                      <p className="text-xl font-bold">{baseAmount.toLocaleString()} {ownerCurrency}</p>
                       {paymentLink?.customerPaysFee && (
                         <p className="text-xs text-muted-foreground">
                           (Frais de transaction inclus)
@@ -1469,6 +1469,7 @@ export default function Pay() {
                       amount={baseAmount}
                       currency={ownerCurrency}
                       paymentLinkId={paymentLink.id}
+                      customerPaysFee={paymentLink.customerPaysFee || false}
                       orderDescription={`Paiement ${paymentLink.productName} par ${cryptoCustomerInfo.customerName}`}
                       customerName={cryptoCustomerInfo.customerName}
                       customerEmail={cryptoCustomerInfo.customerEmail}

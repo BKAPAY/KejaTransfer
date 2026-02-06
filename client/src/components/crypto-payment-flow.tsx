@@ -43,6 +43,7 @@ interface CryptoPaymentFlowProps {
   customerName?: string;
   customerEmail?: string;
   customerPhone?: string;
+  customerPaysFee?: boolean;
   onSuccess?: (transactionId: string) => void;
   onError?: (error: string) => void;
 }
@@ -70,6 +71,7 @@ export function CryptoPaymentFlow({
   customerName,
   customerEmail,
   customerPhone,
+  customerPaysFee = false,
   onSuccess,
   onError,
 }: CryptoPaymentFlowProps) {
@@ -98,8 +100,24 @@ export function CryptoPaymentFlow({
     payCurrency: string;
     priceAmount: number;
     priceCurrency: string;
+    customerAmount?: number;
+    feeAmount?: number;
+    feePercentage?: number;
   }>({
-    queryKey: [`/api/crypto/estimate?amount=${amount}&currency=${currency}&crypto=${selectedCrypto}`],
+    queryKey: [`/api/crypto/estimate`, amount, currency, selectedCrypto, customerPaysFee, paymentLinkId, apiKeyId],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        amount: String(amount),
+        currency,
+        crypto: selectedCrypto!,
+      });
+      if (customerPaysFee) params.set("customerPaysFee", "true");
+      if (paymentLinkId) params.set("paymentLinkId", paymentLinkId);
+      if (apiKeyId) params.set("apiKeyId", apiKeyId);
+      const res = await fetch(`/api/crypto/estimate?${params.toString()}`);
+      if (!res.ok) throw new Error("Erreur estimation");
+      return res.json();
+    },
     enabled: !!selectedCrypto && amount > 0 && paymentStep === "confirm",
   });
 
@@ -369,6 +387,18 @@ export function CryptoPaymentFlow({
               <span className="text-muted-foreground">Montant</span>
               <span className="font-semibold">{amount.toLocaleString()} {currency}</span>
             </div>
+            {customerPaysFee && estimate?.feeAmount && estimate.feeAmount > 0 ? (
+              <>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Frais ({((estimate.feePercentage || 0) / 10).toFixed(1)}%)</span>
+                  <span className="font-semibold">+{estimate.feeAmount.toLocaleString()} {currency}</span>
+                </div>
+                <div className="flex justify-between border-t pt-2">
+                  <span className="text-muted-foreground font-medium">Total</span>
+                  <span className="font-bold">{(estimate.customerAmount || amount).toLocaleString()} {currency}</span>
+                </div>
+              </>
+            ) : null}
             <div className="flex justify-between">
               <span className="text-muted-foreground">Crypto</span>
               <span className="font-semibold">{selectedCrypto.toUpperCase()}</span>
