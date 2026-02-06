@@ -39,6 +39,7 @@ interface CryptoPaymentFlowProps {
   paymentLinkId?: string;
   merchantLinkId?: string;
   apiKeyId?: string;
+  storageId?: string;
   orderDescription?: string;
   customerName?: string;
   customerEmail?: string;
@@ -60,8 +61,8 @@ interface PaymentDetails {
   expiresIn: number;
 }
 
-function getStorageKey(paymentLinkId?: string, merchantLinkId?: string, apiKeyId?: string, userId?: string) {
-  return `bkapay_crypto_${paymentLinkId || merchantLinkId || apiKeyId || userId || "default"}`;
+function getStorageKey(storageId?: string, paymentLinkId?: string, merchantLinkId?: string, apiKeyId?: string, userId?: string) {
+  return `bkapay_crypto_${storageId || paymentLinkId || merchantLinkId || apiKeyId || userId || "default"}`;
 }
 
 function loadPersistedPayment(storageKey: string, amount: number, currency: string): { paymentDetails: PaymentDetails | null; selectedCrypto: string | null; step: "select" | "confirm" | "waiting" | "completed" | "failed"; timeLeft: number } {
@@ -71,7 +72,7 @@ function loadPersistedPayment(storageKey: string, amount: number, currency: stri
     if (!saved) return empty;
     const data = JSON.parse(saved);
     if (!data.paymentDetails || !data.createdAt) return empty;
-    if (data.amount !== amount || data.currency !== currency) {
+    if (amount > 0 && (data.amount !== amount || data.currency !== currency)) {
       localStorage.removeItem(storageKey);
       return empty;
     }
@@ -94,6 +95,7 @@ export function CryptoPaymentFlow({
   paymentLinkId,
   merchantLinkId,
   apiKeyId,
+  storageId,
   orderDescription,
   customerName,
   customerEmail,
@@ -103,7 +105,7 @@ export function CryptoPaymentFlow({
   onError,
 }: CryptoPaymentFlowProps) {
   const { toast } = useToast();
-  const storageKey = getStorageKey(paymentLinkId, merchantLinkId, apiKeyId, userId);
+  const storageKey = getStorageKey(storageId, paymentLinkId, merchantLinkId, apiKeyId, userId);
   const persisted = loadPersistedPayment(storageKey, amount, currency);
   const [selectedCrypto, setSelectedCrypto] = useState<string | null>(persisted.selectedCrypto);
   const [paymentDetails, setPaymentDetails] = useState<PaymentDetails | null>(persisted.paymentDetails);

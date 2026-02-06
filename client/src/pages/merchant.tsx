@@ -158,10 +158,10 @@ export default function Merchant() {
   const [cryptoStep, setCryptoStep] = useState<"info" | "payment">(() => {
     if (!token) return "info";
     try {
-      const keys = Object.keys(localStorage);
-      const cryptoKey = keys.find(k => k.startsWith("bkapay_crypto_"));
-      if (cryptoKey) {
-        const data = JSON.parse(localStorage.getItem(cryptoKey) || "{}");
+      const cryptoKey = `bkapay_crypto_merchant_${token}`;
+      const saved = localStorage.getItem(cryptoKey);
+      if (saved) {
+        const data = JSON.parse(saved);
         if (data.paymentDetails && data.createdAt && data.cryptoCustomerInfo) {
           const elapsed = Math.floor((Date.now() - data.createdAt) / 1000);
           const remaining = (data.expiresIn || 1800) - elapsed;
@@ -179,10 +179,10 @@ export default function Merchant() {
   } | null>(() => {
     if (!token) return null;
     try {
-      const keys = Object.keys(localStorage);
-      const cryptoKey = keys.find(k => k.startsWith("bkapay_crypto_"));
-      if (cryptoKey) {
-        const data = JSON.parse(localStorage.getItem(cryptoKey) || "{}");
+      const cryptoKey = `bkapay_crypto_merchant_${token}`;
+      const saved = localStorage.getItem(cryptoKey);
+      if (saved) {
+        const data = JSON.parse(saved);
         if (data.paymentDetails && data.createdAt && data.cryptoCustomerInfo) {
           const elapsed = Math.floor((Date.now() - data.createdAt) / 1000);
           const remaining = (data.expiresIn || 1800) - elapsed;
@@ -1334,6 +1334,7 @@ export default function Merchant() {
                     amount={cryptoCustomerInfo.amount}
                     currency={ownerCurrency}
                     merchantLinkId={merchantLink.id}
+                    storageId={`merchant_${token}`}
                     orderDescription={`Paiement à ${merchantLink.merchantName} par ${cryptoCustomerInfo.customerName}`}
                     customerName={cryptoCustomerInfo.customerName}
                     customerEmail={cryptoCustomerInfo.customerEmail}

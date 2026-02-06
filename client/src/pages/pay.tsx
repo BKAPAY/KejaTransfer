@@ -267,10 +267,10 @@ export default function Pay() {
   const [cryptoStep, setCryptoStep] = useState<"info" | "payment">(() => {
     if (!token) return "info";
     try {
-      const keys = Object.keys(localStorage);
-      const cryptoKey = keys.find(k => k.startsWith("bkapay_crypto_"));
-      if (cryptoKey) {
-        const data = JSON.parse(localStorage.getItem(cryptoKey) || "{}");
+      const cryptoKey = `bkapay_crypto_pay_${token}`;
+      const saved = localStorage.getItem(cryptoKey);
+      if (saved) {
+        const data = JSON.parse(saved);
         if (data.paymentDetails && data.createdAt && data.cryptoCustomerInfo) {
           const elapsed = Math.floor((Date.now() - data.createdAt) / 1000);
           const remaining = (data.expiresIn || 1800) - elapsed;
@@ -287,10 +287,10 @@ export default function Pay() {
   } | null>(() => {
     if (!token) return null;
     try {
-      const keys = Object.keys(localStorage);
-      const cryptoKey = keys.find(k => k.startsWith("bkapay_crypto_"));
-      if (cryptoKey) {
-        const data = JSON.parse(localStorage.getItem(cryptoKey) || "{}");
+      const cryptoKey = `bkapay_crypto_pay_${token}`;
+      const saved = localStorage.getItem(cryptoKey);
+      if (saved) {
+        const data = JSON.parse(saved);
         if (data.paymentDetails && data.createdAt && data.cryptoCustomerInfo) {
           const elapsed = Math.floor((Date.now() - data.createdAt) / 1000);
           const remaining = (data.expiresIn || 1800) - elapsed;
@@ -1500,6 +1500,7 @@ export default function Pay() {
                       amount={baseAmount}
                       currency={ownerCurrency}
                       paymentLinkId={paymentLink.id}
+                      storageId={`pay_${token}`}
                       customerPaysFee={paymentLink.customerPaysFee || false}
                       orderDescription={`Paiement ${paymentLink.productName} par ${cryptoCustomerInfo.customerName}`}
                       customerName={cryptoCustomerInfo.customerName}
