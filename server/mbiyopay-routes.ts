@@ -146,7 +146,7 @@ export async function handleMbiyoPayWithdrawal(
 
     const beneficiaryName = user.firstName && user.lastName 
       ? `${user.firstName} ${user.lastName}` 
-      : user.email || "BKApay User";
+      : "BKApay User";
     
     // ALWAYS send converted amount to provider
     const result = await createMbiyoPayPayout({
@@ -250,7 +250,7 @@ export async function handleMbiyoPayTransfer(
 
     const beneficiaryName = user.firstName && user.lastName 
       ? `${user.firstName} ${user.lastName}` 
-      : user.email || "BKApay User";
+      : "BKApay User";
     
     // ALWAYS send converted amount to provider
     const result = await createMbiyoPayPayout({
