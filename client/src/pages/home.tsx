@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -129,6 +129,52 @@ function useScrollAnimation() {
   return ref;
 }
 
+const adSlides = [
+  { src: adAfricaMapImage, alt: "BKApay - 15 pays connectés en Afrique" },
+  { src: adMarketImage, alt: "BKApay - Acceptez les paiements partout" },
+  { src: adCryptoImage, alt: "BKApay - Mobile Money + Crypto" },
+  { src: adManJumpImage, alt: "BKApay - La joie des paiements réussis" },
+];
+
+function AdSlideshow() {
+  const [current, setCurrent] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrent((prev) => (prev + 1) % adSlides.length);
+    }, 4000);
+    return () => clearInterval(timer);
+  }, []);
+
+  return (
+    <section className="py-4 sm:py-6 md:py-8 overflow-hidden">
+      <div className="container mx-auto px-2 sm:px-4 md:px-8 max-w-7xl">
+        <div className="relative rounded-md overflow-hidden">
+          {adSlides.map((slide, index) => (
+            <img
+              key={index}
+              src={slide.src}
+              alt={slide.alt}
+              className={`w-full rounded-md transition-opacity duration-1000 ${index === current ? "opacity-100" : "opacity-0 absolute inset-0"}`}
+              data-testid={`img-ad-slide-${index}`}
+            />
+          ))}
+          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2">
+            {adSlides.map((_, index) => (
+              <button
+                key={index}
+                onClick={() => setCurrent(index)}
+                className={`w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full transition-all ${index === current ? "bg-white scale-110" : "bg-white/50"}`}
+                data-testid={`button-ad-dot-${index}`}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function Home() {
   const scrollRef = useScrollAnimation();
 
@@ -219,19 +265,8 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Africa Map Banner */}
-      <section className="py-4 sm:py-6 md:py-8 overflow-hidden">
-        <div className="container mx-auto px-2 sm:px-4 md:px-8 max-w-7xl">
-          <div className="animate-on-scroll anim-scale-in">
-            <img
-              src={adAfricaMapImage}
-              alt="BKApay - 15 pays connectés en Afrique"
-              className="w-full rounded-md"
-              data-testid="img-africa-map-banner"
-            />
-          </div>
-        </div>
-      </section>
+      {/* Promotional Slideshow */}
+      <AdSlideshow />
 
       {/* Mobile Money Hero Section */}
       <section className="py-8 sm:py-12 md:py-16 lg:py-20 overflow-hidden">
@@ -256,20 +291,6 @@ export default function Home() {
                 Acceptez les paiements via tous les opérateurs Mobile Money d'Afrique de l'Ouest. Orange Money, MTN, Moov, Wave, Free Money, T-Money et bien plus. Transactions instantanées, sécurisées et fiables.
               </p>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Market Entrepreneur Banner */}
-      <section className="py-4 sm:py-6 md:py-8 bg-card overflow-hidden">
-        <div className="container mx-auto px-2 sm:px-4 md:px-8 max-w-7xl">
-          <div className="animate-on-scroll anim-slide-right">
-            <img
-              src={adMarketImage}
-              alt="BKApay - Acceptez les paiements partout"
-              className="w-full rounded-md"
-              data-testid="img-market-banner"
-            />
           </div>
         </div>
       </section>
@@ -304,20 +325,6 @@ export default function Home() {
                 className="w-full rounded-md"
               />
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Crypto Mobile Banner */}
-      <section className="py-4 sm:py-6 md:py-8 bg-card overflow-hidden">
-        <div className="container mx-auto px-2 sm:px-4 md:px-8 max-w-7xl">
-          <div className="animate-on-scroll anim-slide-left">
-            <img
-              src={adCryptoImage}
-              alt="BKApay - Mobile Money + Crypto"
-              className="w-full rounded-md"
-              data-testid="img-crypto-banner"
-            />
           </div>
         </div>
       </section>
@@ -403,20 +410,6 @@ export default function Home() {
                 />
               </div>
             ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Man Celebrating Banner */}
-      <section className="py-4 sm:py-6 md:py-8 overflow-hidden">
-        <div className="container mx-auto px-2 sm:px-4 md:px-8 max-w-7xl">
-          <div className="animate-on-scroll anim-scale-in">
-            <img
-              src={adManJumpImage}
-              alt="BKApay - La joie des paiements réussis"
-              className="w-full rounded-md"
-              data-testid="img-man-jump-banner"
-            />
           </div>
         </div>
       </section>
