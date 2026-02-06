@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import { storage } from "./storage";
-import { NowPaymentsClient, SUPPORTED_CRYPTOCURRENCIES, getCryptoDisplayName, getCryptoMinAmountXOF, getCryptoSymbol, CRYPTO_MIN_AMOUNT_XOF, USDT_MIN_AMOUNT_XOF } from "./nowpayments";
+import { NowPaymentsClient, SUPPORTED_CRYPTOCURRENCIES, getCryptoDisplayName, getCryptoMinAmountXOF, getCryptoSymbol, CRYPTO_MIN_AMOUNT_XOF, USDT_MIN_AMOUNT_XOF, CRYPTO_WITHDRAWAL_MIN_XOF } from "./nowpayments";
 import { convertCurrency } from "./currency-converter";
 import QRCode from "qrcode";
 import { getFeeFromDatabase, calculateOutgoingFee } from "./utils/fees";
@@ -77,6 +77,7 @@ router.get("/api/crypto/currencies", async (req: Request, res: Response) => {
       enabledCryptos = await storage.getPayinEnabledCryptoCurrencies();
     }
     
+    const isPayoutDirection = direction === "payout";
     let cryptosList = enabledCryptos.length === 0 
       ? SUPPORTED_CRYPTOCURRENCIES.map((c) => ({
           code: c.code,
@@ -84,11 +85,11 @@ router.get("/api/crypto/currencies", async (req: Request, res: Response) => {
           symbol: c.symbol,
           payinEnabled: true,
           payoutEnabled: true,
-          minAmountXOF: c.minAmountXOF,
+          minAmountXOF: isPayoutDirection ? CRYPTO_WITHDRAWAL_MIN_XOF : c.minAmountXOF,
         }))
       : enabledCryptos.map((crypto: any) => ({
           ...crypto,
-          minAmountXOF: getCryptoMinAmountXOF(crypto.code),
+          minAmountXOF: isPayoutDirection ? CRYPTO_WITHDRAWAL_MIN_XOF : getCryptoMinAmountXOF(crypto.code),
         }));
 
     // Si la devise demandée n'est pas XOF, convertir les minimums
@@ -702,11 +703,10 @@ router.post("/api/crypto/create-withdrawal", async (req: Request, res: Response)
       baseAmountInXof = baseAmount / 0.0015;
     }
 
-    const minAmountXof = getCryptoMinAmountXOF(crypto);
-    if (baseAmountInXof < minAmountXof) {
+    if (baseAmountInXof < CRYPTO_WITHDRAWAL_MIN_XOF) {
       return res.status(400).json({
         success: false,
-        error: `Montant minimum pour ${getCryptoDisplayName(crypto)}: ${minAmountXof.toLocaleString("fr-FR")} XOF`,
+        error: `Montant minimum pour les retraits/transferts crypto: ${CRYPTO_WITHDRAWAL_MIN_XOF.toLocaleString("fr-FR")} XOF`,
       });
     }
 

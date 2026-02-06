@@ -295,9 +295,12 @@ export class NowPaymentsClient {
   }
 }
 
-// Minimums en XOF pour les paiements crypto
+// Minimums en XOF pour les paiements crypto (dépôts entrants)
 export const CRYPTO_MIN_AMOUNT_XOF = 2000; // Minimum par défaut: 2000 XOF
 export const USDT_MIN_AMOUNT_XOF = 8000; // Minimum pour USDT (TRC20 et ERC20): 8000 XOF
+
+// Minimum en XOF pour les retraits et transferts crypto (sortants)
+export const CRYPTO_WITHDRAWAL_MIN_XOF = 15000; // 15 000 XOF pour tous les crypto
 
 export const SUPPORTED_CRYPTOCURRENCIES = [
   { code: "btc", name: "Bitcoin", symbol: "BTC", minAmountXOF: CRYPTO_MIN_AMOUNT_XOF },

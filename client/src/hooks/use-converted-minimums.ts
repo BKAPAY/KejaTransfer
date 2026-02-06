@@ -5,6 +5,8 @@ interface ConvertedMinimums {
   transferMin: number;
   depositMin: number;
   cryptoMin: number;
+  cryptoWithdrawalMin: number;
+  cryptoTransferMin: number;
   paymentLinkMin: number;
   isLoading: boolean;
 }
@@ -14,6 +16,8 @@ const BASE_MINIMUMS_XOF = {
   transfer: 500,
   deposit: 100,
   crypto: 500,
+  cryptoWithdrawal: 15000,
+  cryptoTransfer: 15000,
   paymentLink: 500,
 };
 
@@ -22,6 +26,8 @@ const BASE_MINIMUMS_CDF = {
   transfer: 2000,
   deposit: 400,
   crypto: 2000,
+  cryptoWithdrawal: 60000,
+  cryptoTransfer: 60000,
   paymentLink: 2000,
 };
 
@@ -43,6 +49,8 @@ export function useConvertedMinimums(userBalanceCurrency: string): ConvertedMini
         fetchConversion(BASE_MINIMUMS_XOF.transfer, "XOF", userBalanceCurrency),
         fetchConversion(BASE_MINIMUMS_XOF.deposit, "XOF", userBalanceCurrency),
         fetchConversion(BASE_MINIMUMS_XOF.crypto, "XOF", userBalanceCurrency),
+        fetchConversion(BASE_MINIMUMS_XOF.cryptoWithdrawal, "XOF", userBalanceCurrency),
+        fetchConversion(BASE_MINIMUMS_XOF.cryptoTransfer, "XOF", userBalanceCurrency),
         fetchConversion(BASE_MINIMUMS_XOF.paymentLink, "XOF", userBalanceCurrency),
       ]);
 
@@ -51,7 +59,9 @@ export function useConvertedMinimums(userBalanceCurrency: string): ConvertedMini
         transfer: conversions[1],
         deposit: conversions[2],
         crypto: conversions[3],
-        paymentLink: conversions[4],
+        cryptoWithdrawal: conversions[4],
+        cryptoTransfer: conversions[5],
+        paymentLink: conversions[6],
       };
     },
     staleTime: 1000 * 60 * 60,
@@ -63,6 +73,8 @@ export function useConvertedMinimums(userBalanceCurrency: string): ConvertedMini
     transferMin: data?.transfer ?? BASE_MINIMUMS_XOF.transfer,
     depositMin: data?.deposit ?? BASE_MINIMUMS_XOF.deposit,
     cryptoMin: data?.crypto ?? BASE_MINIMUMS_XOF.crypto,
+    cryptoWithdrawalMin: data?.cryptoWithdrawal ?? BASE_MINIMUMS_XOF.cryptoWithdrawal,
+    cryptoTransferMin: data?.cryptoTransfer ?? BASE_MINIMUMS_XOF.cryptoTransfer,
     paymentLinkMin: data?.paymentLink ?? BASE_MINIMUMS_XOF.paymentLink,
     isLoading,
   };

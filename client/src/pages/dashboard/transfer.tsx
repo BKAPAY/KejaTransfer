@@ -64,7 +64,7 @@ export default function Transfer() {
     ? COUNTRIES.find(c => c.code === user.country)?.currency || "XOF"
     : "XOF";
 
-  const { transferMin } = useConvertedMinimums(userBalanceCurrency);
+  const { transferMin, cryptoTransferMin } = useConvertedMinimums(userBalanceCurrency);
 
   const { data: enabledCountriesOperators } = useQuery<Record<string, string[]>>({
     queryKey: ["/api/countries-operators/withdrawals"],
@@ -557,7 +557,7 @@ export default function Transfer() {
                 </Form>
               }
               cryptoContent={
-                amount && amount >= transferMin && user ? (
+                amount && amount >= cryptoTransferMin && user ? (
                   <CryptoWithdrawalFlow
                     amount={amount}
                     currency={userBalanceCurrency}
@@ -571,7 +571,7 @@ export default function Transfer() {
                   />
                 ) : (
                   <div className="p-4 text-center text-muted-foreground text-sm">
-                    Entrez un montant d'au moins {transferMin.toLocaleString("fr-FR")} {userBalanceCurrency} pour transferer en crypto
+                    Entrez un montant d'au moins {cryptoTransferMin.toLocaleString("fr-FR")} {userBalanceCurrency} pour transférer en crypto
                   </div>
                 )
               }
