@@ -29,6 +29,7 @@ import fastPaymentImage from "@assets/generated_images/v3_fast_payment.png";
 import cryptoHeroImage from "@assets/crypto-payment-hero.png";
 import cardHeroImage from "@assets/card-payment-hero.png";
 import heroMainImage from "@assets/hero-main.png";
+import mobileMoneyHeroImage from "@assets/generated_images/v3_mobile_money_hero.png";
 
 const countries = COUNTRIES;
 
@@ -175,6 +176,41 @@ export default function Home() {
                   Se connecter
                 </Button>
               </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Mobile Money Hero Section */}
+      <section className="py-8 sm:py-12 md:py-16 lg:py-20 overflow-hidden">
+        <div className="container mx-auto px-2 sm:px-4 md:px-8 max-w-7xl">
+          <div className="grid md:grid-cols-2 gap-6 sm:gap-8 lg:gap-12 items-center">
+            <div className="animate-on-scroll anim-slide-left">
+              <img
+                src={mobileMoneyHeroImage}
+                alt="Paiements Mobile Money"
+                className="w-full rounded-md"
+                data-testid="img-mobile-money-hero"
+              />
+            </div>
+            <div className="animate-on-scroll anim-slide-right">
+              <div className="bg-primary/10 w-10 h-10 sm:w-12 sm:h-12 rounded-md flex items-center justify-center mb-3 sm:mb-4">
+                <CreditCard className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
+              </div>
+              <h2 className="text-lg sm:text-2xl md:text-3xl lg:text-4xl font-bold mb-3 sm:mb-4 text-foreground">
+                Paiements Mobile Money
+              </h2>
+              <p className="text-xs sm:text-sm md:text-base text-muted-foreground mb-4 sm:mb-6 leading-relaxed">
+                Acceptez les paiements via tous les opérateurs Mobile Money d'Afrique de l'Ouest. Orange Money, MTN, Moov, Wave, Free Money, T-Money et bien plus. Transactions instantanées, sécurisées et fiables.
+              </p>
+              <div className="flex flex-wrap gap-2 sm:gap-3">
+                {operators.map((op) => (
+                  <div key={op.name} className="flex items-center gap-1.5 px-2 py-1 sm:px-3 sm:py-1.5 bg-muted rounded-md">
+                    <img src={op.image} alt={op.name} className="w-5 h-5 sm:w-6 sm:h-6 object-contain" />
+                    <span className="text-xs sm:text-sm font-medium text-foreground">{op.name.split(' ')[0]}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
