@@ -1503,7 +1503,7 @@ export default function Pay() {
                       currency={ownerCurrency}
                       paymentLinkId={paymentLink.id}
                       storageId={`pay_${token}`}
-                      customerPaysFee={paymentLink.customerPaysFee || false}
+                      customerPaysFee={(paymentLink as any).customerPaysCryptoFee || false}
                       orderDescription={`Paiement ${paymentLink.productName} par ${cryptoCustomerInfo.customerName}`}
                       customerName={cryptoCustomerInfo.customerName}
                       customerEmail={cryptoCustomerInfo.customerEmail}

@@ -1322,7 +1322,7 @@ export default function ApiPay() {
                   amount={amount}
                   currency={ownerCurrency}
                   apiKeyId={key}
-                  customerPaysFee={apiKeyInfo?.customerPaysFee || false}
+                  customerPaysFee={(apiKeyInfo as any)?.customerPaysCryptoFee || false}
                   orderDescription={description || `Paiement à ${apiKeyInfo?.siteName}`}
                   customerName={customerName}
                   customerEmail={customerEmail}

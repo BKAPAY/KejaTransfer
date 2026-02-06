@@ -82,6 +82,7 @@ const paymentLinkSchema = z.object({
   ),
   allowedCountries: z.array(z.string()).default([]),
   customerPaysFee: z.boolean().default(false),
+  customerPaysCryptoFee: z.boolean().default(false),
 });
 
 type PaymentLinkFormData = z.infer<typeof paymentLinkSchema>;
@@ -144,6 +145,7 @@ export default function PaymentLinks() {
       amount: undefined as any,
       allowedCountries: [],
       customerPaysFee: false,
+      customerPaysCryptoFee: false,
     },
   });
 
@@ -156,6 +158,7 @@ export default function PaymentLinks() {
       amount: link.amount,
       allowedCountries: link.allowedCountries || [],
       customerPaysFee: link.customerPaysFee || false,
+      customerPaysCryptoFee: (link as any).customerPaysCryptoFee || false,
     });
     const images = link.imageUrls?.length ? link.imageUrls : (link.imageUrl ? [link.imageUrl] : []);
     setExistingImages(images);
@@ -210,6 +213,7 @@ export default function PaymentLinks() {
         videoUrl: videoUrl,
         allowedCountries: data.allowedCountries,
         customerPaysFee: data.customerPaysFee,
+        customerPaysCryptoFee: data.customerPaysCryptoFee,
       });
       return res.json() as Promise<PaymentLink>;
     },
@@ -247,6 +251,7 @@ export default function PaymentLinks() {
         videoUrl: videoUrl,
         allowedCountries: data.allowedCountries,
         customerPaysFee: data.customerPaysFee,
+        customerPaysCryptoFee: data.customerPaysCryptoFee,
       });
       return res.json() as Promise<PaymentLink>;
     },
@@ -372,6 +377,7 @@ export default function PaymentLinks() {
               amount: undefined as any,
               allowedCountries: [],
               customerPaysFee: false,
+              customerPaysCryptoFee: false,
             });
             setAmountInput("");
             setExistingImages([]);
@@ -601,7 +607,7 @@ export default function PaymentLinks() {
                   )}
                 />
 
-                {/* Frais de paiement */}
+                {/* Frais Mobile Money */}
                 <FormField
                   control={form.control}
                   name="customerPaysFee"
@@ -610,15 +616,41 @@ export default function PaymentLinks() {
                       <div className="space-y-0.5">
                         <FormLabel className="flex items-center gap-2">
                           <Wallet className="w-4 h-4" />
-                          Frais à la charge du client
+                          Frais Mobile Money a la charge du client
                         </FormLabel>
                         <p className="text-sm text-muted-foreground">
-                          Si activé, le client paiera les frais de transaction en plus du montant.
+                          Si active, le client paiera les frais de transaction Mobile Money en plus du montant.
                         </p>
                       </div>
                       <FormControl>
                         <Switch
                           data-testid="switch-customer-pays-fee"
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+
+                {/* Frais Crypto */}
+                <FormField
+                  control={form.control}
+                  name="customerPaysCryptoFee"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                      <div className="space-y-0.5">
+                        <FormLabel className="flex items-center gap-2">
+                          <Wallet className="w-4 h-4" />
+                          Frais Crypto a la charge du client
+                        </FormLabel>
+                        <p className="text-sm text-muted-foreground">
+                          Si active, le client paiera les frais de transaction crypto en plus du montant.
+                        </p>
+                      </div>
+                      <FormControl>
+                        <Switch
+                          data-testid="switch-customer-pays-crypto-fee"
                           checked={field.value}
                           onCheckedChange={field.onChange}
                         />
@@ -766,6 +798,7 @@ export default function PaymentLinks() {
                       amount: undefined as any,
                       allowedCountries: [],
                       customerPaysFee: false,
+                      customerPaysCryptoFee: false,
                     });
                     setAmountInput("");
                     setExistingImages([]);

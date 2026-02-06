@@ -238,7 +238,7 @@ router.post("/api/crypto/create-payment", async (req: Request, res: Response) =>
       return res.status(503).json({ error: "Paiements crypto non disponibles" });
     }
 
-    // Trouver le userId et vérifier customerPaysFee
+    // Trouver le userId et vérifier customerPaysCryptoFee (frais crypto séparés)
     let ownerUserId = userId;
     let customerPaysFee = false;
     
@@ -246,7 +246,7 @@ router.post("/api/crypto/create-payment", async (req: Request, res: Response) =>
       const paymentLink = await storage.getPaymentLinkById(paymentLinkId);
       if (paymentLink) {
         ownerUserId = paymentLink.userId;
-        customerPaysFee = paymentLink.customerPaysFee || false;
+        customerPaysFee = (paymentLink as any).customerPaysCryptoFee || false;
       }
     }
     
@@ -254,7 +254,6 @@ router.post("/api/crypto/create-payment", async (req: Request, res: Response) =>
       const merchantLink = await storage.getMerchantLinkById(merchantLinkId);
       if (merchantLink) {
         ownerUserId = merchantLink.userId;
-        // merchantLinks n'a pas customerPaysFee, donc on utilise false par défaut
         customerPaysFee = false;
       }
     }
@@ -263,7 +262,7 @@ router.post("/api/crypto/create-payment", async (req: Request, res: Response) =>
       const apiKey = await storage.getApiKeyByPublicKey(apiKeyId);
       if (apiKey) {
         ownerUserId = apiKey.userId;
-        customerPaysFee = apiKey.customerPaysFee || false;
+        customerPaysFee = (apiKey as any).customerPaysCryptoFee || false;
       }
     }
     

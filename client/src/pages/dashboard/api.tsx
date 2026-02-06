@@ -44,7 +44,7 @@ export default function ApiPage() {
   const [editingCallback, setEditingCallback] = useState<string | null>(null);
   const [callbackUrls, setCallbackUrls] = useState<Record<string, string>>({});
   const [editingSettings, setEditingSettings] = useState<string | null>(null);
-  const [settingsData, setSettingsData] = useState<Record<string, { allowedCountries: string[]; customerPaysFee: boolean }>>({});
+  const [settingsData, setSettingsData] = useState<Record<string, { allowedCountries: string[]; customerPaysFee: boolean; customerPaysCryptoFee: boolean }>>({});
   const { toast } = useToast();
 
   const { data: user } = useQuery<User>({
@@ -159,8 +159,8 @@ export default function ApiPage() {
   });
 
   const settingsMutation = useMutation({
-    mutationFn: async ({ id, allowedCountries, customerPaysFee }: { id: string; allowedCountries: string[]; customerPaysFee: boolean }) => {
-      const res = await apiRequest("PATCH", `/api/api-keys/${id}/settings`, { allowedCountries, customerPaysFee });
+    mutationFn: async ({ id, allowedCountries, customerPaysFee, customerPaysCryptoFee }: { id: string; allowedCountries: string[]; customerPaysFee: boolean; customerPaysCryptoFee: boolean }) => {
+      const res = await apiRequest("PATCH", `/api/api-keys/${id}/settings`, { allowedCountries, customerPaysFee, customerPaysCryptoFee });
       return res.json();
     },
     onSuccess: () => {
@@ -588,20 +588,39 @@ export default function ApiPage() {
                       
                       <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
                         <div>
-                          <label className="text-sm font-medium">Le client paie les frais</label>
+                          <label className="text-sm font-medium">Frais Mobile Money a la charge du client</label>
                           <p className="text-xs text-muted-foreground">
-                            Si activé, les frais seront ajoutés au montant payé par le client
+                            Si active, les frais Mobile Money seront ajoutes au montant paye par le client
                           </p>
                         </div>
                         <Switch
                           checked={settingsData[apiKey.id]?.customerPaysFee || false}
                           onCheckedChange={(checked) => {
                             setSettingsData(prev => {
-                              const current = prev[apiKey.id] || { allowedCountries: [], customerPaysFee: false };
+                              const current = prev[apiKey.id] || { allowedCountries: [], customerPaysFee: false, customerPaysCryptoFee: false };
                               return { ...prev, [apiKey.id]: { ...current, customerPaysFee: checked } };
                             });
                           }}
                           data-testid={`switch-fee-${apiKey.id}`}
+                        />
+                      </div>
+                      
+                      <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                        <div>
+                          <label className="text-sm font-medium">Frais Crypto a la charge du client</label>
+                          <p className="text-xs text-muted-foreground">
+                            Si active, les frais crypto seront ajoutes au montant paye par le client
+                          </p>
+                        </div>
+                        <Switch
+                          checked={settingsData[apiKey.id]?.customerPaysCryptoFee || false}
+                          onCheckedChange={(checked) => {
+                            setSettingsData(prev => {
+                              const current = prev[apiKey.id] || { allowedCountries: [], customerPaysFee: false, customerPaysCryptoFee: false };
+                              return { ...prev, [apiKey.id]: { ...current, customerPaysCryptoFee: checked } };
+                            });
+                          }}
+                          data-testid={`switch-crypto-fee-${apiKey.id}`}
                         />
                       </div>
                       
@@ -614,6 +633,7 @@ export default function ApiPage() {
                               id: apiKey.id,
                               allowedCountries: data?.allowedCountries || [],
                               customerPaysFee: data?.customerPaysFee || false,
+                              customerPaysCryptoFee: data?.customerPaysCryptoFee || false,
                             });
                           }}
                           disabled={settingsMutation.isPending}
@@ -661,9 +681,15 @@ export default function ApiPage() {
                           )}
                         </div>
                         <div>
-                          <span className="text-muted-foreground">Frais: </span>
+                          <span className="text-muted-foreground">Frais Mobile Money: </span>
                           <Badge variant={(apiKey as any).customerPaysFee ? "default" : "outline"} className="text-xs">
-                            {(apiKey as any).customerPaysFee ? "Payés par le client" : "A votre charge"}
+                            {(apiKey as any).customerPaysFee ? "Client" : "A votre charge"}
+                          </Badge>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Frais Crypto: </span>
+                          <Badge variant={(apiKey as any).customerPaysCryptoFee ? "default" : "outline"} className="text-xs">
+                            {(apiKey as any).customerPaysCryptoFee ? "Client" : "A votre charge"}
                           </Badge>
                         </div>
                       </div>
@@ -676,6 +702,7 @@ export default function ApiPage() {
                             [apiKey.id]: {
                               allowedCountries: (apiKey as any).allowedCountries || [],
                               customerPaysFee: (apiKey as any).customerPaysFee || false,
+                              customerPaysCryptoFee: (apiKey as any).customerPaysCryptoFee || false,
                             }
                           }));
                           setEditingSettings(apiKey.id);

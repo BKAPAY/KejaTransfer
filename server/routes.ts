@@ -1303,6 +1303,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isActive: z.boolean().optional(),
         allowedCountries: z.array(z.string()).optional(),
         customerPaysFee: z.boolean().optional(),
+        customerPaysCryptoFee: z.boolean().optional(),
       });
       const validatedData = patchPaymentLinkSchema.parse(req.body);
       const link = await storage.updatePaymentLink(req.params.id, req.session.userId!, validatedData);
@@ -1522,14 +1523,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const keyId = req.params.id;
       const userId = req.session.userId!;
-      const { allowedCountries, customerPaysFee } = req.body;
+      const { allowedCountries, customerPaysFee, customerPaysCryptoFee } = req.body;
 
       const settingsSchema = z.object({
         allowedCountries: z.array(z.string()).optional(),
         customerPaysFee: z.boolean().optional(),
+        customerPaysCryptoFee: z.boolean().optional(),
       });
 
-      const validatedData = settingsSchema.parse({ allowedCountries, customerPaysFee });
+      const validatedData = settingsSchema.parse({ allowedCountries, customerPaysFee, customerPaysCryptoFee });
       
       const updatedKey = await storage.updateApiKeySettings(keyId, userId, validatedData);
       if (!updatedKey) {
@@ -1540,6 +1542,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success: true,
         allowedCountries: updatedKey.allowedCountries,
         customerPaysFee: updatedKey.customerPaysFee,
+        customerPaysCryptoFee: updatedKey.customerPaysCryptoFee,
         message: "Paramètres mis à jour avec succès"
       });
     } catch (error: any) {
@@ -1573,6 +1576,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isActive: apiKey.isActive,
         allowedCountries: apiKey.allowedCountries || [],
         customerPaysFee: apiKey.customerPaysFee || false,
+        customerPaysCryptoFee: (apiKey as any).customerPaysCryptoFee || false,
         ownerCountry: owner?.country || null,
         ownerCurrency,
       });
