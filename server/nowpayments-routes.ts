@@ -757,8 +757,8 @@ router.post("/api/crypto/create-withdrawal", async (req: Request, res: Response)
       
       let errorMessage = "Le retrait crypto a echoue. Votre solde n'a pas ete debite. Veuillez reessayer.";
       const errMsg = payoutError?.message || "";
-      if (errMsg.includes("Invalid IP") || errMsg.includes("Access denied")) {
-        const ipMatch = errMsg.match(/Invalid IP\s*-\s*([\d.]+)/);
+      if (errMsg.includes("Invalid IP") || errMsg.includes("Access denied") || errMsg.includes("IP")) {
+        const ipMatch = errMsg.match(/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/);
         const ip = ipMatch ? ipMatch[1] : "";
         errorMessage = ip
           ? `Pour activer les retraits crypto, veuillez contacter l'assistance BKApay et communiquer l'adresse IP suivante : ${ip}`
