@@ -181,6 +181,24 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Countries Section */}
+      <section className="py-6 sm:py-8 md:py-12 lg:py-16 bg-card overflow-hidden">
+        <div className="container mx-auto px-2 sm:px-4 md:px-8 max-w-7xl">
+          <div className="text-center mb-4 sm:mb-8">
+            <h2 className="animate-on-scroll anim-fade-up text-lg sm:text-xl md:text-3xl lg:text-4xl font-bold mb-2 sm:mb-4 text-foreground">Disponible dans 15 pays</h2>
+            <p className="animate-on-scroll anim-fade-up anim-delay-1 text-xs sm:text-sm md:text-base lg:text-lg text-muted-foreground">Couvrant toute l'Afrique de l'Ouest francophone</p>
+          </div>
+          <div className="flex gap-2 sm:gap-4 carousel-scroll">
+            {[...countries, ...countries].map((country, index) => (
+              <Card key={`${country.code}-${index}`} className="p-2 sm:p-3 lg:p-6 text-center hover-elevate flex-shrink-0 min-w-max">
+                <div className="mb-1 sm:mb-2 lg:mb-3 flex justify-center"><CountryFlag code={country.code} size="xl" /></div>
+                <div className="text-xs sm:text-sm font-medium text-foreground">{country.name}</div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* Mobile Money Hero Section */}
       <section className="py-8 sm:py-12 md:py-16 lg:py-20 overflow-hidden">
         <div className="container mx-auto px-2 sm:px-4 md:px-8 max-w-7xl">
@@ -212,24 +230,6 @@ export default function Home() {
                 ))}
               </div>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Countries Section */}
-      <section className="py-6 sm:py-8 md:py-12 lg:py-16 bg-card overflow-hidden">
-        <div className="container mx-auto px-2 sm:px-4 md:px-8 max-w-7xl">
-          <div className="text-center mb-4 sm:mb-8">
-            <h2 className="animate-on-scroll anim-fade-up text-lg sm:text-xl md:text-3xl lg:text-4xl font-bold mb-2 sm:mb-4 text-foreground">Disponible dans 15 pays</h2>
-            <p className="animate-on-scroll anim-fade-up anim-delay-1 text-xs sm:text-sm md:text-base lg:text-lg text-muted-foreground">Couvrant toute l'Afrique de l'Ouest francophone</p>
-          </div>
-          <div className="flex gap-2 sm:gap-4 carousel-scroll">
-            {[...countries, ...countries].map((country, index) => (
-              <Card key={`${country.code}-${index}`} className="p-2 sm:p-3 lg:p-6 text-center hover-elevate flex-shrink-0 min-w-max">
-                <div className="mb-1 sm:mb-2 lg:mb-3 flex justify-center"><CountryFlag code={country.code} size="xl" /></div>
-                <div className="text-xs sm:text-sm font-medium text-foreground">{country.name}</div>
-              </Card>
-            ))}
           </div>
         </div>
       </section>
