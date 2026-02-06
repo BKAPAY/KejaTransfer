@@ -26,6 +26,7 @@ import { getCurrencyDecimals } from "@/lib/currency";
 import { CurrencySelector, getCurrencyLabel } from "@/components/currency-selector";
 import { OperatorSelector } from "@/components/operator-selector";
 import { hasMultipleCurrencies, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
+import { useCryptoAvailability } from "@/hooks/use-crypto-availability";
 
 interface ApiKeyInfo {
   siteName: string;
@@ -242,7 +243,9 @@ export default function ApiPay() {
   // Currency conversion for non-XOF countries
   // IMPORTANT: Only calculate target currency if a country is selected
   // This prevents conversion from triggering before user selects a country
+  const ownerCountry = (apiKeyInfo as any)?.ownerCountry || null;
   const ownerCurrency = (apiKeyInfo as any)?.ownerCurrency || "XOF";
+  const { cryptoPayinEnabled } = useCryptoAvailability(ownerCountry);
   const targetCurrency = country
     ? (hasMultipleCurrencies(country) 
         ? selectedCurrency 
@@ -1299,7 +1302,8 @@ export default function ApiPay() {
             </div>
           </div>
 
-          <PaymentMethodSelector 
+          <PaymentMethodSelector
+            showCrypto={cryptoPayinEnabled}
             mobileMoneyContent={mobileMoneyForm}
             cryptoContent={
               amount && amount >= 500 ? (

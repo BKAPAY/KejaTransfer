@@ -59,6 +59,7 @@ export default function Withdrawal() {
     : "XOF";
 
   const { withdrawalMin } = useConvertedMinimums(userBalanceCurrency);
+  const { cryptoPayoutEnabled } = useCryptoAvailability(user?.country);
 
   const { data: enabledCountriesOperators } = useQuery<Record<string, string[]>>({
     queryKey: ["/api/countries-operators/withdrawals"],
@@ -402,6 +403,7 @@ export default function Withdrawal() {
             </div>
 
             <PaymentMethodSelector
+              showCrypto={cryptoPayoutEnabled}
               mobileMoneyContent={
                 <Form {...form}>
                   <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">

@@ -23,6 +23,7 @@ import { CurrencySelector, getCurrencyLabel } from "@/components/currency-select
 import { OperatorSelector } from "@/components/operator-selector";
 import { hasMultipleCurrencies, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
 import { getCurrencyDecimals } from "@/lib/currency";
+import { useCryptoAvailability } from "@/hooks/use-crypto-availability";
 
 interface ConversionData {
   convertedAmount: number;
@@ -295,8 +296,9 @@ export default function Merchant() {
     }
   }, [selectedCountry]);
 
-  // Get the owner's currency (the currency of the merchant link creator)
+  const ownerCountry = (merchantLink as any)?.ownerCountry || null;
   const ownerCurrency = (merchantLink as any)?.ownerCurrency || "XOF";
+  const { cryptoPayinEnabled } = useCryptoAvailability(ownerCountry);
   
   // Currency conversion (ownerCurrency -> Target Currency)
   // IMPORTANT: Only calculate target currency if a country is selected
@@ -1284,7 +1286,8 @@ export default function Merchant() {
           </div>
         </CardHeader>
         <CardContent className="p-3 sm:p-4 lg:p-6">
-          <PaymentMethodSelector 
+          <PaymentMethodSelector
+            showCrypto={cryptoPayinEnabled}
             mobileMoneyContent={mobileMoneyForm}
             cryptoContent={
               cryptoStep === "payment" && cryptoCustomerInfo ? (

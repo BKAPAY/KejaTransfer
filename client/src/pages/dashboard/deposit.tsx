@@ -68,6 +68,7 @@ export default function Deposit() {
     : "XOF";
 
   const { depositMin, cryptoMin } = useConvertedMinimums(userBalanceCurrency);
+  const { cryptoPayinEnabled } = useCryptoAvailability(user?.country);
 
   const { data: enabledCountriesOperators, isLoading: isLoadingOperators } = useQuery<Record<string, string[]>>({
     queryKey: ["/api/countries-operators/deposits"],
@@ -606,6 +607,7 @@ export default function Deposit() {
             </div>
 
             <PaymentMethodSelector
+              showCrypto={cryptoPayinEnabled}
               cryptoContent={
                 amount && amount >= cryptoMin ? (
                   <CryptoPaymentFlow
