@@ -4500,6 +4500,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             country,
             operator,
             description: paymentLink.description || `Paiement via lien`,
+            customerName: effectiveCustomerName,
+            customerEmail: customerEmail || null,
+            customerPhone: customerPhone || null,
             paydunyaToken: paydunyaResponse.token,
             metadata: JSON.stringify({
               phone: customerPhone,
@@ -4597,7 +4600,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           customerPhone,
           country,
           operator,
-          otpCode
+          otpCode,
+          customerName || "Client",
+          customerEmail || null
         );
 
         if (result.requiresOtp) {
@@ -4635,7 +4640,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Merchant Link Route - Multi-Provider
   app.post("/api/fedapay/merchant-link/:token", async (req: Request, res: Response) => {
     try {
-      const { customerName, customerPhone, amount, country, operator, currency, originalAmount, originalCurrency } = req.body;
+      const { customerName, customerEmail, customerPhone, amount, country, operator, currency, originalAmount, originalCurrency } = req.body;
       const { token } = req.params;
 
       const merchantLink = await storage.getMerchantLinkByToken(token);
@@ -4737,6 +4742,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             country,
             operator,
             description: `Paiement ${merchantLink.merchantName}`,
+            customerName: effectiveCustomerName,
+            customerEmail: customerEmail || null,
+            customerPhone: customerPhone || null,
             paydunyaToken: paydunyaResponse.token,
             metadata: JSON.stringify({
               phone: customerPhone,

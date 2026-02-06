@@ -338,7 +338,9 @@ export async function handleAfribaPayPaymentLink(
   phone: string,
   country: string,
   operator: string,
-  otpCode?: string
+  otpCode?: string,
+  customerName?: string,
+  customerEmail?: string
 ): Promise<{ 
   success: boolean; 
   transactionId?: string; 
@@ -412,6 +414,8 @@ export async function handleAfribaPayPaymentLink(
       country: countryCode,
       operator: operator,
       description: paymentLink.description || "Paiement via lien",
+      customerName: customerName || null,
+      customerEmail: customerEmail || null,
       customerPhone: phone,
       metadata: JSON.stringify({
         afribaPayTransactionId: result.transactionId,
@@ -444,7 +448,9 @@ export async function handleAfribaPayMerchantLink(
   phone: string,
   country: string,
   operator: string,
-  otpCode?: string
+  otpCode?: string,
+  customerName?: string,
+  customerEmail?: string
 ): Promise<{ 
   success: boolean; 
   transactionId?: string; 
@@ -518,6 +524,8 @@ export async function handleAfribaPayMerchantLink(
       country: countryCode,
       operator: operator,
       description: `Paiement ${merchantLink.merchantName}`,
+      customerName: customerName || null,
+      customerEmail: customerEmail || null,
       customerPhone: phone,
       metadata: JSON.stringify({
         afribaPayTransactionId: result.transactionId,
@@ -630,7 +638,7 @@ export async function handleAfribaPayApiPayment(
       description: description || "Paiement via API",
       customerPhone: customerPhone,
       customerName: customerName,
-      customerEmail: "noreply@bkapay.com",
+      customerEmail: customerEmail || null,
       metadata: JSON.stringify({
         afribaPayTransactionId: result.transactionId,
         afribaPayOrderId: result.orderId,
