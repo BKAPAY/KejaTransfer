@@ -298,36 +298,14 @@ async function processFedaPayPayout(transaction: Transaction & { user?: User }, 
       }
       return true;
     } else {
-      // Still pending
-      if (hasPaymentExpired(transaction)) {
-        console.log(`[PaymentPolling] ⏱️ FedaPay payout ${transaction.id} TIMEOUT (10min) - marking as failed`);
-        await storage.updateTransactionStatus(transaction.id, "failed");
-        
-        // Refund the balance
-        const deductedAmount = metadata.deductedFromBalance;
-        if (deductedAmount) {
-          await storage.updateUserBalance(transaction.userId, deductedAmount);
-          console.log(`[PaymentPolling] Refunded ${deductedAmount} to user ${transaction.userId}`);
-        }
-        return true;
-      }
-      console.log(`[PaymentPolling] ⏳ FedaPay payout ${transaction.id} still pending (${remainingSeconds}s remaining)`);
+      // Still pending - no timeout for payouts, they remain pending until the provider processes them
+      const age = getTransactionAge(transaction);
+      const ageMinutes = Math.round(age / 60000);
+      console.log(`[PaymentPolling] ⏳ FedaPay payout ${transaction.id} still pending (age: ${ageMinutes}min) - waiting for provider`);
       return false;
     }
   } catch (error) {
     console.error(`[PaymentPolling] Error checking FedaPay payout ${transaction.id}:`, error);
-    if (hasPaymentExpired(transaction)) {
-      console.log(`[PaymentPolling] ⏱️ FedaPay payout ${transaction.id} expired with error - marking as failed`);
-      await storage.updateTransactionStatus(transaction.id, "failed");
-      
-      // Refund the balance
-      const deductedAmount = metadata.deductedFromBalance;
-      if (deductedAmount) {
-        await storage.updateUserBalance(transaction.userId, deductedAmount);
-        console.log(`[PaymentPolling] Refunded ${deductedAmount} to user ${transaction.userId}`);
-      }
-      return true;
-    }
     return false;
   }
 }
