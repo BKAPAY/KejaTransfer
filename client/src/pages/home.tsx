@@ -218,17 +218,9 @@ export default function Home() {
               <h2 className="text-lg sm:text-2xl md:text-3xl lg:text-4xl font-bold mb-3 sm:mb-4 text-foreground">
                 Paiements Mobile Money
               </h2>
-              <p className="text-xs sm:text-sm md:text-base text-muted-foreground mb-4 sm:mb-6 leading-relaxed">
+              <p className="text-xs sm:text-sm md:text-base text-muted-foreground leading-relaxed">
                 Acceptez les paiements via tous les opérateurs Mobile Money d'Afrique de l'Ouest. Orange Money, MTN, Moov, Wave, Free Money, T-Money et bien plus. Transactions instantanées, sécurisées et fiables.
               </p>
-              <div className="flex flex-wrap gap-2 sm:gap-3">
-                {operators.map((op) => (
-                  <div key={op.name} className="flex items-center gap-1.5 px-2 py-1 sm:px-3 sm:py-1.5 bg-muted rounded-md">
-                    <img src={op.image} alt={op.name} className="w-5 h-5 sm:w-6 sm:h-6 object-contain" />
-                    <span className="text-xs sm:text-sm font-medium text-foreground">{op.name.split(' ')[0]}</span>
-                  </div>
-                ))}
-              </div>
             </div>
           </div>
         </div>
