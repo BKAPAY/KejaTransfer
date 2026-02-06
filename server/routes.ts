@@ -1558,6 +1558,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isActive: apiKey.isActive,
         allowedCountries: apiKey.allowedCountries || [],
         customerPaysFee: apiKey.customerPaysFee || false,
+        ownerCountry: owner?.country || null,
         ownerCurrency,
       });
     } catch (error: any) {

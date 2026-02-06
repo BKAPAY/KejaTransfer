@@ -1340,6 +1340,7 @@ export class DbStorage implements IStorage {
     const { PAYDUNYA_COUNTRIES } = await import("@shared/paydunya-countries");
     const { FEDAPAY_COUNTRIES } = await import("@shared/fedapay-countries");
     const { MBIYOPAY_COUNTRIES } = await import("@shared/mbiyopay-countries");
+    const { NOWPAYMENTS_COUNTRIES } = await import("@shared/nowpayments-countries");
     
     const existing = await this.getCountryStatuses();
     const existingSet = new Set(existing.map(c => `${c.provider}-${c.country}`));
@@ -1401,6 +1402,22 @@ export class DbStorage implements IStorage {
         .insert(schema.countryStatus)
         .values({
           provider: "mbiyopay",
+          country: country.code,
+          payinEnabled: false,
+          payoutEnabled: false,
+        })
+        .catch(() => {});
+    }
+
+    // Initialize NOWPayments countries (crypto)
+    for (const country of NOWPAYMENTS_COUNTRIES) {
+      const key = `nowpayments-${country.code}`;
+      if (existingSet.has(key)) continue;
+      
+      await db
+        .insert(schema.countryStatus)
+        .values({
+          provider: "nowpayments",
           country: country.code,
           payinEnabled: false,
           payoutEnabled: false,

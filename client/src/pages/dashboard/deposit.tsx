@@ -23,6 +23,7 @@ import { OperatorSelector } from "@/components/operator-selector";
 import { hasMultipleCurrencies, getMbiyoPayCurrencyForCountry, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
 import { useConvertedMinimums } from "@/hooks/use-converted-minimums";
 import { getCurrencyDecimals } from "@/lib/currency";
+import { useCryptoAvailability } from "@/hooks/use-crypto-availability";
 
 interface ConversionData {
   convertedAmount: number;

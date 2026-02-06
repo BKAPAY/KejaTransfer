@@ -13,6 +13,7 @@ import { AFRIBAPAY_COUNTRIES } from "@shared/afribapay-countries";
 import { PAYDUNYA_COUNTRIES } from "@shared/paydunya-countries";
 import { FEDAPAY_COUNTRIES } from "@shared/fedapay-countries";
 import { MBIYOPAY_COUNTRIES } from "@shared/mbiyopay-countries";
+import { NOWPAYMENTS_COUNTRIES } from "@shared/nowpayments-countries";
 
 interface ProviderConfig {
   id: string;
@@ -44,6 +45,12 @@ const PROVIDERS = [
     name: "MbiyoPay", 
     color: "bg-teal-500",
     countries: MBIYOPAY_COUNTRIES 
+  },
+  { 
+    id: "nowpayments", 
+    name: "NOWPayments", 
+    color: "bg-orange-500",
+    countries: NOWPAYMENTS_COUNTRIES 
   },
 ];
 
@@ -238,6 +245,85 @@ export default function CountryOperatorConfigPage() {
                     <Skeleton key={i} className="h-32" />
                   ))}
                 </div>
+              ) : provider.id === "nowpayments" ? (
+                <div className="grid gap-4">
+                  <div className="bg-muted/50 border rounded-lg p-4 mb-2">
+                    <p className="text-sm text-muted-foreground">
+                      NOWPayments gere les paiements en cryptomonnaie. Activez ou desactivez les paiements crypto (entrants/sortants) par pays.
+                      Pas besoin de configurer des operateurs individuels.
+                    </p>
+                  </div>
+                  {provider.countries.map((countryInfo) => {
+                    const countryCode = countryInfo.code;
+                    const countryStatus = countryStatusMap[countryCode];
+
+                    return (
+                      <Card key={`${provider.id}-${countryCode}`}>
+                        <div className="p-4">
+                          <div className="flex items-center justify-between flex-wrap gap-2">
+                            <div className="flex items-center gap-3">
+                              <Globe className="w-6 h-6 text-muted-foreground" />
+                              <div>
+                                <h3 className="font-semibold text-foreground">{countryInfo.name} ({countryCode})</h3>
+                                <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
+                                  <span>{countryInfo.currency}</span>
+                                  {countryStatus?.payinEnabled && (
+                                    <Badge variant="secondary" className="text-xs bg-green-500/10 text-green-600">
+                                      Depot crypto actif
+                                    </Badge>
+                                  )}
+                                  {countryStatus?.payoutEnabled && (
+                                    <Badge variant="secondary" className="text-xs bg-blue-500/10 text-blue-600">
+                                      Retrait crypto actif
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-3 flex-wrap">
+                              {countryStatus && (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    variant={countryStatus.payinEnabled ? "default" : "outline"}
+                                    onClick={() => toggleCountrySetting(countryStatus, "payin")}
+                                    disabled={updateCountryMutation.isPending}
+                                    data-testid={`toggle-country-payin-${provider.id}-${countryCode}`}
+                                    className="gap-2"
+                                  >
+                                    {countryStatus.payinEnabled ? (
+                                      <CheckCircle2 className="w-4 h-4" />
+                                    ) : (
+                                      <XCircle className="w-4 h-4" />
+                                    )}
+                                    <span className="text-xs">Depot (Payin)</span>
+                                  </Button>
+
+                                  <Button
+                                    size="sm"
+                                    variant={countryStatus.payoutEnabled ? "default" : "outline"}
+                                    onClick={() => toggleCountrySetting(countryStatus, "payout")}
+                                    disabled={updateCountryMutation.isPending}
+                                    data-testid={`toggle-country-payout-${provider.id}-${countryCode}`}
+                                    className="gap-2"
+                                  >
+                                    {countryStatus.payoutEnabled ? (
+                                      <CheckCircle2 className="w-4 h-4" />
+                                    ) : (
+                                      <XCircle className="w-4 h-4" />
+                                    )}
+                                    <span className="text-xs">Retrait (Payout)</span>
+                                  </Button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </Card>
+                    );
+                  })}
+                </div>
               ) : (
                 <div className="grid gap-4">
                   {provider.countries.map((countryInfo) => {
@@ -246,7 +332,6 @@ export default function CountryOperatorConfigPage() {
                     const countryStatus = countryStatusMap[countryCode];
                     const isExpanded = expandedCountry === `${provider.id}-${countryCode}`;
                     
-                    // Count active operators for payin and payout
                     const activePayinOperators = countryConfigs.filter(c => c.incomingEnabled).length;
                     const activePayoutOperators = countryConfigs.filter(c => c.outgoingEnabled).length;
                     const hasPayinActive = countryStatus?.payinEnabled && activePayinOperators > 0;
@@ -345,7 +430,7 @@ export default function CountryOperatorConfigPage() {
                               <h4 className="text-sm font-medium text-muted-foreground mb-2">
                                 Opérateurs {provider.name}
                               </h4>
-                              {countryInfo.operators.map((op) => {
+                              {countryInfo.operators.map((op: any) => {
                                 const config = countryConfigs.find(c => c.operator === op.code);
                                 
                                 return (

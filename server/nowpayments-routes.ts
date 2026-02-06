@@ -19,6 +19,32 @@ async function getNowPaymentsClient(): Promise<NowPaymentsClient | null> {
   });
 }
 
+router.get("/api/crypto/country-availability", async (req: Request, res: Response) => {
+  try {
+    const { country } = req.query;
+    if (!country || typeof country !== "string") {
+      return res.status(400).json({ error: "Le parametre country est requis" });
+    }
+
+    const countryStatuses = await storage.getCountryStatuses();
+    const nowpaymentsStatus = countryStatuses.find(
+      (s) => s.provider === "nowpayments" && s.country === country.toUpperCase()
+    );
+
+    if (!nowpaymentsStatus) {
+      return res.json({ payinEnabled: false, payoutEnabled: false });
+    }
+
+    return res.json({
+      payinEnabled: nowpaymentsStatus.payinEnabled,
+      payoutEnabled: nowpaymentsStatus.payoutEnabled,
+    });
+  } catch (error: any) {
+    console.error("[NOWPayments] Country availability check failed:", error);
+    res.status(500).json({ error: "Erreur lors de la verification" });
+  }
+});
+
 router.get("/api/crypto/status", async (req: Request, res: Response) => {
   try {
     const client = await getNowPaymentsClient();

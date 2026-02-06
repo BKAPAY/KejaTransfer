@@ -26,6 +26,7 @@ import { useConvertedMinimums } from "@/hooks/use-converted-minimums";
 import { getCurrencyDecimals } from "@/lib/currency";
 import { PaymentMethodSelector } from "@/components/payment-method-selector";
 import { CryptoWithdrawalFlow } from "@/components/crypto-withdrawal-flow";
+import { useCryptoAvailability } from "@/hooks/use-crypto-availability";
 
 const transferSchema = z.object({
   amount: z.number().min(1, "Veuillez saisir un montant valide"),
