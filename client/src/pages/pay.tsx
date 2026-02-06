@@ -1529,14 +1529,16 @@ export default function Pay() {
                       <div>
                         <label className="text-xs sm:text-sm font-medium">Téléphone</label>
                         <Input
-                          placeholder="+229 00 00 00 00"
+                          type="tel"
+                          inputMode="numeric"
+                          placeholder="00 00 00 00"
                           data-testid="input-crypto-phone"
                           value={cryptoCustomerInfo?.customerPhone || ""}
                           onChange={(e) => setCryptoCustomerInfo(prev => ({
                             ...prev,
                             customerName: prev?.customerName || "",
                             customerEmail: prev?.customerEmail || "",
-                            customerPhone: e.target.value,
+                            customerPhone: e.target.value.replace(/\D/g, ""),
                           }))}
                         />
                       </div>
