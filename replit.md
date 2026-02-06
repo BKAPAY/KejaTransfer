@@ -40,7 +40,7 @@ The frontend uses React 18 with TypeScript, Shadcn UI, and Tailwind CSS for a pr
 - **Withdrawal Security System**: Allows users to configure up to 3 withdrawal phone numbers and requires a 6-digit bcrypt-hashed security code for all withdrawals.
 - **Phone Input**: Implements `PhoneInputWithPrefix` with locked country dial codes for various forms.
 - **Email Verification**: Supports optional two-step email verification during signup and a three-step password reset flow using Gmail SMTP via nodemailer.
-- **Cryptocurrency Payments (NOWPayments)**: Supports various cryptocurrencies with a XOF → USD conversion and a complex fee structure (10% markup, 15% crypto fee, optional 6% standard fee).
+- **Cryptocurrency Payments (NOWPayments)**: Supports various cryptocurrencies with a XOF → USD conversion and a complex fee structure (10% markup, 15% crypto fee, optional 6% standard fee). Admin controls crypto availability per country via payin/payout toggles in the Countries & Operators page (NOWPayments tab). Uses `country_status` table with `provider='nowpayments'` and a `/api/crypto/country-availability` endpoint. Frontend pages conditionally show crypto via `useCryptoAvailability` hook. Public payment pages (pay, merchant, api-pay) use the link/API key owner's country to determine availability.
 - **Multi-Currency Support**: Supports multiple currencies for certain countries (e.g., CDF and USD for DRC) with a `CurrencySelector` and real-time conversion using an exchange rate API.
 - **Currency Conversion Rule**: All final converted amounts are sent to payment providers, with transaction metadata storing `providerAmount`, `providerCurrency`, `balanceAmount`, and `balanceCurrency`.
 
