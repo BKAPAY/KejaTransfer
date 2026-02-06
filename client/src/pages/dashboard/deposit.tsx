@@ -334,8 +334,7 @@ export default function Deposit() {
 
     const checkPaymentStatus = async () => {
       try {
-        // First, trigger backend verification to update status
-        await fetch("/api/softpay/verify-payment", {
+        const verifyRes = await fetch("/api/softpay/verify-payment", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ 
@@ -344,39 +343,51 @@ export default function Deposit() {
           }),
         });
 
-        // Then fetch the updated transaction status
-        const res = await fetch(`/api/transactions/${paymentData.transactionId}`);
-        if (res.ok) {
-          const tx = await res.json();
-          if (tx.status === "completed") {
-            setPollingStatus("completed");
-            setPaymentStep("completed");
-            
-            toast({
-              title: "Paiement reussi",
-              description: "Votre depot a ete complete",
-            });
+        let resolvedStatus: string | null = null;
 
-            queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
-            queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
-            queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+        if (verifyRes.ok) {
+          const verifyData = await verifyRes.json();
+          if (verifyData.status === "completed") resolvedStatus = "completed";
+          else if (verifyData.status === "failed") resolvedStatus = "failed";
+        }
 
-            setTimeout(() => {
-              form.reset();
-              setPaymentData({});
-              setPollingStatus(null);
-              setPaymentStep("form");
-            }, 3000);
-            return true;
-          } else if (tx.status === "failed") {
-            setPaymentStep("form");
-            toast({
-              title: "Paiement echoue",
-              description: "Le paiement n'a pas abouti",
-              variant: "destructive",
-            });
-            return true;
+        if (!resolvedStatus) {
+          const res = await fetch(`/api/transactions/${paymentData.transactionId}`);
+          if (res.ok) {
+            const tx = await res.json();
+            if (tx.status === "completed") resolvedStatus = "completed";
+            else if (tx.status === "failed") resolvedStatus = "failed";
           }
+        }
+
+        if (resolvedStatus === "completed") {
+          setPollingStatus("completed");
+          setPaymentStep("completed");
+          
+          toast({
+            title: "Paiement reussi",
+            description: "Votre depot a ete complete",
+          });
+
+          queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+
+          setTimeout(() => {
+            form.reset();
+            setPaymentData({});
+            setPollingStatus(null);
+            setPaymentStep("form");
+          }, 3000);
+          return true;
+        } else if (resolvedStatus === "failed") {
+          setPaymentStep("form");
+          toast({
+            title: "Paiement echoue",
+            description: "Le paiement n'a pas abouti",
+            variant: "destructive",
+          });
+          return true;
         }
       } catch (error) {
         console.error("Payment verification error:", error);
