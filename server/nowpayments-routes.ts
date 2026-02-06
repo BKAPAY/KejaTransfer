@@ -754,9 +754,20 @@ router.post("/api/crypto/create-withdrawal", async (req: Request, res: Response)
     } catch (payoutError: any) {
       console.error("[NOWPayments] Payout API failed:", payoutError);
       await storage.addFundsToUser(user.id, totalToDebit);
+      
+      let errorMessage = "Le retrait crypto a echoue. Votre solde n'a pas ete debite. Veuillez reessayer.";
+      const errMsg = payoutError?.message || "";
+      if (errMsg.includes("Invalid IP") || errMsg.includes("Access denied")) {
+        const ipMatch = errMsg.match(/Invalid IP\s*-\s*([\d.]+)/);
+        const ip = ipMatch ? ipMatch[1] : "";
+        errorMessage = `Acces refuse par NOWPayments: l'adresse IP du serveur${ip ? ` (${ip})` : ""} n'est pas autorisee. Veuillez ajouter cette IP dans la liste blanche (whitelist) de votre compte NOWPayments dans Settings > Payouts.`;
+      } else if (errMsg.includes("Authorization") || errMsg.includes("auth")) {
+        errorMessage = "Authentification NOWPayments echouee. Verifiez l'email et le mot de passe dans la configuration des fournisseurs.";
+      }
+      
       return res.status(500).json({ 
         success: false, 
-        error: "Le retrait crypto a echoue. Votre solde n'a pas ete debite. Veuillez reessayer." 
+        error: errorMessage
       });
     }
 
