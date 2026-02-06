@@ -38,6 +38,10 @@ import cryptoHeroImage from "@assets/crypto-payment-hero.png";
 import cardHeroImage from "@assets/card-payment-hero.png";
 import heroMainImage from "@assets/hero-main.png";
 import mobileMoneyHeroImage from "@assets/generated_images/v3_mobile_money_hero.png";
+import adAfricaMapImage from "@assets/ad_photos/ad_07_africa_map.png";
+import adMarketImage from "@assets/ad_photos/ad_03_market_entrepreneur.png";
+import adCryptoImage from "@assets/ad_photos/ad_05_crypto_mobile.png";
+import adManJumpImage from "@assets/ad_photos/ad_08_man_celebrating.png";
 
 const countries = COUNTRIES;
 
