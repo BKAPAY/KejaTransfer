@@ -1300,6 +1300,20 @@ export default function ApiPay() {
           </div>
 
           <PaymentMethodSelector
+            defaultMethod={(() => {
+              try {
+                const cryptoKey = `bkapay_crypto_${key}`;
+                const saved = localStorage.getItem(cryptoKey);
+                if (saved) {
+                  const data = JSON.parse(saved);
+                  if (data.paymentDetails && data.createdAt) {
+                    const elapsed = Math.floor((Date.now() - data.createdAt) / 1000);
+                    if ((data.expiresIn || 1800) - elapsed > 0) return "crypto";
+                  }
+                }
+              } catch {}
+              return "mobile_money";
+            })()}
             mobileMoneyContent={mobileMoneyForm}
             cryptoContent={
               amount && amount >= 500 ? (
