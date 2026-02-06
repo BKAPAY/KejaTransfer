@@ -149,6 +149,8 @@ export const providerConfigs = pgTable("provider_configs", {
   enableKycSubmitted: text("enable_kyc_submitted"), // Enable KYC submitted email
   enableKycVerified: text("enable_kyc_verified"), // Enable KYC verified email
   enableKycRejected: text("enable_kyc_rejected"), // Enable KYC rejected email
+  cryptoMarkupPercent: integer("crypto_markup_percent").default(100), // 100 = 10%, stored as value * 10
+  cryptoFeePercent: integer("crypto_fee_percent").default(150), // 150 = 15%, stored as value * 10
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

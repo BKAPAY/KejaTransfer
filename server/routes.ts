@@ -6710,6 +6710,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get/Update NOWPayments crypto global fee settings (markup and crypto fee)
+  app.get("/api/admin/crypto-fee-settings", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const config = await storage.getProviderConfig("nowpayments");
+      res.json({
+        cryptoMarkupPercent: config?.cryptoMarkupPercent ?? 100,
+        cryptoFeePercent: config?.cryptoFeePercent ?? 150,
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
+  app.put("/api/admin/crypto-fee-settings", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { cryptoMarkupPercent, cryptoFeePercent } = req.body;
+      if (cryptoMarkupPercent !== undefined && (cryptoMarkupPercent < 0 || cryptoMarkupPercent > 1000)) {
+        return res.status(400).json({ error: "Le pourcentage de markup doit etre entre 0 et 100" });
+      }
+      if (cryptoFeePercent !== undefined && (cryptoFeePercent < 0 || cryptoFeePercent > 1000)) {
+        return res.status(400).json({ error: "Le pourcentage de frais crypto doit etre entre 0 et 100" });
+      }
+
+      const updateData: any = {};
+      if (cryptoMarkupPercent !== undefined) updateData.cryptoMarkupPercent = cryptoMarkupPercent;
+      if (cryptoFeePercent !== undefined) updateData.cryptoFeePercent = cryptoFeePercent;
+
+      await storage.updateProviderConfig("nowpayments", updateData);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Update crypto fee settings error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
   // Public endpoint to get fee for a specific provider/country/operator (3 params - must be first)
   app.get("/api/fees/:provider/:country/:operator", async (req: Request, res: Response) => {
     try {
