@@ -47,7 +47,8 @@ export const paymentLinks = pgTable("payment_links", {
   token: text("token").notNull().unique(), // Unique token for the payment link
   isActive: boolean("is_active").notNull().default(true),
   allowedCountries: text("allowed_countries").array().default([]), // Empty array = all countries allowed
-  customerPaysFee: boolean("customer_pays_fee").notNull().default(false), // If true, customer pays the 6% fee
+  customerPaysFee: boolean("customer_pays_fee").notNull().default(false), // If true, customer pays the 6% fee for mobile money
+  customerPaysCryptoFee: boolean("customer_pays_crypto_fee").notNull().default(false), // If true, customer pays crypto fees
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -73,7 +74,8 @@ export const apiKeys = pgTable("api_keys", {
   callbackSecret: text("callback_secret"), // HMAC secret for signing callbacks
   isActive: boolean("is_active").notNull().default(true),
   allowedCountries: text("allowed_countries").array().default([]), // Empty array = all countries allowed
-  customerPaysFee: boolean("customer_pays_fee").notNull().default(false), // If true, customer pays the 6% fee
+  customerPaysFee: boolean("customer_pays_fee").notNull().default(false), // If true, customer pays the 6% fee for mobile money
+  customerPaysCryptoFee: boolean("customer_pays_crypto_fee").notNull().default(false), // If true, customer pays crypto fees
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
