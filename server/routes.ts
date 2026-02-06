@@ -4673,7 +4673,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           merchantLink,
           amount, // converted amount for provider
           customerName || "Client",
-          "noreply@bkapay.com", // Privacy: never send real customer emails to providers
+          customerEmail || null,
           customerPhone,
           country,
           operator,
@@ -4836,7 +4836,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           customerPhone,
           country,
           operator,
-          otpCode
+          otpCode,
+          customerName || "Client",
+          customerEmail || null
         );
 
         if (result.requiresOtp) {
