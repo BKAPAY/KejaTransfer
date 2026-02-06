@@ -760,9 +760,11 @@ router.post("/api/crypto/create-withdrawal", async (req: Request, res: Response)
       if (errMsg.includes("Invalid IP") || errMsg.includes("Access denied")) {
         const ipMatch = errMsg.match(/Invalid IP\s*-\s*([\d.]+)/);
         const ip = ipMatch ? ipMatch[1] : "";
-        errorMessage = `Acces refuse par NOWPayments: l'adresse IP du serveur${ip ? ` (${ip})` : ""} n'est pas autorisee. Veuillez ajouter cette IP dans la liste blanche (whitelist) de votre compte NOWPayments dans Settings > Payouts.`;
+        errorMessage = ip
+          ? `Pour activer les retraits crypto, veuillez contacter l'assistance BKApay et communiquer l'adresse IP suivante : ${ip}`
+          : "Pour activer les retraits crypto, veuillez contacter l'assistance BKApay pour finaliser la configuration.";
       } else if (errMsg.includes("Authorization") || errMsg.includes("auth")) {
-        errorMessage = "Authentification NOWPayments echouee. Verifiez l'email et le mot de passe dans la configuration des fournisseurs.";
+        errorMessage = "Service de retrait crypto temporairement indisponible. Veuillez contacter l'assistance BKApay.";
       }
       
       return res.status(500).json({ 
