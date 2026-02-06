@@ -78,7 +78,7 @@ const PROVIDER_INFO = {
     name: "NOWPayments",
     description: "Paiements en cryptomonnaies (Bitcoin, Ethereum, USDT, etc.)",
     color: "bg-orange-500",
-    fields: ["apiKey", "ipnSecret"],
+    fields: ["apiKey", "ipnSecret", "publicKey", "secretKey"],
     countries: "Global - Crypto uniquement",
   },
   exchangerate: {
@@ -114,6 +114,8 @@ const getFieldLabel = (provider: string, field: string): string => {
     switch (field) {
       case "apiKey": return "Clé API NOWPayments";
       case "ipnSecret": return "IPN Secret (pour les webhooks)";
+      case "publicKey": return "Email du compte NOWPayments (pour les payouts)";
+      case "secretKey": return "Mot de passe du compte NOWPayments (pour les payouts)";
       default: return field;
     }
   }

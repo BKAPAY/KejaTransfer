@@ -16,6 +16,8 @@ async function getNowPaymentsClient(): Promise<NowPaymentsClient | null> {
   return new NowPaymentsClient({
     apiKey: config.apiKey,
     ipnSecret: config.ipnSecret || undefined,
+    email: config.publicKey || undefined,
+    password: config.secretKey || undefined,
   });
 }
 

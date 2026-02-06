@@ -5,6 +5,8 @@ const NOWPAYMENTS_API_URL = "https://api.nowpayments.io/v1";
 interface NowPaymentsConfig {
   apiKey: string;
   ipnSecret?: string;
+  email?: string;
+  password?: string;
 }
 
 interface ApiStatus {
@@ -128,10 +130,16 @@ interface ValidateAddressResponse {
 export class NowPaymentsClient {
   private apiKey: string;
   private ipnSecret?: string;
+  private email?: string;
+  private password?: string;
+  private jwtToken: string | null = null;
+  private jwtExpiry: number = 0;
 
   constructor(config: NowPaymentsConfig) {
     this.apiKey = config.apiKey;
     this.ipnSecret = config.ipnSecret;
+    this.email = config.email;
+    this.password = config.password;
   }
 
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -153,6 +161,59 @@ export class NowPaymentsClient {
     }
 
     return response.json();
+  }
+
+  private async authenticatedRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+    const token = await this.getJwtToken();
+    const url = `${NOWPAYMENTS_API_URL}${endpoint}`;
+    const headers: Record<string, string> = {
+      "x-api-key": this.apiKey,
+      "Authorization": `Bearer ${token}`,
+      "Content-Type": "application/json",
+      ...((options.headers as Record<string, string>) || {}),
+    };
+
+    const response = await fetch(url, {
+      ...options,
+      headers,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `NOWPayments API error: ${response.status}`);
+    }
+
+    return response.json();
+  }
+
+  private async getJwtToken(): Promise<string> {
+    if (!this.email || !this.password) {
+      throw new Error("Email et mot de passe NOWPayments requis pour les operations payout");
+    }
+
+    const now = Date.now();
+    if (this.jwtToken && now < this.jwtExpiry) {
+      return this.jwtToken;
+    }
+
+    console.log("[NOWPayments] Authenticating for JWT token...");
+    const url = `${NOWPAYMENTS_API_URL}/auth`;
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: this.email, password: this.password }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `NOWPayments auth failed: ${response.status}`);
+    }
+
+    const data = await response.json();
+    this.jwtToken = data.token;
+    this.jwtExpiry = now + 50 * 60 * 1000;
+    console.log("[NOWPayments] JWT token obtained successfully");
+    return this.jwtToken!;
   }
 
   async getStatus(): Promise<ApiStatus> {
@@ -193,18 +254,18 @@ export class NowPaymentsClient {
     if (ipnCallbackUrl) {
       data.ipn_callback_url = ipnCallbackUrl;
     }
-    return this.request<PayoutResponse>("/payout", {
+    return this.authenticatedRequest<PayoutResponse>("/payout", {
       method: "POST",
       body: JSON.stringify(data),
     });
   }
 
   async getPayoutStatus(payoutId: string): Promise<PayoutStatusResponse> {
-    return this.request<PayoutStatusResponse>(`/payout/${payoutId}`);
+    return this.authenticatedRequest<PayoutStatusResponse>(`/payout/${payoutId}`);
   }
 
   async validateAddress(currency: string, address: string): Promise<ValidateAddressResponse> {
-    return this.request<ValidateAddressResponse>("/payout/validate-address", {
+    return this.authenticatedRequest<ValidateAddressResponse>("/payout/validate-address", {
       method: "POST",
       body: JSON.stringify({ currency, address }),
     });
