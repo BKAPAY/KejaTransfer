@@ -26,8 +26,8 @@ const BASE_MINIMUMS_CDF = {
   transfer: 2000,
   deposit: 400,
   crypto: 2000,
-  cryptoWithdrawal: 60000,
-  cryptoTransfer: 60000,
+  cryptoWithdrawal: 61500,
+  cryptoTransfer: 61500,
   paymentLink: 2000,
 };
 
