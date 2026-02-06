@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { COUNTRIES, OPERATORS } from "@shared/schema";
 import type { User } from "@shared/schema";
 import { PhoneInputWithPrefix } from "@/components/phone-input-with-prefix";
+import { CountryFlag } from "@/components/country-flag";
 import { Send, Info, CheckCircle2, Loader2, Lock, AlertCircle, Settings } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { calculateOutgoingFee, fetchFeeConfig, formatFeePercentage } from "@/lib/fees";
@@ -400,7 +401,7 @@ export default function Transfer() {
                             <SelectContent>
                               {payoutCountries.map((country) => (
                                 <SelectItem key={country.code} value={country.code}>
-                                  {country.flag} {country.name}
+                                  <span className="flex items-center gap-2"><CountryFlag code={country.code} size="xs" />{country.name}</span>
                                 </SelectItem>
                               ))}
                             </SelectContent>

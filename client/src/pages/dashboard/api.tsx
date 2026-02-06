@@ -9,6 +9,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { ApiKey, User } from "@shared/schema";
 import { COUNTRIES } from "@shared/schema";
+import { CountryFlag } from "@/components/country-flag";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -576,7 +577,7 @@ export default function ApiPage() {
                                   htmlFor={`country-${apiKey.id}-${country.code}`}
                                   className="text-sm cursor-pointer flex items-center gap-1"
                                 >
-                                  <span>{country.flag}</span>
+                                  <CountryFlag code={country.code} size="xs" />
                                   <span>{country.name}</span>
                                 </label>
                               </div>
@@ -650,7 +651,7 @@ export default function ApiPage() {
                                 const country = COUNTRIES.find(c => c.code === code);
                                 return (
                                   <Badge key={code} variant="secondary" className="text-xs">
-                                    {country?.flag} {country?.name || code}
+                                    <span className="flex items-center gap-1"><CountryFlag code={code} size="xs" />{country?.name || code}</span>
                                   </Badge>
                                 );
                               })}

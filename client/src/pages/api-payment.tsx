@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertCircle, Loader2 } from "lucide-react";
 import { OPERATORS, COUNTRIES } from "@shared/schema";
+import { CountryFlag } from "@/components/country-flag";
 import { CurrencySelector, getCurrencyLabel } from "@/components/currency-selector";
 import { hasMultipleCurrencies, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
 import type { Transaction } from "@shared/schema";
@@ -216,14 +217,14 @@ export default function ApiPayment() {
                   <SelectValue placeholder="Sélectionnez un pays" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="SN">Senegal</SelectItem>
-                  <SelectItem value="CI">Cote d'Ivoire</SelectItem>
-                  <SelectItem value="BF">Burkina Faso</SelectItem>
-                  <SelectItem value="BJ">Benin</SelectItem>
-                  <SelectItem value="TG">Togo</SelectItem>
-                  <SelectItem value="GN">Guinee</SelectItem>
-                  <SelectItem value="NE">Niger</SelectItem>
-                  <SelectItem value="CD">RD Congo</SelectItem>
+                  <SelectItem value="SN"><span className="flex items-center gap-2"><CountryFlag code="SN" size="xs" />Senegal</span></SelectItem>
+                  <SelectItem value="CI"><span className="flex items-center gap-2"><CountryFlag code="CI" size="xs" />Cote d'Ivoire</span></SelectItem>
+                  <SelectItem value="BF"><span className="flex items-center gap-2"><CountryFlag code="BF" size="xs" />Burkina Faso</span></SelectItem>
+                  <SelectItem value="BJ"><span className="flex items-center gap-2"><CountryFlag code="BJ" size="xs" />Benin</span></SelectItem>
+                  <SelectItem value="TG"><span className="flex items-center gap-2"><CountryFlag code="TG" size="xs" />Togo</span></SelectItem>
+                  <SelectItem value="GN"><span className="flex items-center gap-2"><CountryFlag code="GN" size="xs" />Guinee</span></SelectItem>
+                  <SelectItem value="NE"><span className="flex items-center gap-2"><CountryFlag code="NE" size="xs" />Niger</span></SelectItem>
+                  <SelectItem value="CD"><span className="flex items-center gap-2"><CountryFlag code="CD" size="xs" />RD Congo</span></SelectItem>
                 </SelectContent>
               </Select>
             </div>

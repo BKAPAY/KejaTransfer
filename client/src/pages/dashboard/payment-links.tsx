@@ -11,6 +11,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { PaymentLink, User } from "@shared/schema";
 import { COUNTRIES } from "@shared/schema";
 import { CurrencySelector } from "@/components/currency-selector";
+import { CountryFlag } from "@/components/country-flag";
 import { hasMultipleCurrencies, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
 import { useToast } from "@/hooks/use-toast";
 import { useConvertedMinimums } from "@/hooks/use-converted-minimums";
@@ -587,7 +588,7 @@ export default function PaymentLinks() {
                                   }}
                                 />
                                 <Label htmlFor={`country-${country.code}`} className="text-sm cursor-pointer flex items-center gap-1">
-                                  <span>{country.flag}</span>
+                                  <CountryFlag code={country.code} size="xs" />
                                   <span>{country.name}</span>
                                 </Label>
                               </div>

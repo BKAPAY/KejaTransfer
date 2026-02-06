@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { CheckCircle2, XCircle, Loader2, ArrowLeft } from "lucide-react";
 import { OPERATORS } from "@shared/schema";
 import logoImage from "@assets/bkapay-logo.png";
+import { CountryFlag, getCountryName } from "@/components/country-flag";
 
 export default function ApiDemo() {
   const [step, setStep] = useState<"form" | "success" | "loading">("form");
@@ -91,13 +92,8 @@ export default function ApiDemo() {
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-muted-foreground">Pays</span>
-                <span className="text-sm text-foreground">
-                  {country === "SN" ? "🇸🇳 Sénégal" : 
-                   country === "CI" ? "🇨🇮 Côte d'Ivoire" :
-                   country === "BF" ? "🇧🇫 Burkina Faso" :
-                   country === "BJ" ? "🇧🇯 Bénin" :
-                   country === "TG" ? "🇹🇬 Togo" :
-                   country === "ML" ? "🇲🇱 Mali" : country}
+                <span className="text-sm text-foreground flex items-center gap-1">
+                  <CountryFlag code={country} size="xs" /> {getCountryName(country)}
                 </span>
               </div>
               <div className="flex justify-between items-center">
@@ -175,12 +171,12 @@ export default function ApiDemo() {
                   <SelectValue placeholder="Sélectionnez un pays" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="SN">🇸🇳 Sénégal</SelectItem>
-                  <SelectItem value="CI">🇨🇮 Côte d'Ivoire</SelectItem>
-                  <SelectItem value="BF">🇧🇫 Burkina Faso</SelectItem>
-                  <SelectItem value="BJ">🇧🇯 Bénin</SelectItem>
-                  <SelectItem value="TG">🇹🇬 Togo</SelectItem>
-                  <SelectItem value="ML">🇲🇱 Mali</SelectItem>
+                  <SelectItem value="SN"><span className="flex items-center gap-2"><CountryFlag code="SN" size="xs" />Sénégal</span></SelectItem>
+                  <SelectItem value="CI"><span className="flex items-center gap-2"><CountryFlag code="CI" size="xs" />Côte d'Ivoire</span></SelectItem>
+                  <SelectItem value="BF"><span className="flex items-center gap-2"><CountryFlag code="BF" size="xs" />Burkina Faso</span></SelectItem>
+                  <SelectItem value="BJ"><span className="flex items-center gap-2"><CountryFlag code="BJ" size="xs" />Bénin</span></SelectItem>
+                  <SelectItem value="TG"><span className="flex items-center gap-2"><CountryFlag code="TG" size="xs" />Togo</span></SelectItem>
+                  <SelectItem value="ML"><span className="flex items-center gap-2"><CountryFlag code="ML" size="xs" />Mali</span></SelectItem>
                 </SelectContent>
               </Select>
             </div>

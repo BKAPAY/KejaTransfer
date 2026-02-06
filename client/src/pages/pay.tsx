@@ -23,6 +23,7 @@ import { CurrencySelector, getCurrencyLabel } from "@/components/currency-select
 import { hasMultipleCurrencies, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
 import { getCurrencyDecimals } from "@/lib/currency";
 import { OperatorSelector } from "@/components/operator-selector";
+import { CountryFlag } from "@/components/country-flag";
 
 function ImageCarousel({ images, productName }: { images: string[]; productName: string }) {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -1306,7 +1307,7 @@ export default function Pay() {
                 <SelectContent>
                   {allowedCountries.map((country) => (
                     <SelectItem key={country.code} value={country.code}>
-                      {country.flag} {country.name}
+                      <span className="flex items-center gap-2"><CountryFlag code={country.code} size="xs" />{country.name}</span>
                     </SelectItem>
                   ))}
                 </SelectContent>

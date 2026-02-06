@@ -18,6 +18,7 @@ import {
   CreditCard,
   Zap,
   XCircle,
+  Globe,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
@@ -26,6 +27,7 @@ import type { User, Transaction } from "@shared/schema";
 import { COUNTRIES } from "@shared/schema";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { CountryFlag } from "@/components/country-flag";
 import { motion } from "framer-motion";
 import {
   PieChart as RechartsPieChart,
@@ -95,25 +97,6 @@ const COUNTRY_NAMES: Record<string, string> = {
   CF: "Centrafrique",
   GA: "Gabon",
   RW: "Rwanda",
-};
-
-const COUNTRY_FLAGS: Record<string, string> = {
-  BJ: "🇧🇯",
-  TG: "🇹🇬",
-  CI: "🇨🇮",
-  SN: "🇸🇳",
-  BF: "🇧🇫",
-  CM: "🇨🇲",
-  CD: "🇨🇩",
-  CG: "🇨🇬",
-  ML: "🇲🇱",
-  GN: "🇬🇳",
-  NE: "🇳🇪",
-  GM: "🇬🇲",
-  TD: "🇹🇩",
-  CF: "🇨🇫",
-  GA: "🇬🇦",
-  RW: "🇷🇼",
 };
 
 const containerVariants = {
@@ -254,7 +237,6 @@ function CountryItem({
   currency?: string;
 }) {
   const percentage = total > 0 ? (amount / total) * 100 : 0;
-  const flag = COUNTRY_FLAGS[country] || "🌍";
   
   return (
     <motion.div
@@ -264,11 +246,10 @@ function CountryItem({
       className="flex items-center gap-2 p-1.5"
     >
       <motion.span 
-        className="text-lg"
         whileHover={{ scale: 1.2 }}
         transition={{ type: "spring", stiffness: 400 }}
       >
-        {flag}
+        <CountryFlag code={country} size="sm" />
       </motion.span>
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between">
@@ -555,7 +536,7 @@ export default function Dashboard() {
                     className="p-3 rounded-xl bg-card border"
                   >
                     <div className="flex items-center gap-2 mb-3">
-                      <span className="text-base">🌍</span>
+                      <Globe className="h-4 w-4 text-primary" />
                       <span className="text-sm font-medium">Par pays</span>
                     </div>
                     {analytics.revenueByCountry.length > 0 ? (

@@ -20,6 +20,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { CountryFlag, getCountryName } from "@/components/country-flag";
 
 const ITEMS_PER_PAGE_OPTIONS = [10, 20, 50, 100];
 
@@ -40,23 +41,6 @@ const COUNTRY_NAMES: Record<string, string> = {
   CF: "Centrafrique",
   GA: "Gabon",
   CD: "RD Congo",
-};
-
-const COUNTRY_FLAGS: Record<string, string> = {
-  BJ: "🇧🇯",
-  TG: "🇹🇬",
-  CI: "🇨🇮",
-  SN: "🇸🇳",
-  BF: "🇧🇫",
-  GN: "🇬🇳",
-  NE: "🇳🇪",
-  ML: "🇲🇱",
-  CM: "🇨🇲",
-  TD: "🇹🇩",
-  CG: "🇨🇬",
-  CF: "🇨🇫",
-  GA: "🇬🇦",
-  CD: "🇨🇩",
 };
 
 const COUNTRY_CURRENCIES: Record<string, string> = {
@@ -687,7 +671,7 @@ export default function Admin() {
                           </h4>
                           {user.country && (
                             <span className="text-sm" title={COUNTRY_NAMES[user.country] || user.country}>
-                              {COUNTRY_FLAGS[user.country] || user.country}
+                              <CountryFlag code={user.country} size="xs" />
                             </span>
                           )}
                           <Badge
@@ -714,7 +698,7 @@ export default function Admin() {
                         <div className="flex items-center gap-2 mt-1">
                           {user.country && (
                             <span className="text-xs flex items-center gap-1" data-testid={`country-${user.id}`}>
-                              <span>{COUNTRY_FLAGS[user.country] || ""}</span>
+                              <CountryFlag code={user.country} size="xs" />
                               <span className="text-muted-foreground">{COUNTRY_NAMES[user.country] || user.country}</span>
                             </span>
                           )}
@@ -820,7 +804,7 @@ export default function Admin() {
                           </Badge>
                           {tx.country && (
                             <span className="text-xs text-muted-foreground">
-                              {COUNTRY_FLAGS[tx.country] || tx.country}
+                              <CountryFlag code={tx.country} size="xs" />
                             </span>
                           )}
                           {tx.operator && (
@@ -979,7 +963,7 @@ export default function Admin() {
                   <p className="text-sm font-medium flex items-center gap-2">
                     {selectedUser.country ? (
                       <>
-                        <span className="text-lg">{COUNTRY_FLAGS[selectedUser.country]}</span>
+                        <CountryFlag code={selectedUser.country} size="sm" />
                         {COUNTRY_NAMES[selectedUser.country] || selectedUser.country}
                       </>
                     ) : (

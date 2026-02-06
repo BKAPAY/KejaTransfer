@@ -7,22 +7,23 @@ import { apiRequest } from "@/lib/queryClient";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { CheckCircle2, Clock, AlertCircle, X, Camera, Shield, ArrowRight, ArrowLeft, User, FileText, PenTool, Trash2, Loader2 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import { CountryFlag, getCountryName } from "@/components/country-flag";
 
-const COUNTRY_DATA: Record<string, { name: string; flag: string }> = {
-  BJ: { name: "Benin", flag: "🇧🇯" },
-  TG: { name: "Togo", flag: "🇹🇬" },
-  CI: { name: "Cote d'Ivoire", flag: "🇨🇮" },
-  SN: { name: "Senegal", flag: "🇸🇳" },
-  BF: { name: "Burkina Faso", flag: "🇧🇫" },
-  GN: { name: "Guinee", flag: "🇬🇳" },
-  NE: { name: "Niger", flag: "🇳🇪" },
-  ML: { name: "Mali", flag: "🇲🇱" },
-  CM: { name: "Cameroun", flag: "🇨🇲" },
-  TD: { name: "Tchad", flag: "🇹🇩" },
-  CG: { name: "Congo-Brazzaville", flag: "🇨🇬" },
-  CF: { name: "Centrafrique", flag: "🇨🇫" },
-  GA: { name: "Gabon", flag: "🇬🇦" },
-  CD: { name: "RD Congo", flag: "🇨🇩" },
+const COUNTRY_DATA: Record<string, { name: string }> = {
+  BJ: { name: "Benin" },
+  TG: { name: "Togo" },
+  CI: { name: "Cote d'Ivoire" },
+  SN: { name: "Senegal" },
+  BF: { name: "Burkina Faso" },
+  GN: { name: "Guinee" },
+  NE: { name: "Niger" },
+  ML: { name: "Mali" },
+  CM: { name: "Cameroun" },
+  TD: { name: "Tchad" },
+  CG: { name: "Congo-Brazzaville" },
+  CF: { name: "Centrafrique" },
+  GA: { name: "Gabon" },
+  CD: { name: "RD Congo" },
 };
 
 type CameraMode = "front" | "back" | "selfie" | null;
@@ -366,7 +367,7 @@ export default function KYC() {
   };
 
   const getCountryInfo = (code: string) => {
-    return COUNTRY_DATA[code] || { name: code, flag: "" };
+    return COUNTRY_DATA[code] || { name: code };
   };
 
   const renderUploadStatus = (type: "front" | "back" | "selfie" | "signature") => {
@@ -506,7 +507,7 @@ export default function KYC() {
             <div className="space-y-1">
               <p className="text-xs font-medium text-muted-foreground">Pays</p>
               <p className="text-sm font-medium bg-muted/50 p-2 rounded flex items-center gap-2">
-                {user?.country && <span>{getCountryInfo(user.country).flag}</span>}
+                {user?.country && <CountryFlag code={user.country} size="xs" />}
                 {user?.country ? getCountryInfo(user.country).name : "-"}
               </p>
             </div>

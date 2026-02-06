@@ -10,12 +10,12 @@ import { ChangePasswordDialog } from "@/components/change-password-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { CountryFlag, getCountryName } from "@/components/country-flag";
 
-// Create lookup from shared COUNTRIES array
 const COUNTRY_MAP = Object.fromEntries(COUNTRIES.map(c => [c.code, c]));
-const getCountryDisplay = (code: string) => {
+const getCountryDisplayName = (code: string) => {
   const country = COUNTRY_MAP[code];
-  return country ? `${country.flag} ${country.name}` : code;
+  return country ? country.name : code;
 };
 
 export default function Profile() {
@@ -120,7 +120,7 @@ export default function Profile() {
                   </label>
                   {user.country ? (
                     <div className="flex items-center gap-2 p-2 bg-muted rounded-md text-sm" data-testid="text-user-country">
-                      {getCountryDisplay(user.country)}
+                      <CountryFlag code={user.country} size="xs" /> {getCountryDisplayName(user.country)}
                     </div>
                   ) : (
                     <div className="space-y-2">
@@ -136,7 +136,7 @@ export default function Profile() {
                         <SelectContent>
                           {ALLOWED_REGISTRATION_COUNTRIES.map((code) => (
                             <SelectItem key={code} value={code}>
-                              {getCountryDisplay(code)}
+                              <span className="flex items-center gap-2"><CountryFlag code={code} size="xs" />{getCountryDisplayName(code)}</span>
                             </SelectItem>
                           ))}
                         </SelectContent>

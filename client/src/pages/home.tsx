@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { CreditCard, Link as LinkIcon, Code, BarChart3, Shield, Zap, Menu } from "lucide-react";
 import { COUNTRIES } from "@shared/schema";
+import { CountryFlag } from "@/components/country-flag";
 import logoImage from "@assets/bkapay-logo.png";
 import omImage from "@assets/om_1763835083036.png";
 import mtnImage from "@assets/mtn (1)_1763835082904.png";
@@ -152,7 +153,7 @@ export default function Home() {
           <div className="flex gap-2 sm:gap-4 carousel-scroll">
             {[...countries, ...countries].map((country, index) => (
               <Card key={`${country.code}-${index}`} className="p-2 sm:p-3 lg:p-6 text-center hover-elevate flex-shrink-0 min-w-max">
-                <div className="text-2xl sm:text-3xl lg:text-4xl mb-1 sm:mb-2 lg:mb-3">{country.flag}</div>
+                <div className="mb-1 sm:mb-2 lg:mb-3 flex justify-center"><CountryFlag code={country.code} size="xl" /></div>
                 <div className="text-xs sm:text-sm font-medium text-foreground">{country.name}</div>
               </Card>
             ))}

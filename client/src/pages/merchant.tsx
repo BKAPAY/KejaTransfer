@@ -21,6 +21,7 @@ import { PaymentMethodSelector } from "@/components/payment-method-selector";
 import { CryptoPaymentFlow } from "@/components/crypto-payment-flow";
 import { CurrencySelector, getCurrencyLabel } from "@/components/currency-selector";
 import { OperatorSelector } from "@/components/operator-selector";
+import { CountryFlag } from "@/components/country-flag";
 import { hasMultipleCurrencies, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
 import { getCurrencyDecimals } from "@/lib/currency";
 
@@ -1158,7 +1159,7 @@ export default function Merchant() {
                     : []
                   ).map((country) => (
                     <SelectItem key={country.code} value={country.code}>
-                      {country.flag} {country.name}
+                      <span className="flex items-center gap-2"><CountryFlag code={country.code} size="xs" />{country.name}</span>
                     </SelectItem>
                   ))}
                 </SelectContent>

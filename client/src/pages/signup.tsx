@@ -15,6 +15,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ALLOWED_REGISTRATION_COUNTRIES } from "@shared/schema";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { Loader2, Mail, ArrowLeft } from "lucide-react";
+import { CountryFlag, getCountryName } from "@/components/country-flag";
 
 const COUNTRY_NAMES: Record<string, string> = {
   BJ: "Bénin",
@@ -26,18 +27,6 @@ const COUNTRY_NAMES: Record<string, string> = {
   CD: "RD Congo",
   CG: "Congo Brazzaville",
   ML: "Mali",
-};
-
-const COUNTRY_FLAGS: Record<string, string> = {
-  BJ: "🇧🇯",
-  TG: "🇹🇬",
-  CI: "🇨🇮",
-  BF: "🇧🇫",
-  SN: "🇸🇳",
-  CM: "🇨🇲",
-  CD: "🇨🇩",
-  CG: "🇨🇬",
-  ML: "🇲🇱",
 };
 
 const signupSchema = z.object({
@@ -329,7 +318,7 @@ export default function Signup() {
                         {ALLOWED_REGISTRATION_COUNTRIES.map((code) => (
                           <SelectItem key={code} value={code}>
                             <span className="flex items-center gap-2">
-                              <span className="text-base">{COUNTRY_FLAGS[code]}</span>
+                              <CountryFlag code={code} size="xs" />
                               <span>{COUNTRY_NAMES[code] || code}</span>
                             </span>
                           </SelectItem>

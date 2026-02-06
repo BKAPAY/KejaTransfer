@@ -26,6 +26,7 @@ import { getCurrencyDecimals } from "@/lib/currency";
 import { CurrencySelector, getCurrencyLabel } from "@/components/currency-selector";
 import { OperatorSelector } from "@/components/operator-selector";
 import { hasMultipleCurrencies, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
+import { CountryFlag } from "@/components/country-flag";
 
 interface ApiKeyInfo {
   siteName: string;
@@ -1123,7 +1124,7 @@ export default function ApiPay() {
               
               return filteredCountries.map(c => (
                 <SelectItem key={c.code} value={c.code}>
-                  {c.flag} {c.name}
+                  <span className="flex items-center gap-2"><CountryFlag code={c.code} size="xs" />{c.name}</span>
                 </SelectItem>
               ));
             })()}

@@ -37,10 +37,12 @@ import {
   CheckCircle2,
   XCircle,
   AlertCircle,
+  Globe,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { CountryFlag } from "@/components/country-flag";
 
 interface Analytics {
   revenueByDate: { date: string; amount: number }[];
@@ -78,17 +80,6 @@ const COUNTRY_NAMES: Record<string, string> = {
   GN: "Guinée",
   NE: "Niger",
   Unknown: "Inconnu",
-};
-
-const COUNTRY_FLAGS: Record<string, string> = {
-  BJ: "🇧🇯",
-  TG: "🇹🇬",
-  CI: "🇨🇮",
-  SN: "🇸🇳",
-  BF: "🇧🇫",
-  ML: "🇲🇱",
-  GN: "🇬🇳",
-  NE: "🇳🇪",
 };
 
 const TYPE_NAMES: Record<string, string> = {
@@ -312,7 +303,6 @@ function CountryCard({
   currency?: string;
 }) {
   const percentage = total > 0 ? (amount / total) * 100 : 0;
-  const flag = COUNTRY_FLAGS[country] || "🌍";
   
   return (
     <motion.div
@@ -323,11 +313,10 @@ function CountryCard({
       className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
     >
       <motion.span 
-        className="text-2xl"
         whileHover={{ scale: 1.2 }}
         transition={{ type: "spring", stiffness: 400 }}
       >
-        {flag}
+        <CountryFlag code={country} size="md" />
       </motion.span>
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between mb-1">
@@ -488,7 +477,7 @@ export default function Analytics() {
   const revenueByCountryWithNames = analytics.revenueByCountry.map((item) => ({
     ...item,
     countryName: COUNTRY_NAMES[item.country] || item.country,
-    flag: COUNTRY_FLAGS[item.country] || "🌍",
+    flag: item.country,
   }));
 
   const revenueByTypeWithNames = analytics.revenueByType.map((item) => ({
@@ -887,7 +876,7 @@ export default function Analytics() {
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-lg">
-                🌍 Par pays
+                <Globe className="h-5 w-5 text-primary" /> Par pays
               </CardTitle>
             </CardHeader>
             <CardContent>

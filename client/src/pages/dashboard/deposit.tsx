@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { COUNTRIES, OPERATORS } from "@shared/schema";
 import type { User } from "@shared/schema";
 import { PhoneInputWithPrefix } from "@/components/phone-input-with-prefix";
+import { CountryFlag } from "@/components/country-flag";
 import { ArrowDownToLine, CheckCircle2, Clock, Info, Loader2, Smartphone } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { calculateIncomingFee, fetchFeeConfig, formatFeePercentage } from "@/lib/fees";
@@ -650,7 +651,7 @@ export default function Deposit() {
                             <SelectContent>
                               {collectCountries.map((country) => (
                                 <SelectItem key={country.code} value={country.code}>
-                                  {country.flag} {country.name}
+                                  <span className="flex items-center gap-2"><CountryFlag code={country.code} size="xs" />{country.name}</span>
                                 </SelectItem>
                               ))}
                             </SelectContent>
