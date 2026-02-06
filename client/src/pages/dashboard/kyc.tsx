@@ -822,7 +822,20 @@ export default function KYC() {
                   </div>
                 </div>
               </div>
-              <p className="text-sm text-muted-foreground">Veuillez soumettre a nouveau avec des documents conformes</p>
+              <div className="bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-900 rounded-lg p-4">
+                <div className="flex gap-3">
+                  <AlertCircle className="w-5 h-5 text-orange-600 dark:text-orange-400 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-orange-700 dark:text-orange-300 mb-1">Attention</p>
+                    <p className="text-sm text-orange-600 dark:text-orange-400">
+                      Veuillez utiliser vos vraies informations personnelles et des documents authentiques. Apres 3 rejets consecutifs, votre compte sera automatiquement suspendu.
+                      {(user as any).kycRejectionCount > 0 && (
+                        <span className="font-semibold"> ({(user as any).kycRejectionCount}/3 rejet{(user as any).kycRejectionCount > 1 ? "s" : ""})</span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+              </div>
               <Button 
                 onClick={startKycProcess}
                 className="w-full"
