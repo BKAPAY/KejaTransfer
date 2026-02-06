@@ -3,6 +3,7 @@ import type { Transaction, User } from "@shared/schema";
 import { getTransactionStatus as getFedaPayTransactionStatus, getPayoutStatus as getFedaPayPayoutStatus } from "./fedapay";
 import { NowPaymentsClient } from "./nowpayments";
 import { getMbiyoPayTransactionStatus } from "./mbiyopay";
+import { sendPaymentCallback } from "./utils/callback";
 
 const PAYDUNYA_MASTER_KEY = process.env.PAYDUNYA_MASTER_KEY;
 const PAYDUNYA_PRIVATE_KEY = process.env.PAYDUNYA_PRIVATE_KEY;
@@ -171,10 +172,28 @@ async function processNowPaymentsTransaction(transaction: Transaction & { user?:
     console.log(`[PaymentPolling] NOWPayments transaction ${transaction.id} - status:`, status.payment_status);
 
     if (status.payment_status === "finished" || status.payment_status === "confirmed") {
-      // Payment is confirmed - use atomic finalize to prevent double crediting
       const result = await storage.finalizeIncomingTransaction(transaction.id, {});
       if (result) {
         console.log(`[PaymentPolling] ✅ NOWPayments transaction ${transaction.id} CONFIRMED - credited=${result.credited}`);
+        
+        if (transaction.type === "api_payment") {
+          try {
+            const apiKeyPublicKey = metadata.apiKeyPublicKey;
+            if (apiKeyPublicKey) {
+              const apiKey = await storage.getApiKeyByPublicKey(apiKeyPublicKey);
+              if (apiKey && apiKey.callbackUrl) {
+                const updatedTx = await storage.getTransaction(transaction.id);
+                if (updatedTx) {
+                  sendPaymentCallback(updatedTx, apiKey, 'payment.completed')
+                    .then(r => console.log(`[PaymentPolling] NOWPayments developer callback sent:`, r))
+                    .catch(e => console.error(`[PaymentPolling] NOWPayments developer callback error:`, e));
+                }
+              }
+            }
+          } catch (callbackError) {
+            console.error("[PaymentPolling] Error sending NOWPayments developer callback:", callbackError);
+          }
+        }
       } else {
         console.log(`[PaymentPolling] NOWPayments transaction ${transaction.id} already processed - skipping`);
       }
@@ -182,6 +201,25 @@ async function processNowPaymentsTransaction(transaction: Transaction & { user?:
     } else if (status.payment_status === "failed" || status.payment_status === "expired" || status.payment_status === "refunded") {
       console.log(`[PaymentPolling] ❌ NOWPayments transaction ${transaction.id} failed/expired (status: ${status.payment_status})`);
       await storage.updateTransactionStatus(transaction.id, "failed");
+      
+      if (transaction.type === "api_payment") {
+        try {
+          const apiKeyPublicKey = metadata.apiKeyPublicKey;
+          if (apiKeyPublicKey) {
+            const apiKey = await storage.getApiKeyByPublicKey(apiKeyPublicKey);
+            if (apiKey && apiKey.callbackUrl) {
+              const updatedTx = await storage.getTransaction(transaction.id);
+              if (updatedTx) {
+                sendPaymentCallback(updatedTx, apiKey, 'payment.failed')
+                  .then(r => console.log(`[PaymentPolling] NOWPayments failed callback sent:`, r))
+                  .catch(e => console.error(`[PaymentPolling] NOWPayments failed callback error:`, e));
+              }
+            }
+          }
+        } catch (callbackError) {
+          console.error("[PaymentPolling] Error sending NOWPayments failed callback:", callbackError);
+        }
+      }
       return true;
     } else {
       // Still pending (waiting, confirming, sending, partially_paid)

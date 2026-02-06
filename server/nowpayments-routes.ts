@@ -4,6 +4,7 @@ import { NowPaymentsClient, SUPPORTED_CRYPTOCURRENCIES, getCryptoDisplayName, ge
 import { convertCurrency } from "./currency-converter";
 import QRCode from "qrcode";
 import { getFeeFromDatabase, calculateOutgoingFee } from "./utils/fees";
+import { sendPaymentCallback } from "./utils/callback";
 import bcrypt from "bcrypt";
 
 const router = Router();
@@ -472,12 +473,64 @@ router.post("/api/webhooks/nowpayments", async (req: Request, res: Response) => 
       const result = await storage.finalizeIncomingTransaction(transaction.id, {});
       if (result) {
         console.log(`[NOWPayments Webhook] ✅ Transaction ${transaction.id} finalized - credited=${result.credited}`);
+        
+        // Send developer callback for API payments
+        if (transaction.type === "api_payment") {
+          try {
+            let apiKeyPublicKey: string | undefined;
+            if (transaction.metadata) {
+              try {
+                const metadata = JSON.parse(transaction.metadata);
+                apiKeyPublicKey = metadata.apiKeyPublicKey;
+              } catch (e) {}
+            }
+            if (apiKeyPublicKey) {
+              const apiKey = await storage.getApiKeyByPublicKey(apiKeyPublicKey);
+              if (apiKey && apiKey.callbackUrl) {
+                const updatedTx = await storage.getTransaction(transaction.id);
+                if (updatedTx) {
+                  sendPaymentCallback(updatedTx, apiKey, 'payment.completed')
+                    .then(r => console.log(`[NOWPayments Webhook] Developer callback sent:`, r))
+                    .catch(e => console.error(`[NOWPayments Webhook] Developer callback error:`, e));
+                }
+              }
+            }
+          } catch (callbackError) {
+            console.error("[NOWPayments Webhook] Error sending developer callback:", callbackError);
+          }
+        }
       } else {
         console.log(`[NOWPayments Webhook] Transaction ${transaction.id} already processed by polling`);
       }
     } else if (payment_status === "failed" || payment_status === "expired" || payment_status === "refunded") {
       await storage.updateTransactionStatus(transaction.id, "failed");
       console.log(`[NOWPayments Webhook] Transaction ${transaction.id} marked as failed (${payment_status})`);
+      
+      // Send failed callback for API payments
+      if (transaction.type === "api_payment") {
+        try {
+          let apiKeyPublicKey: string | undefined;
+          if (transaction.metadata) {
+            try {
+              const metadata = JSON.parse(transaction.metadata);
+              apiKeyPublicKey = metadata.apiKeyPublicKey;
+            } catch (e) {}
+          }
+          if (apiKeyPublicKey) {
+            const apiKey = await storage.getApiKeyByPublicKey(apiKeyPublicKey);
+            if (apiKey && apiKey.callbackUrl) {
+              const updatedTx = await storage.getTransaction(transaction.id);
+              if (updatedTx) {
+                sendPaymentCallback(updatedTx, apiKey, 'payment.failed')
+                  .then(r => console.log(`[NOWPayments Webhook] Failed callback sent:`, r))
+                  .catch(e => console.error(`[NOWPayments Webhook] Failed callback error:`, e));
+              }
+            }
+          }
+        } catch (callbackError) {
+          console.error("[NOWPayments Webhook] Error sending failed callback:", callbackError);
+        }
+      }
     } else {
       console.log(`[NOWPayments Webhook] Transaction ${transaction.id} still pending (${payment_status})`);
     }

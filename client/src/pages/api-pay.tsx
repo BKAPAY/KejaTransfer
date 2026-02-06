@@ -1329,6 +1329,16 @@ export default function ApiPay() {
                   customerPhone={customerPhone}
                   onSuccess={() => {
                     setPaymentStage("completed");
+                    if (key) clearPaymentState(key);
+                    toast({
+                      title: "Paiement reussi",
+                      description: "Votre transaction crypto a ete confirmee",
+                    });
+                    if (callbackUrl) {
+                      setTimeout(() => {
+                        window.location.href = `${callbackUrl}${callbackUrl.includes('?') ? '&' : '?'}status=success&amount=${amount}`;
+                      }, 2000);
+                    }
                   }}
                 />
               ) : (
