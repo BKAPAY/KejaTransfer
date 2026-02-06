@@ -79,6 +79,52 @@ interface PaymentStatusResponse {
   updated_at: string;
 }
 
+interface PayoutWithdrawal {
+  address: string;
+  currency: string;
+  amount: number;
+  extra_id?: string;
+  ipn_callback_url?: string;
+}
+
+interface CreatePayoutRequest {
+  withdrawals: PayoutWithdrawal[];
+  ipn_callback_url?: string;
+}
+
+interface PayoutResponse {
+  id: string;
+  withdrawals: Array<{
+    id: string;
+    address: string;
+    currency: string;
+    amount: number | string;
+    hash?: string;
+    status: string;
+    extra_id?: string;
+    error?: string;
+  }>;
+}
+
+interface PayoutStatusResponse {
+  id: string;
+  status: string;
+  withdrawals: Array<{
+    id: string;
+    address: string;
+    currency: string;
+    amount: number | string;
+    hash?: string;
+    status: string;
+    error?: string;
+  }>;
+}
+
+interface ValidateAddressResponse {
+  isValid?: boolean;
+  message?: string;
+}
+
 export class NowPaymentsClient {
   private apiKey: string;
   private ipnSecret?: string;
@@ -140,6 +186,28 @@ export class NowPaymentsClient {
 
   async getPaymentStatus(paymentId: string): Promise<PaymentStatusResponse> {
     return this.request<PaymentStatusResponse>(`/payment/${paymentId}`);
+  }
+
+  async createPayout(withdrawals: PayoutWithdrawal[], ipnCallbackUrl?: string): Promise<PayoutResponse> {
+    const data: CreatePayoutRequest = { withdrawals };
+    if (ipnCallbackUrl) {
+      data.ipn_callback_url = ipnCallbackUrl;
+    }
+    return this.request<PayoutResponse>("/payout", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getPayoutStatus(payoutId: string): Promise<PayoutStatusResponse> {
+    return this.request<PayoutStatusResponse>(`/payout/${payoutId}`);
+  }
+
+  async validateAddress(currency: string, address: string): Promise<ValidateAddressResponse> {
+    return this.request<ValidateAddressResponse>("/payout/validate-address", {
+      method: "POST",
+      body: JSON.stringify({ currency, address }),
+    });
   }
 
   verifyIpnSignature(body: any, signature: string): boolean {

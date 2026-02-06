@@ -440,6 +440,92 @@ router.post("/api/webhooks/nowpayments", async (req: Request, res: Response) => 
   }
 });
 
+router.post("/api/webhooks/nowpayments/payout", async (req: Request, res: Response) => {
+  try {
+    const signature = req.headers["x-nowpayments-sig"] as string;
+    const body = req.body;
+
+    console.log("[NOWPayments Payout Webhook] Received:", JSON.stringify(body));
+
+    const config = await storage.getProviderConfig("nowpayments");
+    if (!config || !config.ipnSecret) {
+      console.error("[NOWPayments Payout Webhook] IPN secret not configured");
+      return res.status(400).json({ error: "IPN not configured" });
+    }
+
+    if (!signature) {
+      console.error("[NOWPayments Payout Webhook] Missing signature header");
+      return res.status(401).json({ error: "Missing signature" });
+    }
+
+    const client = new NowPaymentsClient({
+      apiKey: config.apiKey || "",
+      ipnSecret: config.ipnSecret,
+    });
+
+    if (!client.verifyIpnSignature(body, signature)) {
+      console.error("[NOWPayments Payout Webhook] Invalid signature");
+      return res.status(401).json({ error: "Invalid signature" });
+    }
+
+    const { id, batch_withdrawal_id, status } = body;
+
+    const searchId = batch_withdrawal_id || id;
+    if (!searchId) {
+      console.error("[NOWPayments Payout Webhook] No payout ID found in webhook body");
+      return res.status(400).json({ error: "No payout ID" });
+    }
+
+    let transactions = await storage.getTransactionsByMetadataPayoutId(searchId.toString());
+    if (transactions.length === 0 && id) {
+      transactions = await storage.getTransactionsByMetadataPayoutId(id.toString());
+    }
+
+    if (transactions.length === 0) {
+      console.error(`[NOWPayments Payout Webhook] Transaction not found for payout: ${searchId}`);
+      return res.status(404).json({ error: "Transaction not found" });
+    }
+
+    const transaction = transactions[0];
+
+    if (transaction.status === "completed" || transaction.status === "failed") {
+      console.log(`[NOWPayments Payout Webhook] Transaction ${transaction.id} already in terminal state: ${transaction.status}`);
+      return res.json({ success: true, message: "Already processed" });
+    }
+
+    const normalizedStatus = (status || "").toUpperCase();
+
+    if (normalizedStatus === "FINISHED" || normalizedStatus === "SENDING") {
+      await storage.updateTransactionStatus(transaction.id, "completed");
+      const metadata = transaction.metadata ? JSON.parse(transaction.metadata) : {};
+      metadata.payoutStatus = normalizedStatus;
+      if (body.hash) metadata.txHash = body.hash;
+      await storage.updateTransactionMetadata(transaction.id, JSON.stringify(metadata));
+      console.log(`[NOWPayments Payout Webhook] Transaction ${transaction.id} marked as completed (${normalizedStatus})`);
+    } else if (normalizedStatus === "FAILED" || normalizedStatus === "REJECTED" || normalizedStatus === "EXPIRED") {
+      await storage.updateTransactionStatus(transaction.id, "failed");
+      const metadata = transaction.metadata ? JSON.parse(transaction.metadata) : {};
+      metadata.payoutStatus = normalizedStatus;
+      metadata.payoutError = body.error || null;
+      metadata.refunded = true;
+      await storage.updateTransactionMetadata(transaction.id, JSON.stringify(metadata));
+      const refundAmount = transaction.amount + (transaction.fee || 0);
+      await storage.addFundsToUser(transaction.userId, refundAmount);
+      console.log(`[NOWPayments Payout Webhook] Transaction ${transaction.id} failed (${normalizedStatus}) - refunded ${refundAmount} to user ${transaction.userId}`);
+    } else {
+      const metadata = transaction.metadata ? JSON.parse(transaction.metadata) : {};
+      metadata.payoutStatus = normalizedStatus;
+      await storage.updateTransactionMetadata(transaction.id, JSON.stringify(metadata));
+      console.log(`[NOWPayments Payout Webhook] Transaction ${transaction.id} status: ${normalizedStatus}`);
+    }
+
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error("[NOWPayments Payout Webhook] Error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 router.get("/api/crypto/withdrawal-estimate", async (req: Request, res: Response) => {
   try {
     const { amount, currency, crypto, type } = req.query;
@@ -619,17 +705,58 @@ router.post("/api/crypto/create-withdrawal", async (req: Request, res: Response)
     }
 
     const client = await getNowPaymentsClient();
+    if (!client) {
+      return res.status(503).json({ success: false, error: "Service crypto non disponible" });
+    }
+
     let estimatedCryptoAmount = 0;
-    if (client) {
-      try {
-        const estimate = await client.getEstimate(usdAmount, "usd", crypto);
-        estimatedCryptoAmount = estimate.estimated_amount;
-      } catch (err) {
-        console.warn("[NOWPayments] Could not get estimate for withdrawal:", err);
-      }
+    try {
+      const estimate = await client.getEstimate(usdAmount, "usd", crypto);
+      estimatedCryptoAmount = estimate.estimated_amount;
+    } catch (err) {
+      console.error("[NOWPayments] Could not get estimate for withdrawal:", err);
+      return res.status(503).json({ success: false, error: "Impossible d'obtenir l'estimation crypto" });
+    }
+
+    if (estimatedCryptoAmount <= 0) {
+      return res.status(400).json({ success: false, error: "Le montant crypto estime est trop faible" });
     }
 
     await storage.subtractFundsFromUser(user.id, totalToDebit);
+
+    const baseUrl = process.env.BASE_URL || `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`;
+    const ipnCallbackUrl = `${baseUrl}/api/webhooks/nowpayments/payout`;
+
+    let payoutId: string | null = null;
+    let payoutWithdrawalId: string | null = null;
+    let payoutStatus = "pending";
+
+    try {
+      const payoutResult = await client.createPayout(
+        [{
+          address: walletAddress,
+          currency: crypto,
+          amount: estimatedCryptoAmount,
+          ipn_callback_url: ipnCallbackUrl,
+        }],
+        ipnCallbackUrl
+      );
+
+      payoutId = payoutResult.id;
+      if (payoutResult.withdrawals && payoutResult.withdrawals.length > 0) {
+        payoutWithdrawalId = payoutResult.withdrawals[0].id;
+        payoutStatus = payoutResult.withdrawals[0].status || "CREATING";
+      }
+
+      console.log(`[NOWPayments] Payout created: ${payoutId} - withdrawal: ${payoutWithdrawalId} - status: ${payoutStatus}`);
+    } catch (payoutError: any) {
+      console.error("[NOWPayments] Payout API failed:", payoutError);
+      await storage.addFundsToUser(user.id, totalToDebit);
+      return res.status(500).json({ 
+        success: false, 
+        error: "Le retrait crypto a echoue. Votre solde n'a pas ete debite. Veuillez reessayer." 
+      });
+    }
 
     const transaction = await storage.createTransaction({
       userId: user.id,
@@ -657,10 +784,13 @@ router.post("/api/crypto/create-withdrawal", async (req: Request, res: Response)
         amountForConversion: amountForConversion,
         originalAmount: baseAmount,
         originalCurrency: sourceCurrency,
+        payoutId,
+        payoutWithdrawalId,
+        payoutStatus,
       }),
     });
 
-    console.log(`[NOWPayments] Crypto ${withdrawalType} created: ${transaction.id} - ${baseAmount} ${sourceCurrency} -> ${estimatedCryptoAmount} ${getCryptoSymbol(crypto)} to ${walletAddress}`);
+    console.log(`[NOWPayments] Crypto ${withdrawalType} created: ${transaction.id} - payout: ${payoutId} - ${baseAmount} ${sourceCurrency} -> ${estimatedCryptoAmount} ${getCryptoSymbol(crypto)} to ${walletAddress}`);
 
     res.json({
       success: true,
@@ -668,7 +798,7 @@ router.post("/api/crypto/create-withdrawal", async (req: Request, res: Response)
       estimatedCryptoAmount,
       cryptoSymbol: getCryptoSymbol(crypto),
       walletAddress,
-      message: `${withdrawalType === "transfer" ? "Transfert" : "Retrait"} crypto soumis. Traitement sous 24h.`,
+      message: `${withdrawalType === "transfer" ? "Transfert" : "Retrait"} crypto en cours de traitement.`,
     });
   } catch (error: any) {
     console.error("[NOWPayments] Create crypto withdrawal failed:", error);

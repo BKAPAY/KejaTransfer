@@ -148,6 +148,7 @@ export interface IStorage {
 
   // Transactions by metadata
   getTransactionsByMetadataPaymentId(paymentId: string): Promise<Transaction[]>;
+  getTransactionsByMetadataPayoutId(payoutId: string): Promise<Transaction[]>;
 
   // Fee Configuration
   getAllFeeConfigs(): Promise<FeeConfig[]>;
@@ -1592,6 +1593,19 @@ export class DbStorage implements IStorage {
       try {
         const meta = JSON.parse(t.metadata);
         return meta.paymentId?.toString() === paymentId;
+      } catch {
+        return false;
+      }
+    });
+  }
+
+  async getTransactionsByMetadataPayoutId(payoutId: string): Promise<Transaction[]> {
+    const allTransactions = await db.select().from(schema.transactions);
+    return allTransactions.filter((t) => {
+      if (!t.metadata) return false;
+      try {
+        const meta = JSON.parse(t.metadata);
+        return meta.payoutId?.toString() === payoutId || meta.payoutWithdrawalId?.toString() === payoutId;
       } catch {
         return false;
       }

@@ -165,7 +165,7 @@ export function CryptoWithdrawalFlow({
             {type === "withdrawal" ? "Retrait" : "Transfert"} crypto initie
           </h3>
           <p className="text-sm text-muted-foreground mt-1">
-            Votre {type === "withdrawal" ? "retrait" : "transfert"} de {amount.toLocaleString("fr-FR")} {currency} en crypto a ete soumis. Le traitement peut prendre quelques minutes.
+            Votre {type === "withdrawal" ? "retrait" : "transfert"} de {amount.toLocaleString("fr-FR")} {currency} en crypto est en cours de traitement.
           </p>
         </div>
       </div>
@@ -353,7 +353,7 @@ export function CryptoWithdrawalFlow({
       <Alert className="border-yellow-200 bg-yellow-50 dark:bg-yellow-950 dark:border-yellow-800">
         <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
         <AlertDescription className="text-xs text-yellow-900 dark:text-yellow-100 ml-2">
-          Les {type === "withdrawal" ? "retraits" : "transferts"} crypto sont traites sous 24h. Verifiez bien votre adresse de portefeuille avant de confirmer.
+          Verifiez bien votre adresse de portefeuille avant de confirmer. Les transactions crypto sont irreversibles.
         </AlertDescription>
       </Alert>
 
