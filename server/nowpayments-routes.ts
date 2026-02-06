@@ -78,7 +78,10 @@ router.get("/api/crypto/currencies", async (req: Request, res: Response) => {
     }
     
     const isPayoutDirection = direction === "payout";
-    let cryptosList = enabledCryptos.length === 0 
+    const allDbCryptos = await storage.getAllCryptoCurrencies();
+    const hasDbRecords = allDbCryptos.length > 0;
+    
+    let cryptosList = (enabledCryptos.length === 0 && !hasDbRecords)
       ? SUPPORTED_CRYPTOCURRENCIES.map((c) => ({
           code: c.code,
           name: c.name,
