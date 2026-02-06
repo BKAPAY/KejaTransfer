@@ -103,6 +103,9 @@ export function CryptoPaymentFlow({
     customerAmount?: number;
     feeAmount?: number;
     feePercentage?: number;
+    netAmount?: number;
+    customerPaysFee?: boolean;
+    markupPercent?: number;
   }>({
     queryKey: [`/api/crypto/estimate`, amount, currency, selectedCrypto, customerPaysFee, paymentLinkId, apiKeyId],
     queryFn: async () => {
@@ -387,17 +390,30 @@ export function CryptoPaymentFlow({
               <span className="text-muted-foreground">Montant</span>
               <span className="font-semibold">{amount.toLocaleString()} {currency}</span>
             </div>
-            {customerPaysFee && estimate?.feeAmount && estimate.feeAmount > 0 ? (
-              <>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Frais ({((estimate.feePercentage || 0) / 10).toFixed(1)}%)</span>
-                  <span className="font-semibold">+{estimate.feeAmount.toLocaleString()} {currency}</span>
-                </div>
-                <div className="flex justify-between border-t pt-2">
-                  <span className="text-muted-foreground font-medium">Total</span>
-                  <span className="font-bold">{(estimate.customerAmount || amount).toLocaleString()} {currency}</span>
-                </div>
-              </>
+            {estimate?.feeAmount && estimate.feeAmount > 0 ? (
+              customerPaysFee ? (
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Frais ({((estimate.feePercentage || 0) / 10).toFixed(1)}%)</span>
+                    <span className="font-semibold">+{estimate.feeAmount.toLocaleString()} {currency}</span>
+                  </div>
+                  <div className="flex justify-between border-t pt-2">
+                    <span className="text-muted-foreground font-medium">Total a payer</span>
+                    <span className="font-bold">{(estimate.customerAmount || amount).toLocaleString()} {currency}</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Frais ({((estimate.feePercentage || 0) / 10).toFixed(1)}%)</span>
+                    <span className="font-semibold">-{estimate.feeAmount.toLocaleString()} {currency}</span>
+                  </div>
+                  <div className="flex justify-between border-t pt-2">
+                    <span className="text-muted-foreground font-medium">Vous recevrez</span>
+                    <span className="font-bold">{(estimate.netAmount || amount).toLocaleString()} {currency}</span>
+                  </div>
+                </>
+              )
             ) : null}
             <div className="flex justify-between">
               <span className="text-muted-foreground">Crypto</span>

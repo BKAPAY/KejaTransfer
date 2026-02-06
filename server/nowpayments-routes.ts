@@ -152,16 +152,19 @@ router.get("/api/crypto/estimate", async (req: Request, res: Response) => {
     const feeConfig = await getFeeFromDatabase(storage, "nowpayments", "CRYPTO", crypto as string);
     const standardFeePercent = feeConfig.incoming / 10;
 
+    const cryptoSettings = await getCryptoFeeSettings();
+    const totalFeePercent = cryptoSettings.feePercent + standardFeePercent;
+
     let customerAmount = baseAmount;
     let feeAmount = 0;
-    let feePercentage = feeConfig.incoming;
 
-    if (customerPaysFee && standardFeePercent > 0) {
-      feeAmount = Math.ceil(baseAmount * standardFeePercent / 100);
+    if (customerPaysFee && totalFeePercent > 0) {
+      feeAmount = Math.ceil(baseAmount * totalFeePercent / 100);
       customerAmount = baseAmount + feeAmount;
+    } else if (!customerPaysFee) {
+      feeAmount = Math.floor(baseAmount * totalFeePercent / 100);
     }
 
-    const cryptoSettings = await getCryptoFeeSettings();
     const amountWithMarkup = customerAmount * (1 + cryptoSettings.markupPercent / 100);
 
     let usdAmount = amountWithMarkup;
@@ -190,8 +193,12 @@ router.get("/api/crypto/estimate", async (req: Request, res: Response) => {
       amountWithMarkup: sourceCurrency === "XOF" ? Math.ceil(amountWithMarkup) : amountWithMarkup,
       customerAmount: Math.ceil(customerAmount),
       feeAmount,
-      feePercentage,
+      feePercentage: totalFeePercent * 10,
       customerPaysFee,
+      netAmount: customerPaysFee ? Math.floor(baseAmount) : Math.floor(baseAmount - feeAmount),
+      markupPercent: cryptoSettings.markupPercent,
+      cryptoFeePercent: cryptoSettings.feePercent,
+      standardFeePercent,
     });
   } catch (error: any) {
     console.error("[NOWPayments] Estimate failed:", error);
@@ -289,11 +296,13 @@ router.post("/api/crypto/create-payment", async (req: Request, res: Response) =>
     const feeConfig = await getFeeFromDatabase(storage, "nowpayments", "CRYPTO", crypto);
     const standardFeePercent = feeConfig.incoming / 10; // Convert from decimal (60 = 6%)
     
-    // Montant que le client paie (avec les frais standard ajoutés si customerPaysFee=true)
-    const feeAmount = customerPaysFee ? Math.ceil(baseAmount * standardFeePercent / 100) : 0;
+    const cryptoSettings = await getCryptoFeeSettings();
+    const totalFeePercent = cryptoSettings.feePercent + standardFeePercent;
+    
+    // Montant que le client paie (avec les frais ajoutés si customerPaysFee=true)
+    const feeAmount = customerPaysFee ? Math.ceil(baseAmount * totalFeePercent / 100) : 0;
     const customerAmount = baseAmount + feeAmount;
     
-    const cryptoSettings = await getCryptoFeeSettings();
     const amountWithMarkup = customerAmount * (1 + cryptoSettings.markupPercent / 100);
     const usdAmount = amountWithMarkup * conversionToUsdRate;
 
@@ -315,13 +324,10 @@ router.post("/api/crypto/create-payment", async (req: Request, res: Response) =>
       color: { dark: "#000000", light: "#ffffff" },
     });
 
-    // Calculer les frais crypto:
-    // - 15% crypto TOUJOURS prélevés
-    // - frais standard (dynamique) SEULEMENT si customerPaysFee est désactivé
-    const totalCryptoFeePercent = cryptoSettings.feePercent + standardFeePercent;
-    const effectiveFeePercent = customerPaysFee 
-      ? cryptoSettings.feePercent
-      : totalCryptoFeePercent;
+    // Frais effectifs: frais globaux crypto + frais par crypto
+    // Si customerPaysFee: les frais sont ajoutés au montant client (déjà fait ci-dessus)
+    // Sinon: les frais sont déduits du solde du propriétaire
+    const effectiveFeePercent = totalFeePercent;
     
     const totalFee = Math.floor(baseAmount * (effectiveFeePercent / 100));
     const feePercentage = effectiveFeePercent * 10;
@@ -357,8 +363,8 @@ router.post("/api/crypto/create-payment", async (req: Request, res: Response) =>
         customerPaysFee,
         cryptoMarkupPercent: cryptoSettings.markupPercent,
         cryptoFeePercent: cryptoSettings.feePercent,
-        standardFeePercent: customerPaysFee ? 0 : standardFeePercent,
-        effectiveFeePercent,
+        standardFeePercent,
+        totalFeePercent: effectiveFeePercent,
         customerAmount: Math.ceil(customerAmount),
         amountWithMarkup: Math.ceil(amountWithMarkup),
         baseAmount: Math.floor(baseAmount),
