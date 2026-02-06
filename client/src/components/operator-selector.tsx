@@ -8,6 +8,14 @@ import waveImage from "@assets/wave (1)_1763835083242.png";
 import freeImage from "@assets/mixxByYas-web-page_1763835083140.png";
 import tmonyImage from "@assets/e-money_1763835083190.png";
 import wizallImage from "@assets/wizall_1763835083090.png";
+import airtelImage from "@assets/airtel-logo.png";
+import mpesaImage from "@assets/mpesa-logo.png";
+import celtiisImage from "@assets/celtiis-logo.png";
+import expressoImage from "@assets/expresso-logo.png";
+import corisImage from "@assets/coris-logo.png";
+import afrimoneyImage from "@assets/afrimoney-logo.png";
+import qmoneyImage from "@assets/qmoney-logo.png";
+import telecelImage from "@assets/telecel-logo.png";
 
 interface Operator {
   readonly code: string;
@@ -29,16 +37,16 @@ const OPERATOR_LOGOS: Record<string, { image?: string; color: string; bgColor: s
   moov: { image: moovImage, color: "#0066CC", bgColor: "bg-blue-100 dark:bg-blue-950", textColor: "text-blue-600 dark:text-blue-400" },
   wave: { image: waveImage, color: "#1E3A8A", bgColor: "bg-indigo-100 dark:bg-indigo-950", textColor: "text-indigo-600 dark:text-indigo-400" },
   free: { image: freeImage, color: "#E53935", bgColor: "bg-red-100 dark:bg-red-950", textColor: "text-red-600 dark:text-red-400" },
-  airtel: { color: "#ED1C24", bgColor: "bg-red-100 dark:bg-red-950", textColor: "text-red-600 dark:text-red-400" },
-  mpesa: { color: "#4CAF50", bgColor: "bg-green-100 dark:bg-green-950", textColor: "text-green-600 dark:text-green-400" },
-  celtiis: { color: "#9C27B0", bgColor: "bg-purple-100 dark:bg-purple-950", textColor: "text-purple-600 dark:text-purple-400" },
+  airtel: { image: airtelImage, color: "#ED1C24", bgColor: "bg-red-100 dark:bg-red-950", textColor: "text-red-600 dark:text-red-400" },
+  mpesa: { image: mpesaImage, color: "#4CAF50", bgColor: "bg-green-100 dark:bg-green-950", textColor: "text-green-600 dark:text-green-400" },
+  celtiis: { image: celtiisImage, color: "#9C27B0", bgColor: "bg-purple-100 dark:bg-purple-950", textColor: "text-purple-600 dark:text-purple-400" },
   tmoney: { image: tmonyImage, color: "#00897B", bgColor: "bg-teal-100 dark:bg-teal-950", textColor: "text-teal-600 dark:text-teal-400" },
   togocom: { image: tmonyImage, color: "#00897B", bgColor: "bg-teal-100 dark:bg-teal-950", textColor: "text-teal-600 dark:text-teal-400" },
-  expresso: { color: "#673AB7", bgColor: "bg-violet-100 dark:bg-violet-950", textColor: "text-violet-600 dark:text-violet-400" },
-  coris: { color: "#FF9800", bgColor: "bg-amber-100 dark:bg-amber-950", textColor: "text-amber-600 dark:text-amber-400" },
-  afrimoney: { color: "#2196F3", bgColor: "bg-sky-100 dark:bg-sky-950", textColor: "text-sky-600 dark:text-sky-400" },
-  qmoney: { color: "#607D8B", bgColor: "bg-slate-100 dark:bg-slate-800", textColor: "text-slate-600 dark:text-slate-400" },
-  telecel: { color: "#795548", bgColor: "bg-stone-100 dark:bg-stone-900", textColor: "text-stone-600 dark:text-stone-400" },
+  expresso: { image: expressoImage, color: "#673AB7", bgColor: "bg-violet-100 dark:bg-violet-950", textColor: "text-violet-600 dark:text-violet-400" },
+  coris: { image: corisImage, color: "#FF9800", bgColor: "bg-amber-100 dark:bg-amber-950", textColor: "text-amber-600 dark:text-amber-400" },
+  afrimoney: { image: afrimoneyImage, color: "#2196F3", bgColor: "bg-sky-100 dark:bg-sky-950", textColor: "text-sky-600 dark:text-sky-400" },
+  qmoney: { image: qmoneyImage, color: "#607D8B", bgColor: "bg-slate-100 dark:bg-slate-800", textColor: "text-slate-600 dark:text-slate-400" },
+  telecel: { image: telecelImage, color: "#795548", bgColor: "bg-stone-100 dark:bg-stone-900", textColor: "text-stone-600 dark:text-stone-400" },
   wizall: { image: wizallImage, color: "#00BCD4", bgColor: "bg-cyan-100 dark:bg-cyan-950", textColor: "text-cyan-600 dark:text-cyan-400" },
 };
 
