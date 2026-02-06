@@ -407,7 +407,12 @@ async function processTransaction(transaction: Transaction & { user?: User }): P
   }
 
   // Check if this is a NOWPayments crypto transaction
+  // IMPORTANT: Skip outgoing crypto transactions (withdrawals/transfers) - they must ONLY be updated by the NOWPayments payout webhook
   if (metadata.paymentId || metadata.nowPaymentsPaymentId || metadata.paymentProvider === "nowpayments" || metadata.isCrypto === true) {
+    if (metadata.isCryptoWithdrawal === true || metadata.payoutId) {
+      console.log(`[PaymentPolling] Skipping crypto payout transaction ${transaction.id} (payoutId: ${metadata.payoutId}) - status managed by webhook only`);
+      return;
+    }
     await processNowPaymentsTransaction(transaction, metadata);
     return;
   }
