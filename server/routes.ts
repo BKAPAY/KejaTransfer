@@ -1596,6 +1596,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Cle API invalide ou inactive" });
       }
 
+      // Vérifier si le propriétaire de la clé API est suspendu
+      const apiOwner = await storage.getUser(apiKey.userId);
+      if (apiOwner?.suspended) {
+        return res.status(403).json({ error: "Ce service est temporairement indisponible" });
+      }
+
       // DEDUPLICATION: Check for duplicate transactions to prevent double payments
       // If orderId is provided, check for existing transaction with same orderId
       if (orderId) {

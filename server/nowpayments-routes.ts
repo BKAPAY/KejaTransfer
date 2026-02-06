@@ -268,6 +268,12 @@ router.post("/api/crypto/create-payment", async (req: Request, res: Response) =>
       return res.status(400).json({ error: "Impossible d'identifier le destinataire du paiement" });
     }
 
+    // Vérifier si le propriétaire est suspendu
+    const ownerUser = await storage.getUser(ownerUserId);
+    if (ownerUser?.suspended) {
+      return res.status(403).json({ error: "Ce service est temporairement indisponible" });
+    }
+
     // Montant de base demandé par l'utilisateur
     const baseAmount = parseFloat(amount);
     

@@ -887,7 +887,8 @@ export default function Pay() {
           <CardContent className="py-12">
             <div className="text-center">
               <img src={logoImage} alt="BKApay" className="h-16 w-auto mx-auto mb-4" />
-              <p className="text-muted-foreground">Lien de paiement introuvable ou inactif</p>
+              <h3 className="text-lg font-semibold text-foreground mb-2">Page introuvable</h3>
+              <p className="text-muted-foreground">Ce lien de paiement n'existe plus ou n'est plus disponible.</p>
             </div>
           </CardContent>
         </Card>

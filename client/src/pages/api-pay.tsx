@@ -643,9 +643,9 @@ export default function ApiPay() {
               <div className="flex gap-3 items-start justify-center">
                 <AlertCircle className="w-5 h-5 text-destructive mt-0.5 flex-shrink-0" />
                 <div>
-                  <p className="font-semibold text-foreground">Lien invalide</p>
+                  <p className="font-semibold text-foreground">Page introuvable</p>
                   <p className="text-sm text-muted-foreground">
-                    Ce lien de paiement n'est pas valide ou a expire
+                    Ce lien de paiement n'existe plus ou n'est plus disponible.
                   </p>
                 </div>
               </div>
