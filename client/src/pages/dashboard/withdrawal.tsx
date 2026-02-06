@@ -22,6 +22,8 @@ import { OperatorSelector } from "@/components/operator-selector";
 import { hasMultipleCurrencies, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
 import { useConvertedMinimums } from "@/hooks/use-converted-minimums";
 import { getCurrencyDecimals } from "@/lib/currency";
+import { PaymentMethodSelector } from "@/components/payment-method-selector";
+import { CryptoWithdrawalFlow } from "@/components/crypto-withdrawal-flow";
 
 const withdrawalSchema = z.object({
   amount: z.number().min(1, "Veuillez saisir un montant valide"),
@@ -381,192 +383,208 @@ export default function Withdrawal() {
           <CardTitle className="text-lg">Details du retrait</CardTitle>
         </CardHeader>
         <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <FormField
-                control={form.control}
-                name="amount"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Montant ({userBalanceCurrency})</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        placeholder="5000"
-                        data-testid="input-withdrawal-amount"
-                        min="1000"
-                        value={field.value || ""}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          field.onChange(val === "" ? undefined : Number(val));
-                        }}
-                      />
-                    </FormControl>
-                    <p className="text-xs text-muted-foreground mt-1">Montant minimum: {withdrawalMin.toLocaleString("fr-FR")} {userBalanceCurrency}</p>
-                    <FormMessage />
-                  </FormItem>
-                )}
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Montant ({userBalanceCurrency})</label>
+              <Input
+                type="number"
+                placeholder="5000"
+                data-testid="input-withdrawal-amount"
+                min="1000"
+                value={amount || ""}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  form.setValue("amount", val === "" ? undefined as any : Number(val));
+                }}
               />
+              <p className="text-xs text-muted-foreground">Montant minimum: {withdrawalMin.toLocaleString("fr-FR")} {userBalanceCurrency}</p>
+            </div>
 
-              <FormField
-                control={form.control}
-                name="withdrawalPhoneIndex"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Numero de retrait</FormLabel>
-                    <Select 
-                      value={field.value !== undefined ? String(field.value) : ""} 
-                      onValueChange={(value) => field.onChange(Number(value))}
-                    >
-                      <FormControl>
-                        <SelectTrigger data-testid="select-withdrawal-phone">
-                          <SelectValue placeholder="Selectionnez un numero" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {withdrawalPhones.map((phone, index) => (
-                          <SelectItem key={index} value={String(index)}>
-                            {phone}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Numero configure dans vos parametres
-                    </p>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            <PaymentMethodSelector
+              mobileMoneyContent={
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                    <FormField
+                      control={form.control}
+                      name="withdrawalPhoneIndex"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Numero de retrait</FormLabel>
+                          <Select 
+                            value={field.value !== undefined ? String(field.value) : ""} 
+                            onValueChange={(value) => field.onChange(Number(value))}
+                          >
+                            <FormControl>
+                              <SelectTrigger data-testid="select-withdrawal-phone">
+                                <SelectValue placeholder="Selectionnez un numero" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {withdrawalPhones.map((phone, index) => (
+                                <SelectItem key={index} value={String(index)}>
+                                  {phone}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Numero configure dans vos parametres
+                          </p>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Pays</label>
-                <div className="flex items-center gap-2 p-3 bg-muted rounded-md border">
-                  <Lock className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm" data-testid="text-withdrawal-country">
-                    {COUNTRIES.find(c => c.code === userCountry)?.name || userCountry}
-                  </span>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Pays configure dans votre profil (non modifiable)
-                </p>
-              </div>
-
-              {hasMultipleCurrencies(userCountry) && (
-                <CurrencySelector
-                  countryCode={userCountry}
-                  selectedCurrency={selectedCurrency}
-                  onCurrencyChange={setSelectedCurrency}
-                />
-              )}
-
-              <FormField
-                control={form.control}
-                name="operator"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Operateur/Porte-monnaie</FormLabel>
-                    {countryOperators.length === 0 ? (
-                      <div className="text-sm text-muted-foreground p-3 bg-muted rounded-md">
-                        Aucun operateur disponible pour votre pays
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Pays</label>
+                      <div className="flex items-center gap-2 p-3 bg-muted rounded-md border">
+                        <Lock className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm" data-testid="text-withdrawal-country">
+                          {COUNTRIES.find(c => c.code === userCountry)?.name || userCountry}
+                        </span>
                       </div>
-                    ) : (
-                      <OperatorSelector
-                        operators={countryOperators}
-                        selectedOperator={field.value}
-                        onSelect={field.onChange}
+                      <p className="text-xs text-muted-foreground">
+                        Pays configure dans votre profil (non modifiable)
+                      </p>
+                    </div>
+
+                    {hasMultipleCurrencies(userCountry) && (
+                      <CurrencySelector
+                        countryCode={userCountry}
+                        selectedCurrency={selectedCurrency}
+                        onCurrencyChange={setSelectedCurrency}
                       />
                     )}
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
 
-              {amount && userCountry && selectedOperator && feeInfo && (
-                <div className="bg-muted p-4 rounded-md border space-y-3">
-                  <div className="flex items-start gap-3">
-                    <Info className="h-4 w-4 mt-0.5 text-muted-foreground flex-shrink-0" />
-                    <div className="text-sm space-y-2 w-full">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Montant saisi:</span>
-                        <span className="font-medium">
-                          {new Intl.NumberFormat("fr-FR", {
-                            style: "currency",
-                            currency: userBalanceCurrency,
-                            minimumFractionDigits: 0,
-                          }).format(amount)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Frais:</span>
-                        <span className="font-medium text-orange-600 dark:text-orange-400" data-testid="text-fee-amount">
-                          -{new Intl.NumberFormat("fr-FR", {
-                            style: "currency",
-                            currency: userBalanceCurrency,
-                            minimumFractionDigits: 0,
-                          }).format(feeInfo.feeAmount)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between font-semibold text-green-600 dark:text-green-400">
-                        <span>Montant recu ({userBalanceCurrency}):</span>
-                        <span data-testid="text-amount-received">
-                          {new Intl.NumberFormat("fr-FR", {
-                            style: "currency",
-                            currency: userBalanceCurrency,
-                            minimumFractionDigits: 0,
-                          }).format(feeInfo.amountReceived)}
-                        </span>
-                      </div>
-                      {needsConversion && conversionData && !conversionData.isLoading && (
-                        <div className="flex justify-between font-semibold text-blue-600 dark:text-blue-400">
-                          <span>Equivalent en {conversionData.targetCurrency}:</span>
-                          <span data-testid="text-converted-amount">
-                            {new Intl.NumberFormat("fr-FR", {
-                              style: "currency",
-                              currency: conversionData.targetCurrency,
-                              minimumFractionDigits: getCurrencyDecimals(conversionData.targetCurrency),
-                              maximumFractionDigits: getCurrencyDecimals(conversionData.targetCurrency),
-                            }).format(conversionData.convertedAmount)}
-                          </span>
+                    <FormField
+                      control={form.control}
+                      name="operator"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Operateur/Porte-monnaie</FormLabel>
+                          {countryOperators.length === 0 ? (
+                            <div className="text-sm text-muted-foreground p-3 bg-muted rounded-md">
+                              Aucun operateur disponible pour votre pays
+                            </div>
+                          ) : (
+                            <OperatorSelector
+                              operators={countryOperators}
+                              selectedOperator={field.value}
+                              onSelect={field.onChange}
+                            />
+                          )}
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {amount && userCountry && selectedOperator && feeInfo && (
+                      <div className="bg-muted p-4 rounded-md border space-y-3">
+                        <div className="flex items-start gap-3">
+                          <Info className="h-4 w-4 mt-0.5 text-muted-foreground flex-shrink-0" />
+                          <div className="text-sm space-y-2 w-full">
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Montant saisi:</span>
+                              <span className="font-medium">
+                                {new Intl.NumberFormat("fr-FR", {
+                                  style: "currency",
+                                  currency: userBalanceCurrency,
+                                  minimumFractionDigits: 0,
+                                }).format(amount)}
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Frais:</span>
+                              <span className="font-medium text-orange-600 dark:text-orange-400" data-testid="text-fee-amount">
+                                -{new Intl.NumberFormat("fr-FR", {
+                                  style: "currency",
+                                  currency: userBalanceCurrency,
+                                  minimumFractionDigits: 0,
+                                }).format(feeInfo.feeAmount)}
+                              </span>
+                            </div>
+                            <div className="flex justify-between font-semibold text-green-600 dark:text-green-400">
+                              <span>Montant recu ({userBalanceCurrency}):</span>
+                              <span data-testid="text-amount-received">
+                                {new Intl.NumberFormat("fr-FR", {
+                                  style: "currency",
+                                  currency: userBalanceCurrency,
+                                  minimumFractionDigits: 0,
+                                }).format(feeInfo.amountReceived)}
+                              </span>
+                            </div>
+                            {needsConversion && conversionData && !conversionData.isLoading && (
+                              <div className="flex justify-between font-semibold text-blue-600 dark:text-blue-400">
+                                <span>Equivalent en {conversionData.targetCurrency}:</span>
+                                <span data-testid="text-converted-amount">
+                                  {new Intl.NumberFormat("fr-FR", {
+                                    style: "currency",
+                                    currency: conversionData.targetCurrency,
+                                    minimumFractionDigits: getCurrencyDecimals(conversionData.targetCurrency),
+                                    maximumFractionDigits: getCurrencyDecimals(conversionData.targetCurrency),
+                                  }).format(conversionData.convertedAmount)}
+                                </span>
+                              </div>
+                            )}
+                            {needsConversion && conversionData?.isLoading && (
+                              <div className="flex items-center gap-2 text-muted-foreground">
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                                <span className="text-xs">Calcul de la conversion...</span>
+                              </div>
+                            )}
+                            <div className="border-t pt-2 flex justify-between">
+                              <span className="text-muted-foreground">Debite du solde:</span>
+                              <span className="font-medium text-foreground" data-testid="text-total-deducted">
+                                {new Intl.NumberFormat("fr-FR", {
+                                  style: "currency",
+                                  currency: userBalanceCurrency,
+                                  minimumFractionDigits: 0,
+                                }).format(feeInfo.totalDeductedFromBalance)}
+                              </span>
+                            </div>
+                            {needsConversion && conversionData && !conversionData.isLoading && (
+                              <p className="text-xs text-muted-foreground">
+                                Taux: 1 {userBalanceCurrency} = {conversionData.conversionRate.toFixed(6)} {conversionData.targetCurrency}
+                              </p>
+                            )}
+                          </div>
                         </div>
-                      )}
-                      {needsConversion && conversionData?.isLoading && (
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                          <span className="text-xs">Calcul de la conversion...</span>
-                        </div>
-                      )}
-                      <div className="border-t pt-2 flex justify-between">
-                        <span className="text-muted-foreground">Debite du solde:</span>
-                        <span className="font-medium text-foreground" data-testid="text-total-deducted">
-                          {new Intl.NumberFormat("fr-FR", {
-                            style: "currency",
-                            currency: userBalanceCurrency,
-                            minimumFractionDigits: 0,
-                          }).format(feeInfo.totalDeductedFromBalance)}
-                        </span>
                       </div>
-                      {needsConversion && conversionData && !conversionData.isLoading && (
-                        <p className="text-xs text-muted-foreground">
-                          Taux: 1 {userBalanceCurrency} = {conversionData.conversionRate.toFixed(6)} {conversionData.targetCurrency}
-                        </p>
-                      )}
-                    </div>
+                    )}
+
+                    <Button
+                      type="submit"
+                      className="w-full"
+                      disabled={withdrawalMutation.isPending || !user || countryOperators.length === 0}
+                      data-testid="button-submit-withdrawal"
+                    >
+                      <CheckCircle2 className="h-4 w-4 mr-2" />
+                      Effectuer le retrait
+                    </Button>
+                  </form>
+                </Form>
+              }
+              cryptoContent={
+                amount && amount >= withdrawalMin && user ? (
+                  <CryptoWithdrawalFlow
+                    amount={amount}
+                    currency={userBalanceCurrency}
+                    userBalance={user.balance || 0}
+                    type="withdrawal"
+                    onSuccess={() => {
+                      form.reset();
+                      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+                      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+                    }}
+                  />
+                ) : (
+                  <div className="p-4 text-center text-muted-foreground text-sm">
+                    Entrez un montant d'au moins {withdrawalMin.toLocaleString("fr-FR")} {userBalanceCurrency} pour retirer en crypto
                   </div>
-                </div>
-              )}
-
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={withdrawalMutation.isPending || !user || countryOperators.length === 0}
-                data-testid="button-submit-withdrawal"
-              >
-                <CheckCircle2 className="h-4 w-4 mr-2" />
-                Effectuer le retrait
-              </Button>
-            </form>
-          </Form>
+                )
+              }
+            />
+          </div>
         </CardContent>
       </Card>
 

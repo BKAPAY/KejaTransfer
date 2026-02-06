@@ -25,7 +25,8 @@ The frontend uses React 18 with TypeScript, Shadcn UI, and Tailwind CSS for a pr
 - **Automatic Database Migrations**: `db-bootstrap.ts` script handles Drizzle ORM migrations on startup with intelligent reconciliation and SHA256 hash verification.
 - **Multi-Provider System**: Supports AfribaPay, Paydunya, FedaPay, MbiyoPay, and NOWPayments (cryptocurrency) with mutual exclusivity per country (for both payin and payout).
 - **Payment Gateway Integration**: FedaPay is a primary gateway for collect (incoming) and payout (outgoing) payments across 7 countries. Payments involve FedaPay redirect and webhook/polling confirmation.
-- **Withdrawal Flows**: Utilizes FedaPay Payout API, including KYC validation, balance checks, and phone number sanitization.
+- **Withdrawal Flows**: Utilizes FedaPay Payout API, including KYC validation, balance checks, and phone number sanitization. Transfer and Withdrawal pages feature a `PaymentMethodSelector` toggle between Mobile Money and Cryptocurrency options.
+- **Crypto Withdrawals/Transfers (NOWPayments)**: Users can withdraw or transfer funds to a crypto wallet address via the `CryptoWithdrawalFlow` component. Backend validates security code, crypto minimums, wallet address, and balance before creating a pending transaction. Processed under 24h by admin due to NOWPayments 2FA requirement.
 - **Silent Fees**: A uniform 6% transaction fee is applied across all countries and operators.
   - **Deposits (Incoming)**: Client pays GROSS, user receives NET (GROSS - 6%).
   - **Withdrawals (Outgoing)**: User enters GROSS, provider receives NET (GROSS - 6%). User's balance debited GROSS.

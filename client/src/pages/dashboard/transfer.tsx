@@ -24,6 +24,8 @@ import { hasMultipleCurrencies, getMbiyoPayCurrenciesForCountry } from "@shared/
 import { useEffect, useCallback } from "react";
 import { useConvertedMinimums } from "@/hooks/use-converted-minimums";
 import { getCurrencyDecimals } from "@/lib/currency";
+import { PaymentMethodSelector } from "@/components/payment-method-selector";
+import { CryptoWithdrawalFlow } from "@/components/crypto-withdrawal-flow";
 
 const transferSchema = z.object({
   amount: z.number().min(1, "Veuillez saisir un montant valide"),
@@ -359,206 +361,222 @@ export default function Transfer() {
           <CardTitle className="text-lg">Details du transfert</CardTitle>
         </CardHeader>
         <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <FormField
-                control={form.control}
-                name="amount"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Montant ({userBalanceCurrency})</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        placeholder="500"
-                        data-testid="input-transfer-amount"
-                        min="500"
-                        value={field.value || ""}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          field.onChange(val === "" ? undefined : Number(val));
-                        }}
-                      />
-                    </FormControl>
-                    <p className="text-xs text-muted-foreground mt-1">Montant minimum: {transferMin.toLocaleString("fr-FR")} {userBalanceCurrency}</p>
-                    <FormMessage />
-                  </FormItem>
-                )}
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Montant ({userBalanceCurrency})</label>
+              <Input
+                type="number"
+                placeholder="500"
+                data-testid="input-transfer-amount"
+                min="500"
+                value={amount || ""}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  form.setValue("amount", val === "" ? undefined as any : Number(val));
+                }}
               />
+              <p className="text-xs text-muted-foreground">Montant minimum: {transferMin.toLocaleString("fr-FR")} {userBalanceCurrency}</p>
+            </div>
 
-              <FormField
-                control={form.control}
-                name="country"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Pays de destination</FormLabel>
-                    <Select value={field.value} onValueChange={(value) => {
-                      field.onChange(value);
-                      form.setValue("operator", "");
-                    }}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-transfer-country">
-                          <SelectValue placeholder="Selectionnez un pays" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {payoutCountries.map((country) => (
-                          <SelectItem key={country.code} value={country.code}>
-                            {country.flag} {country.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {selectedCountry && hasMultipleCurrencies(selectedCountry) && (
-                <CurrencySelector
-                  countryCode={selectedCountry}
-                  selectedCurrency={selectedCurrency}
-                  onCurrencyChange={setSelectedCurrency}
-                />
-              )}
-
-              {selectedCountry && (
-                <FormField
-                  control={form.control}
-                  name="operator"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Operateur/Porte-monnaie</FormLabel>
-                      {countryOperators.length === 0 ? (
-                        <div className="text-sm text-muted-foreground p-3 bg-muted rounded-md">
-                          Aucun operateur disponible pour ce pays
-                        </div>
-                      ) : (
-                        <OperatorSelector
-                          operators={countryOperators}
-                          selectedOperator={field.value}
-                          onSelect={field.onChange}
-                        />
+            <PaymentMethodSelector
+              mobileMoneyContent={
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                    <FormField
+                      control={form.control}
+                      name="country"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Pays de destination</FormLabel>
+                          <Select value={field.value} onValueChange={(value) => {
+                            field.onChange(value);
+                            form.setValue("operator", "");
+                          }}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-transfer-country">
+                                <SelectValue placeholder="Selectionnez un pays" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {payoutCountries.map((country) => (
+                                <SelectItem key={country.code} value={country.code}>
+                                  {country.flag} {country.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
                       )}
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
+                    />
 
-              <FormField
-                control={form.control}
-                name="phone"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Numero de telephone</FormLabel>
-                    <FormControl>
-                      <PhoneInputWithPrefix
-                        country={selectedCountry}
-                        value={field.value}
-                        onChange={field.onChange}
-                        data-testid="input-transfer-phone"
+                    {selectedCountry && hasMultipleCurrencies(selectedCountry) && (
+                      <CurrencySelector
+                        countryCode={selectedCountry}
+                        selectedCurrency={selectedCurrency}
+                        onCurrencyChange={setSelectedCurrency}
                       />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                    )}
 
-              <FormField
-                control={form.control}
-                name="phoneConfirm"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Confirmer le numero de telephone</FormLabel>
-                    <FormControl>
-                      <PhoneInputWithPrefix
-                        country={selectedCountry}
-                        value={field.value}
-                        onChange={field.onChange}
-                        data-testid="input-transfer-phone-confirm"
+                    {selectedCountry && (
+                      <FormField
+                        control={form.control}
+                        name="operator"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Operateur/Porte-monnaie</FormLabel>
+                            {countryOperators.length === 0 ? (
+                              <div className="text-sm text-muted-foreground p-3 bg-muted rounded-md">
+                                Aucun operateur disponible pour ce pays
+                              </div>
+                            ) : (
+                              <OperatorSelector
+                                operators={countryOperators}
+                                selectedOperator={field.value}
+                                onSelect={field.onChange}
+                              />
+                            )}
+                            <FormMessage />
+                          </FormItem>
+                        )}
                       />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                    )}
 
-              {amount && selectedCountry && selectedOperator && feeInfo && (
-                <div className="bg-muted p-4 rounded-md border space-y-3">
-                  <div className="flex items-start gap-3">
-                    <Info className="h-4 w-4 mt-0.5 text-muted-foreground flex-shrink-0" />
-                    <div className="text-sm space-y-2 w-full">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Montant a envoyer:</span>
-                        <span className="font-medium">
-                          {new Intl.NumberFormat("fr-FR", {
-                            style: "currency",
-                            currency: userBalanceCurrency,
-                            minimumFractionDigits: 0,
-                          }).format(amount)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Frais:</span>
-                        <span className="font-medium text-orange-600 dark:text-orange-400" data-testid="text-fee-amount">
-                          +{new Intl.NumberFormat("fr-FR", {
-                            style: "currency",
-                            currency: userBalanceCurrency,
-                            minimumFractionDigits: 0,
-                          }).format(feeInfo.feeAmount)}
-                        </span>
-                      </div>
-                      <div className="border-t pt-2 flex justify-between font-semibold">
-                        <span>Total debite du solde:</span>
-                        <span className="text-foreground" data-testid="text-total-deducted">
-                          {new Intl.NumberFormat("fr-FR", {
-                            style: "currency",
-                            currency: userBalanceCurrency,
-                            minimumFractionDigits: 0,
-                          }).format(amount + feeInfo.feeAmount)}
-                        </span>
-                      </div>
-                      {needsConversion && conversionData && !conversionData.isLoading && (
-                        <div className="border-t pt-2 mt-2">
-                          <div className="flex justify-between text-green-600 dark:text-green-400 font-semibold">
-                            <span>Destinataire recevra:</span>
-                            <span data-testid="text-converted-amount">
-                              {new Intl.NumberFormat("fr-FR", {
-                                style: "currency",
-                                currency: conversionData.targetCurrency,
-                                minimumFractionDigits: getCurrencyDecimals(conversionData.targetCurrency),
-                                maximumFractionDigits: getCurrencyDecimals(conversionData.targetCurrency),
-                              }).format(conversionData.convertedAmount)}
-                            </span>
+                    <FormField
+                      control={form.control}
+                      name="phone"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Numero de telephone</FormLabel>
+                          <FormControl>
+                            <PhoneInputWithPrefix
+                              country={selectedCountry}
+                              value={field.value}
+                              onChange={field.onChange}
+                              data-testid="input-transfer-phone"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="phoneConfirm"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Confirmer le numero de telephone</FormLabel>
+                          <FormControl>
+                            <PhoneInputWithPrefix
+                              country={selectedCountry}
+                              value={field.value}
+                              onChange={field.onChange}
+                              data-testid="input-transfer-phone-confirm"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {amount && selectedCountry && selectedOperator && feeInfo && (
+                      <div className="bg-muted p-4 rounded-md border space-y-3">
+                        <div className="flex items-start gap-3">
+                          <Info className="h-4 w-4 mt-0.5 text-muted-foreground flex-shrink-0" />
+                          <div className="text-sm space-y-2 w-full">
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Montant a envoyer:</span>
+                              <span className="font-medium">
+                                {new Intl.NumberFormat("fr-FR", {
+                                  style: "currency",
+                                  currency: userBalanceCurrency,
+                                  minimumFractionDigits: 0,
+                                }).format(amount)}
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Frais:</span>
+                              <span className="font-medium text-orange-600 dark:text-orange-400" data-testid="text-fee-amount">
+                                +{new Intl.NumberFormat("fr-FR", {
+                                  style: "currency",
+                                  currency: userBalanceCurrency,
+                                  minimumFractionDigits: 0,
+                                }).format(feeInfo.feeAmount)}
+                              </span>
+                            </div>
+                            <div className="border-t pt-2 flex justify-between font-semibold">
+                              <span>Total debite du solde:</span>
+                              <span className="text-foreground" data-testid="text-total-deducted">
+                                {new Intl.NumberFormat("fr-FR", {
+                                  style: "currency",
+                                  currency: userBalanceCurrency,
+                                  minimumFractionDigits: 0,
+                                }).format(amount + feeInfo.feeAmount)}
+                              </span>
+                            </div>
+                            {needsConversion && conversionData && !conversionData.isLoading && (
+                              <div className="border-t pt-2 mt-2">
+                                <div className="flex justify-between text-green-600 dark:text-green-400 font-semibold">
+                                  <span>Destinataire recevra:</span>
+                                  <span data-testid="text-converted-amount">
+                                    {new Intl.NumberFormat("fr-FR", {
+                                      style: "currency",
+                                      currency: conversionData.targetCurrency,
+                                      minimumFractionDigits: getCurrencyDecimals(conversionData.targetCurrency),
+                                      maximumFractionDigits: getCurrencyDecimals(conversionData.targetCurrency),
+                                    }).format(conversionData.convertedAmount)}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Taux: 1 {userBalanceCurrency} = {conversionData.conversionRate.toFixed(6)} {conversionData.targetCurrency}
+                                </p>
+                              </div>
+                            )}
+                            {needsConversion && conversionData?.isLoading && (
+                              <div className="border-t pt-2 mt-2 flex items-center gap-2 text-muted-foreground">
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                                <span className="text-xs">Calcul de la conversion...</span>
+                              </div>
+                            )}
                           </div>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Taux: 1 {userBalanceCurrency} = {conversionData.conversionRate.toFixed(6)} {conversionData.targetCurrency}
-                          </p>
                         </div>
-                      )}
-                      {needsConversion && conversionData?.isLoading && (
-                        <div className="border-t pt-2 mt-2 flex items-center gap-2 text-muted-foreground">
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                          <span className="text-xs">Calcul de la conversion...</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
+                      </div>
+                    )}
 
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={transferMutation.isPending || !user || countryOperators.length === 0}
-                data-testid="button-submit-transfer"
-              >
-                <CheckCircle2 className="h-4 w-4 mr-2" />
-                Effectuer le transfert
-              </Button>
-            </form>
-          </Form>
+                    <Button
+                      type="submit"
+                      className="w-full"
+                      disabled={transferMutation.isPending || !user || countryOperators.length === 0}
+                      data-testid="button-submit-transfer"
+                    >
+                      <CheckCircle2 className="h-4 w-4 mr-2" />
+                      Effectuer le transfert
+                    </Button>
+                  </form>
+                </Form>
+              }
+              cryptoContent={
+                amount && amount >= transferMin && user ? (
+                  <CryptoWithdrawalFlow
+                    amount={amount}
+                    currency={userBalanceCurrency}
+                    userBalance={user.balance || 0}
+                    type="transfer"
+                    onSuccess={() => {
+                      form.reset();
+                      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+                      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+                    }}
+                  />
+                ) : (
+                  <div className="p-4 text-center text-muted-foreground text-sm">
+                    Entrez un montant d'au moins {transferMin.toLocaleString("fr-FR")} {userBalanceCurrency} pour transferer en crypto
+                  </div>
+                )
+              }
+            />
+          </div>
         </CardContent>
       </Card>
 

@@ -1,9 +1,10 @@
 import { Router, Request, Response } from "express";
 import { storage } from "./storage";
-import { NowPaymentsClient, SUPPORTED_CRYPTOCURRENCIES, getCryptoDisplayName, getCryptoMinAmountXOF, CRYPTO_MIN_AMOUNT_XOF, USDT_MIN_AMOUNT_XOF } from "./nowpayments";
+import { NowPaymentsClient, SUPPORTED_CRYPTOCURRENCIES, getCryptoDisplayName, getCryptoMinAmountXOF, getCryptoSymbol, CRYPTO_MIN_AMOUNT_XOF, USDT_MIN_AMOUNT_XOF } from "./nowpayments";
 import { convertCurrency } from "./currency-converter";
 import QRCode from "qrcode";
-import { getFeeFromDatabase } from "./utils/fees";
+import { getFeeFromDatabase, calculateOutgoingFee } from "./utils/fees";
+import bcrypt from "bcrypt";
 
 const router = Router();
 
@@ -406,6 +407,217 @@ router.post("/api/webhooks/nowpayments", async (req: Request, res: Response) => 
   } catch (error: any) {
     console.error("[NOWPayments Webhook] Error:", error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+router.get("/api/crypto/withdrawal-estimate", async (req: Request, res: Response) => {
+  try {
+    const { amount, currency, crypto } = req.query;
+
+    if (!amount || !currency || !crypto) {
+      return res.status(400).json({ error: "Parametres manquants: amount, currency, crypto" });
+    }
+
+    const client = await getNowPaymentsClient();
+    if (!client) {
+      return res.status(503).json({ error: "Paiements crypto non disponibles" });
+    }
+
+    const baseAmount = parseFloat(amount as string);
+    const sourceCurrency = (currency as string).toUpperCase();
+
+    if (!baseAmount || baseAmount <= 0) {
+      return res.status(400).json({ error: "Montant invalide" });
+    }
+
+    const supportedCurrencies = ["XOF", "XAF", "CDF", "GNF", "USD"];
+    if (!supportedCurrencies.includes(sourceCurrency)) {
+      return res.status(400).json({ error: "Devise non supportee" });
+    }
+
+    const feeConfig = await getFeeFromDatabase(storage, "nowpayments", "CRYPTO", crypto as string);
+    const feePercentage = feeConfig.outgoing;
+    const feeCalc = calculateOutgoingFee(Math.floor(baseAmount), feePercentage);
+
+    let usdAmount = feeCalc.amountReceived;
+    if (sourceCurrency === "XOF" || sourceCurrency === "XAF") {
+      usdAmount = feeCalc.amountReceived * 0.0015;
+    } else if (sourceCurrency === "CDF") {
+      usdAmount = feeCalc.amountReceived * 0.00035;
+    } else if (sourceCurrency === "GNF") {
+      usdAmount = feeCalc.amountReceived * 0.00012;
+    }
+
+    const estimate = await client.getEstimate(usdAmount, "usd", crypto as string);
+
+    res.json({
+      amount: baseAmount,
+      currency: sourceCurrency,
+      feeAmount: feeCalc.feeAmount,
+      feePercentage: feePercentage,
+      amountAfterFee: feeCalc.amountReceived,
+      totalDeducted: feeCalc.totalDeductedFromBalance,
+      estimatedCryptoAmount: estimate.estimated_amount,
+      cryptoCurrency: crypto,
+      cryptoSymbol: getCryptoSymbol(crypto as string),
+      usdEquivalent: usdAmount,
+    });
+  } catch (error: any) {
+    console.error("[NOWPayments] Withdrawal estimate failed:", error);
+    res.status(500).json({ error: error.message || "Impossible d'obtenir l'estimation" });
+  }
+});
+
+router.post("/api/crypto/create-withdrawal", async (req: Request, res: Response) => {
+  try {
+    const { amount, currency, crypto, walletAddress, type, securityCode } = req.body;
+
+    if (!amount || !currency || !crypto || !walletAddress || !securityCode) {
+      return res.status(400).json({ success: false, error: "Parametres manquants" });
+    }
+
+    if (!req.session?.userId) {
+      return res.status(401).json({ success: false, error: "Non authentifie" });
+    }
+
+    const user = await storage.getUser(req.session.userId);
+    if (!user) {
+      return res.status(404).json({ success: false, error: "Utilisateur non trouve" });
+    }
+
+    if (user.suspended) {
+      return res.status(403).json({ success: false, error: "Votre compte a ete suspendu" });
+    }
+
+    if (user.kycStatus !== "verified") {
+      return res.status(403).json({ success: false, error: "Verification KYC requise" });
+    }
+
+    if (!user.securityCode) {
+      return res.status(400).json({ success: false, error: "Code de securite non configure" });
+    }
+
+    const isValidCode = await bcrypt.compare(securityCode, user.securityCode);
+    if (!isValidCode) {
+      return res.status(400).json({ success: false, error: "Code de securite incorrect" });
+    }
+
+    const cryptoInfo = SUPPORTED_CRYPTOCURRENCIES.find(c => c.code === crypto);
+    if (!cryptoInfo) {
+      return res.status(400).json({ success: false, error: "Cryptomonnaie non supportee" });
+    }
+
+    if (walletAddress.length < 10 || walletAddress.length > 256) {
+      return res.status(400).json({ success: false, error: "Adresse de portefeuille invalide" });
+    }
+
+    const baseAmount = parseFloat(amount);
+    const sourceCurrency = (currency as string).toUpperCase();
+
+    const supportedCurrencies = ["XOF", "XAF", "CDF", "GNF", "USD"];
+    if (!supportedCurrencies.includes(sourceCurrency)) {
+      return res.status(400).json({ success: false, error: "Devise non supportee" });
+    }
+
+    if (baseAmount <= 0) {
+      return res.status(400).json({ success: false, error: "Montant invalide" });
+    }
+
+    let baseAmountInXof = baseAmount;
+    if (sourceCurrency === "CDF") {
+      baseAmountInXof = baseAmount * 0.00036 * 655.957;
+    } else if (sourceCurrency === "GNF") {
+      baseAmountInXof = baseAmount * 0.00012 * 655.957;
+    } else if (sourceCurrency === "XAF") {
+      baseAmountInXof = baseAmount;
+    } else if (sourceCurrency === "USD") {
+      baseAmountInXof = baseAmount / 0.0015;
+    }
+
+    const minAmountXof = getCryptoMinAmountXOF(crypto);
+    if (baseAmountInXof < minAmountXof) {
+      return res.status(400).json({
+        success: false,
+        error: `Montant minimum pour ${getCryptoDisplayName(crypto)}: ${minAmountXof.toLocaleString("fr-FR")} XOF`,
+      });
+    }
+
+    const withdrawalType = type === "transfer" ? "transfer" : "withdrawal";
+
+    const feeConfig = await getFeeFromDatabase(storage, "nowpayments", "CRYPTO", crypto);
+    const feePercentage = feeConfig.outgoing;
+    const feeCalc = calculateOutgoingFee(Math.floor(baseAmount), feePercentage);
+
+    if (user.balance < feeCalc.totalDeductedFromBalance) {
+      return res.status(400).json({ 
+        success: false, 
+        error: `Solde insuffisant. Vous avez ${user.balance} ${sourceCurrency}, il faut ${feeCalc.totalDeductedFromBalance} ${sourceCurrency}` 
+      });
+    }
+
+    let usdAmount = feeCalc.amountReceived;
+    if (sourceCurrency === "XOF" || sourceCurrency === "XAF") {
+      usdAmount = feeCalc.amountReceived * 0.0015;
+    } else if (sourceCurrency === "CDF") {
+      usdAmount = feeCalc.amountReceived * 0.00035;
+    } else if (sourceCurrency === "GNF") {
+      usdAmount = feeCalc.amountReceived * 0.00012;
+    }
+
+    const client = await getNowPaymentsClient();
+    let estimatedCryptoAmount = 0;
+    if (client) {
+      try {
+        const estimate = await client.getEstimate(usdAmount, "usd", crypto);
+        estimatedCryptoAmount = estimate.estimated_amount;
+      } catch (err) {
+        console.warn("[NOWPayments] Could not get estimate for withdrawal:", err);
+      }
+    }
+
+    await storage.subtractFundsFromUser(user.id, feeCalc.totalDeductedFromBalance);
+
+    const transaction = await storage.createTransaction({
+      userId: user.id,
+      type: withdrawalType,
+      amount: Math.floor(baseAmount),
+      fee: feeCalc.feeAmount,
+      feePercentage: feePercentage,
+      currency: sourceCurrency,
+      status: "pending",
+      country: "CRYPTO",
+      operator: crypto,
+      description: `${withdrawalType === "transfer" ? "Transfert" : "Retrait"} crypto ${getCryptoDisplayName(crypto)}`,
+      metadata: JSON.stringify({
+        paymentProvider: "nowpayments",
+        isCrypto: true,
+        isCryptoWithdrawal: true,
+        withdrawalType,
+        walletAddress,
+        cryptoCurrency: crypto,
+        cryptoSymbol: getCryptoSymbol(crypto),
+        estimatedCryptoAmount,
+        usdEquivalent: usdAmount,
+        feeAmount: feeCalc.feeAmount,
+        amountAfterFee: feeCalc.amountReceived,
+        originalAmount: baseAmount,
+        originalCurrency: sourceCurrency,
+      }),
+    });
+
+    console.log(`[NOWPayments] Crypto ${withdrawalType} created: ${transaction.id} - ${baseAmount} ${sourceCurrency} -> ${estimatedCryptoAmount} ${getCryptoSymbol(crypto)} to ${walletAddress}`);
+
+    res.json({
+      success: true,
+      transactionId: transaction.id,
+      estimatedCryptoAmount,
+      cryptoSymbol: getCryptoSymbol(crypto),
+      walletAddress,
+      message: `${withdrawalType === "transfer" ? "Transfert" : "Retrait"} crypto soumis. Traitement sous 24h.`,
+    });
+  } catch (error: any) {
+    console.error("[NOWPayments] Create crypto withdrawal failed:", error);
+    res.status(500).json({ success: false, error: error.message || "Erreur lors du retrait crypto" });
   }
 });
 
