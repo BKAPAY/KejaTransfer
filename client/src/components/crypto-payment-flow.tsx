@@ -60,6 +60,33 @@ interface PaymentDetails {
   expiresIn: number;
 }
 
+function getStorageKey(paymentLinkId?: string, merchantLinkId?: string, apiKeyId?: string, userId?: string) {
+  return `bkapay_crypto_${paymentLinkId || merchantLinkId || apiKeyId || userId || "default"}`;
+}
+
+function loadPersistedPayment(storageKey: string, amount: number, currency: string): { paymentDetails: PaymentDetails | null; selectedCrypto: string | null; step: "select" | "confirm" | "waiting" | "completed" | "failed"; timeLeft: number } {
+  const empty = { paymentDetails: null, selectedCrypto: null, step: "select" as const, timeLeft: 0 };
+  try {
+    const saved = localStorage.getItem(storageKey);
+    if (!saved) return empty;
+    const data = JSON.parse(saved);
+    if (!data.paymentDetails || !data.createdAt) return empty;
+    if (data.amount !== amount || data.currency !== currency) {
+      localStorage.removeItem(storageKey);
+      return empty;
+    }
+    const elapsed = Math.floor((Date.now() - data.createdAt) / 1000);
+    const remaining = (data.expiresIn || 1800) - elapsed;
+    if (remaining <= 0) {
+      localStorage.removeItem(storageKey);
+      return empty;
+    }
+    return { paymentDetails: data.paymentDetails, selectedCrypto: data.selectedCrypto || null, step: "waiting", timeLeft: remaining };
+  } catch {
+    return empty;
+  }
+}
+
 export function CryptoPaymentFlow({
   amount,
   currency = "XOF",
@@ -76,11 +103,14 @@ export function CryptoPaymentFlow({
   onError,
 }: CryptoPaymentFlowProps) {
   const { toast } = useToast();
-  const [selectedCrypto, setSelectedCrypto] = useState<string | null>(null);
-  const [paymentDetails, setPaymentDetails] = useState<PaymentDetails | null>(null);
-  const [paymentStep, setPaymentStep] = useState<"select" | "confirm" | "waiting" | "completed" | "failed">("select");
+  const storageKey = getStorageKey(paymentLinkId, merchantLinkId, apiKeyId, userId);
+  const persisted = loadPersistedPayment(storageKey, amount, currency);
+  const [selectedCrypto, setSelectedCrypto] = useState<string | null>(persisted.selectedCrypto);
+  const [paymentDetails, setPaymentDetails] = useState<PaymentDetails | null>(persisted.paymentDetails);
+  const [paymentStep, setPaymentStep] = useState<"select" | "confirm" | "waiting" | "completed" | "failed">(persisted.step);
   const [copied, setCopied] = useState(false);
-  const [timeLeft, setTimeLeft] = useState<number>(0);
+  const [timeLeft, setTimeLeft] = useState<number>(persisted.timeLeft);
+  const [pollFailures, setPollFailures] = useState(0);
 
   const { data: cryptoStatus } = useQuery<{ available: boolean; message: string }>({
     queryKey: ["/api/crypto/status"],
@@ -145,7 +175,16 @@ export function CryptoPaymentFlow({
       if (data.success) {
         setPaymentDetails(data);
         setPaymentStep("waiting");
-        setTimeLeft(data.expiresIn || 1800);
+        const expires = data.expiresIn || 1800;
+        setTimeLeft(expires);
+        localStorage.setItem(storageKey, JSON.stringify({
+          paymentDetails: data,
+          selectedCrypto,
+          createdAt: Date.now(),
+          expiresIn: expires,
+          amount,
+          currency,
+        }));
         toast({
           title: "Paiement cree",
           description: "Envoyez le montant exact a l'adresse indiquee",
@@ -177,29 +216,41 @@ export function CryptoPaymentFlow({
     queryKey: ["/api/crypto/payment-status", paymentDetails?.paymentId],
     queryFn: async () => {
       if (!paymentDetails?.paymentId) return null;
-      const res = await fetch(`/api/crypto/payment-status/${paymentDetails.paymentId}`);
-      if (!res.ok) throw new Error("Failed to fetch status");
-      return res.json();
+      try {
+        const res = await fetch(`/api/crypto/payment-status/${paymentDetails.paymentId}`);
+        if (!res.ok) {
+          setPollFailures((prev) => prev + 1);
+          return null;
+        }
+        setPollFailures(0);
+        return res.json();
+      } catch {
+        setPollFailures((prev) => prev + 1);
+        return null;
+      }
     },
     enabled: paymentStep === "waiting" && !!paymentDetails?.paymentId,
-    refetchInterval: 5000,
+    refetchInterval: 15000,
+    retry: 2,
   });
 
   useEffect(() => {
     if (paymentStatus) {
-      if (paymentStatus.status === "finished" || paymentStatus.status === "confirmed") {
+      if (paymentStatus.status === "finished" || paymentStatus.status === "confirmed" || paymentStatus.status === "partially_paid") {
         setPaymentStep("completed");
+        localStorage.removeItem(storageKey);
         onSuccess?.(paymentDetails?.transactionId || "");
         toast({
           title: "Paiement confirme",
           description: "Votre paiement a ete recu avec succes",
         });
-      } else if (paymentStatus.status === "failed" || paymentStatus.status === "expired") {
+      } else if (paymentStatus.status === "failed" || paymentStatus.status === "expired" || paymentStatus.status === "refunded") {
         setPaymentStep("failed");
+        localStorage.removeItem(storageKey);
         onError?.("Paiement echoue ou expire");
       }
     }
-  }, [paymentStatus, paymentDetails, onSuccess, onError, toast]);
+  }, [paymentStatus, paymentDetails, onSuccess, onError, toast, storageKey]);
 
   useEffect(() => {
     if (paymentStep === "waiting" && timeLeft > 0) {
@@ -207,6 +258,7 @@ export function CryptoPaymentFlow({
         setTimeLeft((prev) => {
           if (prev <= 1) {
             setPaymentStep("failed");
+            localStorage.removeItem(storageKey);
             return 0;
           }
           return prev - 1;
@@ -214,7 +266,7 @@ export function CryptoPaymentFlow({
       }, 1000);
       return () => clearInterval(timer);
     }
-  }, [paymentStep, timeLeft]);
+  }, [paymentStep, timeLeft, storageKey]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -289,7 +341,7 @@ export function CryptoPaymentFlow({
               Le delai de paiement a expire ou une erreur s'est produite.
             </p>
           </div>
-          <Button onClick={() => setPaymentStep("select")} variant="outline">
+          <Button onClick={() => { localStorage.removeItem(storageKey); setPaymentStep("select"); setPaymentDetails(null); setSelectedCrypto(null); }} variant="outline">
             Reessayer
           </Button>
         </CardContent>
@@ -361,15 +413,22 @@ export function CryptoPaymentFlow({
             </AlertDescription>
           </Alert>
 
-          <div className="flex items-center justify-center gap-2 text-muted-foreground text-sm">
-            <RefreshCw className="h-4 w-4 animate-spin" />
-            <span>Verification automatique en cours...</span>
-          </div>
+          {pollFailures >= 3 ? (
+            <div className="flex items-center justify-center gap-2 text-orange-600 text-sm">
+              <AlertCircle className="h-4 w-4" />
+              <span>Verification automatique interrompue. Utilisez le bouton ci-dessous.</span>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center gap-2 text-muted-foreground text-sm">
+              <RefreshCw className="h-4 w-4 animate-spin" />
+              <span>Verification automatique en cours...</span>
+            </div>
+          )}
 
           <Button
             variant="outline"
             className="w-full"
-            onClick={() => refetchStatus()}
+            onClick={() => { setPollFailures(0); refetchStatus(); }}
           >
             Verifier manuellement
           </Button>
