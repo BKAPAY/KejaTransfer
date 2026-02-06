@@ -3,17 +3,16 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Globe, Wifi, CheckCircle2, XCircle, ChevronDown, ChevronRight, AlertCircle } from "lucide-react";
+import { Globe, Wifi, CheckCircle2, XCircle, ChevronDown, ChevronRight, AlertCircle, Bitcoin } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { CountryOperatorConfig, CountryStatus } from "@shared/schema";
+import type { CountryOperatorConfig, CountryStatus, CryptoCurrency } from "@shared/schema";
 import { AFRIBAPAY_COUNTRIES } from "@shared/afribapay-countries";
 import { PAYDUNYA_COUNTRIES } from "@shared/paydunya-countries";
 import { FEDAPAY_COUNTRIES } from "@shared/fedapay-countries";
 import { MBIYOPAY_COUNTRIES } from "@shared/mbiyopay-countries";
-import { NOWPAYMENTS_COUNTRIES } from "@shared/nowpayments-countries";
 
 interface ProviderConfig {
   id: string;
@@ -50,7 +49,7 @@ const PROVIDERS = [
     id: "nowpayments", 
     name: "NOWPayments", 
     color: "bg-orange-500",
-    countries: NOWPAYMENTS_COUNTRIES 
+    countries: [] 
   },
 ];
 
@@ -125,6 +124,32 @@ export default function CountryOperatorConfigPage() {
       toast({
         title: "Erreur",
         description: error.message || "Impossible de mettre à jour",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const { data: cryptoCurrencies, isLoading: isLoadingCrypto } = useQuery<CryptoCurrency[]>({
+    queryKey: ["/api/admin/crypto-currencies"],
+  });
+
+  const toggleCryptoMutation = useMutation({
+    mutationFn: async (payload: { code: string; isEnabled: boolean }) => {
+      return apiRequest("PUT", `/api/admin/crypto-currencies/${payload.code}`, {
+        isEnabled: payload.isEnabled,
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Succes",
+        description: "Cryptomonnaie mise a jour",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/crypto-currencies"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erreur",
+        description: error.message || "Impossible de mettre a jour",
         variant: "destructive",
       });
     },
@@ -249,80 +274,58 @@ export default function CountryOperatorConfigPage() {
                 <div className="grid gap-4">
                   <div className="bg-muted/50 border rounded-lg p-4 mb-2">
                     <p className="text-sm text-muted-foreground">
-                      NOWPayments gere les paiements en cryptomonnaie. Activez ou desactivez les paiements crypto (entrants/sortants) par pays.
-                      Pas besoin de configurer des operateurs individuels.
+                      NOWPayments gere les paiements en cryptomonnaie. Activez ou desactivez les cryptomonnaies disponibles pour les paiements.
                     </p>
                   </div>
-                  {provider.countries.map((countryInfo) => {
-                    const countryCode = countryInfo.code;
-                    const countryStatus = countryStatusMap[countryCode];
-
-                    return (
-                      <Card key={`${provider.id}-${countryCode}`}>
-                        <div className="p-4">
-                          <div className="flex items-center justify-between flex-wrap gap-2">
-                            <div className="flex items-center gap-3">
-                              <Globe className="w-6 h-6 text-muted-foreground" />
-                              <div>
-                                <h3 className="font-semibold text-foreground">{countryInfo.name} ({countryCode})</h3>
-                                <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
-                                  <span>{countryInfo.currency}</span>
-                                  {countryStatus?.payinEnabled && (
-                                    <Badge variant="secondary" className="text-xs bg-green-500/10 text-green-600">
-                                      Depot crypto actif
-                                    </Badge>
-                                  )}
-                                  {countryStatus?.payoutEnabled && (
-                                    <Badge variant="secondary" className="text-xs bg-blue-500/10 text-blue-600">
-                                      Retrait crypto actif
-                                    </Badge>
-                                  )}
+                  {isLoadingCrypto ? (
+                    <div className="grid gap-3">
+                      {Array.from({ length: 6 }).map((_, i) => (
+                        <Skeleton key={i} className="h-16" />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="grid gap-3">
+                      {cryptoCurrencies?.map((crypto) => (
+                        <Card key={crypto.code}>
+                          <div className="p-4">
+                            <div className="flex items-center justify-between flex-wrap gap-2">
+                              <div className="flex items-center gap-3">
+                                <Bitcoin className="w-6 h-6 text-muted-foreground" />
+                                <div>
+                                  <h3 className="font-semibold text-foreground">{crypto.name}</h3>
+                                  <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
+                                    <span>{crypto.symbol}</span>
+                                    <span className="text-xs text-muted-foreground">({crypto.code})</span>
+                                  </div>
                                 </div>
                               </div>
-                            </div>
 
-                            <div className="flex items-center gap-3 flex-wrap">
-                              {countryStatus && (
-                                <>
-                                  <Button
-                                    size="sm"
-                                    variant={countryStatus.payinEnabled ? "default" : "outline"}
-                                    onClick={() => toggleCountrySetting(countryStatus, "payin")}
-                                    disabled={updateCountryMutation.isPending}
-                                    data-testid={`toggle-country-payin-${provider.id}-${countryCode}`}
-                                    className="gap-2"
-                                  >
-                                    {countryStatus.payinEnabled ? (
-                                      <CheckCircle2 className="w-4 h-4" />
-                                    ) : (
-                                      <XCircle className="w-4 h-4" />
-                                    )}
-                                    <span className="text-xs">Depot (Payin)</span>
-                                  </Button>
-
-                                  <Button
-                                    size="sm"
-                                    variant={countryStatus.payoutEnabled ? "default" : "outline"}
-                                    onClick={() => toggleCountrySetting(countryStatus, "payout")}
-                                    disabled={updateCountryMutation.isPending}
-                                    data-testid={`toggle-country-payout-${provider.id}-${countryCode}`}
-                                    className="gap-2"
-                                  >
-                                    {countryStatus.payoutEnabled ? (
-                                      <CheckCircle2 className="w-4 h-4" />
-                                    ) : (
-                                      <XCircle className="w-4 h-4" />
-                                    )}
-                                    <span className="text-xs">Retrait (Payout)</span>
-                                  </Button>
-                                </>
-                              )}
+                              <Button
+                                size="sm"
+                                variant={crypto.isEnabled ? "default" : "outline"}
+                                onClick={() => toggleCryptoMutation.mutate({ code: crypto.code, isEnabled: !crypto.isEnabled })}
+                                disabled={toggleCryptoMutation.isPending}
+                                data-testid={`toggle-crypto-${crypto.code}`}
+                                className="gap-2"
+                              >
+                                {crypto.isEnabled ? (
+                                  <CheckCircle2 className="w-4 h-4" />
+                                ) : (
+                                  <XCircle className="w-4 h-4" />
+                                )}
+                                <span className="text-xs">{crypto.isEnabled ? "Active" : "Desactive"}</span>
+                              </Button>
                             </div>
                           </div>
+                        </Card>
+                      ))}
+                      {(!cryptoCurrencies || cryptoCurrencies.length === 0) && (
+                        <div className="text-center py-8 text-muted-foreground">
+                          Aucune cryptomonnaie configuree
                         </div>
-                      </Card>
-                    );
-                  })}
+                      )}
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="grid gap-4">

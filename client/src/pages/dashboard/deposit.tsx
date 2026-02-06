@@ -23,7 +23,6 @@ import { OperatorSelector } from "@/components/operator-selector";
 import { hasMultipleCurrencies, getMbiyoPayCurrencyForCountry, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
 import { useConvertedMinimums } from "@/hooks/use-converted-minimums";
 import { getCurrencyDecimals } from "@/lib/currency";
-import { useCryptoAvailability } from "@/hooks/use-crypto-availability";
 
 interface ConversionData {
   convertedAmount: number;
@@ -68,7 +67,6 @@ export default function Deposit() {
     : "XOF";
 
   const { depositMin, cryptoMin } = useConvertedMinimums(userBalanceCurrency);
-  const { cryptoPayinEnabled } = useCryptoAvailability(user?.country);
 
   const { data: enabledCountriesOperators, isLoading: isLoadingOperators } = useQuery<Record<string, string[]>>({
     queryKey: ["/api/countries-operators/deposits"],
@@ -607,7 +605,6 @@ export default function Deposit() {
             </div>
 
             <PaymentMethodSelector
-              showCrypto={cryptoPayinEnabled}
               cryptoContent={
                 amount && amount >= cryptoMin ? (
                   <CryptoPaymentFlow

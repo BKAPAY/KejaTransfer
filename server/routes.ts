@@ -6568,6 +6568,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== Crypto Currencies Admin Routes =====
+  app.get("/api/admin/crypto-currencies", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const currencies = await storage.getAllCryptoCurrencies();
+      res.json(currencies);
+    } catch (error: any) {
+      console.error("Get crypto currencies error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
+  app.put("/api/admin/crypto-currencies/:code", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { code } = req.params;
+      const { isEnabled } = req.body;
+
+      const updated = await storage.updateCryptoCurrency(code, { isEnabled });
+      if (!updated) {
+        return res.status(404).json({ error: "Cryptomonnaie non trouvee" });
+      }
+
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Update crypto currency error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
   // ===== Fee Configuration Routes =====
   app.get("/api/admin/fee-configs", requireAdmin, async (req: Request, res: Response) => {
     try {

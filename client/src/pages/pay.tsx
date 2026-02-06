@@ -23,7 +23,6 @@ import { CurrencySelector, getCurrencyLabel } from "@/components/currency-select
 import { hasMultipleCurrencies, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
 import { getCurrencyDecimals } from "@/lib/currency";
 import { OperatorSelector } from "@/components/operator-selector";
-import { useCryptoAvailability } from "@/hooks/use-crypto-availability";
 
 function ImageCarousel({ images, productName }: { images: string[]; productName: string }) {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -462,7 +461,6 @@ export default function Pay() {
 
   const ownerCountry = (paymentLink as any)?.ownerCountry || null;
   const ownerCurrency = (paymentLink as any)?.ownerCurrency || "XOF";
-  const { cryptoPayinEnabled } = useCryptoAvailability(ownerCountry);
   
   // conversion (ownerCurrency -> Target Currency)
   // IMPORTANT: Only calculate target currency if a country is selected
@@ -1450,7 +1448,6 @@ export default function Pay() {
         </CardHeader>
         <CardContent className="p-3 sm:p-4 lg:p-6">
           <PaymentMethodSelector
-            showCrypto={cryptoPayinEnabled}
             mobileMoneyContent={mobileMoneyForm}
             cryptoContent={
               baseAmount >= 500 ? (

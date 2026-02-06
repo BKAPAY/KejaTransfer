@@ -26,7 +26,6 @@ import { useConvertedMinimums } from "@/hooks/use-converted-minimums";
 import { getCurrencyDecimals } from "@/lib/currency";
 import { PaymentMethodSelector } from "@/components/payment-method-selector";
 import { CryptoWithdrawalFlow } from "@/components/crypto-withdrawal-flow";
-import { useCryptoAvailability } from "@/hooks/use-crypto-availability";
 
 const transferSchema = z.object({
   amount: z.number().min(1, "Veuillez saisir un montant valide"),
@@ -66,7 +65,6 @@ export default function Transfer() {
     : "XOF";
 
   const { transferMin } = useConvertedMinimums(userBalanceCurrency);
-  const { cryptoPayoutEnabled } = useCryptoAvailability(user?.country);
 
   const { data: enabledCountriesOperators } = useQuery<Record<string, string[]>>({
     queryKey: ["/api/countries-operators/withdrawals"],
@@ -381,7 +379,6 @@ export default function Transfer() {
             </div>
 
             <PaymentMethodSelector
-              showCrypto={cryptoPayoutEnabled}
               mobileMoneyContent={
                 <Form {...form}>
                   <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
