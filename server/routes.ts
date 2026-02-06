@@ -162,6 +162,14 @@ async function requireApiKey(req: Request, res: Response, next: Function) {
       });
     }
 
+    // Vérifier si le propriétaire de la clé API est suspendu
+    const apiKeyOwner = await storage.getUser(apiKey.userId);
+    if (apiKeyOwner?.suspended) {
+      return res.status(403).json({ 
+        error: "Ce service est temporairement indisponible" 
+      });
+    }
+
     // Ajouter les informations de clé API à la requête
     (req as any).apiKey = apiKey;
     (req as any).userId = apiKey.userId;
@@ -1552,6 +1560,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Get owner's currency for proper display
       const owner = await storage.getUser(apiKey.userId);
+      
+      // Vérifier si le propriétaire est suspendu
+      if (owner?.suspended) {
+        return res.status(403).json({ error: "Ce service est temporairement indisponible" });
+      }
+      
       const ownerCurrency = owner?.country ? getCurrencyForCountry(owner.country) : "XOF";
       
       res.json({
