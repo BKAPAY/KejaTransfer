@@ -161,7 +161,8 @@ export const cryptoCurrencies = pgTable("crypto_currencies", {
   code: text("code").notNull().unique(), // "btc", "eth", "usdt", "ltc", etc.
   name: text("name").notNull(), // "Bitcoin", "Ethereum", etc.
   symbol: text("symbol").notNull(), // "BTC", "ETH", etc.
-  isEnabled: boolean("is_enabled").notNull().default(true),
+  payinEnabled: boolean("payin_enabled").notNull().default(true),
+  payoutEnabled: boolean("payout_enabled").notNull().default(true),
   minAmount: integer("min_amount"), // Minimum payment amount in USD cents
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),

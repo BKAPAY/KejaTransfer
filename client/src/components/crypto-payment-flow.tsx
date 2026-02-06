@@ -25,7 +25,8 @@ interface CryptoCurrency {
   code: string;
   name: string;
   symbol: string;
-  isEnabled: boolean;
+  payinEnabled: boolean;
+  payoutEnabled: boolean;
   minAmountXOF: number;
   minAmount?: number;
   minCurrency?: string;
@@ -84,9 +85,9 @@ export function CryptoPaymentFlow({
   });
 
   const { data: currencies, isLoading: currenciesLoading } = useQuery<CryptoCurrency[]>({
-    queryKey: ["/api/crypto/currencies", currency],
+    queryKey: ["/api/crypto/currencies", currency, "payin"],
     queryFn: async () => {
-      const res = await fetch(`/api/crypto/currencies?currency=${currency}`);
+      const res = await fetch(`/api/crypto/currencies?currency=${currency}&direction=payin`);
       return res.json();
     },
     enabled: cryptoStatus?.available === true,
@@ -211,7 +212,7 @@ export function CryptoPaymentFlow({
     }
   };
 
-  const enabledCurrencies = currencies?.filter((c) => c.isEnabled) || [];
+  const enabledCurrencies = currencies || [];
 
   if (!cryptoStatus?.available) {
     return (

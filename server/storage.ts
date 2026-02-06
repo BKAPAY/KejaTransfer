@@ -140,7 +140,8 @@ export interface IStorage {
 
   // Crypto Currencies
   getAllCryptoCurrencies(): Promise<schema.CryptoCurrency[]>;
-  getEnabledCryptoCurrencies(): Promise<schema.CryptoCurrency[]>;
+  getPayinEnabledCryptoCurrencies(): Promise<schema.CryptoCurrency[]>;
+  getPayoutEnabledCryptoCurrencies(): Promise<schema.CryptoCurrency[]>;
   getCryptoCurrencyByCode(code: string): Promise<schema.CryptoCurrency | undefined>;
   createCryptoCurrency(data: schema.InsertCryptoCurrency): Promise<schema.CryptoCurrency>;
   updateCryptoCurrency(code: string, updates: Partial<schema.InsertCryptoCurrency>): Promise<schema.CryptoCurrency | undefined>;
@@ -1546,11 +1547,18 @@ export class DbStorage implements IStorage {
     return db.select().from(schema.cryptoCurrencies);
   }
 
-  async getEnabledCryptoCurrencies(): Promise<schema.CryptoCurrency[]> {
+  async getPayinEnabledCryptoCurrencies(): Promise<schema.CryptoCurrency[]> {
     return db
       .select()
       .from(schema.cryptoCurrencies)
-      .where(eq(schema.cryptoCurrencies.isEnabled, true));
+      .where(eq(schema.cryptoCurrencies.payinEnabled, true));
+  }
+
+  async getPayoutEnabledCryptoCurrencies(): Promise<schema.CryptoCurrency[]> {
+    return db
+      .select()
+      .from(schema.cryptoCurrencies)
+      .where(eq(schema.cryptoCurrencies.payoutEnabled, true));
   }
 
   async getCryptoCurrencyByCode(code: string): Promise<schema.CryptoCurrency | undefined> {

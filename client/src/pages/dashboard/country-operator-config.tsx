@@ -134,9 +134,10 @@ export default function CountryOperatorConfigPage() {
   });
 
   const toggleCryptoMutation = useMutation({
-    mutationFn: async (payload: { code: string; isEnabled: boolean }) => {
+    mutationFn: async (payload: { code: string; payinEnabled?: boolean; payoutEnabled?: boolean }) => {
       return apiRequest("PUT", `/api/admin/crypto-currencies/${payload.code}`, {
-        isEnabled: payload.isEnabled,
+        payinEnabled: payload.payinEnabled,
+        payoutEnabled: payload.payoutEnabled,
       });
     },
     onSuccess: () => {
@@ -300,21 +301,39 @@ export default function CountryOperatorConfigPage() {
                                 </div>
                               </div>
 
-                              <Button
-                                size="sm"
-                                variant={crypto.isEnabled ? "default" : "outline"}
-                                onClick={() => toggleCryptoMutation.mutate({ code: crypto.code, isEnabled: !crypto.isEnabled })}
-                                disabled={toggleCryptoMutation.isPending}
-                                data-testid={`toggle-crypto-${crypto.code}`}
-                                className="gap-2"
-                              >
-                                {crypto.isEnabled ? (
-                                  <CheckCircle2 className="w-4 h-4" />
-                                ) : (
-                                  <XCircle className="w-4 h-4" />
-                                )}
-                                <span className="text-xs">{crypto.isEnabled ? "Active" : "Desactive"}</span>
-                              </Button>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  size="sm"
+                                  variant={crypto.payinEnabled ? "default" : "outline"}
+                                  onClick={() => toggleCryptoMutation.mutate({ code: crypto.code, payinEnabled: !crypto.payinEnabled })}
+                                  disabled={toggleCryptoMutation.isPending}
+                                  data-testid={`toggle-crypto-payin-${crypto.code}`}
+                                  className="gap-2"
+                                >
+                                  {crypto.payinEnabled ? (
+                                    <CheckCircle2 className="w-4 h-4" />
+                                  ) : (
+                                    <XCircle className="w-4 h-4" />
+                                  )}
+                                  <span className="text-xs">Entrant</span>
+                                </Button>
+
+                                <Button
+                                  size="sm"
+                                  variant={crypto.payoutEnabled ? "default" : "outline"}
+                                  onClick={() => toggleCryptoMutation.mutate({ code: crypto.code, payoutEnabled: !crypto.payoutEnabled })}
+                                  disabled={toggleCryptoMutation.isPending}
+                                  data-testid={`toggle-crypto-payout-${crypto.code}`}
+                                  className="gap-2"
+                                >
+                                  {crypto.payoutEnabled ? (
+                                    <CheckCircle2 className="w-4 h-4" />
+                                  ) : (
+                                    <XCircle className="w-4 h-4" />
+                                  )}
+                                  <span className="text-xs">Sortant</span>
+                                </Button>
+                              </div>
                             </div>
                           </div>
                         </Card>

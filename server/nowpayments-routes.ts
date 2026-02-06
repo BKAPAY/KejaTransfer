@@ -65,14 +65,18 @@ router.get("/api/crypto/currencies", async (req: Request, res: Response) => {
     const { currency } = req.query;
     const targetCurrency = ((currency as string) || "XOF").toUpperCase();
     
-    const enabledCryptos = await storage.getEnabledCryptoCurrencies();
+    const direction = (req.query.direction as string) || "payin";
+    const enabledCryptos = direction === "payout"
+      ? await storage.getPayoutEnabledCryptoCurrencies()
+      : await storage.getPayinEnabledCryptoCurrencies();
     
     let cryptosList = enabledCryptos.length === 0 
       ? SUPPORTED_CRYPTOCURRENCIES.map((c) => ({
           code: c.code,
           name: c.name,
           symbol: c.symbol,
-          isEnabled: true,
+          payinEnabled: true,
+          payoutEnabled: true,
           minAmountXOF: c.minAmountXOF,
         }))
       : enabledCryptos.map((crypto: any) => ({
@@ -669,73 +673,6 @@ router.post("/api/crypto/create-withdrawal", async (req: Request, res: Response)
   } catch (error: any) {
     console.error("[NOWPayments] Create crypto withdrawal failed:", error);
     res.status(500).json({ success: false, error: error.message || "Erreur lors du retrait crypto" });
-  }
-});
-
-router.get("/api/admin/crypto-currencies", async (req: Request, res: Response) => {
-  try {
-    const cryptosInDb = await storage.getAllCryptoCurrencies();
-    
-    // Fusionner toutes les cryptos supportées avec celles en base de données
-    const cryptoMap = new Map<string, any>();
-    
-    // D'abord, ajouter toutes les cryptos supportées avec isEnabled: false par défaut
-    for (const c of SUPPORTED_CRYPTOCURRENCIES) {
-      cryptoMap.set(c.code, {
-        id: null,
-        code: c.code,
-        name: c.name,
-        symbol: c.symbol,
-        isEnabled: false,
-        minAmount: null,
-      });
-    }
-    
-    // Ensuite, mettre à jour avec les données de la base de données
-    for (const dbCrypto of cryptosInDb) {
-      cryptoMap.set(dbCrypto.code, {
-        id: dbCrypto.id,
-        code: dbCrypto.code,
-        name: dbCrypto.name,
-        symbol: dbCrypto.symbol,
-        isEnabled: dbCrypto.isEnabled,
-        minAmount: dbCrypto.minAmount,
-      });
-    }
-    
-    res.json(Array.from(cryptoMap.values()));
-  } catch (error: any) {
-    console.error("[Admin] Get crypto currencies failed:", error);
-    res.status(500).json({ error: "Impossible de récupérer les cryptomonnaies" });
-  }
-});
-
-router.put("/api/admin/crypto-currencies/:code", async (req: Request, res: Response) => {
-  try {
-    const { code } = req.params;
-    const { isEnabled } = req.body;
-
-    const existing = await storage.getCryptoCurrencyByCode(code);
-    
-    if (existing) {
-      await storage.updateCryptoCurrency(code, { isEnabled });
-    } else {
-      const cryptoInfo = SUPPORTED_CRYPTOCURRENCIES.find((c) => c.code === code);
-      if (!cryptoInfo) {
-        return res.status(404).json({ error: "Cryptomonnaie non supportée" });
-      }
-      await storage.createCryptoCurrency({
-        code: cryptoInfo.code,
-        name: cryptoInfo.name,
-        symbol: cryptoInfo.symbol,
-        isEnabled,
-      });
-    }
-
-    res.json({ success: true });
-  } catch (error: any) {
-    console.error("[Admin] Update crypto currency failed:", error);
-    res.status(500).json({ error: "Impossible de mettre à jour la cryptomonnaie" });
   }
 });
 

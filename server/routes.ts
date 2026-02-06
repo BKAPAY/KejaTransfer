@@ -65,6 +65,7 @@ import {
   EmailType,
 } from "./email-service";
 import nowpaymentsRoutes from "./nowpayments-routes";
+import { SUPPORTED_CRYPTOCURRENCIES } from "./nowpayments";
 import afribaPayRoutes from "./afribapay-routes";
 import {
   handleAfribaPayDeposit,
@@ -6571,8 +6572,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ===== Crypto Currencies Admin Routes =====
   app.get("/api/admin/crypto-currencies", requireAdmin, async (req: Request, res: Response) => {
     try {
-      const currencies = await storage.getAllCryptoCurrencies();
-      res.json(currencies);
+      const cryptosInDb = await storage.getAllCryptoCurrencies();
+      const cryptoMap = new Map<string, any>();
+
+      for (const c of SUPPORTED_CRYPTOCURRENCIES) {
+        cryptoMap.set(c.code, {
+          id: null,
+          code: c.code,
+          name: c.name,
+          symbol: c.symbol,
+          payinEnabled: false,
+          payoutEnabled: false,
+          minAmount: null,
+        });
+      }
+
+      for (const dbCrypto of cryptosInDb) {
+        cryptoMap.set(dbCrypto.code, {
+          id: dbCrypto.id,
+          code: dbCrypto.code,
+          name: dbCrypto.name,
+          symbol: dbCrypto.symbol,
+          payinEnabled: dbCrypto.payinEnabled,
+          payoutEnabled: dbCrypto.payoutEnabled,
+          minAmount: dbCrypto.minAmount,
+        });
+      }
+
+      res.json(Array.from(cryptoMap.values()));
     } catch (error: any) {
       console.error("Get crypto currencies error:", error);
       res.status(500).json({ error: "Une erreur est survenue" });
@@ -6582,14 +6609,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/admin/crypto-currencies/:code", requireAdmin, async (req: Request, res: Response) => {
     try {
       const { code } = req.params;
-      const { isEnabled } = req.body;
+      const { payinEnabled, payoutEnabled } = req.body;
 
-      const updated = await storage.updateCryptoCurrency(code, { isEnabled });
-      if (!updated) {
-        return res.status(404).json({ error: "Cryptomonnaie non trouvee" });
+      const updates: any = {};
+      if (typeof payinEnabled === "boolean") updates.payinEnabled = payinEnabled;
+      if (typeof payoutEnabled === "boolean") updates.payoutEnabled = payoutEnabled;
+
+      const existing = await storage.getCryptoCurrencyByCode(code);
+
+      if (existing) {
+        const updated = await storage.updateCryptoCurrency(code, updates);
+        res.json(updated);
+      } else {
+        const cryptoInfo = SUPPORTED_CRYPTOCURRENCIES.find((c) => c.code === code);
+        if (!cryptoInfo) {
+          return res.status(404).json({ error: "Cryptomonnaie non trouvee" });
+        }
+        const created = await storage.createCryptoCurrency({
+          code: cryptoInfo.code,
+          name: cryptoInfo.name,
+          symbol: cryptoInfo.symbol,
+          payinEnabled: typeof payinEnabled === "boolean" ? payinEnabled : true,
+          payoutEnabled: typeof payoutEnabled === "boolean" ? payoutEnabled : true,
+        });
+        res.json(created);
       }
-
-      res.json(updated);
     } catch (error: any) {
       console.error("Update crypto currency error:", error);
       res.status(500).json({ error: "Une erreur est survenue" });

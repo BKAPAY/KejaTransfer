@@ -13,7 +13,8 @@ interface CryptoCurrency {
   code: string;
   name: string;
   symbol: string;
-  isEnabled: boolean;
+  payinEnabled: boolean;
+  payoutEnabled: boolean;
   minAmount: number | null;
 }
 
@@ -49,8 +50,8 @@ export default function CryptoConfigPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ code, isEnabled }: { code: string; isEnabled: boolean }) => {
-      return apiRequest("PUT", `/api/admin/crypto-currencies/${code}`, { isEnabled });
+    mutationFn: async ({ code, payinEnabled, payoutEnabled }: { code: string; payinEnabled?: boolean; payoutEnabled?: boolean }) => {
+      return apiRequest("PUT", `/api/admin/crypto-currencies/${code}`, { payinEnabled, payoutEnabled });
     },
     onSuccess: () => {
       toast({
@@ -67,10 +68,6 @@ export default function CryptoConfigPage() {
       });
     },
   });
-
-  const toggleCrypto = (code: string, currentEnabled: boolean) => {
-    updateMutation.mutate({ code, isEnabled: !currentEnabled });
-  };
 
   if (statusLoading || currenciesLoading) {
     return (
@@ -150,12 +147,26 @@ export default function CryptoConfigPage() {
                     </Badge>
                   </div>
                 </div>
-                <Switch
-                  checked={crypto.isEnabled}
-                  onCheckedChange={() => toggleCrypto(crypto.code, crypto.isEnabled)}
-                  disabled={updateMutation.isPending}
-                  data-testid={`switch-crypto-${crypto.code}`}
-                />
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs text-muted-foreground">Entrant</span>
+                    <Switch
+                      checked={crypto.payinEnabled}
+                      onCheckedChange={() => updateMutation.mutate({ code: crypto.code, payinEnabled: !crypto.payinEnabled })}
+                      disabled={updateMutation.isPending}
+                      data-testid={`switch-crypto-payin-${crypto.code}`}
+                    />
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs text-muted-foreground">Sortant</span>
+                    <Switch
+                      checked={crypto.payoutEnabled}
+                      onCheckedChange={() => updateMutation.mutate({ code: crypto.code, payoutEnabled: !crypto.payoutEnabled })}
+                      disabled={updateMutation.isPending}
+                      data-testid={`switch-crypto-payout-${crypto.code}`}
+                    />
+                  </div>
+                </div>
               </div>
             ))}
           </div>

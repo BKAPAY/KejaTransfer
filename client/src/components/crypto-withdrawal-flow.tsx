@@ -24,7 +24,8 @@ interface CryptoCurrency {
   code: string;
   name: string;
   symbol: string;
-  isEnabled: boolean;
+  payinEnabled: boolean;
+  payoutEnabled: boolean;
   minAmountXOF: number;
   minAmount?: number;
   minCurrency?: string;
@@ -54,9 +55,9 @@ export function CryptoWithdrawalFlow({
   const [securityError, setSecurityError] = useState("");
 
   const { data: cryptoCurrencies, isLoading: loadingCurrencies } = useQuery<CryptoCurrency[]>({
-    queryKey: ["/api/crypto/currencies", currency],
+    queryKey: ["/api/crypto/currencies", currency, "payout"],
     queryFn: async () => {
-      const res = await fetch(`/api/crypto/currencies?currency=${currency}`);
+      const res = await fetch(`/api/crypto/currencies?currency=${currency}&direction=payout`);
       return res.json();
     },
   });
@@ -183,7 +184,7 @@ export function CryptoWithdrawalFlow({
           </div>
         ) : (
           <div className="grid grid-cols-3 gap-2">
-            {cryptoCurrencies?.filter(c => c.isEnabled).map((crypto) => (
+            {cryptoCurrencies?.map((crypto) => (
               <button
                 key={crypto.code}
                 type="button"
