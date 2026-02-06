@@ -1,4 +1,5 @@
 import { Link } from "wouter";
+import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -7,7 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { CreditCard, Link as LinkIcon, Code, BarChart3, Shield, Zap, Menu } from "lucide-react";
+import { CreditCard, Link as LinkIcon, Code, BarChart3, Shield, Zap, Menu, Bitcoin, Wallet } from "lucide-react";
 import { COUNTRIES } from "@shared/schema";
 import { CountryFlag } from "@/components/country-flag";
 import logoImage from "@assets/bkapay-logo.png";
@@ -24,8 +25,10 @@ import apiGatewayImage from "@assets/generated_images/api_gateway_feature_image.
 import dashboardImage from "@assets/generated_images/dashboard_analytics_feature_image.png";
 import securityImage from "@assets/generated_images/security_feature_image.png";
 import fastPaymentImage from "@assets/generated_images/fast_payment_processing_image.png";
+import cryptoHeroImage from "@assets/crypto-payment-hero.png";
+import cardHeroImage from "@assets/card-payment-hero.png";
+import heroMainImage from "@assets/hero-main.png";
 
-// Use all 15 AfribaPay countries from shared schema
 const countries = COUNTRIES;
 
 const operators = [
@@ -77,9 +80,38 @@ const features = [
   },
 ];
 
+function useScrollAnimation() {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("is-visible");
+          }
+        });
+      },
+      { threshold: 0.1, rootMargin: "0px 0px -40px 0px" }
+    );
+
+    const el = ref.current;
+    if (el) {
+      const targets = el.querySelectorAll(".animate-on-scroll");
+      targets.forEach((t) => observer.observe(t));
+    }
+
+    return () => observer.disconnect();
+  }, []);
+
+  return ref;
+}
+
 export default function Home() {
+  const scrollRef = useScrollAnimation();
+
   return (
-    <div className="w-full min-h-screen bg-background overflow-hidden">
+    <div ref={scrollRef} className="w-full min-h-screen bg-background overflow-hidden">
       {/* Header */}
       <header className="border-b bg-card sticky top-0 z-50">
         <div className="container mx-auto px-2 sm:px-4 md:px-8 py-2 sm:py-4">
@@ -115,26 +147,30 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Hero Section */}
-      <section className="relative py-8 md:py-20 lg:py-32 overflow-hidden bg-gradient-to-br from-primary/5 via-background to-accent/5">
-        <div className="container mx-auto px-2 sm:px-4 md:px-8 max-w-7xl">
-          <div className="space-y-3 sm:space-y-6 lg:space-y-8">
+      {/* Hero Section with background image */}
+      <section className="relative py-12 md:py-24 lg:py-36 overflow-hidden">
+        <div className="absolute inset-0">
+          <img src={heroMainImage} alt="" className="w-full h-full object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/60 to-black/40" />
+        </div>
+        <div className="container mx-auto px-2 sm:px-4 md:px-8 max-w-7xl relative z-10">
+          <div className="space-y-3 sm:space-y-6 lg:space-y-8 max-w-2xl">
             <div className="space-y-2 sm:space-y-4">
-              <h1 className="text-xl sm:text-2xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-foreground leading-tight">
+              <h1 className="animate-on-scroll anim-slide-left text-xl sm:text-2xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-white leading-tight">
                 Paiements Mobile Money pour l'Afrique de l'Ouest
               </h1>
-              <p className="text-xs sm:text-sm md:text-base lg:text-lg text-muted-foreground">
+              <p className="animate-on-scroll anim-slide-left anim-delay-1 text-xs sm:text-sm md:text-base lg:text-lg text-white/80">
                 Acceptez les paiements Orange Money, MTN, Moov, Wave et plus dans 15 pays. Plateforme simple, sécurisée et fiable.
               </p>
             </div>
-            <div className="flex flex-wrap gap-2 sm:gap-4">
+            <div className="animate-on-scroll anim-slide-left anim-delay-2 flex flex-wrap gap-2 sm:gap-4">
               <Link href="/signup">
-                <Button size="sm" className="text-xs sm:text-sm md:text-base" data-testid="button-hero-signup">
+                <Button className="text-xs sm:text-sm md:text-base" data-testid="button-hero-signup">
                   Commencer
                 </Button>
               </Link>
               <Link href="/login">
-                <Button size="sm" variant="outline" className="text-xs sm:text-sm md:text-base" data-testid="button-hero-login">
+                <Button variant="outline" className="text-xs sm:text-sm md:text-base border-white/30 text-white bg-white/10 backdrop-blur-sm" data-testid="button-hero-login">
                   Se connecter
                 </Button>
               </Link>
@@ -147,8 +183,8 @@ export default function Home() {
       <section className="py-6 sm:py-8 md:py-12 lg:py-16 bg-card overflow-hidden">
         <div className="container mx-auto px-2 sm:px-4 md:px-8 max-w-7xl">
           <div className="text-center mb-4 sm:mb-8">
-            <h2 className="text-lg sm:text-xl md:text-3xl lg:text-4xl font-bold mb-2 sm:mb-4 text-foreground">Disponible dans 15 pays</h2>
-            <p className="text-xs sm:text-sm md:text-base lg:text-lg text-muted-foreground">Couvrant toute l'Afrique de l'Ouest francophone</p>
+            <h2 className="animate-on-scroll anim-fade-up text-lg sm:text-xl md:text-3xl lg:text-4xl font-bold mb-2 sm:mb-4 text-foreground">Disponible dans 15 pays</h2>
+            <p className="animate-on-scroll anim-fade-up anim-delay-1 text-xs sm:text-sm md:text-base lg:text-lg text-muted-foreground">Couvrant toute l'Afrique de l'Ouest francophone</p>
           </div>
           <div className="flex gap-2 sm:gap-4 carousel-scroll">
             {[...countries, ...countries].map((country, index) => (
@@ -161,18 +197,83 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Crypto Payment Section */}
+      <section className="py-8 sm:py-12 md:py-16 lg:py-20 overflow-hidden">
+        <div className="container mx-auto px-2 sm:px-4 md:px-8 max-w-7xl">
+          <div className="grid md:grid-cols-2 gap-6 sm:gap-8 lg:gap-12 items-center">
+            <div className="animate-on-scroll anim-slide-left order-2 md:order-1">
+              <div className="bg-accent/10 w-10 h-10 sm:w-12 sm:h-12 rounded-md flex items-center justify-center mb-3 sm:mb-4">
+                <Bitcoin className="w-5 h-5 sm:w-6 sm:h-6 text-accent" />
+              </div>
+              <h2 className="text-lg sm:text-2xl md:text-3xl lg:text-4xl font-bold mb-3 sm:mb-4 text-foreground">
+                Paiements en Cryptomonnaie
+              </h2>
+              <p className="text-xs sm:text-sm md:text-base text-muted-foreground mb-4 sm:mb-6 leading-relaxed">
+                Acceptez Bitcoin, Ethereum, USDT, TRX et bien d'autres cryptomonnaies. Conversion automatique en XOF, XAF ou CDF. Vos clients paient en crypto, vous recevez en monnaie locale.
+              </p>
+              <div className="flex flex-wrap gap-2 sm:gap-3">
+                <span className="inline-flex items-center gap-1 px-2 py-1 sm:px-3 sm:py-1.5 bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-400 rounded-md text-xs sm:text-sm font-medium">BTC</span>
+                <span className="inline-flex items-center gap-1 px-2 py-1 sm:px-3 sm:py-1.5 bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-400 rounded-md text-xs sm:text-sm font-medium">ETH</span>
+                <span className="inline-flex items-center gap-1 px-2 py-1 sm:px-3 sm:py-1.5 bg-green-100 dark:bg-green-950 text-green-700 dark:text-green-400 rounded-md text-xs sm:text-sm font-medium">USDT</span>
+                <span className="inline-flex items-center gap-1 px-2 py-1 sm:px-3 sm:py-1.5 bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-400 rounded-md text-xs sm:text-sm font-medium">TRX</span>
+                <span className="inline-flex items-center gap-1 px-2 py-1 sm:px-3 sm:py-1.5 bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400 rounded-md text-xs sm:text-sm font-medium">LTC</span>
+                <span className="inline-flex items-center gap-1 px-2 py-1 sm:px-3 sm:py-1.5 bg-muted text-muted-foreground rounded-md text-xs sm:text-sm font-medium">+ plus</span>
+              </div>
+            </div>
+            <div className="animate-on-scroll anim-slide-right order-1 md:order-2">
+              <img
+                src={cryptoHeroImage}
+                alt="Paiements en cryptomonnaie"
+                className="w-full rounded-md"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Card Payment Section */}
+      <section className="py-8 sm:py-12 md:py-16 lg:py-20 bg-card overflow-hidden">
+        <div className="container mx-auto px-2 sm:px-4 md:px-8 max-w-7xl">
+          <div className="grid md:grid-cols-2 gap-6 sm:gap-8 lg:gap-12 items-center">
+            <div className="animate-on-scroll anim-slide-left">
+              <img
+                src={cardHeroImage}
+                alt="Paiements par carte bancaire"
+                className="w-full rounded-md"
+              />
+            </div>
+            <div className="animate-on-scroll anim-slide-right">
+              <div className="bg-primary/10 w-10 h-10 sm:w-12 sm:h-12 rounded-md flex items-center justify-center mb-3 sm:mb-4">
+                <Wallet className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
+              </div>
+              <h2 className="text-lg sm:text-2xl md:text-3xl lg:text-4xl font-bold mb-3 sm:mb-4 text-foreground">
+                Paiements par Carte Bancaire
+              </h2>
+              <p className="text-xs sm:text-sm md:text-base text-muted-foreground mb-4 sm:mb-6 leading-relaxed">
+                Acceptez les paiements par carte Visa, Mastercard et autres cartes internationales. Transactions sécurisées et conformes aux normes PCI DSS pour la protection de vos clients.
+              </p>
+              <div className="flex flex-wrap gap-2 sm:gap-3">
+                <span className="inline-flex items-center gap-1 px-2 py-1 sm:px-3 sm:py-1.5 bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400 rounded-md text-xs sm:text-sm font-medium">Visa</span>
+                <span className="inline-flex items-center gap-1 px-2 py-1 sm:px-3 sm:py-1.5 bg-orange-100 dark:bg-orange-950 text-orange-700 dark:text-orange-400 rounded-md text-xs sm:text-sm font-medium">Mastercard</span>
+                <span className="inline-flex items-center gap-1 px-2 py-1 sm:px-3 sm:py-1.5 bg-muted text-muted-foreground rounded-md text-xs sm:text-sm font-medium">Cartes internationales</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Features Section */}
       <section className="py-6 sm:py-12 md:py-16 lg:py-20">
         <div className="container mx-auto px-2 sm:px-4 md:px-8 max-w-7xl">
           <div className="text-center mb-6 sm:mb-10 lg:mb-16">
-            <h2 className="text-lg sm:text-2xl md:text-3xl lg:text-4xl font-bold mb-2 sm:mb-4 text-foreground">Fonctionnalités puissantes</h2>
-            <p className="text-xs sm:text-sm md:text-base lg:text-lg text-muted-foreground max-w-2xl mx-auto">
+            <h2 className="animate-on-scroll anim-fade-up text-lg sm:text-2xl md:text-3xl lg:text-4xl font-bold mb-2 sm:mb-4 text-foreground">Fonctionnalités puissantes</h2>
+            <p className="animate-on-scroll anim-fade-up anim-delay-1 text-xs sm:text-sm md:text-base lg:text-lg text-muted-foreground max-w-2xl mx-auto">
               Tout ce dont vous avez besoin pour accepter des paiements et gérer votre activité
             </p>
           </div>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6 lg:gap-8">
             {features.map((feature, index) => (
-              <Card key={index} className="overflow-hidden hover-elevate flex flex-col h-full">
+              <Card key={index} className={`animate-on-scroll anim-scale-in anim-delay-${(index % 3) + 1} overflow-hidden hover-elevate flex flex-col h-full`}>
                 <img 
                   src={feature.image} 
                   alt={feature.title}
@@ -195,8 +296,8 @@ export default function Home() {
       <section className="py-6 sm:py-10 md:py-14 lg:py-16 bg-card overflow-hidden">
         <div className="container mx-auto px-2 sm:px-4 md:px-8 max-w-7xl">
           <div className="text-center mb-4 sm:mb-8">
-            <h2 className="text-lg sm:text-2xl md:text-3xl lg:text-4xl font-bold mb-2 sm:mb-4 text-foreground">Tous les opérateurs supportés</h2>
-            <p className="text-xs sm:text-sm md:text-base lg:text-lg text-muted-foreground">Acceptez les paiements de tous les principaux opérateurs</p>
+            <h2 className="animate-on-scroll anim-fade-up text-lg sm:text-2xl md:text-3xl lg:text-4xl font-bold mb-2 sm:mb-4 text-foreground">Tous les opérateurs supportés</h2>
+            <p className="animate-on-scroll anim-fade-up anim-delay-1 text-xs sm:text-sm md:text-base lg:text-lg text-muted-foreground">Acceptez les paiements de tous les principaux opérateurs</p>
           </div>
           <div className="flex gap-1 sm:gap-2 carousel-scroll">
             {[...operators, ...operators].map((operator, index) => (
@@ -218,17 +319,19 @@ export default function Home() {
       {/* CTA Section */}
       <section className="py-8 sm:py-12 md:py-16 lg:py-20 bg-gradient-to-br from-primary to-primary/80">
         <div className="container mx-auto px-2 sm:px-4 md:px-8 max-w-4xl text-center">
-          <h2 className="text-lg sm:text-2xl md:text-3xl lg:text-4xl font-bold mb-3 sm:mb-6 text-primary-foreground">
+          <h2 className="animate-on-scroll anim-fade-up text-lg sm:text-2xl md:text-3xl lg:text-4xl font-bold mb-3 sm:mb-6 text-primary-foreground">
             Prêt à commencer ?
           </h2>
-          <p className="text-xs sm:text-sm md:text-base lg:text-lg text-primary-foreground/90 mb-4 sm:mb-8">
+          <p className="animate-on-scroll anim-fade-up anim-delay-1 text-xs sm:text-sm md:text-base lg:text-lg text-primary-foreground/90 mb-4 sm:mb-8">
             Rejoignez des milliers d'entreprises qui font confiance à BKApay
           </p>
-          <Link href="/signup">
-            <Button size="sm" variant="secondary" className="text-xs sm:text-sm md:text-base" data-testid="button-cta-signup">
-              Créer un compte
-            </Button>
-          </Link>
+          <div className="animate-on-scroll anim-fade-up anim-delay-2">
+            <Link href="/signup">
+              <Button variant="secondary" className="text-xs sm:text-sm md:text-base" data-testid="button-cta-signup">
+                Créer un compte
+              </Button>
+            </Link>
+          </div>
         </div>
       </section>
 
