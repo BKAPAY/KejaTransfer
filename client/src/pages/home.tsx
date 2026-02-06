@@ -19,6 +19,14 @@ import waveImage from "@assets/wave (1)_1763835083242.png";
 import freeImage from "@assets/mixxByYas-web-page_1763835083140.png";
 import tmonyImage from "@assets/e-money_1763835083190.png";
 import wizallImage from "@assets/wizall_1763835083090.png";
+import airtelImage from "@assets/airtel-logo.png";
+import mpesaImage from "@assets/mpesa-logo.png";
+import celtiisImage from "@assets/celtiis-logo.png";
+import expressoImage from "@assets/expresso-logo.png";
+import corisImage from "@assets/coris-logo.png";
+import afrimoneyImage from "@assets/afrimoney-logo.png";
+import qmoneyImage from "@assets/qmoney-logo.png";
+import telecelImage from "@assets/telecel-logo.png";
 import paymentLinksImage from "@assets/generated_images/v3_payment_links.png";
 import merchantLinksImage from "@assets/generated_images/v3_merchant_links.png";
 import apiGatewayImage from "@assets/generated_images/v3_api_gateway.png";
@@ -41,6 +49,14 @@ const operators = [
   { name: "Free Money", image: freeImage },
   { name: "T-Money", image: tmonyImage },
   { name: "Wizall", image: wizallImage },
+  { name: "Airtel Money", image: airtelImage },
+  { name: "M-Pesa", image: mpesaImage },
+  { name: "Celtiis", image: celtiisImage },
+  { name: "Expresso", image: expressoImage },
+  { name: "Coris Money", image: corisImage },
+  { name: "AfriMoney", image: afrimoneyImage },
+  { name: "QMoney", image: qmoneyImage },
+  { name: "Telecel", image: telecelImage },
 ];
 
 const features = [
