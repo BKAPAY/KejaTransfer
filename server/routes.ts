@@ -6217,7 +6217,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error("Error sending KYC rejected email:", emailError);
       }
 
-      res.json(user);
+      const autoSuspended = user.suspended && (user.kycRejectionCount || 0) >= 3;
+      if (autoSuspended) {
+        console.log(`[KYC] Auto-suspension du compte ${userId} apres ${user.kycRejectionCount} rejets KYC`);
+      }
+
+      res.json({ ...user, autoSuspended });
     } catch (error: any) {
       console.error("Reject KYC error:", error);
       res.status(500).json({ error: "Une erreur est survenue" });

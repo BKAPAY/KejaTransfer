@@ -65,8 +65,12 @@ export function KycVerificationModal({
       if (!response.ok) throw new Error("Failed to reject KYC");
       return response.json();
     },
-    onSuccess: () => {
-      toast({ title: "Succès", description: "KYC rejetée" });
+    onSuccess: (data: any) => {
+      if (data?.autoSuspended) {
+        toast({ title: "Compte suspendu", description: `Le compte a ete automatiquement suspendu apres ${data.kycRejectionCount} rejets KYC consecutifs`, variant: "destructive" });
+      } else {
+        toast({ title: "Succès", description: "KYC rejetée" });
+      }
       setSelectedUser(null);
       setRejectionReason("");
       refetch();

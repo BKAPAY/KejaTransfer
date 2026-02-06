@@ -25,6 +25,7 @@ export const users = pgTable("users", {
   kycSelfie: text("kyc_selfie"), // Base64 encoded or URL
   kycSignature: text("kyc_signature"), // Base64 encoded signature
   kycRejectionReason: text("kyc_rejection_reason"), // Reason for KYC rejection
+  kycRejectionCount: integer("kyc_rejection_count").notNull().default(0), // Number of KYC rejections
   withdrawalPhones: text("withdrawal_phones").array().default([]), // Up to 3 withdrawal phone numbers
   securityCode: text("security_code"), // 6-digit security code for transfers/withdrawals
   isAdmin: boolean("is_admin").notNull().default(false),
@@ -234,6 +235,7 @@ export const insertUserSchema = createInsertSchema(users).omit({
   kycIdBack: true,
   kycSelfie: true,
   kycRejectionReason: true,
+  kycRejectionCount: true,
   withdrawalPhones: true,
   securityCode: true,
   isAdmin: true,

@@ -238,11 +238,19 @@ export class DbStorage implements IStorage {
   }
 
   async rejectKyc(userId: string, reason?: string): Promise<User | undefined> {
+    const user = await this.getUser(userId);
+    if (!user) return undefined;
+
+    const newRejectionCount = (user.kycRejectionCount || 0) + 1;
+    const shouldSuspend = newRejectionCount >= 3;
+
     const results = await db
       .update(schema.users)
       .set({ 
         kycStatus: "rejected",
         kycRejectionReason: reason || null,
+        kycRejectionCount: newRejectionCount,
+        ...(shouldSuspend ? { suspended: true } : {}),
       })
       .where(eq(schema.users.id, userId))
       .returning();
@@ -883,6 +891,7 @@ export class DbStorage implements IStorage {
       balance: schema.users.balance,
       kycStatus: schema.users.kycStatus,
       kycRejectionReason: schema.users.kycRejectionReason,
+      kycRejectionCount: schema.users.kycRejectionCount,
       isAdmin: schema.users.isAdmin,
       isPrimaryAdmin: schema.users.isPrimaryAdmin,
       suspended: schema.users.suspended,
@@ -893,6 +902,7 @@ export class DbStorage implements IStorage {
       kycIdFront: sql<string | null>`NULL`.as('kycIdFront'),
       kycIdBack: sql<string | null>`NULL`.as('kycIdBack'),
       kycSelfie: sql<string | null>`NULL`.as('kycSelfie'),
+      kycSignature: sql<string | null>`NULL`.as('kycSignature'),
     }).from(schema.users).orderBy(desc(schema.users.balance));
   }
 
