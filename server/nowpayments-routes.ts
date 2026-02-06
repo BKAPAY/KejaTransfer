@@ -412,7 +412,7 @@ router.post("/api/webhooks/nowpayments", async (req: Request, res: Response) => 
 
 router.get("/api/crypto/withdrawal-estimate", async (req: Request, res: Response) => {
   try {
-    const { amount, currency, crypto } = req.query;
+    const { amount, currency, crypto, type } = req.query;
 
     if (!amount || !currency || !crypto) {
       return res.status(400).json({ error: "Parametres manquants: amount, currency, crypto" });
@@ -425,6 +425,7 @@ router.get("/api/crypto/withdrawal-estimate", async (req: Request, res: Response
 
     const baseAmount = parseFloat(amount as string);
     const sourceCurrency = (currency as string).toUpperCase();
+    const operationType = type === "transfer" ? "transfer" : "withdrawal";
 
     if (!baseAmount || baseAmount <= 0) {
       return res.status(400).json({ error: "Montant invalide" });
@@ -439,13 +440,24 @@ router.get("/api/crypto/withdrawal-estimate", async (req: Request, res: Response
     const feePercentage = feeConfig.outgoing;
     const feeCalc = calculateOutgoingFee(Math.floor(baseAmount), feePercentage);
 
-    let usdAmount = feeCalc.amountReceived;
+    let amountForConversion: number;
+    let totalDeducted: number;
+
+    if (operationType === "transfer") {
+      amountForConversion = baseAmount;
+      totalDeducted = baseAmount + feeCalc.feeAmount;
+    } else {
+      amountForConversion = feeCalc.amountReceived;
+      totalDeducted = feeCalc.totalDeductedFromBalance;
+    }
+
+    let usdAmount = amountForConversion;
     if (sourceCurrency === "XOF" || sourceCurrency === "XAF") {
-      usdAmount = feeCalc.amountReceived * 0.0015;
+      usdAmount = amountForConversion * 0.0015;
     } else if (sourceCurrency === "CDF") {
-      usdAmount = feeCalc.amountReceived * 0.00035;
+      usdAmount = amountForConversion * 0.00035;
     } else if (sourceCurrency === "GNF") {
-      usdAmount = feeCalc.amountReceived * 0.00012;
+      usdAmount = amountForConversion * 0.00012;
     }
 
     const estimate = await client.getEstimate(usdAmount, "usd", crypto as string);
@@ -453,10 +465,11 @@ router.get("/api/crypto/withdrawal-estimate", async (req: Request, res: Response
     res.json({
       amount: baseAmount,
       currency: sourceCurrency,
+      type: operationType,
       feeAmount: feeCalc.feeAmount,
       feePercentage: feePercentage,
       amountAfterFee: feeCalc.amountReceived,
-      totalDeducted: feeCalc.totalDeductedFromBalance,
+      totalDeducted: totalDeducted,
       estimatedCryptoAmount: estimate.estimated_amount,
       cryptoCurrency: crypto,
       cryptoSymbol: getCryptoSymbol(crypto as string),
@@ -548,20 +561,31 @@ router.post("/api/crypto/create-withdrawal", async (req: Request, res: Response)
     const feePercentage = feeConfig.outgoing;
     const feeCalc = calculateOutgoingFee(Math.floor(baseAmount), feePercentage);
 
-    if (user.balance < feeCalc.totalDeductedFromBalance) {
+    let amountForConversion: number;
+    let totalToDebit: number;
+
+    if (withdrawalType === "transfer") {
+      amountForConversion = baseAmount;
+      totalToDebit = baseAmount + feeCalc.feeAmount;
+    } else {
+      amountForConversion = feeCalc.amountReceived;
+      totalToDebit = feeCalc.totalDeductedFromBalance;
+    }
+
+    if (user.balance < totalToDebit) {
       return res.status(400).json({ 
         success: false, 
-        error: `Solde insuffisant. Vous avez ${user.balance} ${sourceCurrency}, il faut ${feeCalc.totalDeductedFromBalance} ${sourceCurrency}` 
+        error: `Solde insuffisant. Vous avez ${user.balance} ${sourceCurrency}, il faut ${totalToDebit} ${sourceCurrency}` 
       });
     }
 
-    let usdAmount = feeCalc.amountReceived;
+    let usdAmount = amountForConversion;
     if (sourceCurrency === "XOF" || sourceCurrency === "XAF") {
-      usdAmount = feeCalc.amountReceived * 0.0015;
+      usdAmount = amountForConversion * 0.0015;
     } else if (sourceCurrency === "CDF") {
-      usdAmount = feeCalc.amountReceived * 0.00035;
+      usdAmount = amountForConversion * 0.00035;
     } else if (sourceCurrency === "GNF") {
-      usdAmount = feeCalc.amountReceived * 0.00012;
+      usdAmount = amountForConversion * 0.00012;
     }
 
     const client = await getNowPaymentsClient();
@@ -575,7 +599,7 @@ router.post("/api/crypto/create-withdrawal", async (req: Request, res: Response)
       }
     }
 
-    await storage.subtractFundsFromUser(user.id, feeCalc.totalDeductedFromBalance);
+    await storage.subtractFundsFromUser(user.id, totalToDebit);
 
     const transaction = await storage.createTransaction({
       userId: user.id,
@@ -599,7 +623,8 @@ router.post("/api/crypto/create-withdrawal", async (req: Request, res: Response)
         estimatedCryptoAmount,
         usdEquivalent: usdAmount,
         feeAmount: feeCalc.feeAmount,
-        amountAfterFee: feeCalc.amountReceived,
+        totalDebited: totalToDebit,
+        amountForConversion: amountForConversion,
         originalAmount: baseAmount,
         originalCurrency: sourceCurrency,
       }),
