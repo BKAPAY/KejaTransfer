@@ -4,7 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Globe, Percent, Save, ChevronDown, ChevronRight, ArrowDownToLine, ArrowUpFromLine, Building2, Bitcoin } from "lucide-react";
+import { Globe, Percent, Save, ChevronDown, ChevronRight, ArrowDownToLine, ArrowUpFromLine, Building2 } from "lucide-react";
+import { CryptoIcon } from "@/components/crypto-icon";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -339,8 +340,10 @@ function NowPaymentsFeeTab({
       <Card>
         <CardHeader>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-orange-500 flex items-center justify-center">
-              <Bitcoin className="w-5 h-5 text-white" />
+            <div className="flex items-center -space-x-1">
+              <CryptoIcon code="btc" size="lg" />
+              <CryptoIcon code="eth" size="lg" />
+              <CryptoIcon code="usdttrc20" size="lg" />
             </div>
             <div>
               <CardTitle className="flex items-center gap-2">

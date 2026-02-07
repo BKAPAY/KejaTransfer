@@ -526,7 +526,11 @@ export function CryptoPaymentFlow({
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Bitcoin className="h-5 w-5" />
+          <div className="flex items-center -space-x-1">
+            <CryptoIcon code="btc" size="sm" />
+            <CryptoIcon code="eth" size="sm" />
+            <CryptoIcon code="usdttrc20" size="sm" />
+          </div>
           Choisissez une cryptomonnaie
         </CardTitle>
       </CardHeader>

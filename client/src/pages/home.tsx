@@ -8,7 +8,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { CreditCard, Link as LinkIcon, Code, BarChart3, Shield, Zap, Menu, Bitcoin, Wallet } from "lucide-react";
+import { CreditCard, Link as LinkIcon, Code, BarChart3, Shield, Zap, Menu, Wallet } from "lucide-react";
+import { CryptoIcon } from "@/components/crypto-icon";
 import { COUNTRIES } from "@shared/schema";
 import { CountryFlag } from "@/components/country-flag";
 import logoImage from "@assets/bkapay-logo.png";
@@ -300,8 +301,10 @@ export default function Home() {
         <div className="container mx-auto px-2 sm:px-4 md:px-8 max-w-7xl">
           <div className="grid md:grid-cols-2 gap-6 sm:gap-8 lg:gap-12 items-center">
             <div className="animate-on-scroll anim-slide-left order-2 md:order-1">
-              <div className="bg-accent/10 w-10 h-10 sm:w-12 sm:h-12 rounded-md flex items-center justify-center mb-3 sm:mb-4">
-                <Bitcoin className="w-5 h-5 sm:w-6 sm:h-6 text-accent" />
+              <div className="flex items-center -space-x-1 mb-3 sm:mb-4">
+                <CryptoIcon code="btc" size="lg" />
+                <CryptoIcon code="eth" size="lg" />
+                <CryptoIcon code="usdttrc20" size="lg" />
               </div>
               <h2 className="text-lg sm:text-2xl md:text-3xl lg:text-4xl font-bold mb-3 sm:mb-4 text-foreground">
                 Paiements en Cryptomonnaie
@@ -310,11 +313,11 @@ export default function Home() {
                 Acceptez Bitcoin, Ethereum, USDT, TRX et bien d'autres cryptomonnaies. Conversion automatique en XOF, XAF ou CDF. Vos clients paient en crypto, vous recevez en monnaie locale.
               </p>
               <div className="flex flex-wrap gap-2 sm:gap-3">
-                <span className="inline-flex items-center gap-1 px-2 py-1 sm:px-3 sm:py-1.5 bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-400 rounded-md text-xs sm:text-sm font-medium">BTC</span>
-                <span className="inline-flex items-center gap-1 px-2 py-1 sm:px-3 sm:py-1.5 bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-400 rounded-md text-xs sm:text-sm font-medium">ETH</span>
-                <span className="inline-flex items-center gap-1 px-2 py-1 sm:px-3 sm:py-1.5 bg-green-100 dark:bg-green-950 text-green-700 dark:text-green-400 rounded-md text-xs sm:text-sm font-medium">USDT</span>
-                <span className="inline-flex items-center gap-1 px-2 py-1 sm:px-3 sm:py-1.5 bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-400 rounded-md text-xs sm:text-sm font-medium">TRX</span>
-                <span className="inline-flex items-center gap-1 px-2 py-1 sm:px-3 sm:py-1.5 bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400 rounded-md text-xs sm:text-sm font-medium">LTC</span>
+                <span className="inline-flex items-center gap-1.5 px-2 py-1 sm:px-3 sm:py-1.5 bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-400 rounded-md text-xs sm:text-sm font-medium"><CryptoIcon code="btc" size="xs" /> BTC</span>
+                <span className="inline-flex items-center gap-1.5 px-2 py-1 sm:px-3 sm:py-1.5 bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-400 rounded-md text-xs sm:text-sm font-medium"><CryptoIcon code="eth" size="xs" /> ETH</span>
+                <span className="inline-flex items-center gap-1.5 px-2 py-1 sm:px-3 sm:py-1.5 bg-green-100 dark:bg-green-950 text-green-700 dark:text-green-400 rounded-md text-xs sm:text-sm font-medium"><CryptoIcon code="usdttrc20" size="xs" /> USDT</span>
+                <span className="inline-flex items-center gap-1.5 px-2 py-1 sm:px-3 sm:py-1.5 bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-400 rounded-md text-xs sm:text-sm font-medium"><CryptoIcon code="trx" size="xs" /> TRX</span>
+                <span className="inline-flex items-center gap-1.5 px-2 py-1 sm:px-3 sm:py-1.5 bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400 rounded-md text-xs sm:text-sm font-medium"><CryptoIcon code="ltc" size="xs" /> LTC</span>
                 <span className="inline-flex items-center gap-1 px-2 py-1 sm:px-3 sm:py-1.5 bg-muted text-muted-foreground rounded-md text-xs sm:text-sm font-medium">+ plus</span>
               </div>
             </div>
