@@ -8,8 +8,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { CreditCard, Link as LinkIcon, Code, BarChart3, Shield, Zap, Menu, Wallet } from "lucide-react";
+import { CreditCard, Link as LinkIcon, Code, BarChart3, Shield, Zap, Menu } from "lucide-react";
 import { CryptoIcon } from "@/components/crypto-icon";
+import { CardBrandIcon } from "@/components/card-brand-icon";
 import { COUNTRIES } from "@shared/schema";
 import { CountryFlag } from "@/components/country-flag";
 import logoImage from "@assets/bkapay-logo.png";
@@ -282,15 +283,25 @@ export default function Home() {
               />
             </div>
             <div className="animate-on-scroll anim-slide-right">
-              <div className="bg-primary/10 w-10 h-10 sm:w-12 sm:h-12 rounded-md flex items-center justify-center mb-3 sm:mb-4">
-                <CreditCard className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
+              <div className="flex items-center -space-x-1 mb-3 sm:mb-4">
+                <img src={omImage} alt="Orange Money" className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-contain bg-white border border-border" />
+                <img src={mtnImage} alt="MTN" className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-contain bg-white border border-border" />
+                <img src={moovImage} alt="Moov" className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-contain bg-white border border-border" />
+                <img src={waveImage} alt="Wave" className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-contain bg-white border border-border" />
               </div>
               <h2 className="text-lg sm:text-2xl md:text-3xl lg:text-4xl font-bold mb-3 sm:mb-4 text-foreground">
                 Paiements Mobile Money
               </h2>
-              <p className="text-xs sm:text-sm md:text-base text-muted-foreground leading-relaxed">
+              <p className="text-xs sm:text-sm md:text-base text-muted-foreground mb-4 sm:mb-6 leading-relaxed">
                 Acceptez les paiements via tous les opérateurs Mobile Money d'Afrique de l'Ouest. Orange Money, MTN, Moov, Wave, Free Money, T-Money et bien plus. Transactions instantanées, sécurisées et fiables.
               </p>
+              <div className="flex flex-wrap gap-2 sm:gap-3">
+                <span className="inline-flex items-center gap-1.5 px-2 py-1 sm:px-3 sm:py-1.5 bg-orange-100 dark:bg-orange-950 text-orange-700 dark:text-orange-400 rounded-md text-xs sm:text-sm font-medium"><img src={omImage} alt="OM" className="w-4 h-4 rounded-full object-contain" /> Orange Money</span>
+                <span className="inline-flex items-center gap-1.5 px-2 py-1 sm:px-3 sm:py-1.5 bg-yellow-100 dark:bg-yellow-950 text-yellow-700 dark:text-yellow-400 rounded-md text-xs sm:text-sm font-medium"><img src={mtnImage} alt="MTN" className="w-4 h-4 rounded-full object-contain" /> MTN</span>
+                <span className="inline-flex items-center gap-1.5 px-2 py-1 sm:px-3 sm:py-1.5 bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400 rounded-md text-xs sm:text-sm font-medium"><img src={moovImage} alt="Moov" className="w-4 h-4 rounded-full object-contain" /> Moov</span>
+                <span className="inline-flex items-center gap-1.5 px-2 py-1 sm:px-3 sm:py-1.5 bg-cyan-100 dark:bg-cyan-950 text-cyan-700 dark:text-cyan-400 rounded-md text-xs sm:text-sm font-medium"><img src={waveImage} alt="Wave" className="w-4 h-4 rounded-full object-contain" /> Wave</span>
+                <span className="inline-flex items-center gap-1.5 px-2 py-1 sm:px-3 sm:py-1.5 bg-muted text-muted-foreground rounded-md text-xs sm:text-sm font-medium">+ 11 autres</span>
+              </div>
             </div>
           </div>
         </div>
@@ -344,8 +355,9 @@ export default function Home() {
               />
             </div>
             <div className="animate-on-scroll anim-slide-right">
-              <div className="bg-primary/10 w-10 h-10 sm:w-12 sm:h-12 rounded-md flex items-center justify-center mb-3 sm:mb-4">
-                <Wallet className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
+              <div className="flex items-center gap-2 mb-3 sm:mb-4">
+                <CardBrandIcon brand="visa" size="lg" />
+                <CardBrandIcon brand="mastercard" size="lg" />
               </div>
               <h2 className="text-lg sm:text-2xl md:text-3xl lg:text-4xl font-bold mb-3 sm:mb-4 text-foreground">
                 Paiements par Carte Bancaire
@@ -354,9 +366,15 @@ export default function Home() {
                 Acceptez les paiements par carte Visa, Mastercard et autres cartes internationales. Transactions sécurisées et conformes aux normes PCI DSS pour la protection de vos clients.
               </p>
               <div className="flex flex-wrap gap-2 sm:gap-3">
-                <span className="inline-flex items-center gap-1 px-2 py-1 sm:px-3 sm:py-1.5 bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400 rounded-md text-xs sm:text-sm font-medium">Visa</span>
-                <span className="inline-flex items-center gap-1 px-2 py-1 sm:px-3 sm:py-1.5 bg-orange-100 dark:bg-orange-950 text-orange-700 dark:text-orange-400 rounded-md text-xs sm:text-sm font-medium">Mastercard</span>
-                <span className="inline-flex items-center gap-1 px-2 py-1 sm:px-3 sm:py-1.5 bg-muted text-muted-foreground rounded-md text-xs sm:text-sm font-medium">Cartes internationales</span>
+                <span className="inline-flex items-center gap-1.5 px-2 py-1 sm:px-3 sm:py-1.5 bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400 rounded-md text-xs sm:text-sm font-medium">
+                  <CardBrandIcon brand="visa" size="xs" /> Visa
+                </span>
+                <span className="inline-flex items-center gap-1.5 px-2 py-1 sm:px-3 sm:py-1.5 bg-orange-100 dark:bg-orange-950 text-orange-700 dark:text-orange-400 rounded-md text-xs sm:text-sm font-medium">
+                  <CardBrandIcon brand="mastercard" size="xs" /> Mastercard
+                </span>
+                <span className="inline-flex items-center gap-1.5 px-2 py-1 sm:px-3 sm:py-1.5 bg-muted text-muted-foreground rounded-md text-xs sm:text-sm font-medium">
+                  <CreditCard className="w-4 h-4" /> Cartes internationales
+                </span>
               </div>
             </div>
           </div>
