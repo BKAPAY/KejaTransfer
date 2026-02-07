@@ -3,7 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Globe, Wifi, CheckCircle2, XCircle, ChevronDown, ChevronRight, AlertCircle, Bitcoin } from "lucide-react";
+import { Globe, Wifi, CheckCircle2, XCircle, ChevronDown, ChevronRight, AlertCircle } from "lucide-react";
+import { CryptoIcon } from "@/components/crypto-icon";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -291,7 +292,7 @@ export default function CountryOperatorConfigPage() {
                           <div className="p-4">
                             <div className="flex items-center justify-between flex-wrap gap-2">
                               <div className="flex items-center gap-3">
-                                <Bitcoin className="w-6 h-6 text-muted-foreground" />
+                                <CryptoIcon code={crypto.code} size="md" />
                                 <div>
                                   <h3 className="font-semibold text-foreground">{crypto.name}</h3>
                                   <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">

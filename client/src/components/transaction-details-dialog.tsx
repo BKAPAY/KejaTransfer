@@ -6,7 +6,8 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import type { Transaction } from "@shared/schema";
-import { Copy, Mail, Phone, Wallet, Bitcoin } from "lucide-react";
+import { Copy, Mail, Phone, Wallet } from "lucide-react";
+import { CryptoIcon } from "@/components/crypto-icon";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { useMemo } from "react";
@@ -203,15 +204,22 @@ export function TransactionDetailsDialog({
           {isCryptoPayment && metadata && (
             <div className="space-y-4 border-t pt-4">
               <h3 className="font-semibold text-lg flex items-center gap-2">
-                <Bitcoin className="w-5 h-5" />
+                {metadata.cryptoCurrency ? (
+                  <CryptoIcon code={metadata.cryptoCurrency} size="md" />
+                ) : (
+                  <CryptoIcon code="btc" size="md" />
+                )}
                 Informations Cryptomonnaie
               </h3>
 
               <div className="grid grid-cols-1 gap-3">
                 {metadata.cryptoCurrency && (
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">Cryptomonnaie</p>
-                    <p className="text-sm font-medium uppercase">{metadata.cryptoCurrency}</p>
+                  <div className="space-y-1 flex items-center gap-2">
+                    <CryptoIcon code={metadata.cryptoCurrency} size="sm" />
+                    <div>
+                      <p className="text-xs text-muted-foreground">Cryptomonnaie</p>
+                      <p className="text-sm font-medium uppercase">{metadata.cryptoCurrency}</p>
+                    </div>
                   </div>
                 )}
 

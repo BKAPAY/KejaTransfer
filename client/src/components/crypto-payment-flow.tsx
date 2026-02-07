@@ -20,6 +20,7 @@ import {
   RefreshCw 
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { CryptoIcon } from "@/components/crypto-icon";
 
 interface CryptoCurrency {
   code: string;
@@ -563,7 +564,10 @@ export function CryptoPaymentFlow({
                   )}
                   data-testid={`button-crypto-${crypto.code}`}
                 >
-                  <div className="font-semibold">{crypto.symbol}</div>
+                  <div className="flex justify-center mb-1">
+                    <CryptoIcon code={crypto.code} size="lg" />
+                  </div>
+                  <div className="font-semibold text-sm">{crypto.symbol}</div>
                   <div className="text-xs text-muted-foreground">{crypto.name}</div>
                   <div className={cn(
                     "text-xs mt-1",

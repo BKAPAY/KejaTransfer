@@ -2,7 +2,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Loader2, Bitcoin, CircleDollarSign, Coins } from "lucide-react";
+import { Loader2, Coins } from "lucide-react";
+import { CryptoIcon } from "@/components/crypto-icon";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -131,15 +132,7 @@ export default function CryptoConfigPage() {
                 className="flex items-center justify-between p-4 border rounded-lg"
               >
                 <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
-                    {crypto.symbol === "BTC" ? (
-                      <Bitcoin className="h-5 w-5 text-orange-500" />
-                    ) : crypto.symbol === "USDT" ? (
-                      <CircleDollarSign className="h-5 w-5 text-green-500" />
-                    ) : (
-                      <Coins className="h-5 w-5 text-primary" />
-                    )}
-                  </div>
+                  <CryptoIcon code={crypto.code} size="lg" />
                   <div>
                     <p className="font-medium">{crypto.name}</p>
                     <Badge variant="secondary" className="text-xs">

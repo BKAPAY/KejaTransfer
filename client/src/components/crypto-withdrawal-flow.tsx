@@ -17,6 +17,7 @@ import {
   Info,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { CryptoIcon } from "@/components/crypto-icon";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Lock } from "lucide-react";
 
@@ -197,6 +198,9 @@ export function CryptoWithdrawalFlow({
                 )}
                 data-testid={`button-select-crypto-${crypto.code}`}
               >
+                <div className="flex justify-center mb-1">
+                  <CryptoIcon code={crypto.code} size="md" />
+                </div>
                 <span className="text-xs font-bold block">{crypto.symbol}</span>
                 <span className="text-[10px] text-muted-foreground block truncate">{crypto.name}</span>
               </button>
