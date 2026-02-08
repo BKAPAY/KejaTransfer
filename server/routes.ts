@@ -2256,11 +2256,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ===== Transactions Routes =====
+
+  function sanitizeTransactionForUser(transaction: any) {
+    const sanitized = { ...transaction };
+    if (sanitized.metadata) {
+      try {
+        const meta = typeof sanitized.metadata === 'string' ? JSON.parse(sanitized.metadata) : { ...sanitized.metadata };
+        delete meta.provider;
+        delete meta.nowpaymentsId;
+        delete meta.fedapayTransactionId;
+        delete meta.wizallTransactionId;
+        delete meta.afribapayId;
+        delete meta.payoutId;
+        delete meta.payoutWithdrawalId;
+        delete meta.payoutBatchId;
+        sanitized.metadata = JSON.stringify(meta);
+      } catch {}
+    }
+    return sanitized;
+  }
   
   app.get("/api/transactions", requireAuth, async (req: Request, res: Response) => {
     try {
       const transactions = await storage.getTransactions(req.session.userId!);
-      res.json(transactions);
+      const sanitized = transactions.map(sanitizeTransactionForUser);
+      res.json(sanitized);
     } catch (error: any) {
       res.status(500).json({ error: "Une erreur est survenue" });
     }
@@ -2273,7 +2293,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!transaction) {
         return res.status(404).json({ error: "Transaction non trouvée" });
       }
-      res.json(transaction);
+      res.json(sanitizeTransactionForUser(transaction));
     } catch (error: any) {
       res.status(500).json({ error: "Une erreur est survenue" });
     }

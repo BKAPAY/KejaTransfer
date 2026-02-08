@@ -255,7 +255,7 @@ export function TransactionDetailsDialog({
 
                 {metadata.paymentId && (
                   <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">ID Paiement NOWPayments</p>
+                    <p className="text-xs text-muted-foreground">Référence de paiement</p>
                     <p className="text-xs font-mono bg-muted p-2 rounded">{metadata.paymentId}</p>
                   </div>
                 )}
