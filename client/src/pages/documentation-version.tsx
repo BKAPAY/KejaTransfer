@@ -722,14 +722,6 @@ if ($data['status'] === 'completed') {
             <p><span className="font-semibold">5.</span> Votre callback <code className="bg-muted px-1 rounded font-mono text-xs">onSuccess</code> est appele automatiquement</p>
           </div>
 
-          <Alert className="border-green-200 bg-green-50 dark:bg-green-950 dark:border-green-800">
-            <Layers className="h-4 w-4" />
-            <AlertDescription className="text-green-800 dark:text-green-200 text-sm">
-              Toutes les fonctionnalites sont identiques a la page de redirection : Mobile Money, cartes bancaires,
-              crypto-monnaies, selection de pays/operateur, conversion de devises, et respect des pays/operateurs
-              actives par l'administrateur.
-            </AlertDescription>
-          </Alert>
         </CardContent>
       </Card>
 
