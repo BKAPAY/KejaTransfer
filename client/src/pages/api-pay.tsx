@@ -138,7 +138,27 @@ export default function ApiPay() {
   const isInlineMode = urlParams.get("mode") === "inline";
   const prefilledName = urlParams.get("customerName") || "";
   const prefilledEmail = urlParams.get("customerEmail") || "";
-  const prefilledPhone = urlParams.get("customerPhone") || "";
+  const rawPrefilledPhone = urlParams.get("customerPhone") || "";
+
+  const stripCountryCode = (phone: string): string => {
+    let cleaned = phone.replace(/[^0-9+]/g, "");
+    if (!cleaned) return "";
+    for (const c of COUNTRIES) {
+      const code = c.phoneCode.replace("+", "");
+      if (cleaned.startsWith("+" + code)) {
+        return cleaned.substring(code.length + 1);
+      }
+      if (cleaned.startsWith(code) && cleaned.length > code.length + 4) {
+        return cleaned.substring(code.length);
+      }
+    }
+    if (cleaned.startsWith("+")) {
+      cleaned = cleaned.substring(1);
+    }
+    return cleaned;
+  };
+
+  const prefilledPhone = stripCountryCode(rawPrefilledPhone);
   
   const [paymentStage, setPaymentStage] = useState<PaymentStage>("form");
   const [invoiceToken, setInvoiceToken] = useState<string | null>(null);
