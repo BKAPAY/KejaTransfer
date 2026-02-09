@@ -50,6 +50,8 @@ import Terms from "@/pages/terms";
 import Privacy from "@/pages/privacy";
 import Cookies from "@/pages/cookies";
 import DocumentationVersion from "@/pages/documentation-version";
+import DocumentationRedirect from "@/pages/documentation-redirect";
+import DocumentationInline from "@/pages/documentation-inline";
 import ForgotPassword from "@/pages/forgot-password";
 import { CURRENT_VERSION } from "@/lib/doc-versions";
 import { COUNTRIES } from "@shared/schema";
@@ -147,6 +149,12 @@ function Router() {
           <Route path="/dashboard/analytics" component={Analytics} />
           <Route path="/dashboard/history" component={History} />
           <Route path="/dashboard/settings" component={Settings} />
+          <Route path="/dashboard/documentation/redirect/:version">
+            {(params) => <DocumentationRedirect version={params.version} />}
+          </Route>
+          <Route path="/dashboard/documentation/inline/:version">
+            {(params) => <DocumentationInline version={params.version} />}
+          </Route>
           <Route path="/dashboard/documentation/:version">
             {(params) => <DocumentationVersion version={params.version} />}
           </Route>
@@ -185,6 +193,12 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
+      <Route path="/documentation/redirect/:version">
+        {(params) => <DocumentationRedirect version={params.version} />}
+      </Route>
+      <Route path="/documentation/inline/:version">
+        {(params) => <DocumentationInline version={params.version} />}
+      </Route>
       <Route path="/documentation/:version">
         {(params) => <DocumentationVersion version={params.version} />}
       </Route>
