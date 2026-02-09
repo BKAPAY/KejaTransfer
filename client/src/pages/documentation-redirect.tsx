@@ -441,13 +441,13 @@ echo json_encode(['received' => true]);
         </CardContent>
       </Card>
 
-      {docVersion.version === "v1.3" && (
+      {docVersion.version === "v1.4" && (
         <Card className="border-green-200 dark:border-green-800">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2">
               <Webhook className="w-5 h-5 text-green-600" />
               Webhooks - Activation automatique
-              <Badge variant="default" className="text-xs">Nouveau v1.3</Badge>
+              <Badge variant="default" className="text-xs">Nouveau v1.4</Badge>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">

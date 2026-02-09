@@ -171,7 +171,7 @@ echo json_encode(['received' => true]);
           <h1 className="text-3xl font-bold text-foreground" data-testid="text-doc-title">
             Documentation API BKApay
           </h1>
-          <Badge variant="default" className="text-xs">v1.3</Badge>
+          <Badge variant="default" className="text-xs">v1.4</Badge>
         </div>
         <p className="text-sm text-muted-foreground mt-2">
           Integrez facilement les paiements mobile money dans votre application
@@ -179,7 +179,7 @@ echo json_encode(['received' => true]);
         <Alert className="mt-4 border-green-200 bg-green-50 dark:bg-green-950 dark:border-green-800">
           <Webhook className="h-4 w-4 text-green-600" />
           <AlertDescription className="text-green-800 dark:text-green-200 text-sm">
-            <strong>Nouveau v1.3:</strong> Webhooks pour activation automatique d'abonnements
+            <strong>Nouveau v1.4:</strong> Integration Inline/Modal Checkout et documentation separee par type
           </AlertDescription>
         </Alert>
       </div>
@@ -392,7 +392,7 @@ echo json_encode(['received' => true]);
           <CardTitle className="flex items-center gap-2">
             <Webhook className="w-5 h-5 text-green-600" />
             Webhooks - Activation automatique
-            <Badge variant="default" className="text-xs">Nouveau v1.3</Badge>
+            <Badge variant="default" className="text-xs">Nouveau v1.4</Badge>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">

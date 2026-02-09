@@ -6,13 +6,26 @@ export interface DocVersion {
   changelog?: string[];
 }
 
-export const CURRENT_VERSION = "v1.3";
+export const CURRENT_VERSION = "v1.4";
 
 export const DOC_VERSIONS: DocVersion[] = [
   {
+    version: "v1.4",
+    releaseDate: "2026-02-09",
+    isLatest: true,
+    isDeprecated: false,
+    changelog: [
+      "Integration Inline/Modal Checkout sans redirection",
+      "SDK JavaScript BKApay pour integration iframe",
+      "Documentation separee par type d'integration (Redirect et Inline)",
+      "Exemples de code React, PHP, Python et Mobile",
+      "Amelioration de la securite postMessage"
+    ]
+  },
+  {
     version: "v1.3",
     releaseDate: "2025-12-06",
-    isLatest: true,
+    isLatest: false,
     isDeprecated: false,
     changelog: [
       "Webhooks pour activation automatique d'abonnements",
