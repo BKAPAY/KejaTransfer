@@ -2163,6 +2163,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== Inline Payment Status (public, safe for external callers) =====
+  app.get("/api/inline-pay/status/:id", async (req: Request, res: Response) => {
+    try {
+      const transaction = await storage.getTransaction(req.params.id);
+      if (!transaction) {
+        return res.status(404).json({ error: "Transaction non trouvee" });
+      }
+
+      // Return only safe public fields
+      res.json({
+        transactionId: transaction.id,
+        status: transaction.status,
+        amount: transaction.amount,
+        currency: transaction.currency || "XOF",
+        description: transaction.description || "",
+        createdAt: transaction.createdAt,
+      });
+    } catch (error: any) {
+      console.error("Inline pay status error:", error);
+      res.status(500).json({ error: "Erreur serveur" });
+    }
+  });
+
   // Get transaction status (for polling) - checks FedaPay or Paydunya if pending
   app.get("/api/transactions/:id/status", async (req: Request, res: Response) => {
     try {

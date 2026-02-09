@@ -135,6 +135,10 @@ export default function ApiPay() {
   const amount = parseInt(urlParams.get("amount") || "0");
   const description = urlParams.get("description") || "";
   const callbackUrl = urlParams.get("callback") || "";
+  const isInlineMode = urlParams.get("mode") === "inline";
+  const prefilledName = urlParams.get("customerName") || "";
+  const prefilledEmail = urlParams.get("customerEmail") || "";
+  const prefilledPhone = urlParams.get("customerPhone") || "";
   
   const [paymentStage, setPaymentStage] = useState<PaymentStage>("form");
   const [invoiceToken, setInvoiceToken] = useState<string | null>(null);
@@ -145,9 +149,9 @@ export default function ApiPay() {
   const [authCode, setAuthCode] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  const [customerName, setCustomerName] = useState("");
-  const [customerEmail, setCustomerEmail] = useState("");
-  const [customerPhone, setCustomerPhone] = useState("");
+  const [customerName, setCustomerName] = useState(prefilledName);
+  const [customerEmail, setCustomerEmail] = useState(prefilledEmail);
+  const [customerPhone, setCustomerPhone] = useState(prefilledPhone);
   const [country, setCountry] = useState("");
   const [operator, setOperator] = useState("");
   const [copiedUssd, setCopiedUssd] = useState(false);
@@ -372,7 +376,13 @@ export default function ApiPay() {
         title: "Paiement reussi",
         description: "Votre transaction a ete confirmee",
       });
-      if (callbackUrl) {
+      if (isInlineMode && window.parent !== window) {
+        window.parent.postMessage({
+          type: "bkapay_payment_success",
+          transactionId,
+          amount,
+        }, window.location.origin);
+      } else if (callbackUrl) {
         setTimeout(() => {
           window.location.href = `${callbackUrl}?status=success&transactionId=${transactionId}&amount=${amount}`;
         }, 2000);
@@ -386,7 +396,13 @@ export default function ApiPay() {
         description: "La transaction n'a pas pu etre completee",
         variant: "destructive",
       });
-      if (callbackUrl) {
+      if (isInlineMode && window.parent !== window) {
+        window.parent.postMessage({
+          type: "bkapay_payment_error",
+          message: "La transaction n'a pas pu etre completee",
+          transactionId,
+        }, window.location.origin);
+      } else if (callbackUrl) {
         setTimeout(() => {
           window.location.href = `${callbackUrl}?status=failed&transactionId=${transactionId}`;
         }, 2000);
@@ -400,6 +416,13 @@ export default function ApiPay() {
         description: "Le temps de validation a expire",
         variant: "destructive",
       });
+      if (isInlineMode && window.parent !== window) {
+        window.parent.postMessage({
+          type: "bkapay_payment_error",
+          message: "Le temps de validation a expire",
+          transactionId,
+        }, window.location.origin);
+      }
     },
   });
 
@@ -1334,7 +1357,13 @@ export default function ApiPay() {
                       title: "Paiement reussi",
                       description: "Votre transaction crypto a ete confirmee",
                     });
-                    if (callbackUrl) {
+                    if (isInlineMode && window.parent !== window) {
+                      window.parent.postMessage({
+                        type: "bkapay_payment_success",
+                        transactionId,
+                        amount,
+                      }, window.location.origin);
+                    } else if (callbackUrl) {
                       setTimeout(() => {
                         window.location.href = `${callbackUrl}${callbackUrl.includes('?') ? '&' : '?'}status=success&amount=${amount}`;
                       }, 2000);
