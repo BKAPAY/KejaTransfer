@@ -403,7 +403,7 @@ export default function ApiPay() {
             transactionId,
             amount,
             status: "completed",
-          }, window.location.origin);
+          }, "*");
         }, 3000);
       } else if (callbackUrl) {
         setTimeout(() => {
@@ -426,7 +426,7 @@ export default function ApiPay() {
             message: "La transaction n'a pas pu etre completee",
             transactionId,
             status: "failed",
-          }, window.location.origin);
+          }, "*");
         }, 3000);
       } else if (callbackUrl) {
         setTimeout(() => {
@@ -449,7 +449,7 @@ export default function ApiPay() {
             message: "Le temps de validation a expire",
             transactionId,
             status: "expired",
-          }, window.location.origin);
+          }, "*");
         }, 3000);
       }
     },
@@ -1399,7 +1399,7 @@ export default function ApiPay() {
                           transactionId,
                           amount,
                           status: "completed",
-                        }, window.location.origin);
+                        }, "*");
                       }, 3000);
                     } else if (callbackUrl) {
                       setTimeout(() => {
