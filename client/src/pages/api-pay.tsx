@@ -397,11 +397,14 @@ export default function ApiPay() {
         description: "Votre transaction a ete confirmee",
       });
       if (isInlineMode && window.parent !== window) {
-        window.parent.postMessage({
-          type: "bkapay_payment_success",
-          transactionId,
-          amount,
-        }, window.location.origin);
+        setTimeout(() => {
+          window.parent.postMessage({
+            type: "bkapay_payment_success",
+            transactionId,
+            amount,
+            status: "completed",
+          }, window.location.origin);
+        }, 3000);
       } else if (callbackUrl) {
         setTimeout(() => {
           window.location.href = `${callbackUrl}?status=success&transactionId=${transactionId}&amount=${amount}`;
@@ -417,11 +420,14 @@ export default function ApiPay() {
         variant: "destructive",
       });
       if (isInlineMode && window.parent !== window) {
-        window.parent.postMessage({
-          type: "bkapay_payment_error",
-          message: "La transaction n'a pas pu etre completee",
-          transactionId,
-        }, window.location.origin);
+        setTimeout(() => {
+          window.parent.postMessage({
+            type: "bkapay_payment_error",
+            message: "La transaction n'a pas pu etre completee",
+            transactionId,
+            status: "failed",
+          }, window.location.origin);
+        }, 3000);
       } else if (callbackUrl) {
         setTimeout(() => {
           window.location.href = `${callbackUrl}?status=failed&transactionId=${transactionId}`;
@@ -437,11 +443,14 @@ export default function ApiPay() {
         variant: "destructive",
       });
       if (isInlineMode && window.parent !== window) {
-        window.parent.postMessage({
-          type: "bkapay_payment_error",
-          message: "Le temps de validation a expire",
-          transactionId,
-        }, window.location.origin);
+        setTimeout(() => {
+          window.parent.postMessage({
+            type: "bkapay_payment_error",
+            message: "Le temps de validation a expire",
+            transactionId,
+            status: "expired",
+          }, window.location.origin);
+        }, 3000);
       }
     },
   });
@@ -748,9 +757,11 @@ export default function ApiPay() {
               </div>
             </div>
             
-            {callbackUrl && (
+            {isInlineMode ? (
+              <p className="text-xs text-muted-foreground">Fermeture automatique...</p>
+            ) : callbackUrl ? (
               <p className="text-xs text-muted-foreground">Redirection en cours...</p>
-            )}
+            ) : null}
           </CardContent>
         </Card>
       </div>
@@ -784,15 +795,19 @@ export default function ApiPay() {
               </div>
             </div>
 
-            <Button
-              onClick={handleNewPayment}
-              variant="outline"
-              className="w-full"
-              data-testid="button-retry"
-            >
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Reessayer le paiement
-            </Button>
+            {isInlineMode ? (
+              <p className="text-xs text-muted-foreground">Fermeture automatique...</p>
+            ) : (
+              <Button
+                onClick={handleNewPayment}
+                variant="outline"
+                className="w-full"
+                data-testid="button-retry"
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Reessayer le paiement
+              </Button>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -1378,11 +1393,14 @@ export default function ApiPay() {
                       description: "Votre transaction crypto a ete confirmee",
                     });
                     if (isInlineMode && window.parent !== window) {
-                      window.parent.postMessage({
-                        type: "bkapay_payment_success",
-                        transactionId,
-                        amount,
-                      }, window.location.origin);
+                      setTimeout(() => {
+                        window.parent.postMessage({
+                          type: "bkapay_payment_success",
+                          transactionId,
+                          amount,
+                          status: "completed",
+                        }, window.location.origin);
+                      }, 3000);
                     } else if (callbackUrl) {
                       setTimeout(() => {
                         window.location.href = `${callbackUrl}${callbackUrl.includes('?') ? '&' : '?'}status=success&amount=${amount}`;

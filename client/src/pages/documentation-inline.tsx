@@ -83,14 +83,17 @@ function payerBKApay() {
       console.log("Paiement reussi !");
       console.log("Transaction ID:", response.transactionId);
       console.log("Montant:", response.amount);
-      console.log("Statut:", response.status);
-      // Rediriger ou mettre a jour votre interface
+      console.log("Statut:", response.status); // "completed"
+      // La fenetre se ferme automatiquement apres 3 secondes
     },
     onError: function(error) {
       console.log("Paiement echoue:", error.message);
+      console.log("Statut:", error.status); // "failed" ou "expired"
+      // La fenetre se ferme automatiquement apres 3 secondes
     },
-    onClose: function() {
-      console.log("Fenetre de paiement fermee");
+    onClose: function(data) {
+      console.log("Paiement annule par le client");
+      console.log("Statut:", data.status); // "cancelled"
     }
   });
 }
@@ -121,13 +124,14 @@ function BoutonPaiement({ montant, description }) {
       description: description,
       onSuccess: (response) => {
         console.log("Paiement reussi:", response.transactionId);
-        // Mettre a jour votre state React
+        // La fenetre se ferme automatiquement
       },
       onError: (error) => {
-        console.error("Erreur:", error.message);
+        console.error("Erreur:", error.message, error.status);
+        // La fenetre se ferme automatiquement
       },
-      onClose: () => {
-        console.log("Modal ferme");
+      onClose: (data) => {
+        console.log("Annule:", data.status); // "cancelled"
       }
     });
   };
@@ -169,6 +173,10 @@ function BoutonPaiement({ montant, description }) {
         },
         onError: function(error) {
           alert("Erreur de paiement: " + error.message);
+          // La fenetre se ferme automatiquement
+        },
+        onClose: function(data) {
+          console.log("Paiement annule:", data.status);
         }
       });
     }
@@ -180,7 +188,7 @@ function BoutonPaiement({ montant, description }) {
 import { WebView } from "react-native-webview";
 import { Modal, View } from "react-native";
 
-function BKApayModal({ visible, onClose, amount, publicKey, onSuccess }) {
+function BKApayModal({ visible, onClose, amount, publicKey, onSuccess, onError }) {
   const paymentUrl = "${baseUrl}/api-pay/" + publicKey 
     + "?amount=" + amount 
     + "&mode=inline";
@@ -188,17 +196,18 @@ function BKApayModal({ visible, onClose, amount, publicKey, onSuccess }) {
   const handleMessage = (event) => {
     const data = JSON.parse(event.nativeEvent.data);
     if (data.type === "bkapay_payment_success") {
-      onSuccess(data);
+      // La fenetre se ferme automatiquement apres 3 secondes
+      onSuccess({ transactionId: data.transactionId, amount: data.amount, status: "completed" });
       onClose();
     } else if (data.type === "bkapay_payment_error") {
-      console.error("Erreur:", data.message);
-    } else if (data.type === "bkapay_payment_close") {
+      // Echec ou expiration - fermeture automatique
+      if (onError) onError({ message: data.message, status: data.status });
       onClose();
     }
   };
 
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" onRequestClose={() => onClose({ status: "cancelled" })}>
       <View style={{ flex: 1 }}>
         <WebView
           source={{ uri: paymentUrl }}
@@ -269,12 +278,17 @@ if ($data['status'] === 'completed') {
     // response.transactionId  - ID unique de la transaction
     // response.amount         - Montant paye
     // response.status         - "completed"
+    // La fenetre se ferme automatiquement apres 3 secondes
   },
   onError: function(error) {
-    // error.message - Description de l'erreur
+    // error.message           - Description de l'erreur
+    // error.transactionId     - ID de la transaction echouee
+    // error.status            - "failed" ou "expired"
+    // La fenetre se ferme automatiquement apres 3 secondes
   },
-  onClose: function() {
-    // Appele quand l'utilisateur ferme la fenetre
+  onClose: function(data) {
+    // data.status             - "cancelled"
+    // Appele uniquement si le client ferme la fenetre sans payer
   }
 });`;
 
@@ -391,7 +405,7 @@ echo json_encode(['received' => true]);
             <p><span className="font-semibold">2.</span> Appelez <code className="bg-muted px-1 rounded font-mono text-xs">BKApay.checkout()</code> avec vos parametres</p>
             <p><span className="font-semibold">3.</span> La fenetre de paiement s'ouvre sur votre site</p>
             <p><span className="font-semibold">4.</span> Le client choisit son pays, operateur et paie</p>
-            <p><span className="font-semibold">5.</span> Votre callback <code className="bg-muted px-1 rounded font-mono text-xs">onSuccess</code> est appele automatiquement</p>
+            <p><span className="font-semibold">5.</span> La fenetre se ferme automatiquement et votre callback <code className="bg-muted px-1 rounded font-mono text-xs">onSuccess</code> ou <code className="bg-muted px-1 rounded font-mono text-xs">onError</code> est appele</p>
           </div>
         </CardContent>
       </Card>
@@ -488,19 +502,29 @@ echo json_encode(['received' => true]);
               <div className="flex flex-col gap-1">
                 <div className="flex gap-2">
                   <Badge variant="outline">onSuccess(response)</Badge>
-                  <span className="text-muted-foreground">Paiement reussi</span>
+                  <span className="text-muted-foreground">Paiement reussi - fermeture auto</span>
                 </div>
                 <p className="text-xs text-muted-foreground ml-2 pl-2 border-l-2 border-green-500/30">
-                  Contient transactionId, amount et status
+                  Contient transactionId, amount et status ("completed")
                 </p>
               </div>
-              <div className="flex gap-2">
-                <Badge variant="outline">onError(error)</Badge>
-                <span className="text-muted-foreground">Erreur de paiement</span>
+              <div className="flex flex-col gap-1">
+                <div className="flex gap-2">
+                  <Badge variant="outline">onError(error)</Badge>
+                  <span className="text-muted-foreground">Echec du paiement - fermeture auto</span>
+                </div>
+                <p className="text-xs text-muted-foreground ml-2 pl-2 border-l-2 border-red-500/30">
+                  Contient message, transactionId et status ("failed" ou "expired")
+                </p>
               </div>
-              <div className="flex gap-2">
-                <Badge variant="outline">onClose()</Badge>
-                <span className="text-muted-foreground">Fenetre fermee par l'utilisateur</span>
+              <div className="flex flex-col gap-1">
+                <div className="flex gap-2">
+                  <Badge variant="outline">onClose(data)</Badge>
+                  <span className="text-muted-foreground">Client ferme sans payer</span>
+                </div>
+                <p className="text-xs text-muted-foreground ml-2 pl-2 border-l-2 border-amber-500/30">
+                  Contient status ("cancelled") - uniquement si fermeture manuelle
+                </p>
               </div>
             </div>
           </div>

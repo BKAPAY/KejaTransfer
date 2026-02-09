@@ -4,6 +4,7 @@
   var BKAPAY_MODAL_ID = "bkapay-checkout-modal";
   var BKAPAY_OVERLAY_ID = "bkapay-checkout-overlay";
   var BKAPAY_IFRAME_ID = "bkapay-checkout-iframe";
+  var paymentFinalized = false;
 
   function getBaseUrl() {
     var scripts = document.getElementsByTagName("script");
@@ -66,7 +67,7 @@
     document.head.appendChild(style);
   }
 
-  function closeModal(options) {
+  function closeModal(triggerOnClose) {
     var overlay = document.getElementById(BKAPAY_OVERLAY_ID);
     var modal = document.getElementById(BKAPAY_MODAL_ID);
     if (overlay) {
@@ -78,14 +79,15 @@
       setTimeout(function() { modal.remove(); }, 300);
     }
     document.body.style.overflow = "";
-    if (options && typeof options.onClose === "function") {
-      options.onClose();
+    if (triggerOnClose && typeof triggerOnClose === "function") {
+      triggerOnClose();
     }
   }
 
   function openModal(options) {
     if (document.getElementById(BKAPAY_MODAL_ID)) return;
 
+    paymentFinalized = false;
     injectStyles();
     document.body.style.overflow = "hidden";
 
@@ -105,7 +107,14 @@
 
     var overlay = document.createElement("div");
     overlay.id = BKAPAY_OVERLAY_ID;
-    overlay.addEventListener("click", function() { closeModal(options); });
+    overlay.addEventListener("click", function() {
+      if (!paymentFinalized) {
+        if (typeof options.onClose === "function") {
+          options.onClose({ status: "cancelled" });
+        }
+      }
+      closeModal();
+    });
 
     var modal = document.createElement("div");
     modal.id = BKAPAY_MODAL_ID;
@@ -115,7 +124,12 @@
     closeBtn.innerHTML = "&#10005;";
     closeBtn.addEventListener("click", function(e) {
       e.stopPropagation();
-      closeModal(options);
+      if (!paymentFinalized) {
+        if (typeof options.onClose === "function") {
+          options.onClose({ status: "cancelled" });
+        }
+      }
+      closeModal();
     });
 
     var iframe = document.createElement("iframe");
@@ -142,6 +156,7 @@
       if (!data || !data.type) return;
 
       if (data.type === "bkapay_payment_success") {
+        paymentFinalized = true;
         if (typeof options.onSuccess === "function") {
           options.onSuccess({
             transactionId: data.transactionId,
@@ -149,16 +164,26 @@
             status: "completed"
           });
         }
-        closeModal({});
+        closeModal();
         window.removeEventListener("message", handler);
       } else if (data.type === "bkapay_payment_error") {
+        paymentFinalized = true;
         if (typeof options.onError === "function") {
-          options.onError({ message: data.message || "Paiement echoue" });
+          options.onError({
+            message: data.message || "Paiement echoue",
+            transactionId: data.transactionId,
+            status: data.status || "failed"
+          });
         }
-        closeModal({});
+        closeModal();
         window.removeEventListener("message", handler);
       } else if (data.type === "bkapay_payment_close") {
-        closeModal(options);
+        if (!paymentFinalized) {
+          if (typeof options.onClose === "function") {
+            options.onClose({ status: "cancelled" });
+          }
+        }
+        closeModal();
         window.removeEventListener("message", handler);
       }
     });
@@ -173,7 +198,7 @@
       openModal(options);
     },
     close: function() {
-      closeModal({});
+      closeModal();
     }
   };
 })();
