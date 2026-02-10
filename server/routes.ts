@@ -7152,13 +7152,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { COUNTRIES, OPERATORS, COLLECT_COUNTRIES, PAYOUT_COUNTRIES } = await import("@shared/schema");
 
+      const currentUserId = req.session?.userId;
+
       // Collect real-time data from DB
-      const [feeConfigsData, countryStatusData, cryptoCurrenciesData, providerConfigsData, supportSettingsData] = await Promise.all([
+      const [feeConfigsData, countryStatusData, cryptoCurrenciesData, providerConfigsData, supportSettingsData, currentUser, userStats] = await Promise.all([
         storage.getAllFeeConfigs(),
         storage.getCountryStatuses(),
         storage.getAllCryptoCurrencies(),
         storage.getProviderConfigs(),
         storage.getSupportSettings(),
+        currentUserId ? storage.getUser(currentUserId) : Promise.resolve(null),
+        currentUserId ? storage.getUserStats(currentUserId) : Promise.resolve(null),
       ]);
 
       // Build country info with real-time per-operator availability
@@ -7226,15 +7230,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const cryptoMarkup = nowpaymentsConfig?.cryptoMarkupPercent ? (nowpaymentsConfig.cryptoMarkupPercent / 10).toFixed(1) : "10";
       const cryptoFee = nowpaymentsConfig?.cryptoFeePercent ? (nowpaymentsConfig.cryptoFeePercent / 10).toFixed(1) : "15";
 
+      // Build user personal info section
+      let userInfoSection = "";
+      if (currentUser) {
+        const userCountry = COUNTRIES.find((c: any) => c.code === currentUser.country);
+        const kycStatusMap: Record<string, string> = {
+          pending: "Non soumis",
+          submitted: "En cours de vérification",
+          verified: "Vérifié",
+          rejected: "Rejeté",
+        };
+        const balanceFormatted = (currentUser.balance / 100).toLocaleString("fr-FR");
+        const totalDepositsFormatted = userStats ? (userStats.totalDeposits / 100).toLocaleString("fr-FR") : "0";
+        const totalTransfersFormatted = userStats ? (userStats.totalTransfers / 100).toLocaleString("fr-FR") : "0";
+        const recentTxCount = userStats?.recentTransactions?.length || 0;
+        const recentTxLines = userStats?.recentTransactions?.slice(0, 5).map((tx: any) => {
+          const typeMap: Record<string, string> = {
+            deposit: "Dépôt",
+            withdrawal: "Retrait",
+            transfer: "Transfert",
+            payment_link: "Lien de paiement",
+            merchant_link: "Lien marchand",
+            api_payment: "Paiement API",
+          };
+          const statusMap: Record<string, string> = {
+            pending: "En attente",
+            completed: "Complété",
+            failed: "Échoué",
+            expired: "Expiré",
+          };
+          const amountF = (tx.amount / 100).toLocaleString("fr-FR");
+          const date = new Date(tx.createdAt).toLocaleDateString("fr-FR");
+          return `  - ${typeMap[tx.type] || tx.type}: ${amountF} FCFA - ${statusMap[tx.status] || tx.status} (${date})`;
+        }) || [];
+
+        userInfoSection = `
+=== INFORMATIONS DE L'UTILISATEUR ACTUEL ===
+- Nom: ${currentUser.firstName} ${currentUser.lastName}
+- Email: ${currentUser.email}
+- Pays: ${userCountry?.name || currentUser.country || "Non défini"}
+- Devise: ${userCountry?.currency || "XOF"}
+- Solde actuel: ${balanceFormatted} FCFA
+- Total des dépôts (complétés): ${totalDepositsFormatted} FCFA
+- Total des transferts (complétés): ${totalTransfersFormatted} FCFA
+- Statut KYC: ${kycStatusMap[currentUser.kycStatus] || currentUser.kycStatus}${currentUser.kycRejectionReason ? `\n- Motif de rejet KYC: ${currentUser.kycRejectionReason}` : ""}
+- Numéros de retrait configurés: ${currentUser.withdrawalPhones && currentUser.withdrawalPhones.length > 0 ? currentUser.withdrawalPhones.join(", ") : "Aucun configuré"}
+- Code de sécurité: ${currentUser.securityCode ? "Configuré" : "Non configuré"}
+- Compte créé le: ${new Date(currentUser.createdAt).toLocaleDateString("fr-FR")}
+- Dernières transactions (${recentTxCount}):
+${recentTxLines.length > 0 ? recentTxLines.join("\n") : "  Aucune transaction récente"}
+`;
+      }
+
       const systemPrompt = `Tu es EMALI AI, l'assistant intelligent de BKApay, une plateforme de paiement mobile money en Afrique de l'Ouest et Centrale. Tu réponds UNIQUEMENT en français.
 
 RÈGLES IMPORTANTES:
-- Tu ne donnes JAMAIS d'informations sur d'autres utilisateurs (soldes, transactions, données personnelles).
-- Tu réponds uniquement sur le fonctionnement de la plateforme BKApay.
+- Tu peux donner à l'utilisateur actuel ses propres informations de compte (solde, transactions, statut KYC, etc.) car elles sont fournies ci-dessous.
+- Tu ne donnes JAMAIS d'informations sur d'AUTRES utilisateurs (soldes, transactions, données personnelles).
+- Tu réponds sur le fonctionnement de la plateforme BKApay et sur les informations du compte de l'utilisateur.
 - Si on te pose une question hors sujet, redirige poliment vers les fonctionnalités de BKApay.
 - Sois concis, professionnel et amical.
 - Utilise les données ci-dessous pour répondre avec précision.
-
+${userInfoSection}
 === INFORMATIONS SUR BKAPAY ===
 
 DESCRIPTION: BKApay est une plateforme de paiement mobile money permettant aux entreprises et particuliers d'accepter et envoyer des paiements via mobile money et cryptomonnaie dans 16 pays d'Afrique.
