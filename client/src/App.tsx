@@ -65,7 +65,8 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
     totalBalance: number;
   }>({
     queryKey: ["/api/dashboard/stats"],
-    refetchInterval: 5000,
+    staleTime: 15000,
+    refetchInterval: 30000,
   });
 
   const { data: user } = useQuery<User>({

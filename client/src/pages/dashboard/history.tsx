@@ -26,7 +26,8 @@ export default function History() {
 
   const { data: transactions, isLoading } = useQuery<Transaction[]>({
     queryKey: ["/api/transactions"],
-    refetchInterval: 3000,
+    staleTime: 10000,
+    refetchInterval: 15000,
   });
   
   const userCurrency = user?.country 

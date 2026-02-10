@@ -65,12 +65,14 @@ export default function Management() {
 
   const { data: pendingTransactions, isLoading: pendingLoading } = useQuery<PendingTransaction[]>({
     queryKey: ["/api/admin/pending-transactions"],
-    refetchInterval: 10000,
+    staleTime: 15000,
+    refetchInterval: 30000,
   });
 
   const { data: pendingKycCount } = useQuery<number>({
     queryKey: ["/api/admin/pending-kyc-count"],
-    refetchInterval: 30000,
+    staleTime: 30000,
+    refetchInterval: 60000,
   });
 
   const validateTransactionMutation = useMutation({

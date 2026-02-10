@@ -1,6 +1,6 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { eq, desc, or, and, sql, gte } from "drizzle-orm";
+import { eq, desc, or, and, sql, gte, inArray } from "drizzle-orm";
 import * as schema from "@shared/schema";
 import type {
   User,
@@ -802,21 +802,34 @@ export class DbStorage implements IStorage {
     totalTransfers: number;
     recentTransactions: Transaction[];
   }> {
-    const user = await this.getUser(userId);
-    const transactions = await this.getTransactions(userId, 100);
-
-    const completed = transactions.filter((t) => t.status === "completed");
-    const deposits = completed.filter((t) => ["deposit", "payment_link", "merchant_link", "api_payment"].includes(t.type));
-    const transfers = completed.filter((t) => t.type === "transfer");
-
-    const totalDeposits = deposits.reduce((sum, t) => sum + t.amount, 0);
-    const totalTransfers = transfers.reduce((sum, t) => sum + t.amount, 0);
+    const [user, recentTransactions, depositsResult, transfersResult] = await Promise.all([
+      this.getUser(userId),
+      this.getTransactions(userId, 10),
+      db.select({
+        total: sql<number>`COALESCE(SUM(${schema.transactions.amount}), 0)`,
+      }).from(schema.transactions).where(
+        and(
+          eq(schema.transactions.userId, userId),
+          eq(schema.transactions.status, "completed"),
+          inArray(schema.transactions.type, ["deposit", "payment_link", "merchant_link", "api_payment"])
+        )
+      ),
+      db.select({
+        total: sql<number>`COALESCE(SUM(${schema.transactions.amount}), 0)`,
+      }).from(schema.transactions).where(
+        and(
+          eq(schema.transactions.userId, userId),
+          eq(schema.transactions.status, "completed"),
+          eq(schema.transactions.type, "transfer")
+        )
+      ),
+    ]);
 
     return {
       totalBalance: user?.balance || 0,
-      totalDeposits,
-      totalTransfers,
-      recentTransactions: transactions.slice(0, 10),
+      totalDeposits: Number(depositsResult[0]?.total || 0),
+      totalTransfers: Number(transfersResult[0]?.total || 0),
+      recentTransactions,
     };
   }
 
@@ -1053,68 +1066,75 @@ export class DbStorage implements IStorage {
     failedTransactions: number;
     totalTransactions: number;
   }> {
-    const transactions = await this.getTransactions(userId, 500);
-    const completed = transactions.filter((t) => t.status === "completed");
-    const failed = transactions.filter((t) => t.status === "failed");
-    
-    // Only count incoming transactions (deposits, payments received) - not outgoing (withdrawals, transfers)
     const incomingTypes = ["deposit", "api_payment", "payment_link", "merchant_link"];
-    const incomingCompleted = completed.filter(t => incomingTypes.includes(t.type));
+    const baseWhere = and(
+      eq(schema.transactions.userId, userId),
+      eq(schema.transactions.status, "completed"),
+      inArray(schema.transactions.type, incomingTypes)
+    );
 
-    // Revenue by date (incoming only)
-    const revenueByDateMap = new Map<string, number>();
-    incomingCompleted.forEach((t) => {
-      const date = new Date(t.createdAt).toLocaleDateString("fr-FR");
-      revenueByDateMap.set(date, (revenueByDateMap.get(date) || 0) + t.amount);
-    });
-    const revenueByDate = Array.from(revenueByDateMap.entries())
-      .map(([date, amount]) => ({ date, amount }))
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const [
+      revenueByDateRows,
+      revenueByOperatorRows,
+      revenueByCountryRows,
+      revenueByTypeRows,
+      countsResult,
+    ] = await Promise.all([
+      db.select({
+        date: sql<string>`to_char(${schema.transactions.createdAt}, 'DD/MM/YYYY')`,
+        amount: sql<number>`COALESCE(SUM(${schema.transactions.amount}), 0)`,
+      }).from(schema.transactions).where(baseWhere)
+        .groupBy(sql`to_char(${schema.transactions.createdAt}, 'DD/MM/YYYY')`)
+        .orderBy(sql`MIN(${schema.transactions.createdAt})`),
 
-    // Revenue by operator (incoming only)
-    const revenueByOperatorMap = new Map<string, { amount: number; count: number }>();
-    incomingCompleted.forEach((t) => {
-      const op = t.operator || "Unknown";
-      const current = revenueByOperatorMap.get(op) || { amount: 0, count: 0 };
-      revenueByOperatorMap.set(op, {
-        amount: current.amount + t.amount,
-        count: current.count + 1,
-      });
-    });
-    const revenueByOperator = Array.from(revenueByOperatorMap.entries())
-      .map(([operator, { amount, count }]) => ({ operator, amount, count }))
-      .sort((a, b) => b.amount - a.amount);
+      db.select({
+        operator: sql<string>`COALESCE(${schema.transactions.operator}, 'Unknown')`,
+        amount: sql<number>`COALESCE(SUM(${schema.transactions.amount}), 0)`,
+        count: sql<number>`COUNT(*)`,
+      }).from(schema.transactions).where(baseWhere)
+        .groupBy(sql`COALESCE(${schema.transactions.operator}, 'Unknown')`)
+        .orderBy(sql`SUM(${schema.transactions.amount}) DESC`),
 
-    // Revenue by country (incoming only)
-    const revenueByCountryMap = new Map<string, { amount: number; count: number }>();
-    incomingCompleted.forEach((t) => {
-      const country = t.country || "Unknown";
-      const current = revenueByCountryMap.get(country) || { amount: 0, count: 0 };
-      revenueByCountryMap.set(country, {
-        amount: current.amount + t.amount,
-        count: current.count + 1,
-      });
-    });
-    const revenueByCountry = Array.from(revenueByCountryMap.entries())
-      .map(([country, { amount, count }]) => ({ country, amount, count }))
-      .sort((a, b) => b.amount - a.amount);
+      db.select({
+        country: sql<string>`COALESCE(${schema.transactions.country}, 'Unknown')`,
+        amount: sql<number>`COALESCE(SUM(${schema.transactions.amount}), 0)`,
+        count: sql<number>`COUNT(*)`,
+      }).from(schema.transactions).where(baseWhere)
+        .groupBy(sql`COALESCE(${schema.transactions.country}, 'Unknown')`)
+        .orderBy(sql`SUM(${schema.transactions.amount}) DESC`),
 
-    // Revenue by type (incoming only)
-    const revenueByTypeMap = new Map<string, { amount: number; count: number }>();
-    incomingCompleted.forEach((t) => {
-      const current = revenueByTypeMap.get(t.type) || { amount: 0, count: 0 };
-      revenueByTypeMap.set(t.type, {
-        amount: current.amount + t.amount,
-        count: current.count + 1,
-      });
-    });
-    const revenueByType = Array.from(revenueByTypeMap.entries())
-      .map(([type, { amount, count }]) => ({ type, amount, count }))
-      .sort((a, b) => b.amount - a.amount);
+      db.select({
+        type: schema.transactions.type,
+        amount: sql<number>`COALESCE(SUM(${schema.transactions.amount}), 0)`,
+        count: sql<number>`COUNT(*)`,
+      }).from(schema.transactions).where(baseWhere)
+        .groupBy(schema.transactions.type)
+        .orderBy(sql`SUM(${schema.transactions.amount}) DESC`),
 
-    const totalRevenue = incomingCompleted.reduce((sum, t) => sum + t.amount, 0);
-    const pendingTransactions = transactions.filter((t) => t.status === "pending").length;
-    const incomingFailed = failed.filter(t => incomingTypes.includes(t.type));
+      db.select({
+        status: schema.transactions.status,
+        count: sql<number>`COUNT(*)`,
+      }).from(schema.transactions).where(
+        and(
+          eq(schema.transactions.userId, userId),
+          or(
+            and(eq(schema.transactions.status, "completed"), inArray(schema.transactions.type, incomingTypes)),
+            and(eq(schema.transactions.status, "failed"), inArray(schema.transactions.type, incomingTypes)),
+            eq(schema.transactions.status, "pending")
+          )
+        )
+      ).groupBy(schema.transactions.status),
+    ]);
+
+    const completedCount = Number(countsResult.find(r => r.status === "completed")?.count || 0);
+    const failedCount = Number(countsResult.find(r => r.status === "failed")?.count || 0);
+    const pendingCount = Number(countsResult.find(r => r.status === "pending")?.count || 0);
+
+    const revenueByDate = revenueByDateRows.map(r => ({ date: r.date, amount: Number(r.amount) }));
+    const revenueByOperator = revenueByOperatorRows.map(r => ({ operator: r.operator, amount: Number(r.amount), count: Number(r.count) }));
+    const revenueByCountry = revenueByCountryRows.map(r => ({ country: r.country, amount: Number(r.amount), count: Number(r.count) }));
+    const revenueByType = revenueByTypeRows.map(r => ({ type: r.type, amount: Number(r.amount), count: Number(r.count) }));
+    const totalRevenue = revenueByType.reduce((sum, r) => sum + r.amount, 0);
 
     return {
       revenueByDate,
@@ -1122,10 +1142,10 @@ export class DbStorage implements IStorage {
       revenueByCountry,
       revenueByType,
       totalRevenue,
-      completedTransactions: incomingCompleted.length,
-      pendingTransactions,
-      failedTransactions: incomingFailed.length,
-      totalTransactions: incomingCompleted.length + incomingFailed.length + pendingTransactions,
+      completedTransactions: completedCount,
+      pendingTransactions: pendingCount,
+      failedTransactions: failedCount,
+      totalTransactions: completedCount + failedCount + pendingCount,
     };
   }
 

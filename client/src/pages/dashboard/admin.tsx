@@ -214,7 +214,8 @@ export default function Admin() {
     withdrawalsByCurrency?: { XOF: number; XAF: number; CDF: number };
   }>({
     queryKey: ["/api/admin/stats"],
-    refetchInterval: 5000,
+    staleTime: 30000,
+    refetchInterval: 60000,
   });
 
   const { data: allUsers = [], isLoading: usersLoading } = useQuery<User[]>({

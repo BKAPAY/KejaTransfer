@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
   Wallet, 
@@ -284,19 +285,30 @@ function CountryItem({
 
 export default function Dashboard() {
   const [, setLocation] = useLocation();
+  const [analyticsReady, setAnalyticsReady] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setAnalyticsReady(true), 100);
+    return () => clearTimeout(timer);
+  }, []);
+
   const { data: user, isLoading: userLoading } = useQuery<User>({
     queryKey: ["/api/auth/me"],
-    refetchInterval: 5000,
+    staleTime: 30000,
+    refetchInterval: 30000,
   });
 
   const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
     queryKey: ["/api/dashboard/stats"],
-    refetchInterval: 3000,
+    staleTime: 15000,
+    refetchInterval: 30000,
   });
 
   const { data: analytics, isLoading: analyticsLoading } = useQuery<Analytics>({
     queryKey: ["/api/analytics"],
-    refetchInterval: 10000,
+    staleTime: 30000,
+    refetchInterval: 60000,
+    enabled: analyticsReady,
   });
 
   // Get user's currency based on their country
