@@ -7240,9 +7240,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           verified: "Vérifié",
           rejected: "Rejeté",
         };
-        const balanceFormatted = (currentUser.balance / 100).toLocaleString("fr-FR");
-        const totalDepositsFormatted = userStats ? (userStats.totalDeposits / 100).toLocaleString("fr-FR") : "0";
-        const totalTransfersFormatted = userStats ? (userStats.totalTransfers / 100).toLocaleString("fr-FR") : "0";
+        const balanceFormatted = currentUser.balance.toLocaleString("fr-FR");
+        const totalDepositsFormatted = userStats ? userStats.totalDeposits.toLocaleString("fr-FR") : "0";
+        const totalTransfersFormatted = userStats ? userStats.totalTransfers.toLocaleString("fr-FR") : "0";
         const recentTxCount = userStats?.recentTransactions?.length || 0;
         const recentTxLines = userStats?.recentTransactions?.slice(0, 5).map((tx: any) => {
           const typeMap: Record<string, string> = {
@@ -7259,7 +7259,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             failed: "Échoué",
             expired: "Expiré",
           };
-          const amountF = (tx.amount / 100).toLocaleString("fr-FR");
+          const amountF = tx.amount.toLocaleString("fr-FR");
           const date = new Date(tx.createdAt).toLocaleDateString("fr-FR");
           return `  - ${typeMap[tx.type] || tx.type}: ${amountF} FCFA - ${statusMap[tx.status] || tx.status} (${date})`;
         }) || [];
@@ -7293,6 +7293,8 @@ RÈGLES IMPORTANTES:
 - Utilise les données ci-dessous pour répondre avec précision.
 ${userInfoSection}
 === INFORMATIONS SUR BKAPAY ===
+
+SITE OFFICIEL: https://bkapay.com
 
 DESCRIPTION: BKApay est une plateforme de paiement mobile money permettant aux entreprises et particuliers d'accepter et envoyer des paiements via mobile money et cryptomonnaie dans 16 pays d'Afrique.
 
