@@ -111,99 +111,153 @@ export default function KycVerificationPage() {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 20;
+    const maxTextWidth = pageWidth - margin * 2;
     let y = 20;
+
+    const KYC_STEP_LABELS = [
+      "Etape 1 - Informations personnelles",
+      "Etape 2 - Description de l'activite",
+      "Etape 3 - Documents d'identite",
+      "Etape 4 - Localisation geographique",
+      "Etape 5 - Signature et validation finale",
+    ];
     
     const getStatusText = (status: string) => {
       switch (status) {
         case "verified": return "Verifie";
         case "rejected": return "Rejete";
-        case "submitted": return "En attente";
+        case "submitted": return "En attente de verification";
         default: return status;
       }
     };
-    
-    doc.setFontSize(20);
+
+    const checkPageBreak = (needed: number) => {
+      if (y + needed > pageHeight - 20) {
+        doc.addPage();
+        y = 20;
+      }
+    };
+
+    const addSectionTitle = (title: string) => {
+      checkPageBreak(20);
+      y += 8;
+      doc.setDrawColor(59, 130, 246);
+      doc.setLineWidth(0.5);
+      doc.line(margin, y, pageWidth - margin, y);
+      y += 8;
+      doc.setFontSize(13);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(30, 64, 175);
+      doc.text(title, margin, y);
+      doc.setTextColor(0, 0, 0);
+      y += 8;
+    };
+
+    const addField = (label: string, value: string) => {
+      checkPageBreak(14);
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(100, 100, 100);
+      doc.text(label, margin + 2, y);
+      y += 5;
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(0, 0, 0);
+      const splitLines = doc.splitTextToSize(value, maxTextWidth - 4);
+      splitLines.forEach((line: string) => {
+        checkPageBreak(7);
+        doc.text(line, margin + 2, y);
+        y += 6;
+      });
+      y += 2;
+    };
+
+    doc.setFontSize(22);
     doc.setFont("helvetica", "bold");
-    doc.text("Verification KYC - BKApay", pageWidth / 2, y, { align: "center" });
-    y += 5;
+    doc.setTextColor(30, 64, 175);
+    doc.text("RAPPORT DE VERIFICATION KYC", pageWidth / 2, y, { align: "center" });
+    y += 8;
+    doc.setFontSize(14);
+    doc.setTextColor(0, 0, 0);
+    doc.text("BKApay - Plateforme de paiement", pageWidth / 2, y, { align: "center" });
+    y += 8;
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
-    doc.text(`Genere le ${new Date().toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })}`, pageWidth / 2, y + 5, { align: "center" });
-    y += 20;
-    
-    doc.setFontSize(14);
-    doc.setFont("helvetica", "bold");
-    doc.text("Informations personnelles", 20, y);
-    y += 10;
-    
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "normal");
-    const infoLines = [
-      `Prenom: ${user.firstName}`,
-      `Nom: ${user.lastName}`,
-      `Email: ${user.email}`,
-      `Pays: ${user.country || "Non defini"}`,
-      `Statut KYC: ${getStatusText(user.kycStatus)}`,
-      `Date d'inscription: ${new Date(user.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}`,
-    ];
-    
-    if ((user as any).kycActivityDescription) {
-      infoLines.push(`Activite: ${(user as any).kycActivityDescription}`);
-    }
-    
-    if ((user as any).kycAddress) {
-      infoLines.push(`Emplacement: ${(user as any).kycAddress}`);
-    }
-    
-    if ((user as any).kycLatitude && (user as any).kycLongitude) {
-      infoLines.push(`Coordonnees GPS: ${(user as any).kycLatitude}, ${(user as any).kycLongitude}`);
-    }
-    
+    doc.setTextColor(100, 100, 100);
+    doc.text(`Document genere le ${new Date().toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })} a ${new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`, pageWidth / 2, y, { align: "center" });
+    doc.setTextColor(0, 0, 0);
+    y += 5;
+
+    addSectionTitle("1. Informations personnelles");
+    addField("Prenom", user.firstName);
+    addField("Nom", user.lastName);
+    addField("Adresse email", user.email);
+    addField("Pays", user.country || "Non defini");
+    addField("Statut KYC", getStatusText(user.kycStatus));
+    addField("Date d'inscription", new Date(user.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" }));
+
     if (user.kycRejectionReason) {
-      infoLines.push(`Raison de rejet: ${user.kycRejectionReason}`);
-    }
-    
-    infoLines.forEach((line) => {
-      const maxLineWidth = pageWidth - 40;
-      const splitLines = doc.splitTextToSize(line, maxLineWidth);
-      splitLines.forEach((splitLine: string) => {
-        doc.text(splitLine, 20, y);
-        y += 7;
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(200, 0, 0);
+      doc.text("Raison du rejet", margin + 2, y);
+      y += 5;
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "normal");
+      const splitLines = doc.splitTextToSize(user.kycRejectionReason, maxTextWidth - 4);
+      splitLines.forEach((line: string) => {
+        checkPageBreak(7);
+        doc.text(line, margin + 2, y);
+        y += 6;
       });
-    });
+      doc.setTextColor(0, 0, 0);
+      y += 2;
+    }
+
+    if ((user as any).kycActivityDescription) {
+      addSectionTitle("2. Description de l'activite");
+      addField("Activite declaree", (user as any).kycActivityDescription);
+    }
+
+    if ((user as any).kycLatitude && (user as any).kycLongitude) {
+      addSectionTitle("3. Localisation geographique");
+      if ((user as any).kycAddress) {
+        addField("Adresse", (user as any).kycAddress);
+      }
+      addField("Latitude", (user as any).kycLatitude);
+      addField("Longitude", (user as any).kycLongitude);
+      addField("Coordonnees GPS", `${(user as any).kycLatitude}, ${(user as any).kycLongitude}`);
+    }
 
     if ((user as any).kycAcceptedTerms) {
-      y += 10;
-      doc.setFontSize(14);
-      doc.setFont("helvetica", "bold");
-      doc.text("Engagements acceptes", 20, y);
-      y += 8;
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "normal");
+      addSectionTitle("4. Engagements acceptes par l'utilisateur");
       try {
         const terms = JSON.parse((user as any).kycAcceptedTerms) as string[];
-        terms.forEach((term: string) => {
-          const maxLineWidth = pageWidth - 50;
-          const splitLines = doc.splitTextToSize(`- ${term}`, maxLineWidth);
-          splitLines.forEach((splitLine: string) => {
-            if (y > pageHeight - 20) {
-              doc.addPage();
-              y = 20;
-            }
-            doc.text(splitLine, 25, y);
-            y += 6;
+        terms.forEach((term: string, i: number) => {
+          const stepLabel = KYC_STEP_LABELS[i] || `Etape ${i + 1}`;
+          checkPageBreak(20);
+          doc.setFontSize(9);
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(59, 130, 246);
+          doc.text(stepLabel, margin + 2, y);
+          doc.setTextColor(0, 0, 0);
+          y += 5;
+          doc.setFontSize(10);
+          doc.setFont("helvetica", "normal");
+          const splitLines = doc.splitTextToSize(`[Accepte] ${term}`, maxTextWidth - 10);
+          splitLines.forEach((line: string) => {
+            checkPageBreak(6);
+            doc.text(line, margin + 6, y);
+            y += 5;
           });
-          y += 2;
+          y += 3;
         });
       } catch {}
     }
-    
-    y += 10;
-    doc.setFontSize(14);
-    doc.setFont("helvetica", "bold");
-    doc.text("Documents fournis", 20, y);
-    y += 10;
-    
+
+    addSectionTitle("5. Documents fournis");
+
     const addImageToPdf = async (imageUrl: string, label: string): Promise<void> => {
       return new Promise((resolve) => {
         if (!imageUrl) {
@@ -214,18 +268,15 @@ export default function KycVerificationPage() {
         const img = new Image();
         img.crossOrigin = "anonymous";
         img.onload = () => {
-          if (y > pageHeight - 100) {
-            doc.addPage();
-            y = 20;
-          }
+          checkPageBreak(110);
           
           doc.setFontSize(11);
           doc.setFont("helvetica", "bold");
-          doc.text(label, 20, y);
-          y += 5;
+          doc.text(label, margin, y);
+          y += 6;
           
-          const maxWidth = 170;
-          const maxHeight = 100;
+          const maxWidth = 160;
+          const maxHeight = 95;
           let width = img.width;
           let height = img.height;
           
@@ -239,19 +290,20 @@ export default function KycVerificationPage() {
           }
           
           try {
-            doc.addImage(img, "JPEG", 20, y, width, height);
+            doc.addImage(img, "JPEG", margin, y, width, height);
             y += height + 10;
           } catch (e) {
             doc.setFont("helvetica", "normal");
-            doc.text("Image non disponible", 20, y);
+            doc.text("Image non disponible", margin, y);
             y += 10;
           }
           resolve();
         };
         img.onerror = () => {
+          checkPageBreak(15);
           doc.setFontSize(11);
           doc.setFont("helvetica", "normal");
-          doc.text(`${label}: Image non disponible`, 20, y);
+          doc.text(`${label}: Image non disponible`, margin, y);
           y += 10;
           resolve();
         };
@@ -270,13 +322,29 @@ export default function KycVerificationPage() {
         await addImageToPdf(user.kycSelfie, "Photo avec piece en main");
       }
       if (user.kycSignature) {
-        await addImageToPdf(user.kycSignature, "Signature");
+        await addImageToPdf(user.kycSignature, "Signature manuscrite");
       }
     } catch (e) {
       console.error("Erreur lors de l'ajout des images:", e);
     }
+
+    checkPageBreak(30);
+    y += 5;
+    doc.setDrawColor(59, 130, 246);
+    doc.setLineWidth(0.5);
+    doc.line(margin, y, pageWidth - margin, y);
+    y += 8;
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "italic");
+    doc.setTextColor(100, 100, 100);
+    doc.text("Ce document est un rapport officiel de verification KYC genere par BKApay.", margin, y);
+    y += 5;
+    doc.text("Il contient les informations fournies par l'utilisateur lors de sa demande de verification.", margin, y);
+    y += 5;
+    doc.text(`Reference: KYC-${user.id.substring(0, 8).toUpperCase()}-${new Date().getFullYear()}`, margin, y);
+    doc.setTextColor(0, 0, 0);
     
-    doc.save(`KYC_${user.email}_${new Date().getTime()}.pdf`);
+    doc.save(`KYC_${user.firstName}_${user.lastName}_${new Date().toISOString().split("T")[0]}.pdf`);
   };
 
   const getStatusBadge = (status: string) => {
@@ -559,23 +627,46 @@ export default function KycVerificationPage() {
                     <Shield className="w-4 h-4" />
                     Engagements acceptes par l'utilisateur
                   </CardTitle>
+                  <CardDescription>Chaque engagement correspond a une etape de la verification KYC</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <ul className="space-y-2">
-                    {(() => {
-                      try {
-                        const terms = JSON.parse((selectedUserDetails as any).kycAcceptedTerms);
-                        return (terms as string[]).map((term: string, i: number) => (
-                          <li key={i} className="flex items-start gap-2">
-                            <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
-                            <span className="text-sm">{term}</span>
-                          </li>
-                        ));
-                      } catch {
-                        return <li className="text-sm text-muted-foreground">Donnees non disponibles</li>;
-                      }
-                    })()}
-                  </ul>
+                  {(() => {
+                    const KYC_STEPS = [
+                      { step: 1, label: "Informations personnelles", icon: "1" },
+                      { step: 2, label: "Description de l'activite", icon: "2" },
+                      { step: 3, label: "Documents d'identite", icon: "3" },
+                      { step: 4, label: "Localisation geographique", icon: "4" },
+                      { step: 5, label: "Signature et validation finale", icon: "5" },
+                    ];
+                    try {
+                      const terms = JSON.parse((selectedUserDetails as any).kycAcceptedTerms) as string[];
+                      return (
+                        <div className="space-y-4">
+                          {terms.map((term: string, i: number) => {
+                            const stepInfo = KYC_STEPS[i] || { step: i + 1, label: `Etape ${i + 1}`, icon: `${i + 1}` };
+                            return (
+                              <div key={i} className="flex items-start gap-3 p-3 rounded-lg border bg-muted/30">
+                                <div className="flex-shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">
+                                  {stepInfo.icon}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+                                    Etape {stepInfo.step} - {stepInfo.label}
+                                  </p>
+                                  <div className="flex items-start gap-2">
+                                    <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
+                                    <span className="text-sm">{term}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    } catch {
+                      return <p className="text-sm text-muted-foreground">Donnees non disponibles</p>;
+                    }
+                  })()}
                 </CardContent>
               </Card>
             )}
