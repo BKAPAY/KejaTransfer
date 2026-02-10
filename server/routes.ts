@@ -1297,7 +1297,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.get("/api/payment-links", requireAuth, async (req: Request, res: Response) => {
     try {
-      const links = await storage.getPaymentLinks(req.session.userId!);
+      const light = req.query.light === "true";
+      const links = light
+        ? await storage.getPaymentLinksLight(req.session.userId!)
+        : await storage.getPaymentLinks(req.session.userId!);
       res.json(links);
     } catch (error: any) {
       res.status(500).json({ error: "Erreur lors de la récupération des liens" });
@@ -1330,6 +1333,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ownerCountry: owner?.country || null,
         ownerCurrency,
       });
+    } catch (error: any) {
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
+  app.get("/api/payment-links/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const link = await storage.getPaymentLinkById(req.params.id);
+      if (!link || link.userId !== req.session.userId!) {
+        return res.status(404).json({ error: "Lien non trouvé" });
+      }
+      res.json(link);
     } catch (error: any) {
       res.status(500).json({ error: "Une erreur est survenue" });
     }

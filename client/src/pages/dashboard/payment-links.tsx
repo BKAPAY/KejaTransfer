@@ -100,8 +100,13 @@ export default function PaymentLinks() {
   const [selectedCurrency, setSelectedCurrency] = useState<string>("XOF");
   const { toast } = useToast();
 
-  const { data: paymentLinks, isLoading } = useQuery<PaymentLink[]>({
-    queryKey: ["/api/payment-links"],
+  const { data: paymentLinks, isLoading } = useQuery<(PaymentLink & { hasImages?: boolean; hasVideo?: boolean })[]>({
+    queryKey: ["/api/payment-links", "light"],
+    queryFn: async () => {
+      const res = await fetch("/api/payment-links?light=true", { credentials: "include" });
+      if (!res.ok) throw new Error("Erreur");
+      return res.json();
+    },
   });
 
   const { data: user } = useQuery<User>({
@@ -149,7 +154,7 @@ export default function PaymentLinks() {
     },
   });
 
-  const startEditingLink = (link: PaymentLink) => {
+  const startEditingLink = async (link: PaymentLink) => {
     setEditingId(link.id);
     setAmountInput(String(link.amount));
     form.reset({
@@ -160,12 +165,25 @@ export default function PaymentLinks() {
       customerPaysFee: link.customerPaysFee || false,
       customerPaysCryptoFee: (link as any).customerPaysCryptoFee || false,
     });
-    const images = link.imageUrls?.length ? link.imageUrls : (link.imageUrl ? [link.imageUrl] : []);
-    setExistingImages(images);
     setImagePreviews([]);
     setNewImageFiles([]);
-    setVideoUrl(link.videoUrl || null);
     setDialogOpen(true);
+
+    try {
+      const res = await fetch(`/api/payment-links/${link.id}`, { credentials: "include" });
+      if (res.ok) {
+        const fullLink: PaymentLink = await res.json();
+        const images = fullLink.imageUrls?.length ? fullLink.imageUrls : (fullLink.imageUrl ? [fullLink.imageUrl] : []);
+        setExistingImages(images);
+        setVideoUrl(fullLink.videoUrl || null);
+      } else {
+        setExistingImages([]);
+        setVideoUrl(null);
+      }
+    } catch {
+      setExistingImages([]);
+      setVideoUrl(null);
+    }
   };
 
   const handleImageAdd = async (files: FileList | null) => {
@@ -724,14 +742,20 @@ export default function PaymentLinks() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {/* Image du produit - affichage compact */}
-                  {link.imageUrl && (
-                    <div className="flex justify-start">
-                      <img
-                        src={link.imageUrl}
-                        alt={link.productName}
-                        className="w-16 h-16 object-cover rounded-md border bg-muted"
-                      />
+                  {((link as any).hasImages || (link as any).hasVideo) && (
+                    <div className="flex items-center gap-2">
+                      {(link as any).hasImages && (
+                        <Badge variant="secondary">
+                          <ImageIcon className="w-3 h-3 mr-1" />
+                          Photos
+                        </Badge>
+                      )}
+                      {(link as any).hasVideo && (
+                        <Badge variant="secondary">
+                          <Video className="w-3 h-3 mr-1" />
+                          Vidéo
+                        </Badge>
+                      )}
                     </div>
                   )}
                   <div className="flex items-center gap-2 p-3 bg-muted rounded-md">

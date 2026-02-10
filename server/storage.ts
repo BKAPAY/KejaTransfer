@@ -346,6 +346,24 @@ export class DbStorage implements IStorage {
     return db.select().from(schema.paymentLinks).where(eq(schema.paymentLinks.userId, userId)).orderBy(desc(schema.paymentLinks.createdAt));
   }
 
+  async getPaymentLinksLight(userId: string): Promise<Omit<PaymentLink, 'imageUrl' | 'imageUrls' | 'videoUrl'>[]> {
+    return db.select({
+      id: schema.paymentLinks.id,
+      userId: schema.paymentLinks.userId,
+      productName: schema.paymentLinks.productName,
+      description: schema.paymentLinks.description,
+      amount: schema.paymentLinks.amount,
+      token: schema.paymentLinks.token,
+      isActive: schema.paymentLinks.isActive,
+      createdAt: schema.paymentLinks.createdAt,
+      allowedCountries: schema.paymentLinks.allowedCountries,
+      customerPaysFee: schema.paymentLinks.customerPaysFee,
+      customerPaysCryptoFee: schema.paymentLinks.customerPaysCryptoFee,
+      hasImages: sql<boolean>`(COALESCE(array_length(${schema.paymentLinks.imageUrls}, 1), 0) > 0 OR ${schema.paymentLinks.imageUrl} IS NOT NULL)`.as('hasImages'),
+      hasVideo: sql<boolean>`(${schema.paymentLinks.videoUrl} IS NOT NULL AND ${schema.paymentLinks.videoUrl} != '')`.as('hasVideo'),
+    }).from(schema.paymentLinks).where(eq(schema.paymentLinks.userId, userId)).orderBy(desc(schema.paymentLinks.createdAt));
+  }
+
   async getPaymentLinkById(id: string): Promise<PaymentLink | undefined> {
     const results = await db.select().from(schema.paymentLinks).where(eq(schema.paymentLinks.id, id)).limit(1);
     return results[0];
