@@ -44,6 +44,41 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { CountryFlag } from "@/components/country-flag";
 
+import omImage from "@assets/om_1763835083036.png";
+import mtnImage from "@assets/mtn (1)_1763835082904.png";
+import moovImage from "@assets/moov (1)_1763835082986.png";
+import waveImage from "@assets/wave (1)_1763835083242.png";
+import freeImage from "@assets/mixxByYas-web-page_1763835083140.png";
+import tmonyImage from "@assets/e-money_1763835083190.png";
+import wizallImage from "@assets/wizall_1763835083090.png";
+import airtelImage from "@assets/airtel-logo.png";
+import mpesaImage from "@assets/mpesa-logo.png";
+import celtiisImage from "@assets/celtiis-logo.png";
+import expressoImage from "@assets/expresso-logo.png";
+import corisImage from "@assets/coris-logo.png";
+import afrimoneyImage from "@assets/afrimoney-logo.png";
+import qmoneyImage from "@assets/qmoney-logo.png";
+import telecelImage from "@assets/telecel-logo.png";
+
+const OPERATOR_LOGOS: Record<string, string> = {
+  orange: omImage,
+  mtn: mtnImage,
+  moov: moovImage,
+  wave: waveImage,
+  free: freeImage,
+  airtel: airtelImage,
+  mpesa: mpesaImage,
+  celtiis: celtiisImage,
+  tmoney: tmonyImage,
+  togocom: tmonyImage,
+  expresso: expressoImage,
+  coris: corisImage,
+  afrimoney: afrimoneyImage,
+  qmoney: qmoneyImage,
+  telecel: telecelImage,
+  wizall: wizallImage,
+};
+
 interface Analytics {
   revenueByDate: { date: string; amount: number }[];
   revenueByOperator: { operator: string; amount: number; count: number }[];
@@ -371,14 +406,22 @@ function OperatorCard({
       whileHover={{ scale: 1.02 }}
       className="flex items-center gap-3 p-3 rounded-lg border bg-card hover-elevate transition-all"
     >
-      <motion.div
-        whileHover={{ rotate: 360 }}
-        transition={{ duration: 0.5 }}
-        className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm"
-        style={{ backgroundColor: COLORS[index % COLORS.length] }}
-      >
-        {operator.substring(0, 2).toUpperCase()}
-      </motion.div>
+      <div className="w-10 h-10 rounded-full flex items-center justify-center overflow-hidden border bg-white dark:bg-gray-800">
+        {OPERATOR_LOGOS[operator.toLowerCase()] ? (
+          <img 
+            src={OPERATOR_LOGOS[operator.toLowerCase()]} 
+            alt={operator} 
+            className="w-7 h-7 object-contain"
+          />
+        ) : (
+          <span 
+            className="text-white font-bold text-sm w-full h-full flex items-center justify-center rounded-full"
+            style={{ backgroundColor: COLORS[index % COLORS.length] }}
+          >
+            {operator.substring(0, 2).toUpperCase()}
+          </span>
+        )}
+      </div>
       <div className="flex-1">
         <p className="font-medium text-sm capitalize">{operator}</p>
         <p className="text-xs text-muted-foreground">{count} transaction{count > 1 ? 's' : ''}</p>
