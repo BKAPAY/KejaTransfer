@@ -7360,7 +7360,7 @@ TRANSFERT (envoyer de l'argent vers un autre numéro):
 IMPORTANT: Ne demande PAS le pays en texte libre. Utilise EXCLUSIVEMENT la section "PAYS ACTIFS POUR LES TRANSFERTS" ci-dessous. N'affiche QUE les pays présents dans cette section. Si aucun pays n'est actif, informe l'utilisateur qu'aucun transfert n'est possible actuellement.
 Étape 1: Affiche UNIQUEMENT les pays de la section "PAYS ACTIFS POUR LES TRANSFERTS" en LISTE NUMÉROTÉE et demande de choisir
 Étape 2: Après le choix du pays, affiche les opérateurs disponibles pour CE pays en LISTE NUMÉROTÉE
-Étape 3: Demande le numéro de téléphone du destinataire (avec indicatif du pays choisi)
+Étape 3: Demande le numéro de téléphone du destinataire SANS indicatif (le pays est déjà sélectionné, l'indicatif sera ajouté automatiquement). L'utilisateur saisit uniquement son numéro local (ex: 97000000)
 Étape 4: Demande le montant net que le destinataire doit recevoir
 Étape 5: Si la devise du pays destinataire est différente de celle de l'utilisateur, utilise convert_currency pour convertir
 Étape 6: Utilise calculate_fees pour calculer les frais
@@ -7644,7 +7644,14 @@ SUPPORT ET CONTACT:
                 return JSON.stringify({ success: false, error: `Solde insuffisant. Solde: ${user.balance.toLocaleString("fr-FR")} ${userCurrencyT}, Requis: ${requiredBalanceT.toLocaleString("fr-FR")} ${userCurrencyT}` });
               }
 
-              const sanitizedPhoneT = phone.replace(/\s+/g, "").replace(/^(\+|00)/, "");
+              let sanitizedPhoneT = phone.replace(/\s+/g, "").replace(/^(\+|00)/, "");
+              const transferCountryInfo = COUNTRIES.find((c: any) => c.code === country);
+              if (transferCountryInfo) {
+                const dialDigits = transferCountryInfo.phoneCode.replace("+", "");
+                if (!sanitizedPhoneT.startsWith(dialDigits)) {
+                  sanitizedPhoneT = dialDigits + sanitizedPhoneT;
+                }
+              }
 
               if (activeProviderT === "fedapay") {
                 const result = await handleFedaPayTransfer(userId, user, Math.floor(amount), country, operator, sanitizedPhoneT, userCurrencyT);
