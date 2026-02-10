@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { X, Send, Loader2 } from "lucide-react";
 import emaliLogo from "@/assets/emali-ai-logo.png";
 
@@ -14,7 +13,41 @@ const WELCOME_MESSAGE = `Bonjour ! Je suis **EMALI AI**, votre assistant intelli
 
 Comment puis-je vous aider aujourd'hui ?`;
 
-const SESSION_TIMEOUT_MS = 2 * 60 * 60 * 1000; // 2 hours
+const SESSION_TIMEOUT_MS = 2 * 60 * 60 * 1000;
+
+function extractOptions(text: string): string[] {
+  const lines = text.split("\n");
+  const options: string[] = [];
+  let inList = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    const match = trimmed.match(/^(?:\d+[\.\)]\s*|[-•]\s+)(.+)$/);
+    if (match) {
+      inList = true;
+      let optText = match[1].trim();
+      optText = optText.replace(/\*\*/g, "").replace(/\*/g, "");
+      if (optText.length > 0 && optText.length < 80) {
+        options.push(optText);
+      }
+    } else if (inList && trimmed === "") {
+      continue;
+    } else if (inList && trimmed.length > 0) {
+      inList = false;
+    }
+  }
+
+  if (options.length >= 2 && options.length <= 20) {
+    return options;
+  }
+  return [];
+}
+
+function getOptionLabel(opt: string): string {
+  let label = opt.replace(/\(.*?\)\s*$/, "").trim();
+  if (label.endsWith(":")) label = label.slice(0, -1).trim();
+  return label || opt;
+}
 
 export function EmaliChatButton() {
   const [isOpen, setIsOpen] = useState(false);
@@ -53,12 +86,12 @@ export function EmaliChatButton() {
     }
   }, [messages]);
 
-  const sendMessage = async () => {
-    const trimmed = input.trim();
-    if (!trimmed || isLoading) return;
+  const sendMessageDirect = useCallback(async (text: string, currentMessages: ChatMessage[]) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
 
     lastActivityRef.current = Date.now();
-    const newMessages: ChatMessage[] = [...messages, { role: "user", content: trimmed }];
+    const newMessages: ChatMessage[] = [...currentMessages, { role: "user", content: trimmed }];
     setMessages(newMessages);
     setInput("");
     setIsLoading(true);
@@ -91,8 +124,8 @@ export function EmaliChatButton() {
         const { done, value } = await reader.read();
         if (done) break;
 
-        const text = decoder.decode(value, { stream: true });
-        const lines = text.split("\n");
+        const rawText = decoder.decode(value, { stream: true });
+        const lines = rawText.split("\n");
 
         for (const line of lines) {
           if (!line.startsWith("data: ")) continue;
@@ -127,7 +160,18 @@ export function EmaliChatButton() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
+
+  const sendMessage = useCallback(async () => {
+    const trimmed = input.trim();
+    if (!trimmed || isLoading) return;
+    await sendMessageDirect(trimmed, messages);
+  }, [input, isLoading, messages, sendMessageDirect]);
+
+  const handleQuickReply = useCallback((text: string) => {
+    if (isLoading) return;
+    sendMessageDirect(text, messages);
+  }, [isLoading, messages, sendMessageDirect]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -147,6 +191,13 @@ export function EmaliChatButton() {
       .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
       .replace(/\*(.*?)\*/g, "<em>$1</em>")
       .replace(/\n/g, "<br />");
+  };
+
+  const isLastAssistantMessage = (index: number) => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === "assistant") return i === index;
+    }
+    return false;
   };
 
   return (
@@ -207,34 +258,54 @@ export function EmaliChatButton() {
               ref={scrollRef}
               className="flex-1 overflow-y-auto p-3 space-y-3"
             >
-              {messages.map((msg, i) => (
-                <div
-                  key={i}
-                  className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-                >
-                  <div
-                    className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${
-                      msg.role === "user"
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted"
-                    }`}
-                    data-testid={`chat-message-${msg.role}-${i}`}
-                  >
-                    {msg.role === "assistant" ? (
-                      <span
-                        dangerouslySetInnerHTML={{
-                          __html: renderMarkdown(msg.content),
-                        }}
-                      />
-                    ) : (
-                      <span style={{ whiteSpace: "pre-wrap" }}>{msg.content}</span>
-                    )}
-                    {msg.role === "assistant" && msg.content === "" && isLoading && (
-                      <Loader2 className="w-4 h-4 animate-spin" />
+              {messages.map((msg, i) => {
+                const showOptions = msg.role === "assistant" && isLastAssistantMessage(i) && !isLoading && msg.content.length > 0;
+                const options = showOptions ? extractOptions(msg.content) : [];
+
+                return (
+                  <div key={i}>
+                    <div
+                      className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                    >
+                      <div
+                        className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${
+                          msg.role === "user"
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted"
+                        }`}
+                        data-testid={`chat-message-${msg.role}-${i}`}
+                      >
+                        {msg.role === "assistant" ? (
+                          <span
+                            dangerouslySetInnerHTML={{
+                              __html: renderMarkdown(msg.content),
+                            }}
+                          />
+                        ) : (
+                          <span style={{ whiteSpace: "pre-wrap" }}>{msg.content}</span>
+                        )}
+                        {msg.role === "assistant" && msg.content === "" && isLoading && (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        )}
+                      </div>
+                    </div>
+                    {options.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mt-2 ml-1">
+                        {options.map((opt, idx) => (
+                          <button
+                            key={idx}
+                            onClick={() => handleQuickReply(opt)}
+                            className="px-3 py-1.5 text-xs font-medium rounded-md border border-primary/30 bg-primary/5 text-primary hover:bg-primary/15 transition-colors cursor-pointer text-left"
+                            data-testid={`quick-reply-${i}-${idx}`}
+                          >
+                            {getOptionLabel(opt)}
+                          </button>
+                        ))}
+                      </div>
                     )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <div className="p-3 border-t">
@@ -249,7 +320,7 @@ export function EmaliChatButton() {
                     el.style.height = Math.min(el.scrollHeight, 120) + "px";
                   }}
                   onKeyDown={handleKeyDown}
-                  placeholder="Écrivez votre message... (Shift+Entrée pour aller à la ligne)"
+                  placeholder="Écrivez votre message..."
                   disabled={isLoading}
                   rows={1}
                   className="flex-1 resize-none !min-h-[36px]"
@@ -269,7 +340,6 @@ export function EmaliChatButton() {
                   )}
                 </Button>
               </div>
-              <p className="text-[10px] text-muted-foreground mt-1">Shift+Entrée pour aller à la ligne</p>
             </div>
           </div>
         </>
