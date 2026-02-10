@@ -11,6 +11,22 @@ interface VideoUploaderProps {
   maxDuration?: number;
 }
 
+async function uploadVideoToServer(dataUrl: string): Promise<string> {
+  const response = await fetch("/api/upload/video", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ data: dataUrl }),
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: "Erreur inconnue" }));
+    throw new Error(err.error || "Erreur lors du telechargement");
+  }
+
+  const result = await response.json();
+  return result.videoUrl;
+}
+
 export function VideoUploader({ videoUrl, onVideoChange, maxDuration = 30 }: VideoUploaderProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -31,7 +47,7 @@ export function VideoUploader({ videoUrl, onVideoChange, maxDuration = 30 }: Vid
     if (!file) return;
 
     if (!file.type.startsWith("video/")) {
-      alert("Veuillez sélectionner un fichier vidéo");
+      alert("Veuillez selectionner un fichier video");
       return;
     }
 
@@ -40,10 +56,9 @@ export function VideoUploader({ videoUrl, onVideoChange, maxDuration = 30 }: Vid
 
     try {
       const videoDataUrl = await readFileAsDataURL(file, (progress) => {
-        setUploadProgress(progress);
+        setUploadProgress(Math.round(progress * 0.5));
       });
       
-      setUploadProgress(100);
       const duration = await getVideoDuration(videoDataUrl);
 
       if (duration > maxDuration) {
@@ -52,15 +67,22 @@ export function VideoUploader({ videoUrl, onVideoChange, maxDuration = 30 }: Vid
         setTrimStart(0);
         setTrimEnd(Math.min(maxDuration, duration));
         setShowTrimmer(true);
+        setIsUploading(false);
+        setUploadProgress(0);
       } else {
-        onVideoChange(videoDataUrl);
+        setUploadProgress(60);
+        const serverUrl = await uploadVideoToServer(videoDataUrl);
+        setUploadProgress(100);
+        onVideoChange(serverUrl);
+        setIsUploading(false);
+        setUploadProgress(0);
       }
     } catch (error) {
-      console.error("Erreur lors du chargement de la vidéo:", error);
-      alert("Erreur lors du chargement de la vidéo");
-    } finally {
+      console.error("Erreur lors du chargement de la video:", error);
+      alert("Erreur lors du chargement de la video");
       setIsUploading(false);
       setUploadProgress(0);
+    } finally {
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
@@ -72,7 +94,7 @@ export function VideoUploader({ videoUrl, onVideoChange, maxDuration = 30 }: Vid
       const reader = new FileReader();
       reader.onprogress = (event) => {
         if (event.lengthComputable && onProgress) {
-          const progress = Math.round((event.loaded / event.total) * 100);
+          const progress = event.loaded / event.total;
           onProgress(progress);
         }
       };
@@ -143,12 +165,13 @@ export function VideoUploader({ videoUrl, onVideoChange, maxDuration = 30 }: Vid
 
     try {
       const trimmedVideo = await trimVideoToRange(originalVideo, trimStart, trimEnd);
-      onVideoChange(trimmedVideo);
+      const serverUrl = await uploadVideoToServer(trimmedVideo);
+      onVideoChange(serverUrl);
       setShowTrimmer(false);
       setOriginalVideo(null);
     } catch (error) {
-      console.error("Erreur lors du découpage:", error);
-      alert("Erreur lors du découpage de la vidéo");
+      console.error("Erreur lors du decoupage:", error);
+      alert("Erreur lors du decoupage de la video");
     } finally {
       setIsTrimming(false);
     }
@@ -293,14 +316,14 @@ export function VideoUploader({ videoUrl, onVideoChange, maxDuration = 30 }: Vid
             <Upload className="h-5 w-5 text-primary animate-pulse" />
             <div className="flex-1">
               <div className="flex justify-between text-sm mb-1">
-                <span>Téléchargement en cours...</span>
+                <span>Telechargement en cours...</span>
                 <span className="font-medium">{uploadProgress}%</span>
               </div>
               <Progress value={uploadProgress} className="h-2" />
             </div>
           </div>
           <p className="text-xs text-muted-foreground text-center">
-            Veuillez patienter pendant le chargement de la vidéo
+            La video est en cours de telechargement sur le serveur
           </p>
         </div>
       ) : (
@@ -313,7 +336,7 @@ export function VideoUploader({ videoUrl, onVideoChange, maxDuration = 30 }: Vid
           data-testid="btn-add-video"
         >
           <Video className="h-6 w-6" />
-          <span className="text-sm">Ajouter une vidéo (max {maxDuration}s)</span>
+          <span className="text-sm">Ajouter une video (max {maxDuration}s)</span>
         </Button>
       )}
 
@@ -322,10 +345,10 @@ export function VideoUploader({ videoUrl, onVideoChange, maxDuration = 30 }: Vid
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Scissors className="h-5 w-5" />
-              Découper la vidéo
+              Decouper la video
             </DialogTitle>
             <DialogDescription>
-              Votre vidéo dure {formatTime(videoDuration)}. Sélectionnez un segment de {maxDuration} secondes maximum.
+              Votre video dure {formatTime(videoDuration)}. Selectionnez un segment de {maxDuration} secondes maximum.
             </DialogDescription>
           </DialogHeader>
 
@@ -353,8 +376,8 @@ export function VideoUploader({ videoUrl, onVideoChange, maxDuration = 30 }: Vid
 
             <div className="space-y-2">
               <div className="flex justify-between text-sm text-muted-foreground">
-                <span>Début: {formatTime(trimStart)}</span>
-                <span>Durée: {formatTime(trimEnd - trimStart)}</span>
+                <span>Debut: {formatTime(trimStart)}</span>
+                <span>Duree: {formatTime(trimEnd - trimStart)}</span>
                 <span>Fin: {formatTime(trimEnd)}</span>
               </div>
               
@@ -369,7 +392,7 @@ export function VideoUploader({ videoUrl, onVideoChange, maxDuration = 30 }: Vid
               />
               
               <p className="text-xs text-center text-muted-foreground">
-                Déplacez les curseurs pour sélectionner le segment à conserver
+                Deplacez les curseurs pour selectionner le segment a conserver
               </p>
             </div>
 
@@ -395,12 +418,12 @@ export function VideoUploader({ videoUrl, onVideoChange, maxDuration = 30 }: Vid
                 {isTrimming ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Découpage...
+                    Telechargement...
                   </>
                 ) : (
                   <>
                     <Check className="h-4 w-4 mr-2" />
-                    Valider le découpage
+                    Valider le decoupage
                   </>
                 )}
               </Button>

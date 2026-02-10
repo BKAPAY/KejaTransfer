@@ -6,6 +6,8 @@ import connectPg from "connect-pg-simple";
 import pg from "pg";
 import bcrypt from "bcrypt";
 import { z } from "zod";
+import fs from "fs";
+import path from "path";
 import { insertUserSchema, insertPaymentLinkSchema, insertMerchantLinkSchema, insertApiKeySchema } from "@shared/schema";
 import { validatePhoneOperator } from "@shared/phone-utils";
 import { randomUUID } from "crypto";
@@ -1049,6 +1051,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  const uploadsDir = path.join(process.cwd(), "uploads", "videos");
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+
+  app.use("/uploads/videos", (req: Request, res: Response, next) => {
+    const filePath = path.join(uploadsDir, path.basename(req.path));
+    if (fs.existsSync(filePath)) {
+      res.setHeader("Cache-Control", "public, max-age=31536000");
+      return res.sendFile(filePath);
+    }
+    next();
+  });
+
+  app.post("/api/upload/video", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { data } = req.body;
+
+      if (!data || typeof data !== "string") {
+        return res.status(400).json({ error: "Donnees video requises" });
+      }
+
+      const matches = data.match(/^data:(video\/(webm|mp4|ogg|mpeg));base64,(.+)/);
+      if (!matches) {
+        return res.status(400).json({ error: "Format video invalide. Formats acceptes: webm, mp4, ogg" });
+      }
+
+      const mimeType = matches[1];
+      const ext = matches[2] === "mpeg" ? "mp4" : matches[2];
+      const base64Data = matches[3];
+      const buffer = Buffer.from(base64Data, "base64");
+
+      const maxSize = 50 * 1024 * 1024;
+      if (buffer.length > maxSize) {
+        return res.status(400).json({ error: "La video est trop volumineuse (max 50 Mo)" });
+      }
+
+      const filename = `${randomUUID()}.${ext}`;
+      const filePath = path.join(uploadsDir, filename);
+
+      await fs.promises.writeFile(filePath, buffer);
+
+      const videoUrl = `/uploads/videos/${filename}`;
+      res.json({ success: true, videoUrl });
+    } catch (error: any) {
+      console.error("Video upload error:", error);
+      res.status(500).json({ error: "Erreur lors du telechargement de la video" });
+    }
+  });
+
   // KYC Upload single document
   app.post("/api/kyc/upload", requireAuth, async (req: Request, res: Response) => {
     try {
@@ -1311,6 +1363,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customerPaysCryptoFee: z.boolean().optional(),
       });
       const validatedData = patchPaymentLinkSchema.parse(req.body);
+
+      if (validatedData.videoUrl !== undefined) {
+        const userLinks = await storage.getPaymentLinks(req.session.userId!);
+        const existingLink = userLinks.find(l => l.id === req.params.id);
+        if (existingLink && existingLink.videoUrl && existingLink.videoUrl.startsWith("/uploads/videos/") && existingLink.videoUrl !== validatedData.videoUrl) {
+          const oldVideoFilename = path.basename(existingLink.videoUrl);
+          const oldVideoPath = path.join(uploadsDir, oldVideoFilename);
+          fs.promises.unlink(oldVideoPath).catch(() => {});
+        }
+      }
+
       const link = await storage.updatePaymentLink(req.params.id, req.session.userId!, validatedData);
       if (!link) {
         return res.status(404).json({ error: "Lien non trouvé" });
@@ -1323,6 +1386,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/payment-links/:id", requireAuth, async (req: Request, res: Response) => {
     try {
+      const links = await storage.getPaymentLinks(req.session.userId!);
+      const ownedLink = links.find(l => l.id === req.params.id);
+
+      if (ownedLink && ownedLink.videoUrl && ownedLink.videoUrl.startsWith("/uploads/videos/")) {
+        const videoFilename = path.basename(ownedLink.videoUrl);
+        const videoPath = path.join(uploadsDir, videoFilename);
+        fs.promises.unlink(videoPath).catch(() => {});
+      }
+
       const success = await storage.deletePaymentLink(req.params.id, req.session.userId!);
       if (!success) {
         return res.status(404).json({ error: "Lien non trouvé" });
