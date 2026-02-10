@@ -6,6 +6,15 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckCircle2, X, Download, FileText, ArrowLeft, Search, BadgeCheck, Loader2, MapPin, Shield } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import type { User } from "@shared/schema";
 import { jsPDF } from "jspdf";
 import { queryClient } from "@/lib/queryClient";
@@ -31,6 +40,7 @@ export default function KycVerificationPage() {
   const [rejectionReason, setRejectionReason] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [lightboxImage, setLightboxImage] = useState<{ src: string; alt: string } | null>(null);
+  const [rejectKycConfirm, setRejectKycConfirm] = useState(false);
 
   const { data: submissions, isLoading, refetch } = useQuery<PartialUser[]>({
     queryKey: ["/api/admin/kyc-submissions"],
@@ -700,7 +710,7 @@ export default function KycVerificationPage() {
                     </Button>
                     <Button
                       variant="destructive"
-                      onClick={() => rejectMutation.mutate(selectedUserDetails.id)}
+                      onClick={() => setRejectKycConfirm(true)}
                       disabled={approveMutation.isPending || rejectMutation.isPending}
                       className="flex-1"
                       data-testid="button-reject-kyc"
@@ -762,6 +772,32 @@ export default function KycVerificationPage() {
           </div>
         </div>
       )}
+
+      <AlertDialog open={rejectKycConfirm} onOpenChange={setRejectKycConfirm}>
+        <AlertDialogContent data-testid="dialog-confirm-reject-kyc">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Rejeter la demande KYC</AlertDialogTitle>
+            <AlertDialogDescription>
+              Êtes-vous sûr de vouloir rejeter la demande KYC de {selectedUserDetails?.firstName} {selectedUserDetails?.lastName} ? Si c'est le 3ème rejet, le compte sera automatiquement suspendu.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex justify-end gap-2">
+            <AlertDialogCancel data-testid="button-cancel-reject-kyc">Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (selectedUserDetails?.id) {
+                  rejectMutation.mutate(selectedUserDetails.id);
+                  setRejectKycConfirm(false);
+                }
+              }}
+              className="bg-destructive text-destructive-foreground"
+              data-testid="button-confirm-reject-kyc"
+            >
+              Rejeter la KYC
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

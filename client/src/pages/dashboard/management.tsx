@@ -50,6 +50,7 @@ export default function Management() {
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; userId?: string; userName?: string }>({ open: false });
   const [suspendDialog, setSuspendDialog] = useState<{ open: boolean; userId?: string; userName?: string }>({ open: false });
   const [unsuspendDialog, setUnsuspendDialog] = useState<{ open: boolean; userId?: string; userName?: string }>({ open: false });
+  const [rejectKycDialog, setRejectKycDialog] = useState<{ open: boolean; userId?: string; userName?: string; isRemoval?: boolean }>({ open: false });
   const [pendingTransactionsDialog, setPendingTransactionsDialog] = useState(false);
   
   // Details view states
@@ -655,7 +656,7 @@ export default function Management() {
                           <Button
                             size="sm"
                             variant="destructive"
-                            onClick={() => rejectKycMutation.mutate(user.id)}
+                            onClick={() => setRejectKycDialog({ open: true, userId: user.id, userName: `${user.firstName} ${user.lastName}`, isRemoval: false })}
                             disabled={rejectKycMutation.isPending}
                             data-testid={`button-reject-kyc-${user.id}`}
                           >
@@ -667,7 +668,7 @@ export default function Management() {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => rejectKycMutation.mutate(user.id)}
+                          onClick={() => setRejectKycDialog({ open: true, userId: user.id, userName: `${user.firstName} ${user.lastName}`, isRemoval: true })}
                           disabled={rejectKycMutation.isPending}
                           data-testid={`button-unverify-kyc-${user.id}`}
                         >
@@ -878,6 +879,36 @@ export default function Management() {
               data-testid="button-confirm-unsuspend"
             >
               {unsuspendUserMutation.isPending ? "Réactivation en cours..." : "Confirmer"}
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Reject/Remove KYC Dialog */}
+      <AlertDialog open={rejectKycDialog.open} onOpenChange={(open) => setRejectKycDialog({ ...rejectKycDialog, open })}>
+        <AlertDialogContent data-testid="dialog-reject-kyc">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{rejectKycDialog.isRemoval ? "Retirer la vérification KYC" : "Rejeter la demande KYC"}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {rejectKycDialog.isRemoval
+                ? `Êtes-vous sûr de vouloir retirer la vérification KYC de ${rejectKycDialog.userName} ? L'utilisateur devra soumettre à nouveau sa demande de vérification.`
+                : `Êtes-vous sûr de vouloir rejeter la demande KYC de ${rejectKycDialog.userName} ? Si c'est le 3ème rejet, le compte sera automatiquement suspendu.`
+              }
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex justify-end gap-2">
+            <AlertDialogCancel data-testid="button-cancel-reject-kyc">Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (rejectKycDialog.userId) {
+                  rejectKycMutation.mutate(rejectKycDialog.userId);
+                  setRejectKycDialog({ open: false });
+                }
+              }}
+              className="bg-destructive text-destructive-foreground"
+              data-testid="button-confirm-reject-kyc"
+            >
+              {rejectKycDialog.isRemoval ? "Retirer la KYC" : "Rejeter la KYC"}
             </AlertDialogAction>
           </div>
         </AlertDialogContent>
