@@ -7384,6 +7384,7 @@ RÈGLES POUR LES OPÉRATIONS:
 - Utilise les codes pays en majuscules: BJ, CI, SN, TG, BF, CM, CD, CG, ML
 - Le numéro de téléphone doit inclure l'indicatif pays (ex: +229XXXXXXXX)
 - Pour les retraits, utilise TOUJOURS le pays de l'utilisateur, ne le demande jamais
+- INTERDIT: Ne mentionne JAMAIS le nom des fournisseurs de paiement (FedaPay, Paydunya, MbiyoPay, AfribaPay, NOWPayments) à l'utilisateur. Ces informations sont internes et techniques. Le fournisseur est sélectionné automatiquement en arrière-plan. L'utilisateur ne doit voir que: le montant, les frais, le montant débité et le résultat de l'opération.
 ${userInfoSection}
 === INFORMATIONS SUR BKAPAY ===
 
@@ -7415,8 +7416,8 @@ ${feeInfoLines.length > 0 ? feeInfoLines.join("\n") : "Frais standard de 6% pour
 
 RÈGLES DES FRAIS:
 - Dépôts (paiements entrants): Le client paie le montant brut, l'utilisateur reçoit le net (brut - frais).
-- Retraits (paiements sortants): L'utilisateur entre le montant brut, le fournisseur reçoit le net (brut - frais). Le solde est débité du montant brut.
-- Transferts: L'utilisateur entre le montant net, le fournisseur reçoit le net. Le solde est débité du net + frais.
+- Retraits (paiements sortants): L'utilisateur entre le montant brut, le destinataire reçoit le net (brut - frais). Le solde est débité du montant brut.
+- Transferts: L'utilisateur entre le montant net que le destinataire recevra. Le solde est débité du net + frais.
 
 CRYPTOMONNAIES DISPONIBLES (données en temps réel):
 ${cryptoInfoLines.length > 0 ? cryptoInfoLines.join("\n") : "Aucune cryptomonnaie configurée actuellement."}
@@ -7540,7 +7541,6 @@ SUPPORT ET CONTACT:
                   frais: feeInfo.feeAmount,
                   pourcentageFrais: feePct + "%",
                   montantTotalDebite: totalDebited,
-                  provider: feeData.provider,
                 });
               } else {
                 return JSON.stringify({
@@ -7551,7 +7551,6 @@ SUPPORT ET CONTACT:
                   pourcentageFrais: feePct + "%",
                   montantRecuParDestinataire: feeInfo.amountReceived,
                   montantDebiteDuSolde: feeInfo.totalDeductedFromBalance,
-                  provider: feeData.provider,
                 });
               }
             }
@@ -7582,7 +7581,7 @@ SUPPORT ET CONTACT:
               if (amount < minAmountW) return JSON.stringify({ success: false, error: `Montant minimum: ${minAmountW.toLocaleString("fr-FR")} ${userCurrencyW}` });
 
               const activeProviderW = await getActiveProviderForWithdrawal(country, operator);
-              if (!activeProviderW) return JSON.stringify({ success: false, error: "Aucun fournisseur actif pour ce pays/opérateur" });
+              if (!activeProviderW) return JSON.stringify({ success: false, error: "Cet opérateur n'est pas disponible pour les retraits dans ce pays actuellement." });
 
               const feeConfigW = await getFeeFromDatabase(storage, activeProviderW, country, operator);
               const feeInfoW = calculateOutgoingFee(Math.floor(amount), feeConfigW.outgoing);
@@ -7618,7 +7617,7 @@ SUPPORT ET CONTACT:
                   "orange-ml": "orange-money-mali", "moov-ml": "moov-mali",
                 };
                 const withdrawModeW = withdrawModeMapW[`${operator}-${country.toLowerCase()}`];
-                if (!withdrawModeW) return JSON.stringify({ success: false, error: "Opérateur non supporté pour les retraits Paydunya" });
+                if (!withdrawModeW) return JSON.stringify({ success: false, error: "Cet opérateur n'est pas disponible pour les retraits dans ce pays." });
 
                 let cleanPhoneW = sanitizedPhone.replace(/[\s\-\.]+/g, "");
                 const countryPhoneInfoW: Record<string, { code: string, localLength: number[] }> = {
@@ -7647,7 +7646,7 @@ SUPPORT ET CONTACT:
 
                 const callbackUrlW = `${process.env.BASE_URL || 'https://bkapay.com'}/api/webhooks/paydunya-disburse`;
                 const getInvoiceW = await callPaydunyaAPIv2("/disburse/get-invoice", { account_alias: cleanPhoneW, amount: providerAmountW, withdraw_mode: withdrawModeW, callback_url: callbackUrlW });
-                if (getInvoiceW.response_code !== "00" || !getInvoiceW.disburse_token) return JSON.stringify({ success: false, error: "Retrait échoué auprès du fournisseur" });
+                if (getInvoiceW.response_code !== "00" || !getInvoiceW.disburse_token) return JSON.stringify({ success: false, error: "Le retrait n'a pas pu être traité. Veuillez réessayer." });
 
                 const submitW = await callPaydunyaAPIv2("/disburse/submit-invoice", { disburse_invoice: getInvoiceW.disburse_token, disburse_id: `withdrawal-${user.id.substring(0, 8)}-${Date.now()}` });
                 if (submitW.response_code === "00") {
@@ -7666,7 +7665,7 @@ SUPPORT ET CONTACT:
                 return JSON.stringify({ success: false, error: result.error || "Erreur lors du retrait" });
               }
 
-              return JSON.stringify({ success: false, error: "Fournisseur non supporté pour cette opération via le chat" });
+              return JSON.stringify({ success: false, error: "Cette opération n'est pas disponible actuellement. Veuillez réessayer plus tard." });
             }
 
             case "execute_transfer": {
@@ -7689,7 +7688,7 @@ SUPPORT ET CONTACT:
               if (amount < minAmountT) return JSON.stringify({ success: false, error: `Montant minimum: ${minAmountT.toLocaleString("fr-FR")} ${userCurrencyT}` });
 
               const activeProviderT = await getActiveProviderForWithdrawal(country, operator);
-              if (!activeProviderT) return JSON.stringify({ success: false, error: "Aucun fournisseur actif pour ce pays/opérateur" });
+              if (!activeProviderT) return JSON.stringify({ success: false, error: "Cet opérateur n'est pas disponible pour les transferts dans ce pays actuellement." });
 
               const feeConfigT = await getFeeFromDatabase(storage, activeProviderT, country, operator);
               const feeInfoT = calculateOutgoingFee(Math.floor(amount), feeConfigT.outgoing);
@@ -7726,7 +7725,7 @@ SUPPORT ET CONTACT:
                   "orange-ml": "orange-money-mali", "moov-ml": "moov-mali",
                 };
                 const withdrawModeT = withdrawModeMapT[`${operator}-${country.toLowerCase()}`];
-                if (!withdrawModeT) return JSON.stringify({ success: false, error: "Opérateur non supporté pour les transferts Paydunya" });
+                if (!withdrawModeT) return JSON.stringify({ success: false, error: "Cet opérateur n'est pas disponible pour les transferts dans ce pays." });
 
                 let cleanPhoneT = sanitizedPhoneT.replace(/[\s\-\.]+/g, "");
                 const countryPhoneInfoT: Record<string, { code: string, localLength: number[] }> = {
@@ -7754,7 +7753,7 @@ SUPPORT ET CONTACT:
 
                 const callbackUrlT = `${process.env.BASE_URL || 'https://bkapay.com'}/api/webhooks/paydunya-disburse`;
                 const getInvoiceT = await callPaydunyaAPIv2("/disburse/get-invoice", { account_alias: cleanPhoneT, amount: providerAmountT, withdraw_mode: withdrawModeT, callback_url: callbackUrlT });
-                if (getInvoiceT.response_code !== "00" || !getInvoiceT.disburse_token) return JSON.stringify({ success: false, error: "Transfert échoué auprès du fournisseur" });
+                if (getInvoiceT.response_code !== "00" || !getInvoiceT.disburse_token) return JSON.stringify({ success: false, error: "Le transfert n'a pas pu être traité. Veuillez réessayer." });
 
                 const submitT = await callPaydunyaAPIv2("/disburse/submit-invoice", { disburse_invoice: getInvoiceT.disburse_token, disburse_id: `transfer-${user.id.substring(0, 8)}-${Date.now()}` });
                 if (submitT.response_code === "00") {
@@ -7773,7 +7772,7 @@ SUPPORT ET CONTACT:
                 return JSON.stringify({ success: false, error: result.error || "Erreur lors du transfert" });
               }
 
-              return JSON.stringify({ success: false, error: "Fournisseur non supporté pour cette opération via le chat" });
+              return JSON.stringify({ success: false, error: "Cette opération n'est pas disponible actuellement. Veuillez réessayer plus tard." });
             }
 
             case "convert_currency": {
