@@ -7302,6 +7302,43 @@ RÈGLES IMPORTANTES:
 - Si on te pose une question hors sujet, redirige poliment vers les fonctionnalités de BKApay.
 - Sois concis, professionnel et amical.
 - Utilise les données ci-dessous pour répondre avec précision.
+
+=== GUIDE RETRAIT ET TRANSFERT ===
+Tu peux aider l'utilisateur à effectuer des RETRAITS et des TRANSFERTS directement depuis le chat. Suis ces étapes UNE PAR UNE, ne pose qu'UNE question à la fois :
+
+RETRAIT (envoyer de l'argent vers son propre numéro mobile money):
+1. Affiche les numéros de retrait configurés de l'utilisateur et demande lequel utiliser
+2. Demande l'opérateur (Orange, MTN, Moov, Wave, etc.) adapté au pays du numéro
+3. Demande le montant souhaité
+4. Utilise la fonction calculate_fees pour calculer les frais
+5. Affiche un récapitulatif clair: montant brut, frais (%), montant reçu par le destinataire, montant débité du solde
+6. Demande le code de sécurité à 6 chiffres pour confirmer
+7. Utilise la fonction execute_withdrawal pour exécuter le retrait
+8. Affiche le résultat (succès ou erreur)
+
+TRANSFERT (envoyer de l'argent vers un autre numéro):
+1. Demande le pays du destinataire
+2. Demande le numéro de téléphone du destinataire (avec indicatif)
+3. Demande l'opérateur
+4. Demande le montant net que le destinataire doit recevoir
+5. Si la devise du destinataire est différente de celle de l'utilisateur, utilise convert_currency pour convertir
+6. Utilise calculate_fees pour calculer les frais
+7. Affiche un récapitulatif clair: montant envoyé, frais (%), montant reçu, conversion si applicable, montant total débité
+8. Demande confirmation ("oui" ou "non")
+9. Utilise la fonction execute_transfer pour exécuter le transfert
+10. Affiche le résultat
+
+RÈGLES POUR LES OPÉRATIONS:
+- Vérifie TOUJOURS que le KYC est vérifié avant de proposer un retrait/transfert
+- Vérifie que le code de sécurité est configuré avant de proposer un retrait
+- Vérifie que des numéros de retrait sont configurés avant de proposer un retrait
+- Vérifie que le solde est suffisant avant d'exécuter
+- Pour le retrait: le code de sécurité est OBLIGATOIRE
+- Pour le transfert: pas de code de sécurité requis, mais demande une confirmation claire
+- N'exécute JAMAIS une opération sans récapitulatif et confirmation préalable de l'utilisateur
+- Utilise les codes opérateur en minuscules: orange, mtn, moov, wave, free, tmoney, wizall, expresso, coris
+- Utilise les codes pays en majuscules: BJ, CI, SN, TG, BF, CM, CD, CG, ML
+- Le numéro de téléphone doit inclure l'indicatif pays (ex: +229XXXXXXXX)
 ${userInfoSection}
 === INFORMATIONS SUR BKAPAY ===
 
@@ -7361,29 +7398,287 @@ SUPPORT ET CONTACT:
 - Groupe WhatsApp communautaire: ${supportSettingsData?.whatsappLink || "https://chat.whatsapp.com/DRe55FMRXCt87VxNvjF1EF"}
 - Pour toute question ou problème, les utilisateurs peuvent contacter le support par email, téléphone ou rejoindre le groupe WhatsApp.`;
 
-      // Set up SSE streaming
+      const emaliTools: any[] = [
+        {
+          type: "function" as const,
+          function: {
+            name: "calculate_fees",
+            description: "Calcule les frais et le montant net pour un retrait ou transfert mobile money. Appelle cette fonction AVANT d'exécuter une opération pour montrer le récapitulatif à l'utilisateur.",
+            parameters: {
+              type: "object",
+              properties: {
+                amount: { type: "number", description: "Montant en unité de devise (FCFA, CDF, etc.)" },
+                type: { type: "string", enum: ["withdrawal", "transfer"], description: "Type: withdrawal (retrait) ou transfer (transfert)" },
+                country: { type: "string", description: "Code pays du destinataire (BJ, CI, SN, TG, BF, CM, CD, CG, ML)" },
+                operator: { type: "string", description: "Code opérateur en minuscules (orange, mtn, moov, wave, free, tmoney, wizall, expresso, coris)" },
+              },
+              required: ["amount", "type", "country", "operator"],
+            },
+          },
+        },
+        {
+          type: "function" as const,
+          function: {
+            name: "execute_withdrawal",
+            description: "Exécute un retrait mobile money. REQUIERT: KYC vérifié, code de sécurité configuré, numéro dans la liste des numéros de retrait, solde suffisant. Appelle calculate_fees AVANT pour montrer le récapitulatif.",
+            parameters: {
+              type: "object",
+              properties: {
+                amount: { type: "number", description: "Montant brut à retirer" },
+                country: { type: "string", description: "Code pays (BJ, CI, SN, TG, BF, CM, CD, CG, ML)" },
+                operator: { type: "string", description: "Code opérateur en minuscules" },
+                phone: { type: "string", description: "Numéro de téléphone complet avec indicatif (ex: +22997000000)" },
+                securityCode: { type: "string", description: "Code de sécurité à 6 chiffres fourni par l'utilisateur" },
+              },
+              required: ["amount", "country", "operator", "phone", "securityCode"],
+            },
+          },
+        },
+        {
+          type: "function" as const,
+          function: {
+            name: "execute_transfer",
+            description: "Exécute un transfert mobile money vers un numéro tiers. REQUIERT: KYC vérifié, solde suffisant. Le montant est le montant NET que le destinataire recevra. Le solde sera débité du montant + frais.",
+            parameters: {
+              type: "object",
+              properties: {
+                amount: { type: "number", description: "Montant net que le destinataire recevra" },
+                country: { type: "string", description: "Code pays du destinataire" },
+                operator: { type: "string", description: "Code opérateur du destinataire en minuscules" },
+                phone: { type: "string", description: "Numéro de téléphone du destinataire avec indicatif" },
+              },
+              required: ["amount", "country", "operator", "phone"],
+            },
+          },
+        },
+        {
+          type: "function" as const,
+          function: {
+            name: "convert_currency",
+            description: "Convertit un montant d'une devise à une autre (XOF, XAF, CDF, USD). Utile quand l'utilisateur et le destinataire ont des devises différentes.",
+            parameters: {
+              type: "object",
+              properties: {
+                amount: { type: "number", description: "Montant à convertir" },
+                fromCurrency: { type: "string", description: "Devise source (XOF, XAF, CDF, USD)" },
+                toCurrency: { type: "string", description: "Devise cible (XOF, XAF, CDF, USD)" },
+              },
+              required: ["amount", "fromCurrency", "toCurrency"],
+            },
+          },
+        },
+      ];
+
+      const handleToolCall = async (toolName: string, args: any, userId: string): Promise<string> => {
+        try {
+          switch (toolName) {
+            case "calculate_fees": {
+              const { amount, type, country, operator } = args;
+              const feeData = await getDynamicOutgoingFees(storage, country, operator);
+              const feeInfo = calculateOutgoingFee(Math.floor(amount), feeData.outgoing);
+              const feePct = (feeData.outgoing / 10).toFixed(1);
+
+              if (type === "transfer") {
+                const totalDebited = Math.floor(amount) + feeInfo.feeAmount;
+                return JSON.stringify({
+                  success: true,
+                  type: "transfer",
+                  montantNet: Math.floor(amount),
+                  frais: feeInfo.feeAmount,
+                  pourcentageFrais: feePct + "%",
+                  montantTotalDebite: totalDebited,
+                  provider: feeData.provider,
+                });
+              } else {
+                return JSON.stringify({
+                  success: true,
+                  type: "withdrawal",
+                  montantBrut: Math.floor(amount),
+                  frais: feeInfo.feeAmount,
+                  pourcentageFrais: feePct + "%",
+                  montantRecuParDestinataire: feeInfo.amountReceived,
+                  montantDebiteDuSolde: feeInfo.totalDeductedFromBalance,
+                  provider: feeData.provider,
+                });
+              }
+            }
+
+            case "execute_withdrawal": {
+              const { amount, country, operator, phone, securityCode } = args;
+              const user = await storage.getUser(userId);
+              if (!user) return JSON.stringify({ success: false, error: "Utilisateur non trouvé" });
+              if (user.suspended) return JSON.stringify({ success: false, error: "Compte suspendu" });
+              if (user.kycStatus !== "verified") return JSON.stringify({ success: false, error: "KYC non vérifié. Veuillez compléter votre vérification KYC." });
+              if (!user.securityCode) return JSON.stringify({ success: false, error: "Code de sécurité non configuré. Allez dans Paramètres pour le configurer." });
+
+              const sanitizedPhoneCheck = phone.replace(/\s+/g, "").replace(/^(\+|00)/, "");
+              const allowedPhones = (user.withdrawalPhones || []).map((p: string) => p.replace(/\s+/g, "").replace(/^(\+|00)/, ""));
+              if (allowedPhones.length === 0) return JSON.stringify({ success: false, error: "Aucun numéro de retrait configuré. Allez dans Paramètres pour ajouter vos numéros." });
+              if (!allowedPhones.some((p: string) => sanitizedPhoneCheck.includes(p) || p.includes(sanitizedPhoneCheck))) {
+                return JSON.stringify({ success: false, error: "Ce numéro ne fait pas partie de vos numéros de retrait autorisés. Utilisez un numéro configuré dans vos paramètres." });
+              }
+
+              const bcryptMod = await import("bcrypt");
+              const isValidCode = await bcryptMod.compare(securityCode, user.securityCode);
+              if (!isValidCode) return JSON.stringify({ success: false, error: "Code de sécurité incorrect" });
+
+              if (!amount || amount <= 0) return JSON.stringify({ success: false, error: "Montant invalide" });
+
+              const userCurrencyW = user.country ? getCurrencyForCountry(user.country) : "XOF";
+              const minAmountW = user.country === "CD" ? 4000 : 1000;
+              if (amount < minAmountW) return JSON.stringify({ success: false, error: `Montant minimum: ${minAmountW.toLocaleString("fr-FR")} ${userCurrencyW}` });
+
+              const activeProviderW = await getActiveProviderForWithdrawal(country, operator);
+              if (!activeProviderW) return JSON.stringify({ success: false, error: "Aucun fournisseur actif pour ce pays/opérateur" });
+
+              const feeConfigW = await getFeeFromDatabase(storage, activeProviderW, country, operator);
+              const feeInfoW = calculateOutgoingFee(Math.floor(amount), feeConfigW.outgoing);
+
+              if (user.balance < feeInfoW.totalDeductedFromBalance) {
+                return JSON.stringify({ success: false, error: `Solde insuffisant. Solde: ${user.balance.toLocaleString("fr-FR")} ${userCurrencyW}, Requis: ${feeInfoW.totalDeductedFromBalance.toLocaleString("fr-FR")} ${userCurrencyW}` });
+              }
+
+              const sanitizedPhone = phone.replace(/\s+/g, "").replace(/^(\+|00)/, "");
+
+              if (activeProviderW === "fedapay") {
+                const result = await handleFedaPayWithdrawal(userId, user, Math.floor(amount), country, operator, sanitizedPhone, userCurrencyW);
+                if (result.success) {
+                  return JSON.stringify({ success: true, message: `Retrait de ${feeInfoW.amountReceived.toLocaleString("fr-FR")} ${userCurrencyW} envoyé avec succès vers ${phone}. Frais: ${feeInfoW.feeAmount.toLocaleString("fr-FR")} ${userCurrencyW}. Transaction ID: ${result.transactionId}` });
+                } else {
+                  return JSON.stringify({ success: false, error: result.error || "Erreur lors du retrait" });
+                }
+              }
+
+              return JSON.stringify({ success: false, error: "Fournisseur non supporté pour cette opération via le chat" });
+            }
+
+            case "execute_transfer": {
+              const { amount, country, operator, phone } = args;
+              const user = await storage.getUser(userId);
+              if (!user) return JSON.stringify({ success: false, error: "Utilisateur non trouvé" });
+              if (user.suspended) return JSON.stringify({ success: false, error: "Compte suspendu" });
+              if (user.kycStatus !== "verified") return JSON.stringify({ success: false, error: "KYC non vérifié. Veuillez compléter votre vérification KYC." });
+
+              if (!amount || amount <= 0) return JSON.stringify({ success: false, error: "Montant invalide" });
+
+              const userCurrencyT = user.country ? getCurrencyForCountry(user.country) : "XOF";
+              const minAmountT = user.country === "CD" ? 2000 : 500;
+              if (amount < minAmountT) return JSON.stringify({ success: false, error: `Montant minimum: ${minAmountT.toLocaleString("fr-FR")} ${userCurrencyT}` });
+
+              const activeProviderT = await getActiveProviderForWithdrawal(country, operator);
+              if (!activeProviderT) return JSON.stringify({ success: false, error: "Aucun fournisseur actif pour ce pays/opérateur" });
+
+              const feeConfigT = await getFeeFromDatabase(storage, activeProviderT, country, operator);
+              const feeInfoT = calculateOutgoingFee(Math.floor(amount), feeConfigT.outgoing);
+              const requiredBalanceT = Math.floor(amount) + feeInfoT.feeAmount;
+
+              if (user.balance < requiredBalanceT) {
+                return JSON.stringify({ success: false, error: `Solde insuffisant. Solde: ${user.balance.toLocaleString("fr-FR")} ${userCurrencyT}, Requis: ${requiredBalanceT.toLocaleString("fr-FR")} ${userCurrencyT}` });
+              }
+
+              const sanitizedPhoneT = phone.replace(/\s+/g, "").replace(/^(\+|00)/, "");
+
+              if (activeProviderT === "fedapay") {
+                const result = await handleFedaPayTransfer(userId, user, Math.floor(amount), country, operator, sanitizedPhoneT, userCurrencyT);
+                if (result.success) {
+                  return JSON.stringify({ success: true, message: `Transfert de ${Math.floor(amount).toLocaleString("fr-FR")} ${userCurrencyT} envoyé avec succès vers ${phone}. Frais: ${feeInfoT.feeAmount.toLocaleString("fr-FR")} ${userCurrencyT}. Total débité: ${requiredBalanceT.toLocaleString("fr-FR")} ${userCurrencyT}. Transaction ID: ${result.transactionId}` });
+                } else {
+                  return JSON.stringify({ success: false, error: result.error || "Erreur lors du transfert" });
+                }
+              }
+
+              return JSON.stringify({ success: false, error: "Fournisseur non supporté pour cette opération via le chat" });
+            }
+
+            case "convert_currency": {
+              const { convertCurrency } = await import("./currency-converter");
+              const convResult = await convertCurrency(args.amount, args.fromCurrency, args.toCurrency);
+              if (convResult.success) {
+                return JSON.stringify({
+                  success: true,
+                  montantOriginal: convResult.originalAmount,
+                  deviseOrigine: convResult.originalCurrency,
+                  montantConverti: Math.floor(convResult.convertedAmount),
+                  deviseCible: convResult.targetCurrency,
+                  tauxDeChange: convResult.conversionRate,
+                });
+              }
+              return JSON.stringify({ success: false, error: convResult.error || "Erreur de conversion" });
+            }
+
+            default:
+              return JSON.stringify({ error: "Fonction inconnue" });
+          }
+        } catch (err: any) {
+          console.error(`[EMALI AI] Tool error (${toolName}):`, err);
+          return JSON.stringify({ success: false, error: err.message || "Erreur interne" });
+        }
+      }
+
       res.setHeader("Content-Type", "text/event-stream");
       res.setHeader("Cache-Control", "no-cache");
       res.setHeader("Connection", "keep-alive");
 
-      const stream = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [
-          { role: "system", content: systemPrompt },
-          ...userMessages.map((m: any) => ({
-            role: m.role as "user" | "assistant",
-            content: m.content,
-          })),
-        ],
-        stream: true,
-        max_completion_tokens: 2048,
-      });
+      const conversationMessages: any[] = [
+        { role: "system", content: systemPrompt },
+        ...userMessages.map((m: any) => ({
+          role: m.role as "user" | "assistant",
+          content: m.content,
+        })),
+      ];
 
-      for await (const chunk of stream) {
-        const content = chunk.choices[0]?.delta?.content || "";
-        if (content) {
-          res.write(`data: ${JSON.stringify({ content })}\n\n`);
+      let maxToolRounds = 5;
+      while (maxToolRounds > 0) {
+        maxToolRounds--;
+
+        const response = await openai.chat.completions.create({
+          model: "gpt-4o-mini",
+          messages: conversationMessages,
+          tools: emaliTools,
+          tool_choice: "auto",
+          max_completion_tokens: 2048,
+        });
+
+        const choice = response.choices[0];
+
+        if (choice.message.tool_calls && choice.message.tool_calls.length > 0) {
+          conversationMessages.push(choice.message);
+
+          for (const toolCall of choice.message.tool_calls) {
+            let fnName = "";
+            let fnArgs: any = {};
+            let toolResult: string;
+
+            try {
+              fnName = (toolCall as any).function.name;
+              fnArgs = JSON.parse((toolCall as any).function.arguments);
+              console.log(`[EMALI AI] Tool call: ${fnName}(${JSON.stringify(fnArgs)})`);
+              toolResult = await handleToolCall(fnName, fnArgs, currentUserId!);
+            } catch (parseErr: any) {
+              console.error(`[EMALI AI] Tool parse/exec error:`, parseErr);
+              toolResult = JSON.stringify({ success: false, error: "Erreur interne lors du traitement de la demande" });
+            }
+
+            console.log(`[EMALI AI] Tool result: ${toolResult}`);
+            conversationMessages.push({
+              role: "tool",
+              tool_call_id: toolCall.id,
+              content: toolResult,
+            });
+          }
+          continue;
         }
+
+        if (choice.message.content) {
+          const finalContent = choice.message.content;
+          const chunkSize = 20;
+          for (let i = 0; i < finalContent.length; i += chunkSize) {
+            const chunk = finalContent.slice(i, i + chunkSize);
+            res.write(`data: ${JSON.stringify({ content: chunk })}\n\n`);
+          }
+        }
+
+        break;
       }
 
       res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
