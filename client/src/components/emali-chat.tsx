@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { X, Send, Loader2 } from "lucide-react";
 import emaliLogo from "@/assets/emali-ai-logo.png";
@@ -24,7 +24,7 @@ export function EmaliChatButton() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const lastActivityRef = useRef<number>(Date.now());
 
   const resetChat = useCallback(() => {
@@ -62,6 +62,9 @@ export function EmaliChatButton() {
     setMessages(newMessages);
     setInput("");
     setIsLoading(true);
+    if (inputRef.current) {
+      inputRef.current.style.height = "36px";
+    }
 
     try {
       const response = await fetch("/api/emali-chat", {
@@ -224,7 +227,7 @@ export function EmaliChatButton() {
                         }}
                       />
                     ) : (
-                      msg.content
+                      <span style={{ whiteSpace: "pre-wrap" }}>{msg.content}</span>
                     )}
                     {msg.role === "assistant" && msg.content === "" && isLoading && (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -235,14 +238,22 @@ export function EmaliChatButton() {
             </div>
 
             <div className="p-3 border-t">
-              <div className="flex gap-2">
-                <Input
+              <div className="flex items-end gap-2">
+                <Textarea
                   ref={inputRef}
                   value={input}
-                  onChange={(e) => setInput(e.target.value)}
+                  onChange={(e) => {
+                    setInput(e.target.value);
+                    const el = e.target;
+                    el.style.height = "auto";
+                    el.style.height = Math.min(el.scrollHeight, 120) + "px";
+                  }}
                   onKeyDown={handleKeyDown}
-                  placeholder="Posez votre question..."
+                  placeholder="Écrivez votre message... (Shift+Entrée pour aller à la ligne)"
                   disabled={isLoading}
+                  rows={1}
+                  className="flex-1 resize-none !min-h-[36px]"
+                  style={{ maxHeight: "120px" }}
                   data-testid="input-emali-message"
                 />
                 <Button
@@ -258,6 +269,7 @@ export function EmaliChatButton() {
                   )}
                 </Button>
               </div>
+              <p className="text-[10px] text-muted-foreground mt-1">Shift+Entrée pour aller à la ligne</p>
             </div>
           </div>
         </>

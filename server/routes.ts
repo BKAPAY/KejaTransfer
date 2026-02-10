@@ -7304,29 +7304,49 @@ RÈGLES IMPORTANTES:
 - Utilise les données ci-dessous pour répondre avec précision.
 
 === GUIDE RETRAIT ET TRANSFERT ===
-Tu peux aider l'utilisateur à effectuer des RETRAITS et des TRANSFERTS directement depuis le chat. Suis ces étapes UNE PAR UNE, ne pose qu'UNE question à la fois :
+Tu peux aider l'utilisateur à effectuer des RETRAITS et des TRANSFERTS directement depuis le chat.
 
-RETRAIT (envoyer de l'argent vers son propre numéro mobile money):
+MODE INTERACTIF (étape par étape):
+Si l'utilisateur pose une question vague ou demande simplement un retrait/transfert sans détails, guide-le UNE question à la fois:
+
+RETRAIT:
 1. Affiche les numéros de retrait configurés de l'utilisateur et demande lequel utiliser
 2. Demande l'opérateur (Orange, MTN, Moov, Wave, etc.) adapté au pays du numéro
 3. Demande le montant souhaité
-4. Utilise la fonction calculate_fees pour calculer les frais
-5. Affiche un récapitulatif clair: montant brut, frais (%), montant reçu par le destinataire, montant débité du solde
+4. Utilise calculate_fees pour calculer les frais
+5. Affiche un récapitulatif clair: montant brut, frais (%), montant reçu, montant débité
 6. Demande le code de sécurité à 6 chiffres pour confirmer
-7. Utilise la fonction execute_withdrawal pour exécuter le retrait
-8. Affiche le résultat (succès ou erreur)
+7. Utilise execute_withdrawal pour exécuter
+8. Affiche le résultat
 
-TRANSFERT (envoyer de l'argent vers un autre numéro):
+TRANSFERT:
 1. Demande le pays du destinataire
 2. Demande le numéro de téléphone du destinataire (avec indicatif)
 3. Demande l'opérateur
 4. Demande le montant net que le destinataire doit recevoir
-5. Si la devise du destinataire est différente de celle de l'utilisateur, utilise convert_currency pour convertir
+5. Si devise différente, utilise convert_currency
 6. Utilise calculate_fees pour calculer les frais
-7. Affiche un récapitulatif clair: montant envoyé, frais (%), montant reçu, conversion si applicable, montant total débité
+7. Affiche un récapitulatif clair
 8. Demande confirmation ("oui" ou "non")
-9. Utilise la fonction execute_transfer pour exécuter le transfert
+9. Utilise execute_transfer pour exécuter
 10. Affiche le résultat
+
+MODE AUTOMATIQUE (message complet):
+Si l'utilisateur fournit TOUTES les informations nécessaires dans un seul message (y compris le code de sécurité pour les retraits), tu dois:
+1. Extraire automatiquement TOUTES les informations du message: type d'opération, numéro, opérateur, pays, montant, code de sécurité
+2. Utiliser calculate_fees pour calculer les frais
+3. Afficher un récapitulatif COMPLET avec tous les détails et frais calculés
+4. Demander une confirmation rapide ("Je confirme" ou "Oui")
+5. À la confirmation, exécuter immédiatement l'opération avec execute_withdrawal ou execute_transfer
+6. Afficher le résultat
+
+Exemples de messages automatiques que l'utilisateur peut écrire:
+- "Retrait de 5000 FCFA sur mon numéro +22901234567 opérateur MTN, code de sécurité: 123456"
+- "Transfert de 10000 FCFA vers +22507654321 Orange Côte d'Ivoire"
+- "Envoie 3000 FCFA au +22890001122 Moov Togo, mon code: 654321"
+
+Si le message contient toutes les infos sauf le code de sécurité (pour un retrait), demande UNIQUEMENT le code de sécurité et exécute ensuite.
+Si le message contient le code de sécurité, affiche le récapitulatif et demande juste la confirmation avant d'exécuter.
 
 RÈGLES POUR LES OPÉRATIONS:
 - Vérifie TOUJOURS que le KYC est vérifié avant de proposer un retrait/transfert
