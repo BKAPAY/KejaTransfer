@@ -97,6 +97,8 @@ const COUNTRY_NAMES: Record<string, string> = {
   CF: "Centrafrique",
   GA: "Gabon",
   RW: "Rwanda",
+  CRYPTO: "Cryptomonnaie",
+  crypto: "Cryptomonnaie",
 };
 
 const containerVariants = {
@@ -248,8 +250,15 @@ function CountryItem({
       <motion.span 
         whileHover={{ scale: 1.2 }}
         transition={{ type: "spring", stiffness: 400 }}
+        className="flex items-center justify-center"
       >
-        <CountryFlag code={country} size="sm" />
+        {country === "CRYPTO" || country === "crypto" ? (
+          <div className="w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center">
+            <span className="text-white font-bold text-[10px]">₿</span>
+          </div>
+        ) : (
+          <CountryFlag code={country} size="sm" />
+        )}
       </motion.span>
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between">
