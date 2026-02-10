@@ -70,6 +70,8 @@ export default function KYC() {
   const [locationAddress, setLocationAddress] = useState("");
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationError, setLocationError] = useState("");
+  const [showSelfieInstructions, setShowSelfieInstructions] = useState(false);
+  const [selfieInstructionsAcknowledged, setSelfieInstructionsAcknowledged] = useState(false);
   const [isResubmitting, setIsResubmitting] = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
   const [cameraMode, setCameraMode] = useState<CameraMode>(null);
@@ -769,6 +771,32 @@ export default function KYC() {
                 <X className="w-4 h-4" />
               </button>
               {renderUploadStatus("selfie")}
+            </div>
+          ) : !selfieInstructionsAcknowledged ? (
+            <div className="space-y-4">
+              <div className="border rounded-lg p-4 bg-muted/30">
+                <div className="flex justify-center mb-4">
+                  <img
+                    src="/selfie-instruction.jpg"
+                    alt="Instruction selfie"
+                    className="w-48 h-auto rounded-lg"
+                  />
+                </div>
+                <div className="text-center space-y-2">
+                  <p className="text-sm font-medium">Comment prendre votre selfie</p>
+                  <p className="text-xs text-muted-foreground">
+                    Tenez votre piece d'identite en main, bien visible a cote de votre visage, comme sur l'image ci-dessus. Assurez-vous que votre visage et le document sont clairement visibles.
+                  </p>
+                </div>
+              </div>
+              <Button
+                className="w-full"
+                onClick={() => setSelfieInstructionsAcknowledged(true)}
+                data-testid="button-selfie-understood"
+              >
+                J'ai compris
+                <ArrowRight className="w-4 h-4 ml-2" />
+              </Button>
             </div>
           ) : (
             <Button
