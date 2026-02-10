@@ -9,9 +9,14 @@ interface ChatMessage {
   content: string;
 }
 
-const WELCOME_MESSAGE = `Bonjour ! Je suis **EMALI AI**, votre assistant intelligent BKApay. Je suis là pour répondre à toutes vos questions sur la plateforme : pays disponibles, opérateurs, frais de transaction, cryptomonnaies, vérification KYC, et bien plus encore.
+const WELCOME_MESSAGE = `Bonjour ! Je suis **EMALI AI**, votre assistant intelligent BKApay. Je suis là pour vous aider. Que souhaitez-vous faire ?
 
-Comment puis-je vous aider aujourd'hui ?`;
+1. Faire un retrait
+2. Faire un transfert
+3. Consulter mon solde
+4. Informations sur les frais
+5. Pays et opérateurs disponibles
+6. Autre question`;
 
 const SESSION_TIMEOUT_MS = 2 * 60 * 60 * 1000;
 
