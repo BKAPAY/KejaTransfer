@@ -163,6 +163,14 @@ export interface IStorage {
   // Support Settings
   getSupportSettings(): Promise<SupportSettings | undefined>;
   updateSupportSettings(updates: { supportEmail?: string; supportPhone?: string; whatsappLink?: string }): Promise<SupportSettings>;
+
+  // Scheduled Operations
+  createScheduledOperation(op: schema.InsertScheduledOperation): Promise<schema.ScheduledOperation>;
+  getScheduledOperations(userId: string): Promise<schema.ScheduledOperation[]>;
+  getScheduledOperationById(id: string): Promise<schema.ScheduledOperation | undefined>;
+  getPendingScheduledOperations(): Promise<schema.ScheduledOperation[]>;
+  updateScheduledOperationStatus(id: string, status: string, resultMessage?: string, transactionId?: string): Promise<schema.ScheduledOperation | undefined>;
+  cancelScheduledOperation(id: string, userId: string): Promise<boolean>;
 }
 
 export class DbStorage implements IStorage {
@@ -1850,6 +1858,54 @@ export class DbStorage implements IStorage {
         .returning();
       return results[0];
     }
+  }
+  // Scheduled Operations
+  async createScheduledOperation(op: schema.InsertScheduledOperation): Promise<schema.ScheduledOperation> {
+    const results = await db.insert(schema.scheduledOperations).values(op).returning();
+    return results[0];
+  }
+
+  async getScheduledOperations(userId: string): Promise<schema.ScheduledOperation[]> {
+    return await db.select().from(schema.scheduledOperations)
+      .where(eq(schema.scheduledOperations.userId, userId))
+      .orderBy(desc(schema.scheduledOperations.createdAt));
+  }
+
+  async getScheduledOperationById(id: string): Promise<schema.ScheduledOperation | undefined> {
+    const results = await db.select().from(schema.scheduledOperations)
+      .where(eq(schema.scheduledOperations.id, id)).limit(1);
+    return results[0];
+  }
+
+  async getPendingScheduledOperations(): Promise<schema.ScheduledOperation[]> {
+    return await db.select().from(schema.scheduledOperations)
+      .where(
+        and(
+          eq(schema.scheduledOperations.status, "pending"),
+          sql`${schema.scheduledOperations.scheduledAt} <= NOW()`
+        )
+      );
+  }
+
+  async updateScheduledOperationStatus(id: string, status: string, resultMessage?: string, transactionId?: string): Promise<schema.ScheduledOperation | undefined> {
+    const updates: any = { status };
+    if (resultMessage) updates.resultMessage = resultMessage;
+    if (transactionId) updates.transactionId = transactionId;
+    if (status === "executed" || status === "failed") updates.executedAt = new Date();
+    const results = await db.update(schema.scheduledOperations)
+      .set(updates)
+      .where(eq(schema.scheduledOperations.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async cancelScheduledOperation(id: string, userId: string): Promise<boolean> {
+    const op = await this.getScheduledOperationById(id);
+    if (!op || op.userId !== userId || op.status !== "pending") return false;
+    await db.update(schema.scheduledOperations)
+      .set({ status: "cancelled" })
+      .where(eq(schema.scheduledOperations.id, id));
+    return true;
   }
 }
 

@@ -3,6 +3,7 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { bootstrapDatabase } from "./db-bootstrap";
 import { startPaymentPolling, stopPaymentPolling } from "./payment-polling";
+import { startScheduler, stopScheduler } from "./scheduler";
 
 const app = express();
 
@@ -91,8 +92,9 @@ app.use((req, res, next) => {
       try {
         await bootstrapDatabase();
         bootstrapComplete = true;
-        log("✅ Bootstrap complete, starting payment polling");
+        log("✅ Bootstrap complete, starting payment polling and scheduler");
         startPaymentPolling();
+        startScheduler();
       } catch (error) {
         bootstrapError = String(error);
         log("❌ Database bootstrap failed: " + bootstrapError);

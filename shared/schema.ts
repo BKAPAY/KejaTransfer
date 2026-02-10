@@ -211,6 +211,35 @@ export const updateFeeConfigSchema = z.object({
   outgoingFeePercentage: z.number().min(0).max(100).optional(),
 });
 
+// Scheduled operations - programmed withdrawals and transfers
+export const scheduledOperations = pgTable("scheduled_operations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  type: text("type").notNull(), // "withdrawal" or "transfer"
+  amount: integer("amount").notNull(),
+  country: text("country").notNull(),
+  operator: text("operator").notNull(),
+  phone: text("phone").notNull(),
+  securityCodeHash: text("security_code_hash"), // bcrypt hash of security code for withdrawals
+  scheduledAt: timestamp("scheduled_at").notNull(),
+  status: text("status").notNull().default("pending"), // "pending", "executed", "failed", "cancelled"
+  resultMessage: text("result_message"),
+  transactionId: varchar("transaction_id"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  executedAt: timestamp("executed_at"),
+});
+
+export type ScheduledOperation = typeof scheduledOperations.$inferSelect;
+export const insertScheduledOperationSchema = createInsertSchema(scheduledOperations).omit({
+  id: true,
+  status: true,
+  resultMessage: true,
+  transactionId: true,
+  createdAt: true,
+  executedAt: true,
+});
+export type InsertScheduledOperation = z.infer<typeof insertScheduledOperationSchema>;
+
 // Support settings table - configurable by admin
 export const supportSettings = pgTable("support_settings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
