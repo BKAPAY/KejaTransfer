@@ -115,6 +115,14 @@ const COUNTRY_NAMES: Record<string, string> = {
   ML: "Mali",
   GN: "Guinée",
   NE: "Niger",
+  CM: "Cameroun",
+  TD: "Tchad",
+  CG: "Congo-Brazzaville",
+  CF: "Centrafrique",
+  GA: "Gabon",
+  CD: "RD Congo",
+  CRYPTO: "Cryptomonnaie",
+  crypto: "Cryptomonnaie",
   Unknown: "Inconnu",
 };
 
@@ -351,8 +359,15 @@ function CountryCard({
       <motion.span 
         whileHover={{ scale: 1.2 }}
         transition={{ type: "spring", stiffness: 400 }}
+        className="flex items-center justify-center"
       >
-        <CountryFlag code={country} size="md" />
+        {country === "CRYPTO" || country === "crypto" ? (
+          <div className="w-6 h-6 rounded-full bg-amber-500 flex items-center justify-center">
+            <span className="text-white font-bold text-xs">₿</span>
+          </div>
+        ) : (
+          <CountryFlag code={country} size="md" />
+        )}
       </motion.span>
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between mb-1">
