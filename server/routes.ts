@@ -7160,24 +7160,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
         storage.getProviderConfigs(),
       ]);
 
-      // Build country info with real-time operator availability
+      // Build country info with real-time per-operator availability
       const countryInfoLines: string[] = [];
       for (const country of COUNTRIES) {
-        const operators = OPERATORS[country.code as keyof typeof OPERATORS] || [];
-        const operatorNames = operators.map((op: any) => op.name).join(", ");
-        
-        // Check country status from DB
+        const countryCode = country.code as keyof typeof OPERATORS;
+        const operators = OPERATORS[countryCode] || [];
         const statuses = countryStatusData.filter((cs: any) => cs.country === country.code);
-        const payinActive = statuses.some((cs: any) => cs.payinEnabled);
-        const payoutActive = statuses.some((cs: any) => cs.payoutEnabled);
-        
-        let statusText = "";
-        if (payinActive && payoutActive) statusText = "Dépôts et retraits actifs";
-        else if (payinActive) statusText = "Dépôts actifs seulement";
-        else if (payoutActive) statusText = "Retraits actifs seulement";
-        else statusText = "Opérateurs non disponibles actuellement";
-        
-        countryInfoLines.push(`- ${country.name} (${country.code}): Devise ${country.currency}, Indicatif ${country.phoneCode}, Opérateurs: ${operatorNames || "Aucun"}, Statut: ${statusText}`);
+        const countryFees = feeConfigsData.filter((fc: any) => fc.country === country.code);
+
+        const payinOperators: string[] = [];
+        const payoutOperators: string[] = [];
+
+        for (const op of operators) {
+          const opProviders = countryFees.filter((fc: any) => fc.operator === op.code);
+          const opProviderNames = opProviders.map((fc: any) => fc.provider);
+
+          const hasPayin = opProviderNames.some((prov: string) =>
+            statuses.some((cs: any) => cs.provider === prov && cs.payinEnabled)
+          );
+          const hasPayout = opProviderNames.some((prov: string) =>
+            statuses.some((cs: any) => cs.provider === prov && cs.payoutEnabled)
+          );
+
+          if (hasPayin) payinOperators.push(op.name);
+          if (hasPayout) payoutOperators.push(op.name);
+        }
+
+        const payinText = payinOperators.length > 0
+          ? `Paiements entrants (dépôts): ${payinOperators.join(", ")}`
+          : "Paiements entrants (dépôts): Aucun opérateur actif pour le moment";
+        const payoutText = payoutOperators.length > 0
+          ? `Paiements sortants (retraits): ${payoutOperators.join(", ")}`
+          : "Paiements sortants (retraits): Aucun opérateur actif pour le moment";
+
+        countryInfoLines.push(`- ${country.name} (${country.code}): Devise ${country.currency}, Indicatif ${country.phoneCode}\n    ${payinText}\n    ${payoutText}`);
       }
 
       // Build fee info from DB
