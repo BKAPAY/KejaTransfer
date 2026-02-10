@@ -5,9 +5,20 @@ import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useState, useRef, useEffect, useCallback } from "react";
-import { CheckCircle2, Clock, AlertCircle, X, Camera, Shield, ArrowRight, ArrowLeft, User, FileText, PenTool, Trash2, Loader2 } from "lucide-react";
+import { CheckCircle2, Clock, AlertCircle, X, Camera, Shield, ArrowRight, ArrowLeft, User, FileText, PenTool, Trash2, Loader2, MapPin, Briefcase, Navigation } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { CountryFlag, getCountryName } from "@/components/country-flag";
+import { Textarea } from "@/components/ui/textarea";
+import { MapContainer, TileLayer, Marker, useMap } from "react-leaflet";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
+  iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png",
+  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
+});
 
 const COUNTRY_DATA: Record<string, { name: string }> = {
   BJ: { name: "Benin" },
@@ -36,15 +47,29 @@ interface UploadState {
   signature: { status: UploadStatus; progress: number };
 }
 
+function RecenterMap({ lat, lng }: { lat: number; lng: number }) {
+  const map = useMap();
+  useEffect(() => {
+    map.setView([lat, lng], 15);
+  }, [lat, lng, map]);
+  return null;
+}
+
 export default function KYC() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [currentStep, setCurrentStep] = useState(1);
+  const totalSteps = 5;
   const [idFrontData, setIdFrontData] = useState<string | null>(null);
   const [idBackData, setIdBackData] = useState<string | null>(null);
   const [selfieData, setSelfieData] = useState<string | null>(null);
   const [signatureData, setSignatureData] = useState<string | null>(null);
+  const [activityDescription, setActivityDescription] = useState("");
+  const [locationData, setLocationData] = useState<{ lat: number; lng: number } | null>(null);
+  const [locationAddress, setLocationAddress] = useState("");
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [locationError, setLocationError] = useState("");
   const [isResubmitting, setIsResubmitting] = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
   const [cameraMode, setCameraMode] = useState<CameraMode>(null);
@@ -55,7 +80,7 @@ export default function KYC() {
     selfie: { status: "idle", progress: 0 },
     signature: { status: "idle", progress: 0 },
   });
-  
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const captureCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -78,13 +103,13 @@ export default function KYC() {
 
     try {
       await apiRequest("POST", "/api/kyc/upload", { type, data });
-      
+
       clearInterval(interval);
       setUploadState(prev => ({
         ...prev,
         [type]: { status: "done", progress: 100 }
       }));
-      
+
       toast({
         title: "Document telecharge",
         description: "Le document a ete enregistre avec succes",
@@ -95,7 +120,7 @@ export default function KYC() {
         ...prev,
         [type]: { status: "error", progress: 0 }
       }));
-      
+
       toast({
         title: "Erreur",
         description: "Erreur lors du telechargement",
@@ -116,13 +141,13 @@ export default function KYC() {
     try {
       stopCamera();
       setCameraMode(mode);
-      
+
       const facingMode = mode === "selfie" ? "user" : "environment";
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
         audio: false,
       });
-      
+
       setStream(mediaStream);
     } catch (error) {
       console.error("Camera error:", error);
@@ -146,20 +171,20 @@ export default function KYC() {
 
   const capturePhoto = async () => {
     if (!videoRef.current || !captureCanvasRef.current || !cameraMode) return;
-    
+
     const video = videoRef.current;
     const canvas = captureCanvasRef.current;
     const ctx = canvas.getContext("2d");
-    
+
     if (!ctx) return;
-    
+
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     ctx.drawImage(video, 0, 0);
-    
+
     const imageData = canvas.toDataURL("image/jpeg", 0.8);
     const currentMode = cameraMode;
-    
+
     if (currentMode === "front") {
       setIdFrontData(imageData);
     } else if (currentMode === "back") {
@@ -167,9 +192,9 @@ export default function KYC() {
     } else if (currentMode === "selfie") {
       setSelfieData(imageData);
     }
-    
+
     stopCamera();
-    
+
     await uploadDocument(currentMode, imageData);
   };
 
@@ -182,7 +207,7 @@ export default function KYC() {
   }, [stream]);
 
   useEffect(() => {
-    if (currentStep === 3 && canvasRef.current) {
+    if (currentStep === 5 && canvasRef.current) {
       const canvas = canvasRef.current;
       const ctx = canvas.getContext("2d");
       if (ctx) {
@@ -286,16 +311,72 @@ export default function KYC() {
     }
   };
 
-  const allUploaded = 
+  const requestLocation = async () => {
+    setLocationLoading(true);
+    setLocationError("");
+
+    if (!navigator.geolocation) {
+      setLocationError("La geolocalisation n'est pas supportee par votre navigateur.");
+      setLocationLoading(false);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        setLocationData({ lat: latitude, lng: longitude });
+
+        try {
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&accept-language=fr`
+          );
+          const data = await response.json();
+          if (data.display_name) {
+            setLocationAddress(data.display_name);
+          } else {
+            setLocationAddress(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+          }
+        } catch {
+          setLocationAddress(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+        }
+
+        setLocationLoading(false);
+      },
+      (error) => {
+        let msg = "Impossible de recuperer votre position.";
+        if (error.code === error.PERMISSION_DENIED) {
+          msg = "Veuillez activer la localisation dans les parametres de votre appareil puis reessayez.";
+        } else if (error.code === error.POSITION_UNAVAILABLE) {
+          msg = "Votre position n'est pas disponible. Verifiez que le GPS est active.";
+        } else if (error.code === error.TIMEOUT) {
+          msg = "Le delai de localisation a expire. Reessayez.";
+        }
+        setLocationError(msg);
+        setLocationLoading(false);
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+  };
+
+  const allUploaded =
     uploadState.front.status === "done" &&
     uploadState.back.status === "done" &&
     uploadState.selfie.status === "done" &&
-    uploadState.signature.status === "done";
+    uploadState.signature.status === "done" &&
+    activityDescription.trim().length >= 10 &&
+    !!locationData &&
+    !!locationAddress;
 
   const submitKycMutation = useMutation({
     mutationFn: async () => {
       if (!idFrontData || !idBackData || !selfieData || !signatureData) {
         throw new Error("Tous les documents sont requis");
+      }
+      if (!activityDescription.trim()) {
+        throw new Error("La description d'activite est requise");
+      }
+      if (!locationData || !locationAddress) {
+        throw new Error("La localisation est requise");
       }
 
       await apiRequest("POST", "/api/kyc/submit", {
@@ -303,6 +384,10 @@ export default function KYC() {
         kycIdBack: idBackData,
         kycSelfie: selfieData,
         kycSignature: signatureData,
+        kycActivityDescription: activityDescription,
+        kycLatitude: locationData?.lat.toString() || "",
+        kycLongitude: locationData?.lng.toString() || "",
+        kycAddress: locationAddress,
       });
     },
     onSuccess: () => {
@@ -314,6 +399,9 @@ export default function KYC() {
       setIdBackData(null);
       setSelfieData(null);
       setSignatureData(null);
+      setActivityDescription("");
+      setLocationData(null);
+      setLocationAddress("");
       setCurrentStep(1);
       setIsResubmitting(false);
       setUploadState({
@@ -372,9 +460,9 @@ export default function KYC() {
 
   const renderUploadStatus = (type: "front" | "back" | "selfie" | "signature") => {
     const state = uploadState[type];
-    
+
     if (state.status === "idle") return null;
-    
+
     if (state.status === "uploading") {
       return (
         <div className="mt-2 space-y-1">
@@ -386,7 +474,7 @@ export default function KYC() {
         </div>
       );
     }
-    
+
     if (state.status === "done") {
       return (
         <div className="mt-2 flex items-center gap-2 text-xs text-green-600 dark:text-green-400">
@@ -395,7 +483,7 @@ export default function KYC() {
         </div>
       );
     }
-    
+
     if (state.status === "error") {
       return (
         <div className="mt-2 flex items-center gap-2 text-xs text-red-600 dark:text-red-400">
@@ -404,13 +492,13 @@ export default function KYC() {
         </div>
       );
     }
-    
+
     return null;
   };
 
   const renderStepIndicator = () => (
-    <div className="flex items-center justify-center gap-2 mb-6">
-      {[1, 2, 3].map((step) => (
+    <div className="flex items-center justify-center gap-1 mb-6">
+      {Array.from({ length: totalSteps }, (_, i) => i + 1).map((step) => (
         <div key={step} className="flex items-center">
           <div
             className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
@@ -423,8 +511,8 @@ export default function KYC() {
           >
             {currentStep > step ? <CheckCircle2 className="w-4 h-4" /> : step}
           </div>
-          {step < 3 && (
-            <div className={`w-12 h-1 mx-1 rounded ${currentStep > step ? "bg-green-500" : "bg-muted"}`} />
+          {step < totalSteps && (
+            <div className={`w-6 sm:w-10 h-1 mx-0.5 rounded ${currentStep > step ? "bg-green-500" : "bg-muted"}`} />
           )}
         </div>
       ))}
@@ -433,13 +521,13 @@ export default function KYC() {
 
   const renderCameraView = () => {
     if (!cameraMode) return null;
-    
+
     const labels: Record<string, string> = {
       front: "Recto de la piece d'identite",
       back: "Verso de la piece d'identite",
       selfie: "Photo avec piece en main",
     };
-    
+
     return (
       <div className="fixed inset-0 z-50 bg-black flex flex-col">
         <div className="flex items-center justify-between p-4 bg-black/80">
@@ -454,7 +542,7 @@ export default function KYC() {
             <X className="w-6 h-6" />
           </Button>
         </div>
-        
+
         <div className="flex-1 flex items-center justify-center overflow-hidden">
           <video
             ref={videoRef}
@@ -464,7 +552,7 @@ export default function KYC() {
             className="max-w-full max-h-full object-contain"
           />
         </div>
-        
+
         <div className="p-6 bg-black/80 flex justify-center">
           <Button
             size="lg"
@@ -475,7 +563,7 @@ export default function KYC() {
             <Camera className="w-8 h-8 text-black" />
           </Button>
         </div>
-        
+
         <canvas ref={captureCanvasRef} className="hidden" />
       </div>
     );
@@ -485,7 +573,7 @@ export default function KYC() {
     <div className="space-y-6">
       <div className="text-center mb-4">
         <User className="w-10 h-10 mx-auto mb-2 text-primary" />
-        <h3 className="text-lg font-semibold">Etape 1: Vos informations</h3>
+        <h3 className="text-lg font-semibold">Etape 1 : Vos informations</h3>
         <p className="text-sm text-muted-foreground">Verifiez les informations de votre compte</p>
       </div>
 
@@ -541,8 +629,65 @@ export default function KYC() {
   const renderStep2 = () => (
     <div className="space-y-6">
       <div className="text-center mb-4">
+        <Briefcase className="w-10 h-10 mx-auto mb-2 text-primary" />
+        <h3 className="text-lg font-semibold">Etape 2 : Description de votre activite</h3>
+        <p className="text-sm text-muted-foreground">Decrivez votre activite professionnelle ou commerciale</p>
+      </div>
+
+      <Card className="border-2">
+        <CardContent className="pt-6">
+          <div className="space-y-3">
+            <label className="text-sm font-medium text-foreground block">
+              Quelle est votre activite ?
+            </label>
+            <Textarea
+              value={activityDescription}
+              onChange={(e) => setActivityDescription(e.target.value)}
+              placeholder="Decrivez votre activite professionnelle, le type de produits ou services que vous proposez, et comment vous comptez utiliser BKApay..."
+              className="min-h-[120px] resize-none"
+              data-testid="input-activity-description"
+            />
+            <p className="text-xs text-muted-foreground">
+              {activityDescription.length}/500 caracteres
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900 rounded-lg p-3">
+        <p className="text-xs text-blue-900 dark:text-blue-200">
+          Cette information nous aide a mieux comprendre votre activite et a securiser votre compte. Soyez aussi precis que possible.
+        </p>
+      </div>
+
+      <div className="flex gap-3">
+        <Button
+          variant="outline"
+          className="flex-1"
+          onClick={() => setCurrentStep(1)}
+          data-testid="button-prev-step-2"
+        >
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Retour
+        </Button>
+        <Button
+          className="flex-1"
+          onClick={() => setCurrentStep(3)}
+          disabled={activityDescription.trim().length < 10}
+          data-testid="button-next-step-2"
+        >
+          Etape suivante
+          <ArrowRight className="w-4 h-4 ml-2" />
+        </Button>
+      </div>
+    </div>
+  );
+
+  const renderStep3 = () => (
+    <div className="space-y-6">
+      <div className="text-center mb-4">
         <FileText className="w-10 h-10 mx-auto mb-2 text-primary" />
-        <h3 className="text-lg font-semibold">Etape 2: Documents d'identite</h3>
+        <h3 className="text-lg font-semibold">Etape 3 : Piece d'identite</h3>
         <p className="text-sm text-muted-foreground">Prenez en photo vos pieces d'identite</p>
       </div>
 
@@ -651,17 +796,17 @@ export default function KYC() {
         <Button
           variant="outline"
           className="flex-1"
-          onClick={() => setCurrentStep(1)}
-          data-testid="button-prev-step-2"
+          onClick={() => setCurrentStep(2)}
+          data-testid="button-prev-step-3"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
           Retour
         </Button>
         <Button
           className="flex-1"
-          onClick={() => setCurrentStep(3)}
+          onClick={() => setCurrentStep(4)}
           disabled={uploadState.front.status !== "done" || uploadState.back.status !== "done" || uploadState.selfie.status !== "done"}
-          data-testid="button-next-step-2"
+          data-testid="button-next-step-3"
         >
           Etape suivante
           <ArrowRight className="w-4 h-4 ml-2" />
@@ -670,11 +815,143 @@ export default function KYC() {
     </div>
   );
 
-  const renderStep3 = () => (
+  const renderStep4 = () => (
+    <div className="space-y-6">
+      <div className="text-center mb-4">
+        <MapPin className="w-10 h-10 mx-auto mb-2 text-primary" />
+        <h3 className="text-lg font-semibold">Etape 4 : Votre emplacement</h3>
+        <p className="text-sm text-muted-foreground">Nous devons verifier votre emplacement actuel</p>
+      </div>
+
+      {!locationData && !locationLoading && (
+        <Card className="border-2 border-dashed">
+          <CardContent className="pt-6 text-center space-y-4">
+            <Navigation className="w-12 h-12 mx-auto text-muted-foreground" />
+            <div>
+              <p className="text-sm font-medium text-foreground mb-1">Activez votre localisation</p>
+              <p className="text-xs text-muted-foreground">
+                Appuyez sur le bouton ci-dessous et autorisez l'acces a votre position lorsque votre appareil vous le demande.
+              </p>
+            </div>
+            <Button
+              onClick={requestLocation}
+              className="w-full"
+              data-testid="button-request-location"
+            >
+              <MapPin className="w-4 h-4 mr-2" />
+              Localiser ma position
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {locationLoading && (
+        <Card className="border-2">
+          <CardContent className="pt-6 text-center space-y-4">
+            <Loader2 className="w-12 h-12 mx-auto text-primary animate-spin" />
+            <p className="text-sm font-medium text-foreground">Recherche de votre position en cours...</p>
+            <p className="text-xs text-muted-foreground">Veuillez patienter quelques instants</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {locationError && (
+        <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-lg p-4">
+          <div className="flex gap-3">
+            <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+            <div className="space-y-2">
+              <p className="text-sm text-red-700 dark:text-red-300">{locationError}</p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={requestLocation}
+                data-testid="button-retry-location"
+              >
+                Reessayer
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {locationData && (
+        <div className="space-y-4">
+          <div className="rounded-lg overflow-hidden border-2" style={{ height: "280px" }}>
+            <MapContainer
+              center={[locationData.lat, locationData.lng]}
+              zoom={15}
+              style={{ height: "100%", width: "100%" }}
+              scrollWheelZoom={false}
+              dragging={false}
+              zoomControl={false}
+            >
+              <TileLayer
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              />
+              <Marker position={[locationData.lat, locationData.lng]} />
+              <RecenterMap lat={locationData.lat} lng={locationData.lng} />
+            </MapContainer>
+          </div>
+
+          <Card className="border-2">
+            <CardContent className="pt-4">
+              <div className="flex items-start gap-3">
+                <MapPin className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                <div className="space-y-1 min-w-0">
+                  <p className="text-xs font-medium text-muted-foreground">Votre adresse detectee</p>
+                  <p className="text-sm text-foreground break-words">{locationAddress}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-900 rounded-lg">
+            <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0" />
+            <span className="text-sm text-green-700 dark:text-green-300">Position localisee avec succes</span>
+          </div>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={requestLocation}
+            className="w-full"
+            data-testid="button-refresh-location"
+          >
+            <Navigation className="w-4 h-4 mr-2" />
+            Actualiser ma position
+          </Button>
+        </div>
+      )}
+
+      <div className="flex gap-3">
+        <Button
+          variant="outline"
+          className="flex-1"
+          onClick={() => setCurrentStep(3)}
+          data-testid="button-prev-step-4"
+        >
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Retour
+        </Button>
+        <Button
+          className="flex-1"
+          onClick={() => setCurrentStep(5)}
+          disabled={!locationData}
+          data-testid="button-next-step-4"
+        >
+          Etape suivante
+          <ArrowRight className="w-4 h-4 ml-2" />
+        </Button>
+      </div>
+    </div>
+  );
+
+  const renderStep5 = () => (
     <div className="space-y-6">
       <div className="text-center mb-4">
         <PenTool className="w-10 h-10 mx-auto mb-2 text-primary" />
-        <h3 className="text-lg font-semibold">Etape 3: Signature</h3>
+        <h3 className="text-lg font-semibold">Etape 5 : Signature</h3>
         <p className="text-sm text-muted-foreground">Signez dans le cadre ci-dessous</p>
       </div>
 
@@ -739,8 +1016,8 @@ export default function KYC() {
         <Button
           variant="outline"
           className="flex-1"
-          onClick={() => setCurrentStep(2)}
-          data-testid="button-prev-step-3"
+          onClick={() => setCurrentStep(4)}
+          data-testid="button-prev-step-5"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
           Retour
@@ -771,6 +1048,10 @@ export default function KYC() {
     setIdBackData(null);
     setSelfieData(null);
     setSignatureData(null);
+    setActivityDescription("");
+    setLocationData(null);
+    setLocationAddress("");
+    setLocationError("");
     setUploadState({
       front: { status: "idle", progress: 0 },
       back: { status: "idle", progress: 0 },
@@ -782,7 +1063,7 @@ export default function KYC() {
   return (
     <div className="space-y-6">
       {renderCameraView()}
-      
+
       <div>
         <h1 className="text-2xl font-bold text-foreground mb-1 flex items-center gap-2">
           <Shield className="h-6 w-6" />
@@ -837,7 +1118,7 @@ export default function KYC() {
                   </div>
                 </div>
               </div>
-              <Button 
+              <Button
                 onClick={startKycProcess}
                 className="w-full"
                 data-testid="button-resubmit-kyc"
@@ -850,9 +1131,9 @@ export default function KYC() {
               <div className="text-center py-4">
                 <Shield className="w-12 h-12 mx-auto mb-2 text-muted-foreground" />
                 <p className="text-sm font-medium text-foreground">Verification d'identite requise</p>
-                <p className="text-xs text-muted-foreground mt-1">Completez la verification en 3 etapes simples</p>
+                <p className="text-xs text-muted-foreground mt-1">Completez la verification en 5 etapes simples</p>
               </div>
-              <Button 
+              <Button
                 onClick={startKycProcess}
                 className="w-full"
                 data-testid="button-start-kyc"
@@ -867,6 +1148,8 @@ export default function KYC() {
               {currentStep === 1 && renderStep1()}
               {currentStep === 2 && renderStep2()}
               {currentStep === 3 && renderStep3()}
+              {currentStep === 4 && renderStep4()}
+              {currentStep === 5 && renderStep5()}
             </div>
           )}
         </CardContent>

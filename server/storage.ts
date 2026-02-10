@@ -41,8 +41,8 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   updateUserBalance(id: string, amount: number): Promise<User | undefined>;
   updateUserPassword(id: string, hashedPassword: string): Promise<User | undefined>;
-  submitKyc(userId: string, kycData: { kycIdFront: string; kycIdBack: string; kycSelfie: string; kycSignature: string }): Promise<User | undefined>;
-  updateKycDocument(userId: string, data: Partial<{ kycIdFront: string; kycIdBack: string; kycSelfie: string; kycSignature: string }>): Promise<void>;
+  submitKyc(userId: string, kycData: { kycIdFront: string; kycIdBack: string; kycSelfie: string; kycSignature: string; kycActivityDescription: string; kycLatitude: string; kycLongitude: string; kycAddress: string }): Promise<User | undefined>;
+  updateKycDocument(userId: string, data: Partial<{ kycIdFront: string; kycIdBack: string; kycSelfie: string; kycSignature: string; kycActivityDescription: string; kycLatitude: string; kycLongitude: string; kycAddress: string }>): Promise<void>;
   approveKyc(userId: string): Promise<User | undefined>;
   rejectKyc(userId: string, reason?: string): Promise<User | undefined>;
   getPendingKycSubmissions(): Promise<User[]>;
@@ -206,7 +206,7 @@ export class DbStorage implements IStorage {
     return results[0];
   }
 
-  async submitKyc(userId: string, kycData: { kycIdFront: string; kycIdBack: string; kycSelfie: string; kycSignature: string }): Promise<User | undefined> {
+  async submitKyc(userId: string, kycData: { kycIdFront: string; kycIdBack: string; kycSelfie: string; kycSignature: string; kycActivityDescription: string; kycLatitude: string; kycLongitude: string; kycAddress: string }): Promise<User | undefined> {
     const results = await db
       .update(schema.users)
       .set({
@@ -215,13 +215,17 @@ export class DbStorage implements IStorage {
         kycIdBack: kycData.kycIdBack,
         kycSelfie: kycData.kycSelfie,
         kycSignature: kycData.kycSignature,
+        kycActivityDescription: kycData.kycActivityDescription,
+        kycLatitude: kycData.kycLatitude,
+        kycLongitude: kycData.kycLongitude,
+        kycAddress: kycData.kycAddress,
       })
       .where(eq(schema.users.id, userId))
       .returning();
     return results[0];
   }
 
-  async updateKycDocument(userId: string, data: Partial<{ kycIdFront: string; kycIdBack: string; kycSelfie: string; kycSignature: string }>): Promise<void> {
+  async updateKycDocument(userId: string, data: Partial<{ kycIdFront: string; kycIdBack: string; kycSelfie: string; kycSignature: string; kycActivityDescription: string; kycLatitude: string; kycLongitude: string; kycAddress: string }>): Promise<void> {
     await db
       .update(schema.users)
       .set(data)
@@ -906,6 +910,10 @@ export class DbStorage implements IStorage {
       kycIdBack: sql<string | null>`NULL`.as('kycIdBack'),
       kycSelfie: sql<string | null>`NULL`.as('kycSelfie'),
       kycSignature: sql<string | null>`NULL`.as('kycSignature'),
+      kycActivityDescription: sql<string | null>`NULL`.as('kycActivityDescription'),
+      kycLatitude: sql<string | null>`NULL`.as('kycLatitude'),
+      kycLongitude: sql<string | null>`NULL`.as('kycLongitude'),
+      kycAddress: sql<string | null>`NULL`.as('kycAddress'),
     }).from(schema.users).orderBy(desc(schema.users.balance));
   }
 

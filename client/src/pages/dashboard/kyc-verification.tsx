@@ -142,13 +142,29 @@ export default function KycVerificationPage() {
       infoLines.push(`Numeros de retrait: ${user.withdrawalPhones.join(", ")}`);
     }
     
+    if ((user as any).kycActivityDescription) {
+      infoLines.push(`Activite: ${(user as any).kycActivityDescription}`);
+    }
+    
+    if ((user as any).kycAddress) {
+      infoLines.push(`Emplacement: ${(user as any).kycAddress}`);
+    }
+    
+    if ((user as any).kycLatitude && (user as any).kycLongitude) {
+      infoLines.push(`Coordonnees GPS: ${(user as any).kycLatitude}, ${(user as any).kycLongitude}`);
+    }
+    
     if (user.kycRejectionReason) {
       infoLines.push(`Raison de rejet: ${user.kycRejectionReason}`);
     }
     
     infoLines.forEach((line) => {
-      doc.text(line, 20, y);
-      y += 7;
+      const maxLineWidth = pageWidth - 40;
+      const splitLines = doc.splitTextToSize(line, maxLineWidth);
+      splitLines.forEach((splitLine: string) => {
+        doc.text(splitLine, 20, y);
+        y += 7;
+      });
     });
     
     y += 10;
@@ -409,6 +425,33 @@ export default function KycVerificationPage() {
               </div>
             </CardContent>
           </Card>
+
+          {(selectedUserDetails as any).kycActivityDescription && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Description de l'activite</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm">{(selectedUserDetails as any).kycActivityDescription}</p>
+              </CardContent>
+            </Card>
+          )}
+
+          {(selectedUserDetails as any).kycAddress && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Emplacement</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <p className="text-sm">{(selectedUserDetails as any).kycAddress}</p>
+                {(selectedUserDetails as any).kycLatitude && (selectedUserDetails as any).kycLongitude && (
+                  <p className="text-xs text-muted-foreground">
+                    Coordonnees: {(selectedUserDetails as any).kycLatitude}, {(selectedUserDetails as any).kycLongitude}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           <div className="space-y-4">
             <div>

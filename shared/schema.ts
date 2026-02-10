@@ -24,6 +24,10 @@ export const users = pgTable("users", {
   kycIdBack: text("kyc_id_back"), // Base64 encoded or URL
   kycSelfie: text("kyc_selfie"), // Base64 encoded or URL
   kycSignature: text("kyc_signature"), // Base64 encoded signature
+  kycActivityDescription: text("kyc_activity_description"), // Business/activity description
+  kycLatitude: text("kyc_latitude"), // GPS latitude
+  kycLongitude: text("kyc_longitude"), // GPS longitude
+  kycAddress: text("kyc_address"), // Reverse geocoded address
   kycRejectionReason: text("kyc_rejection_reason"), // Reason for KYC rejection
   kycRejectionCount: integer("kyc_rejection_count").notNull().default(0), // Number of KYC rejections
   withdrawalPhones: text("withdrawal_phones").array().default([]), // Up to 3 withdrawal phone numbers
@@ -279,6 +283,10 @@ export const submitKycSchema = z.object({
   kycIdBack: z.string().min(1, "Photo verso requise"),
   kycSelfie: z.string().min(1, "Selfie requis"),
   kycSignature: z.string().min(1, "Signature requise"),
+  kycActivityDescription: z.string().min(1, "Description d'activite requise"),
+  kycLatitude: z.string().min(1, "Localisation requise"),
+  kycLongitude: z.string().min(1, "Localisation requise"),
+  kycAddress: z.string().min(1, "Adresse requise"),
 });
 
 export const insertPaymentLinkSchema = createInsertSchema(paymentLinks).omit({
