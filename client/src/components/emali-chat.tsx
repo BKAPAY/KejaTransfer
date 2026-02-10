@@ -135,6 +135,12 @@ export function EmaliChatButton() {
 
   const renderMarkdown = (text: string) => {
     return text
+      .replace(/### (.*?)(\n|$)/g, '<strong class="text-sm block mt-2 mb-1">$1</strong>')
+      .replace(/## (.*?)(\n|$)/g, '<strong class="text-sm block mt-2 mb-1">$1</strong>')
+      .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
+        '<a href="$2" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 px-2 py-1 mt-1 mb-1 rounded-md bg-primary/10 text-primary text-xs font-medium hover:bg-primary/20 transition-colors" style="text-decoration:none">$1</a>')
+      .replace(/(?<!["\w])(https?:\/\/[^\s<)]+)/g,
+        '<a href="$1" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 px-2 py-1 mt-1 mb-1 rounded-md bg-primary/10 text-primary text-xs font-medium hover:bg-primary/20 transition-colors" style="text-decoration:none">$1</a>')
       .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
       .replace(/\*(.*?)\*/g, "<em>$1</em>")
       .replace(/\n/g, "<br />");
