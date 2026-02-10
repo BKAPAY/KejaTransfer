@@ -43,6 +43,7 @@ import { motion } from "framer-motion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { CountryFlag } from "@/components/country-flag";
+import { CRYPTO_LOGOS, CRYPTO_COLORS } from "@/components/crypto-icon";
 
 import omImage from "@assets/om_1763835083036.png";
 import mtnImage from "@assets/mtn (1)_1763835082904.png";
@@ -413,10 +414,16 @@ function OperatorCard({
             alt={operator} 
             className="w-7 h-7 object-contain"
           />
+        ) : CRYPTO_LOGOS[operator.toLowerCase()] ? (
+          <img 
+            src={CRYPTO_LOGOS[operator.toLowerCase()]} 
+            alt={operator} 
+            className="w-7 h-7 object-contain"
+          />
         ) : (
           <span 
             className="text-white font-bold text-sm w-full h-full flex items-center justify-center rounded-full"
-            style={{ backgroundColor: COLORS[index % COLORS.length] }}
+            style={{ backgroundColor: CRYPTO_COLORS[operator.toLowerCase()] || COLORS[index % COLORS.length] }}
           >
             {operator.substring(0, 2).toUpperCase()}
           </span>
