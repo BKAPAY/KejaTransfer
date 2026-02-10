@@ -7155,9 +7155,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const currentUserId = req.session?.userId;
 
       // Collect real-time data from DB
-      const [feeConfigsData, countryStatusData, cryptoCurrenciesData, providerConfigsData, supportSettingsData, currentUser, userStats] = await Promise.all([
+      const [feeConfigsData, countryStatusData, countryOperatorConfigsData, cryptoCurrenciesData, providerConfigsData, supportSettingsData, currentUser, userStats] = await Promise.all([
         storage.getAllFeeConfigs(),
         storage.getCountryStatuses(),
+        storage.getCountryOperatorConfigs(),
         storage.getAllCryptoCurrencies(),
         storage.getProviderConfigs(),
         storage.getSupportSettings(),
@@ -7176,16 +7177,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const payinOperators: string[] = [];
         const payoutOperators: string[] = [];
 
+        const opConfigs = countryOperatorConfigsData.filter((oc: any) => oc.country === country.code);
+
         for (const op of operators) {
           const opProviders = countryFees.filter((fc: any) => fc.operator === op.code);
           const opProviderNames = opProviders.map((fc: any) => fc.provider);
 
-          const hasPayin = opProviderNames.some((prov: string) =>
-            statuses.some((cs: any) => cs.provider === prov && cs.payinEnabled)
-          );
-          const hasPayout = opProviderNames.some((prov: string) =>
-            statuses.some((cs: any) => cs.provider === prov && cs.payoutEnabled)
-          );
+          const hasPayin = opProviderNames.some((prov: string) => {
+            const providerEnabled = statuses.some((cs: any) => cs.provider === prov && cs.payinEnabled);
+            if (!providerEnabled) return false;
+            const opConfig = opConfigs.find((oc: any) => oc.provider === prov && oc.operator === op.code);
+            return opConfig ? opConfig.incomingEnabled : false;
+          });
+          const hasPayout = opProviderNames.some((prov: string) => {
+            const providerEnabled = statuses.some((cs: any) => cs.provider === prov && cs.payoutEnabled);
+            if (!providerEnabled) return false;
+            const opConfig = opConfigs.find((oc: any) => oc.provider === prov && oc.operator === op.code);
+            return opConfig ? opConfig.outgoingEnabled : false;
+          });
 
           if (hasPayin) payinOperators.push(op.name);
           if (hasPayout) payoutOperators.push(op.name);
