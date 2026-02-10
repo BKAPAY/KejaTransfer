@@ -99,6 +99,7 @@ export interface IStorage {
     totalBalance: number;
     totalDeposits: number;
     totalTransfers: number;
+    totalWithdrawals: number;
     recentTransactions: Transaction[];
   }>;
 
@@ -818,9 +819,10 @@ export class DbStorage implements IStorage {
     totalBalance: number;
     totalDeposits: number;
     totalTransfers: number;
+    totalWithdrawals: number;
     recentTransactions: Transaction[];
   }> {
-    const [user, recentTransactions, depositsResult, transfersResult] = await Promise.all([
+    const [user, recentTransactions, depositsResult, transfersResult, withdrawalsResult] = await Promise.all([
       this.getUser(userId),
       this.getTransactions(userId, 10),
       db.select({
@@ -841,12 +843,22 @@ export class DbStorage implements IStorage {
           eq(schema.transactions.type, "transfer")
         )
       ),
+      db.select({
+        total: sql<number>`COALESCE(SUM(${schema.transactions.amount}), 0)`,
+      }).from(schema.transactions).where(
+        and(
+          eq(schema.transactions.userId, userId),
+          eq(schema.transactions.status, "completed"),
+          eq(schema.transactions.type, "withdrawal")
+        )
+      ),
     ]);
 
     return {
       totalBalance: user?.balance || 0,
       totalDeposits: Number(depositsResult[0]?.total || 0),
       totalTransfers: Number(transfersResult[0]?.total || 0),
+      totalWithdrawals: Number(withdrawalsResult[0]?.total || 0),
       recentTransactions,
     };
   }

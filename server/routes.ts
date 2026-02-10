@@ -7243,6 +7243,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const balanceFormatted = currentUser.balance.toLocaleString("fr-FR");
         const totalDepositsFormatted = userStats ? userStats.totalDeposits.toLocaleString("fr-FR") : "0";
         const totalTransfersFormatted = userStats ? userStats.totalTransfers.toLocaleString("fr-FR") : "0";
+        const totalWithdrawalsFormatted = userStats ? userStats.totalWithdrawals.toLocaleString("fr-FR") : "0";
         const recentTxCount = userStats?.recentTransactions?.length || 0;
         const recentTxLines = userStats?.recentTransactions?.slice(0, 5).map((tx: any) => {
           const typeMap: Record<string, string> = {
@@ -7272,6 +7273,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 - Devise: ${userCountry?.currency || "XOF"}
 - Solde actuel: ${balanceFormatted} FCFA
 - Total des dépôts (complétés): ${totalDepositsFormatted} FCFA
+- Total des retraits (complétés): ${totalWithdrawalsFormatted} FCFA
 - Total des transferts (complétés): ${totalTransfersFormatted} FCFA
 - Statut KYC: ${kycStatusMap[currentUser.kycStatus] || currentUser.kycStatus}${currentUser.kycRejectionReason ? `\n- Motif de rejet KYC: ${currentUser.kycRejectionReason}` : ""}
 - Numéros de retrait configurés: ${currentUser.withdrawalPhones && currentUser.withdrawalPhones.length > 0 ? currentUser.withdrawalPhones.join(", ") : "Aucun configuré"}
