@@ -133,25 +133,19 @@ export default function KycVerificationPage() {
     
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
-    doc.text("Informations du profil", 20, y);
+    doc.text("Informations personnelles", 20, y);
     y += 10;
     
     doc.setFontSize(11);
     doc.setFont("helvetica", "normal");
     const infoLines = [
-      `Nom complet: ${user.firstName} ${user.lastName}`,
+      `Prenom: ${user.firstName}`,
+      `Nom: ${user.lastName}`,
       `Email: ${user.email}`,
       `Pays: ${user.country || "Non defini"}`,
-      `Solde: ${new Intl.NumberFormat("fr-FR").format(user.balance)} XOF`,
       `Statut KYC: ${getStatusText(user.kycStatus)}`,
       `Date d'inscription: ${new Date(user.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}`,
-      `Administrateur: ${user.isAdmin ? "Oui" : "Non"}`,
-      `Compte suspendu: ${user.suspended ? "Oui" : "Non"}`,
     ];
-    
-    if (user.withdrawalPhones && user.withdrawalPhones.length > 0) {
-      infoLines.push(`Numeros de retrait: ${user.withdrawalPhones.join(", ")}`);
-    }
     
     if ((user as any).kycActivityDescription) {
       infoLines.push(`Activite: ${(user as any).kycActivityDescription}`);
@@ -407,13 +401,17 @@ export default function KycVerificationPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Informations du profil</CardTitle>
+              <CardTitle className="text-base">Informations personnelles</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground">Nom complet</p>
-                  <p className="text-sm font-medium">{selectedUserDetails.firstName} {selectedUserDetails.lastName}</p>
+                  <p className="text-xs font-medium text-muted-foreground">Prenom</p>
+                  <p className="text-sm font-medium">{selectedUserDetails.firstName}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">Nom</p>
+                  <p className="text-sm font-medium">{selectedUserDetails.lastName}</p>
                 </div>
                 <div>
                   <p className="text-xs font-medium text-muted-foreground">Email</p>
@@ -424,10 +422,6 @@ export default function KycVerificationPage() {
                   <p className="text-sm font-medium">{selectedUserDetails.country || "Non defini"}</p>
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground">Solde</p>
-                  <p className="text-sm font-medium">{new Intl.NumberFormat("fr-FR").format(selectedUserDetails.balance)} XOF</p>
-                </div>
-                <div>
                   <p className="text-xs font-medium text-muted-foreground">Statut KYC</p>
                   <div className="mt-1">{getStatusBadge(selectedUserDetails.kycStatus)}</div>
                 </div>
@@ -435,26 +429,8 @@ export default function KycVerificationPage() {
                   <p className="text-xs font-medium text-muted-foreground">Date d'inscription</p>
                   <p className="text-sm font-medium">{new Date(selectedUserDetails.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}</p>
                 </div>
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground">Administrateur</p>
-                  <p className="text-sm font-medium">{selectedUserDetails.isAdmin ? "Oui" : "Non"}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground">Compte suspendu</p>
-                  <p className="text-sm font-medium">{selectedUserDetails.suspended ? "Oui" : "Non"}</p>
-                </div>
-                {selectedUserDetails.withdrawalPhones && selectedUserDetails.withdrawalPhones.length > 0 && (
-                  <div className="md:col-span-2 lg:col-span-3">
-                    <p className="text-xs font-medium text-muted-foreground">Numeros de retrait</p>
-                    <div className="flex flex-wrap gap-2 mt-1">
-                      {selectedUserDetails.withdrawalPhones.map((phone, index) => (
-                        <Badge key={index} variant="outline">{phone}</Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
                 {selectedUserDetails.kycRejectionReason && (
-                  <div className="md:col-span-2 lg:col-span-3">
+                  <div className="md:col-span-2">
                     <p className="text-xs font-medium text-muted-foreground">Raison du rejet KYC</p>
                     <p className="text-sm text-red-600 dark:text-red-400">{selectedUserDetails.kycRejectionReason}</p>
                   </div>
