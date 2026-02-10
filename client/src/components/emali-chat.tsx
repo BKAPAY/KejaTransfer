@@ -20,6 +20,13 @@ const WELCOME_MESSAGE = `Bonjour ! Je suis **EMALI AI**, votre assistant intelli
 
 const SESSION_TIMEOUT_MS = 2 * 60 * 60 * 1000;
 
+function isInformationalLine(text: string): boolean {
+  if (/:\s*\d/.test(text)) return true;
+  if (/\d+\s*(FCFA|XOF|XAF|CDF|USD|EUR|%)/i.test(text)) return true;
+  if (/montant|frais|solde|débité|recev|total|récap/i.test(text)) return true;
+  return false;
+}
+
 function extractOptions(text: string): string[] {
   const lines = text.split("\n");
   const options: string[] = [];
@@ -27,13 +34,14 @@ function extractOptions(text: string): string[] {
 
   for (const line of lines) {
     const trimmed = line.trim();
-    const match = trimmed.match(/^(?:\d+[\.\)]\s*|[-•]\s+)(.+)$/);
+    const match = trimmed.match(/^(\d+[\.\)]\s*)(.+)$/);
     if (match) {
-      inList = true;
-      let optText = match[1].trim();
-      optText = optText.replace(/\*\*/g, "").replace(/\*/g, "");
-      if (optText.length > 0 && optText.length < 80) {
+      const optText = match[2].trim().replace(/\*\*/g, "").replace(/\*/g, "");
+      if (optText.length > 0 && optText.length < 80 && !isInformationalLine(optText)) {
+        inList = true;
         options.push(optText);
+      } else {
+        inList = false;
       }
     } else if (inList && trimmed === "") {
       continue;

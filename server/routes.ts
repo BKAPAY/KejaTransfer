@@ -7591,7 +7591,14 @@ SUPPORT ET CONTACT:
                 return JSON.stringify({ success: false, error: `Solde insuffisant. Solde: ${user.balance.toLocaleString("fr-FR")} ${userCurrencyW}, Requis: ${feeInfoW.totalDeductedFromBalance.toLocaleString("fr-FR")} ${userCurrencyW}` });
               }
 
-              const sanitizedPhone = phone.replace(/\s+/g, "").replace(/^(\+|00)/, "");
+              let sanitizedPhone = phone.replace(/\s+/g, "").replace(/^(\+|00)/, "");
+              const withdrawCountryInfo = COUNTRIES.find((c: any) => c.code === country);
+              if (withdrawCountryInfo) {
+                const dialDigitsW = withdrawCountryInfo.phoneCode.replace("+", "");
+                if (!sanitizedPhone.startsWith(dialDigitsW)) {
+                  sanitizedPhone = dialDigitsW + sanitizedPhone;
+                }
+              }
 
               if (activeProviderW === "fedapay") {
                 const result = await handleFedaPayWithdrawal(userId, user, Math.floor(amount), country, operator, sanitizedPhone, userCurrencyW);
@@ -7600,6 +7607,63 @@ SUPPORT ET CONTACT:
                 } else {
                   return JSON.stringify({ success: false, error: result.error || "Erreur lors du retrait" });
                 }
+              } else if (activeProviderW === "paydunya") {
+                const withdrawModeMapW: Record<string, string> = {
+                  "orange-sn": "orange-money-senegal", "free-sn": "free-money-senegal", "expresso-sn": "expresso-senegal",
+                  "wave-sn": "wave-senegal", "wizall-sn": "wizall-senegal",
+                  "orange-ci": "orange-money-ci", "mtn-ci": "mtn-ci", "moov-ci": "moov-ci", "wave-ci": "wave-ci",
+                  "orange-bf": "orange-money-burkina", "moov-bf": "moov-burkina-faso",
+                  "moov-bj": "moov-benin", "mtn-bj": "mtn-benin",
+                  "tmoney-tg": "t-money-togo", "moov-tg": "moov-togo",
+                  "orange-ml": "orange-money-mali", "moov-ml": "moov-mali",
+                };
+                const withdrawModeW = withdrawModeMapW[`${operator}-${country.toLowerCase()}`];
+                if (!withdrawModeW) return JSON.stringify({ success: false, error: "Opérateur non supporté pour les retraits Paydunya" });
+
+                let cleanPhoneW = sanitizedPhone.replace(/[\s\-\.]+/g, "");
+                const countryPhoneInfoW: Record<string, { code: string, localLength: number[] }> = {
+                  "SN": { code: "221", localLength: [9] }, "CI": { code: "225", localLength: [10] },
+                  "BF": { code: "226", localLength: [8] }, "BJ": { code: "229", localLength: [8, 10] },
+                  "TG": { code: "228", localLength: [8] }, "ML": { code: "223", localLength: [8] },
+                };
+                const phoneInfoW = countryPhoneInfoW[country.toUpperCase()];
+                if (phoneInfoW) {
+                  if (cleanPhoneW.startsWith(phoneInfoW.code)) {
+                    const withoutCodeW = cleanPhoneW.substring(phoneInfoW.code.length);
+                    if (phoneInfoW.localLength.includes(withoutCodeW.length)) {
+                      cleanPhoneW = withoutCodeW;
+                    }
+                  }
+                }
+
+                const amountForProviderW = feeInfoW.amountReceived;
+                let providerAmountW = amountForProviderW;
+                if (userCurrencyW !== "XOF") {
+                  const { convertCurrency } = await import("./currency-converter");
+                  const convW = await convertCurrency(amountForProviderW, userCurrencyW, "XOF");
+                  if (convW.success) providerAmountW = Math.floor(convW.convertedAmount);
+                  else return JSON.stringify({ success: false, error: "Erreur de conversion de devise" });
+                }
+
+                const callbackUrlW = `${process.env.BASE_URL || 'https://bkapay.com'}/api/webhooks/paydunya-disburse`;
+                const getInvoiceW = await callPaydunyaAPIv2("/disburse/get-invoice", { account_alias: cleanPhoneW, amount: providerAmountW, withdraw_mode: withdrawModeW, callback_url: callbackUrlW });
+                if (getInvoiceW.response_code !== "00" || !getInvoiceW.disburse_token) return JSON.stringify({ success: false, error: "Retrait échoué auprès du fournisseur" });
+
+                const submitW = await callPaydunyaAPIv2("/disburse/submit-invoice", { disburse_invoice: getInvoiceW.disburse_token, disburse_id: `withdrawal-${user.id.substring(0, 8)}-${Date.now()}` });
+                if (submitW.response_code === "00") {
+                  await storage.updateUserBalance(userId, -feeInfoW.totalDeductedFromBalance);
+                  const txW = await storage.createTransaction({ userId, type: "withdrawal", amount: Math.floor(amount), fee: feeInfoW.feeAmount, feePercentage: feeInfoW.feePercentage, currency: userCurrencyW, status: "completed", country, operator, customerPhone: cleanPhoneW, description: `Retrait de ${Math.floor(amount)} ${userCurrencyW}`, paydunyaToken: getInvoiceW.disburse_token, metadata: JSON.stringify({ provider: "paydunya", providerAmount: providerAmountW, providerCurrency: "XOF" }) });
+                  return JSON.stringify({ success: true, message: `Retrait de ${feeInfoW.amountReceived.toLocaleString("fr-FR")} ${userCurrencyW} envoyé avec succès. Frais: ${feeInfoW.feeAmount.toLocaleString("fr-FR")} ${userCurrencyW}. Transaction ID: ${txW.id}` });
+                }
+                return JSON.stringify({ success: false, error: "Retrait échoué" });
+              } else if (activeProviderW === "mbiyopay") {
+                const result = await handleMbiyoPayWithdrawal(userId, user, Math.floor(amount), country, operator, sanitizedPhone, userCurrencyW);
+                if (result.success) return JSON.stringify({ success: true, message: `Retrait envoyé avec succès. Transaction ID: ${result.transactionId}` });
+                return JSON.stringify({ success: false, error: result.error || "Erreur lors du retrait" });
+              } else if (activeProviderW === "afribapay") {
+                const result = await handleAfribaPayWithdrawal(userId, user, Math.floor(amount), country, operator, sanitizedPhone, userCurrencyW);
+                if (result.success) return JSON.stringify({ success: true, message: `Retrait envoyé avec succès. Transaction ID: ${result.transactionId}` });
+                return JSON.stringify({ success: false, error: result.error || "Erreur lors du retrait" });
               }
 
               return JSON.stringify({ success: false, error: "Fournisseur non supporté pour cette opération via le chat" });
@@ -7651,6 +7715,62 @@ SUPPORT ET CONTACT:
                 } else {
                   return JSON.stringify({ success: false, error: result.error || "Erreur lors du transfert" });
                 }
+              } else if (activeProviderT === "paydunya") {
+                const withdrawModeMapT: Record<string, string> = {
+                  "orange-sn": "orange-money-senegal", "free-sn": "free-money-senegal", "expresso-sn": "expresso-senegal",
+                  "wave-sn": "wave-senegal", "wizall-sn": "wizall-senegal",
+                  "orange-ci": "orange-money-ci", "mtn-ci": "mtn-ci", "moov-ci": "moov-ci", "wave-ci": "wave-ci",
+                  "orange-bf": "orange-money-burkina", "moov-bf": "moov-burkina-faso",
+                  "moov-bj": "moov-benin", "mtn-bj": "mtn-benin",
+                  "tmoney-tg": "t-money-togo", "moov-tg": "moov-togo",
+                  "orange-ml": "orange-money-mali", "moov-ml": "moov-mali",
+                };
+                const withdrawModeT = withdrawModeMapT[`${operator}-${country.toLowerCase()}`];
+                if (!withdrawModeT) return JSON.stringify({ success: false, error: "Opérateur non supporté pour les transferts Paydunya" });
+
+                let cleanPhoneT = sanitizedPhoneT.replace(/[\s\-\.]+/g, "");
+                const countryPhoneInfoT: Record<string, { code: string, localLength: number[] }> = {
+                  "SN": { code: "221", localLength: [9] }, "CI": { code: "225", localLength: [10] },
+                  "BF": { code: "226", localLength: [8] }, "BJ": { code: "229", localLength: [8, 10] },
+                  "TG": { code: "228", localLength: [8] }, "ML": { code: "223", localLength: [8] },
+                };
+                const phoneInfoT = countryPhoneInfoT[country.toUpperCase()];
+                if (phoneInfoT) {
+                  if (cleanPhoneT.startsWith(phoneInfoT.code)) {
+                    const withoutCodeT = cleanPhoneT.substring(phoneInfoT.code.length);
+                    if (phoneInfoT.localLength.includes(withoutCodeT.length)) {
+                      cleanPhoneT = withoutCodeT;
+                    }
+                  }
+                }
+
+                let providerAmountT = Math.floor(amount);
+                if (userCurrencyT !== "XOF") {
+                  const { convertCurrency } = await import("./currency-converter");
+                  const convT = await convertCurrency(Math.floor(amount), userCurrencyT, "XOF");
+                  if (convT.success) providerAmountT = Math.floor(convT.convertedAmount);
+                  else return JSON.stringify({ success: false, error: "Erreur de conversion de devise" });
+                }
+
+                const callbackUrlT = `${process.env.BASE_URL || 'https://bkapay.com'}/api/webhooks/paydunya-disburse`;
+                const getInvoiceT = await callPaydunyaAPIv2("/disburse/get-invoice", { account_alias: cleanPhoneT, amount: providerAmountT, withdraw_mode: withdrawModeT, callback_url: callbackUrlT });
+                if (getInvoiceT.response_code !== "00" || !getInvoiceT.disburse_token) return JSON.stringify({ success: false, error: "Transfert échoué auprès du fournisseur" });
+
+                const submitT = await callPaydunyaAPIv2("/disburse/submit-invoice", { disburse_invoice: getInvoiceT.disburse_token, disburse_id: `transfer-${user.id.substring(0, 8)}-${Date.now()}` });
+                if (submitT.response_code === "00") {
+                  await storage.updateUserBalance(userId, -requiredBalanceT);
+                  const txT = await storage.createTransaction({ userId, type: "transfer", amount: Math.floor(amount), fee: feeInfoT.feeAmount, feePercentage: feeInfoT.feePercentage, currency: userCurrencyT, status: "completed", country, operator, customerPhone: cleanPhoneT, description: `Transfert de ${Math.floor(amount)} ${userCurrencyT}`, paydunyaToken: getInvoiceT.disburse_token, metadata: JSON.stringify({ provider: "paydunya", providerAmount: providerAmountT, providerCurrency: "XOF" }) });
+                  return JSON.stringify({ success: true, message: `Transfert de ${Math.floor(amount).toLocaleString("fr-FR")} ${userCurrencyT} envoyé avec succès. Frais: ${feeInfoT.feeAmount.toLocaleString("fr-FR")} ${userCurrencyT}. Total débité: ${requiredBalanceT.toLocaleString("fr-FR")} ${userCurrencyT}. Transaction ID: ${txT.id}` });
+                }
+                return JSON.stringify({ success: false, error: "Transfert échoué" });
+              } else if (activeProviderT === "mbiyopay") {
+                const result = await handleMbiyoPayTransfer(userId, user, Math.floor(amount), country, operator, sanitizedPhoneT, userCurrencyT);
+                if (result.success) return JSON.stringify({ success: true, message: `Transfert envoyé avec succès. Transaction ID: ${result.transactionId}` });
+                return JSON.stringify({ success: false, error: result.error || "Erreur lors du transfert" });
+              } else if (activeProviderT === "afribapay") {
+                const result = await handleAfribaPayTransfer(userId, user, Math.floor(amount), country, operator, sanitizedPhoneT, userCurrencyT);
+                if (result.success) return JSON.stringify({ success: true, message: `Transfert envoyé avec succès. Transaction ID: ${result.transactionId}` });
+                return JSON.stringify({ success: false, error: result.error || "Erreur lors du transfert" });
               }
 
               return JSON.stringify({ success: false, error: "Fournisseur non supporté pour cette opération via le chat" });
