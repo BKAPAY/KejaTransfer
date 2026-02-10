@@ -7153,11 +7153,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { COUNTRIES, OPERATORS, COLLECT_COUNTRIES, PAYOUT_COUNTRIES } = await import("@shared/schema");
 
       // Collect real-time data from DB
-      const [feeConfigsData, countryStatusData, cryptoCurrenciesData, providerConfigsData] = await Promise.all([
+      const [feeConfigsData, countryStatusData, cryptoCurrenciesData, providerConfigsData, supportSettingsData] = await Promise.all([
         storage.getAllFeeConfigs(),
         storage.getCountryStatuses(),
         storage.getAllCryptoCurrencies(),
         storage.getProviderConfigs(),
+        storage.getSupportSettings(),
       ]);
 
       // Build country info with real-time per-operator availability
@@ -7282,7 +7283,13 @@ SÉCURITÉ:
 INSCRIPTION:
 - Pays autorisés pour l'inscription: Bénin, Côte d'Ivoire, Sénégal, Togo, Burkina Faso, Cameroun, RD Congo, Congo-Brazzaville, Mali
 - Vérification email optionnelle lors de l'inscription
-- Le pays ne peut pas être changé après l'inscription`;
+- Le pays ne peut pas être changé après l'inscription
+
+SUPPORT ET CONTACT:
+- Email du support: ${supportSettingsData?.supportEmail || "support@bkapay.com"}
+- Numéro de téléphone du support: ${supportSettingsData?.supportPhone || "+229 01 46 44 73 19"}
+- Groupe WhatsApp communautaire: ${supportSettingsData?.whatsappLink || "https://chat.whatsapp.com/DRe55FMRXCt87VxNvjF1EF"}
+- Pour toute question ou problème, les utilisateurs peuvent contacter le support par email, téléphone ou rejoindre le groupe WhatsApp.`;
 
       // Set up SSE streaming
       res.setHeader("Content-Type", "text/event-stream");
