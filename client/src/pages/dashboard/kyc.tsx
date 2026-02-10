@@ -381,6 +381,14 @@ export default function KYC() {
         throw new Error("La localisation est requise");
       }
 
+      const acceptedTerms = [
+        "Je certifie que les informations personnelles fournies sont exactes et correspondent a mes documents officiels.",
+        "Je declare exercer l'activite decrite de maniere legale et m'engage a utiliser BKApay conformement aux lois en vigueur.",
+        "Je confirme etre le titulaire des documents d'identite soumis et autorise BKApay a les utiliser pour la verification de mon identite.",
+        "J'autorise BKApay a collecter et utiliser ma position geographique dans le cadre de la verification de mon compte.",
+        "En signant, je certifie l'exactitude de toutes les informations fournies et j'accepte les conditions generales d'utilisation de BKApay. Toute fausse declaration pourra entrainer la suspension de mon compte.",
+      ];
+
       await apiRequest("POST", "/api/kyc/submit", {
         kycIdFront: idFrontData,
         kycIdBack: idBackData,
@@ -390,6 +398,7 @@ export default function KYC() {
         kycLatitude: locationData?.lat.toString() || "",
         kycLongitude: locationData?.lng.toString() || "",
         kycAddress: locationAddress,
+        kycAcceptedTerms: JSON.stringify(acceptedTerms),
       });
     },
     onSuccess: () => {
@@ -531,39 +540,40 @@ export default function KYC() {
     };
 
     return (
-      <div className="fixed inset-0 z-50 bg-black flex flex-col">
-        <div className="flex items-center justify-between p-4 bg-black/80">
-          <h3 className="text-white font-medium">{labels[cameraMode]}</h3>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={stopCamera}
-            className="text-white hover:bg-white/20"
-            data-testid="button-close-camera"
-          >
-            <X className="w-6 h-6" />
-          </Button>
-        </div>
+      <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4">
+        <div className="w-full max-w-sm bg-black rounded-xl overflow-hidden">
+          <div className="flex items-center justify-between px-3 py-2 bg-black/80">
+            <h3 className="text-white text-sm font-medium">{labels[cameraMode]}</h3>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={stopCamera}
+              className="text-white hover:bg-white/20"
+              data-testid="button-close-camera"
+            >
+              <X className="w-5 h-5" />
+            </Button>
+          </div>
 
-        <div className="flex-1 flex items-center justify-center overflow-hidden">
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            className="max-w-full max-h-full object-contain"
-          />
-        </div>
+          <div className="relative" style={{ height: "300px" }}>
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="w-full h-full object-cover"
+            />
+          </div>
 
-        <div className="p-6 bg-black/80 flex justify-center">
-          <Button
-            size="lg"
-            onClick={capturePhoto}
-            className="rounded-full w-16 h-16 bg-white hover:bg-gray-200"
-            data-testid="button-capture-photo"
-          >
-            <Camera className="w-8 h-8 text-black" />
-          </Button>
+          <div className="py-3 bg-black/80 flex justify-center">
+            <Button
+              onClick={capturePhoto}
+              className="rounded-full w-14 h-14 bg-white hover:bg-gray-200"
+              data-testid="button-capture-photo"
+            >
+              <Camera className="w-6 h-6 text-black" />
+            </Button>
+          </div>
         </div>
 
         <canvas ref={captureCanvasRef} className="hidden" />
@@ -611,10 +621,13 @@ export default function KYC() {
         </CardContent>
       </Card>
 
-      <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900 rounded-lg p-3">
-        <p className="text-xs text-blue-900 dark:text-blue-200">
-          Ces informations seront utilisees pour verifier votre identite. Assurez-vous qu'elles correspondent a vos documents officiels.
-        </p>
+      <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-lg p-3">
+        <div className="flex gap-2">
+          <Shield className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+          <p className="text-xs text-amber-900 dark:text-amber-200">
+            En continuant, je certifie que les informations personnelles fournies sont exactes et correspondent a mes documents officiels.
+          </p>
+        </div>
       </div>
 
       <Button
@@ -656,10 +669,13 @@ export default function KYC() {
         </CardContent>
       </Card>
 
-      <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900 rounded-lg p-3">
-        <p className="text-xs text-blue-900 dark:text-blue-200">
-          Cette information nous aide a mieux comprendre votre activite et a securiser votre compte. Soyez aussi precis que possible.
-        </p>
+      <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-lg p-3">
+        <div className="flex gap-2">
+          <Shield className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+          <p className="text-xs text-amber-900 dark:text-amber-200">
+            En continuant, je declare exercer l'activite decrite de maniere legale et m'engage a utiliser BKApay conformement aux lois en vigueur.
+          </p>
+        </div>
       </div>
 
       <div className="flex gap-3">
@@ -814,10 +830,13 @@ export default function KYC() {
         </div>
       </div>
 
-      <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900 rounded-lg p-3">
-        <p className="text-xs text-blue-900 dark:text-blue-200">
-          Documents acceptes: Passeport, Permis de conduire ou Piece d'identite nationale. La photo avec piece en main doit montrer clairement votre visage et le document.
-        </p>
+      <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-lg p-3">
+        <div className="flex gap-2">
+          <Shield className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+          <p className="text-xs text-amber-900 dark:text-amber-200">
+            En continuant, je confirme etre le titulaire des documents d'identite soumis et autorise BKApay a les utiliser pour la verification de mon identite.
+          </p>
+        </div>
       </div>
 
       <div className="flex gap-3">
@@ -952,6 +971,15 @@ export default function KYC() {
         </div>
       )}
 
+      <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-lg p-3">
+        <div className="flex gap-2">
+          <Shield className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+          <p className="text-xs text-amber-900 dark:text-amber-200">
+            En continuant, j'autorise BKApay a collecter et utiliser ma position geographique dans le cadre de la verification de mon compte.
+          </p>
+        </div>
+      </div>
+
       <div className="flex gap-3">
         <Button
           variant="outline"
@@ -1034,10 +1062,13 @@ export default function KYC() {
         </div>
       )}
 
-      <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900 rounded-lg p-3">
-        <p className="text-xs text-blue-900 dark:text-blue-200">
-          En signant, vous certifiez que les informations fournies sont exactes et que vous etes le titulaire des documents d'identite soumis.
-        </p>
+      <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-lg p-3">
+        <div className="flex gap-2">
+          <Shield className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+          <p className="text-xs text-amber-900 dark:text-amber-200">
+            En signant et soumettant, je certifie l'exactitude de toutes les informations fournies et j'accepte les conditions generales d'utilisation de BKApay. Toute fausse declaration pourra entrainer la suspension de mon compte.
+          </p>
+        </div>
       </div>
 
       <div className="flex gap-3">

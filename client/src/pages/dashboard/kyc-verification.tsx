@@ -5,12 +5,22 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { CheckCircle2, X, Download, FileText, ArrowLeft, Search, BadgeCheck, Loader2 } from "lucide-react";
+import { CheckCircle2, X, Download, FileText, ArrowLeft, Search, BadgeCheck, Loader2, MapPin, Shield } from "lucide-react";
 import type { User } from "@shared/schema";
 import { jsPDF } from "jspdf";
 import { queryClient } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 import { Badge } from "@/components/ui/badge";
+import { MapContainer, TileLayer, Marker } from "react-leaflet";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
+  iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png",
+  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
+});
 
 type PartialUser = Pick<User, 'id' | 'email' | 'firstName' | 'lastName' | 'kycStatus' | 'kycRejectionReason' | 'createdAt' | 'balance' | 'isAdmin' | 'suspended'>;
 
@@ -20,6 +30,7 @@ export default function KycVerificationPage() {
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [lightboxImage, setLightboxImage] = useState<{ src: string; alt: string } | null>(null);
 
   const { data: submissions, isLoading, refetch } = useQuery<PartialUser[]>({
     queryKey: ["/api/admin/kyc-submissions"],
@@ -166,6 +177,32 @@ export default function KycVerificationPage() {
         y += 7;
       });
     });
+
+    if ((user as any).kycAcceptedTerms) {
+      y += 10;
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.text("Engagements acceptes", 20, y);
+      y += 8;
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      try {
+        const terms = JSON.parse((user as any).kycAcceptedTerms) as string[];
+        terms.forEach((term: string) => {
+          const maxLineWidth = pageWidth - 50;
+          const splitLines = doc.splitTextToSize(`- ${term}`, maxLineWidth);
+          splitLines.forEach((splitLine: string) => {
+            if (y > pageHeight - 20) {
+              doc.addPage();
+              y = 20;
+            }
+            doc.text(splitLine, 25, y);
+            y += 6;
+          });
+          y += 2;
+        });
+      } catch {}
+    }
     
     y += 10;
     doc.setFontSize(14);
@@ -437,18 +474,40 @@ export default function KycVerificationPage() {
             </Card>
           )}
 
-          {(selectedUserDetails as any).kycAddress && (
+          {(selectedUserDetails as any).kycLatitude && (selectedUserDetails as any).kycLongitude && (
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Emplacement</CardTitle>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <MapPin className="w-4 h-4" />
+                  Emplacement de l'utilisateur
+                </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2">
-                <p className="text-sm">{(selectedUserDetails as any).kycAddress}</p>
-                {(selectedUserDetails as any).kycLatitude && (selectedUserDetails as any).kycLongitude && (
-                  <p className="text-xs text-muted-foreground">
-                    Coordonnees: {(selectedUserDetails as any).kycLatitude}, {(selectedUserDetails as any).kycLongitude}
-                  </p>
+              <CardContent className="space-y-3">
+                <div className="rounded-lg overflow-hidden border" style={{ height: "300px" }}>
+                  <MapContainer
+                    center={[parseFloat((selectedUserDetails as any).kycLatitude), parseFloat((selectedUserDetails as any).kycLongitude)]}
+                    zoom={15}
+                    style={{ height: "100%", width: "100%" }}
+                    scrollWheelZoom={true}
+                    dragging={true}
+                    zoomControl={true}
+                  >
+                    <TileLayer
+                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    />
+                    <Marker position={[parseFloat((selectedUserDetails as any).kycLatitude), parseFloat((selectedUserDetails as any).kycLongitude)]} />
+                  </MapContainer>
+                </div>
+                {(selectedUserDetails as any).kycAddress && (
+                  <div className="flex items-start gap-2">
+                    <MapPin className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                    <p className="text-sm">{(selectedUserDetails as any).kycAddress}</p>
+                  </div>
                 )}
+                <p className="text-xs text-muted-foreground">
+                  Coordonnees GPS: {(selectedUserDetails as any).kycLatitude}, {(selectedUserDetails as any).kycLongitude}
+                </p>
               </CardContent>
             </Card>
           )}
@@ -456,9 +515,14 @@ export default function KycVerificationPage() {
           <div className="space-y-4">
             <div>
               <h3 className="font-semibold mb-4">Documents fournis</h3>
+              <p className="text-xs text-muted-foreground mb-3">Cliquez sur une image pour la voir en taille reelle</p>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {selectedUserDetails.kycIdFront && (
-                  <div className="border rounded-lg p-4">
+                  <div
+                    className="border rounded-lg p-4 cursor-pointer hover-elevate"
+                    onClick={() => setLightboxImage({ src: selectedUserDetails.kycIdFront!, alt: "Piece d'identite (Recto)" })}
+                    data-testid="button-view-id-front"
+                  >
                     <p className="text-sm font-medium mb-3">Piece d'identite (Recto)</p>
                     <img
                       src={selectedUserDetails.kycIdFront}
@@ -468,7 +532,11 @@ export default function KycVerificationPage() {
                   </div>
                 )}
                 {selectedUserDetails.kycIdBack && (
-                  <div className="border rounded-lg p-4">
+                  <div
+                    className="border rounded-lg p-4 cursor-pointer hover-elevate"
+                    onClick={() => setLightboxImage({ src: selectedUserDetails.kycIdBack!, alt: "Piece d'identite (Verso)" })}
+                    data-testid="button-view-id-back"
+                  >
                     <p className="text-sm font-medium mb-3">Piece d'identite (Verso)</p>
                     <img
                       src={selectedUserDetails.kycIdBack}
@@ -478,7 +546,11 @@ export default function KycVerificationPage() {
                   </div>
                 )}
                 {selectedUserDetails.kycSelfie && (
-                  <div className="border rounded-lg p-4">
+                  <div
+                    className="border rounded-lg p-4 cursor-pointer hover-elevate"
+                    onClick={() => setLightboxImage({ src: selectedUserDetails.kycSelfie!, alt: "Photo avec piece en main" })}
+                    data-testid="button-view-selfie"
+                  >
                     <p className="text-sm font-medium mb-3">Photo avec piece en main</p>
                     <img
                       src={selectedUserDetails.kycSelfie}
@@ -488,7 +560,11 @@ export default function KycVerificationPage() {
                   </div>
                 )}
                 {selectedUserDetails.kycSignature && (
-                  <div className="border rounded-lg p-4">
+                  <div
+                    className="border rounded-lg p-4 cursor-pointer hover-elevate"
+                    onClick={() => setLightboxImage({ src: selectedUserDetails.kycSignature!, alt: "Signature" })}
+                    data-testid="button-view-signature"
+                  >
                     <p className="text-sm font-medium mb-3">Signature</p>
                     <img
                       src={selectedUserDetails.kycSignature}
@@ -499,6 +575,34 @@ export default function KycVerificationPage() {
                 )}
               </div>
             </div>
+
+            {(selectedUserDetails as any).kycAcceptedTerms && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Shield className="w-4 h-4" />
+                    Engagements acceptes par l'utilisateur
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-2">
+                    {(() => {
+                      try {
+                        const terms = JSON.parse((selectedUserDetails as any).kycAcceptedTerms);
+                        return (terms as string[]).map((term: string, i: number) => (
+                          <li key={i} className="flex items-start gap-2">
+                            <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
+                            <span className="text-sm">{term}</span>
+                          </li>
+                        ));
+                      } catch {
+                        return <li className="text-sm text-muted-foreground">Donnees non disponibles</li>;
+                      }
+                    })()}
+                  </ul>
+                </CardContent>
+              </Card>
+            )}
 
             {selectedUserDetails.kycStatus === "submitted" && (
               <Card>
@@ -564,6 +668,32 @@ export default function KycVerificationPage() {
             <p className="text-muted-foreground">Utilisateur non trouve</p>
           </CardContent>
         </Card>
+      )}
+
+      {lightboxImage && (
+        <div
+          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
+          onClick={() => setLightboxImage(null)}
+          data-testid="lightbox-overlay"
+        >
+          <div className="relative max-w-4xl max-h-[90vh] w-full" onClick={(e) => e.stopPropagation()}>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setLightboxImage(null)}
+              className="absolute -top-12 right-0 text-white hover:bg-white/20"
+              data-testid="button-close-lightbox"
+            >
+              <X className="w-6 h-6" />
+            </Button>
+            <p className="text-white text-sm font-medium mb-2 text-center">{lightboxImage.alt}</p>
+            <img
+              src={lightboxImage.src}
+              alt={lightboxImage.alt}
+              className="w-full max-h-[80vh] object-contain rounded-lg"
+            />
+          </div>
+        </div>
       )}
     </div>
   );

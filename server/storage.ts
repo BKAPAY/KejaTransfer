@@ -41,8 +41,8 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   updateUserBalance(id: string, amount: number): Promise<User | undefined>;
   updateUserPassword(id: string, hashedPassword: string): Promise<User | undefined>;
-  submitKyc(userId: string, kycData: { kycIdFront: string; kycIdBack: string; kycSelfie: string; kycSignature: string; kycActivityDescription: string; kycLatitude: string; kycLongitude: string; kycAddress: string }): Promise<User | undefined>;
-  updateKycDocument(userId: string, data: Partial<{ kycIdFront: string; kycIdBack: string; kycSelfie: string; kycSignature: string; kycActivityDescription: string; kycLatitude: string; kycLongitude: string; kycAddress: string }>): Promise<void>;
+  submitKyc(userId: string, kycData: { kycIdFront: string; kycIdBack: string; kycSelfie: string; kycSignature: string; kycActivityDescription: string; kycLatitude: string; kycLongitude: string; kycAddress: string; kycAcceptedTerms: string }): Promise<User | undefined>;
+  updateKycDocument(userId: string, data: Partial<{ kycIdFront: string; kycIdBack: string; kycSelfie: string; kycSignature: string; kycActivityDescription: string; kycLatitude: string; kycLongitude: string; kycAddress: string; kycAcceptedTerms: string }>): Promise<void>;
   approveKyc(userId: string): Promise<User | undefined>;
   rejectKyc(userId: string, reason?: string): Promise<User | undefined>;
   getPendingKycSubmissions(): Promise<User[]>;
@@ -206,7 +206,7 @@ export class DbStorage implements IStorage {
     return results[0];
   }
 
-  async submitKyc(userId: string, kycData: { kycIdFront: string; kycIdBack: string; kycSelfie: string; kycSignature: string; kycActivityDescription: string; kycLatitude: string; kycLongitude: string; kycAddress: string }): Promise<User | undefined> {
+  async submitKyc(userId: string, kycData: { kycIdFront: string; kycIdBack: string; kycSelfie: string; kycSignature: string; kycActivityDescription: string; kycLatitude: string; kycLongitude: string; kycAddress: string; kycAcceptedTerms: string }): Promise<User | undefined> {
     const results = await db
       .update(schema.users)
       .set({
@@ -219,13 +219,14 @@ export class DbStorage implements IStorage {
         kycLatitude: kycData.kycLatitude,
         kycLongitude: kycData.kycLongitude,
         kycAddress: kycData.kycAddress,
+        kycAcceptedTerms: kycData.kycAcceptedTerms,
       })
       .where(eq(schema.users.id, userId))
       .returning();
     return results[0];
   }
 
-  async updateKycDocument(userId: string, data: Partial<{ kycIdFront: string; kycIdBack: string; kycSelfie: string; kycSignature: string; kycActivityDescription: string; kycLatitude: string; kycLongitude: string; kycAddress: string }>): Promise<void> {
+  async updateKycDocument(userId: string, data: Partial<{ kycIdFront: string; kycIdBack: string; kycSelfie: string; kycSignature: string; kycActivityDescription: string; kycLatitude: string; kycLongitude: string; kycAddress: string; kycAcceptedTerms: string }>): Promise<void> {
     await db
       .update(schema.users)
       .set(data)
@@ -914,6 +915,7 @@ export class DbStorage implements IStorage {
       kycLatitude: sql<string | null>`NULL`.as('kycLatitude'),
       kycLongitude: sql<string | null>`NULL`.as('kycLongitude'),
       kycAddress: sql<string | null>`NULL`.as('kycAddress'),
+      kycAcceptedTerms: sql<string | null>`NULL`.as('kycAcceptedTerms'),
     }).from(schema.users).orderBy(desc(schema.users.balance));
   }
 
