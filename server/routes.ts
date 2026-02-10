@@ -7349,12 +7349,9 @@ IMPORTANT: Pour un retrait, le pays est TOUJOURS le pays de l'utilisateur (fourn
 Étape 2: Affiche UNIQUEMENT les opérateurs de la section "OPÉRATEURS ACTIFS POUR LES RETRAITS" en LISTE NUMÉROTÉE. Si aucun opérateur n'est actif, informe l'utilisateur qu'aucun retrait n'est possible actuellement.
 Étape 3: Demande le montant souhaité
 Étape 4: Utilise calculate_fees pour calculer les frais (utilise le pays de l'utilisateur comme country)
-Étape 5: Affiche un récapitulatif clair avec montant brut, frais (%), montant reçu, montant débité, puis propose:
-1. Confirmer
-2. Annuler
-Étape 6: Demande le code de sécurité à 6 chiffres
-Étape 7: Utilise execute_withdrawal pour exécuter (utilise le pays de l'utilisateur comme country)
-Étape 8: Affiche le résultat
+Étape 5: Affiche un récapitulatif SIMPLE: "Montant débité de votre solde: X, Le destinataire recevra: Y" puis demande IMMÉDIATEMENT le code de sécurité à 6 chiffres dans le MÊME message. Ne propose PAS de confirmer ou annuler.
+Étape 6: Utilise execute_withdrawal pour exécuter (utilise le pays de l'utilisateur comme country)
+Étape 7: Affiche le résultat
 
 TRANSFERT (envoyer de l'argent vers un autre numéro):
 IMPORTANT: Ne demande PAS le pays en texte libre. Utilise EXCLUSIVEMENT la section "PAYS ACTIFS POUR LES TRANSFERTS" ci-dessous. N'affiche QUE les pays présents dans cette section. Si aucun pays n'est actif, informe l'utilisateur qu'aucun transfert n'est possible actuellement.
@@ -7364,23 +7361,17 @@ IMPORTANT: Ne demande PAS le pays en texte libre. Utilise EXCLUSIVEMENT la secti
 Étape 4: Demande le montant net que le destinataire doit recevoir
 Étape 5: Si la devise du pays destinataire est différente de celle de l'utilisateur, utilise convert_currency pour convertir
 Étape 6: Utilise calculate_fees pour calculer les frais
-Étape 7: Affiche un récapitulatif clair puis propose:
-1. Confirmer
-2. Annuler
-Étape 8: Demande le code de sécurité à 6 chiffres pour confirmer
-Étape 9: Utilise execute_transfer pour exécuter
-Étape 10: Affiche le résultat
+Étape 7: Affiche un récapitulatif SIMPLE: "Montant débité de votre solde: X, Le destinataire recevra: Y" puis demande IMMÉDIATEMENT le code de sécurité à 6 chiffres dans le MÊME message. Ne propose PAS de confirmer ou annuler.
+Étape 8: Utilise execute_transfer pour exécuter
+Étape 9: Affiche le résultat
 
 MODE AUTOMATIQUE (message complet en une seule fois):
 Si l'utilisateur fournit TOUTES les informations dans un seul message (numéro, opérateur, montant, code de sécurité), tu dois:
 1. Extraire automatiquement toutes les informations du message
 2. Pour un retrait: utiliser le pays de l'utilisateur automatiquement
 3. Utiliser calculate_fees pour calculer les frais
-4. Afficher un récapitulatif COMPLET puis proposer:
-1. Confirmer
-2. Annuler
-5. À la confirmation, exécuter immédiatement l'opération
-6. Afficher le résultat
+4. Exécuter immédiatement l'opération sans demander de confirmation
+5. Afficher le résultat avec récapitulatif simple
 
 RÈGLES POUR LES OPÉRATIONS:
 - Vérifie TOUJOURS que le KYC est vérifié avant de proposer un retrait/transfert
