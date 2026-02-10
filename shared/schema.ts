@@ -533,3 +533,6 @@ export const PAYOUT_OPERATORS: Record<string, string[]> = {
   RW: ["mtn", "airtel"],
   GM: ["afrimoney", "qmoney", "wave"],
 };
+
+// Chat schema for EMALI AI
+export * from "./models/chat";

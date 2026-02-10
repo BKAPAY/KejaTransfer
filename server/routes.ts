@@ -7136,6 +7136,176 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== EMALI AI Chat Endpoint ====================
+  app.post("/api/emali-chat", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { messages: userMessages } = req.body;
+      if (!userMessages || !Array.isArray(userMessages)) {
+        return res.status(400).json({ error: "Messages requis" });
+      }
+
+      const OpenAI = (await import("openai")).default;
+      const openai = new OpenAI({
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+      });
+
+      const { COUNTRIES, OPERATORS, COLLECT_COUNTRIES, PAYOUT_COUNTRIES } = await import("@shared/schema");
+
+      // Collect real-time data from DB
+      const [feeConfigsData, countryStatusData, cryptoCurrenciesData, providerConfigsData] = await Promise.all([
+        storage.getAllFeeConfigs(),
+        storage.getCountryStatuses(),
+        storage.getAllCryptoCurrencies(),
+        storage.getProviderConfigs(),
+      ]);
+
+      // Build country info with real-time operator availability
+      const countryInfoLines: string[] = [];
+      for (const country of COUNTRIES) {
+        const operators = OPERATORS[country.code as keyof typeof OPERATORS] || [];
+        const operatorNames = operators.map((op: any) => op.name).join(", ");
+        
+        // Check country status from DB
+        const statuses = countryStatusData.filter((cs: any) => cs.country === country.code);
+        const payinActive = statuses.some((cs: any) => cs.payinEnabled);
+        const payoutActive = statuses.some((cs: any) => cs.payoutEnabled);
+        
+        let statusText = "";
+        if (payinActive && payoutActive) statusText = "Dépôts et retraits actifs";
+        else if (payinActive) statusText = "Dépôts actifs seulement";
+        else if (payoutActive) statusText = "Retraits actifs seulement";
+        else statusText = "Opérateurs non disponibles actuellement";
+        
+        countryInfoLines.push(`- ${country.name} (${country.code}): Devise ${country.currency}, Indicatif ${country.phoneCode}, Opérateurs: ${operatorNames || "Aucun"}, Statut: ${statusText}`);
+      }
+
+      // Build fee info from DB
+      const feeInfoLines: string[] = [];
+      const feesByCountry: Record<string, any[]> = {};
+      for (const fc of feeConfigsData) {
+        if (!feesByCountry[fc.country]) feesByCountry[fc.country] = [];
+        feesByCountry[fc.country].push(fc);
+      }
+      for (const [countryCode, fees] of Object.entries(feesByCountry)) {
+        const countryName = COUNTRIES.find((c: any) => c.code === countryCode)?.name || countryCode;
+        for (const fee of fees as any[]) {
+          const inPct = (fee.incomingFeePercentage / 10).toFixed(1);
+          const outPct = (fee.outgoingFeePercentage / 10).toFixed(1);
+          feeInfoLines.push(`  ${countryName} - ${fee.operator}: Frais entrants ${inPct}%, Frais sortants ${outPct}%`);
+        }
+      }
+
+      // Build crypto info
+      const cryptoInfoLines: string[] = [];
+      for (const crypto of cryptoCurrenciesData) {
+        const payinStatus = crypto.payinEnabled ? "actif" : "inactif";
+        const payoutStatus = crypto.payoutEnabled ? "actif" : "inactif";
+        cryptoInfoLines.push(`- ${crypto.name} (${crypto.symbol}): Dépôt ${payinStatus}, Retrait ${payoutStatus}`);
+      }
+
+      // Get crypto fee config
+      const nowpaymentsConfig = providerConfigsData.find((p: any) => p.provider === "nowpayments");
+      const cryptoMarkup = nowpaymentsConfig?.cryptoMarkupPercent ? (nowpaymentsConfig.cryptoMarkupPercent / 10).toFixed(1) : "10";
+      const cryptoFee = nowpaymentsConfig?.cryptoFeePercent ? (nowpaymentsConfig.cryptoFeePercent / 10).toFixed(1) : "15";
+
+      const systemPrompt = `Tu es EMALI AI, l'assistant intelligent de BKApay, une plateforme de paiement mobile money en Afrique de l'Ouest et Centrale. Tu réponds UNIQUEMENT en français.
+
+RÈGLES IMPORTANTES:
+- Tu ne donnes JAMAIS d'informations sur d'autres utilisateurs (soldes, transactions, données personnelles).
+- Tu réponds uniquement sur le fonctionnement de la plateforme BKApay.
+- Si on te pose une question hors sujet, redirige poliment vers les fonctionnalités de BKApay.
+- Sois concis, professionnel et amical.
+- Utilise les données ci-dessous pour répondre avec précision.
+
+=== INFORMATIONS SUR BKAPAY ===
+
+DESCRIPTION: BKApay est une plateforme de paiement mobile money permettant aux entreprises et particuliers d'accepter et envoyer des paiements via mobile money et cryptomonnaie dans 16 pays d'Afrique.
+
+FONCTIONNALITÉS:
+- Dépôts (recevoir de l'argent via mobile money ou crypto)
+- Retraits (envoyer de l'argent vers un numéro mobile money ou portefeuille crypto)
+- Transferts (envoyer de l'argent à un autre numéro)
+- Liens de paiement (créer des liens pour recevoir des paiements)
+- Liens marchands (intégration pour les commerçants)
+- API pour développeurs (intégration technique)
+- Vérification KYC (identification obligatoire en 5 étapes)
+
+PAYS ET OPÉRATEURS DISPONIBLES (données en temps réel):
+${countryInfoLines.join("\n")}
+
+FRAIS DE TRANSACTION MOBILE MONEY (données en temps réel):
+${feeInfoLines.length > 0 ? feeInfoLines.join("\n") : "Frais standard de 6% pour tous les pays et opérateurs."}
+
+RÈGLES DES FRAIS:
+- Dépôts (paiements entrants): Le client paie le montant brut, l'utilisateur reçoit le net (brut - frais).
+- Retraits (paiements sortants): L'utilisateur entre le montant brut, le fournisseur reçoit le net (brut - frais). Le solde est débité du montant brut.
+- Transferts: L'utilisateur entre le montant net, le fournisseur reçoit le net. Le solde est débité du net + frais.
+
+CRYPTOMONNAIES DISPONIBLES (données en temps réel):
+${cryptoInfoLines.length > 0 ? cryptoInfoLines.join("\n") : "Aucune cryptomonnaie configurée actuellement."}
+
+FRAIS CRYPTO:
+- Majoration de conversion XOF/USD: ${cryptoMarkup}%
+- Frais crypto supplémentaires: ${cryptoFee}%
+- Plus les frais standard de la plateforme
+
+VÉRIFICATION KYC (5 étapes):
+1. Photo recto de la pièce d'identité
+2. Photo verso de la pièce d'identité
+3. Selfie avec la pièce d'identité
+4. Signature numérique
+5. Description de l'activité et localisation GPS
+Note: Après 3 rejets de KYC, le compte est automatiquement suspendu.
+
+SÉCURITÉ:
+- Code de sécurité à 6 chiffres requis pour les retraits
+- Jusqu'à 3 numéros de retrait configurables
+- Sessions sécurisées avec authentification persistante
+
+INSCRIPTION:
+- Pays autorisés pour l'inscription: Bénin, Côte d'Ivoire, Sénégal, Togo, Burkina Faso, Cameroun, RD Congo, Congo-Brazzaville, Mali
+- Vérification email optionnelle lors de l'inscription
+- Le pays ne peut pas être changé après l'inscription`;
+
+      // Set up SSE streaming
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+
+      const stream = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: systemPrompt },
+          ...userMessages.map((m: any) => ({
+            role: m.role as "user" | "assistant",
+            content: m.content,
+          })),
+        ],
+        stream: true,
+        max_completion_tokens: 2048,
+      });
+
+      for await (const chunk of stream) {
+        const content = chunk.choices[0]?.delta?.content || "";
+        if (content) {
+          res.write(`data: ${JSON.stringify({ content })}\n\n`);
+        }
+      }
+
+      res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+      res.end();
+    } catch (error: any) {
+      console.error("[EMALI AI] Error:", error);
+      if (res.headersSent) {
+        res.write(`data: ${JSON.stringify({ error: "Une erreur est survenue" })}\n\n`);
+        res.end();
+      } else {
+        res.status(500).json({ error: "Une erreur est survenue avec l'assistant EMALI AI" });
+      }
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

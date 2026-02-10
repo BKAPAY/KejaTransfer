@@ -8,6 +8,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { useEffect, useRef } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Wallet } from "lucide-react";
+import { EmaliChatButton } from "@/components/emali-chat";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import Signup from "@/pages/signup";
@@ -115,7 +116,12 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
         <AppSidebar />
         <div className="flex flex-col flex-1 min-w-0">
           <header className="flex items-center justify-between gap-4 p-4 border-b bg-card sticky top-0 z-10">
-            <SidebarTrigger size="lg" data-testid="button-sidebar-toggle" />
+            <div className="flex items-center gap-4">
+              <SidebarTrigger size="lg" data-testid="button-sidebar-toggle" />
+              <div className="relative">
+                <EmaliChatButton />
+              </div>
+            </div>
             <div className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 rounded-lg" data-testid="header-balance">
               <Wallet className="h-4 w-4 text-primary" />
               <span className="text-sm font-semibold text-primary">

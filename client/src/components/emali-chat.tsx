@@ -1,0 +1,261 @@
+import { useState, useRef, useEffect, useCallback } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { X, Send, Loader2 } from "lucide-react";
+import emaliLogo from "@/assets/emali-ai-logo.png";
+
+interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+const WELCOME_MESSAGE = `Bonjour ! Je suis **EMALI AI**, votre assistant intelligent BKApay. Je suis là pour répondre à toutes vos questions sur la plateforme : pays disponibles, opérateurs, frais de transaction, cryptomonnaies, vérification KYC, et bien plus encore.
+
+Comment puis-je vous aider aujourd'hui ?`;
+
+const SESSION_TIMEOUT_MS = 2 * 60 * 60 * 1000; // 2 hours
+
+export function EmaliChatButton() {
+  const [isOpen, setIsOpen] = useState(false);
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    { role: "assistant", content: WELCOME_MESSAGE },
+  ]);
+  const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const lastActivityRef = useRef<number>(Date.now());
+
+  const resetChat = useCallback(() => {
+    setMessages([{ role: "assistant", content: WELCOME_MESSAGE }]);
+    setInput("");
+    setIsLoading(false);
+    lastActivityRef.current = Date.now();
+  }, []);
+
+  const handleOpen = useCallback(() => {
+    const now = Date.now();
+    if (now - lastActivityRef.current > SESSION_TIMEOUT_MS) {
+      resetChat();
+    }
+    setIsOpen(true);
+    setTimeout(() => inputRef.current?.focus(), 100);
+  }, [resetChat]);
+
+  const handleClose = useCallback(() => {
+    setIsOpen(false);
+  }, []);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages]);
+
+  const sendMessage = async () => {
+    const trimmed = input.trim();
+    if (!trimmed || isLoading) return;
+
+    lastActivityRef.current = Date.now();
+    const newMessages: ChatMessage[] = [...messages, { role: "user", content: trimmed }];
+    setMessages(newMessages);
+    setInput("");
+    setIsLoading(true);
+
+    try {
+      const response = await fetch("/api/emali-chat", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: newMessages.map((m) => ({ role: m.role, content: m.content })),
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Erreur de connexion");
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error("Pas de réponse");
+
+      const decoder = new TextDecoder();
+      let assistantContent = "";
+      setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const text = decoder.decode(value, { stream: true });
+        const lines = text.split("\n");
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          try {
+            const data = JSON.parse(line.slice(6));
+            if (data.content) {
+              assistantContent += data.content;
+              setMessages((prev) => {
+                const updated = [...prev];
+                updated[updated.length - 1] = {
+                  role: "assistant",
+                  content: assistantContent,
+                };
+                return updated;
+              });
+            }
+            if (data.done) break;
+            if (data.error) throw new Error(data.error);
+          } catch (e) {
+            if (!(e instanceof SyntaxError)) throw e;
+          }
+        }
+      }
+    } catch (error) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: "Désolé, je rencontre un problème technique. Veuillez réessayer dans quelques instants.",
+        },
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  };
+
+  const renderMarkdown = (text: string) => {
+    return text
+      .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+      .replace(/\*(.*?)\*/g, "<em>$1</em>")
+      .replace(/\n/g, "<br />");
+  };
+
+  return (
+    <>
+      <Button
+        size="icon"
+        variant="ghost"
+        onClick={handleOpen}
+        className="relative"
+        data-testid="button-emali-chat"
+      >
+        <img
+          src={emaliLogo}
+          alt="EMALI AI"
+          className="w-7 h-7 rounded-full"
+        />
+      </Button>
+
+      {isOpen && (
+        <>
+          <div
+            className="fixed inset-0 z-40"
+            onClick={handleClose}
+          />
+          <div
+            className="fixed z-50 flex flex-col bg-card border rounded-lg shadow-lg overflow-hidden"
+            style={{
+              top: "60px",
+              left: "70px",
+              width: "min(380px, calc(100vw - 90px))",
+              height: "min(520px, calc(100vh - 80px))",
+            }}
+            data-testid="emali-chat-panel"
+          >
+            <div className="flex items-center justify-between gap-2 p-3 border-b bg-primary/5">
+              <div className="flex items-center gap-2">
+                <img
+                  src={emaliLogo}
+                  alt="EMALI AI"
+                  className="w-8 h-8 rounded-full"
+                />
+                <div>
+                  <h3 className="font-semibold text-sm">EMALI AI</h3>
+                  <p className="text-xs text-muted-foreground">Assistant BKApay</p>
+                </div>
+              </div>
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={handleClose}
+                data-testid="button-close-emali"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+
+            <div
+              ref={scrollRef}
+              className="flex-1 overflow-y-auto p-3 space-y-3"
+            >
+              {messages.map((msg, i) => (
+                <div
+                  key={i}
+                  className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                >
+                  <div
+                    className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${
+                      msg.role === "user"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted"
+                    }`}
+                    data-testid={`chat-message-${msg.role}-${i}`}
+                  >
+                    {msg.role === "assistant" ? (
+                      <span
+                        dangerouslySetInnerHTML={{
+                          __html: renderMarkdown(msg.content),
+                        }}
+                      />
+                    ) : (
+                      msg.content
+                    )}
+                    {msg.role === "assistant" && msg.content === "" && isLoading && (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="p-3 border-t">
+              <div className="flex gap-2">
+                <Input
+                  ref={inputRef}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Posez votre question..."
+                  disabled={isLoading}
+                  data-testid="input-emali-message"
+                />
+                <Button
+                  size="icon"
+                  onClick={sendMessage}
+                  disabled={!input.trim() || isLoading}
+                  data-testid="button-send-emali"
+                >
+                  {isLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Send className="w-4 h-4" />
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </>
+  );
+}

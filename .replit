@@ -44,3 +44,6 @@ waitForPort = 5000
 [userenv.shared]
 BASE_URL = "https://bkapay.com"
 MBIYOPAY_WEBHOOK_SECRET = "bkapay_webhook_9f7aA2XkPqL89zD4mS"
+
+[agent]
+integrations = ["javascript_openai_ai_integrations:2.0.0"]
