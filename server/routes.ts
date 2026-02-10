@@ -7210,6 +7210,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         countryInfoLines.push(`- ${country.name} (${country.code}): Devise ${country.currency}, Indicatif ${country.phoneCode}\n    ${payinText}\n    ${payoutText}`);
       }
 
+      // Build transfer-eligible countries list (countries with at least one active payout operator)
+      const transferCountryLines: string[] = [];
+      const withdrawalCountryLines: string[] = [];
+      for (const country of COUNTRIES) {
+        const countryCode = country.code as keyof typeof OPERATORS;
+        const operators = OPERATORS[countryCode] || [];
+        const statuses = countryStatusData.filter((cs: any) => cs.country === country.code);
+        const countryFees = feeConfigsData.filter((fc: any) => fc.country === country.code);
+        const opConfigs = countryOperatorConfigsData.filter((oc: any) => oc.country === country.code);
+
+        const activePayoutOps: string[] = [];
+        for (const op of operators) {
+          const opProviders = countryFees.filter((fc: any) => fc.operator === op.code);
+          const hasPayout = opProviders.some((fc: any) => {
+            const providerEnabled = statuses.some((cs: any) => cs.provider === fc.provider && cs.payoutEnabled);
+            if (!providerEnabled) return false;
+            const opConfig = opConfigs.find((oc: any) => oc.provider === fc.provider && oc.operator === op.code);
+            return opConfig ? opConfig.outgoingEnabled : false;
+          });
+          if (hasPayout) activePayoutOps.push(op.name);
+        }
+
+        if (activePayoutOps.length > 0) {
+          transferCountryLines.push(`- ${country.name} (${country.code}): ${activePayoutOps.join(", ")}`);
+          if (currentUser && currentUser.country === country.code) {
+            withdrawalCountryLines.push(`- ${country.name} (${country.code}): ${activePayoutOps.join(", ")}`);
+          }
+        }
+      }
+
       // Build fee info from DB
       const feeInfoLines: string[] = [];
       const feesByCountry: Record<string, any[]> = {};
@@ -7316,7 +7346,7 @@ Quand tu proposes des choix à l'utilisateur (numéros, opérateurs, pays, confi
 RETRAIT (envoyer de l'argent vers son propre numéro mobile money):
 IMPORTANT: Pour un retrait, le pays est TOUJOURS le pays de l'utilisateur (fourni dans ses infos). Ne demande JAMAIS le pays.
 Étape 1: Affiche les numéros de retrait configurés en LISTE NUMÉROTÉE et demande de choisir
-Étape 2: Affiche les opérateurs disponibles pour le PAYS DE L'UTILISATEUR en LISTE NUMÉROTÉE et demande de choisir
+Étape 2: Affiche UNIQUEMENT les opérateurs de la section "OPÉRATEURS ACTIFS POUR LES RETRAITS" en LISTE NUMÉROTÉE. Si aucun opérateur n'est actif, informe l'utilisateur qu'aucun retrait n'est possible actuellement.
 Étape 3: Demande le montant souhaité
 Étape 4: Utilise calculate_fees pour calculer les frais (utilise le pays de l'utilisateur comme country)
 Étape 5: Affiche un récapitulatif clair avec montant brut, frais (%), montant reçu, montant débité, puis propose:
@@ -7327,8 +7357,8 @@ IMPORTANT: Pour un retrait, le pays est TOUJOURS le pays de l'utilisateur (fourn
 Étape 8: Affiche le résultat
 
 TRANSFERT (envoyer de l'argent vers un autre numéro):
-IMPORTANT: Ne demande PAS le pays en texte libre. Affiche la LISTE NUMÉROTÉE des pays disponibles.
-Étape 1: Affiche les pays disponibles pour les transferts en LISTE NUMÉROTÉE et demande de choisir
+IMPORTANT: Ne demande PAS le pays en texte libre. Utilise EXCLUSIVEMENT la section "PAYS ACTIFS POUR LES TRANSFERTS" ci-dessous. N'affiche QUE les pays présents dans cette section. Si aucun pays n'est actif, informe l'utilisateur qu'aucun transfert n'est possible actuellement.
+Étape 1: Affiche UNIQUEMENT les pays de la section "PAYS ACTIFS POUR LES TRANSFERTS" en LISTE NUMÉROTÉE et demande de choisir
 Étape 2: Après le choix du pays, affiche les opérateurs disponibles pour CE pays en LISTE NUMÉROTÉE
 Étape 3: Demande le numéro de téléphone du destinataire (avec indicatif du pays choisi)
 Étape 4: Demande le montant net que le destinataire doit recevoir
@@ -7381,6 +7411,13 @@ FONCTIONNALITÉS:
 
 PAYS ET OPÉRATEURS DISPONIBLES (données en temps réel):
 ${countryInfoLines.join("\n")}
+
+=== PAYS ACTIFS POUR LES TRANSFERTS (payout activé dans la base de données) ===
+IMPORTANT: Pour les transferts, propose UNIQUEMENT ces pays. Ne propose JAMAIS un pays qui n'est pas dans cette liste.
+${transferCountryLines.length > 0 ? transferCountryLines.join("\n") : "Aucun pays actif pour les transferts actuellement."}
+
+=== OPÉRATEURS ACTIFS POUR LES RETRAITS (pays de l'utilisateur) ===
+${withdrawalCountryLines.length > 0 ? withdrawalCountryLines.join("\n") : "Aucun opérateur actif pour les retraits dans le pays de l'utilisateur."}
 
 FRAIS DE TRANSACTION MOBILE MONEY (données en temps réel):
 ${feeInfoLines.length > 0 ? feeInfoLines.join("\n") : "Frais standard de 6% pour tous les pays et opérateurs."}
