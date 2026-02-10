@@ -12,8 +12,8 @@
     {
       "idx": 1,
       "version": "7",
-      "when": 1770761032491,
-      "tag": "0001_bent_pretty_boy",
+      "when": 1770761069165,
+      "tag": "0001_add_primary_admin",
       "breakpoints": true
     }
   ]
