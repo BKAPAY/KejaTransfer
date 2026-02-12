@@ -5,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { CheckCircle2, X, Download, FileText, ArrowLeft, Search, BadgeCheck, Loader2, MapPin, Shield } from "lucide-react";
+import { CheckCircle2, X, Download, FileText, ArrowLeft, Search, BadgeCheck, Loader2, MapPin, Shield, Layers, ExternalLink, Globe, Satellite } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,7 +20,7 @@ import { jsPDF } from "jspdf";
 import { queryClient } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 import { Badge } from "@/components/ui/badge";
-import { MapContainer, TileLayer, Marker } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, LayersControl } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -29,6 +29,16 @@ L.Icon.Default.mergeOptions({
   iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
   iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png",
   shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
+});
+
+const kycMarkerIcon = new L.Icon({
+  iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png",
+  iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
+  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41],
 });
 
 type PartialUser = Pick<User, 'id' | 'email' | 'firstName' | 'lastName' | 'kycStatus' | 'kycRejectionReason' | 'createdAt' | 'balance' | 'isAdmin' | 'suspended'>;
@@ -528,29 +538,80 @@ export default function KycVerificationPage() {
             </Card>
           )}
 
-          {(selectedUserDetails as any).kycLatitude && (selectedUserDetails as any).kycLongitude && (
+          {(selectedUserDetails as any).kycLatitude && (selectedUserDetails as any).kycLongitude && (() => {
+            const lat = parseFloat((selectedUserDetails as any).kycLatitude);
+            const lng = parseFloat((selectedUserDetails as any).kycLongitude);
+            const googleMaps3DUrl = `https://www.google.com/maps/@${lat},${lng},18z/data=!3m1!1e3`;
+            const googleMapsStreetViewUrl = `https://www.google.com/maps/@${lat},${lng},3a,75y,90t/data=!3m6!1e1!3m4!1s!2e0!7i16384!8i8192`;
+            const googleMapsDirectionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+            return (
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
                 <CardTitle className="text-base flex items-center gap-2">
                   <MapPin className="w-4 h-4" />
-                  Emplacement de l'utilisateur
+                  Localisation GPS
                 </CardTitle>
+                <div className="flex items-center gap-1 flex-wrap">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => window.open(googleMaps3DUrl, '_blank')}
+                    data-testid="button-google-maps-satellite"
+                  >
+                    <Satellite className="w-3.5 h-3.5 mr-1.5" />
+                    Satellite 3D
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => window.open(googleMapsStreetViewUrl, '_blank')}
+                    data-testid="button-google-street-view"
+                  >
+                    <Globe className="w-3.5 h-3.5 mr-1.5" />
+                    Street View
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => window.open(googleMapsDirectionsUrl, '_blank')}
+                    data-testid="button-google-directions"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5 mr-1.5" />
+                    Itineraire
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="rounded-lg overflow-hidden border" style={{ height: "300px" }}>
+                <div className="rounded-lg overflow-hidden border" style={{ height: "400px" }}>
                   <MapContainer
-                    center={[parseFloat((selectedUserDetails as any).kycLatitude), parseFloat((selectedUserDetails as any).kycLongitude)]}
-                    zoom={15}
+                    center={[lat, lng]}
+                    zoom={17}
                     style={{ height: "100%", width: "100%" }}
                     scrollWheelZoom={true}
                     dragging={true}
                     zoomControl={true}
                   >
-                    <TileLayer
-                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                    />
-                    <Marker position={[parseFloat((selectedUserDetails as any).kycLatitude), parseFloat((selectedUserDetails as any).kycLongitude)]} />
+                    <LayersControl position="topright">
+                      <LayersControl.BaseLayer name="Plan">
+                        <TileLayer
+                          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                        />
+                      </LayersControl.BaseLayer>
+                      <LayersControl.BaseLayer checked name="Satellite">
+                        <TileLayer
+                          attribution='Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+                          url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                        />
+                      </LayersControl.BaseLayer>
+                      <LayersControl.BaseLayer name="Satellite + Noms">
+                        <TileLayer
+                          attribution='Tiles &copy; Esri'
+                          url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                        />
+                      </LayersControl.BaseLayer>
+                    </LayersControl>
+                    <Marker position={[lat, lng]} icon={kycMarkerIcon} />
                   </MapContainer>
                 </div>
                 {(selectedUserDetails as any).kycAddress && (
@@ -560,11 +621,12 @@ export default function KycVerificationPage() {
                   </div>
                 )}
                 <p className="text-xs text-muted-foreground">
-                  Coordonnees GPS: {(selectedUserDetails as any).kycLatitude}, {(selectedUserDetails as any).kycLongitude}
+                  Coordonnees GPS: {lat.toFixed(6)}, {lng.toFixed(6)}
                 </p>
               </CardContent>
             </Card>
-          )}
+            );
+          })()}
 
           <div className="space-y-4">
             <div>
