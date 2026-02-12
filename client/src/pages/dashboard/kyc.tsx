@@ -9,7 +9,7 @@ import { CheckCircle2, Clock, AlertCircle, X, Camera, Shield, ArrowRight, ArrowL
 import { Progress } from "@/components/ui/progress";
 import { CountryFlag, getCountryName } from "@/components/country-flag";
 import { Textarea } from "@/components/ui/textarea";
-import { MapContainer, TileLayer, Marker, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, useMap, LayersControl } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -923,22 +923,45 @@ export default function KYC() {
 
       {locationData && (
         <div className="space-y-4">
-          <div className="rounded-lg overflow-hidden border-2" style={{ height: "280px" }}>
+          <div className="rounded-lg overflow-hidden border-2" style={{ height: "300px" }}>
             <MapContainer
               center={[locationData.lat, locationData.lng]}
-              zoom={15}
+              zoom={17}
               style={{ height: "100%", width: "100%" }}
-              scrollWheelZoom={false}
-              dragging={false}
-              zoomControl={false}
+              scrollWheelZoom={true}
+              dragging={true}
+              zoomControl={true}
             >
-              <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              />
+              <LayersControl position="topright">
+                <LayersControl.BaseLayer name="Plan">
+                  <TileLayer
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  />
+                </LayersControl.BaseLayer>
+                <LayersControl.BaseLayer checked name="Satellite">
+                  <TileLayer
+                    attribution='Tiles &copy; Esri'
+                    url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                  />
+                </LayersControl.BaseLayer>
+              </LayersControl>
               <Marker position={[locationData.lat, locationData.lng]} />
               <RecenterMap lat={locationData.lat} lng={locationData.lng} />
             </MapContainer>
+          </div>
+
+          <div className="flex gap-2 flex-wrap">
+            <Button
+              size="sm"
+              variant="outline"
+              type="button"
+              onClick={() => window.open(`https://www.google.com/maps/@${locationData.lat},${locationData.lng},18z/data=!3m1!1e3`, '_blank')}
+              data-testid="button-kyc-google-3d"
+            >
+              <Navigation className="w-3.5 h-3.5 mr-1.5" />
+              Voir en 3D sur Google Maps
+            </Button>
           </div>
 
           <Card className="border-2">
