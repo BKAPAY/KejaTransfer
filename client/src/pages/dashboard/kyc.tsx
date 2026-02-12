@@ -951,19 +951,6 @@ export default function KYC() {
             </MapContainer>
           </div>
 
-          <div className="flex gap-2 flex-wrap">
-            <Button
-              size="sm"
-              variant="outline"
-              type="button"
-              onClick={() => window.open(`https://www.google.com/maps/@${locationData.lat},${locationData.lng},18z/data=!3m1!1e3`, '_blank')}
-              data-testid="button-kyc-google-3d"
-            >
-              <Navigation className="w-3.5 h-3.5 mr-1.5" />
-              Voir en 3D sur Google Maps
-            </Button>
-          </div>
-
           <Card className="border-2">
             <CardContent className="pt-4">
               <div className="flex items-start gap-3">
