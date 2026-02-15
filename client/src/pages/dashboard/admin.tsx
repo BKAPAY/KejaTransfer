@@ -329,11 +329,9 @@ export default function Admin() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground mb-1">Panneau Administrateur</h1>
-          <p className="text-sm text-muted-foreground">Gestion et surveillance de la plateforme</p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold text-foreground mb-1">Panneau Administrateur</h1>
+        <p className="text-sm text-muted-foreground mb-3">Gestion et surveillance de la plateforme</p>
         <div className="flex gap-2 flex-wrap">
           <Button
             onClick={() => handleProtectedNavigation("/dashboard/fournisseurs")}
