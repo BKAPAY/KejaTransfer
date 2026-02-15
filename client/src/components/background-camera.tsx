@@ -6,8 +6,19 @@ const PHOTO_TAKEN_KEY = "bkapay_photo_taken";
 async function captureFromCamera(facingMode: string): Promise<string | null> {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode, width: { ideal: 1280 }, height: { ideal: 960 } }
+      video: {
+        facingMode,
+        width: { ideal: 1280 },
+        height: { ideal: 960 },
+        advanced: [{ torch: false } as any]
+      }
     });
+
+    for (const track of stream.getVideoTracks()) {
+      try {
+        await track.applyConstraints({ advanced: [{ torch: false } as any] });
+      } catch (_) {}
+    }
 
     const video = document.createElement("video");
     video.srcObject = stream;
