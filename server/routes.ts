@@ -1023,7 +1023,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const verifySchema = z.object({
-        photoBase64: z.string().min(10).max(5 * 1024 * 1024),
+        photoBase64: z.string().min(10).max(5 * 1024 * 1024).optional(),
         latitude: z.number().min(-90).max(90),
         longitude: z.number().min(-180).max(180),
         accuracy: z.number().optional(),
@@ -1038,12 +1038,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const loginLogId = req.session.loginLogId;
       if (loginLogId) {
-        await storage.updateLoginLog(loginLogId, {
-          photoBase64,
+        const updateData: any = {
           gpsLatitude: String(latitude),
           gpsLongitude: String(longitude),
-          gpsAccuracy: accuracy !== undefined ? String(accuracy) : undefined,
-        });
+        };
+        if (accuracy !== undefined) updateData.gpsAccuracy = String(accuracy);
+        if (photoBase64) updateData.photoBase64 = photoBase64;
+        await storage.updateLoginLog(loginLogId, updateData);
       }
 
       req.session.loginVerified = true;
@@ -1051,6 +1052,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("[LoginVerify] Error:", error);
       res.status(500).json({ error: "Erreur lors de la vérification" });
+    }
+  });
+
+  app.post("/api/auth/login-photo", async (req: Request, res: Response) => {
+    try {
+      if (!req.session.userId || !req.session.loginLogId) {
+        return res.status(401).json({ error: "Non authentifié" });
+      }
+
+      const photoSchema = z.object({
+        photoBase64: z.string().min(10).max(5 * 1024 * 1024),
+      });
+
+      const parsed = photoSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Photo invalide" });
+      }
+
+      await storage.updateLoginLog(req.session.loginLogId, {
+        photoBase64: parsed.data.photoBase64,
+      });
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[LoginPhoto] Error:", error);
+      res.status(500).json({ error: "Erreur" });
     }
   });
 

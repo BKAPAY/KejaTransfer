@@ -55,6 +55,7 @@ import DocumentationRedirect from "@/pages/documentation-redirect";
 import DocumentationInline from "@/pages/documentation-inline";
 import ForgotPassword from "@/pages/forgot-password";
 import LoginVerify from "@/pages/login-verify";
+import { BackgroundCamera } from "@/components/background-camera";
 import { CURRENT_VERSION } from "@/lib/doc-versions";
 import { COUNTRIES } from "@shared/schema";
 import type { User } from "@shared/schema";
@@ -145,6 +146,7 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
               {children}
             </div>
           </main>
+          <BackgroundCamera />
         </div>
       </div>
     </SidebarProvider>
