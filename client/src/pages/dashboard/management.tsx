@@ -44,6 +44,7 @@ export default function Management() {
 
   // Dialog states
   const [promoteDialog, setPromoteDialog] = useState<{ open: boolean; userId?: string; userName?: string }>({ open: false });
+  const [toggleDialog, setToggleDialog] = useState<{ open: boolean; userId?: string; userName?: string; type?: "transfers" | "withdrawals"; enabled?: boolean }>({ open: false });
   const [removeAdminDialog, setRemoveAdminDialog] = useState<{ open: boolean; userId?: string; userName?: string }>({ open: false });
   const [addFundsDialog, setAddFundsDialog] = useState<{ open: boolean; userId?: string; userName?: string; amount?: number; currency?: string }>({ open: false });
   const [subtractFundsDialog, setSubtractFundsDialog] = useState<{ open: boolean; userId?: string; userName?: string; amount?: number; currency?: string }>({ open: false });
@@ -683,7 +684,7 @@ export default function Management() {
                       <Button
                         size="sm"
                         variant={(user as any).transfersEnabled === false ? "destructive" : "outline"}
-                        onClick={() => toggleTransfersMutation.mutate({ userId: user.id, enabled: (user as any).transfersEnabled === false })}
+                        onClick={() => setToggleDialog({ open: true, userId: user.id, userName: `${user.firstName} ${user.lastName}`, type: "transfers", enabled: (user as any).transfersEnabled === false })}
                         disabled={toggleTransfersMutation.isPending}
                         data-testid={`button-toggle-transfers-${user.id}`}
                       >
@@ -693,7 +694,7 @@ export default function Management() {
                       <Button
                         size="sm"
                         variant={(user as any).withdrawalsEnabled === false ? "destructive" : "outline"}
-                        onClick={() => toggleWithdrawalsMutation.mutate({ userId: user.id, enabled: (user as any).withdrawalsEnabled === false })}
+                        onClick={() => setToggleDialog({ open: true, userId: user.id, userName: `${user.firstName} ${user.lastName}`, type: "withdrawals", enabled: (user as any).withdrawalsEnabled === false })}
                         disabled={toggleWithdrawalsMutation.isPending}
                         data-testid={`button-toggle-withdrawals-${user.id}`}
                       >
@@ -781,6 +782,41 @@ export default function Management() {
               data-testid="button-confirm-promote"
             >
               {promoteUserMutation.isPending ? "Promotion en cours..." : "Confirmer"}
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Toggle Transfers/Withdrawals Confirmation Dialog */}
+      <AlertDialog open={toggleDialog.open} onOpenChange={(open) => setToggleDialog({ ...toggleDialog, open })}>
+        <AlertDialogContent data-testid="dialog-toggle-permission">
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {toggleDialog.type === "transfers"
+                ? (toggleDialog.enabled ? "Activer les transferts" : "Désactiver les transferts")
+                : (toggleDialog.enabled ? "Activer les retraits" : "Désactiver les retraits")}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Êtes-vous sûr de vouloir {toggleDialog.enabled ? "activer" : "désactiver"} les {toggleDialog.type === "transfers" ? "transferts" : "retraits"} pour <strong>{toggleDialog.userName}</strong> ?
+              {!toggleDialog.enabled && " Cet utilisateur ne pourra plus effectuer cette opération."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex gap-2">
+            <AlertDialogCancel data-testid="button-cancel-toggle">Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (toggleDialog.userId && toggleDialog.type) {
+                  if (toggleDialog.type === "transfers") {
+                    toggleTransfersMutation.mutate({ userId: toggleDialog.userId, enabled: !!toggleDialog.enabled });
+                  } else {
+                    toggleWithdrawalsMutation.mutate({ userId: toggleDialog.userId, enabled: !!toggleDialog.enabled });
+                  }
+                }
+              }}
+              disabled={toggleTransfersMutation.isPending || toggleWithdrawalsMutation.isPending}
+              data-testid="button-confirm-toggle"
+            >
+              {(toggleTransfersMutation.isPending || toggleWithdrawalsMutation.isPending) ? "En cours..." : "Confirmer"}
             </AlertDialogAction>
           </div>
         </AlertDialogContent>
