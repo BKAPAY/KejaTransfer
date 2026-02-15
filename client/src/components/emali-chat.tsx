@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { X, Send, Loader2 } from "lucide-react";
@@ -73,6 +74,13 @@ export function EmaliChatButton() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const lastActivityRef = useRef<number>(Date.now());
 
+  const { data: emaliStatus } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/platform-settings/emali-enabled"],
+    refetchInterval: 30000,
+  });
+
+  const isEmaliEnabled = emaliStatus?.enabled !== false;
+
   const resetChat = useCallback(() => {
     setMessages([{ role: "assistant", content: WELCOME_MESSAGE }]);
     setInput("");
@@ -80,14 +88,21 @@ export function EmaliChatButton() {
     lastActivityRef.current = Date.now();
   }, []);
 
+  useEffect(() => {
+    if (!isEmaliEnabled && isOpen) {
+      setIsOpen(false);
+    }
+  }, [isEmaliEnabled, isOpen]);
+
   const handleOpen = useCallback(() => {
+    if (!isEmaliEnabled) return;
     const now = Date.now();
     if (now - lastActivityRef.current > SESSION_TIMEOUT_MS) {
       resetChat();
     }
     setIsOpen(true);
     setTimeout(() => inputRef.current?.focus(), 100);
-  }, [resetChat]);
+  }, [resetChat, isEmaliEnabled]);
 
   const handleClose = useCallback(() => {
     setIsOpen(false);
@@ -218,8 +233,8 @@ export function EmaliChatButton() {
       <Button
         size="icon"
         variant="ghost"
-        onClick={handleOpen}
-        className="relative"
+        onClick={isEmaliEnabled ? handleOpen : undefined}
+        className={`relative ${!isEmaliEnabled ? "pointer-events-none" : ""}`}
         data-testid="button-emali-chat"
       >
         <img
@@ -229,7 +244,7 @@ export function EmaliChatButton() {
         />
       </Button>
 
-      {isOpen && (
+      {isOpen && isEmaliEnabled && (
         <>
           <div
             className="fixed inset-0 z-40"

@@ -1,9 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useQuery } from "@tanstack/react-query";
-import { queryClient } from "@/lib/queryClient";
-import { Users, UserCheck, TrendingDown, TrendingUp, Search, Settings, Globe, RefreshCw, Database, AlertCircle, CheckCircle2, Eye, History, MapPin, Mail, Phone, CreditCard, Percent, Lock, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { Users, UserCheck, TrendingDown, TrendingUp, Search, Settings, Globe, RefreshCw, Database, AlertCircle, CheckCircle2, Eye, History, MapPin, Mail, Phone, CreditCard, Percent, Lock, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Bot, Power } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -110,6 +110,27 @@ export default function Admin() {
   const [txSearchQuery, setTxSearchQuery] = useState("");
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+
+  const { data: emaliStatus } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/platform-settings/emali-enabled"],
+  });
+
+  const toggleEmaliMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const res = await apiRequest("POST", "/api/admin/toggle-emali", { enabled });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/platform-settings/emali-enabled"] });
+      toast({
+        title: data.enabled ? "Assistant active" : "Assistant desactive",
+        description: data.enabled ? "EMALI AI est maintenant disponible pour les utilisateurs" : "EMALI AI est desormais desactive",
+      });
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible de modifier le statut", variant: "destructive" });
+    },
+  });
 
   const handleProtectedNavigation = (path: string) => {
     setPendingNavigation(path);
@@ -368,6 +389,16 @@ export default function Admin() {
           >
             <Lock className="w-4 h-4" />
             Infos Support
+          </Button>
+          <Button
+            onClick={() => toggleEmaliMutation.mutate(!(emaliStatus?.enabled ?? true))}
+            disabled={toggleEmaliMutation.isPending}
+            data-testid="button-toggle-emali"
+            className="gap-2"
+            variant={emaliStatus?.enabled !== false ? "default" : "secondary"}
+          >
+            <Bot className="w-4 h-4" />
+            {emaliStatus?.enabled !== false ? "EMALI AI : ON" : "EMALI AI : OFF"}
           </Button>
         </div>
       </div>

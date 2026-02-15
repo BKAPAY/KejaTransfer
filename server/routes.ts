@@ -6263,6 +6263,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Platform settings - get emali status (public for authenticated users)
+  app.get("/api/platform-settings/emali-enabled", async (req: Request, res: Response) => {
+    try {
+      const result = await pgPool.query(
+        "SELECT value FROM platform_settings WHERE key = 'emali_enabled'"
+      );
+      const enabled = result.rows.length > 0 ? result.rows[0].value === 'true' : true;
+      res.json({ enabled });
+    } catch (error) {
+      res.json({ enabled: true });
+    }
+  });
+
+  // Platform settings - toggle emali (admin only)
+  app.post("/api/admin/toggle-emali", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { enabled } = req.body;
+      if (typeof enabled !== 'boolean') {
+        return res.status(400).json({ error: "Valeur invalide" });
+      }
+      await pgPool.query(
+        "INSERT INTO platform_settings (key, value, updated_at) VALUES ('emali_enabled', $1, NOW()) ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = NOW()",
+        [enabled ? 'true' : 'false']
+      );
+      res.json({ success: true, enabled });
+    } catch (error: any) {
+      console.error("Toggle emali error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
   app.post("/api/admin/add-funds", requireAdmin, async (req: Request, res: Response) => {
     try {
       const { userId, amount } = req.body;
