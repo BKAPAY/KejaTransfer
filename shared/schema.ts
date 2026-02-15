@@ -36,6 +36,8 @@ export const users = pgTable("users", {
   isAdmin: boolean("is_admin").notNull().default(false),
   isPrimaryAdmin: boolean("is_primary_admin").notNull().default(false), // Super admin that cannot be removed
   suspended: boolean("suspended").notNull().default(false),
+  transfersEnabled: boolean("transfers_enabled").notNull().default(true),
+  withdrawalsEnabled: boolean("withdrawals_enabled").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

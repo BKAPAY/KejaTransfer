@@ -952,6 +952,8 @@ export class DbStorage implements IStorage {
       isAdmin: schema.users.isAdmin,
       isPrimaryAdmin: schema.users.isPrimaryAdmin,
       suspended: schema.users.suspended,
+      transfersEnabled: schema.users.transfersEnabled,
+      withdrawalsEnabled: schema.users.withdrawalsEnabled,
       createdAt: schema.users.createdAt,
       country: schema.users.country,
       withdrawalPhones: schema.users.withdrawalPhones,

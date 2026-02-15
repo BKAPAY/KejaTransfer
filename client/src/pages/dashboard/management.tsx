@@ -331,6 +331,36 @@ export default function Management() {
   });
 
 
+  const toggleTransfersMutation = useMutation({
+    mutationFn: async ({ userId, enabled }: { userId: string; enabled: boolean }) => {
+      const res = await apiRequest("POST", "/api/admin/toggle-transfers", { userId, enabled });
+      return res.json();
+    },
+    onSuccess: (_, vars) => {
+      toast({ title: "Succès", description: vars.enabled ? "Transferts activés" : "Transferts désactivés" });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      refetchUsers();
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible de modifier les transferts", variant: "destructive" });
+    },
+  });
+
+  const toggleWithdrawalsMutation = useMutation({
+    mutationFn: async ({ userId, enabled }: { userId: string; enabled: boolean }) => {
+      const res = await apiRequest("POST", "/api/admin/toggle-withdrawals", { userId, enabled });
+      return res.json();
+    },
+    onSuccess: (_, vars) => {
+      toast({ title: "Succès", description: vars.enabled ? "Retraits activés" : "Retraits désactivés" });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      refetchUsers();
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible de modifier les retraits", variant: "destructive" });
+    },
+  });
+
   // Helper function to get currency for a user's country
   const getCurrencyForUser = (user: User) => {
     return user?.country 
@@ -650,6 +680,26 @@ export default function Management() {
                           Réactiver
                         </Button>
                       )}
+                      <Button
+                        size="sm"
+                        variant={(user as any).transfersEnabled === false ? "destructive" : "outline"}
+                        onClick={() => toggleTransfersMutation.mutate({ userId: user.id, enabled: (user as any).transfersEnabled === false })}
+                        disabled={toggleTransfersMutation.isPending}
+                        data-testid={`button-toggle-transfers-${user.id}`}
+                      >
+                        <ArrowUpRight className="w-4 h-4 mr-1" />
+                        {(user as any).transfersEnabled === false ? "Transferts OFF" : "Transferts ON"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={(user as any).withdrawalsEnabled === false ? "destructive" : "outline"}
+                        onClick={() => toggleWithdrawalsMutation.mutate({ userId: user.id, enabled: (user as any).withdrawalsEnabled === false })}
+                        disabled={toggleWithdrawalsMutation.isPending}
+                        data-testid={`button-toggle-withdrawals-${user.id}`}
+                      >
+                        <ArrowDownLeft className="w-4 h-4 mr-1" />
+                        {(user as any).withdrawalsEnabled === false ? "Retraits OFF" : "Retraits ON"}
+                      </Button>
                       {user.kycStatus === "submitted" ? (
                         <>
                           <Button

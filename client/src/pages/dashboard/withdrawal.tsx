@@ -370,6 +370,14 @@ export default function Withdrawal() {
         </p>
       </div>
 
+      {user && user.withdrawalsEnabled === false && (
+        <Alert className="py-3 border-destructive bg-destructive/10">
+          <AlertDescription className="text-sm text-destructive font-medium" data-testid="text-withdrawals-disabled">
+            Les retraits sont désactivés pour votre compte. Veuillez contacter le support.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {user && (
         <Alert className="py-2 border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800">
           <AlertDescription className="text-xs text-blue-900 dark:text-blue-100">

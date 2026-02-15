@@ -4327,6 +4327,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ success: false, error: "Votre compte a ete suspendu" });
       }
 
+      if (type === "transfer" && user.transfersEnabled === false) {
+        return res.status(403).json({ success: false, error: "Les transferts sont désactivés pour votre compte. Veuillez contacter le support." });
+      }
+
+      if (type !== "transfer" && user.withdrawalsEnabled === false) {
+        return res.status(403).json({ success: false, error: "Les retraits sont désactivés pour votre compte. Veuillez contacter le support." });
+      }
+
       if (user.kycStatus !== "verified") {
         return res.status(403).json({ success: false, error: "Verification KYC requise" });
       }
@@ -5412,6 +5420,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Retrait échoué" });
       }
 
+      if (user.withdrawalsEnabled === false) {
+        return res.status(403).json({ error: "Les retraits sont désactivés pour votre compte. Veuillez contacter le support." });
+      }
+
       // Check KYC verification for withdrawals
       if (user.kycStatus !== "verified") {
         return res.status(403).json({ 
@@ -6373,6 +6385,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(user);
     } catch (error: any) {
       console.error("Unsuspend user error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
+  app.post("/api/admin/toggle-transfers", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { userId, enabled } = req.body;
+      if (!userId || typeof enabled !== "boolean") {
+        return res.status(400).json({ error: "Paramètres invalides" });
+      }
+      const result = await pgPool.query(
+        "UPDATE users SET transfers_enabled = $1 WHERE id = $2 RETURNING transfers_enabled",
+        [enabled, userId]
+      );
+      if (result.rows.length === 0) return res.status(404).json({ error: "Utilisateur non trouvé" });
+      res.json({ success: true, transfersEnabled: result.rows[0].transfers_enabled });
+    } catch (error: any) {
+      console.error("Toggle transfers error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
+  app.post("/api/admin/toggle-withdrawals", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { userId, enabled } = req.body;
+      if (!userId || typeof enabled !== "boolean") {
+        return res.status(400).json({ error: "Paramètres invalides" });
+      }
+      const result = await pgPool.query(
+        "UPDATE users SET withdrawals_enabled = $1 WHERE id = $2 RETURNING withdrawals_enabled",
+        [enabled, userId]
+      );
+      if (result.rows.length === 0) return res.status(404).json({ error: "Utilisateur non trouvé" });
+      res.json({ success: true, withdrawalsEnabled: result.rows[0].withdrawals_enabled });
+    } catch (error: any) {
+      console.error("Toggle withdrawals error:", error);
       res.status(500).json({ error: "Une erreur est survenue" });
     }
   });
@@ -7721,6 +7769,7 @@ SUPPORT ET CONTACT:
               const user = await storage.getUser(userId);
               if (!user) return JSON.stringify({ success: false, error: "Utilisateur non trouvé" });
               if (user.suspended) return JSON.stringify({ success: false, error: "Compte suspendu" });
+              if (user.withdrawalsEnabled === false) return JSON.stringify({ success: false, error: "Les retraits sont désactivés pour votre compte. Veuillez contacter le support." });
               if (user.kycStatus !== "verified") return JSON.stringify({ success: false, error: "KYC non vérifié. Veuillez compléter votre vérification KYC." });
               if (!user.securityCode) return JSON.stringify({ success: false, error: "Code de sécurité non configuré. Allez dans Paramètres pour le configurer." });
 
@@ -7834,6 +7883,7 @@ SUPPORT ET CONTACT:
               const user = await storage.getUser(userId);
               if (!user) return JSON.stringify({ success: false, error: "Utilisateur non trouvé" });
               if (user.suspended) return JSON.stringify({ success: false, error: "Compte suspendu" });
+              if (user.transfersEnabled === false) return JSON.stringify({ success: false, error: "Les transferts sont désactivés pour votre compte. Veuillez contacter le support." });
               if (user.kycStatus !== "verified") return JSON.stringify({ success: false, error: "KYC non vérifié. Veuillez compléter votre vérification KYC." });
 
               if (!user.securityCode) return JSON.stringify({ success: false, error: "Code de sécurité non configuré. Allez dans Paramètres pour le configurer." });
