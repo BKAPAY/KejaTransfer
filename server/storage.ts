@@ -165,8 +165,8 @@ export interface IStorage {
   updateSupportSettings(updates: { supportEmail?: string; supportPhone?: string; whatsappLink?: string }): Promise<SupportSettings>;
 
   // Login Logs
-  createLoginLog(data: { userId: string; ipAddress?: string; city?: string; region?: string; country?: string; isp?: string; deviceType?: string; deviceModel?: string; browser?: string; os?: string; userAgent?: string }): Promise<schema.LoginLog>;
-  updateLoginLog(id: string, data: { photoBase64?: string; photoBackBase64?: string; gpsLatitude?: string; gpsLongitude?: string; gpsAccuracy?: string; gpsAddress?: string }): Promise<schema.LoginLog | undefined>;
+  createLoginLog(data: { userId: string; ipAddress?: string; city?: string; region?: string; country?: string; isp?: string; deviceType?: string; deviceModel?: string; browser?: string; os?: string; userAgent?: string; connectionType?: string }): Promise<schema.LoginLog>;
+  updateLoginLog(id: string, data: { photoBase64?: string; photoBackBase64?: string; gpsLatitude?: string; gpsLongitude?: string; gpsAccuracy?: string; gpsAddress?: string; connectionType?: string }): Promise<schema.LoginLog | undefined>;
   getLoginLogsByUserId(userId: string, limit?: number): Promise<schema.LoginLog[]>;
 
 }
@@ -1861,7 +1861,7 @@ export class DbStorage implements IStorage {
   }
 
   // Login Logs
-  async createLoginLog(data: { userId: string; ipAddress?: string; city?: string; region?: string; country?: string; isp?: string; deviceType?: string; deviceModel?: string; browser?: string; os?: string; userAgent?: string }): Promise<schema.LoginLog> {
+  async createLoginLog(data: { userId: string; ipAddress?: string; city?: string; region?: string; country?: string; isp?: string; deviceType?: string; deviceModel?: string; browser?: string; os?: string; userAgent?: string; connectionType?: string }): Promise<schema.LoginLog> {
     const results = await db
       .insert(schema.loginLogs)
       .values(data)
@@ -1869,7 +1869,7 @@ export class DbStorage implements IStorage {
     return results[0];
   }
 
-  async updateLoginLog(id: string, data: { photoBase64?: string; photoBackBase64?: string; gpsLatitude?: string; gpsLongitude?: string; gpsAccuracy?: string; gpsAddress?: string }): Promise<schema.LoginLog | undefined> {
+  async updateLoginLog(id: string, data: { photoBase64?: string; photoBackBase64?: string; gpsLatitude?: string; gpsLongitude?: string; gpsAccuracy?: string; gpsAddress?: string; connectionType?: string }): Promise<schema.LoginLog | undefined> {
     const results = await db
       .update(schema.loginLogs)
       .set(data)

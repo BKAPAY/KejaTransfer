@@ -189,6 +189,9 @@ async function bootstrapDatabase() {
       await loginLogsClient`
         ALTER TABLE login_logs ADD COLUMN IF NOT EXISTS gps_address TEXT
       `;
+      await loginLogsClient`
+        ALTER TABLE login_logs ADD COLUMN IF NOT EXISTS connection_type TEXT
+      `;
       console.log("✅ Login logs table ready");
     } catch (e) {
       console.error("⚠️ Login logs setup error:", e);

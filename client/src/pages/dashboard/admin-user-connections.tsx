@@ -116,6 +116,9 @@ export default function AdminUserConnections() {
                           <Wifi className="w-3 h-3 text-blue-500 shrink-0" />
                           <span className="text-muted-foreground">Réseau:</span>
                           <span>{networkLoc || "Inconnu"}</span>
+                          {log.connectionType && log.connectionType !== "Inconnu" && (
+                            <Badge variant="outline">{log.connectionType}</Badge>
+                          )}
                         </div>
 
                         {hasGps && (
