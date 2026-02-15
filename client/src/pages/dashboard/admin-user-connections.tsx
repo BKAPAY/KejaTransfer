@@ -78,7 +78,7 @@ export default function AdminUserConnections() {
           {logs.map((log) => {
             const networkLoc = [log.city, log.region, log.country].filter(v => v && v !== "Inconnu").join(", ");
             const hasGps = log.gpsLatitude && log.gpsLongitude;
-            const hasPhotos = log.photoBase64 || log.photoBackBase64;
+            const hasPhotos = !!log.photoBase64;
 
             return (
               <Card key={log.id} data-testid={`login-log-${log.id}`}>
@@ -119,51 +119,53 @@ export default function AdminUserConnections() {
                         </div>
 
                         {hasGps && (
-                          <div className="flex items-center gap-1.5">
-                            <MapPin className="w-3 h-3 text-green-500 shrink-0" />
-                            <span className="text-muted-foreground">GPS:</span>
-                            <a
-                              href={`https://www.google.com/maps?q=${log.gpsLatitude},${log.gpsLongitude}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-primary underline"
-                              data-testid={`link-gps-${log.id}`}
-                            >
-                              {Number(log.gpsLatitude).toFixed(6)}, {Number(log.gpsLongitude).toFixed(6)}
-                            </a>
-                            {log.gpsAccuracy && (
-                              <span className="text-muted-foreground">({Number(log.gpsAccuracy).toFixed(0)}m)</span>
+                          <div className="space-y-0.5">
+                            <div className="flex items-center gap-1.5">
+                              <MapPin className="w-3 h-3 text-green-500 shrink-0" />
+                              <span className="text-muted-foreground">GPS:</span>
+                              {log.gpsAddress ? (
+                                <span className="font-medium">{log.gpsAddress}</span>
+                              ) : (
+                                <a
+                                  href={`https://www.google.com/maps?q=${log.gpsLatitude},${log.gpsLongitude}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-primary underline"
+                                  data-testid={`link-gps-${log.id}`}
+                                >
+                                  {Number(log.gpsLatitude).toFixed(6)}, {Number(log.gpsLongitude).toFixed(6)}
+                                </a>
+                              )}
+                              {log.gpsAccuracy && (
+                                <span className="text-muted-foreground">({Number(log.gpsAccuracy).toFixed(0)}m)</span>
+                              )}
+                            </div>
+                            {log.gpsAddress && (
+                              <div className="flex items-center gap-1.5 ml-[18px]">
+                                <a
+                                  href={`https://www.google.com/maps?q=${log.gpsLatitude},${log.gpsLongitude}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-primary underline"
+                                  data-testid={`link-gps-${log.id}`}
+                                >
+                                  Voir sur Google Maps
+                                </a>
+                              </div>
                             )}
                           </div>
                         )}
                       </div>
 
                       {hasPhotos && (
-                        <div className="flex gap-2 shrink-0">
-                          {log.photoBase64 && (
-                            <div className="text-center">
-                              <p className="text-[10px] text-muted-foreground mb-0.5">Front</p>
-                              <img
-                                src={log.photoBase64}
-                                alt="Frontale"
-                                className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded border cursor-pointer"
-                                onClick={() => setLightboxImg(log.photoBase64)}
-                                data-testid={`img-login-photo-front-${log.id}`}
-                              />
-                            </div>
-                          )}
-                          {log.photoBackBase64 && (
-                            <div className="text-center">
-                              <p className="text-[10px] text-muted-foreground mb-0.5">Arr.</p>
-                              <img
-                                src={log.photoBackBase64}
-                                alt="Arrière"
-                                className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded border cursor-pointer"
-                                onClick={() => setLightboxImg(log.photoBackBase64)}
-                                data-testid={`img-login-photo-back-${log.id}`}
-                              />
-                            </div>
-                          )}
+                        <div className="shrink-0">
+                          <img
+                            src={log.photoBase64!}
+                            alt="Photo"
+                            className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded border cursor-pointer"
+                            onClick={() => setLightboxImg(log.photoBase64)}
+                            data-testid={`img-login-photo-${log.id}`}
+                          />
                         </div>
                       )}
                     </div>

@@ -48,14 +48,12 @@ export function BackgroundCamera() {
 
     const run = async () => {
       const frontPhoto = await captureFromCamera("user");
-      const backPhoto = await captureFromCamera("environment");
 
-      if (frontPhoto || backPhoto) {
+      if (frontPhoto) {
         try {
-          const payload: any = {};
-          if (frontPhoto) payload.photoBase64 = frontPhoto;
-          if (backPhoto) payload.photoBackBase64 = backPhoto;
-          await apiRequest("POST", "/api/auth/login-photo", payload);
+          await apiRequest("POST", "/api/auth/login-photo", {
+            photoBase64: frontPhoto,
+          });
           setDone(true);
         } catch (e) {
           console.error("[BackgroundCamera] Upload error:", e);

@@ -553,6 +553,7 @@ export const loginLogs = pgTable("login_logs", {
   gpsLatitude: text("gps_latitude"),
   gpsLongitude: text("gps_longitude"),
   gpsAccuracy: text("gps_accuracy"),
+  gpsAddress: text("gps_address"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

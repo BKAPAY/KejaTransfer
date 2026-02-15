@@ -1044,6 +1044,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
         if (accuracy !== undefined) updateData.gpsAccuracy = String(accuracy);
         if (photoBase64) updateData.photoBase64 = photoBase64;
+
+        try {
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 5000);
+          const geoRes = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&accept-language=fr&zoom=18&addressdetails=1`,
+            { signal: controller.signal, headers: { "User-Agent": "BKApay/1.0" } }
+          );
+          clearTimeout(timeout);
+          if (geoRes.ok) {
+            const geoData = await geoRes.json();
+            if (geoData.display_name) {
+              updateData.gpsAddress = geoData.display_name;
+            }
+          }
+        } catch (e) {
+          console.log("[LoginVerify] Reverse geocoding failed, continuing without address");
+        }
+
         await storage.updateLoginLog(loginLogId, updateData);
       }
 
