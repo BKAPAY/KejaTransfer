@@ -397,7 +397,7 @@ export default function Dashboard() {
           <Button 
             data-testid="button-transfer"
             className="flex-1 flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white"
-            onClick={() => setLocation("/dashboard/transfer")}
+            onClick={() => { if (user?.transfersEnabled !== false) setLocation("/dashboard/transfer"); }}
           >
             <Send className="h-4 w-4" />
             Transfert
@@ -406,7 +406,7 @@ export default function Dashboard() {
             data-testid="button-withdrawal"
             variant="accent"
             className="flex-1 flex items-center justify-center gap-2"
-            onClick={() => setLocation("/dashboard/withdrawal")}
+            onClick={() => { if (user?.withdrawalsEnabled !== false) setLocation("/dashboard/withdrawal"); }}
           >
             <ArrowUpFromLine className="h-4 w-4" />
             Retrait

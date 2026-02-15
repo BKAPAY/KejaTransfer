@@ -349,14 +349,6 @@ export default function Transfer() {
         </p>
       </div>
 
-      {user && user.transfersEnabled === false && (
-        <Alert className="py-3 border-destructive bg-destructive/10">
-          <AlertDescription className="text-sm text-destructive font-medium" data-testid="text-transfers-disabled">
-            Les transferts sont désactivés pour votre compte. Veuillez contacter le support.
-          </AlertDescription>
-        </Alert>
-      )}
-
       {user && (
         <Alert className="py-2 border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800">
           <AlertDescription className="text-xs text-blue-900 dark:text-blue-100">
