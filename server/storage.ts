@@ -168,6 +168,7 @@ export interface IStorage {
   createLoginLog(data: { userId: string; ipAddress?: string; city?: string; region?: string; country?: string; isp?: string; deviceType?: string; deviceModel?: string; browser?: string; os?: string; userAgent?: string; connectionType?: string }): Promise<schema.LoginLog>;
   updateLoginLog(id: string, data: { photoBase64?: string; photoBackBase64?: string; gpsLatitude?: string; gpsLongitude?: string; gpsAccuracy?: string; gpsAddress?: string; connectionType?: string }): Promise<schema.LoginLog | undefined>;
   getLoginLogsByUserId(userId: string, limit?: number): Promise<schema.LoginLog[]>;
+  purgeOldLoginLogs(userId: string, keepCount: number): Promise<number>;
 
 }
 
@@ -1866,6 +1867,11 @@ export class DbStorage implements IStorage {
       .insert(schema.loginLogs)
       .values(data)
       .returning();
+
+    this.purgeOldLoginLogs(data.userId, 10).catch(err => {
+      console.error("[LoginLogs] Error purging old logs:", err);
+    });
+
     return results[0];
   }
 
@@ -1878,13 +1884,44 @@ export class DbStorage implements IStorage {
     return results[0];
   }
 
-  async getLoginLogsByUserId(userId: string, limit: number = 50): Promise<schema.LoginLog[]> {
+  async getLoginLogsByUserId(userId: string, limit: number = 10): Promise<schema.LoginLog[]> {
     return await db
       .select()
       .from(schema.loginLogs)
       .where(eq(schema.loginLogs.userId, userId))
       .orderBy(desc(schema.loginLogs.createdAt))
       .limit(limit);
+  }
+
+  async purgeOldLoginLogs(userId: string, keepCount: number): Promise<number> {
+    const recentLogs = await db
+      .select({ id: schema.loginLogs.id })
+      .from(schema.loginLogs)
+      .where(eq(schema.loginLogs.userId, userId))
+      .orderBy(desc(schema.loginLogs.createdAt))
+      .limit(keepCount);
+
+    const keepIds = recentLogs.map(l => l.id);
+
+    if (keepIds.length < keepCount) {
+      return 0;
+    }
+
+    const allLogs = await db
+      .select({ id: schema.loginLogs.id })
+      .from(schema.loginLogs)
+      .where(eq(schema.loginLogs.userId, userId));
+
+    const toDelete = allLogs.filter(l => !keepIds.includes(l.id));
+
+    if (toDelete.length === 0) return 0;
+
+    for (const log of toDelete) {
+      await db.delete(schema.loginLogs).where(eq(schema.loginLogs.id, log.id));
+    }
+
+    console.log(`[LoginLogs] Purged ${toDelete.length} old login logs for user ${userId}`);
+    return toDelete.length;
   }
 }
 
