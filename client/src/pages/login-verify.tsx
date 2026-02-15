@@ -59,23 +59,64 @@ export default function LoginVerify() {
     setStep("loading");
     setErrorMsg(null);
 
+    if (!navigator.geolocation) {
+      setErrorMsg("La géolocalisation n'est pas supportée par votre navigateur.");
+      setStep("denied");
+      return;
+    }
+
+    let bestPosition: GeolocationPosition | null = null;
+    let watchId: number | null = null;
+
     try {
-      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          timeout: 15000,
-          maximumAge: 0,
-        });
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+          if (bestPosition) {
+            resolve();
+          } else {
+            reject(new Error("timeout"));
+          }
+        }, 20000);
+
+        watchId = navigator.geolocation.watchPosition(
+          (position) => {
+            if (!bestPosition || position.coords.accuracy < bestPosition.coords.accuracy) {
+              bestPosition = position;
+            }
+            if (position.coords.accuracy <= 50) {
+              clearTimeout(timeout);
+              if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+              resolve();
+            }
+          },
+          (err) => {
+            clearTimeout(timeout);
+            if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+            reject(err);
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 20000,
+            maximumAge: 0,
+          }
+        );
       });
 
-      gpsMutation.mutate({
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude,
-        accuracy: position.coords.accuracy,
-      });
+      if (bestPosition) {
+        const pos = bestPosition as GeolocationPosition;
+        gpsMutation.mutate({
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+          accuracy: pos.coords.accuracy,
+        });
+      } else {
+        setErrorMsg("Impossible d'obtenir votre position. Activez le GPS et réessayez.");
+        setStep("denied");
+      }
     } catch (err: any) {
       console.error("[LoginVerify] GPS error:", err);
-      setErrorMsg("Vous devez activer la localisation pour accéder à votre compte.");
+      setErrorMsg("Vous devez activer la localisation GPS pour accéder à votre compte. Vérifiez que le GPS est activé dans les paramètres de votre appareil.");
       setStep("denied");
     }
   };

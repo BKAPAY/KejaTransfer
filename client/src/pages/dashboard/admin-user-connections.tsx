@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Monitor, Smartphone, Laptop, Globe, MapPin, Wifi, X } from "lucide-react";
+import { ArrowLeft, Monitor, Smartphone, Laptop, Globe, MapPin, Wifi, X, Calendar } from "lucide-react";
 import type { LoginLog, User } from "@shared/schema";
 import { useState } from "react";
 
@@ -25,10 +25,9 @@ export default function AdminUserConnections() {
   });
 
   const getDeviceIcon = (deviceType: string | null) => {
-    if (!deviceType) return <Monitor className="w-4 h-4" />;
-    if (deviceType === "Mobile") return <Smartphone className="w-4 h-4" />;
-    if (deviceType === "Tablette") return <Smartphone className="w-4 h-4" />;
-    return <Laptop className="w-4 h-4" />;
+    if (!deviceType) return <Monitor className="w-4 h-4 shrink-0" />;
+    if (deviceType === "Mobile" || deviceType === "Tablette") return <Smartphone className="w-4 h-4 shrink-0" />;
+    return <Laptop className="w-4 h-4 shrink-0" />;
   };
 
   const formatDate = (date: string | Date) => {
@@ -39,6 +38,7 @@ export default function AdminUserConnections() {
       year: "numeric",
       hour: "2-digit",
       minute: "2-digit",
+      second: "2-digit",
     });
   };
 
@@ -70,99 +70,108 @@ export default function AdminUserConnections() {
       {isLoading ? (
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-32 w-full" />
+            <Skeleton key={i} className="h-24 w-full" />
           ))}
         </div>
       ) : logs && logs.length > 0 ? (
-        <div className="space-y-4">
-          {logs.map((log) => (
-            <Card key={log.id} data-testid={`login-log-${log.id}`}>
-              <CardContent className="p-4 space-y-3">
-                <div className="flex items-start justify-between gap-2 flex-wrap">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {getDeviceIcon(log.deviceType)}
-                    <span className="font-medium text-sm">{log.deviceType || "Inconnu"}</span>
-                    {log.deviceModel && (
-                      <Badge variant="default">{log.deviceModel}</Badge>
-                    )}
-                    <Badge variant="secondary">{log.browser || "Inconnu"}</Badge>
-                    <Badge variant="outline">{log.os || "Inconnu"}</Badge>
-                  </div>
-                  <span className="text-xs text-muted-foreground">{formatDate(log.createdAt)}</span>
-                </div>
+        <div className="space-y-3">
+          {logs.map((log) => {
+            const networkLoc = [log.city, log.region, log.country].filter(v => v && v !== "Inconnu").join(", ");
+            const hasGps = log.gpsLatitude && log.gpsLongitude;
+            const hasPhotos = log.photoBase64 || log.photoBackBase64;
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
-                  <div className="flex items-center gap-2">
-                    <Globe className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                    <span className="text-muted-foreground">IP:</span>
-                    <span className="font-mono text-xs">{log.ipAddress || "Inconnu"}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Wifi className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                    <span className="text-muted-foreground">FAI:</span>
-                    <span>{log.isp || "Inconnu"}</span>
-                  </div>
-
-                  <div className="flex items-center gap-2 sm:col-span-2 p-2 rounded bg-muted/50">
-                    <MapPin className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-                    <span className="text-muted-foreground">Réseau:</span>
-                    <span>{[log.city, log.region, log.country].filter(v => v && v !== "Inconnu").join(", ") || "Inconnu"}</span>
-                  </div>
-
-                  {log.gpsLatitude && log.gpsLongitude && (
-                    <div className="flex items-center gap-2 sm:col-span-2 p-2 rounded bg-green-50 dark:bg-green-950/30">
-                      <MapPin className="w-3.5 h-3.5 text-green-500 shrink-0" />
-                      <span className="text-muted-foreground">GPS exact:</span>
-                      <a
-                        href={`https://www.google.com/maps?q=${log.gpsLatitude},${log.gpsLongitude}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary underline text-xs"
-                        data-testid={`link-gps-${log.id}`}
-                      >
-                        {Number(log.gpsLatitude).toFixed(6)}, {Number(log.gpsLongitude).toFixed(6)}
-                      </a>
-                      {log.gpsAccuracy && (
-                        <span className="text-xs text-muted-foreground">(précision: {Number(log.gpsAccuracy).toFixed(0)}m)</span>
-                      )}
+            return (
+              <Card key={log.id} data-testid={`login-log-${log.id}`}>
+                <CardContent className="p-3 sm:p-4">
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {getDeviceIcon(log.deviceType)}
+                        <span className="text-sm font-medium">{log.deviceType || "Inconnu"}</span>
+                        {log.deviceModel && <Badge variant="default">{log.deviceModel}</Badge>}
+                        <Badge variant="secondary">{log.browser || "?"}</Badge>
+                        <Badge variant="outline">{log.os || "?"}</Badge>
+                      </div>
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground shrink-0">
+                        <Calendar className="w-3 h-3" />
+                        {formatDate(log.createdAt)}
+                      </div>
                     </div>
-                  )}
-                </div>
 
-                {(log.photoBase64 || log.photoBackBase64) && (
-                  <div className="pt-3 border-t">
-                    <p className="text-xs text-muted-foreground mb-2">Photos de connexion:</p>
-                    <div className="flex gap-3 flex-wrap">
-                      {log.photoBase64 && (
-                        <div className="space-y-1">
-                          <p className="text-xs text-muted-foreground">Frontale</p>
-                          <img
-                            src={log.photoBase64}
-                            alt="Photo frontale"
-                            className="w-28 h-28 object-cover rounded-md border cursor-pointer"
-                            onClick={() => setLightboxImg(log.photoBase64)}
-                            data-testid={`img-login-photo-front-${log.id}`}
-                          />
+                    <div className="flex flex-col sm:flex-row sm:items-start gap-2 text-xs">
+                      <div className="flex-1 space-y-1">
+                        <div className="flex items-center gap-1.5">
+                          <Globe className="w-3 h-3 text-muted-foreground shrink-0" />
+                          <span className="text-muted-foreground">IP:</span>
+                          <span className="font-mono">{log.ipAddress || "?"}</span>
+                          {log.isp && log.isp !== "Inconnu" && (
+                            <>
+                              <span className="text-muted-foreground">-</span>
+                              <span>{log.isp}</span>
+                            </>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
+                          <Wifi className="w-3 h-3 text-blue-500 shrink-0" />
+                          <span className="text-muted-foreground">Réseau:</span>
+                          <span>{networkLoc || "Inconnu"}</span>
+                        </div>
+
+                        {hasGps && (
+                          <div className="flex items-center gap-1.5">
+                            <MapPin className="w-3 h-3 text-green-500 shrink-0" />
+                            <span className="text-muted-foreground">GPS:</span>
+                            <a
+                              href={`https://www.google.com/maps?q=${log.gpsLatitude},${log.gpsLongitude}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-primary underline"
+                              data-testid={`link-gps-${log.id}`}
+                            >
+                              {Number(log.gpsLatitude).toFixed(6)}, {Number(log.gpsLongitude).toFixed(6)}
+                            </a>
+                            {log.gpsAccuracy && (
+                              <span className="text-muted-foreground">({Number(log.gpsAccuracy).toFixed(0)}m)</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {hasPhotos && (
+                        <div className="flex gap-2 shrink-0">
+                          {log.photoBase64 && (
+                            <div className="text-center">
+                              <p className="text-[10px] text-muted-foreground mb-0.5">Front</p>
+                              <img
+                                src={log.photoBase64}
+                                alt="Frontale"
+                                className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded border cursor-pointer"
+                                onClick={() => setLightboxImg(log.photoBase64)}
+                                data-testid={`img-login-photo-front-${log.id}`}
+                              />
+                            </div>
+                          )}
+                          {log.photoBackBase64 && (
+                            <div className="text-center">
+                              <p className="text-[10px] text-muted-foreground mb-0.5">Arr.</p>
+                              <img
+                                src={log.photoBackBase64}
+                                alt="Arrière"
+                                className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded border cursor-pointer"
+                                onClick={() => setLightboxImg(log.photoBackBase64)}
+                                data-testid={`img-login-photo-back-${log.id}`}
+                              />
+                            </div>
+                          )}
                         </div>
                       )}
-                      {log.photoBackBase64 && (
-                        <div className="space-y-1">
-                          <p className="text-xs text-muted-foreground">Arrière</p>
-                          <img
-                            src={log.photoBackBase64}
-                            alt="Photo arrière"
-                            className="w-28 h-28 object-cover rounded-md border cursor-pointer"
-                            onClick={() => setLightboxImg(log.photoBackBase64)}
-                            data-testid={`img-login-photo-back-${log.id}`}
-                          />
-                        </div>
-                      )}
                     </div>
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       ) : (
         <div className="text-center py-12">
