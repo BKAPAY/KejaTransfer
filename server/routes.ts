@@ -13,6 +13,7 @@ import { validatePhoneOperator } from "@shared/phone-utils";
 import { randomUUID } from "crypto";
 import { calculateIncomingFee, calculateOutgoingFee, calculateCustomerPaysFee, getFeeFromDatabase, getDynamicFees, getDynamicOutgoingFees, getActiveProviderForCountry, getActivePayoutProviderForCountry } from "./utils/fees";
 import { sendPaymentCallback } from "./utils/callback";
+import { recordLoginLog } from "./utils/login-tracker";
 import { 
   SOFTPAY_OPERATORS, 
   getOperatorKey, 
@@ -884,6 +885,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!tfaEnabled || user.isAdmin) {
         req.session.userId = user.id;
         console.log(`[Login] ${user.email} connecté directement (2FA disabled: ${!tfaEnabled}, isAdmin: ${user.isAdmin})`);
+        recordLoginLog(req, user.id);
         return res.json({
           success: true,
           message: "Connexion réussie",
@@ -976,6 +978,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       resetRateLimit(`code:${email.toLowerCase()}`);
 
       req.session.userId = user.id;
+      recordLoginLog(req, user.id);
       res.json({ success: true, user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName } });
     } catch (error: any) {
       console.error("[Login] Error:", error);
@@ -6291,6 +6294,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Toggle emali error:", error);
       res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
+  // Admin - Get login logs for a user
+  app.get("/api/admin/login-logs/:userId", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { userId } = req.params;
+      const logs = await storage.getLoginLogsByUserId(userId, 100);
+      res.json(logs);
+    } catch (error: any) {
+      console.error("Get login logs error:", error);
+      res.status(500).json({ error: "Erreur lors de la récupération des logs" });
     }
   });
 

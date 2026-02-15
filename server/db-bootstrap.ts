@@ -147,6 +147,32 @@ async function bootstrapDatabase() {
     }
     await settingsClient.end();
 
+    // Step 6b: Ensure login_logs table exists
+    console.log("⚙️ Ensuring login_logs table exists...");
+    const loginLogsClient = postgres(DATABASE_URL);
+    try {
+      await loginLogsClient`
+        CREATE TABLE IF NOT EXISTS login_logs (
+          id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+          user_id VARCHAR NOT NULL REFERENCES users(id),
+          ip_address TEXT,
+          city TEXT,
+          region TEXT,
+          country TEXT,
+          isp TEXT,
+          device_type TEXT,
+          browser TEXT,
+          os TEXT,
+          user_agent TEXT,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `;
+      console.log("✅ Login logs table ready");
+    } catch (e) {
+      console.error("⚠️ Login logs setup error:", e);
+    }
+    await loginLogsClient.end();
+
     // Step 7: Ensure primary admin exists
     console.log("👤 Ensuring primary admin exists...");
     const seedClient = postgres(DATABASE_URL);

@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Users, Shield, Trash2, Plus, Minus, History, Link as LinkIcon, Store, Key, User as UserIcon, Check, X, FileCheck, AlertCircle, Unlock, Lock, Clock, CheckCircle, XCircle, ArrowDownLeft, ArrowUpRight, Loader2 } from "lucide-react";
+import { Users, Shield, Trash2, Plus, Minus, History, Link as LinkIcon, Store, Key, User as UserIcon, Check, X, FileCheck, AlertCircle, Unlock, Lock, Clock, CheckCircle, XCircle, ArrowDownLeft, ArrowUpRight, Loader2, Monitor } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
@@ -31,6 +31,7 @@ import {
   MerchantLinksDialog,
   ApiKeysDialog,
   ProfileDialog,
+  LoginLogsDialog,
 } from "./management-details";
 import { useLocation } from "wouter";
 
@@ -59,6 +60,7 @@ export default function Management() {
   const [merchantLinksViewUserId, setMerchantLinksViewUserId] = useState<string | null>(null);
   const [apiKeysViewUserId, setApiKeysViewUserId] = useState<string | null>(null);
   const [profileViewUserId, setProfileViewUserId] = useState<string | null>(null);
+  const [loginLogsViewUserId, setLoginLogsViewUserId] = useState<string | null>(null);
 
   const { data: allUsers, isLoading: usersLoading, refetch: refetchUsers } = useQuery<User[]>({
     queryKey: ["/api/admin/users"],
@@ -591,6 +593,15 @@ export default function Management() {
                         <Key className="w-4 h-4 mr-1" />
                         API
                       </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setLoginLogsViewUserId(user.id)}
+                        data-testid={`button-view-login-logs-${user.id}`}
+                      >
+                        <Monitor className="w-4 h-4 mr-1" />
+                        Connexions
+                      </Button>
                     </div>
 
                     {/* Actions */}
@@ -1081,6 +1092,9 @@ export default function Management() {
       
       {/* API Keys Dialog */}
       {apiKeysViewUserId && <ApiKeysDialog userId={apiKeysViewUserId} onOpenChange={() => setApiKeysViewUserId(null)} />}
+
+      {/* Login Logs Dialog */}
+      {loginLogsViewUserId && <LoginLogsDialog userId={loginLogsViewUserId} onOpenChange={() => setLoginLogsViewUserId(null)} />}
     </div>
   );
 }

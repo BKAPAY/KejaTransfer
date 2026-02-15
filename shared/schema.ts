@@ -534,5 +534,23 @@ export const PAYOUT_OPERATORS: Record<string, string[]> = {
   GM: ["afrimoney", "qmoney", "wave"],
 };
 
+// Login logs for admin connection tracking
+export const loginLogs = pgTable("login_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  ipAddress: text("ip_address"),
+  city: text("city"),
+  region: text("region"),
+  country: text("country"),
+  isp: text("isp"),
+  deviceType: text("device_type"),
+  browser: text("browser"),
+  os: text("os"),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type LoginLog = typeof loginLogs.$inferSelect;
+
 // Chat schema for EMALI AI
 export * from "./models/chat";

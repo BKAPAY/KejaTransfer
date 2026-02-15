@@ -6,11 +6,11 @@ import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Copy, Eye, EyeOff, Search, X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { Copy, Eye, EyeOff, Search, X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Monitor, Smartphone, Laptop, Globe, MapPin, Wifi } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
-import type { User, Transaction, PaymentLink, MerchantLink, ApiKey } from "@shared/schema";
+import type { User, Transaction, PaymentLink, MerchantLink, ApiKey, LoginLog } from "@shared/schema";
 
 const ITEMS_PER_PAGE_OPTIONS = [10, 20, 50, 100];
 
@@ -754,6 +754,100 @@ export function ProfileDialog({ userId, onOpenChange }: { userId: string; onOpen
             </div>
           </div>
         ) : null}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Login Logs Dialog Component
+export function LoginLogsDialog({ userId, onOpenChange }: { userId: string; onOpenChange: () => void }) {
+  const { data: logs, isLoading } = useQuery<LoginLog[]>({
+    queryKey: [`/api/admin/login-logs/${userId}`],
+  });
+
+  const getDeviceIcon = (deviceType: string | null) => {
+    if (!deviceType) return <Monitor className="w-4 h-4" />;
+    if (deviceType === "Mobile") return <Smartphone className="w-4 h-4" />;
+    if (deviceType === "Tablette") return <Smartphone className="w-4 h-4" />;
+    return <Laptop className="w-4 h-4" />;
+  };
+
+  const formatDate = (date: string | Date) => {
+    const d = new Date(date);
+    return d.toLocaleDateString("fr-FR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  return (
+    <Dialog open={true} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[85vh]">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2" data-testid="dialog-title-login-logs">
+            <Monitor className="w-5 h-5" />
+            Historique des connexions
+          </DialogTitle>
+        </DialogHeader>
+        <ScrollArea className="max-h-[65vh]">
+          {isLoading ? (
+            <div className="space-y-3 p-2">
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-24 w-full" />
+              ))}
+            </div>
+          ) : logs && logs.length > 0 ? (
+            <div className="space-y-3 p-2">
+              {logs.map((log) => (
+                <Card key={log.id} data-testid={`login-log-${log.id}`}>
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between gap-2 flex-wrap mb-2">
+                      <div className="flex items-center gap-2">
+                        {getDeviceIcon(log.deviceType)}
+                        <span className="font-medium text-sm">{log.deviceType || "Inconnu"}</span>
+                        <Badge variant="secondary">{log.browser || "Inconnu"}</Badge>
+                        <Badge variant="outline">{log.os || "Inconnu"}</Badge>
+                      </div>
+                      <span className="text-xs text-muted-foreground">{formatDate(log.createdAt)}</span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                      <div className="flex items-center gap-2">
+                        <Globe className="w-3.5 h-3.5 text-muted-foreground" />
+                        <span className="text-muted-foreground">IP:</span>
+                        <span className="font-mono text-xs">{log.ipAddress || "Inconnu"}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <MapPin className="w-3.5 h-3.5 text-muted-foreground" />
+                        <span className="text-muted-foreground">Lieu:</span>
+                        <span>{[log.city, log.country].filter(Boolean).join(", ") || "Inconnu"}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Wifi className="w-3.5 h-3.5 text-muted-foreground" />
+                        <span className="text-muted-foreground">FAI:</span>
+                        <span>{log.isp || "Inconnu"}</span>
+                      </div>
+                      {log.region && log.region !== "Inconnu" && (
+                        <div className="flex items-center gap-2">
+                          <MapPin className="w-3.5 h-3.5 text-muted-foreground" />
+                          <span className="text-muted-foreground">Région:</span>
+                          <span>{log.region}</span>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <Monitor className="w-12 h-12 mx-auto text-muted-foreground/50 mb-2" />
+              <p className="text-muted-foreground">Aucune connexion enregistrée</p>
+            </div>
+          )}
+        </ScrollArea>
       </DialogContent>
     </Dialog>
   );

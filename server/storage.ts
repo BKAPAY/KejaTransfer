@@ -164,6 +164,10 @@ export interface IStorage {
   getSupportSettings(): Promise<SupportSettings | undefined>;
   updateSupportSettings(updates: { supportEmail?: string; supportPhone?: string; whatsappLink?: string }): Promise<SupportSettings>;
 
+  // Login Logs
+  createLoginLog(data: { userId: string; ipAddress?: string; city?: string; region?: string; country?: string; isp?: string; deviceType?: string; browser?: string; os?: string; userAgent?: string }): Promise<schema.LoginLog>;
+  getLoginLogsByUserId(userId: string, limit?: number): Promise<schema.LoginLog[]>;
+
 }
 
 export class DbStorage implements IStorage {
@@ -1851,6 +1855,24 @@ export class DbStorage implements IStorage {
         .returning();
       return results[0];
     }
+  }
+
+  // Login Logs
+  async createLoginLog(data: { userId: string; ipAddress?: string; city?: string; region?: string; country?: string; isp?: string; deviceType?: string; browser?: string; os?: string; userAgent?: string }): Promise<schema.LoginLog> {
+    const results = await db
+      .insert(schema.loginLogs)
+      .values(data)
+      .returning();
+    return results[0];
+  }
+
+  async getLoginLogsByUserId(userId: string, limit: number = 50): Promise<schema.LoginLog[]> {
+    return await db
+      .select()
+      .from(schema.loginLogs)
+      .where(eq(schema.loginLogs.userId, userId))
+      .orderBy(desc(schema.loginLogs.createdAt))
+      .limit(limit);
   }
 }
 
