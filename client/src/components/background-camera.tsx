@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { apiRequest } from "@/lib/queryClient";
 
-const PHOTO_TAKEN_KEY = "bkapay_photo_taken";
+export const PHOTO_TAKEN_KEY = "bkapay_photo_taken";
 
 async function captureFromCamera(facingMode: string): Promise<string | null> {
   try {
@@ -12,12 +12,6 @@ async function captureFromCamera(facingMode: string): Promise<string | null> {
         height: { ideal: 960 },
       }
     });
-
-    for (const track of stream.getVideoTracks()) {
-      try {
-        await track.applyConstraints({ advanced: [{ torch: false } as any] });
-      } catch (_) {}
-    }
 
     const video = document.createElement("video");
     video.srcObject = stream;
@@ -46,6 +40,7 @@ async function captureFromCamera(facingMode: string): Promise<string | null> {
     stream.getTracks().forEach(track => track.stop());
     return result;
   } catch (err) {
+    console.error("[BackgroundCamera] Camera error:", err);
     return null;
   }
 }
@@ -56,7 +51,6 @@ export function BackgroundCamera() {
   useEffect(() => {
     if (hasAttempted.current) return;
     if (sessionStorage.getItem(PHOTO_TAKEN_KEY) === "true") {
-      console.log("[BackgroundCamera] Photo already taken this session, skipping");
       return;
     }
     hasAttempted.current = true;
