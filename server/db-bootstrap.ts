@@ -125,7 +125,29 @@ async function bootstrapDatabase() {
 
     await client.end();
 
-    // Step 6: Ensure primary admin exists
+    // Step 6: Ensure platform_settings table exists
+    console.log("⚙️ Ensuring platform_settings table exists...");
+    const settingsClient = postgres(DATABASE_URL);
+    try {
+      await settingsClient`
+        CREATE TABLE IF NOT EXISTS platform_settings (
+          key TEXT PRIMARY KEY,
+          value TEXT NOT NULL,
+          updated_at TIMESTAMP DEFAULT NOW()
+        )
+      `;
+      await settingsClient`
+        INSERT INTO platform_settings (key, value)
+        VALUES ('emali_enabled', 'true')
+        ON CONFLICT (key) DO NOTHING
+      `;
+      console.log("✅ Platform settings table ready");
+    } catch (e) {
+      console.error("⚠️ Platform settings setup error:", e);
+    }
+    await settingsClient.end();
+
+    // Step 7: Ensure primary admin exists
     console.log("👤 Ensuring primary admin exists...");
     const seedClient = postgres(DATABASE_URL);
     const seedDb = drizzle(seedClient);
