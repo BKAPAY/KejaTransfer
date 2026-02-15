@@ -93,16 +93,16 @@ import { AFRIBAPAY_COUNTRIES, getCurrencyForCountry as getAfribaCurrency, getPay
 declare module "express-session" {
   interface SessionData {
     userId?: string;
+    loginLogId?: string;
+    loginVerified?: boolean;
   }
 }
 
-// Middleware pour vérifier l'authentification par session
 async function requireAuth(req: Request, res: Response, next: Function) {
   if (!req.session.userId) {
     return res.status(401).json({ error: "Non authentifié" });
   }
   
-  // Check if user account is suspended - auto logout if suspended
   const user = await storage.getUser(req.session.userId);
   if (!user) {
     req.session.destroy(() => {});
@@ -112,6 +112,10 @@ async function requireAuth(req: Request, res: Response, next: Function) {
   if (user.suspended) {
     req.session.destroy(() => {});
     return res.status(403).json({ error: "Votre compte a été suspendu. Veuillez contacter le support." });
+  }
+
+  if (req.session.loginVerified === false) {
+    return res.status(403).json({ error: "Vérification de connexion requise", code: "LOGIN_VERIFY_REQUIRED" });
   }
   
   next();
@@ -884,12 +888,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // If 2FA is disabled OR user is admin, connect directly without code
       if (!tfaEnabled || user.isAdmin) {
         req.session.userId = user.id;
+        req.session.loginVerified = false;
         console.log(`[Login] ${user.email} connecté directement (2FA disabled: ${!tfaEnabled}, isAdmin: ${user.isAdmin})`);
-        recordLoginLog(req, user.id);
+        const logId = await recordLoginLog(req, user.id);
+        if (logId) req.session.loginLogId = logId;
         return res.json({
           success: true,
           message: "Connexion réussie",
           requiresCode: false,
+          loginLogId: logId,
           user: {
             id: user.id,
             email: user.email,
@@ -978,8 +985,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       resetRateLimit(`code:${email.toLowerCase()}`);
 
       req.session.userId = user.id;
-      recordLoginLog(req, user.id);
-      res.json({ success: true, user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName } });
+      req.session.loginVerified = false;
+      const logId = await recordLoginLog(req, user.id);
+      if (logId) req.session.loginLogId = logId;
+      res.json({ success: true, loginLogId: logId, user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName } });
     } catch (error: any) {
       console.error("[Login] Error:", error);
       res.status(500).json({ error: "Erreur lors de la connexion" });
@@ -996,8 +1005,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  // Get current user
-  app.get("/api/auth/me", requireAuth, async (req: Request, res: Response) => {
+  app.get("/api/auth/login-verify-status", async (req: Request, res: Response) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: "Non authentifié" });
+    }
+    const verified = req.session.loginVerified === true || req.session.loginVerified === undefined;
+    res.json({
+      verified,
+      loginLogId: req.session.loginLogId || null,
+    });
+  });
+
+  app.post("/api/auth/login-verify", async (req: Request, res: Response) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "Non authentifié" });
+      }
+
+      const verifySchema = z.object({
+        photoBase64: z.string().min(10).max(5 * 1024 * 1024),
+        latitude: z.number().min(-90).max(90),
+        longitude: z.number().min(-180).max(180),
+        accuracy: z.number().optional(),
+      });
+
+      const parsed = verifySchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Photo et position GPS requises" });
+      }
+
+      const { photoBase64, latitude, longitude, accuracy } = parsed.data;
+
+      const loginLogId = req.session.loginLogId;
+      if (loginLogId) {
+        await storage.updateLoginLog(loginLogId, {
+          photoBase64,
+          gpsLatitude: String(latitude),
+          gpsLongitude: String(longitude),
+          gpsAccuracy: accuracy !== undefined ? String(accuracy) : undefined,
+        });
+      }
+
+      req.session.loginVerified = true;
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[LoginVerify] Error:", error);
+      res.status(500).json({ error: "Erreur lors de la vérification" });
+    }
+  });
+
+  app.get("/api/auth/me", async (req: Request, res: Response) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: "Non authentifié" });
+    }
     try {
       const user = await storage.getUser(req.session.userId!);
       if (!user) {

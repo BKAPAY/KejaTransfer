@@ -54,6 +54,7 @@ import DocumentationVersion from "@/pages/documentation-version";
 import DocumentationRedirect from "@/pages/documentation-redirect";
 import DocumentationInline from "@/pages/documentation-inline";
 import ForgotPassword from "@/pages/forgot-password";
+import LoginVerify from "@/pages/login-verify";
 import { CURRENT_VERSION } from "@/lib/doc-versions";
 import { COUNTRIES } from "@shared/schema";
 import type { User } from "@shared/schema";
@@ -87,12 +88,22 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
     }).format(amount);
   };
 
-  // Si pas authentifié, rediriger vers login
+  const { data: verifyStatus } = useQuery<{ verified: boolean }>({
+    queryKey: ["/api/auth/login-verify-status"],
+    enabled: !isLoading && !error,
+  });
+
   useEffect(() => {
     if (!isLoading && error && location.startsWith("/dashboard")) {
       setLocation("/login");
     }
   }, [isLoading, error, location, setLocation]);
+
+  useEffect(() => {
+    if (verifyStatus && verifyStatus.verified === false && location.startsWith("/dashboard")) {
+      setLocation("/login-verify");
+    }
+  }, [verifyStatus, location, setLocation]);
 
   // En attente de vérification d'auth
   if (isLoading) {
@@ -217,6 +228,7 @@ function Router() {
       </Route>
       <Route path="/signup" component={Signup} />
       <Route path="/login" component={Login} />
+      <Route path="/login-verify" component={LoginVerify} />
       <Route path="/forgot-password" component={ForgotPassword} />
       <Route path="/terms" component={Terms} />
       <Route path="/privacy" component={Privacy} />

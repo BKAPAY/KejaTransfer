@@ -129,15 +129,10 @@ export default function Login() {
     onSuccess: async (response: any, data) => {
       console.log("[Login] Response received:", JSON.stringify(response));
       
-      // If 2FA is disabled or user is admin - they are logged in directly
       if (response.requiresCode === false || !response.requiresCode) {
-        console.log("[Login] Direct login - redirecting to dashboard");
+        console.log("[Login] Direct login - redirecting to verification");
         await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
-        toast({
-          title: "Connexion reussie",
-          description: "Bienvenue sur BKApay",
-        });
-        setLocation("/dashboard");
+        setLocation("/login-verify");
         return;
       }
       
@@ -169,16 +164,11 @@ export default function Login() {
       return response;
     },
     onSuccess: async () => {
-      // Clear all login state on successful login
       if (credentials?.email) {
         clearStorage(credentials.email);
       }
       await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
-      toast({
-        title: "Connexion réussie",
-        description: "Bienvenue sur BKApay",
-      });
-      setLocation("/dashboard");
+      setLocation("/login-verify");
     },
     onError: (error: any) => {
       toast({

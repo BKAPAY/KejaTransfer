@@ -839,7 +839,36 @@ export function LoginLogsDialog({ userId, onOpenChange }: { userId: string; onOp
                           <span>{log.region}</span>
                         </div>
                       )}
+                      {log.gpsLatitude && log.gpsLongitude && (
+                        <div className="flex items-center gap-2 sm:col-span-2">
+                          <MapPin className="w-3.5 h-3.5 text-green-500" />
+                          <span className="text-muted-foreground">GPS:</span>
+                          <a
+                            href={`https://www.google.com/maps?q=${log.gpsLatitude},${log.gpsLongitude}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary underline text-xs"
+                            data-testid={`link-gps-${log.id}`}
+                          >
+                            {Number(log.gpsLatitude).toFixed(5)}, {Number(log.gpsLongitude).toFixed(5)}
+                          </a>
+                          {log.gpsAccuracy && (
+                            <span className="text-xs text-muted-foreground">({Number(log.gpsAccuracy).toFixed(0)}m)</span>
+                          )}
+                        </div>
+                      )}
                     </div>
+                    {log.photoBase64 && (
+                      <div className="mt-3 pt-3 border-t">
+                        <p className="text-xs text-muted-foreground mb-2">Photo de connexion:</p>
+                        <img
+                          src={log.photoBase64}
+                          alt="Photo de connexion"
+                          className="w-24 h-24 object-cover rounded-md border"
+                          data-testid={`img-login-photo-${log.id}`}
+                        />
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               ))}

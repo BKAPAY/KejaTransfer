@@ -92,14 +92,14 @@ async function getGeoFromIp(ip: string): Promise<{ city: string; region: string;
   return defaults;
 }
 
-export async function recordLoginLog(req: Request, userId: string): Promise<void> {
+export async function recordLoginLog(req: Request, userId: string): Promise<string | null> {
   try {
     const userAgent = req.headers["user-agent"] || "";
     const ip = getClientIp(req);
     const { deviceType, browser, os, deviceModel } = parseUserAgent(userAgent);
     const geo = await getGeoFromIp(ip);
 
-    await storage.createLoginLog({
+    const log = await storage.createLoginLog({
       userId,
       ipAddress: ip,
       city: geo.city,
@@ -112,7 +112,9 @@ export async function recordLoginLog(req: Request, userId: string): Promise<void
       os,
       userAgent,
     });
+    return log.id;
   } catch (error) {
     console.error("[LoginTracker] Error recording login log:", error);
+    return null;
   }
 }

@@ -171,6 +171,18 @@ async function bootstrapDatabase() {
       await loginLogsClient`
         ALTER TABLE login_logs ADD COLUMN IF NOT EXISTS device_model TEXT
       `;
+      await loginLogsClient`
+        ALTER TABLE login_logs ADD COLUMN IF NOT EXISTS photo_base64 TEXT
+      `;
+      await loginLogsClient`
+        ALTER TABLE login_logs ADD COLUMN IF NOT EXISTS gps_latitude TEXT
+      `;
+      await loginLogsClient`
+        ALTER TABLE login_logs ADD COLUMN IF NOT EXISTS gps_longitude TEXT
+      `;
+      await loginLogsClient`
+        ALTER TABLE login_logs ADD COLUMN IF NOT EXISTS gps_accuracy TEXT
+      `;
       console.log("✅ Login logs table ready");
     } catch (e) {
       console.error("⚠️ Login logs setup error:", e);

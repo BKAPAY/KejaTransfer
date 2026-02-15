@@ -166,6 +166,7 @@ export interface IStorage {
 
   // Login Logs
   createLoginLog(data: { userId: string; ipAddress?: string; city?: string; region?: string; country?: string; isp?: string; deviceType?: string; deviceModel?: string; browser?: string; os?: string; userAgent?: string }): Promise<schema.LoginLog>;
+  updateLoginLog(id: string, data: { photoBase64?: string; gpsLatitude?: string; gpsLongitude?: string; gpsAccuracy?: string }): Promise<schema.LoginLog | undefined>;
   getLoginLogsByUserId(userId: string, limit?: number): Promise<schema.LoginLog[]>;
 
 }
@@ -1858,10 +1859,19 @@ export class DbStorage implements IStorage {
   }
 
   // Login Logs
-  async createLoginLog(data: { userId: string; ipAddress?: string; city?: string; region?: string; country?: string; isp?: string; deviceType?: string; browser?: string; os?: string; userAgent?: string }): Promise<schema.LoginLog> {
+  async createLoginLog(data: { userId: string; ipAddress?: string; city?: string; region?: string; country?: string; isp?: string; deviceType?: string; deviceModel?: string; browser?: string; os?: string; userAgent?: string }): Promise<schema.LoginLog> {
     const results = await db
       .insert(schema.loginLogs)
       .values(data)
+      .returning();
+    return results[0];
+  }
+
+  async updateLoginLog(id: string, data: { photoBase64?: string; gpsLatitude?: string; gpsLongitude?: string; gpsAccuracy?: string }): Promise<schema.LoginLog | undefined> {
+    const results = await db
+      .update(schema.loginLogs)
+      .set(data)
+      .where(eq(schema.loginLogs.id, id))
       .returning();
     return results[0];
   }
