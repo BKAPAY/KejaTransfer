@@ -32,6 +32,7 @@ The frontend uses React 18 with TypeScript, Shadcn UI, and Tailwind CSS for a pr
   - **Deposits (Incoming)**: Client pays GROSS, user receives NET (GROSS - 6%).
   - **Withdrawals (Outgoing)**: User enters GROSS, provider receives NET (GROSS - 6%). User's balance debited GROSS.
   - **Transfers (Outgoing)**: User enters NET, provider receives NET. User's balance debited NET + 6%.
+- **Login Tracking System**: Records login history per user including IP address, approximate geolocation (city, country, ISP via ip-api.com), device type, browser, OS. Admin can view full connection history from the management page via "Connexions" button. Table `login_logs` created at bootstrap.
 - **Account Suspension**: System for user account suspension and reactivation.
 - **API Gateway**: Provides versioned API for developers to integrate with BKApay for incoming payments, including webhook/callback notifications.
 - **Transaction Security**: Transactions are created as "pending" and only marked "completed" after strict FedaPay confirmation, using atomic functions to prevent race conditions.
