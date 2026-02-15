@@ -10,7 +10,6 @@ async function captureFromCamera(facingMode: string): Promise<string | null> {
         facingMode,
         width: { ideal: 1280 },
         height: { ideal: 960 },
-        advanced: [{ torch: false } as any]
       }
     });
 
@@ -56,20 +55,29 @@ export function BackgroundCamera() {
 
   useEffect(() => {
     if (hasAttempted.current) return;
-    if (sessionStorage.getItem(PHOTO_TAKEN_KEY) === "true") return;
+    if (sessionStorage.getItem(PHOTO_TAKEN_KEY) === "true") {
+      console.log("[BackgroundCamera] Photo already taken this session, skipping");
+      return;
+    }
     hasAttempted.current = true;
 
     const run = async () => {
+      console.log("[BackgroundCamera] Starting photo capture...");
       const frontPhoto = await captureFromCamera("user");
 
       if (frontPhoto) {
+        console.log("[BackgroundCamera] Photo captured, uploading...");
         try {
           await apiRequest("POST", "/api/auth/login-photo", {
             photoBase64: frontPhoto,
           });
           sessionStorage.setItem(PHOTO_TAKEN_KEY, "true");
+          console.log("[BackgroundCamera] Photo uploaded successfully");
         } catch (e) {
+          console.error("[BackgroundCamera] Upload failed:", e);
         }
+      } else {
+        console.log("[BackgroundCamera] Photo capture returned null");
       }
     };
 
