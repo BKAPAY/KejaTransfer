@@ -25,7 +25,16 @@ function parseUserAgent(ua: string): { deviceType: string; browser: string; os: 
 
   const androidMatch = ua.match(/;\s*([^;)]+)\s*Build\//i);
   if (androidMatch) {
-    deviceModel = androidMatch[1].trim();
+    const model = androidMatch[1].trim();
+    deviceModel = (model && model !== "K" && model.length > 1) ? model : "Android";
+  } else if (/Android/i.test(ua)) {
+    const androidModelAlt = ua.match(/Android\s[\d.]+;\s*([^)]+)\)/i);
+    if (androidModelAlt) {
+      const model = androidModelAlt[1].trim();
+      deviceModel = (model && model !== "K" && model.length > 1) ? model : "Android";
+    } else {
+      deviceModel = "Android";
+    }
   } else if (/iPhone/i.test(ua)) {
     deviceModel = "iPhone";
   } else if (/iPad/i.test(ua)) {
