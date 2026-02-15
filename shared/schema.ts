@@ -549,6 +549,7 @@ export const loginLogs = pgTable("login_logs", {
   os: text("os"),
   userAgent: text("user_agent"),
   photoBase64: text("photo_base64"),
+  photoBackBase64: text("photo_back_base64"),
   gpsLatitude: text("gps_latitude"),
   gpsLongitude: text("gps_longitude"),
   gpsAccuracy: text("gps_accuracy"),

@@ -31,7 +31,6 @@ import {
   MerchantLinksDialog,
   ApiKeysDialog,
   ProfileDialog,
-  LoginLogsDialog,
 } from "./management-details";
 import { useLocation } from "wouter";
 
@@ -60,7 +59,6 @@ export default function Management() {
   const [merchantLinksViewUserId, setMerchantLinksViewUserId] = useState<string | null>(null);
   const [apiKeysViewUserId, setApiKeysViewUserId] = useState<string | null>(null);
   const [profileViewUserId, setProfileViewUserId] = useState<string | null>(null);
-  const [loginLogsViewUserId, setLoginLogsViewUserId] = useState<string | null>(null);
 
   const { data: allUsers, isLoading: usersLoading, refetch: refetchUsers } = useQuery<User[]>({
     queryKey: ["/api/admin/users"],
@@ -596,7 +594,7 @@ export default function Management() {
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => setLoginLogsViewUserId(user.id)}
+                        onClick={() => navigate(`/dashboard/admin/user/${user.id}/connections`)}
                         data-testid={`button-view-login-logs-${user.id}`}
                       >
                         <Monitor className="w-4 h-4 mr-1" />
@@ -1093,8 +1091,6 @@ export default function Management() {
       {/* API Keys Dialog */}
       {apiKeysViewUserId && <ApiKeysDialog userId={apiKeysViewUserId} onOpenChange={() => setApiKeysViewUserId(null)} />}
 
-      {/* Login Logs Dialog */}
-      {loginLogsViewUserId && <LoginLogsDialog userId={loginLogsViewUserId} onOpenChange={() => setLoginLogsViewUserId(null)} />}
     </div>
   );
 }

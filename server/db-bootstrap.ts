@@ -175,6 +175,9 @@ async function bootstrapDatabase() {
         ALTER TABLE login_logs ADD COLUMN IF NOT EXISTS photo_base64 TEXT
       `;
       await loginLogsClient`
+        ALTER TABLE login_logs ADD COLUMN IF NOT EXISTS photo_back_base64 TEXT
+      `;
+      await loginLogsClient`
         ALTER TABLE login_logs ADD COLUMN IF NOT EXISTS gps_latitude TEXT
       `;
       await loginLogsClient`

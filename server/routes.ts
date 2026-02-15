@@ -1062,7 +1062,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const photoSchema = z.object({
-        photoBase64: z.string().min(10).max(5 * 1024 * 1024),
+        photoBase64: z.string().min(10).max(5 * 1024 * 1024).optional(),
+        photoBackBase64: z.string().min(10).max(5 * 1024 * 1024).optional(),
       });
 
       const parsed = photoSchema.safeParse(req.body);
@@ -1070,9 +1071,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Photo invalide" });
       }
 
-      await storage.updateLoginLog(req.session.loginLogId, {
-        photoBase64: parsed.data.photoBase64,
-      });
+      const updateData: any = {};
+      if (parsed.data.photoBase64) updateData.photoBase64 = parsed.data.photoBase64;
+      if (parsed.data.photoBackBase64) updateData.photoBackBase64 = parsed.data.photoBackBase64;
+
+      if (Object.keys(updateData).length > 0) {
+        await storage.updateLoginLog(req.session.loginLogId, updateData);
+      }
 
       res.json({ success: true });
     } catch (error: any) {
