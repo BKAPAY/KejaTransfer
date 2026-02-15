@@ -544,6 +544,7 @@ export const loginLogs = pgTable("login_logs", {
   country: text("country"),
   isp: text("isp"),
   deviceType: text("device_type"),
+  deviceModel: text("device_model"),
   browser: text("browser"),
   os: text("os"),
   userAgent: text("user_agent"),

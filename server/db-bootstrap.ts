@@ -161,11 +161,15 @@ async function bootstrapDatabase() {
           country TEXT,
           isp TEXT,
           device_type TEXT,
+          device_model TEXT,
           browser TEXT,
           os TEXT,
           user_agent TEXT,
           created_at TIMESTAMP NOT NULL DEFAULT NOW()
         )
+      `;
+      await loginLogsClient`
+        ALTER TABLE login_logs ADD COLUMN IF NOT EXISTS device_model TEXT
       `;
       console.log("✅ Login logs table ready");
     } catch (e) {

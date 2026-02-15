@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Copy, Eye, EyeOff, Search, X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Monitor, Smartphone, Laptop, Globe, MapPin, Wifi } from "lucide-react";
+import { Copy, Eye, EyeOff, Search, X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Monitor, Smartphone, Laptop, Globe, MapPin, Wifi, TabletSmartphone } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
@@ -805,9 +805,12 @@ export function LoginLogsDialog({ userId, onOpenChange }: { userId: string; onOp
                 <Card key={log.id} data-testid={`login-log-${log.id}`}>
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between gap-2 flex-wrap mb-2">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         {getDeviceIcon(log.deviceType)}
                         <span className="font-medium text-sm">{log.deviceType || "Inconnu"}</span>
+                        {log.deviceModel && (
+                          <Badge variant="default">{log.deviceModel}</Badge>
+                        )}
                         <Badge variant="secondary">{log.browser || "Inconnu"}</Badge>
                         <Badge variant="outline">{log.os || "Inconnu"}</Badge>
                       </div>

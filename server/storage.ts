@@ -165,7 +165,7 @@ export interface IStorage {
   updateSupportSettings(updates: { supportEmail?: string; supportPhone?: string; whatsappLink?: string }): Promise<SupportSettings>;
 
   // Login Logs
-  createLoginLog(data: { userId: string; ipAddress?: string; city?: string; region?: string; country?: string; isp?: string; deviceType?: string; browser?: string; os?: string; userAgent?: string }): Promise<schema.LoginLog>;
+  createLoginLog(data: { userId: string; ipAddress?: string; city?: string; region?: string; country?: string; isp?: string; deviceType?: string; deviceModel?: string; browser?: string; os?: string; userAgent?: string }): Promise<schema.LoginLog>;
   getLoginLogsByUserId(userId: string, limit?: number): Promise<schema.LoginLog[]>;
 
 }

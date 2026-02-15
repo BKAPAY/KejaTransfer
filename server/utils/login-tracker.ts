@@ -1,10 +1,11 @@
 import { Request } from "express";
 import { storage } from "../storage";
 
-function parseUserAgent(ua: string): { deviceType: string; browser: string; os: string } {
+function parseUserAgent(ua: string): { deviceType: string; browser: string; os: string; deviceModel: string } {
   let deviceType = "Desktop";
   let browser = "Inconnu";
   let os = "Inconnu";
+  let deviceModel = "";
 
   if (/mobile|android|iphone|ipad|ipod|blackberry|windows phone/i.test(ua)) {
     deviceType = /ipad|tablet/i.test(ua) ? "Tablette" : "Mobile";
@@ -22,7 +23,20 @@ function parseUserAgent(ua: string): { deviceType: string; browser: string; os: 
   else if (/iphone|ipad|ipod/i.test(ua)) os = "iOS";
   else if (/linux/i.test(ua)) os = "Linux";
 
-  return { deviceType, browser, os };
+  const androidMatch = ua.match(/;\s*([^;)]+)\s*Build\//i);
+  if (androidMatch) {
+    deviceModel = androidMatch[1].trim();
+  } else if (/iPhone/i.test(ua)) {
+    deviceModel = "iPhone";
+  } else if (/iPad/i.test(ua)) {
+    deviceModel = "iPad";
+  } else if (/Macintosh/i.test(ua)) {
+    deviceModel = "Mac";
+  } else if (/Windows NT/i.test(ua)) {
+    deviceModel = "PC Windows";
+  }
+
+  return { deviceType, browser, os, deviceModel };
 }
 
 function getClientIp(req: Request): string {
@@ -73,7 +87,7 @@ export async function recordLoginLog(req: Request, userId: string): Promise<void
   try {
     const userAgent = req.headers["user-agent"] || "";
     const ip = getClientIp(req);
-    const { deviceType, browser, os } = parseUserAgent(userAgent);
+    const { deviceType, browser, os, deviceModel } = parseUserAgent(userAgent);
     const geo = await getGeoFromIp(ip);
 
     await storage.createLoginLog({
@@ -84,6 +98,7 @@ export async function recordLoginLog(req: Request, userId: string): Promise<void
       country: geo.country,
       isp: geo.isp,
       deviceType,
+      deviceModel: deviceModel || undefined,
       browser,
       os,
       userAgent,
