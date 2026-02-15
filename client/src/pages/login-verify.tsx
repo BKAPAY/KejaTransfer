@@ -18,6 +18,9 @@ export default function LoginVerify() {
 
   const { data: verifyStatus, isLoading: statusLoading, error: statusError } = useQuery<{ verified: boolean }>({
     queryKey: ["/api/auth/login-verify-status"],
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: "always",
   });
 
   useEffect(() => {

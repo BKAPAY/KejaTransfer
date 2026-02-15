@@ -114,7 +114,7 @@ async function requireAuth(req: Request, res: Response, next: Function) {
     return res.status(403).json({ error: "Votre compte a été suspendu. Veuillez contacter le support." });
   }
 
-  if (req.session.loginVerified === false) {
+  if (req.session.loginVerified !== true) {
     return res.status(403).json({ error: "Vérification de connexion requise", code: "LOGIN_VERIFY_REQUIRED" });
   }
   
@@ -1009,7 +1009,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!req.session.userId) {
       return res.status(401).json({ error: "Non authentifié" });
     }
-    const verified = req.session.loginVerified === true || req.session.loginVerified === undefined;
+    const verified = req.session.loginVerified === true;
     res.json({
       verified,
       loginLogId: req.session.loginLogId || null,
