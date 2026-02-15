@@ -131,7 +131,6 @@ export default function Login() {
       
       if (response.requiresCode === false || !response.requiresCode) {
         console.log("[Login] Direct login - redirecting to verification");
-        sessionStorage.removeItem("bkapay_photo_taken");
         await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
         await queryClient.invalidateQueries({ queryKey: ["/api/auth/login-verify-status"] });
         setLocation("/login-verify");
@@ -169,7 +168,6 @@ export default function Login() {
       if (credentials?.email) {
         clearStorage(credentials.email);
       }
-      sessionStorage.removeItem("bkapay_photo_taken");
       await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
       await queryClient.invalidateQueries({ queryKey: ["/api/auth/login-verify-status"] });
       setLocation("/login-verify");

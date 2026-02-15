@@ -139,7 +139,6 @@ export function AppSidebar() {
     },
     onSuccess: () => {
       localStorage.removeItem("adminAccessCode");
-      sessionStorage.removeItem("bkapay_photo_taken");
       toast({
         title: "Déconnexion réussie",
         description: "À bientôt sur BKApay",

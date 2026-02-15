@@ -145,7 +145,6 @@ export default function LoginVerify() {
     try {
       await apiRequest("POST", "/api/auth/logout");
     } catch (e) {}
-    sessionStorage.removeItem("bkapay_photo_taken");
     queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
     setLocation("/login");
   };
