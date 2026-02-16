@@ -1927,9 +1927,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (activeProvider === "mbiyopay") {
         // Use MbiyoPay
-        const { createMbiyoPayPayin, getCurrencyForCountry: getMbiyoCurrency } = await import("./mbiyopay");
+        const { createMbiyoPayPayin, getCurrencyForCountry: getMbiyoCurrency, mbiyoPayOperatorRequiresOtp: mbiyoNeedsOtp, getMbiyoPayOtpInstructions: getMbiyoOtpInfo } = await import("./mbiyopay");
+        const { otpCode } = req.body;
         // Provider currency is based on the payer's country
         const providerCurrency = requestCurrency || getMbiyoCurrency(country);
+        
+        const needsOtp = mbiyoNeedsOtp(country, operator);
+        if (needsOtp && !otpCode) {
+          const otpInfo = getMbiyoOtpInfo(country);
+          return res.json({
+            success: false,
+            requiresOTP: true,
+            otpInstructions: otpInfo.instructions,
+            otpUssdCode: otpInfo.ussdCode,
+            otpHint: otpInfo.hint,
+            provider: "mbiyopay",
+            error: "Code OTP requis pour Orange Money",
+          });
+        }
         
         // CRITICAL: Convert amount from owner's currency to provider currency if different
         let convertedAmountForProvider = amountForProvider;
@@ -1948,13 +1963,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`[API-PAY INIT] Using MbiyoPay for ${country}/${operator}, phone=${customerPhone}, providerCurrency=${providerCurrency}, customerPaysFee=${apiKey.customerPaysFee}`);
 
         const result = await createMbiyoPayPayin({
-          amount: convertedAmountForProvider, // ALWAYS send converted amount to provider
+          amount: convertedAmountForProvider,
           currency: providerCurrency,
           phone: customerPhone,
           countryCode: country,
           network: operator,
           orderId: `BKAPAY-APIPAY-${Date.now()}`,
           callbackUrl: `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/mbiyopay`,
+          otpCode,
         });
 
         if (!result.success) {
@@ -6082,8 +6098,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (activeProvider === "mbiyopay") {
         // Use MbiyoPay for payment
         console.log(`[PAYMENT_SUBMIT] Using MbiyoPay for ${country}/${operator}, phone=${customerPhone}`);
-        const { createMbiyoPayPayin, getCurrencyForCountry } = await import("./mbiyopay");
+        const { createMbiyoPayPayin, getCurrencyForCountry, mbiyoPayOperatorRequiresOtp: mbiyoNeedsOtp, getMbiyoPayOtpInstructions: getMbiyoOtpInfo } = await import("./mbiyopay");
         const { calculateIncomingFee, getFeeFromDatabase } = await import("./utils/fees");
+        const { otpCode } = req.body;
+        
+        const needsOtp = mbiyoNeedsOtp(country, operator);
+        if (needsOtp && !otpCode) {
+          const otpInfo = getMbiyoOtpInfo(country);
+          return res.json({
+            success: false,
+            requiresOTP: true,
+            otpInstructions: otpInfo.instructions,
+            otpUssdCode: otpInfo.ussdCode,
+            otpHint: otpInfo.hint,
+            provider: "mbiyopay",
+            error: "Code OTP requis pour Orange Money",
+          });
+        }
         
         const grossAmount = transaction.amount;
         const mbiyoSubmitFeeConfig = await getFeeFromDatabase(storage, "mbiyopay", country, operator);
@@ -6098,6 +6129,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           network: operator,
           orderId: `BKAPAY-API-${transactionId}-${Date.now()}`,
           callbackUrl: `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/mbiyopay`,
+          otpCode,
         });
 
         if (result.success && result.transactionId) {
