@@ -87,6 +87,16 @@ export async function handleMbiyoPayDeposit(
       return { success: false, transactionId: tx.id, error: result.error || "Erreur lors du depot" };
     }
 
+    // If pending (ambiguous API response), keep transaction pending and wait for webhook
+    if (result.pending) {
+      console.log(`[MbiyoPay Deposit] Ambiguous API response - transaction ${tx.id} stays pending, waiting for webhook`);
+      return {
+        success: true,
+        transactionId: tx.id,
+        message: result.message || "Paiement en cours de traitement. Veuillez patienter.",
+      };
+    }
+
     const updatedMetadata = JSON.stringify({
       mbiyopayTransactionId: result.transactionId,
       redirectUrl: result.redirectUrl,

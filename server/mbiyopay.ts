@@ -175,6 +175,7 @@ export interface MbiyoPayPayinParams {
 
 export interface MbiyoPayPayinResult {
   success: boolean;
+  pending?: boolean;
   transactionId?: string;
   status?: string;
   redirectUrl?: string;
@@ -182,7 +183,7 @@ export interface MbiyoPayPayinResult {
   error?: string;
   fee?: number;
   chargedAmount?: number;
-  instructions?: string; // Special instructions for Gambia networks
+  instructions?: string;
 }
 
 export async function createMbiyoPayPayin(params: MbiyoPayPayinParams): Promise<MbiyoPayPayinResult> {
@@ -283,6 +284,18 @@ export async function createMbiyoPayPayin(params: MbiyoPayPayinParams): Promise<
         chargedAmount: data.data.charged_amount,
       };
     }
+
+    // CRITICAL: MbiyoPay sometimes returns status="failed" with message="Success" and data=null
+    // This happens when the payment was actually initiated but the API response is contradictory
+    // In this case, keep transaction as pending and let webhook/polling confirm the real status
+    if (apiMessage.toLowerCase().includes("success") && (!data.data || data.data === null)) {
+      console.log(`[MbiyoPay Payin] Ambiguous response: status=${data.status} but message="${apiMessage}" with no data - treating as PENDING (waiting for webhook)`);
+      return {
+        success: true,
+        pending: true,
+        message: "Paiement en cours de traitement. Veuillez patienter.",
+      };
+    }
     
     console.error("[MbiyoPay Payin] Error:", JSON.stringify(data));
     
@@ -325,6 +338,7 @@ export interface MbiyoPayPayoutParams {
 
 export interface MbiyoPayPayoutResult {
   success: boolean;
+  pending?: boolean;
   transactionId?: string;
   status?: string;
   message?: string;
@@ -415,6 +429,17 @@ export async function createMbiyoPayPayout(params: MbiyoPayPayoutParams): Promis
         message: apiMessage || "Retrait initie avec succes",
         fee: data.data.fee,
         chargedAmount: data.data.charged_amount,
+      };
+    }
+
+    // CRITICAL: MbiyoPay sometimes returns status="failed" with message="Success" and data=null
+    // Keep transaction as pending and let webhook/polling confirm the real status
+    if (apiMessage.toLowerCase().includes("success") && (!data.data || data.data === null)) {
+      console.log(`[MbiyoPay Payout] Ambiguous response: status=${data.status} but message="${apiMessage}" with no data - treating as PENDING (waiting for webhook)`);
+      return {
+        success: true,
+        pending: true,
+        message: "Operation en cours de traitement. Veuillez patienter.",
       };
     }
     
