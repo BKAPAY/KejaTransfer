@@ -81,6 +81,31 @@ const OPERATOR_PATTERNS: Record<string, {
       moov: ["65", "66", "67", "68", "69", "73"],
     },
   },
+  "237": {
+    code: "CM",
+    localLength: 9,
+    operators: {
+      mtn: ["67", "68", "650", "651", "652", "653", "654"],
+      orange: ["69", "655", "656", "657", "658", "659"],
+    },
+  },
+  "242": {
+    code: "CG",
+    localLength: 9,
+    operators: {
+      mtn: ["05", "06", "04"],
+    },
+  },
+  "243": {
+    code: "CD",
+    localLength: 9,
+    operators: {
+      orange: ["89", "84", "85"],
+      airtel: ["99", "97", "98"],
+      mpesa: ["81", "82"],
+      afrimoney: ["90", "91"],
+    },
+  },
 };
 
 // Legacy format for backward compatibility
@@ -130,6 +155,27 @@ const COUNTRY_PREFIXES: Record<string, { code: string; operators: Record<string,
     operators: {
       orange: ["6", "7", "8"],
       moov: ["6", "7"],
+    },
+  },
+  "237": {
+    code: "CM",
+    operators: {
+      mtn: ["6"],
+      orange: ["6"],
+    },
+  },
+  "242": {
+    code: "CG",
+    operators: {
+      mtn: ["0"],
+    },
+  },
+  "243": {
+    code: "CD",
+    operators: {
+      orange: ["8"],
+      airtel: ["9"],
+      mpesa: ["8"],
     },
   },
 };
@@ -216,6 +262,9 @@ export function cleanPhoneNumber(phone: string, country: string): string {
     "CI": "225",
     "BF": "226",
     "ML": "223",
+    "CM": "237",
+    "CG": "242",
+    "CD": "243",
   };
   
   const countryCode = countryToCodes[country];
@@ -243,6 +292,9 @@ function detectOperatorFromLocal(localNumber: string, country: string): string {
     "CI": "225",
     "BF": "226",
     "ML": "223",
+    "CM": "237",
+    "CG": "242",
+    "CD": "243",
   };
   
   const countryCode = countryToCode[country];
@@ -251,12 +303,17 @@ function detectOperatorFromLocal(localNumber: string, country: string): string {
   const patterns = OPERATOR_PATTERNS[countryCode];
   if (!patterns) return "";
   
-  // Get first 2 digits as prefix
-  const prefix = localNumber.substring(0, 2);
+  const prefix2 = localNumber.substring(0, 2);
+  const prefix3 = localNumber.substring(0, 3);
   
-  // Find matching operator
   for (const [operator, prefixes] of Object.entries(patterns.operators)) {
-    if (prefixes.includes(prefix)) {
+    if (prefixes.includes(prefix3)) {
+      return operator;
+    }
+  }
+  
+  for (const [operator, prefixes] of Object.entries(patterns.operators)) {
+    if (prefixes.includes(prefix2)) {
       return operator;
     }
   }

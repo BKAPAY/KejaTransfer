@@ -12,6 +12,7 @@ import {
   getCurrencyForCountry,
   formatPhoneForMbiyoPay,
 } from "./mbiyopay";
+import { validatePhoneOperator } from "@shared/phone-utils";
 
 export async function handleMbiyoPayDeposit(
   userId: string,
@@ -34,6 +35,12 @@ export async function handleMbiyoPayDeposit(
     const countryOperators = MBIYOPAY_OPERATORS[countryLower] || [];
     if (!countryOperators.includes(operator.toLowerCase())) {
       return { success: false, error: `Operateur ${operator} non supporte pour ${country}` };
+    }
+
+    const phoneValidation = validatePhoneOperator(phone, operator, country.toUpperCase());
+    console.log(`[MbiyoPay Deposit] Phone operator validation:`, phoneValidation);
+    if (!phoneValidation.isValid) {
+      return { success: false, error: phoneValidation.message };
     }
 
     const providerAmount = Math.floor(amount);
