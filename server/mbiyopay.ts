@@ -1,6 +1,7 @@
 import { storage } from "./storage";
 
 const MBIYOPAY_BASE_URL = "https://dashboard.mbiyo.africa/api/v1";
+const MBIYOPAY_TIMEOUT_MS = 30000; // 30 seconds timeout for API calls
 
 export const MBIYOPAY_SUPPORTED_COUNTRIES = ["bj", "bf", "ci", "sn", "tg", "ml", "gn", "cm", "cg", "cd", "gm"];
 
@@ -217,14 +218,23 @@ export async function createMbiyoPayPayin(params: MbiyoPayPayinParams): Promise<
     console.log(`[MbiyoPay Payin] Creating payment: ${params.amount} ${params.currency}, ${params.network}/${params.countryCode}, phone=${formattedPhone}`);
     console.log(`[MbiyoPay Payin] Full request body:`, JSON.stringify(requestBody, null, 2));
     
-    const response = await fetch(`${MBIYOPAY_BASE_URL}/merchant/payin`, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(requestBody),
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), MBIYOPAY_TIMEOUT_MS);
+    
+    let response: Response;
+    try {
+      response = await fetch(`${MBIYOPAY_BASE_URL}/merchant/payin`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestBody),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
     
     const data = await response.json();
     
@@ -269,7 +279,10 @@ export async function createMbiyoPayPayin(params: MbiyoPayPayinParams): Promise<
       error: errorMessage
     };
   } catch (error: any) {
-    console.error("[MbiyoPay Payin] Exception:", error);
+    console.error("[MbiyoPay Payin] Exception:", error.name, error.message);
+    if (error.name === "AbortError") {
+      return { success: false, error: "Paiement echoue: Le service MbiyoPay ne repond pas. Veuillez reessayer dans quelques minutes." };
+    }
     return { success: false, error: "Paiement echoue: Erreur de connexion au service de paiement." };
   }
 }
@@ -333,14 +346,23 @@ export async function createMbiyoPayPayout(params: MbiyoPayPayoutParams): Promis
     console.log(`[MbiyoPay Payout] Creating payout: ${params.amount} ${params.currency}, ${params.network}/${params.countryCode}, phone=${formattedPhone}`);
     console.log(`[MbiyoPay Payout] Full request body:`, JSON.stringify(requestBody, null, 2));
     
-    const response = await fetch(`${MBIYOPAY_BASE_URL}/merchant/payout`, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(requestBody),
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), MBIYOPAY_TIMEOUT_MS);
+    
+    let response: Response;
+    try {
+      response = await fetch(`${MBIYOPAY_BASE_URL}/merchant/payout`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestBody),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
     
     const data = await response.json();
     
@@ -379,7 +401,10 @@ export async function createMbiyoPayPayout(params: MbiyoPayPayoutParams): Promis
       error: errorMessage 
     };
   } catch (error: any) {
-    console.error("[MbiyoPay Payout] Exception:", error);
+    console.error("[MbiyoPay Payout] Exception:", error.name, error.message);
+    if (error.name === "AbortError") {
+      return { success: false, error: "Retrait echoue: Le service MbiyoPay ne repond pas. Veuillez reessayer dans quelques minutes." };
+    }
     return { success: false, error: "Retrait echoue: Erreur de connexion au service de paiement." };
   }
 }
@@ -401,12 +426,21 @@ export async function getMbiyoPayTransactionStatus(transactionId: string): Promi
       return { success: false, error: "MbiyoPay non configure ou desactive" };
     }
     
-    const response = await fetch(`${MBIYOPAY_BASE_URL}/merchant/transactions/${transactionId}`, {
-      method: "GET",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-      },
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), MBIYOPAY_TIMEOUT_MS);
+    
+    let response: Response;
+    try {
+      response = await fetch(`${MBIYOPAY_BASE_URL}/merchant/transactions/${transactionId}`, {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+        },
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
     
     const data = await response.json();
     
@@ -453,13 +487,22 @@ export async function resendMbiyoPayWebhook(transactionId: string): Promise<{ su
     
     console.log(`[MbiyoPay] Resending webhook for transaction: ${transactionId}`);
     
-    const response = await fetch(`${MBIYOPAY_BASE_URL}/merchant/transactions/${transactionId}/resend-webhook`, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), MBIYOPAY_TIMEOUT_MS);
+    
+    let response: Response;
+    try {
+      response = await fetch(`${MBIYOPAY_BASE_URL}/merchant/transactions/${transactionId}/resend-webhook`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
     
     const data = await response.json();
     
