@@ -13,7 +13,7 @@ import { COUNTRIES, OPERATORS } from "@shared/schema";
 import type { User } from "@shared/schema";
 import { PhoneInputWithPrefix } from "@/components/phone-input-with-prefix";
 import { CountryFlag } from "@/components/country-flag";
-import { ArrowDownToLine, CheckCircle2, Clock, Info, Loader2, Smartphone } from "lucide-react";
+import { ArrowDownToLine, CheckCircle2, Clock, ExternalLink, Info, Loader2, Smartphone } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { calculateIncomingFee, fetchFeeConfig, formatFeePercentage } from "@/lib/fees";
 import { useState, useEffect, useCallback } from "react";
@@ -42,7 +42,7 @@ type DepositFormData = z.infer<typeof depositSchema>;
 
 export default function Deposit() {
   const { toast } = useToast();
-  const [paymentStep, setPaymentStep] = useState<"form" | "polling" | "completed" | "otp">("form");
+  const [paymentStep, setPaymentStep] = useState<"form" | "polling" | "completed" | "otp" | "redirect">("form");
   const [depositAmount, setDepositAmount] = useState<number | undefined>(undefined);
   const [paymentData, setPaymentData] = useState<{
     transactionId?: string;
@@ -249,6 +249,12 @@ export default function Deposit() {
             title: "Code OTP requis",
             description: response.ussdInstruction || "Generez votre code de paiement",
           });
+        } else if (response.redirectUrl) {
+          setPaymentStep("redirect");
+          toast({
+            title: "Redirection requise",
+            description: "Cliquez sur le bouton pour finaliser le paiement",
+          });
         } else {
           setPaymentStep("polling");
           toast({
@@ -326,12 +332,21 @@ export default function Deposit() {
             instructions: response.instructions,
           }));
         }
-        setPaymentStep("polling");
-        setOtpCode("");
-        toast({
-          title: "Code valide",
-          description: "Veuillez valider le paiement sur votre telephone",
-        });
+        if (response.redirectUrl) {
+          setPaymentStep("redirect");
+          setOtpCode("");
+          toast({
+            title: "Redirection requise",
+            description: "Cliquez sur le bouton pour finaliser le paiement",
+          });
+        } else {
+          setPaymentStep("polling");
+          setOtpCode("");
+          toast({
+            title: "Code valide",
+            description: "Veuillez valider le paiement sur votre telephone",
+          });
+        }
       } else {
         toast({
           title: "Erreur",
@@ -373,7 +388,7 @@ export default function Deposit() {
   };
 
   useEffect(() => {
-    if (paymentStep !== "polling" || !paymentData.transactionId) return;
+    if ((paymentStep !== "polling" && paymentStep !== "redirect") || !paymentData.transactionId) return;
 
     const checkPaymentStatus = async () => {
       try {
@@ -445,7 +460,7 @@ export default function Deposit() {
 
     const timeout = setTimeout(() => {
       clearInterval(interval);
-      if (paymentStep === "polling") {
+      if (paymentStep === "polling" || paymentStep === "redirect") {
         setPaymentStep("form");
         toast({
           title: "Delai expire",
@@ -566,6 +581,60 @@ export default function Deposit() {
               variant="outline"
               size="sm"
               data-testid="button-cancel-polling"
+            >
+              Annuler
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {paymentStep === "redirect" && paymentData.redirectUrl && (
+        <Card>
+          <CardContent className="py-8 text-center space-y-4">
+            <ExternalLink className="h-12 w-12 mx-auto text-blue-600" />
+            <div>
+              <p className="font-semibold text-lg">
+                {form.getValues("operator")?.toLowerCase() === "wave" ? "Paiement Wave" : "Finaliser le paiement"}
+              </p>
+              <p className="text-sm text-muted-foreground mt-2">
+                {form.getValues("operator")?.toLowerCase() === "wave"
+                  ? "Cliquez sur le bouton ci-dessous pour completer votre paiement via Wave"
+                  : "Cliquez sur le bouton ci-dessous pour finaliser votre paiement"}
+              </p>
+            </div>
+            <div className="text-center p-4 bg-muted rounded-lg">
+              <p className="text-sm text-muted-foreground">Montant</p>
+              <p className="text-2xl font-bold text-primary">
+                {amount?.toLocaleString()} FCFA
+              </p>
+            </div>
+            <Button
+              onClick={() => {
+                if (paymentData.redirectUrl) {
+                  window.open(paymentData.redirectUrl, "_blank");
+                }
+              }}
+              className="w-full"
+              variant="default"
+              size="lg"
+              data-testid="button-redirect-payment"
+            >
+              <ExternalLink className="w-5 h-5 mr-2" />
+              {form.getValues("operator")?.toLowerCase() === "wave"
+                ? "Aller a Wave pour payer"
+                : "Finaliser le paiement"}
+            </Button>
+            <Alert className="border-yellow-200 bg-yellow-50 dark:bg-yellow-950 dark:border-yellow-800">
+              <Clock className="h-4 w-4 text-yellow-600" />
+              <AlertDescription className="text-sm text-yellow-900 dark:text-yellow-100 ml-2">
+                Apres avoir paye, revenez ici. La verification est automatique.
+              </AlertDescription>
+            </Alert>
+            <Button
+              onClick={handleBackToForm}
+              variant="outline"
+              size="sm"
+              data-testid="button-cancel-redirect"
             >
               Annuler
             </Button>

@@ -6148,6 +6148,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           res.json({
             success: true,
             transactionId: transactionId,
+            redirectUrl: result.redirectUrl,
+            instructions: result.instructions,
             message: result.message || "Paiement initie. Veuillez valider sur votre telephone.",
             provider: "mbiyopay",
           });
