@@ -287,7 +287,15 @@ async function processMbiyoPayTransaction(transaction: Transaction & { user?: Us
             }
             return true;
           } else if (foundStatus === "failed" || foundStatus === "cancelled") {
-            console.log(`[PaymentPolling] ❌ MbiyoPay transaction ${transaction.id} ${foundStatus} via order_id search`);
+            // Don't trust "failed" for recent transactions - MbiyoPay may update later
+            const MBIYOPAY_FAILED_GRACE_PERIOD_MS = 3 * 60 * 1000;
+            const txAge = getTransactionAge(transaction);
+            if (txAge < MBIYOPAY_FAILED_GRACE_PERIOD_MS) {
+              const graceRemaining = Math.round((MBIYOPAY_FAILED_GRACE_PERIOD_MS - txAge) / 1000);
+              console.log(`[PaymentPolling] ⏳ MbiyoPay transaction ${transaction.id} shows "${foundStatus}" via order_id but too recent - waiting ${graceRemaining}s grace period`);
+              return false; // Keep polling
+            }
+            console.log(`[PaymentPolling] ❌ MbiyoPay transaction ${transaction.id} ${foundStatus} via order_id search (after grace period)`);
             if (transaction.type === "withdrawal" || transaction.type === "transfer") {
               const refundAmount = metadata.deductedFromBalance || metadata.totalDebited || transaction.amount;
               await storage.updateUserBalance(transaction.userId, refundAmount);
@@ -344,9 +352,47 @@ async function processMbiyoPayTransaction(transaction: Transaction & { user?: Us
         }
         return true;
       } 
-      // MbiyoPay official status: failed, cancelled = payment failed (per API docs)
+      // MbiyoPay sometimes returns "failed" prematurely while mobile money is still processing
+      // Only trust "failed" status after a grace period (3 minutes) to allow MbiyoPay to update
       else if (status === "failed" || status === "cancelled") {
-        console.log(`[PaymentPolling] ❌ MbiyoPay transaction ${transaction.id} failed (status: ${status})`);
+        const MBIYOPAY_FAILED_GRACE_PERIOD_MS = 3 * 60 * 1000; // 3 minutes grace period
+        const transactionAgeMs = getTransactionAge(transaction);
+        
+        if (transactionAgeMs < MBIYOPAY_FAILED_GRACE_PERIOD_MS) {
+          const graceRemaining = Math.round((MBIYOPAY_FAILED_GRACE_PERIOD_MS - transactionAgeMs) / 1000);
+          console.log(`[PaymentPolling] ⏳ MbiyoPay transaction ${transaction.id} shows "${status}" but too recent (${Math.round(transactionAgeMs/1000)}s old) - waiting ${graceRemaining}s grace period before trusting`);
+          return false; // Keep polling
+        }
+        
+        // Grace period passed - do a final confirmation check via order_id search before trusting "failed"
+        if (metadata.orderId) {
+          try {
+            const finalCheck = await searchMbiyoPayTransactionByOrderId(metadata.orderId);
+            if (finalCheck.success && finalCheck.status) {
+              const finalStatus = finalCheck.status.toLowerCase();
+              if (finalStatus === "successful") {
+                console.log(`[PaymentPolling] ✅ MbiyoPay transaction ${transaction.id} actually SUCCESSFUL on final check (was "${status}")!`);
+                if (transaction.type === "deposit" || transaction.type === "payment_link" || transaction.type === "merchant_link" || transaction.type === "api_payment") {
+                  const result = await storage.finalizeIncomingTransaction(transaction.id, {});
+                  if (result) {
+                    console.log(`[PaymentPolling] ✅ Finalized: credited=${result.credited}`);
+                  }
+                } else {
+                  await storage.updateTransactionStatus(transaction.id, "completed");
+                }
+                return true;
+              } else if (finalStatus !== "failed" && finalStatus !== "cancelled") {
+                console.log(`[PaymentPolling] MbiyoPay transaction ${transaction.id} shows "${finalStatus}" on final check - continuing to poll`);
+                return false;
+              }
+            }
+          } catch (finalCheckError) {
+            console.log(`[PaymentPolling] Final check error for ${transaction.id}:`, finalCheckError);
+          }
+        }
+        
+        // Confirmed failed after grace period and final check
+        console.log(`[PaymentPolling] ❌ MbiyoPay transaction ${transaction.id} confirmed failed after grace period (status: ${status})`);
         if (transaction.type === "withdrawal" || transaction.type === "transfer") {
           const refundAmount = metadata.deductedFromBalance || metadata.totalDebited || transaction.amount;
           await storage.updateUserBalance(transaction.userId, refundAmount);
