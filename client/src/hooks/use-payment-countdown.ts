@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { queryClient } from "@/lib/queryClient";
 
-export const DEFAULT_COUNTDOWN_DURATION = 10 * 60; // 10 minutes in seconds (Mobile Money)
-export const CRYPTO_COUNTDOWN_DURATION = 30 * 60; // 30 minutes in seconds (Crypto)
-const POLL_INTERVAL = 1000; // 1 second
+export const DEFAULT_COUNTDOWN_DURATION = 10 * 60;
+export const CRYPTO_COUNTDOWN_DURATION = 30 * 60;
+const POLL_INTERVAL = 1000;
 
 interface PaymentCountdownState {
   remainingTime: number;
@@ -19,7 +19,6 @@ interface UsePaymentCountdownOptions {
   onCompleted?: () => void;
   onFailed?: () => void;
   onExpired?: () => void;
-  /** Duration in seconds. Default 600 (10 min) for Mobile Money, use 1800 (30 min) for crypto */
   durationSeconds?: number;
 }
 
@@ -75,67 +74,97 @@ export function usePaymentCountdown({
 } {
   const [remainingTime, setRemainingTime] = useState(durationSeconds);
   const [status, setStatus] = useState<"pending" | "completed" | "failed" | "expired">("pending");
+  const [counting, setCounting] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const pollRef = useRef<NodeJS.Timeout | null>(null);
+  const inMemoryStartRef = useRef<number | null>(null);
 
   const storageKey = getStorageKey(invoiceToken, transactionId);
 
-  // Initialize remaining time from localStorage on mount (before enabled is true)
   useEffect(() => {
     if (!storageKey) return;
-    
+
     const existingStartTime = getStartTime(storageKey);
     if (existingStartTime) {
       const remaining = calculateRemainingTime(existingStartTime, durationSeconds);
       setRemainingTime(remaining);
-      
-      // If already expired, set status
       if (remaining <= 0) {
         setStatus("expired");
       }
     }
   }, [storageKey, durationSeconds]);
 
+  useEffect(() => {
+    if (storageKey && inMemoryStartRef.current && !getStartTime(storageKey)) {
+      setStartTime(storageKey, inMemoryStartRef.current);
+    }
+  }, [storageKey]);
+
   const startCountdown = useCallback(() => {
-    if (!storageKey) return;
+    const now = Date.now();
+    inMemoryStartRef.current = now;
 
-    let startTime = getStartTime(storageKey);
-    if (!startTime) {
-      startTime = Date.now();
-      setStartTime(storageKey, startTime);
+    if (storageKey) {
+      let startTime = getStartTime(storageKey);
+      if (!startTime) {
+        startTime = now;
+        setStartTime(storageKey, startTime);
+      }
+      inMemoryStartRef.current = startTime;
     }
 
-    const remaining = calculateRemainingTime(startTime, durationSeconds);
-    setRemainingTime(remaining);
-
-    if (remaining <= 0) {
-      setStatus("expired");
-      onExpired?.();
-    }
-  }, [storageKey, onExpired, durationSeconds]);
+    setRemainingTime(durationSeconds);
+    setStatus("pending");
+    setCounting(true);
+  }, [storageKey, durationSeconds]);
 
   const resetCountdown = useCallback(() => {
     if (storageKey) {
       clearStartTime(storageKey);
     }
+    inMemoryStartRef.current = null;
     setRemainingTime(durationSeconds);
     setStatus("pending");
+    setCounting(false);
+
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
   }, [storageKey, durationSeconds]);
 
-  // Countdown timer
   useEffect(() => {
-    if (!enabled || !storageKey) return;
+    if (!counting && !enabled) return;
+    if (counting) {
+      setCounting(false);
+    }
 
-    const startTime = getStartTime(storageKey);
-    if (!startTime) {
-      setStartTime(storageKey, Date.now());
+    const getEffectiveStartTime = (): number | null => {
+      if (storageKey) {
+        const stored = getStartTime(storageKey);
+        if (stored) return stored;
+      }
+      return inMemoryStartRef.current;
+    };
+
+    const effectiveStart = getEffectiveStartTime();
+    if (!effectiveStart) {
+      const now = Date.now();
+      inMemoryStartRef.current = now;
+      if (storageKey) {
+        setStartTime(storageKey, now);
+      }
+    }
+
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
     }
 
     timerRef.current = setInterval(() => {
-      const storedStartTime = getStartTime(storageKey);
-      if (!storedStartTime) return;
+      const startTime = getEffectiveStartTime() || inMemoryStartRef.current;
+      if (!startTime) return;
 
-      const remaining = calculateRemainingTime(storedStartTime, durationSeconds);
+      const remaining = calculateRemainingTime(startTime, durationSeconds);
       setRemainingTime(remaining);
 
       if (remaining <= 0 && status === "pending") {
@@ -152,9 +181,8 @@ export function usePaymentCountdown({
         clearInterval(timerRef.current);
       }
     };
-  }, [enabled, storageKey, status, onExpired]);
+  }, [enabled, counting, storageKey, status, onExpired, durationSeconds]);
 
-  // Payment status polling
   useEffect(() => {
     if (!enabled || (!invoiceToken && !transactionId) || status !== "pending") return;
 
@@ -170,7 +198,7 @@ export function usePaymentCountdown({
         if (data.status === "completed" || data.response_code === "00") {
           setStatus("completed");
           clearStartTime(storageKey);
-          // Invalider le cache pour mettre à jour l'historique et le solde immédiatement
+          inMemoryStartRef.current = null;
           queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
           queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
           queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
@@ -181,7 +209,7 @@ export function usePaymentCountdown({
         } else if (data.status === "failed") {
           setStatus("failed");
           clearStartTime(storageKey);
-          // Invalider le cache pour mettre à jour l'historique
+          inMemoryStartRef.current = null;
           queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
           queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
           onFailed?.();
@@ -204,7 +232,6 @@ export function usePaymentCountdown({
     };
   }, [enabled, invoiceToken, transactionId, storageKey, status, onCompleted, onFailed]);
 
-  // Cleanup on unmount when not in polling mode
   useEffect(() => {
     return () => {
       if (timerRef.current) {
