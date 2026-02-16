@@ -121,7 +121,8 @@ const getFieldLabel = (provider: string, field: string): string => {
     }
   }
   if (provider === "mbiyopay") {
-    if (field === "apiKey") return "Clé API Merchant MbiyoPay";
+    if (field === "apiKey") return "Clé API Merchant MbiyoPay (Bearer Token)";
+    if (field === "publicKey") return "Clé Publique MbiyoPay";
   }
   if (provider === "exchangerate") {
     if (field === "apiKey") return "Clé API ExchangeRate (exchangerate-api.com)";
