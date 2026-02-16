@@ -457,7 +457,6 @@ export const OPERATORS = {
   CM: [
     { code: "orange", name: "Orange Money", requiresOtp: false },
     { code: "mtn", name: "MTN Mobile Money", requiresOtp: false },
-    { code: "moov", name: "Moov Money", requiresOtp: false },
   ],
   CD: [
     { code: "orange", name: "Orange Money", requiresOtp: false },
