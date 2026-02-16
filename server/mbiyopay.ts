@@ -36,7 +36,7 @@ export const MBIYOPAY_OPERATORS: Record<string, string[]> = {
   tg: ["moov", "togocom"],
   ml: ["orange", "moov"],
   gn: ["orange"],
-  cm: ["orange", "moov"],
+  cm: ["orange", "mtn"],
   cg: ["mtn"],
   cd: ["mpesa", "airtel", "orange", "afrimoney"],
   gm: ["afrimoney", "qmoney", "wave"],
@@ -92,7 +92,7 @@ export const MBIYOPAY_OPERATOR_API_CODES: Record<string, Record<string, string>>
   },
   cm: {
     orange: "orange",
-    moov: "moov",
+    mtn: "mtn",
   },
   cg: {
     mtn: "mtn",
@@ -179,7 +179,7 @@ export function mbiyoPayOperatorRequiresOtp(countryCode: string, network: string
   const op = network.toLowerCase();
   if (op !== "orange") return false;
   if (country === "cd") return false;
-  const countriesWithOrangeOtp = ["bf", "ci", "sn", "ml", "gn", "cm"];
+  const countriesWithOrangeOtp = ["bf", "ci", "sn", "ml", "gn"];
   return countriesWithOrangeOtp.includes(country);
 }
 
