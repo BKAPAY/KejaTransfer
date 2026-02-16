@@ -249,7 +249,24 @@ async function processMbiyoPayTransaction(transaction: Transaction & { user?: Us
   const remainingTime = Math.max(0, PAYMENT_TIMEOUT_MS - transactionAge);
   const remainingSeconds = Math.round(remainingTime / 1000);
 
-  console.log(`[PaymentPolling] Checking MbiyoPay transaction ${transaction.id} (mbiyopayId: ${mbiyopayTransactionId}, ${remainingSeconds}s remaining)`);
+  console.log(`[PaymentPolling] Checking MbiyoPay transaction ${transaction.id} (mbiyopayId: ${mbiyopayTransactionId || 'not yet assigned'}, orderId: ${metadata.orderId || 'none'}, ${remainingSeconds}s remaining)`);
+
+  // If we don't have a MbiyoPay transaction ID yet, we can't poll the status
+  // The webhook will update the metadata when MbiyoPay sends it
+  if (!mbiyopayTransactionId) {
+    if (hasPaymentExpired(transaction)) {
+      console.log(`[PaymentPolling] MbiyoPay transaction ${transaction.id} expired without receiving mbiyopayTransactionId - marking as failed`);
+      if (transaction.type === "withdrawal" || transaction.type === "transfer") {
+        const refundAmount = metadata.deductedFromBalance || metadata.totalDebited || transaction.amount;
+        await storage.updateUserBalance(transaction.userId, refundAmount);
+        console.log(`[PaymentPolling] Refunded ${refundAmount} to user ${transaction.userId} for expired MbiyoPay ${transaction.type}`);
+      }
+      await storage.updateTransactionStatus(transaction.id, "failed");
+      return true;
+    }
+    console.log(`[PaymentPolling] Waiting for MbiyoPay webhook to provide transaction ID for ${transaction.id} (${remainingSeconds}s remaining)`);
+    return false;
+  }
 
   try {
     const statusResult = await getMbiyoPayTransactionStatus(mbiyopayTransactionId);

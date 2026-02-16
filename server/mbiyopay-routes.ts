@@ -43,6 +43,9 @@ export async function handleMbiyoPayDeposit(
     const feeConfig = await getFeeFromDatabase(storage, "mbiyopay", country, operator);
     const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming);
 
+    const orderId = `BKAPAY-DEP-${Date.now()}`;
+    const startTime = Date.now();
+
     // Create transaction BEFORE calling MbiyoPay API so it always appears in history
     const tx = await storage.createTransaction({
       userId: userId,
@@ -64,7 +67,8 @@ export async function handleMbiyoPayDeposit(
         providerCurrency,
         balanceAmount,
         balanceCurrency: userCurrency,
-        startTime: Date.now(),
+        orderId,
+        startTime,
       }),
     });
 
@@ -74,17 +78,15 @@ export async function handleMbiyoPayDeposit(
       phone: phone,
       countryCode: country,
       network: operator,
-      orderId: `BKAPAY-DEP-${Date.now()}`,
+      orderId,
       callbackUrl: `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/mbiyopay`,
     });
 
     if (!result.success) {
-      // Mark the transaction as failed since MbiyoPay rejected it
       await storage.updateTransactionStatus(tx.id, "failed");
       return { success: false, transactionId: tx.id, error: result.error || "Erreur lors du depot" };
     }
 
-    // Update transaction with MbiyoPay transaction ID
     const updatedMetadata = JSON.stringify({
       mbiyopayTransactionId: result.transactionId,
       redirectUrl: result.redirectUrl,
@@ -95,7 +97,8 @@ export async function handleMbiyoPayDeposit(
       providerCurrency,
       balanceAmount,
       balanceCurrency: userCurrency,
-      startTime: Date.now(),
+      orderId,
+      startTime,
     });
     await storage.updateTransactionMetadata(tx.id, updatedMetadata);
 
@@ -161,6 +164,9 @@ export async function handleMbiyoPayWithdrawal(
       ? `${user.firstName} ${user.lastName}` 
       : "BKApay User";
 
+    const orderId = `BKAPAY-WD-${Date.now()}`;
+    const startTime = Date.now();
+
     // Debit balance BEFORE API call
     await storage.updateUserBalance(userId, -feeInfo.totalDeductedFromBalance);
 
@@ -187,7 +193,8 @@ export async function handleMbiyoPayWithdrawal(
         balanceCurrency: balanceCurrency,
         provider: "mbiyopay",
         paymentProvider: "mbiyopay",
-        startTime: Date.now(),
+        orderId,
+        startTime,
       }),
     });
 
@@ -197,7 +204,7 @@ export async function handleMbiyoPayWithdrawal(
       phone: phone,
       countryCode: country,
       network: operator,
-      orderId: `BKAPAY-WD-${Date.now()}`,
+      orderId,
       callbackUrl: `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/mbiyopay`,
       beneficiaryName,
     });
@@ -221,7 +228,8 @@ export async function handleMbiyoPayWithdrawal(
       balanceCurrency: balanceCurrency,
       provider: "mbiyopay",
       paymentProvider: "mbiyopay",
-      startTime: Date.now(),
+      orderId,
+      startTime,
     });
     await storage.updateTransactionMetadata(tx.id, updatedMetadata);
 
@@ -284,6 +292,9 @@ export async function handleMbiyoPayTransfer(
       ? `${user.firstName} ${user.lastName}` 
       : "BKApay User";
 
+    const orderId = `BKAPAY-TF-${Date.now()}`;
+    const startTime = Date.now();
+
     // Debit balance BEFORE API call
     await storage.updateUserBalance(userId, -totalToDebit);
 
@@ -309,7 +320,8 @@ export async function handleMbiyoPayTransfer(
         balanceCurrency: balanceCurrency,
         provider: "mbiyopay",
         paymentProvider: "mbiyopay",
-        startTime: Date.now(),
+        orderId,
+        startTime,
       }),
     });
 
@@ -319,7 +331,7 @@ export async function handleMbiyoPayTransfer(
       phone: phone,
       countryCode: country,
       network: operator,
-      orderId: `BKAPAY-TF-${Date.now()}`,
+      orderId,
       callbackUrl: `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/mbiyopay`,
       beneficiaryName,
     });
@@ -343,7 +355,8 @@ export async function handleMbiyoPayTransfer(
       balanceCurrency: balanceCurrency,
       provider: "mbiyopay",
       paymentProvider: "mbiyopay",
-      startTime: Date.now(),
+      orderId,
+      startTime,
     });
     await storage.updateTransactionMetadata(tx.id, updatedMetadata);
 
@@ -396,6 +409,9 @@ export async function handleMbiyoPayPaymentLink(
       providerAmount = Math.ceil(providerAmount * (1 + feePercentage / 100));
     }
 
+    const orderId = `BKAPAY-PL-${paymentLink.id}-${Date.now()}`;
+    const startTime = Date.now();
+
     // Create transaction BEFORE calling MbiyoPay API so it always appears in history
     const tx = await storage.createTransaction({
       userId: paymentLink.userId,
@@ -420,7 +436,8 @@ export async function handleMbiyoPayPaymentLink(
         balanceCurrency,
         provider: "mbiyopay",
         paymentProvider: "mbiyopay",
-        startTime: Date.now(),
+        orderId,
+        startTime,
       }),
     });
 
@@ -430,7 +447,7 @@ export async function handleMbiyoPayPaymentLink(
       phone: customerPhone,
       countryCode: country,
       network: operator,
-      orderId: `BKAPAY-PL-${paymentLink.id}-${Date.now()}`,
+      orderId,
       callbackUrl: `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/mbiyopay`,
     });
 
@@ -451,7 +468,8 @@ export async function handleMbiyoPayPaymentLink(
       balanceCurrency,
       provider: "mbiyopay",
       paymentProvider: "mbiyopay",
-      startTime: Date.now(),
+      orderId,
+      startTime,
     });
     await storage.updateTransactionMetadata(tx.id, updatedMetadata);
 
@@ -502,6 +520,9 @@ export async function handleMbiyoPayMerchantLink(
     const feeConfig = await getFeeFromDatabase(storage, "mbiyopay", country, operator);
     const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming);
 
+    const orderId = `BKAPAY-ML-${merchantLink.id}-${Date.now()}`;
+    const startTime = Date.now();
+
     // Create transaction BEFORE calling MbiyoPay API so it always appears in history
     const tx = await storage.createTransaction({
       userId: merchantLink.userId,
@@ -525,7 +546,8 @@ export async function handleMbiyoPayMerchantLink(
         balanceCurrency,
         provider: "mbiyopay",
         paymentProvider: "mbiyopay",
-        startTime: Date.now(),
+        orderId,
+        startTime,
       }),
     });
 
@@ -535,7 +557,7 @@ export async function handleMbiyoPayMerchantLink(
       phone: customerPhone,
       countryCode: country,
       network: operator,
-      orderId: `BKAPAY-ML-${merchantLink.id}-${Date.now()}`,
+      orderId,
       callbackUrl: `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/mbiyopay`,
     });
 
@@ -554,7 +576,8 @@ export async function handleMbiyoPayMerchantLink(
       balanceCurrency,
       provider: "mbiyopay",
       paymentProvider: "mbiyopay",
-      startTime: Date.now(),
+      orderId,
+      startTime,
     });
     await storage.updateTransactionMetadata(tx.id, updatedMetadata);
 
@@ -596,6 +619,9 @@ export async function handleMbiyoPayApiPayment(
     const feeConfig = await getFeeFromDatabase(storage, "mbiyopay", country, operator);
     const feeInfo = calculateIncomingFee(grossAmount, feeConfig.incoming);
 
+    const orderId = `BKAPAY-API-${apiKey.id}-${Date.now()}`;
+    const startTime = Date.now();
+
     // Create transaction BEFORE calling MbiyoPay API so it always appears in history
     const tx = await storage.createTransaction({
       userId: apiKey.userId,
@@ -617,7 +643,8 @@ export async function handleMbiyoPayApiPayment(
         provider: "mbiyopay",
         paymentProvider: "mbiyopay",
         developerCallbackUrl: callbackUrl,
-        startTime: Date.now(),
+        orderId,
+        startTime,
       }),
     });
 
@@ -627,7 +654,7 @@ export async function handleMbiyoPayApiPayment(
       phone: customerPhone,
       countryCode: country,
       network: operator,
-      orderId: `BKAPAY-API-${apiKey.id}-${Date.now()}`,
+      orderId,
       callbackUrl: `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/mbiyopay`,
     });
 
@@ -644,7 +671,8 @@ export async function handleMbiyoPayApiPayment(
       provider: "mbiyopay",
       paymentProvider: "mbiyopay",
       developerCallbackUrl: callbackUrl,
-      startTime: Date.now(),
+      orderId,
+      startTime,
     });
     await storage.updateTransactionMetadata(tx.id, updatedMetadata);
 
@@ -685,15 +713,17 @@ export async function handleMbiyoPayWebhook(req: Request, res: Response) {
     }
 
     // MbiyoPay webhook format: { event, transaction_id, order_id, status, amount, ... }
-    const { event, transaction_id, status } = payload;
+    const { event, transaction_id, order_id, status } = payload;
+    console.log("[MbiyoPay Webhook] Full payload:", JSON.stringify(payload));
 
-    if (!transaction_id) {
-      console.warn(`[SECURITY] MbiyoPay webhook without transaction_id from IP: ${clientIP}`);
-      return res.status(400).json({ error: "Missing transaction_id" });
+    if (!transaction_id && !order_id) {
+      console.warn(`[SECURITY] MbiyoPay webhook without transaction_id or order_id from IP: ${clientIP}`);
+      return res.status(400).json({ error: "Missing transaction_id and order_id" });
     }
 
     const pendingTransactions = await storage.getAllPendingTransactions();
-    const tx = pendingTransactions.find((t: any) => {
+    // Match by mbiyopayTransactionId first, then fallback to orderId
+    let tx = pendingTransactions.find((t: any) => {
       try {
         const metadata = JSON.parse(t.metadata || "{}");
         return metadata.mbiyopayTransactionId === transaction_id;
@@ -702,8 +732,32 @@ export async function handleMbiyoPayWebhook(req: Request, res: Response) {
       }
     });
     
+    // Fallback: match by order_id if mbiyopayTransactionId not found
+    if (!tx && order_id) {
+      tx = pendingTransactions.find((t: any) => {
+        try {
+          const metadata = JSON.parse(t.metadata || "{}");
+          return metadata.orderId === order_id;
+        } catch {
+          return false;
+        }
+      });
+      if (tx) {
+        console.log(`[MbiyoPay Webhook] Matched by order_id: ${order_id} -> BKApay tx: ${tx.id}`);
+        // Update metadata with the MbiyoPay transaction ID we just received
+        try {
+          const existingMeta = JSON.parse(tx.metadata || "{}");
+          existingMeta.mbiyopayTransactionId = transaction_id;
+          await storage.updateTransactionMetadata(tx.id, JSON.stringify(existingMeta));
+          console.log(`[MbiyoPay Webhook] Updated metadata with mbiyopayTransactionId: ${transaction_id}`);
+        } catch (e) {
+          console.error(`[MbiyoPay Webhook] Failed to update metadata:`, e);
+        }
+      }
+    }
+    
     if (!tx) {
-      console.warn(`[SECURITY] MbiyoPay webhook for unknown transaction from IP ${clientIP}: ${transaction_id}`);
+      console.warn(`[SECURITY] MbiyoPay webhook for unknown transaction from IP ${clientIP}: transaction_id=${transaction_id}, order_id=${order_id}`);
       return res.status(404).json({ error: "Transaction not found" });
     }
 

@@ -3,6 +3,15 @@ import { storage } from "./storage";
 const MBIYOPAY_BASE_URL = "https://dashboard.mbiyo.africa/api/v1";
 const MBIYOPAY_TIMEOUT_MS = 30000; // 30 seconds timeout for API calls
 
+// Helper to safely extract message string from MbiyoPay API responses
+// MbiyoPay sometimes returns message as a string, sometimes as an array
+function extractMessage(msg: any): string {
+  if (!msg) return "";
+  if (typeof msg === "string") return msg;
+  if (Array.isArray(msg)) return msg.join(", ");
+  return String(msg);
+}
+
 export const MBIYOPAY_SUPPORTED_COUNTRIES = ["bj", "bf", "ci", "sn", "tg", "ml", "gn", "cm", "cg", "cd", "gm"];
 
 export const MBIYOPAY_COUNTRY_CURRENCIES: Record<string, string> = {
@@ -238,40 +247,56 @@ export async function createMbiyoPayPayin(params: MbiyoPayPayinParams): Promise<
     
     const data = await response.json();
     
+    const apiMessage = extractMessage(data.message);
+    console.log(`[MbiyoPay Payin] Response: status=${data.status}, message="${apiMessage}", hasData=${!!data.data}`);
+
+    // Success case: status is "success" and data contains transaction info
     if (data.status === "success" && data.data) {
       console.log(`[MbiyoPay Payin] Payment created: ${data.data.transaction_id}`);
-      // Capture instructions field for Gambia networks
       const result: MbiyoPayPayinResult = {
         success: true,
         transactionId: data.data.transaction_id,
         status: data.data.status,
         redirectUrl: data.data.redirect_url,
-        message: data.message || "Paiement initie avec succes",
+        message: apiMessage || "Paiement initie avec succes",
         fee: data.data.fee,
         chargedAmount: data.data.charged_amount,
       };
-      // Add instructions for Gambia if present
       if (data.data.instructions) {
         result.instructions = data.data.instructions;
         console.log(`[MbiyoPay Payin] Instructions provided: ${data.data.instructions}`);
       }
       return result;
     }
+
+    // Some MbiyoPay responses have status != "success" but message contains "Success"
+    // and data contains transaction info - handle this edge case
+    if (data.data && data.data.transaction_id) {
+      console.log(`[MbiyoPay Payin] Non-standard success: status=${data.status}, but data present with transaction_id=${data.data.transaction_id}`);
+      return {
+        success: true,
+        transactionId: data.data.transaction_id,
+        status: data.data.status,
+        redirectUrl: data.data.redirect_url,
+        message: apiMessage || "Paiement initie avec succes",
+        fee: data.data.fee,
+        chargedAmount: data.data.charged_amount,
+      };
+    }
     
-    console.error("[MbiyoPay Payin] Error:", data);
+    console.error("[MbiyoPay Payin] Error:", JSON.stringify(data));
     
-    // Handle specific MbiyoPay error messages professionally
     let errorMessage = "Paiement echoue";
-    const apiMessage = data.message?.toLowerCase() || "";
+    const msgLower = apiMessage.toLowerCase();
     
-    if (apiMessage.includes("invalid") && apiMessage.includes("phone")) {
+    if (msgLower.includes("invalid") && msgLower.includes("phone")) {
       errorMessage = "Paiement echoue: Numero de telephone invalide.";
-    } else if (apiMessage.includes("network") || apiMessage.includes("operator")) {
+    } else if (msgLower.includes("network") || msgLower.includes("operator")) {
       errorMessage = "Paiement echoue: Operateur non supporte pour ce pays.";
-    } else if (apiMessage.includes("amount")) {
+    } else if (msgLower.includes("amount")) {
       errorMessage = "Paiement echoue: Montant invalide.";
-    } else if (data.message) {
-      errorMessage = `Paiement echoue: ${data.message}`;
+    } else if (apiMessage) {
+      errorMessage = `Paiement echoue: ${apiMessage}`;
     }
     
     return { 
@@ -366,34 +391,48 @@ export async function createMbiyoPayPayout(params: MbiyoPayPayoutParams): Promis
     
     const data = await response.json();
     
+    const apiMessage = extractMessage(data.message);
+    console.log(`[MbiyoPay Payout] Response: status=${data.status}, message="${apiMessage}", hasData=${!!data.data}`);
+
     if (data.status === "success" && data.data) {
       console.log(`[MbiyoPay Payout] Payout created: ${data.data.transaction_id}`);
       return {
         success: true,
         transactionId: data.data.transaction_id,
         status: data.data.status,
-        message: data.message || "Retrait initie avec succes",
+        message: apiMessage || "Retrait initie avec succes",
+        fee: data.data.fee,
+        chargedAmount: data.data.charged_amount,
+      };
+    }
+
+    if (data.data && data.data.transaction_id) {
+      console.log(`[MbiyoPay Payout] Non-standard success: status=${data.status}, but data present with transaction_id=${data.data.transaction_id}`);
+      return {
+        success: true,
+        transactionId: data.data.transaction_id,
+        status: data.data.status,
+        message: apiMessage || "Retrait initie avec succes",
         fee: data.data.fee,
         chargedAmount: data.data.charged_amount,
       };
     }
     
-    console.error("[MbiyoPay Payout] Error:", data);
+    console.error("[MbiyoPay Payout] Error:", JSON.stringify(data));
     
-    // Handle specific MbiyoPay error messages professionally
     let errorMessage = "Retrait echoue";
-    const apiMessage = data.message?.toLowerCase() || "";
+    const msgLower = apiMessage.toLowerCase();
     
-    if (apiMessage.includes("insufficient balance") || apiMessage.includes("balance")) {
+    if (msgLower.includes("insufficient balance") || msgLower.includes("balance")) {
       errorMessage = "Retrait echoue: Insuffisance de solde dans le wallet de paiement. Veuillez reessayer plus tard.";
-    } else if (apiMessage.includes("kyc")) {
+    } else if (msgLower.includes("kyc")) {
       errorMessage = "Retrait echoue: Verification KYC requise par le fournisseur.";
-    } else if (apiMessage.includes("invalid") && apiMessage.includes("phone")) {
+    } else if (msgLower.includes("invalid") && msgLower.includes("phone")) {
       errorMessage = "Retrait echoue: Numero de telephone invalide.";
-    } else if (apiMessage.includes("network") || apiMessage.includes("operator")) {
+    } else if (msgLower.includes("network") || msgLower.includes("operator")) {
       errorMessage = "Retrait echoue: Operateur non supporte pour ce pays.";
-    } else if (data.message) {
-      errorMessage = `Retrait echoue: ${data.message}`;
+    } else if (apiMessage) {
+      errorMessage = `Retrait echoue: ${apiMessage}`;
     }
     
     return { 
@@ -444,7 +483,10 @@ export async function getMbiyoPayTransactionStatus(transactionId: string): Promi
     
     const data = await response.json();
     
-    if (data.status === "success" && data.data) {
+    const statusMessage = extractMessage(data.message);
+    console.log(`[MbiyoPay Status] Response: status=${data.status}, message="${statusMessage}", hasData=${!!data.data}`);
+
+    if (data.data) {
       return {
         success: true,
         transactionId: data.data.transaction_id,
@@ -457,7 +499,7 @@ export async function getMbiyoPayTransactionStatus(transactionId: string): Promi
     
     return { 
       success: false, 
-      error: data.message || "Transaction non trouvee" 
+      error: statusMessage || "Transaction non trouvee" 
     };
   } catch (error: any) {
     console.error("[MbiyoPay Status] Exception:", error);
