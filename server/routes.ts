@@ -3973,6 +3973,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Admin endpoint to resend MbiyoPay webhook for stuck transactions
   app.post("/api/admin/mbiyopay/resend-webhook", handleMbiyoPayResendWebhook);
 
+  // Admin diagnostic endpoint to check MbiyoPay merchant account status
+  app.get("/api/admin/mbiyopay/diagnostic", async (req: Request, res: Response) => {
+    if (!req.session?.userId) return res.status(401).json({ error: "Non authentifie" });
+    const user = await storage.getUser(req.session.userId);
+    if (!user?.isAdmin) return res.status(403).json({ error: "Non autorise" });
+
+    const { checkMbiyoPayMerchantStatus } = await import("./mbiyopay");
+    const result = await checkMbiyoPayMerchantStatus();
+    res.json(result);
+  });
+
   // ===== Currency Conversion Route =====
   app.post("/api/convert-currency", async (req: Request, res: Response) => {
     try {

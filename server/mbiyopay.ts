@@ -406,7 +406,21 @@ export async function createMbiyoPayPayout(params: MbiyoPayPayoutParams): Promis
     const data = await response.json();
     
     const apiMessage = extractMessage(data.message);
-    console.log(`[MbiyoPay Payout] Response: status=${data.status}, message="${apiMessage}", hasData=${!!data.data}`);
+    console.log(`[MbiyoPay Payout] HTTP ${response.status} Response: status=${data.status}, message="${apiMessage}", hasData=${!!data.data}`);
+    
+    // Log specific HTTP error codes for debugging
+    if (response.status === 403) {
+      console.error(`[MbiyoPay Payout] HTTP 403 Forbidden - Likely KYC not approved for payouts on merchant account`);
+      return { success: false, error: "Retrait echoue: KYC du compte marchand MbiyoPay non approuve. Verifiez votre compte sur dashboard.mbiyo.africa" };
+    }
+    if (response.status === 401) {
+      console.error(`[MbiyoPay Payout] HTTP 401 Unauthorized - API key invalid or expired`);
+      return { success: false, error: "Retrait echoue: Cle API MbiyoPay invalide ou expiree." };
+    }
+    if (response.status >= 500) {
+      console.error(`[MbiyoPay Payout] HTTP ${response.status} Server Error - MbiyoPay service issue`);
+      return { success: false, error: "Retrait echoue: Service MbiyoPay temporairement indisponible. Reessayez dans quelques minutes." };
+    }
 
     if (data.status === "success" && data.data) {
       console.log(`[MbiyoPay Payout] Payout created: ${data.data.transaction_id}`);
@@ -449,13 +463,15 @@ export async function createMbiyoPayPayout(params: MbiyoPayPayoutParams): Promis
     const msgLower = apiMessage.toLowerCase();
     
     if (msgLower.includes("insufficient balance") || msgLower.includes("balance")) {
-      errorMessage = "Retrait echoue: Insuffisance de solde dans le wallet de paiement. Veuillez reessayer plus tard.";
+      errorMessage = "Retrait echoue: Insuffisance de solde dans le wallet marchand MbiyoPay.";
     } else if (msgLower.includes("kyc")) {
-      errorMessage = "Retrait echoue: Verification KYC requise par le fournisseur.";
+      errorMessage = "Retrait echoue: KYC du compte marchand MbiyoPay non approuve pour les payouts.";
     } else if (msgLower.includes("invalid") && msgLower.includes("phone")) {
       errorMessage = "Retrait echoue: Numero de telephone invalide.";
     } else if (msgLower.includes("network") || msgLower.includes("operator")) {
       errorMessage = "Retrait echoue: Operateur non supporte pour ce pays.";
+    } else if (msgLower.includes("transaction initiation failed")) {
+      errorMessage = "Retrait echoue: Le service de payout MbiyoPay n'est pas disponible. Verifiez que votre compte marchand MbiyoPay a les permissions payout activees et un solde suffisant sur dashboard.mbiyo.africa";
     } else if (apiMessage) {
       errorMessage = `Retrait echoue: ${apiMessage}`;
     }
@@ -529,6 +545,54 @@ export async function getMbiyoPayTransactionStatus(transactionId: string): Promi
   } catch (error: any) {
     console.error("[MbiyoPay Status] Exception:", error);
     return { success: false, error: error.message || "Erreur de connexion" };
+  }
+}
+
+export async function checkMbiyoPayMerchantStatus(): Promise<{
+  success: boolean;
+  balance?: number;
+  currency?: string;
+  kycStatus?: string;
+  payoutEnabled?: boolean;
+  error?: string;
+  rawResponse?: any;
+}> {
+  try {
+    const apiKey = await getMbiyoPayApiKey();
+    if (!apiKey) {
+      return { success: false, error: "MbiyoPay non configure ou desactive" };
+    }
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), MBIYOPAY_TIMEOUT_MS);
+
+    let response: Response;
+    try {
+      response = await fetch(`${MBIYOPAY_BASE_URL}/merchant/balance`, {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+        },
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    const data = await response.json();
+    console.log(`[MbiyoPay Diagnostic] HTTP ${response.status} Balance check:`, JSON.stringify(data));
+
+    return {
+      success: response.status === 200,
+      balance: data.data?.balance || data.balance,
+      currency: data.data?.currency || data.currency,
+      kycStatus: data.data?.kyc_status || data.kyc_status,
+      payoutEnabled: data.data?.payout_enabled || data.payout_enabled,
+      rawResponse: data,
+    };
+  } catch (error: any) {
+    console.error("[MbiyoPay Diagnostic] Error:", error.message);
+    return { success: false, error: error.message };
   }
 }
 
