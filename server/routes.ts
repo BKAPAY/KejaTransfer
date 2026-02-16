@@ -53,6 +53,7 @@ import {
   handleMbiyoPayApiPayment,
   handleMbiyoPayWebhook,
   handleMbiyoPayResendWebhook,
+  pollMbiyoPayTransaction,
 } from "./mbiyopay-routes";
 import {
   MBIYOPAY_SUPPORTED_COUNTRIES,
@@ -2431,6 +2432,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           } catch (checkError) {
             console.log(`[TransactionStatus] Error checking FedaPay for ${transaction.id}:`, checkError);
+          }
+        }
+
+        // Check MbiyoPay if we have a MbiyoPay transaction ID
+        if (metadata.mbiyopayTransactionId && metadata.provider === "mbiyopay") {
+          try {
+            const mbiyoStatus = await pollMbiyoPayTransaction(metadata.mbiyopayTransactionId);
+            console.log(`[TransactionStatus] MbiyoPay check for ${transaction.id}:`, mbiyoStatus);
+
+            if (mbiyoStatus.completed && mbiyoStatus.status === "completed") {
+              if (transaction.type === "deposit" || transaction.type === "payment_link" || transaction.type === "merchant_link" || transaction.type === "api_payment") {
+                const result = await storage.finalizeIncomingTransaction(transaction.id, {});
+                console.log(`[TransactionStatus] MbiyoPay CONFIRMED - finalized: ${result ? 'new' : 'already processed'}`);
+              } else {
+                await storage.updateTransactionStatus(transaction.id, "completed");
+              }
+              return res.json({ 
+                status: "completed",
+                message: "Paiement confirme"
+              });
+            } else if (mbiyoStatus.completed && mbiyoStatus.status === "failed") {
+              if (transaction.type === "withdrawal" || transaction.type === "transfer") {
+                const refundAmount = metadata.deductedFromBalance || metadata.totalDebited || transaction.amount;
+                await storage.updateUserBalance(transaction.userId, refundAmount);
+                console.log(`[TransactionStatus] MbiyoPay FAILED - refunding ${refundAmount} for ${transaction.type}`);
+              }
+              await storage.updateTransactionStatus(transaction.id, "failed");
+              return res.json({ 
+                status: "failed",
+                message: "Paiement echoue ou annule"
+              });
+            }
+          } catch (checkError) {
+            console.log(`[TransactionStatus] Error checking MbiyoPay for ${transaction.id}:`, checkError);
           }
         }
 

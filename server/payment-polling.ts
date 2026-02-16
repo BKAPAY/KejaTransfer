@@ -259,19 +259,29 @@ async function processMbiyoPayTransaction(transaction: Transaction & { user?: Us
     if (statusResult.success && statusResult.status) {
       const status = statusResult.status.toLowerCase();
       
-      // MbiyoPay status: completed, success, successful = payment confirmed
-      if (status === "completed" || status === "success" || status === "successful" || status === "approved") {
-        const result = await storage.finalizeIncomingTransaction(transaction.id, {});
-        if (result) {
-          console.log(`[PaymentPolling] ✅ MbiyoPay transaction ${transaction.id} CONFIRMED - finalized: credited=${result.credited}`);
+      // MbiyoPay official status: successful = payment confirmed (per API docs)
+      if (status === "successful") {
+        if (transaction.type === "deposit" || transaction.type === "payment_link" || transaction.type === "merchant_link" || transaction.type === "api_payment") {
+          const result = await storage.finalizeIncomingTransaction(transaction.id, {});
+          if (result) {
+            console.log(`[PaymentPolling] ✅ MbiyoPay transaction ${transaction.id} CONFIRMED - finalized: credited=${result.credited}`);
+          } else {
+            console.log(`[PaymentPolling] MbiyoPay transaction ${transaction.id} already processed - skipping`);
+          }
         } else {
-          console.log(`[PaymentPolling] MbiyoPay transaction ${transaction.id} already processed - skipping`);
+          await storage.updateTransactionStatus(transaction.id, "completed");
+          console.log(`[PaymentPolling] ✅ MbiyoPay ${transaction.type} ${transaction.id} COMPLETED`);
         }
         return true;
       } 
-      // MbiyoPay status: failed, cancelled, declined, expired = payment failed
-      else if (status === "failed" || status === "cancelled" || status === "canceled" || status === "declined" || status === "expired") {
+      // MbiyoPay official status: failed, cancelled = payment failed (per API docs)
+      else if (status === "failed" || status === "cancelled") {
         console.log(`[PaymentPolling] ❌ MbiyoPay transaction ${transaction.id} failed (status: ${status})`);
+        if (transaction.type === "withdrawal" || transaction.type === "transfer") {
+          const refundAmount = metadata.deductedFromBalance || metadata.totalDebited || transaction.amount;
+          await storage.updateUserBalance(transaction.userId, refundAmount);
+          console.log(`[PaymentPolling] Refunded ${refundAmount} to user ${transaction.userId} for failed MbiyoPay ${transaction.type}`);
+        }
         await storage.updateTransactionStatus(transaction.id, "failed");
         return true;
       } 

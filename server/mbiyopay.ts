@@ -47,16 +47,16 @@ export const COUNTRY_PHONE_PREFIXES: Record<string, string> = {
 };
 
 // Map internal operator codes to MbiyoPay API codes
-// Some operators have different names (e.g., togocom -> tmoney, celtiis -> celtis)
+// Names match the official MbiyoPay documentation exactly
 export const MBIYOPAY_OPERATOR_API_CODES: Record<string, Record<string, string>> = {
   tg: {
-    togocom: "tmoney",  // Togocel's mobile money service is called T-Money
+    togocom: "togocom",
     moov: "moov",
   },
   bj: {
     mtn: "mtn",
     moov: "moov",
-    celtiis: "celtis",  // May need adjustment
+    celtiis: "celtiis",
   },
   bf: {
     orange: "orange",

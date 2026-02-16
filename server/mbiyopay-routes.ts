@@ -570,20 +570,21 @@ export async function handleMbiyoPayWebhook(req: Request, res: Response) {
     const clientIP = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
     console.log("[MbiyoPay Webhook] Received:", { transaction_id: payload.transaction_id, status: payload.status, ip: clientIP });
 
-    // Verify webhook signature if secret is configured
+    // Verify webhook signature using the secret configured in MbiyoPay dashboard
     const webhookSecret = process.env.MBIYOPAY_WEBHOOK_SECRET;
     if (webhookSecret) {
-      // MbiyoPay may send signature in various headers
-      const signature = req.headers["x-webhook-signature"] || 
-                       req.headers["x-webhook-secret"] || 
+      const signature = req.headers["x-webhook-secret"] || 
+                       req.headers["x-webhook-signature"] || 
                        req.headers["x-signature"] || 
                        req.headers["signature"] ||
-                       req.headers["authorization"]?.replace("Bearer ", "");
-      if (signature !== webhookSecret) {
-        console.error(`[SECURITY] MbiyoPay webhook invalid signature from IP: ${clientIP}`);
+                       req.headers["secret"];
+      if (!signature || signature !== webhookSecret) {
+        console.error(`[SECURITY] MbiyoPay webhook invalid signature from IP: ${clientIP}, received: ${signature ? 'present but wrong' : 'missing'}`);
         return res.status(401).json({ error: "Invalid signature" });
       }
-      console.log("[MbiyoPay Webhook] Signature verified");
+      console.log("[MbiyoPay Webhook] Signature verified successfully");
+    } else {
+      console.warn("[MbiyoPay Webhook] No MBIYOPAY_WEBHOOK_SECRET configured - skipping signature verification");
     }
 
     // MbiyoPay webhook format: { event, transaction_id, order_id, status, amount, ... }
@@ -628,7 +629,7 @@ export async function handleMbiyoPayWebhook(req: Request, res: Response) {
       }
       
       const apiStatus = (apiVerification.status || "").toLowerCase();
-      const isVerified = apiStatus === "completed" || apiStatus === "success" || apiStatus === "successful" || apiStatus === "approved";
+      const isVerified = apiStatus === "successful";
       
       if (!isVerified) {
         console.error(`[SECURITY] ⚠️ PAYMENT VERIFICATION FAILED for transaction ${tx.id}`);
@@ -678,11 +679,11 @@ export async function pollMbiyoPayTransaction(transactionId: string): Promise<{ 
       return { status: "pending", completed: false };
     }
 
-    const status = result.status?.toLowerCase();
+    const apiStatus = result.status?.toLowerCase();
     
-    if (status === "successful") {
+    if (apiStatus === "successful") {
       return { status: "completed", completed: true };
-    } else if (status === "failed" || status === "cancelled") {
+    } else if (apiStatus === "failed" || apiStatus === "cancelled") {
       return { status: "failed", completed: true };
     }
 
