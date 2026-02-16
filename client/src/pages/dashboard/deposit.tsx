@@ -293,7 +293,7 @@ export default function Deposit() {
       if (paymentData.provider === "mbiyopay") {
         const providerAmount = conversionData ? Math.floor(conversionData.convertedAmount) : depositAmount;
         const providerCurrency = conversionData ? conversionData.targetCurrency : userBalanceCurrency;
-        const res = await apiRequest("POST", "/api/deposit", {
+        const res = await apiRequest("POST", "/api/fedapay/deposit", {
           ...formData,
           amount: providerAmount,
           currency: providerCurrency,
