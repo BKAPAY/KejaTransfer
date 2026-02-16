@@ -308,10 +308,13 @@ export async function createMbiyoPayPayin(params: MbiyoPayPayinParams): Promise<
     
     const apiMessage = extractMessage(data.message);
     console.log(`[MbiyoPay Payin] Response: status=${data.status}, message="${apiMessage}", hasData=${!!data.data}`);
+    if (data.data) {
+      console.log(`[MbiyoPay Payin] Response data: transaction_id=${data.data.transaction_id}, status=${data.data.status}, redirect_url=${data.data.redirect_url || "NONE"}, fee=${data.data.fee}, instructions=${data.data.instructions || "NONE"}`);
+    }
 
     // Success case: status is "success" and data contains transaction info
     if (data.status === "success" && data.data) {
-      console.log(`[MbiyoPay Payin] Payment created: ${data.data.transaction_id}`);
+      console.log(`[MbiyoPay Payin] Payment created: ${data.data.transaction_id}, redirectUrl=${data.data.redirect_url || "NONE"}`);
       const result: MbiyoPayPayinResult = {
         success: true,
         transactionId: data.data.transaction_id,

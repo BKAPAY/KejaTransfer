@@ -114,6 +114,7 @@ export async function handleMbiyoPayDeposit(
     });
     await storage.updateTransactionMetadata(tx.id, updatedMetadata);
 
+    console.log(`[MbiyoPay Deposit] Returning to frontend: transactionId=${tx.id}, redirectUrl=${result.redirectUrl || "NONE"}, instructions=${result.instructions || "NONE"}`);
     return {
       success: true,
       transactionId: tx.id,

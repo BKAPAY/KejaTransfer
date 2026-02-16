@@ -528,10 +528,16 @@ export default function Deposit() {
             <div>
               <p className="font-semibold text-lg">Validation en attente</p>
               <p className="text-sm text-muted-foreground mt-2">
-                {paymentData.message || "Une demande de paiement a ete envoyee sur votre telephone."}
+                {form.getValues("operator")?.toLowerCase() === "wave"
+                  ? "Une demande de paiement Wave a ete envoyee. Ouvrez l'application Wave sur votre telephone et acceptez la demande de paiement."
+                  : form.getValues("operator")?.toLowerCase() === "orange"
+                    ? "Une demande de paiement Orange Money a ete envoyee sur votre telephone."
+                    : "Une demande de paiement a ete envoyee sur votre telephone."}
               </p>
               <p className="text-sm text-muted-foreground mt-1">
-                Veuillez valider le paiement sur votre application mobile money.
+                {form.getValues("operator")?.toLowerCase() === "wave"
+                  ? "Verifiez vos notifications Wave pour valider le paiement."
+                  : "Veuillez valider le paiement sur votre application mobile money."}
               </p>
             </div>
             <div className="text-center p-4 bg-muted rounded-lg">
