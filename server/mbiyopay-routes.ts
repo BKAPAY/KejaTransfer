@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import { storage } from "./storage";
-import { randomUUID } from "crypto";
+
 import { calculateIncomingFee, calculateOutgoingFee, getFeeFromDatabase } from "./utils/fees";
 import { 
   createMbiyoPayPayin, 
@@ -35,31 +35,15 @@ export async function handleMbiyoPayDeposit(
       return { success: false, error: `Operateur ${operator} non supporte pour ${country}` };
     }
 
-    // Provider gets the converted amount, balance uses original amount
     const providerAmount = Math.floor(amount);
     const providerCurrency = currency || getCurrencyForCountry(country);
     const balanceAmount = originalAmount ? Math.floor(originalAmount) : providerAmount;
     const userCurrency = originalCurrency || providerCurrency;
     
-    // Get dynamic fees from database for mbiyopay - calculate fees on the balance amount
     const feeConfig = await getFeeFromDatabase(storage, "mbiyopay", country, operator);
     const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming);
 
-    const result = await createMbiyoPayPayin({
-      amount: providerAmount,
-      currency: providerCurrency,
-      phone: phone,
-      countryCode: country,
-      network: operator,
-      orderId: `BKAPAY-DEP-${Date.now()}`,
-      callbackUrl: `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/mbiyopay`,
-    });
-
-    if (!result.success) {
-      return { success: false, error: result.error || "Erreur lors du depot" };
-    }
-
-    const transactionId = randomUUID();
+    // Create transaction BEFORE calling MbiyoPay API so it always appears in history
     const tx = await storage.createTransaction({
       userId: userId,
       type: "deposit",
@@ -73,16 +57,47 @@ export async function handleMbiyoPayDeposit(
       description: `Depot de ${providerAmount} ${providerCurrency}`,
       customerPhone: phone,
       metadata: JSON.stringify({
-        mbiyopayTransactionId: result.transactionId,
-        redirectUrl: result.redirectUrl,
         phone,
         provider: "mbiyopay",
+        paymentProvider: "mbiyopay",
         providerAmount,
         providerCurrency,
         balanceAmount,
         balanceCurrency: userCurrency,
+        startTime: Date.now(),
       }),
     });
+
+    const result = await createMbiyoPayPayin({
+      amount: providerAmount,
+      currency: providerCurrency,
+      phone: phone,
+      countryCode: country,
+      network: operator,
+      orderId: `BKAPAY-DEP-${Date.now()}`,
+      callbackUrl: `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/mbiyopay`,
+    });
+
+    if (!result.success) {
+      // Mark the transaction as failed since MbiyoPay rejected it
+      await storage.updateTransactionStatus(tx.id, "failed");
+      return { success: false, transactionId: tx.id, error: result.error || "Erreur lors du depot" };
+    }
+
+    // Update transaction with MbiyoPay transaction ID
+    const updatedMetadata = JSON.stringify({
+      mbiyopayTransactionId: result.transactionId,
+      redirectUrl: result.redirectUrl,
+      phone,
+      provider: "mbiyopay",
+      paymentProvider: "mbiyopay",
+      providerAmount,
+      providerCurrency,
+      balanceAmount,
+      balanceCurrency: userCurrency,
+      startTime: Date.now(),
+    });
+    await storage.updateTransactionMetadata(tx.id, updatedMetadata);
 
     return {
       success: true,
@@ -90,7 +105,7 @@ export async function handleMbiyoPayDeposit(
       mbiyopayTransactionId: result.transactionId,
       redirectUrl: result.redirectUrl,
       message: result.message || "Paiement initie. Veuillez valider sur votre telephone.",
-      instructions: result.instructions, // For Gambia networks
+      instructions: result.instructions,
     };
   } catch (error: any) {
     console.error("[MbiyoPay Deposit] Error:", error);
@@ -122,7 +137,6 @@ export async function handleMbiyoPayWithdrawal(
     const providerCurrency = getCurrencyForCountry(country);
     const balanceCurrency = userCurrency || providerCurrency;
     
-    // Get dynamic fees from database for mbiyopay
     const feeConfig = await getFeeFromDatabase(storage, "mbiyopay", country, operator);
     const feeInfo = calculateOutgoingFee(grossAmount, feeConfig.outgoing);
 
@@ -130,7 +144,6 @@ export async function handleMbiyoPayWithdrawal(
       return { success: false, error: "Solde insuffisant" };
     }
 
-    // CRITICAL: Convert amount from user's currency to provider currency if different
     let amountForProvider = feeInfo.amountReceived;
     if (balanceCurrency !== providerCurrency) {
       const { convertCurrency } = await import("./currency-converter");
@@ -147,8 +160,37 @@ export async function handleMbiyoPayWithdrawal(
     const beneficiaryName = user.firstName && user.lastName 
       ? `${user.firstName} ${user.lastName}` 
       : "BKApay User";
-    
-    // ALWAYS send converted amount to provider
+
+    // Debit balance BEFORE API call
+    await storage.updateUserBalance(userId, -feeInfo.totalDeductedFromBalance);
+
+    // Create transaction BEFORE calling MbiyoPay API so it always appears in history
+    const tx = await storage.createTransaction({
+      userId: userId,
+      type: "withdrawal",
+      amount: grossAmount,
+      fee: feeInfo.feeAmount,
+      feePercentage: feeInfo.feePercentage,
+      currency: balanceCurrency,
+      status: "pending",
+      country: country.toUpperCase(),
+      operator: operator,
+      description: `Retrait de ${grossAmount} ${balanceCurrency} (recu: ${amountForProvider} ${providerCurrency})`,
+      customerPhone: phone,
+      metadata: JSON.stringify({
+        phone,
+        deductedFromBalance: feeInfo.totalDeductedFromBalance,
+        amountReceived: feeInfo.amountReceived,
+        providerAmount: amountForProvider,
+        providerCurrency: providerCurrency,
+        balanceAmount: grossAmount,
+        balanceCurrency: balanceCurrency,
+        provider: "mbiyopay",
+        paymentProvider: "mbiyopay",
+        startTime: Date.now(),
+      }),
+    });
+
     const result = await createMbiyoPayPayout({
       amount: amountForProvider,
       currency: providerCurrency,
@@ -161,35 +203,27 @@ export async function handleMbiyoPayWithdrawal(
     });
 
     if (!result.success) {
-      return { success: false, error: result.error || "Retrait echoue" };
+      // Refund balance and mark as failed
+      await storage.updateUserBalance(userId, feeInfo.totalDeductedFromBalance);
+      await storage.updateTransactionStatus(tx.id, "failed");
+      return { success: false, transactionId: tx.id, error: result.error || "Retrait echoue" };
     }
 
-    await storage.updateUserBalance(userId, -feeInfo.totalDeductedFromBalance);
-
-    const tx = await storage.createTransaction({
-      userId: userId,
-      type: "withdrawal",
-      amount: grossAmount,
-      fee: feeInfo.feeAmount,
-      feePercentage: feeInfo.feePercentage,
-      currency: balanceCurrency, // Store in user's currency
-      status: "pending",
-      country: country.toUpperCase(),
-      operator: operator,
-      description: `Retrait de ${grossAmount} ${balanceCurrency} (recu: ${amountForProvider} ${providerCurrency})`,
-      customerPhone: phone,
-      metadata: JSON.stringify({
-        mbiyopayTransactionId: result.transactionId,
-        phone,
-        deductedFromBalance: feeInfo.totalDeductedFromBalance,
-        amountReceived: feeInfo.amountReceived,
-        providerAmount: amountForProvider,
-        providerCurrency: providerCurrency,
-        balanceAmount: grossAmount,
-        balanceCurrency: balanceCurrency,
-        provider: "mbiyopay",
-      }),
+    // Update transaction with MbiyoPay transaction ID
+    const updatedMetadata = JSON.stringify({
+      mbiyopayTransactionId: result.transactionId,
+      phone,
+      deductedFromBalance: feeInfo.totalDeductedFromBalance,
+      amountReceived: feeInfo.amountReceived,
+      providerAmount: amountForProvider,
+      providerCurrency: providerCurrency,
+      balanceAmount: grossAmount,
+      balanceCurrency: balanceCurrency,
+      provider: "mbiyopay",
+      paymentProvider: "mbiyopay",
+      startTime: Date.now(),
     });
+    await storage.updateTransactionMetadata(tx.id, updatedMetadata);
 
     return {
       success: true,
@@ -225,7 +259,6 @@ export async function handleMbiyoPayTransfer(
     const providerCurrency = getCurrencyForCountry(country);
     const balanceCurrency = userCurrency || providerCurrency;
     
-    // Get dynamic fees from database for mbiyopay
     const feeConfig = await getFeeFromDatabase(storage, "mbiyopay", country, operator);
     const feeInfo = calculateOutgoingFee(netAmount, feeConfig.outgoing);
     const totalToDebit = netAmount + feeInfo.feeAmount;
@@ -234,7 +267,6 @@ export async function handleMbiyoPayTransfer(
       return { success: false, error: "Solde insuffisant" };
     }
 
-    // CRITICAL: Convert amount from user's currency to provider currency if different
     let amountForProvider = netAmount;
     if (balanceCurrency !== providerCurrency) {
       const { convertCurrency } = await import("./currency-converter");
@@ -251,8 +283,36 @@ export async function handleMbiyoPayTransfer(
     const beneficiaryName = user.firstName && user.lastName 
       ? `${user.firstName} ${user.lastName}` 
       : "BKApay User";
-    
-    // ALWAYS send converted amount to provider
+
+    // Debit balance BEFORE API call
+    await storage.updateUserBalance(userId, -totalToDebit);
+
+    // Create transaction BEFORE calling MbiyoPay API so it always appears in history
+    const tx = await storage.createTransaction({
+      userId: userId,
+      type: "transfer",
+      amount: netAmount,
+      fee: feeInfo.feeAmount,
+      feePercentage: feeInfo.feePercentage,
+      currency: balanceCurrency,
+      status: "pending",
+      country: country.toUpperCase(),
+      operator: operator,
+      description: `Transfert de ${netAmount} ${balanceCurrency} (envoye: ${amountForProvider} ${providerCurrency})`,
+      customerPhone: phone,
+      metadata: JSON.stringify({
+        phone,
+        totalDebited: totalToDebit,
+        providerAmount: amountForProvider,
+        providerCurrency: providerCurrency,
+        balanceAmount: netAmount,
+        balanceCurrency: balanceCurrency,
+        provider: "mbiyopay",
+        paymentProvider: "mbiyopay",
+        startTime: Date.now(),
+      }),
+    });
+
     const result = await createMbiyoPayPayout({
       amount: amountForProvider,
       currency: providerCurrency,
@@ -265,36 +325,27 @@ export async function handleMbiyoPayTransfer(
     });
 
     if (!result.success) {
-      // Replace "Retrait" with "Transfert" in error message
+      // Refund balance and mark as failed
+      await storage.updateUserBalance(userId, totalToDebit);
+      await storage.updateTransactionStatus(tx.id, "failed");
       const errorMsg = result.error ? result.error.replace("Retrait", "Transfert") : "Transfert echoue";
-      return { success: false, error: errorMsg };
+      return { success: false, transactionId: tx.id, error: errorMsg };
     }
 
-    await storage.updateUserBalance(userId, -totalToDebit);
-
-    const tx = await storage.createTransaction({
-      userId: userId,
-      type: "transfer",
-      amount: netAmount,
-      fee: feeInfo.feeAmount,
-      feePercentage: feeInfo.feePercentage,
-      currency: balanceCurrency, // Store in user's currency
-      status: "pending",
-      country: country.toUpperCase(),
-      operator: operator,
-      description: `Transfert de ${netAmount} ${balanceCurrency} (envoye: ${amountForProvider} ${providerCurrency})`,
-      customerPhone: phone,
-      metadata: JSON.stringify({
-        mbiyopayTransactionId: result.transactionId,
-        phone,
-        totalDebited: totalToDebit,
-        providerAmount: amountForProvider,
-        providerCurrency: providerCurrency,
-        balanceAmount: netAmount,
-        balanceCurrency: balanceCurrency,
-        provider: "mbiyopay",
-      }),
+    // Update transaction with MbiyoPay transaction ID
+    const updatedMetadata = JSON.stringify({
+      mbiyopayTransactionId: result.transactionId,
+      phone,
+      totalDebited: totalToDebit,
+      providerAmount: amountForProvider,
+      providerCurrency: providerCurrency,
+      balanceAmount: netAmount,
+      balanceCurrency: balanceCurrency,
+      provider: "mbiyopay",
+      paymentProvider: "mbiyopay",
+      startTime: Date.now(),
     });
+    await storage.updateTransactionMetadata(tx.id, updatedMetadata);
 
     return {
       success: true,
@@ -345,6 +396,34 @@ export async function handleMbiyoPayPaymentLink(
       providerAmount = Math.ceil(providerAmount * (1 + feePercentage / 100));
     }
 
+    // Create transaction BEFORE calling MbiyoPay API so it always appears in history
+    const tx = await storage.createTransaction({
+      userId: paymentLink.userId,
+      type: "payment_link",
+      amount: baseAmount,
+      fee: feeInfo.feeAmount,
+      feePercentage: feeInfo.feePercentage,
+      currency: balanceCurrency,
+      status: "pending",
+      country: country.toUpperCase(),
+      operator: operator,
+      description: paymentLink.description || `Paiement via lien`,
+      customerPhone: customerPhone,
+      customerName: customerName,
+      customerEmail: customerEmail,
+      metadata: JSON.stringify({
+        paymentLinkId: paymentLink.id,
+        customerPaysFee,
+        providerAmount,
+        providerCurrency,
+        balanceAmount: baseAmount,
+        balanceCurrency,
+        provider: "mbiyopay",
+        paymentProvider: "mbiyopay",
+        startTime: Date.now(),
+      }),
+    });
+
     const result = await createMbiyoPayPayin({
       amount: providerAmount,
       currency: providerCurrency,
@@ -356,36 +435,25 @@ export async function handleMbiyoPayPaymentLink(
     });
 
     if (!result.success) {
-      return { success: false, error: result.error || "Erreur lors du paiement" };
+      await storage.updateTransactionStatus(tx.id, "failed");
+      return { success: false, transactionId: tx.id, error: result.error || "Erreur lors du paiement" };
     }
 
-    // Store transaction with owner's currency for balance credit
-    const tx = await storage.createTransaction({
-      userId: paymentLink.userId,
-      type: "payment_link",
-      amount: baseAmount, // Store base amount for balance credit
-      fee: feeInfo.feeAmount,
-      feePercentage: feeInfo.feePercentage,
-      currency: balanceCurrency, // Owner's currency
-      status: "pending",
-      country: country.toUpperCase(),
-      operator: operator,
-      description: paymentLink.description || `Paiement via lien`,
-      customerPhone: customerPhone,
-      customerName: customerName,
-      customerEmail: customerEmail,
-      metadata: JSON.stringify({
-        mbiyopayTransactionId: result.transactionId,
-        redirectUrl: result.redirectUrl,
-        paymentLinkId: paymentLink.id,
-        customerPaysFee,
-        providerAmount,
-        providerCurrency,
-        balanceAmount: baseAmount,
-        balanceCurrency,
-        provider: "mbiyopay",
-      }),
+    // Update transaction with MbiyoPay transaction ID
+    const updatedMetadata = JSON.stringify({
+      mbiyopayTransactionId: result.transactionId,
+      redirectUrl: result.redirectUrl,
+      paymentLinkId: paymentLink.id,
+      customerPaysFee,
+      providerAmount,
+      providerCurrency,
+      balanceAmount: baseAmount,
+      balanceCurrency,
+      provider: "mbiyopay",
+      paymentProvider: "mbiyopay",
+      startTime: Date.now(),
     });
+    await storage.updateTransactionMetadata(tx.id, updatedMetadata);
 
     return {
       success: true,
@@ -434,6 +502,33 @@ export async function handleMbiyoPayMerchantLink(
     const feeConfig = await getFeeFromDatabase(storage, "mbiyopay", country, operator);
     const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming);
 
+    // Create transaction BEFORE calling MbiyoPay API so it always appears in history
+    const tx = await storage.createTransaction({
+      userId: merchantLink.userId,
+      type: "merchant_link",
+      amount: balanceAmount,
+      fee: feeInfo.feeAmount,
+      feePercentage: feeInfo.feePercentage,
+      currency: balanceCurrency,
+      status: "pending",
+      country: country.toUpperCase(),
+      operator: operator,
+      description: merchantLink.description || `Paiement marchand`,
+      customerPhone: customerPhone,
+      customerName: customerName,
+      customerEmail: customerEmail,
+      metadata: JSON.stringify({
+        merchantLinkId: merchantLink.id,
+        providerAmount,
+        providerCurrency,
+        balanceAmount,
+        balanceCurrency,
+        provider: "mbiyopay",
+        paymentProvider: "mbiyopay",
+        startTime: Date.now(),
+      }),
+    });
+
     const result = await createMbiyoPayPayin({
       amount: providerAmount,
       currency: providerCurrency,
@@ -445,35 +540,23 @@ export async function handleMbiyoPayMerchantLink(
     });
 
     if (!result.success) {
-      return { success: false, error: result.error || "Erreur lors du paiement" };
+      await storage.updateTransactionStatus(tx.id, "failed");
+      return { success: false, transactionId: tx.id, error: result.error || "Erreur lors du paiement" };
     }
 
-    // Store transaction with owner's currency for balance credit
-    const tx = await storage.createTransaction({
-      userId: merchantLink.userId,
-      type: "merchant_link",
-      amount: balanceAmount, // Store balance amount for credit
-      fee: feeInfo.feeAmount,
-      feePercentage: feeInfo.feePercentage,
-      currency: balanceCurrency, // Owner's currency
-      status: "pending",
-      country: country.toUpperCase(),
-      operator: operator,
-      description: merchantLink.description || `Paiement marchand`,
-      customerPhone: customerPhone,
-      customerName: customerName,
-      customerEmail: customerEmail,
-      metadata: JSON.stringify({
-        mbiyopayTransactionId: result.transactionId,
-        redirectUrl: result.redirectUrl,
-        merchantLinkId: merchantLink.id,
-        providerAmount,
-        providerCurrency,
-        balanceAmount,
-        balanceCurrency,
-        provider: "mbiyopay",
-      }),
+    const updatedMetadata = JSON.stringify({
+      mbiyopayTransactionId: result.transactionId,
+      redirectUrl: result.redirectUrl,
+      merchantLinkId: merchantLink.id,
+      providerAmount,
+      providerCurrency,
+      balanceAmount,
+      balanceCurrency,
+      provider: "mbiyopay",
+      paymentProvider: "mbiyopay",
+      startTime: Date.now(),
     });
+    await storage.updateTransactionMetadata(tx.id, updatedMetadata);
 
     return {
       success: true,
@@ -513,20 +596,7 @@ export async function handleMbiyoPayApiPayment(
     const feeConfig = await getFeeFromDatabase(storage, "mbiyopay", country, operator);
     const feeInfo = calculateIncomingFee(grossAmount, feeConfig.incoming);
 
-    const result = await createMbiyoPayPayin({
-      amount: grossAmount,
-      currency: currency,
-      phone: customerPhone,
-      countryCode: country,
-      network: operator,
-      orderId: `BKAPAY-API-${apiKey.id}-${Date.now()}`,
-      callbackUrl: `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/mbiyopay`,
-    });
-
-    if (!result.success) {
-      return { success: false, error: result.error || "Erreur lors du paiement" };
-    }
-
+    // Create transaction BEFORE calling MbiyoPay API so it always appears in history
     const tx = await storage.createTransaction({
       userId: apiKey.userId,
       type: "api_payment",
@@ -542,14 +612,41 @@ export async function handleMbiyoPayApiPayment(
       customerName: customerName,
       customerEmail: customerEmail,
       metadata: JSON.stringify({
-        mbiyopayTransactionId: result.transactionId,
-        redirectUrl: result.redirectUrl,
         apiKeyId: apiKey.id,
         grossAmount,
         provider: "mbiyopay",
+        paymentProvider: "mbiyopay",
         developerCallbackUrl: callbackUrl,
+        startTime: Date.now(),
       }),
     });
+
+    const result = await createMbiyoPayPayin({
+      amount: grossAmount,
+      currency: currency,
+      phone: customerPhone,
+      countryCode: country,
+      network: operator,
+      orderId: `BKAPAY-API-${apiKey.id}-${Date.now()}`,
+      callbackUrl: `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/mbiyopay`,
+    });
+
+    if (!result.success) {
+      await storage.updateTransactionStatus(tx.id, "failed");
+      return { success: false, transactionId: tx.id, error: result.error || "Erreur lors du paiement" };
+    }
+
+    const updatedMetadata = JSON.stringify({
+      mbiyopayTransactionId: result.transactionId,
+      redirectUrl: result.redirectUrl,
+      apiKeyId: apiKey.id,
+      grossAmount,
+      provider: "mbiyopay",
+      paymentProvider: "mbiyopay",
+      developerCallbackUrl: callbackUrl,
+      startTime: Date.now(),
+    });
+    await storage.updateTransactionMetadata(tx.id, updatedMetadata);
 
     return {
       success: true,
