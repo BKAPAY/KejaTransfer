@@ -4909,7 +4909,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           paymentLink,
           customerPhone,
           customerName || "Client",
-          "noreply@bkapay.com",
+          customerEmail || "noreply@bkapay.com",
           operator,
           country, // payer's country
           amountInPayerCurrency, // converted amount for provider
@@ -5145,7 +5145,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           amount, // converted amount for provider
           customerPhone,
           customerName || "Client",
-          "noreply@bkapay.com",
+          customerEmail || "noreply@bkapay.com",
           operator,
           country, // payer's country
           originalAmount || amount, // original amount for balance credit
@@ -5358,7 +5358,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           transaction.amount,
           transaction.description || "Paiement via API",
           customerName || transaction.customerName || "Client",
-          "noreply@bkapay.com",
+          transaction.customerEmail || "noreply@bkapay.com",
           customerPhone || transaction.customerPhone || "",
           country,
           operator
