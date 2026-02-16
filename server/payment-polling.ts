@@ -2,7 +2,7 @@ import { storage } from "./storage";
 import type { Transaction, User } from "@shared/schema";
 import { getTransactionStatus as getFedaPayTransactionStatus, getPayoutStatus as getFedaPayPayoutStatus } from "./fedapay";
 import { NowPaymentsClient } from "./nowpayments";
-import { getMbiyoPayTransactionStatus } from "./mbiyopay";
+import { getMbiyoPayTransactionStatus, searchMbiyoPayTransactionByOrderId } from "./mbiyopay";
 import { sendPaymentCallback } from "./utils/callback";
 
 const PAYDUNYA_MASTER_KEY = process.env.PAYDUNYA_MASTER_KEY;
@@ -251,9 +251,62 @@ async function processMbiyoPayTransaction(transaction: Transaction & { user?: Us
 
   console.log(`[PaymentPolling] Checking MbiyoPay transaction ${transaction.id} (mbiyopayId: ${mbiyopayTransactionId || 'not yet assigned'}, orderId: ${metadata.orderId || 'none'}, ${remainingSeconds}s remaining)`);
 
-  // If we don't have a MbiyoPay transaction ID yet, we can't poll the status
-  // The webhook will update the metadata when MbiyoPay sends it
+  // If we don't have a MbiyoPay transaction ID yet, try to find it by order_id
+  // Only search every ~30 seconds (6 polling cycles) to avoid API rate limiting
   if (!mbiyopayTransactionId) {
+    const orderId = metadata.orderId;
+    const lastOrderIdSearch = metadata._lastOrderIdSearchTime || 0;
+    const searchInterval = 30000; // 30 seconds between searches
+    const shouldSearch = orderId && (Date.now() - lastOrderIdSearch >= searchInterval);
+    
+    if (shouldSearch) {
+      console.log(`[PaymentPolling] No mbiyopayTransactionId for ${transaction.id} - searching by order_id: ${orderId}`);
+      // Record the search time to avoid searching too frequently
+      metadata._lastOrderIdSearchTime = Date.now();
+      await storage.updateTransactionMetadata(transaction.id, JSON.stringify(metadata));
+      
+      try {
+        const searchResult = await searchMbiyoPayTransactionByOrderId(orderId);
+        if (searchResult.success && searchResult.transactionId) {
+          // Found the transaction! Update metadata with the real MbiyoPay transaction ID
+          metadata.mbiyopayTransactionId = searchResult.transactionId;
+          await storage.updateTransactionMetadata(transaction.id, JSON.stringify(metadata));
+          console.log(`[PaymentPolling] Found MbiyoPay transaction ID ${searchResult.transactionId} for order ${orderId} - status: ${searchResult.status}`);
+          
+          // Process the status immediately
+          const foundStatus = (searchResult.status || "").toLowerCase();
+          if (foundStatus === "successful") {
+            if (transaction.type === "deposit" || transaction.type === "payment_link" || transaction.type === "merchant_link" || transaction.type === "api_payment") {
+              const result = await storage.finalizeIncomingTransaction(transaction.id, {});
+              if (result) {
+                console.log(`[PaymentPolling] ✅ MbiyoPay transaction ${transaction.id} CONFIRMED via order_id search - credited=${result.credited}`);
+              }
+            } else {
+              await storage.updateTransactionStatus(transaction.id, "completed");
+              console.log(`[PaymentPolling] ✅ MbiyoPay ${transaction.type} ${transaction.id} COMPLETED via order_id search`);
+            }
+            return true;
+          } else if (foundStatus === "failed" || foundStatus === "cancelled") {
+            console.log(`[PaymentPolling] ❌ MbiyoPay transaction ${transaction.id} ${foundStatus} via order_id search`);
+            if (transaction.type === "withdrawal" || transaction.type === "transfer") {
+              const refundAmount = metadata.deductedFromBalance || metadata.totalDebited || transaction.amount;
+              await storage.updateUserBalance(transaction.userId, refundAmount);
+              console.log(`[PaymentPolling] Refunded ${refundAmount} to user ${transaction.userId}`);
+            }
+            await storage.updateTransactionStatus(transaction.id, "failed");
+            return true;
+          }
+          // If pending, we now have the ID and will use normal polling next cycle
+          console.log(`[PaymentPolling] MbiyoPay transaction ${transaction.id} still ${foundStatus} - will poll by ID next cycle`);
+          return false;
+        } else {
+          console.log(`[PaymentPolling] Could not find MbiyoPay transaction by order_id ${orderId}: ${searchResult.error}`);
+        }
+      } catch (searchError) {
+        console.log(`[PaymentPolling] Error searching MbiyoPay by order_id: ${searchError}`);
+      }
+    }
+    
     if (hasPaymentExpired(transaction)) {
       console.log(`[PaymentPolling] MbiyoPay transaction ${transaction.id} expired without receiving mbiyopayTransactionId - marking as failed`);
       if (transaction.type === "withdrawal" || transaction.type === "transfer") {
@@ -264,7 +317,7 @@ async function processMbiyoPayTransaction(transaction: Transaction & { user?: Us
       await storage.updateTransactionStatus(transaction.id, "failed");
       return true;
     }
-    console.log(`[PaymentPolling] Waiting for MbiyoPay webhook to provide transaction ID for ${transaction.id} (${remainingSeconds}s remaining)`);
+    console.log(`[PaymentPolling] Waiting for MbiyoPay transaction ID for ${transaction.id} (${remainingSeconds}s remaining)`);
     return false;
   }
 

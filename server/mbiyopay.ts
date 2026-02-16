@@ -544,6 +544,70 @@ export function getCurrencyForCountry(countryCode: string): string {
   return MBIYOPAY_COUNTRY_CURRENCIES[countryCode.toLowerCase()] || "XOF";
 }
 
+// Search for a transaction by order_id on MbiyoPay API
+// Used when we don't have a mbiyopayTransactionId (ambiguous response with data=null)
+export async function searchMbiyoPayTransactionByOrderId(orderId: string): Promise<MbiyoPayStatusResult> {
+  try {
+    const apiKey = await getMbiyoPayApiKey();
+    if (!apiKey) {
+      return { success: false, error: "MbiyoPay non configure ou desactive" };
+    }
+    
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), MBIYOPAY_TIMEOUT_MS);
+    
+    // Try the transactions list endpoint with order_id filter
+    let response: Response;
+    try {
+      response = await fetch(`${MBIYOPAY_BASE_URL}/merchant/transactions?order_id=${encodeURIComponent(orderId)}`, {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+        },
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+    
+    const data = await response.json();
+    console.log(`[MbiyoPay Search] order_id=${orderId}, response status=${response.status}, apiStatus=${data.status}, hasData=${!!data.data}`);
+    
+    // Handle array response (list of transactions)
+    if (data.data && Array.isArray(data.data) && data.data.length > 0) {
+      const tx = data.data[0];
+      console.log(`[MbiyoPay Search] Found transaction: id=${tx.transaction_id}, status=${tx.status}`);
+      return {
+        success: true,
+        transactionId: tx.transaction_id,
+        status: tx.status,
+        amount: tx.amount,
+        fee: tx.fee,
+        currency: tx.currency,
+      };
+    }
+    
+    // Handle single object response
+    if (data.data && data.data.transaction_id) {
+      console.log(`[MbiyoPay Search] Found transaction: id=${data.data.transaction_id}, status=${data.data.status}`);
+      return {
+        success: true,
+        transactionId: data.data.transaction_id,
+        status: data.data.status,
+        amount: data.data.amount,
+        fee: data.data.fee,
+        currency: data.data.currency,
+      };
+    }
+    
+    console.log(`[MbiyoPay Search] No transaction found for order_id=${orderId}`);
+    return { success: false, error: "Transaction non trouvee par order_id" };
+  } catch (error: any) {
+    console.error(`[MbiyoPay Search] Error searching by order_id=${orderId}:`, error.message);
+    return { success: false, error: error.message || "Erreur de recherche" };
+  }
+}
+
 // Resend webhook notification for a specific transaction
 export async function resendMbiyoPayWebhook(transactionId: string): Promise<{ success: boolean; message?: string; error?: string }> {
   try {
