@@ -369,8 +369,8 @@ export async function createMbiyoPayPayin(params: MbiyoPayPayinParams): Promise<
       errorMessage = "Paiement echoue: Operateur non supporte pour ce pays.";
     } else if (msgLower.includes("amount")) {
       errorMessage = "Paiement echoue: Montant invalide.";
-    } else if (apiMessage) {
-      errorMessage = `Paiement echoue: ${apiMessage}`;
+    } else {
+      errorMessage = "Paiement echoue: Veuillez reessayer dans quelques minutes.";
     }
     
     return { 
@@ -380,7 +380,7 @@ export async function createMbiyoPayPayin(params: MbiyoPayPayinParams): Promise<
   } catch (error: any) {
     console.error("[MbiyoPay Payin] Exception:", error.name, error.message);
     if (error.name === "AbortError") {
-      return { success: false, error: "Paiement echoue: Le service MbiyoPay ne repond pas. Veuillez reessayer dans quelques minutes." };
+      return { success: false, error: "Paiement echoue: Le service de paiement ne repond pas. Veuillez reessayer dans quelques minutes." };
     }
     return { success: false, error: "Paiement echoue: Erreur de connexion au service de paiement." };
   }
@@ -472,15 +472,15 @@ export async function createMbiyoPayPayout(params: MbiyoPayPayoutParams): Promis
     // Log specific HTTP error codes for debugging
     if (response.status === 403) {
       console.error(`[MbiyoPay Payout] HTTP 403 Forbidden - Likely KYC not approved for payouts on merchant account`);
-      return { success: false, error: "Retrait echoue: KYC du compte marchand MbiyoPay non approuve. Verifiez votre compte sur dashboard.mbiyo.africa" };
+      return { success: false, error: "Retrait echoue: Service temporairement indisponible." };
     }
     if (response.status === 401) {
       console.error(`[MbiyoPay Payout] HTTP 401 Unauthorized - API key invalid or expired`);
-      return { success: false, error: "Retrait echoue: Cle API MbiyoPay invalide ou expiree." };
+      return { success: false, error: "Retrait echoue: Service temporairement indisponible." };
     }
     if (response.status >= 500) {
       console.error(`[MbiyoPay Payout] HTTP ${response.status} Server Error - MbiyoPay service issue`);
-      return { success: false, error: "Retrait echoue: Service MbiyoPay temporairement indisponible. Reessayez dans quelques minutes." };
+      return { success: false, error: "Retrait echoue: Service temporairement indisponible. Reessayez dans quelques minutes." };
     }
 
     if (data.status === "success" && data.data) {
@@ -523,18 +523,18 @@ export async function createMbiyoPayPayout(params: MbiyoPayPayoutParams): Promis
     let errorMessage = "Retrait echoue";
     const msgLower = apiMessage.toLowerCase();
     
-    if (msgLower.includes("insufficient balance") || msgLower.includes("balance")) {
-      errorMessage = "Retrait echoue: Insuffisance de solde dans le wallet marchand MbiyoPay.";
+    if (msgLower.includes("insufficient balance") || msgLower.includes("balance") || msgLower.includes("wallet")) {
+      errorMessage = "Retrait echoue: Service temporairement indisponible. Veuillez reessayer plus tard.";
     } else if (msgLower.includes("kyc")) {
-      errorMessage = "Retrait echoue: KYC du compte marchand MbiyoPay non approuve pour les payouts.";
+      errorMessage = "Retrait echoue: Service temporairement indisponible.";
     } else if (msgLower.includes("invalid") && msgLower.includes("phone")) {
       errorMessage = "Retrait echoue: Numero de telephone invalide.";
     } else if (msgLower.includes("network") || msgLower.includes("operator")) {
       errorMessage = "Retrait echoue: Operateur non supporte pour ce pays.";
     } else if (msgLower.includes("transaction initiation failed")) {
-      errorMessage = "Retrait echoue: Le service de payout MbiyoPay n'est pas disponible. Verifiez que votre compte marchand MbiyoPay a les permissions payout activees et un solde suffisant sur dashboard.mbiyo.africa";
-    } else if (apiMessage) {
-      errorMessage = `Retrait echoue: ${apiMessage}`;
+      errorMessage = "Retrait echoue: Le service de retrait est temporairement indisponible. Veuillez reessayer plus tard.";
+    } else {
+      errorMessage = "Retrait echoue: Veuillez reessayer dans quelques minutes.";
     }
     
     return { 
@@ -544,7 +544,7 @@ export async function createMbiyoPayPayout(params: MbiyoPayPayoutParams): Promis
   } catch (error: any) {
     console.error("[MbiyoPay Payout] Exception:", error.name, error.message);
     if (error.name === "AbortError") {
-      return { success: false, error: "Retrait echoue: Le service MbiyoPay ne repond pas. Veuillez reessayer dans quelques minutes." };
+      return { success: false, error: "Retrait echoue: Le service de paiement ne repond pas. Veuillez reessayer dans quelques minutes." };
     }
     return { success: false, error: "Retrait echoue: Erreur de connexion au service de paiement." };
   }

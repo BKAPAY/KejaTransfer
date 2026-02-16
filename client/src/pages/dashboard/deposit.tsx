@@ -24,6 +24,7 @@ import { OperatorSelector } from "@/components/operator-selector";
 import { hasMultipleCurrencies, getMbiyoPayCurrencyForCountry, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
 import { useConvertedMinimums } from "@/hooks/use-converted-minimums";
 import { getCurrencyDecimals } from "@/lib/currency";
+import { usePaymentCountdown, DEFAULT_COUNTDOWN_DURATION } from "@/hooks/use-payment-countdown";
 
 interface ConversionData {
   convertedAmount: number;
@@ -61,6 +62,46 @@ export default function Deposit() {
   const [otpCode, setOtpCode] = useState("");
   const [pollingStatus, setPollingStatus] = useState<string | null>(null);
   const [conversionData, setConversionData] = useState<ConversionData | null>(null);
+
+  const countdown = usePaymentCountdown({
+    invoiceToken: paymentData.paydunyaToken || null,
+    transactionId: paymentData.transactionId || null,
+    enabled: paymentStep === "polling" || paymentStep === "redirect",
+    durationSeconds: DEFAULT_COUNTDOWN_DURATION,
+    onCompleted: () => {
+      setPollingStatus("completed");
+      setPaymentStep("completed");
+      toast({
+        title: "Paiement reussi",
+        description: "Votre depot a ete complete",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      setTimeout(() => {
+        form.reset();
+        setPaymentData({});
+        setPollingStatus(null);
+        setPaymentStep("form");
+      }, 3000);
+    },
+    onFailed: () => {
+      setPaymentStep("form");
+      toast({
+        title: "Paiement echoue",
+        description: "Le paiement n'a pas abouti",
+        variant: "destructive",
+      });
+    },
+    onExpired: () => {
+      setPaymentStep("form");
+      toast({
+        title: "Delai expire",
+        description: "Le paiement n'a pas ete confirme dans le delai imparti",
+        variant: "destructive",
+      });
+    },
+  });
   const [selectedCurrency, setSelectedCurrency] = useState<string>("XOF");
   const [feePercentage, setFeePercentage] = useState<number>(60);
 
@@ -250,12 +291,14 @@ export default function Deposit() {
             description: response.ussdInstruction || "Generez votre code de paiement",
           });
         } else if (response.redirectUrl) {
+          countdown.startCountdown();
           setPaymentStep("redirect");
           toast({
             title: "Redirection requise",
             description: "Cliquez sur le bouton pour finaliser le paiement",
           });
         } else {
+          countdown.startCountdown();
           setPaymentStep("polling");
           toast({
             title: "Paiement initie",
@@ -333,6 +376,7 @@ export default function Deposit() {
           }));
         }
         if (response.redirectUrl) {
+          countdown.startCountdown();
           setPaymentStep("redirect");
           setOtpCode("");
           toast({
@@ -340,6 +384,7 @@ export default function Deposit() {
             description: "Cliquez sur le bouton pour finaliser le paiement",
           });
         } else {
+          countdown.startCountdown();
           setPaymentStep("polling");
           setOtpCode("");
           toast({
@@ -387,94 +432,6 @@ export default function Deposit() {
     otpMutation.mutate({ authorizationCode: otpCode });
   };
 
-  useEffect(() => {
-    if ((paymentStep !== "polling" && paymentStep !== "redirect") || !paymentData.transactionId) return;
-
-    const checkPaymentStatus = async () => {
-      try {
-        const verifyRes = await fetch("/api/softpay/verify-payment", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ 
-            transactionId: paymentData.transactionId,
-            invoiceToken: paymentData.paydunyaToken 
-          }),
-        });
-
-        let resolvedStatus: string | null = null;
-
-        if (verifyRes.ok) {
-          const verifyData = await verifyRes.json();
-          if (verifyData.status === "completed") resolvedStatus = "completed";
-          else if (verifyData.status === "failed") resolvedStatus = "failed";
-        }
-
-        if (!resolvedStatus) {
-          const res = await fetch(`/api/transactions/${paymentData.transactionId}`);
-          if (res.ok) {
-            const tx = await res.json();
-            if (tx.status === "completed") resolvedStatus = "completed";
-            else if (tx.status === "failed") resolvedStatus = "failed";
-          }
-        }
-
-        if (resolvedStatus === "completed") {
-          setPollingStatus("completed");
-          setPaymentStep("completed");
-          
-          toast({
-            title: "Paiement reussi",
-            description: "Votre depot a ete complete",
-          });
-
-          queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
-          queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
-          queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
-
-          setTimeout(() => {
-            form.reset();
-            setPaymentData({});
-            setPollingStatus(null);
-            setPaymentStep("form");
-          }, 3000);
-          return true;
-        } else if (resolvedStatus === "failed") {
-          setPaymentStep("form");
-          toast({
-            title: "Paiement echoue",
-            description: "Le paiement n'a pas abouti",
-            variant: "destructive",
-          });
-          return true;
-        }
-      } catch (error) {
-        console.error("Payment verification error:", error);
-      }
-      return false;
-    };
-
-    const interval = setInterval(async () => {
-      const isDone = await checkPaymentStatus();
-      if (isDone) clearInterval(interval);
-    }, 3000);
-
-    const timeout = setTimeout(() => {
-      clearInterval(interval);
-      if (paymentStep === "polling" || paymentStep === "redirect") {
-        setPaymentStep("form");
-        toast({
-          title: "Delai expire",
-          description: "Le paiement n'a pas ete confirme dans le delai imparti",
-          variant: "destructive",
-        });
-      }
-    }, 600000);
-
-    return () => {
-      clearInterval(interval);
-      clearTimeout(timeout);
-    };
-  }, [paymentStep, paymentData.transactionId, toast, form]);
 
   const onSubmit = (data: DepositFormData) => {
     if (!depositAmount || depositAmount < depositMin) {
@@ -489,6 +446,7 @@ export default function Deposit() {
   };
 
   const handleBackToForm = () => {
+    countdown.resetCountdown();
     setPaymentStep("form");
     setPaymentData({});
     form.reset();
@@ -538,6 +496,12 @@ export default function Deposit() {
                 {form.getValues("operator")?.toLowerCase() === "wave"
                   ? "Verifiez vos notifications Wave pour valider le paiement."
                   : "Veuillez valider le paiement sur votre application mobile money."}
+              </p>
+            </div>
+            <div className="bg-primary/10 rounded-lg p-4">
+              <p className="text-sm text-muted-foreground mb-1">Temps restant</p>
+              <p className="text-3xl font-mono font-bold text-primary" data-testid="text-countdown">
+                {countdown.formattedTime}
               </p>
             </div>
             <div className="text-center p-4 bg-muted rounded-lg">
@@ -606,6 +570,12 @@ export default function Deposit() {
                 {form.getValues("operator")?.toLowerCase() === "wave"
                   ? "Cliquez sur le bouton ci-dessous pour completer votre paiement via Wave"
                   : "Cliquez sur le bouton ci-dessous pour finaliser votre paiement"}
+              </p>
+            </div>
+            <div className="bg-primary/10 rounded-lg p-4">
+              <p className="text-sm text-muted-foreground mb-1">Temps restant</p>
+              <p className="text-3xl font-mono font-bold text-primary" data-testid="text-redirect-countdown">
+                {countdown.formattedTime}
               </p>
             </div>
             <div className="text-center p-4 bg-muted rounded-lg">

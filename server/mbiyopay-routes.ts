@@ -28,7 +28,7 @@ export async function handleMbiyoPayDeposit(
   try {
     const countryLower = country.toLowerCase();
     if (!MBIYOPAY_SUPPORTED_COUNTRIES.includes(countryLower)) {
-      return { success: false, error: `Pays non supporte pour les depots via MbiyoPay: ${country}` };
+      return { success: false, error: `Ce pays n'est pas encore disponible pour les depots` };
     }
 
     const countryOperators = MBIYOPAY_OPERATORS[countryLower] || [];
