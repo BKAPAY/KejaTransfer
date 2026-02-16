@@ -145,6 +145,7 @@ export default function Merchant() {
   const [ussdInstruction, setUssdInstruction] = useState<string | null>(null);
   const [wizallTransactionId, setWizallTransactionId] = useState<string | null>(null);
   const [redirectUrl, setRedirectUrl] = useState<string | null>(null);
+  const [mbiyoInstructions, setMbiyoInstructions] = useState<string | null>(null);
   const [authCode, setAuthCode] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [paidAmount, setPaidAmount] = useState<number>(0);
@@ -469,7 +470,10 @@ export default function Merchant() {
         setSavedCountry(formData.country);
         setSavedOperator(formData.operator);
         
-        // Vérifier si c'est un opérateur qui nécessite une redirection (Wave)
+        if (data.instructions) {
+          setMbiyoInstructions(data.instructions);
+        }
+        
         if (data.redirectUrl) {
           setRedirectUrl(data.redirectUrl);
           setPaymentStage("redirect");
@@ -863,9 +867,23 @@ export default function Merchant() {
     );
   }
 
-  // STAGE: Wave Redirect - Bouton pour aller à Wave
+  // STAGE: Redirect - Bouton pour aller à Wave ou Orange Money
   if (paymentStage === "redirect" && redirectUrl) {
-    const handleWaveRedirect = () => {
+    const isWave = savedOperator?.toLowerCase() === "wave";
+    const isOrange = savedOperator?.toLowerCase() === "orange";
+    const redirectTitle = isWave ? "Paiement Wave" : isOrange ? "Paiement Orange Money" : "Finaliser le paiement";
+    const redirectDesc = isWave 
+      ? "Cliquez sur le bouton ci-dessous pour compléter votre paiement via Wave"
+      : isOrange
+        ? "Cliquez sur le bouton ci-dessous pour compléter votre paiement via Orange Money"
+        : "Cliquez sur le bouton ci-dessous pour finaliser votre paiement";
+    const redirectBtnText = isWave 
+      ? "Aller à Wave pour payer"
+      : isOrange
+        ? "Aller à Orange Money pour payer"
+        : "Finaliser le paiement";
+    
+    const handleRedirectPayment = () => {
       countdown.startCountdown();
       setPaymentStage("polling");
       
@@ -887,16 +905,16 @@ export default function Merchant() {
         <Card className="w-full max-w-md">
           <CardHeader className="text-center space-y-2">
             <img src={logoImage} alt="BKApay" className="h-10 w-auto mx-auto" />
-            <CardTitle>Paiement Wave</CardTitle>
+            <CardTitle>{redirectTitle}</CardTitle>
             <CardDescription>
-              Cliquez sur le bouton ci-dessous pour compléter votre paiement via Wave
+              {redirectDesc}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <Alert className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
               <AlertCircle className="h-4 w-4 text-blue-600" />
               <AlertDescription className="text-sm text-blue-800 dark:text-blue-200">
-                Vous serez redirigé vers Wave pour finaliser le paiement de manière sécurisée.
+                Vous serez redirigé pour finaliser le paiement de manière sécurisée.
               </AlertDescription>
             </Alert>
             
@@ -907,14 +925,24 @@ export default function Merchant() {
               </p>
             </div>
             
+            {mbiyoInstructions && (
+              <Alert className="border-purple-200 bg-purple-50 dark:bg-purple-950 dark:border-purple-800">
+                <AlertCircle className="h-4 w-4 text-purple-600" />
+                <AlertDescription className="text-sm text-purple-800 dark:text-purple-200">
+                  <p className="font-semibold mb-1">Instructions de l'operateur</p>
+                  <p className="whitespace-pre-line">{mbiyoInstructions}</p>
+                </AlertDescription>
+              </Alert>
+            )}
+            
             <Button
-              onClick={handleWaveRedirect}
-              className="w-full bg-blue-600 hover:bg-blue-700"
+              onClick={handleRedirectPayment}
+              className="w-full bg-blue-600"
               size="lg"
               data-testid="button-wave-redirect"
             >
               <ExternalLink className="w-5 h-5 mr-2" />
-              Aller à Wave pour payer
+              {redirectBtnText}
             </Button>
             
             <p className="text-xs text-muted-foreground text-center">
@@ -951,6 +979,15 @@ export default function Merchant() {
               <Alert className="bg-primary/5 border-primary/20">
                 <AlertDescription className="text-sm whitespace-pre-line">
                   {ussdInstruction}
+                </AlertDescription>
+              </Alert>
+            )}
+            {mbiyoInstructions && (
+              <Alert className="border-purple-200 bg-purple-50 dark:bg-purple-950 dark:border-purple-800">
+                <AlertCircle className="h-4 w-4 text-purple-600" />
+                <AlertDescription className="text-sm text-purple-800 dark:text-purple-200">
+                  <p className="font-semibold mb-1">Instructions de l'operateur</p>
+                  <p className="whitespace-pre-line">{mbiyoInstructions}</p>
                 </AlertDescription>
               </Alert>
             )}

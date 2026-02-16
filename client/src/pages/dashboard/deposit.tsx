@@ -52,6 +52,7 @@ export default function Deposit() {
     ussdInstruction?: string;
     paydunyaToken?: string;
     requiresOTP?: boolean;
+    instructions?: string;
   }>({});
   const [otpCode, setOtpCode] = useState("");
   const [pollingStatus, setPollingStatus] = useState<string | null>(null);
@@ -234,6 +235,7 @@ export default function Deposit() {
           ussdInstruction: response.ussdInstruction,
           paydunyaToken: response.token,
           requiresOTP: response.requiresOTP,
+          instructions: response.instructions,
         });
         
         if (response.requiresOTP) {
@@ -487,6 +489,15 @@ export default function Deposit() {
                 <Info className="h-4 w-4 text-blue-600" />
                 <AlertDescription className="text-sm text-blue-900 dark:text-blue-100 ml-2 whitespace-pre-line">
                   {paymentData.ussdInstruction}
+                </AlertDescription>
+              </Alert>
+            )}
+            {paymentData.instructions && (
+              <Alert className="border-purple-200 bg-purple-50 dark:bg-purple-950 dark:border-purple-800 text-left">
+                <Info className="h-4 w-4 text-purple-600" />
+                <AlertDescription className="text-sm text-purple-900 dark:text-purple-100 ml-2">
+                  <p className="font-semibold mb-1">Instructions de l'operateur</p>
+                  <p className="whitespace-pre-line">{paymentData.instructions}</p>
                 </AlertDescription>
               </Alert>
             )}

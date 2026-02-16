@@ -405,7 +405,7 @@ export async function handleMbiyoPayPaymentLink(
   convertedAmount?: number,
   convertedCurrency?: string,
   ownerCurrency?: string
-): Promise<{ success: boolean; transactionId?: string; mbiyopayTransactionId?: string; redirectUrl?: string; message?: string; error?: string }> {
+): Promise<{ success: boolean; transactionId?: string; mbiyopayTransactionId?: string; redirectUrl?: string; message?: string; error?: string; instructions?: string }> {
   try {
     // Use payer's country for the payment provider
     const country = payerCountry || paymentLink.country || "BJ";
@@ -510,6 +510,7 @@ export async function handleMbiyoPayPaymentLink(
       transactionId: tx.id,
       mbiyopayTransactionId: result.transactionId,
       redirectUrl: result.redirectUrl,
+      instructions: result.instructions,
       message: result.message || "Paiement initie",
     };
   } catch (error: any) {
@@ -529,7 +530,7 @@ export async function handleMbiyoPayMerchantLink(
   originalAmount?: number,
   originalCurrency?: string,
   payerCurrency?: string // Currency selected by payer (for multi-currency countries like RDC)
-): Promise<{ success: boolean; transactionId?: string; mbiyopayTransactionId?: string; redirectUrl?: string; message?: string; error?: string }> {
+): Promise<{ success: boolean; transactionId?: string; mbiyopayTransactionId?: string; redirectUrl?: string; message?: string; error?: string; instructions?: string }> {
   try {
     // Use payer's country for the payment provider
     const country = payerCountry || merchantLink.country || "BJ";
@@ -627,6 +628,7 @@ export async function handleMbiyoPayMerchantLink(
       transactionId: tx.id,
       mbiyopayTransactionId: result.transactionId,
       redirectUrl: result.redirectUrl,
+      instructions: result.instructions,
       message: result.message || "Paiement initie",
     };
   } catch (error: any) {
@@ -645,7 +647,7 @@ export async function handleMbiyoPayApiPayment(
   country: string,
   description?: string,
   callbackUrl?: string
-): Promise<{ success: boolean; transactionId?: string; mbiyopayTransactionId?: string; redirectUrl?: string; message?: string; error?: string }> {
+): Promise<{ success: boolean; transactionId?: string; mbiyopayTransactionId?: string; redirectUrl?: string; message?: string; error?: string; instructions?: string }> {
   try {
     const countryLower = country.toLowerCase();
     
@@ -731,6 +733,7 @@ export async function handleMbiyoPayApiPayment(
       transactionId: tx.id,
       mbiyopayTransactionId: result.transactionId,
       redirectUrl: result.redirectUrl,
+      instructions: result.instructions,
       message: result.message || "Paiement initie",
     };
   } catch (error: any) {
