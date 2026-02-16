@@ -514,7 +514,7 @@ export default function Merchant() {
             });
           }
         } else if (data.requiresOTP) {
-          // Opérateur Orange nécessite un code OTP
+          countdown.resetCountdown();
           setPaymentStage("otp");
           
           toast({
@@ -539,7 +539,7 @@ export default function Merchant() {
             });
           }
         } else if (data.requiresTwoStep) {
-          // Paiement USSD en deux étapes (confirmation manuelle)
+          countdown.resetCountdown();
           setPaymentStage("ussd");
           
           toast({
@@ -564,15 +564,6 @@ export default function Merchant() {
             });
           }
         } else {
-          // Paiement standard avec polling
-          countdown.startCountdown();
-          setPaymentStage("polling");
-          
-          toast({
-            title: "Paiement initie",
-            description: data.message || "Veuillez valider le paiement sur votre telephone",
-          });
-          
           if (token) {
             saveMerchantPaymentState(token, {
               stage: "polling",
@@ -591,6 +582,7 @@ export default function Merchant() {
           }
         }
       } else if (data.requiresOTP) {
+        countdown.resetCountdown();
         setMbiyoOtpInstructions(data.otpInstructions || "");
         setMbiyoOtpUssdCode(data.otpUssdCode || "");
         setMbiyoOtpHint(data.otpHint || "");
@@ -601,6 +593,7 @@ export default function Merchant() {
           description: data.otpInstructions || "Generez votre code de paiement Orange Money",
         });
       } else {
+        countdown.resetCountdown();
         setPaymentStage("failed");
         if (token) clearMerchantPaymentState(token);
         toast({
@@ -611,6 +604,7 @@ export default function Merchant() {
       }
     },
     onError: (error: any) => {
+      countdown.resetCountdown();
       setPaymentStage("failed");
       if (token) clearMerchantPaymentState(token);
       toast({
@@ -697,6 +691,8 @@ export default function Merchant() {
   });
 
   const onSubmit = async (data: MerchantPaymentFormData) => {
+    countdown.startCountdown();
+    setPaymentStage("polling");
     initMutation.mutate(data);
   };
 
@@ -1185,6 +1181,8 @@ export default function Merchant() {
             <Button
               onClick={() => {
                 const formData = form.getValues();
+                countdown.startCountdown();
+                setPaymentStage("polling");
                 initMutation.mutate(formData);
               }}
               disabled={initMutation.isPending || !mbiyoOtpCode.trim()}

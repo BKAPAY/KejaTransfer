@@ -518,6 +518,7 @@ export default function ApiPay() {
     },
     onSuccess: (data) => {
       if (!data.success && data.requiresOTP) {
+        countdown.resetCountdown();
         setMbiyoOtpInstructions(data.otpInstructions || "");
         setMbiyoOtpUssdCode(data.otpUssdCode || "");
         setMbiyoOtpHint(data.otpHint || "");
@@ -547,15 +548,11 @@ export default function ApiPay() {
           description: "Cliquez sur le bouton pour finaliser le paiement",
         });
       } else if (data.requiresTwoStep) {
+        countdown.resetCountdown();
         newStage = "ussd";
       } else if (data.requiresOTP) {
+        countdown.resetCountdown();
         newStage = "otp";
-      } else {
-        countdown.startCountdown();
-        toast({
-          title: "Paiement initie",
-          description: "Veuillez valider le paiement sur votre telephone",
-        });
       }
       
       setPaymentStage(newStage);
@@ -577,6 +574,7 @@ export default function ApiPay() {
       }
     },
     onError: (error: any) => {
+      countdown.resetCountdown();
       setPaymentStage("failed");
       toast({
         title: "Erreur",
@@ -663,6 +661,8 @@ export default function ApiPay() {
       });
       return;
     }
+    countdown.startCountdown();
+    setPaymentStage("polling");
     initMutation.mutate();
   };
 
@@ -1231,7 +1231,11 @@ export default function ApiPay() {
               />
             </div>
             <Button
-              onClick={() => initMutation.mutate()}
+              onClick={() => {
+                countdown.startCountdown();
+                setPaymentStage("polling");
+                initMutation.mutate();
+              }}
               disabled={initMutation.isPending || !mbiyoOtpCode.trim()}
               className="w-full"
               data-testid="button-submit-mbiyo-otp"

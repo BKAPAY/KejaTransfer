@@ -285,27 +285,21 @@ export default function Deposit() {
         });
         
         if (response.requiresOTP) {
+          countdown.resetCountdown();
           setPaymentStep("otp");
           toast({
             title: "Code OTP requis",
             description: response.ussdInstruction || "Generez votre code de paiement",
           });
         } else if (response.redirectUrl) {
-          countdown.startCountdown();
           setPaymentStep("redirect");
           toast({
             title: "Redirection requise",
             description: "Cliquez sur le bouton pour finaliser le paiement",
           });
-        } else {
-          countdown.startCountdown();
-          setPaymentStep("polling");
-          toast({
-            title: "Paiement initie",
-            description: response.message || "Veuillez valider le paiement sur votre telephone",
-          });
         }
       } else if (response.requiresOTP) {
+        countdown.resetCountdown();
         setPaymentData({
           otpInstructions: response.otpInstructions,
           otpUssdCode: response.otpUssdCode,
@@ -319,6 +313,8 @@ export default function Deposit() {
           description: response.otpInstructions || "Generez votre code de paiement Orange Money",
         });
       } else {
+        countdown.resetCountdown();
+        setPaymentStep("form");
         toast({
           title: "Erreur",
           description: response.error || "Erreur lors du depot",
@@ -327,6 +323,8 @@ export default function Deposit() {
       }
     },
     onError: (error: any) => {
+      countdown.resetCountdown();
+      setPaymentStep("form");
       toast({
         title: "Erreur",
         description: error.message || "Erreur lors du depot",
@@ -442,6 +440,8 @@ export default function Deposit() {
       });
       return;
     }
+    countdown.startCountdown();
+    setPaymentStep("polling");
     depositMutation.mutate(data);
   };
 
