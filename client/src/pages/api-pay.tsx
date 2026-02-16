@@ -35,7 +35,7 @@ interface ApiKeyInfo {
   customerPaysFee?: boolean;
 }
 
-type PaymentStage = "form" | "ussd" | "otp" | "polling" | "completed" | "failed" | "redirect";
+type PaymentStage = "form" | "ussd" | "otp" | "polling" | "completed" | "failed" | "redirect" | "mbiyoOtp";
 
 interface PaymentState {
   stage: PaymentStage;
@@ -168,6 +168,11 @@ export default function ApiPay() {
   const [redirectUrl, setRedirectUrl] = useState<string | null>(null);
   const [mbiyoInstructions, setMbiyoInstructions] = useState<string | null>(null);
   const [authCode, setAuthCode] = useState("");
+  const [mbiyoOtpInstructions, setMbiyoOtpInstructions] = useState("");
+  const [mbiyoOtpUssdCode, setMbiyoOtpUssdCode] = useState("");
+  const [mbiyoOtpHint, setMbiyoOtpHint] = useState("");
+  const [mbiyoProvider, setMbiyoProvider] = useState("");
+  const [mbiyoOtpCode, setMbiyoOtpCode] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const [customerName, setCustomerName] = useState(prefilledName);
@@ -473,6 +478,11 @@ export default function ApiPay() {
     setWizallTransactionId(null);
     setRedirectUrl(null);
     setAuthCode("");
+    setMbiyoOtpCode("");
+    setMbiyoOtpInstructions("");
+    setMbiyoOtpUssdCode("");
+    setMbiyoOtpHint("");
+    setMbiyoProvider("");
     setCustomerName("");
     setCustomerEmail("");
     setCustomerPhone("");
@@ -482,27 +492,44 @@ export default function ApiPay() {
 
   const initMutation = useMutation({
     mutationFn: async () => {
+      const bodyData: any = {
+        publicKey: key,
+        amount,
+        description,
+        customerName,
+        customerEmail,
+        customerPhone,
+        country,
+        operator,
+        currency: selectedCurrency,
+        callbackUrl: callbackUrl || null,
+      };
+      if (mbiyoOtpCode) {
+        bodyData.otpCode = mbiyoOtpCode;
+      }
       const response = await fetch("/api/api-pay/init", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          publicKey: key,
-          amount,
-          description,
-          customerName,
-          customerEmail,
-          customerPhone,
-          country,
-          operator,
-          currency: selectedCurrency, // Include selected currency for multi-currency countries
-          callbackUrl: callbackUrl || null,
-        }),
+        body: JSON.stringify(bodyData),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Erreur lors de l'initialisation");
       return data;
     },
     onSuccess: (data) => {
+      if (!data.success && data.requiresOTP) {
+        setMbiyoOtpInstructions(data.otpInstructions || "");
+        setMbiyoOtpUssdCode(data.otpUssdCode || "");
+        setMbiyoOtpHint(data.otpHint || "");
+        setMbiyoProvider(data.provider || "");
+        setPaymentStage("mbiyoOtp");
+        toast({
+          title: "Code OTP requis",
+          description: data.otpInstructions || "Generez votre code de paiement Orange Money",
+        });
+        return;
+      }
+
       setTransactionId(data.transactionId);
       setInvoiceToken(data.token);
       setUssdInstruction(data.ussdInstruction || data.message || null);
@@ -1158,6 +1185,73 @@ export default function ApiPay() {
             >
               <RefreshCw className="w-3 h-3 mr-1" />
               Recommencer un nouveau paiement
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (paymentStage === "mbiyoOtp") {
+    return (
+      <div className="w-full min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center p-4 overflow-hidden">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center space-y-2">
+            <img src={logoImage} alt="BKApay" className="h-10 w-auto mx-auto" />
+            <CardTitle>Code de paiement Orange Money</CardTitle>
+            <CardDescription>
+              {mbiyoOtpInstructions || "Generez votre code de paiement et entrez-le ci-dessous"}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {mbiyoOtpUssdCode && (
+              <Alert className="bg-orange-50 dark:bg-orange-950 border-orange-200 dark:border-orange-800">
+                <AlertCircle className="h-4 w-4 text-orange-600" />
+                <AlertDescription className="text-sm text-orange-800 dark:text-orange-200">
+                  <p className="font-semibold mb-1">Composez ce code USSD sur votre telephone :</p>
+                  <div className="bg-white dark:bg-gray-900 border border-orange-300 dark:border-orange-700 rounded-md px-3 py-2 my-2 text-center">
+                    <code className="text-lg font-bold text-orange-700 dark:text-orange-400">
+                      {mbiyoOtpUssdCode}
+                    </code>
+                  </div>
+                  {mbiyoOtpHint && (
+                    <p className="text-xs text-orange-600 dark:text-orange-400">{mbiyoOtpHint}</p>
+                  )}
+                </AlertDescription>
+              </Alert>
+            )}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium">Code de paiement</label>
+              <Input
+                type="text"
+                value={mbiyoOtpCode}
+                onChange={(e) => setMbiyoOtpCode(e.target.value)}
+                placeholder="Entrez le code obtenu"
+                data-testid="input-mbiyo-otp-code"
+              />
+            </div>
+            <Button
+              onClick={() => initMutation.mutate()}
+              disabled={initMutation.isPending || !mbiyoOtpCode.trim()}
+              className="w-full"
+              data-testid="button-submit-mbiyo-otp"
+            >
+              {initMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Validation...
+                </>
+              ) : (
+                "Valider le code"
+              )}
+            </Button>
+            <Button
+              onClick={() => { setPaymentStage("form"); setMbiyoOtpCode(""); }}
+              variant="outline"
+              className="w-full"
+              data-testid="button-cancel-mbiyo-otp"
+            >
+              Annuler
             </Button>
           </CardContent>
         </Card>

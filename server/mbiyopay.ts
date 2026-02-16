@@ -171,6 +171,57 @@ export interface MbiyoPayPayinParams {
   network: string;
   orderId?: string;
   callbackUrl?: string;
+  otpCode?: string;
+}
+
+export function mbiyoPayOperatorRequiresOtp(countryCode: string, network: string): boolean {
+  const country = countryCode.toLowerCase();
+  const op = network.toLowerCase();
+  if (op !== "orange") return false;
+  if (country === "cd") return false;
+  const countriesWithOrangeOtp = ["bf", "ci", "sn", "ml", "gn", "cm"];
+  return countriesWithOrangeOtp.includes(country);
+}
+
+export function getMbiyoPayOtpInstructions(countryCode: string): { ussdCode: string; instructions: string; hint: string } {
+  const country = countryCode.toUpperCase();
+  const codes: Record<string, { ussdCode: string; instructions: string; hint: string }> = {
+    SN: {
+      ussdCode: "#144#391#",
+      instructions: "Composez #144#391# puis entrez votre code secret Orange Money pour obtenir votre code de paiement",
+      hint: "Entrez votre code secret Orange Money quand demande",
+    },
+    CI: {
+      ussdCode: "#144*82#",
+      instructions: "Composez #144*82# puis choisissez l'option 2 pour generer votre code de paiement",
+      hint: "Selectionnez l'option 2 dans le menu",
+    },
+    BF: {
+      ussdCode: "#144*4*6#",
+      instructions: "Composez #144*4*6# puis suivez les instructions pour obtenir votre code de paiement",
+      hint: "Entrez votre code secret Orange Money quand demande",
+    },
+    ML: {
+      ussdCode: "#144*8#",
+      instructions: "Composez #144*8# puis suivez les instructions pour obtenir votre code de paiement",
+      hint: "Entrez votre code secret Orange Money quand demande",
+    },
+    GN: {
+      ussdCode: "#144#",
+      instructions: "Composez #144# puis selectionnez 'Paiement marchand' pour obtenir votre code de paiement",
+      hint: "Selectionnez l'option Paiement marchand dans le menu",
+    },
+    CM: {
+      ussdCode: "#150*50#",
+      instructions: "Composez #150*50# puis suivez les instructions pour obtenir votre code de paiement",
+      hint: "Entrez votre code secret Orange Money quand demande",
+    },
+  };
+  return codes[country] || {
+    ussdCode: "#144#",
+    instructions: "Composez #144# sur votre telephone Orange pour obtenir votre code de paiement",
+    hint: "Suivez les instructions pour obtenir votre code",
+  };
 }
 
 export interface MbiyoPayPayinResult {
@@ -212,17 +263,24 @@ export async function createMbiyoPayPayin(params: MbiyoPayPayinParams): Promise<
     console.log(`[MbiyoPay Payin] Operator mapping: ${params.network} -> ${apiOperatorCode}`);
     
     // MbiyoPay documentation shows network in UPPERCASE in the example (e.g., "ORANGE")
+    const metadata: Record<string, string> = {
+      network: apiOperatorCode.toUpperCase(),
+      phone_number: formattedPhone,
+      country_code: params.countryCode.toUpperCase(),
+    };
+    
+    if (params.otpCode) {
+      metadata.otp_code = params.otpCode;
+      console.log(`[MbiyoPay Payin] Including OTP code in request`);
+    }
+    
     const requestBody = {
       amount: params.amount,
       currency: params.currency,
       payment_method: "mobile_money",
       order_id: params.orderId || `BKAPAY-${Date.now()}`,
       callback_url: params.callbackUrl || `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/mbiyopay`,
-      metadata: {
-        network: apiOperatorCode.toUpperCase(),
-        phone_number: formattedPhone,
-        country_code: params.countryCode.toUpperCase(),
-      },
+      metadata,
     };
     
     console.log(`[MbiyoPay Payin] Creating payment: ${params.amount} ${params.currency}, ${params.network}/${params.countryCode}, phone=${formattedPhone}`);

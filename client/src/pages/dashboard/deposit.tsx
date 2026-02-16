@@ -53,6 +53,10 @@ export default function Deposit() {
     paydunyaToken?: string;
     requiresOTP?: boolean;
     instructions?: string;
+    otpInstructions?: string;
+    otpUssdCode?: string;
+    otpHint?: string;
+    provider?: string;
   }>({});
   const [otpCode, setOtpCode] = useState("");
   const [pollingStatus, setPollingStatus] = useState<string | null>(null);
@@ -236,6 +240,7 @@ export default function Deposit() {
           paydunyaToken: response.token,
           requiresOTP: response.requiresOTP,
           instructions: response.instructions,
+          provider: response.provider,
         });
         
         if (response.requiresOTP) {
@@ -251,6 +256,19 @@ export default function Deposit() {
             description: response.message || "Veuillez valider le paiement sur votre telephone",
           });
         }
+      } else if (response.requiresOTP) {
+        setPaymentData({
+          otpInstructions: response.otpInstructions,
+          otpUssdCode: response.otpUssdCode,
+          otpHint: response.otpHint,
+          provider: response.provider,
+          requiresOTP: true,
+        });
+        setPaymentStep("otp");
+        toast({
+          title: "Code OTP requis",
+          description: response.otpInstructions || "Generez votre code de paiement Orange Money",
+        });
       } else {
         toast({
           title: "Erreur",
@@ -271,6 +289,21 @@ export default function Deposit() {
   const otpMutation = useMutation({
     mutationFn: async ({ authorizationCode }: { authorizationCode: string }) => {
       const formData = form.getValues();
+      
+      if (paymentData.provider === "mbiyopay") {
+        const providerAmount = conversionData ? Math.floor(conversionData.convertedAmount) : depositAmount;
+        const providerCurrency = conversionData ? conversionData.targetCurrency : userBalanceCurrency;
+        const res = await apiRequest("POST", "/api/deposit", {
+          ...formData,
+          amount: providerAmount,
+          currency: providerCurrency,
+          originalAmount: depositAmount,
+          originalCurrency: userBalanceCurrency,
+          otpCode: authorizationCode,
+        });
+        return res.json();
+      }
+      
       const res = await apiRequest("POST", "/api/payment-links/softpay-confirm", {
         token: paymentData.paydunyaToken,
         transactionId: paymentData.transactionId,
@@ -285,6 +318,14 @@ export default function Deposit() {
     },
     onSuccess: (response: any) => {
       if (response.success) {
+        if (paymentData.provider === "mbiyopay") {
+          setPaymentData(prev => ({
+            ...prev,
+            transactionId: response.transactionId,
+            redirectUrl: response.redirectUrl,
+            instructions: response.instructions,
+          }));
+        }
         setPaymentStep("polling");
         setOtpCode("");
         toast({
@@ -318,7 +359,7 @@ export default function Deposit() {
       return;
     }
     
-    if (!paymentData.paydunyaToken || !paymentData.transactionId) {
+    if (paymentData.provider !== "mbiyopay" && (!paymentData.paydunyaToken || !paymentData.transactionId)) {
       toast({
         title: "Erreur",
         description: "Donnees de paiement manquantes. Veuillez recommencer.",
@@ -553,9 +594,25 @@ export default function Deposit() {
               <Smartphone className="h-12 w-12 mx-auto text-primary" />
               <p className="font-semibold text-lg">Code de confirmation requis</p>
               <p className="text-sm text-muted-foreground">
-                {paymentData.ussdInstruction || "Generez votre code de paiement et entrez-le ci-dessous"}
+                {paymentData.otpInstructions || paymentData.ussdInstruction || "Generez votre code de paiement et entrez-le ci-dessous"}
               </p>
             </div>
+            {paymentData.otpUssdCode && (
+              <Alert className="bg-orange-50 dark:bg-orange-950 border-orange-200 dark:border-orange-800">
+                <Info className="h-4 w-4 text-orange-600" />
+                <AlertDescription className="text-sm text-orange-800 dark:text-orange-200">
+                  <p className="font-semibold mb-1">Composez ce code USSD sur votre telephone :</p>
+                  <div className="bg-white dark:bg-gray-900 border border-orange-300 dark:border-orange-700 rounded-md px-3 py-2 my-2 text-center">
+                    <code className="text-lg font-bold text-orange-700 dark:text-orange-400">
+                      {paymentData.otpUssdCode}
+                    </code>
+                  </div>
+                  {paymentData.otpHint && (
+                    <p className="text-xs text-orange-600 dark:text-orange-400">{paymentData.otpHint}</p>
+                  )}
+                </AlertDescription>
+              </Alert>
+            )}
             <div className="text-center p-4 bg-muted rounded-lg">
               <p className="text-sm text-muted-foreground">Montant</p>
               <p className="text-2xl font-bold text-primary">

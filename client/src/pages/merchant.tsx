@@ -102,7 +102,7 @@ function getMerchantPaymentStateKey(token: string): string {
 }
 
 interface MerchantPaymentState {
-  stage: "form" | "ussd" | "otp" | "polling" | "completed" | "failed" | "redirect";
+  stage: "form" | "ussd" | "otp" | "polling" | "completed" | "failed" | "redirect" | "mbiyoOtp";
   invoiceToken: string | null;
   transactionId: string | null;
   ussdInstruction: string | null;
@@ -139,7 +139,7 @@ function clearMerchantPaymentState(token: string): void {
 export default function Merchant() {
   const [, params] = useRoute("/merchant/:token");
   const token = params?.token;
-  const [paymentStage, setPaymentStage] = useState<"form" | "ussd" | "otp" | "polling" | "completed" | "failed" | "redirect">("form");
+  const [paymentStage, setPaymentStage] = useState<"form" | "ussd" | "otp" | "polling" | "completed" | "failed" | "redirect" | "mbiyoOtp">("form");
   const [invoiceToken, setInvoiceToken] = useState<string | null>(null);
   const [transactionId, setTransactionId] = useState<string | null>(null);
   const [ussdInstruction, setUssdInstruction] = useState<string | null>(null);
@@ -147,6 +147,11 @@ export default function Merchant() {
   const [redirectUrl, setRedirectUrl] = useState<string | null>(null);
   const [mbiyoInstructions, setMbiyoInstructions] = useState<string | null>(null);
   const [authCode, setAuthCode] = useState("");
+  const [mbiyoOtpInstructions, setMbiyoOtpInstructions] = useState("");
+  const [mbiyoOtpUssdCode, setMbiyoOtpUssdCode] = useState("");
+  const [mbiyoOtpHint, setMbiyoOtpHint] = useState("");
+  const [mbiyoProvider, setMbiyoProvider] = useState("");
+  const [mbiyoOtpCode, setMbiyoOtpCode] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [paidAmount, setPaidAmount] = useState<number>(0);
   const [savedCountry, setSavedCountry] = useState<string>("");
@@ -396,6 +401,11 @@ export default function Merchant() {
     setWizallTransactionId(null);
     setRedirectUrl(null);
     setAuthCode("");
+    setMbiyoOtpCode("");
+    setMbiyoOtpInstructions("");
+    setMbiyoOtpUssdCode("");
+    setMbiyoOtpHint("");
+    setMbiyoProvider("");
     setPaidAmount(0);
     setSavedCountry("");
     setSavedOperator("");
@@ -447,7 +457,7 @@ export default function Merchant() {
         ? conversionData.targetCurrency
         : selectedCurrency;
       
-      const res = await apiRequest("POST", `/api/fedapay/merchant-link/${token}`, {
+      const body: any = {
         amount: providerAmount,
         customerName: data.customerName,
         customerEmail: data.customerEmail,
@@ -457,7 +467,11 @@ export default function Merchant() {
         currency: providerCurrency,
         originalAmount: data.amount,
         originalCurrency: ownerCurrency,
-      });
+      };
+      if (mbiyoOtpCode) {
+        body.otpCode = mbiyoOtpCode;
+      }
+      const res = await apiRequest("POST", `/api/fedapay/merchant-link/${token}`, body);
       return res.json();
     },
     onSuccess: (data: any) => {
@@ -576,8 +590,17 @@ export default function Merchant() {
             });
           }
         }
+      } else if (data.requiresOTP) {
+        setMbiyoOtpInstructions(data.otpInstructions || "");
+        setMbiyoOtpUssdCode(data.otpUssdCode || "");
+        setMbiyoOtpHint(data.otpHint || "");
+        setMbiyoProvider(data.provider || "");
+        setPaymentStage("mbiyoOtp");
+        toast({
+          title: "Code OTP requis",
+          description: data.otpInstructions || "Generez votre code de paiement Orange Money",
+        });
       } else {
-        // Paiement échoué - afficher l'erreur et passer à l'état "failed"
         setPaymentStage("failed");
         if (token) clearMerchantPaymentState(token);
         toast({
@@ -1114,6 +1137,76 @@ export default function Merchant() {
             >
               <RefreshCw className="w-3 h-3 mr-1" />
               Recommencer un nouveau paiement
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (paymentStage === "mbiyoOtp") {
+    return (
+      <div className="w-full min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center p-4 overflow-hidden">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center space-y-2">
+            <img src={logoImage} alt="BKApay" className="h-10 w-auto mx-auto" />
+            <CardTitle>Code de paiement Orange Money</CardTitle>
+            <CardDescription>
+              {mbiyoOtpInstructions || "Generez votre code de paiement et entrez-le ci-dessous"}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {mbiyoOtpUssdCode && (
+              <Alert className="bg-orange-50 dark:bg-orange-950 border-orange-200 dark:border-orange-800">
+                <AlertCircle className="h-4 w-4 text-orange-600" />
+                <AlertDescription className="text-sm text-orange-800 dark:text-orange-200">
+                  <p className="font-semibold mb-1">Composez ce code USSD sur votre telephone :</p>
+                  <div className="bg-white dark:bg-gray-900 border border-orange-300 dark:border-orange-700 rounded-md px-3 py-2 my-2 text-center">
+                    <code className="text-lg font-bold text-orange-700 dark:text-orange-400">
+                      {mbiyoOtpUssdCode}
+                    </code>
+                  </div>
+                  {mbiyoOtpHint && (
+                    <p className="text-xs text-orange-600 dark:text-orange-400">{mbiyoOtpHint}</p>
+                  )}
+                </AlertDescription>
+              </Alert>
+            )}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium">Code de paiement</label>
+              <Input
+                type="text"
+                value={mbiyoOtpCode}
+                onChange={(e) => setMbiyoOtpCode(e.target.value)}
+                placeholder="Entrez le code obtenu"
+                data-testid="input-mbiyo-otp-code"
+              />
+            </div>
+            <Button
+              onClick={() => {
+                const formData = form.getValues();
+                initMutation.mutate(formData);
+              }}
+              disabled={initMutation.isPending || !mbiyoOtpCode.trim()}
+              className="w-full"
+              data-testid="button-submit-mbiyo-otp"
+            >
+              {initMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Validation...
+                </>
+              ) : (
+                "Valider le code"
+              )}
+            </Button>
+            <Button
+              onClick={() => { setPaymentStage("form"); setMbiyoOtpCode(""); }}
+              variant="outline"
+              className="w-full"
+              data-testid="button-cancel-mbiyo-otp"
+            >
+              Annuler
             </Button>
           </CardContent>
         </Card>

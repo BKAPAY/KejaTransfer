@@ -22,7 +22,8 @@ export async function handleMbiyoPayDeposit(
   phone: string,
   currency?: string,
   originalAmount?: number,
-  originalCurrency?: string
+  originalCurrency?: string,
+  otpCode?: string
 ): Promise<{ success: boolean; transactionId?: string; mbiyopayTransactionId?: string; redirectUrl?: string; message?: string; error?: string; instructions?: string }> {
   try {
     const countryLower = country.toLowerCase();
@@ -80,6 +81,7 @@ export async function handleMbiyoPayDeposit(
       network: operator,
       orderId,
       callbackUrl: `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/mbiyopay`,
+      otpCode,
     });
 
     if (!result.success) {
@@ -404,7 +406,8 @@ export async function handleMbiyoPayPaymentLink(
   payerCountry: string,
   convertedAmount?: number,
   convertedCurrency?: string,
-  ownerCurrency?: string
+  ownerCurrency?: string,
+  otpCode?: string
 ): Promise<{ success: boolean; transactionId?: string; mbiyopayTransactionId?: string; redirectUrl?: string; message?: string; error?: string; instructions?: string }> {
   try {
     // Use payer's country for the payment provider
@@ -473,6 +476,7 @@ export async function handleMbiyoPayPaymentLink(
       network: operator,
       orderId,
       callbackUrl: `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/mbiyopay`,
+      otpCode,
     });
 
     if (!result.success) {
@@ -529,7 +533,8 @@ export async function handleMbiyoPayMerchantLink(
   payerCountry: string,
   originalAmount?: number,
   originalCurrency?: string,
-  payerCurrency?: string // Currency selected by payer (for multi-currency countries like RDC)
+  payerCurrency?: string,
+  otpCode?: string
 ): Promise<{ success: boolean; transactionId?: string; mbiyopayTransactionId?: string; redirectUrl?: string; message?: string; error?: string; instructions?: string }> {
   try {
     // Use payer's country for the payment provider
@@ -592,6 +597,7 @@ export async function handleMbiyoPayMerchantLink(
       network: operator,
       orderId,
       callbackUrl: `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/mbiyopay`,
+      otpCode,
     });
 
     if (!result.success) {
@@ -646,7 +652,8 @@ export async function handleMbiyoPayApiPayment(
   operator: string,
   country: string,
   description?: string,
-  callbackUrl?: string
+  callbackUrl?: string,
+  otpCode?: string
 ): Promise<{ success: boolean; transactionId?: string; mbiyopayTransactionId?: string; redirectUrl?: string; message?: string; error?: string; instructions?: string }> {
   try {
     const countryLower = country.toLowerCase();
@@ -699,6 +706,7 @@ export async function handleMbiyoPayApiPayment(
       network: operator,
       orderId,
       callbackUrl: `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/mbiyopay`,
+      otpCode,
     });
 
     if (!result.success) {
