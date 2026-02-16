@@ -367,7 +367,7 @@ export async function createMbiyoPayPayout(params: MbiyoPayPayoutParams): Promis
     console.log(`[MbiyoPay Payout] Phone formatting: input="${params.phone}" -> output="${formattedPhone}" (country=${params.countryCode})`);
     console.log(`[MbiyoPay Payout] Operator mapping: ${params.network} -> ${apiOperatorCode}`);
     
-    // MbiyoPay documentation shows network in UPPERCASE
+    // MbiyoPay payout documentation shows network in lowercase (e.g., "orange", "moov", "mtn")
     const requestBody = {
       amount: params.amount,
       currency: params.currency,
@@ -375,7 +375,7 @@ export async function createMbiyoPayPayout(params: MbiyoPayPayoutParams): Promis
       order_id: params.orderId || `BKAPAY-PAYOUT-${Date.now()}`,
       callback_url: params.callbackUrl || `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/mbiyopay`,
       metadata: {
-        network: apiOperatorCode.toUpperCase(),
+        network: apiOperatorCode.toLowerCase(),
         phone_number: formattedPhone,
         country_code: params.countryCode.toUpperCase(),
         beneficiary: params.beneficiaryName || "BKApay User",
