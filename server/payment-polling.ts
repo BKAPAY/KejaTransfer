@@ -288,7 +288,7 @@ async function processMbiyoPayTransaction(transaction: Transaction & { user?: Us
             return true;
           } else if (foundStatus === "failed" || foundStatus === "cancelled") {
             const isOutgoing = transaction.type === "withdrawal" || transaction.type === "transfer";
-            const MBIYOPAY_FAILED_GRACE_PERIOD_MS = isOutgoing ? 15 * 1000 : 3 * 60 * 1000;
+            const MBIYOPAY_FAILED_GRACE_PERIOD_MS = isOutgoing ? 15 * 1000 : 10 * 60 * 1000;
             const txAge = getTransactionAge(transaction);
             if (txAge < MBIYOPAY_FAILED_GRACE_PERIOD_MS) {
               const graceRemaining = Math.round((MBIYOPAY_FAILED_GRACE_PERIOD_MS - txAge) / 1000);
@@ -354,7 +354,7 @@ async function processMbiyoPayTransaction(transaction: Transaction & { user?: Us
       } 
       else if (status === "failed" || status === "cancelled") {
         const isOutgoing = transaction.type === "withdrawal" || transaction.type === "transfer";
-        const MBIYOPAY_FAILED_GRACE_PERIOD_MS = isOutgoing ? 15 * 1000 : 3 * 60 * 1000;
+        const MBIYOPAY_FAILED_GRACE_PERIOD_MS = isOutgoing ? 15 * 1000 : 10 * 60 * 1000;
         const transactionAgeMs = getTransactionAge(transaction);
         
         if (transactionAgeMs < MBIYOPAY_FAILED_GRACE_PERIOD_MS) {
