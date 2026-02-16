@@ -287,8 +287,8 @@ async function processMbiyoPayTransaction(transaction: Transaction & { user?: Us
             }
             return true;
           } else if (foundStatus === "failed" || foundStatus === "cancelled") {
-            // Don't trust "failed" for recent transactions - MbiyoPay may update later
-            const MBIYOPAY_FAILED_GRACE_PERIOD_MS = 3 * 60 * 1000;
+            const isOutgoing = transaction.type === "withdrawal" || transaction.type === "transfer";
+            const MBIYOPAY_FAILED_GRACE_PERIOD_MS = isOutgoing ? 15 * 1000 : 3 * 60 * 1000;
             const txAge = getTransactionAge(transaction);
             if (txAge < MBIYOPAY_FAILED_GRACE_PERIOD_MS) {
               const graceRemaining = Math.round((MBIYOPAY_FAILED_GRACE_PERIOD_MS - txAge) / 1000);
@@ -352,10 +352,9 @@ async function processMbiyoPayTransaction(transaction: Transaction & { user?: Us
         }
         return true;
       } 
-      // MbiyoPay sometimes returns "failed" prematurely while mobile money is still processing
-      // Only trust "failed" status after a grace period (3 minutes) to allow MbiyoPay to update
       else if (status === "failed" || status === "cancelled") {
-        const MBIYOPAY_FAILED_GRACE_PERIOD_MS = 3 * 60 * 1000; // 3 minutes grace period
+        const isOutgoing = transaction.type === "withdrawal" || transaction.type === "transfer";
+        const MBIYOPAY_FAILED_GRACE_PERIOD_MS = isOutgoing ? 15 * 1000 : 3 * 60 * 1000;
         const transactionAgeMs = getTransactionAge(transaction);
         
         if (transactionAgeMs < MBIYOPAY_FAILED_GRACE_PERIOD_MS) {
