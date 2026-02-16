@@ -72,7 +72,7 @@ const PROVIDER_INFO = {
     name: "MbiyoPay",
     description: "Passerelle de paiement pour 11 pays africains",
     color: "bg-teal-500",
-    fields: ["apiKey"],
+    fields: ["apiKey", "publicKey"],
     countries: "11 pays (Bénin, BF, CI, Sénégal, Togo, Mali, Guinée, Cameroun, Congo, RDC, Gambie)",
   },
   nowpayments: {
