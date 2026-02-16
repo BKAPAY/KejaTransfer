@@ -6514,6 +6514,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/admin/reset-user", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { userId } = req.body;
+      if (!userId) {
+        return res.status(400).json({ error: "Identifiant utilisateur requis" });
+      }
+      const targetUser = await storage.getUser(userId);
+      if (targetUser?.isPrimaryAdmin) {
+        return res.status(403).json({ error: "Impossible de reinitialiser l'administrateur principal" });
+      }
+      await storage.resetUserData(userId);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Reset user error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
   app.post("/api/admin/suspend", requireAdmin, async (req: Request, res: Response) => {
     try {
       const { userId } = req.body;

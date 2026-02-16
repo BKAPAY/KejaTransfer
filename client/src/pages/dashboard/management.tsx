@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Users, Shield, Trash2, Plus, Minus, History, Link as LinkIcon, Store, Key, User as UserIcon, Check, X, FileCheck, AlertCircle, Unlock, Lock, Clock, CheckCircle, XCircle, ArrowDownLeft, ArrowUpRight, Loader2, Monitor } from "lucide-react";
+import { Users, Shield, Trash2, Plus, Minus, History, Link as LinkIcon, Store, Key, User as UserIcon, Check, X, FileCheck, AlertCircle, Unlock, Lock, Clock, CheckCircle, XCircle, ArrowDownLeft, ArrowUpRight, Loader2, Monitor, RotateCcw } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
@@ -49,6 +49,7 @@ export default function Management() {
   const [addFundsDialog, setAddFundsDialog] = useState<{ open: boolean; userId?: string; userName?: string; amount?: number; currency?: string }>({ open: false });
   const [subtractFundsDialog, setSubtractFundsDialog] = useState<{ open: boolean; userId?: string; userName?: string; amount?: number; currency?: string }>({ open: false });
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; userId?: string; userName?: string }>({ open: false });
+  const [resetDialog, setResetDialog] = useState<{ open: boolean; userId?: string | null; userName?: string }>({ open: false, userId: null, userName: "" });
   const [suspendDialog, setSuspendDialog] = useState<{ open: boolean; userId?: string; userName?: string }>({ open: false });
   const [unsuspendDialog, setUnsuspendDialog] = useState<{ open: boolean; userId?: string; userName?: string }>({ open: false });
   const [rejectKycDialog, setRejectKycDialog] = useState<{ open: boolean; userId?: string; userName?: string; isRemoval?: boolean }>({ open: false });
@@ -194,6 +195,27 @@ export default function Management() {
     },
     onError: () => {
       toast({ title: "Erreur", description: "Impossible de supprimer l'utilisateur", variant: "destructive" });
+    },
+  });
+
+  const resetUserMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const response = await fetch("/api/admin/reset-user", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId }),
+      });
+      if (!response.ok) throw new Error("Failed to reset user");
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Succès", description: "Données utilisateur réinitialisées" });
+      setResetDialog({ open: false, userId: null, userName: "" });
+      refetchUsers();
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible de réinitialiser l'utilisateur", variant: "destructive" });
     },
   });
 
@@ -738,6 +760,16 @@ export default function Management() {
                       ) : null}
                       <Button
                         size="sm"
+                        variant="outline"
+                        onClick={() => setResetDialog({ open: true, userId: user.id, userName: `${user.firstName} ${user.lastName}` })}
+                        disabled={resetUserMutation.isPending}
+                        data-testid={`button-reset-${user.id}`}
+                      >
+                        <RotateCcw className="w-4 h-4 mr-1" />
+                        Reinitialiser
+                      </Button>
+                      <Button
+                        size="sm"
                         variant="destructive"
                         onClick={() => setDeleteDialog({ open: true, userId: user.id, userName: `${user.firstName} ${user.lastName}` })}
                         disabled={deleteUserMutation.isPending}
@@ -922,6 +954,33 @@ export default function Management() {
               className="bg-destructive hover:bg-destructive/90"
             >
               {deleteUserMutation.isPending ? "Suppression en cours..." : "Supprimer"}
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Reset User Dialog */}
+      <AlertDialog open={resetDialog.open} onOpenChange={(open) => setResetDialog({ ...resetDialog, open })}>
+        <AlertDialogContent data-testid="dialog-reset">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reinitialiser l'utilisateur</AlertDialogTitle>
+            <AlertDialogDescription>
+              Toutes les donnees de <strong>{resetDialog.userName}</strong> seront supprimees (transactions, liens de paiement, liens marchands, cles API, historique de connexion). Le solde sera remis a 0 et le KYC reinitialise. Le compte sera conserve.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex gap-2">
+            <AlertDialogCancel data-testid="button-cancel-reset">Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (resetDialog.userId) {
+                  resetUserMutation.mutate(resetDialog.userId);
+                }
+              }}
+              disabled={resetUserMutation.isPending}
+              data-testid="button-confirm-reset"
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {resetUserMutation.isPending ? "Reinitialisation..." : "Reinitialiser"}
             </AlertDialogAction>
           </div>
         </AlertDialogContent>

@@ -1073,16 +1073,37 @@ export class DbStorage implements IStorage {
 
   async deleteUser(userId: string): Promise<boolean> {
     // Must delete related data first due to foreign key constraints
-    // 1. Delete transactions
+    // 1. Delete login logs
+    await db.delete(schema.loginLogs).where(eq(schema.loginLogs.userId, userId));
+    // 2. Delete transactions
     await db.delete(schema.transactions).where(eq(schema.transactions.userId, userId));
-    // 2. Delete payment links
+    // 3. Delete payment links
     await db.delete(schema.paymentLinks).where(eq(schema.paymentLinks.userId, userId));
-    // 3. Delete merchant links
+    // 4. Delete merchant links
     await db.delete(schema.merchantLinks).where(eq(schema.merchantLinks.userId, userId));
-    // 4. Delete API keys
+    // 5. Delete API keys
     await db.delete(schema.apiKeys).where(eq(schema.apiKeys.userId, userId));
-    // 5. Finally delete the user
+    // 6. Delete sessions for this user
+    await db.execute(sql`DELETE FROM session WHERE sess::text LIKE ${'%"userId":"' + userId + '"%'}`);
+    // 7. Finally delete the user
     await db.delete(schema.users).where(eq(schema.users.id, userId));
+    return true;
+  }
+
+  async resetUserData(userId: string): Promise<boolean> {
+    // Delete all user data but keep the account
+    await db.delete(schema.loginLogs).where(eq(schema.loginLogs.userId, userId));
+    await db.delete(schema.transactions).where(eq(schema.transactions.userId, userId));
+    await db.delete(schema.paymentLinks).where(eq(schema.paymentLinks.userId, userId));
+    await db.delete(schema.merchantLinks).where(eq(schema.merchantLinks.userId, userId));
+    await db.delete(schema.apiKeys).where(eq(schema.apiKeys.userId, userId));
+    // Reset balance to 0, reset KYC, clear withdrawal settings
+    await db.update(schema.users).set({
+      balance: 0,
+      kycStatus: "unverified",
+      withdrawalPhones: null,
+      securityCode: null,
+    }).where(eq(schema.users.id, userId));
     return true;
   }
 
