@@ -220,13 +220,20 @@ export async function handleMbiyoPayWithdrawal(
     });
 
     if (!result.success) {
-      // Refund balance and mark as failed
       await storage.updateUserBalance(userId, feeInfo.totalDeductedFromBalance);
       await storage.updateTransactionStatus(tx.id, "failed");
       return { success: false, transactionId: tx.id, error: result.error || "Retrait echoue" };
     }
 
-    // Update transaction with MbiyoPay transaction ID
+    if (result.pending) {
+      console.log(`[MbiyoPay Withdrawal] Ambiguous API response - transaction ${tx.id} stays pending, waiting for webhook`);
+      return {
+        success: true,
+        transactionId: tx.id,
+        message: result.message || "Retrait en cours de traitement. Veuillez patienter.",
+      };
+    }
+
     const updatedMetadata = JSON.stringify({
       mbiyopayTransactionId: result.transactionId,
       phone,
@@ -347,14 +354,21 @@ export async function handleMbiyoPayTransfer(
     });
 
     if (!result.success) {
-      // Refund balance and mark as failed
       await storage.updateUserBalance(userId, totalToDebit);
       await storage.updateTransactionStatus(tx.id, "failed");
       const errorMsg = result.error ? result.error.replace("Retrait", "Transfert") : "Transfert echoue";
       return { success: false, transactionId: tx.id, error: errorMsg };
     }
 
-    // Update transaction with MbiyoPay transaction ID
+    if (result.pending) {
+      console.log(`[MbiyoPay Transfer] Ambiguous API response - transaction ${tx.id} stays pending, waiting for webhook`);
+      return {
+        success: true,
+        transactionId: tx.id,
+        message: result.message || "Transfert en cours de traitement. Veuillez patienter.",
+      };
+    }
+
     const updatedMetadata = JSON.stringify({
       mbiyopayTransactionId: result.transactionId,
       phone,
@@ -466,7 +480,15 @@ export async function handleMbiyoPayPaymentLink(
       return { success: false, transactionId: tx.id, error: result.error || "Erreur lors du paiement" };
     }
 
-    // Update transaction with MbiyoPay transaction ID
+    if (result.pending) {
+      console.log(`[MbiyoPay PaymentLink] Ambiguous API response - transaction ${tx.id} stays pending, waiting for webhook`);
+      return {
+        success: true,
+        transactionId: tx.id,
+        message: result.message || "Paiement en cours de traitement. Veuillez patienter.",
+      };
+    }
+
     const updatedMetadata = JSON.stringify({
       mbiyopayTransactionId: result.transactionId,
       redirectUrl: result.redirectUrl,
@@ -576,6 +598,15 @@ export async function handleMbiyoPayMerchantLink(
       return { success: false, transactionId: tx.id, error: result.error || "Erreur lors du paiement" };
     }
 
+    if (result.pending) {
+      console.log(`[MbiyoPay MerchantLink] Ambiguous API response - transaction ${tx.id} stays pending, waiting for webhook`);
+      return {
+        success: true,
+        transactionId: tx.id,
+        message: result.message || "Paiement en cours de traitement. Veuillez patienter.",
+      };
+    }
+
     const updatedMetadata = JSON.stringify({
       mbiyopayTransactionId: result.transactionId,
       redirectUrl: result.redirectUrl,
@@ -673,6 +704,15 @@ export async function handleMbiyoPayApiPayment(
       return { success: false, transactionId: tx.id, error: result.error || "Erreur lors du paiement" };
     }
 
+    if (result.pending) {
+      console.log(`[MbiyoPay API Payment] Ambiguous API response - transaction ${tx.id} stays pending, waiting for webhook`);
+      return {
+        success: true,
+        transactionId: tx.id,
+        message: result.message || "Paiement en cours de traitement. Veuillez patienter.",
+      };
+    }
+
     const updatedMetadata = JSON.stringify({
       mbiyopayTransactionId: result.transactionId,
       redirectUrl: result.redirectUrl,
@@ -732,7 +772,6 @@ export async function handleMbiyoPayWebhook(req: Request, res: Response) {
     }
 
     const pendingTransactions = await storage.getAllPendingTransactions();
-    // Match by mbiyopayTransactionId first, then fallback to orderId
     let tx = pendingTransactions.find((t: any) => {
       try {
         const metadata = JSON.parse(t.metadata || "{}");
@@ -742,7 +781,6 @@ export async function handleMbiyoPayWebhook(req: Request, res: Response) {
       }
     });
     
-    // Fallback: match by order_id if mbiyopayTransactionId not found
     if (!tx && order_id) {
       tx = pendingTransactions.find((t: any) => {
         try {
@@ -752,17 +790,40 @@ export async function handleMbiyoPayWebhook(req: Request, res: Response) {
           return false;
         }
       });
-      if (tx) {
-        console.log(`[MbiyoPay Webhook] Matched by order_id: ${order_id} -> BKApay tx: ${tx.id}`);
-        // Update metadata with the MbiyoPay transaction ID we just received
+    }
+
+    // If not found in pending, search ALL recent MbiyoPay transactions (including failed ones)
+    // This handles the case where a transaction was prematurely marked as "failed" 
+    // due to ambiguous API response but the payment actually went through
+    if (!tx && (transaction_id || order_id)) {
+      const allTransactions = await storage.getAllTransactionsForAdmin(200);
+      tx = allTransactions.find((t: any) => {
         try {
-          const existingMeta = JSON.parse(tx.metadata || "{}");
+          const metadata = JSON.parse(t.metadata || "{}");
+          if (metadata.paymentProvider !== "mbiyopay") return false;
+          if (transaction_id && metadata.mbiyopayTransactionId === transaction_id) return true;
+          if (order_id && metadata.orderId === order_id) return true;
+          return false;
+        } catch {
+          return false;
+        }
+      });
+      if (tx) {
+        console.log(`[MbiyoPay Webhook] Found transaction ${tx.id} in all transactions (status: ${tx.status})`);
+      }
+    }
+
+    // Update metadata with mbiyopayTransactionId if matched by orderId
+    if (tx && transaction_id) {
+      try {
+        const existingMeta = JSON.parse(tx.metadata || "{}");
+        if (!existingMeta.mbiyopayTransactionId && transaction_id) {
           existingMeta.mbiyopayTransactionId = transaction_id;
           await storage.updateTransactionMetadata(tx.id, JSON.stringify(existingMeta));
           console.log(`[MbiyoPay Webhook] Updated metadata with mbiyopayTransactionId: ${transaction_id}`);
-        } catch (e) {
-          console.error(`[MbiyoPay Webhook] Failed to update metadata:`, e);
         }
+      } catch (e) {
+        console.error(`[MbiyoPay Webhook] Failed to update metadata:`, e);
       }
     }
     
@@ -771,8 +832,15 @@ export async function handleMbiyoPayWebhook(req: Request, res: Response) {
       return res.status(404).json({ error: "Transaction not found" });
     }
 
-    if (tx.status === "completed" || tx.status === "failed") {
-      console.log(`[MbiyoPay Webhook] Transaction ${tx.id} already finalized: ${tx.status}`);
+    if (tx.status === "completed") {
+      console.log(`[MbiyoPay Webhook] Transaction ${tx.id} already completed`);
+      return res.json({ success: true, message: "Already processed" });
+    }
+
+    // Allow processing of "failed" transactions if webhook says successful
+    // (handles case where API returned ambiguous response but payment actually went through)
+    if (tx.status === "failed" && status !== "successful") {
+      console.log(`[MbiyoPay Webhook] Transaction ${tx.id} already failed and webhook status is ${status} - skipping`);
       return res.json({ success: true, message: "Already processed" });
     }
 
@@ -801,8 +869,14 @@ export async function handleMbiyoPayWebhook(req: Request, res: Response) {
       
       console.log(`[SECURITY] ✅ Payment VERIFIED by MbiyoPay API for transaction ${tx.id}`);
       
+      const wasAlreadyFailed = tx.status === "failed";
+      
       if (tx.type === "deposit" || tx.type === "payment_link" || tx.type === "merchant_link" || tx.type === "api_payment") {
-        // Use atomic finalizeIncomingTransaction to prevent double-credit race with polling
+        // For incoming transactions: recover from "failed" by resetting to "pending" first
+        if (wasAlreadyFailed) {
+          console.log(`[MbiyoPay Webhook] Recovering failed deposit ${tx.id} - resetting to pending before finalizing`);
+          await storage.updateTransactionStatus(tx.id, "pending");
+        }
         const result = await storage.finalizeIncomingTransaction(tx.id, {});
         if (result) {
           console.log(`[MbiyoPay Webhook] Deposit completed: ${tx.id}, credited=${result.credited}, netAmount=${result.transaction.amount - (result.transaction.fee || 0)}`);
@@ -810,6 +884,14 @@ export async function handleMbiyoPayWebhook(req: Request, res: Response) {
           console.log(`[MbiyoPay Webhook] Transaction ${tx.id} already processed by polling - skipping`);
         }
       } else if (tx.type === "withdrawal" || tx.type === "transfer") {
+        if (wasAlreadyFailed) {
+          // For outgoing transactions that were already "failed" and refunded:
+          // We must re-debit the user's balance before marking as completed
+          const txMetadata = JSON.parse(tx.metadata || "{}");
+          const reDebitAmount = txMetadata.deductedFromBalance || txMetadata.totalDebited || tx.amount;
+          await storage.updateUserBalance(tx.userId, -reDebitAmount);
+          console.log(`[MbiyoPay Webhook] Re-debited ${reDebitAmount} from user ${tx.userId} for recovered ${tx.type} ${tx.id}`);
+        }
         await storage.updateTransactionStatus(tx.id, "completed");
         console.log(`[MbiyoPay Webhook] Withdrawal/Transfer completed: ${tx.id}`);
       }
