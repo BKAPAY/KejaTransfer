@@ -891,7 +891,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // If 2FA is disabled OR user is admin, connect directly without code
       if (!tfaEnabled || user.isAdmin) {
         req.session.userId = user.id;
-        req.session.loginVerified = false;
+        req.session.loginVerified = true; // GPS verification disabled
         console.log(`[Login] ${user.email} connecté directement (2FA disabled: ${!tfaEnabled}, isAdmin: ${user.isAdmin})`);
         const logId = await recordLoginLog(req, user.id);
         if (logId) req.session.loginLogId = logId;
@@ -988,7 +988,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       resetRateLimit(`code:${email.toLowerCase()}`);
 
       req.session.userId = user.id;
-      req.session.loginVerified = false;
+      req.session.loginVerified = true; // GPS verification disabled
       const logId = await recordLoginLog(req, user.id);
       if (logId) req.session.loginLogId = logId;
       res.json({ success: true, loginLogId: logId, user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName } });
