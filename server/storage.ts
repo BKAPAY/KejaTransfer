@@ -1072,21 +1072,24 @@ export class DbStorage implements IStorage {
   }
 
   async deleteUser(userId: string): Promise<boolean> {
-    // Must delete related data first due to foreign key constraints
-    // 1. Delete login logs
+    const user = await this.getUser(userId);
+    if (!user) return false;
+    const userEmail = user.email;
+    console.log(`[DeleteUser] Suppression complete de l'utilisateur ${userEmail} (${userId})...`);
     await db.delete(schema.loginLogs).where(eq(schema.loginLogs.userId, userId));
-    // 2. Delete transactions
     await db.delete(schema.transactions).where(eq(schema.transactions.userId, userId));
-    // 3. Delete payment links
     await db.delete(schema.paymentLinks).where(eq(schema.paymentLinks.userId, userId));
-    // 4. Delete merchant links
     await db.delete(schema.merchantLinks).where(eq(schema.merchantLinks.userId, userId));
-    // 5. Delete API keys
     await db.delete(schema.apiKeys).where(eq(schema.apiKeys.userId, userId));
-    // 6. Delete sessions for this user
     await db.execute(sql`DELETE FROM session WHERE sess::text LIKE ${'%"userId":"' + userId + '"%'}`);
-    // 7. Finally delete the user
+    await db.execute(sql`DELETE FROM verification_codes WHERE email = ${userEmail}`);
     await db.delete(schema.users).where(eq(schema.users.id, userId));
+    const check = await this.getUserByEmail(userEmail);
+    if (check) {
+      console.error(`[DeleteUser] ERREUR: L'utilisateur ${userEmail} existe encore apres suppression!`);
+      return false;
+    }
+    console.log(`[DeleteUser] Utilisateur ${userEmail} supprime avec succes`);
     return true;
   }
 

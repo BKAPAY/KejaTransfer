@@ -6537,16 +6537,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!userId) {
         return res.status(400).json({ error: "Identifiant utilisateur requis" });
       }
-      // Check if target user is primary admin
       const targetUser = await storage.getUser(userId);
-      if (targetUser?.isPrimaryAdmin) {
+      if (!targetUser) {
+        return res.status(404).json({ error: "Utilisateur non trouvé" });
+      }
+      if (targetUser.isPrimaryAdmin) {
         return res.status(403).json({ error: "Impossible de supprimer l'administrateur principal" });
       }
-      await storage.deleteUser(userId);
-      res.json({ success: true });
+      const deleted = await storage.deleteUser(userId);
+      if (!deleted) {
+        return res.status(500).json({ error: "La suppression a échoué, l'utilisateur existe encore" });
+      }
+      clearAuthCache(userId);
+      res.json({ success: true, message: `Compte ${targetUser.email} supprimé définitivement` });
     } catch (error: any) {
       console.error("Delete user error:", error);
-      res.status(500).json({ error: "Une erreur est survenue" });
+      res.status(500).json({ error: "Une erreur est survenue lors de la suppression" });
     }
   });
 
