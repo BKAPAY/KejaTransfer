@@ -1,5 +1,5 @@
 import { Switch, Route, useLocation } from "wouter";
-import { queryClient } from "./lib/queryClient";
+import { queryClient, getQueryFn } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -62,18 +62,16 @@ import type { User } from "@shared/schema";
 
 function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [location, setLocation] = useLocation();
-  const { isLoading, error } = useAuth();
+  const { user, isLoading, isAuthenticated, isUnauthenticated, isServerError } = useAuth();
+  const redirectedRef = useRef(false);
 
   const { data: stats } = useQuery<{
     totalBalance: number;
-  }>({
+  } | null>({
     queryKey: ["/api/dashboard/stats"],
+    queryFn: getQueryFn({ on401: "returnNull" }),
     staleTime: 15000,
     refetchInterval: 30000,
-  });
-
-  const { data: user } = useQuery<User>({
-    queryKey: ["/api/auth/me"],
   });
 
   const userCurrency = user?.country 
@@ -89,16 +87,23 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
     }).format(amount);
   };
 
-  const { data: verifyStatus } = useQuery<{ verified: boolean }>({
+  const { data: verifyStatus } = useQuery<{ verified: boolean } | null>({
     queryKey: ["/api/auth/login-verify-status"],
-    enabled: !isLoading && !error,
+    queryFn: async ({ queryKey }) => {
+      const res = await fetch(queryKey[0] as string, { credentials: "include" });
+      if (res.status === 401) return null;
+      if (!res.ok) return null;
+      return await res.json();
+    },
+    enabled: !isLoading && isAuthenticated,
   });
 
   useEffect(() => {
-    if (!isLoading && error && location.startsWith("/dashboard")) {
+    if (!isLoading && isUnauthenticated && location.startsWith("/dashboard") && !redirectedRef.current) {
+      redirectedRef.current = true;
       setLocation("/login");
     }
-  }, [isLoading, error, location, setLocation]);
+  }, [isLoading, isUnauthenticated, location, setLocation]);
 
   useEffect(() => {
     if (verifyStatus && verifyStatus.verified === false && location.startsWith("/dashboard")) {
