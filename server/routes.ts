@@ -4467,7 +4467,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (user.country === "CD") {
         // RDC users: fixed minimums in CDF
-        minAmountInUserCurrency = isTransferType ? 2000 : 4000; // 2000 CDF transfer, 4000 CDF withdrawal
+        minAmountInUserCurrency = isTransferType ? 2000 : 1000; // 2000 CDF transfer, 1000 CDF withdrawal
       } else {
         // Other users: minimums in XOF (500 transfer, 1000 withdrawal)
         minAmountInUserCurrency = isTransferType ? 500 : 1000;
@@ -7973,7 +7973,7 @@ SUPPORT ET CONTACT:
               if (!amount || amount <= 0) return JSON.stringify({ success: false, error: "Montant invalide" });
 
               const userCurrencyW = user.country ? getCurrencyForCountry(user.country) : "XOF";
-              const minAmountW = user.country === "CD" ? 4000 : 1000;
+              const minAmountW = user.country === "CD" ? 1000 : 1000;
               if (amount < minAmountW) return JSON.stringify({ success: false, error: `Montant minimum: ${minAmountW.toLocaleString("fr-FR")} ${userCurrencyW}` });
 
               const activeProviderW = await getActiveProviderForWithdrawal(country, operator);

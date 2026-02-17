@@ -22,7 +22,7 @@ const BASE_MINIMUMS_XOF = {
 };
 
 const BASE_MINIMUMS_CDF = {
-  withdrawal: 4000,
+  withdrawal: 1000,
   transfer: 2000,
   deposit: 400,
   crypto: 2000,

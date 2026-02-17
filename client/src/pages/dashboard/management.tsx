@@ -521,7 +521,7 @@ export default function Management() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap mb-1">
                           <h4 className="font-semibold text-sm">
-                            {user.firstName} {user.lastName}
+                            {COUNTRIES.find(c => c.code === user.country)?.flag || ""} {user.firstName} {user.lastName}
                           </h4>
                           <Badge
                             variant={user.kycStatus === "verified" ? "default" : "secondary"}
