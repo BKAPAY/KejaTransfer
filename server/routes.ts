@@ -101,18 +101,34 @@ declare module "express-session" {
   }
 }
 
+const authCache = new Map<string, { user: any; timestamp: number }>();
+const AUTH_CACHE_TTL = 10000;
+
 async function requireAuth(req: Request, res: Response, next: Function) {
   if (!req.session.userId) {
     return res.status(401).json({ error: "Non authentifié" });
   }
   
-  const user = await storage.getUser(req.session.userId);
+  const cached = authCache.get(req.session.userId);
+  const now = Date.now();
+  let user;
+  
+  if (cached && (now - cached.timestamp) < AUTH_CACHE_TTL) {
+    user = cached.user;
+  } else {
+    user = await storage.getUser(req.session.userId);
+    if (user) {
+      authCache.set(req.session.userId, { user, timestamp: now });
+    }
+  }
+  
   if (!user) {
     req.session.destroy(() => {});
     return res.status(401).json({ error: "Non authentifié" });
   }
   
   if (user.suspended) {
+    authCache.delete(req.session.userId);
     req.session.destroy(() => {});
     return res.status(403).json({ error: "Votre compte a été suspendu. Veuillez contacter le support." });
   }
@@ -124,19 +140,39 @@ async function requireAuth(req: Request, res: Response, next: Function) {
   next();
 }
 
-// Middleware pour vérifier l'authentification administrateur
+function clearAuthCache(userId?: string) {
+  if (userId) {
+    authCache.delete(userId);
+  } else {
+    authCache.clear();
+  }
+}
+
 async function requireAdmin(req: Request, res: Response, next: Function) {
   if (!req.session.userId) {
     return res.status(401).json({ error: "Non authentifié" });
   }
-  const user = await storage.getUser(req.session.userId);
+  
+  const cached = authCache.get(req.session.userId);
+  const now = Date.now();
+  let user;
+  
+  if (cached && (now - cached.timestamp) < AUTH_CACHE_TTL) {
+    user = cached.user;
+  } else {
+    user = await storage.getUser(req.session.userId);
+    if (user) {
+      authCache.set(req.session.userId, { user, timestamp: now });
+    }
+  }
+  
   if (!user) {
     req.session.destroy(() => {});
     return res.status(401).json({ error: "Non authentifié" });
   }
   
-  // Admin accounts can still be suspended (for security)
   if (user.suspended) {
+    authCache.delete(req.session.userId);
     req.session.destroy(() => {});
     return res.status(403).json({ error: "Votre compte a été suspendu. Veuillez contacter le support." });
   }
@@ -480,7 +516,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
-        maxAge: 5 * 60 * 60 * 1000, // 5 hours - session expires after 5 hours of inactivity
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days - session expires after 7 days of inactivity
       },
     })
   );
@@ -6547,6 +6583,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!user) {
         return res.status(404).json({ error: "Utilisateur non trouvé" });
       }
+      clearAuthCache(userId);
       res.json(user);
     } catch (error: any) {
       console.error("Suspend user error:", error);
@@ -6564,6 +6601,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!user) {
         return res.status(404).json({ error: "Utilisateur non trouvé" });
       }
+      clearAuthCache(userId);
       
       // Also clear any temporary login suspension for this user
       clearTemporarySuspension(user.email);
