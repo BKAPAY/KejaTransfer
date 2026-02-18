@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, Link as LinkIcon, Copy, ExternalLink } from "lucide-react";
 import type { PaymentLink, User } from "@shared/schema";
+import { COUNTRIES } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 
 export default function AdminUserLinks() {
@@ -24,13 +25,12 @@ export default function AdminUserLinks() {
     enabled: !!userId,
   });
 
+  const userCurrency = user?.country
+    ? COUNTRIES.find(c => c.code === user.country)?.currency || "XOF"
+    : "XOF";
+
   const formatAmount = (amount: number) => {
-    return new Intl.NumberFormat("fr-FR", {
-      style: "currency",
-      currency: "XOF",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
+    return `${amount.toLocaleString("fr-FR")} ${userCurrency}`;
   };
 
   const copyToClipboard = (text: string) => {

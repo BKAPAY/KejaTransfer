@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, User, Mail, Phone, MapPin, Calendar, Shield, CheckCircle, XCircle } from "lucide-react";
 import type { User as UserType } from "@shared/schema";
+import { COUNTRIES } from "@shared/schema";
 
 const COUNTRY_NAMES: Record<string, string> = {
   BJ: "Bénin",
@@ -15,6 +16,15 @@ const COUNTRY_NAMES: Record<string, string> = {
   BF: "Burkina Faso",
   GN: "Guinée",
   NE: "Niger",
+  CM: "Cameroun",
+  CD: "RD Congo",
+  CG: "Congo-Brazzaville",
+  TD: "Tchad",
+  CF: "Centrafrique",
+  GA: "Gabon",
+  ML: "Mali",
+  GM: "Gambie",
+  RW: "Rwanda",
 };
 
 export default function AdminUserProfile() {
@@ -37,13 +47,12 @@ export default function AdminUserProfile() {
     });
   };
 
+  const userCurrency = user?.country
+    ? COUNTRIES.find(c => c.code === user.country)?.currency || "XOF"
+    : "XOF";
+
   const formatAmount = (amount: number) => {
-    return new Intl.NumberFormat("fr-FR", {
-      style: "currency",
-      currency: "XOF",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
+    return `${amount.toLocaleString("fr-FR")} ${userCurrency}`;
   };
 
   if (isLoading) {

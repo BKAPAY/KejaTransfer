@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import type { User, Transaction, PaymentLink, MerchantLink, ApiKey, LoginLog } from "@shared/schema";
+import { COUNTRIES } from "@shared/schema";
 
 const ITEMS_PER_PAGE_OPTIONS = [10, 20, 50, 100];
 
@@ -19,11 +20,18 @@ export function HistoryDialog({ userId, onOpenChange }: { userId: string; onOpen
   const { data: transactions, isLoading } = useQuery<Transaction[]>({
     queryKey: [`/api/admin/user/${userId}/transactions`],
   });
+  const { data: dialogUser } = useQuery<User>({
+    queryKey: [`/api/admin/user/${userId}/profile`],
+  });
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const { toast } = useToast();
+
+  const userCurrency = dialogUser?.country
+    ? COUNTRIES.find(c => c.code === dialogUser.country)?.currency || "XOF"
+    : "XOF";
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, "default" | "secondary" | "destructive"> = {
@@ -57,13 +65,9 @@ export function HistoryDialog({ userId, onOpenChange }: { userId: string; onOpen
     return types[type] || type;
   };
 
-  const formatAmount = (amount: number) => {
-    return new Intl.NumberFormat("fr-FR", {
-      style: "currency",
-      currency: "XOF",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
+  const formatAmount = (amount: number, currency?: string) => {
+    const cur = currency || userCurrency;
+    return `${amount.toLocaleString("fr-FR")} ${cur}`;
   };
 
   const filteredTransactions = React.useMemo(() => {
@@ -103,7 +107,7 @@ export function HistoryDialog({ userId, onOpenChange }: { userId: string; onOpen
   }, [searchQuery]);
 
   if (selectedTx) {
-    return <TransactionDetailDialog transaction={selectedTx} onOpenChange={() => setSelectedTx(null)} />;
+    return <TransactionDetailDialog transaction={selectedTx} onOpenChange={() => setSelectedTx(null)} userCurrency={userCurrency} />;
   }
 
   return (
@@ -276,7 +280,7 @@ export function HistoryDialog({ userId, onOpenChange }: { userId: string; onOpen
 }
 
 // Transaction Detail Dialog Component
-function TransactionDetailDialog({ transaction, onOpenChange }: { transaction: Transaction; onOpenChange: () => void }) {
+function TransactionDetailDialog({ transaction, onOpenChange, userCurrency }: { transaction: Transaction; onOpenChange: () => void; userCurrency?: string }) {
   const getStatusBadge = (status: string) => {
     const variants: Record<string, "default" | "secondary" | "destructive"> = {
       completed: "default",
@@ -308,13 +312,9 @@ function TransactionDetailDialog({ transaction, onOpenChange }: { transaction: T
     return types[type] || type;
   };
 
-  const formatAmount = (amount: number) => {
-    return new Intl.NumberFormat("fr-FR", {
-      style: "currency",
-      currency: "XOF",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
+  const formatAmount = (amount: number, currency?: string) => {
+    const cur = currency || userCurrency || "XOF";
+    return `${amount.toLocaleString("fr-FR")} ${cur}`;
   };
 
   return (
@@ -435,14 +435,17 @@ export function PaymentLinksDialog({ userId, onOpenChange }: { userId: string; o
   const { data: links, isLoading } = useQuery<PaymentLink[]>({
     queryKey: [`/api/admin/user/${userId}/payment-links`],
   });
+  const { data: plUser } = useQuery<User>({
+    queryKey: [`/api/admin/user/${userId}/profile`],
+  });
   const { toast } = useToast();
 
+  const userCurrency = plUser?.country
+    ? COUNTRIES.find(c => c.code === plUser.country)?.currency || "XOF"
+    : "XOF";
+
   const formatAmount = (amount: number) => {
-    return new Intl.NumberFormat("fr-FR", {
-      style: "currency",
-      currency: "XOF",
-      minimumFractionDigits: 0,
-    }).format(amount);
+    return `${amount.toLocaleString("fr-FR")} ${userCurrency}`;
   };
 
   const copyToClipboard = (text: string) => {
@@ -648,12 +651,12 @@ export function ProfileDialog({ userId, onOpenChange }: { userId: string; onOpen
   const { toast } = useToast();
   const [toggling, setToggling] = React.useState(false);
 
+  const profileCurrency = user?.country
+    ? COUNTRIES.find(c => c.code === user.country)?.currency || "XOF"
+    : "XOF";
+
   const formatAmount = (amount: number) => {
-    return new Intl.NumberFormat("fr-FR", {
-      style: "currency",
-      currency: "XOF",
-      minimumFractionDigits: 0,
-    }).format(amount);
+    return `${amount.toLocaleString("fr-FR")} ${profileCurrency}`;
   };
 
   const handleToggleVerification = async () => {
