@@ -2510,7 +2510,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 message: "Paiement confirme"
               });
             } else if (mbiyoStatus.completed && mbiyoStatus.status === "failed") {
-              const MBIYOPAY_FAILED_GRACE_PERIOD_MS = 3 * 60 * 1000;
+              const MBIYOPAY_FAILED_GRACE_PERIOD_MS = 60 * 1000;
               const startTime = metadata.startTime || new Date(transaction.createdAt).getTime();
               const txAge = Date.now() - startTime;
               if (txAge < MBIYOPAY_FAILED_GRACE_PERIOD_MS) {

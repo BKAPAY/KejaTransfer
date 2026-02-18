@@ -989,7 +989,7 @@ export async function handleMbiyoPayWebhook(req: Request, res: Response) {
         await storage.updateTransactionStatus(tx.id, "completed");
         console.log(`[MbiyoPay Webhook] Withdrawal/Transfer completed: ${tx.id}`);
       }
-    } else if (status === "failed" || status === "cancelled") {
+    } else if (status === "failed" || status === "cancelled" || status === "expired" || status === "rejected" || status === "error") {
       // For failed transactions, we can trust the webhook (no risk of fraud)
       if (tx.type === "withdrawal" || tx.type === "transfer") {
         const metadata = JSON.parse(tx.metadata || "{}");
@@ -1020,7 +1020,7 @@ export async function pollMbiyoPayTransaction(transactionId: string): Promise<{ 
     
     if (apiStatus === "successful") {
       return { status: "completed", completed: true };
-    } else if (apiStatus === "failed" || apiStatus === "cancelled") {
+    } else if (apiStatus === "failed" || apiStatus === "cancelled" || apiStatus === "expired" || apiStatus === "rejected" || apiStatus === "error") {
       return { status: "failed", completed: true };
     }
 
