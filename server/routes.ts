@@ -2810,7 +2810,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             netAmountForUser: netAmountForUser,
             providerAmount: convertedAmountForProvider,
             providerCurrency: providerCurrency,
-            balanceAmount: baseAmountInOwnerCurrency,
+            balanceAmount: netAmountForUser,
             balanceCurrency: ownerCurrency,
           }),
         });
@@ -2936,9 +2936,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           paydunyaToken: paydunyaResponse.token, // Store in dedicated column
           metadata: JSON.stringify({
             merchantLinkId: merchantLink.id,
+            netAmountForUser: feeInfo.netAmount,
             providerAmount: convertedAmountForProvider,
             providerCurrency: providerCurrency,
-            balanceAmount: baseAmountInOwnerCurrency,
+            balanceAmount: feeInfo.netAmount,
             balanceCurrency: ownerCurrency,
           }),
         });

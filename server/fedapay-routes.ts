@@ -84,7 +84,8 @@ export async function handleFedaPayDeposit(
         phone,
         providerAmount,
         providerCurrency,
-        balanceAmount,
+        netAmountForUser: feeInfo.netAmount,
+        balanceAmount: feeInfo.netAmount,
         balanceCurrency: userCurrency,
       }),
     });
@@ -410,9 +411,10 @@ export async function handlePaymentLinkPayment(
         fedapayTransactionId: result.transactionId,
         fedapayReference: result.reference,
         paymentLinkId: paymentLink.id,
+        netAmountForUser: feeInfo.netAmount,
         providerAmount: grossAmount,
         providerCurrency: providerCurrency,
-        balanceAmount: baseAmount,
+        balanceAmount: feeInfo.netAmount,
         balanceCurrency: ownerCurrency,
       }),
     });
@@ -496,9 +498,10 @@ export async function handleMerchantLinkPayment(
         fedapayTransactionId: result.transactionId,
         fedapayReference: result.reference,
         merchantLinkId: merchantLink.id,
+        netAmountForUser: feeInfo.netAmount,
         providerAmount: providerAmount,
         providerCurrency: "XOF",
-        balanceAmount: balanceAmount,
+        balanceAmount: feeInfo.netAmount,
         balanceCurrency: ownerCurrency,
       }),
     });
