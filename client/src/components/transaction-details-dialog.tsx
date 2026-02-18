@@ -6,10 +6,11 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import type { Transaction } from "@shared/schema";
-import { Copy, Mail, Phone, Wallet, AlertTriangle, CheckCircle, XCircle } from "lucide-react";
+import { Copy, Mail, Phone, Wallet, AlertTriangle, CheckCircle, XCircle, Lock, ShieldCheck } from "lucide-react";
 import { CryptoIcon } from "@/components/crypto-icon";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useMemo, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -49,6 +50,9 @@ export function TransactionDetailsDialog({
 }: TransactionDetailsDialogProps) {
   const { toast } = useToast();
   const [confirmAction, setConfirmAction] = useState<string | null>(null);
+  const [adminStep, setAdminStep] = useState<"idle" | "code" | "confirm">("idle");
+  const [adminCode, setAdminCode] = useState("");
+  const [adminCodeError, setAdminCodeError] = useState(false);
 
   const metadata = useMemo<TransactionMetadata | null>(() => {
     if (!transaction?.metadata) return null;
@@ -67,6 +71,9 @@ export function TransactionDetailsDialog({
     onSuccess: (data) => {
       toast({ title: "Statut modifié", description: data.message });
       setConfirmAction(null);
+      setAdminStep("idle");
+      setAdminCode("");
+      setAdminCodeError(false);
       queryClient.invalidateQueries({ queryKey: [`/api/admin/user`] });
       queryClient.invalidateQueries({ predicate: (query) => {
         const key = query.queryKey[0] as string;
@@ -78,6 +85,9 @@ export function TransactionDetailsDialog({
     onError: (error: any) => {
       toast({ title: "Erreur", description: error.message || "Impossible de changer le statut", variant: "destructive" });
       setConfirmAction(null);
+      setAdminStep("idle");
+      setAdminCode("");
+      setAdminCodeError(false);
     },
   });
 
@@ -375,12 +385,17 @@ export function TransactionDetailsDialog({
                 Actions administrateur
               </h3>
 
-              {!confirmAction ? (
+              {adminStep === "idle" && (
                 <div className="flex flex-wrap gap-2">
                   {transaction.status === "completed" && (
                     <Button
                       variant="destructive"
-                      onClick={() => setConfirmAction("failed")}
+                      onClick={() => {
+                        setConfirmAction("failed");
+                        setAdminStep("code");
+                        setAdminCode("");
+                        setAdminCodeError(false);
+                      }}
                       data-testid="button-admin-mark-failed"
                     >
                       <XCircle className="w-4 h-4 mr-2" />
@@ -390,7 +405,12 @@ export function TransactionDetailsDialog({
                   {(transaction.status === "failed" || transaction.status === "pending") && (
                     <Button
                       variant="default"
-                      onClick={() => setConfirmAction("completed")}
+                      onClick={() => {
+                        setConfirmAction("completed");
+                        setAdminStep("code");
+                        setAdminCode("");
+                        setAdminCodeError(false);
+                      }}
                       data-testid="button-admin-mark-completed"
                     >
                       <CheckCircle className="w-4 h-4 mr-2" />
@@ -398,8 +418,75 @@ export function TransactionDetailsDialog({
                     </Button>
                   )}
                 </div>
-              ) : (
+              )}
+
+              {adminStep === "code" && (
+                <div className="bg-muted/50 border border-border rounded-md p-4 space-y-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Lock className="w-4 h-4 text-muted-foreground" />
+                    <p className="text-sm font-medium">Entrez le code de sécurité pour continuer</p>
+                  </div>
+                  <Input
+                    type="password"
+                    placeholder="Code de sécurité"
+                    value={adminCode}
+                    onChange={(e) => {
+                      setAdminCode(e.target.value);
+                      setAdminCodeError(false);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        if (adminCode === "19992025") {
+                          setAdminStep("confirm");
+                          setAdminCodeError(false);
+                        } else {
+                          setAdminCodeError(true);
+                        }
+                      }
+                    }}
+                    className={adminCodeError ? "border-destructive" : ""}
+                    data-testid="input-admin-security-code"
+                  />
+                  {adminCodeError && (
+                    <p className="text-xs text-destructive">Code de sécurité incorrect</p>
+                  )}
+                  <div className="flex gap-2">
+                    <Button
+                      variant="default"
+                      onClick={() => {
+                        if (adminCode === "19992025") {
+                          setAdminStep("confirm");
+                          setAdminCodeError(false);
+                        } else {
+                          setAdminCodeError(true);
+                        }
+                      }}
+                      data-testid="button-admin-validate-code"
+                    >
+                      Valider le code
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setAdminStep("idle");
+                        setConfirmAction(null);
+                        setAdminCode("");
+                        setAdminCodeError(false);
+                      }}
+                      data-testid="button-admin-cancel-code"
+                    >
+                      Annuler
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {adminStep === "confirm" && (
                 <div className="bg-destructive/10 border border-destructive/20 rounded-md p-4 space-y-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <ShieldCheck className="w-4 h-4 text-green-600" />
+                    <p className="text-sm font-medium text-green-700 dark:text-green-400">Code vérifié</p>
+                  </div>
                   <p className="text-sm font-medium">
                     {confirmAction === "failed" 
                       ? "Confirmer le passage en Echoué ? Le montant sera déduit du solde de l'utilisateur."
@@ -411,16 +498,20 @@ export function TransactionDetailsDialog({
                       variant={confirmAction === "failed" ? "destructive" : "default"}
                       onClick={() => changeStatusMutation.mutate({ 
                         transactionId: transaction.id, 
-                        newStatus: confirmAction 
+                        newStatus: confirmAction! 
                       })}
                       disabled={changeStatusMutation.isPending}
                       data-testid="button-admin-confirm-status"
                     >
-                      {changeStatusMutation.isPending ? "En cours..." : "Confirmer"}
+                      {changeStatusMutation.isPending ? "En cours..." : "Confirmer le changement"}
                     </Button>
                     <Button
                       variant="outline"
-                      onClick={() => setConfirmAction(null)}
+                      onClick={() => {
+                        setAdminStep("idle");
+                        setConfirmAction(null);
+                        setAdminCode("");
+                      }}
                       disabled={changeStatusMutation.isPending}
                       data-testid="button-admin-cancel-status"
                     >
