@@ -867,22 +867,21 @@ export class DbStorage implements IStorage {
     verifiedUsers: number;
     totalDeposits: number;
     totalWithdrawals: number;
-    depositsByCurrency: { XOF: number; XAF: number; CDF: number };
-    withdrawalsByCurrency: { XOF: number; XAF: number; CDF: number };
+    depositsByCurrency: { XOF: number; XAF: number; CDF: number; GNF: number; GMD: number; RWF: number };
+    withdrawalsByCurrency: { XOF: number; XAF: number; CDF: number; GNF: number; GMD: number; RWF: number };
   }> {
     const allUsers = await db.select().from(schema.users);
     const verifiedUsers = allUsers.filter((u) => u.kycStatus === "verified").length;
 
-    // Create a map of userId to currency based on user's country
     const userCurrencyMap = new Map<string, string>();
     const COUNTRY_CURRENCIES: Record<string, string> = {
-      "BJ": "XOF", // Bénin
-      "TG": "XOF", // Togo
-      "SN": "XOF", // Sénégal
-      "CI": "XOF", // Côte d'Ivoire
-      "ML": "XOF", // Mali
-      "CM": "XAF", // Cameroun
-      "CD": "CDF", // RDC
+      "BJ": "XOF", "TG": "XOF", "SN": "XOF", "CI": "XOF", "ML": "XOF",
+      "BF": "XOF", "NE": "XOF",
+      "CM": "XAF", "TD": "XAF", "CG": "XAF", "CF": "XAF", "GA": "XAF",
+      "CD": "CDF",
+      "GN": "GNF",
+      "GM": "GMD",
+      "RW": "RWF",
     };
     allUsers.forEach(u => {
       userCurrencyMap.set(u.id, u.country ? COUNTRY_CURRENCIES[u.country] || "XOF" : "XOF");
@@ -894,7 +893,6 @@ export class DbStorage implements IStorage {
         t.status === "completed" &&
         ["deposit", "payment_link", "merchant_link", "api_payment"].includes(t.type)
     );
-    // Include both withdrawals and transfers as outgoing money
     const completedOutgoing = allTransactions.filter(
       (t) => t.status === "completed" && ["withdrawal", "transfer"].includes(t.type)
     );
@@ -902,22 +900,24 @@ export class DbStorage implements IStorage {
     const totalDeposits = completedDeposits.reduce((sum, t) => sum + t.amount, 0);
     const totalWithdrawals = completedOutgoing.reduce((sum, t) => sum + t.amount, 0);
 
-    // Calculate deposits by currency
-    const depositsByCurrency = { XOF: 0, XAF: 0, CDF: 0 };
+    const depositsByCurrency = { XOF: 0, XAF: 0, CDF: 0, GNF: 0, GMD: 0, RWF: 0 };
     completedDeposits.forEach(t => {
       const currency = t.currency || userCurrencyMap.get(t.userId) || "XOF";
-      if (currency === "XOF") depositsByCurrency.XOF += t.amount;
-      else if (currency === "XAF") depositsByCurrency.XAF += t.amount;
-      else if (currency === "CDF") depositsByCurrency.CDF += t.amount;
+      if (currency in depositsByCurrency) {
+        depositsByCurrency[currency as keyof typeof depositsByCurrency] += t.amount;
+      } else {
+        depositsByCurrency.XOF += t.amount;
+      }
     });
 
-    // Calculate withdrawals by currency
-    const withdrawalsByCurrency = { XOF: 0, XAF: 0, CDF: 0 };
+    const withdrawalsByCurrency = { XOF: 0, XAF: 0, CDF: 0, GNF: 0, GMD: 0, RWF: 0 };
     completedOutgoing.forEach(t => {
       const currency = t.currency || userCurrencyMap.get(t.userId) || "XOF";
-      if (currency === "XOF") withdrawalsByCurrency.XOF += t.amount;
-      else if (currency === "XAF") withdrawalsByCurrency.XAF += t.amount;
-      else if (currency === "CDF") withdrawalsByCurrency.CDF += t.amount;
+      if (currency in withdrawalsByCurrency) {
+        withdrawalsByCurrency[currency as keyof typeof withdrawalsByCurrency] += t.amount;
+      } else {
+        withdrawalsByCurrency.XOF += t.amount;
+      }
     });
 
     return {

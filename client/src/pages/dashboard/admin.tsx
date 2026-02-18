@@ -41,6 +41,8 @@ const COUNTRY_NAMES: Record<string, string> = {
   CF: "Centrafrique",
   GA: "Gabon",
   CD: "RD Congo",
+  GM: "Gambie",
+  RW: "Rwanda",
 };
 
 const COUNTRY_CURRENCIES: Record<string, string> = {
@@ -49,7 +51,7 @@ const COUNTRY_CURRENCIES: Record<string, string> = {
   CI: "XOF",
   SN: "XOF",
   BF: "XOF",
-  GN: "XOF",
+  GN: "GNF",
   NE: "XOF",
   ML: "XOF",
   CM: "XAF",
@@ -58,6 +60,8 @@ const COUNTRY_CURRENCIES: Record<string, string> = {
   CF: "XAF",
   GA: "XAF",
   CD: "CDF",
+  GM: "GMD",
+  RW: "RWF",
 };
 
 interface DiagnosticResult {
@@ -231,8 +235,8 @@ export default function Admin() {
     verifiedUsers: number;
     totalDeposits: number;
     totalWithdrawals: number;
-    depositsByCurrency?: { XOF: number; XAF: number; CDF: number };
-    withdrawalsByCurrency?: { XOF: number; XAF: number; CDF: number };
+    depositsByCurrency?: { XOF: number; XAF: number; CDF: number; GNF: number; GMD: number; RWF: number };
+    withdrawalsByCurrency?: { XOF: number; XAF: number; CDF: number; GNF: number; GMD: number; RWF: number };
   }>({
     queryKey: ["/api/admin/stats"],
     staleTime: 30000,
@@ -465,7 +469,16 @@ export default function Admin() {
                 {stats?.depositsByCurrency?.CDF ? (
                   <div className="text-lg font-bold">{formatAmount(stats.depositsByCurrency.CDF, "CDF")}</div>
                 ) : null}
-                {!stats?.depositsByCurrency?.XOF && !stats?.depositsByCurrency?.XAF && !stats?.depositsByCurrency?.CDF && (
+                {stats?.depositsByCurrency?.GNF ? (
+                  <div className="text-lg font-bold">{formatAmount(stats.depositsByCurrency.GNF, "GNF")}</div>
+                ) : null}
+                {stats?.depositsByCurrency?.GMD ? (
+                  <div className="text-lg font-bold">{formatAmount(stats.depositsByCurrency.GMD, "GMD")}</div>
+                ) : null}
+                {stats?.depositsByCurrency?.RWF ? (
+                  <div className="text-lg font-bold">{formatAmount(stats.depositsByCurrency.RWF, "RWF")}</div>
+                ) : null}
+                {!stats?.depositsByCurrency?.XOF && !stats?.depositsByCurrency?.XAF && !stats?.depositsByCurrency?.CDF && !stats?.depositsByCurrency?.GNF && !stats?.depositsByCurrency?.GMD && !stats?.depositsByCurrency?.RWF && (
                   <div className="text-lg font-bold">0 XOF</div>
                 )}
                 <p className="text-xs text-muted-foreground">Argent entrant</p>
@@ -494,7 +507,16 @@ export default function Admin() {
                 {stats?.withdrawalsByCurrency?.CDF ? (
                   <div className="text-lg font-bold">{formatAmount(stats.withdrawalsByCurrency.CDF, "CDF")}</div>
                 ) : null}
-                {!stats?.withdrawalsByCurrency?.XOF && !stats?.withdrawalsByCurrency?.XAF && !stats?.withdrawalsByCurrency?.CDF && (
+                {stats?.withdrawalsByCurrency?.GNF ? (
+                  <div className="text-lg font-bold">{formatAmount(stats.withdrawalsByCurrency.GNF, "GNF")}</div>
+                ) : null}
+                {stats?.withdrawalsByCurrency?.GMD ? (
+                  <div className="text-lg font-bold">{formatAmount(stats.withdrawalsByCurrency.GMD, "GMD")}</div>
+                ) : null}
+                {stats?.withdrawalsByCurrency?.RWF ? (
+                  <div className="text-lg font-bold">{formatAmount(stats.withdrawalsByCurrency.RWF, "RWF")}</div>
+                ) : null}
+                {!stats?.withdrawalsByCurrency?.XOF && !stats?.withdrawalsByCurrency?.XAF && !stats?.withdrawalsByCurrency?.CDF && !stats?.withdrawalsByCurrency?.GNF && !stats?.withdrawalsByCurrency?.GMD && !stats?.withdrawalsByCurrency?.RWF && (
                   <div className="text-lg font-bold">0 XOF</div>
                 )}
                 <p className="text-xs text-muted-foreground">Argent sortant</p>

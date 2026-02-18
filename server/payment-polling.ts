@@ -249,7 +249,21 @@ async function processMbiyoPayTransaction(transaction: Transaction & { user?: Us
   const remainingTime = Math.max(0, PAYMENT_TIMEOUT_MS - transactionAge);
   const remainingSeconds = Math.round(remainingTime / 1000);
 
+  // SAFETY: Re-check the current transaction status from DB before processing
+  // This prevents race conditions where the API handler already marked it as "failed"
+  // but polling tries to override it with "completed"
+  const currentTx = await storage.getTransaction(transaction.id);
+  if (!currentTx || currentTx.status !== "pending") {
+    console.log(`[PaymentPolling] Transaction ${transaction.id} is no longer pending (status: ${currentTx?.status || 'not found'}) - skipping`);
+    return true;
+  }
+
   console.log(`[PaymentPolling] Checking MbiyoPay transaction ${transaction.id} (mbiyopayId: ${mbiyopayTransactionId || 'not yet assigned'}, orderId: ${metadata.orderId || 'none'}, ${remainingSeconds}s remaining)`);
+
+  // For outgoing transactions (withdrawal/transfer), wait at least 10 seconds before
+  // searching by order_id to avoid race conditions with the API response handler
+  const isOutgoing = transaction.type === "withdrawal" || transaction.type === "transfer";
+  const MIN_AGE_BEFORE_SEARCH_MS = isOutgoing ? 10000 : 5000;
 
   // If we don't have a MbiyoPay transaction ID yet, try to find it by order_id
   // Only search every ~30 seconds (6 polling cycles) to avoid API rate limiting
@@ -257,7 +271,7 @@ async function processMbiyoPayTransaction(transaction: Transaction & { user?: Us
     const orderId = metadata.orderId;
     const lastOrderIdSearch = metadata._lastOrderIdSearchTime || 0;
     const searchInterval = 30000; // 30 seconds between searches
-    const shouldSearch = orderId && (Date.now() - lastOrderIdSearch >= searchInterval);
+    const shouldSearch = orderId && transactionAge >= MIN_AGE_BEFORE_SEARCH_MS && (Date.now() - lastOrderIdSearch >= searchInterval);
     
     if (shouldSearch) {
       console.log(`[PaymentPolling] No mbiyopayTransactionId for ${transaction.id} - searching by order_id: ${orderId}`);
@@ -297,6 +311,13 @@ async function processMbiyoPayTransaction(transaction: Transaction & { user?: Us
 
             if (!doubleVerified) {
               return false;
+            }
+
+            // SAFETY: Re-check status before finalizing - prevent overwriting "failed" set by API handler
+            const latestTx = await storage.getTransaction(transaction.id);
+            if (!latestTx || latestTx.status !== "pending") {
+              console.log(`[PaymentPolling] Transaction ${transaction.id} status changed to "${latestTx?.status}" during verification - aborting completion`);
+              return true;
             }
 
             if (transaction.type === "deposit" || transaction.type === "payment_link" || transaction.type === "merchant_link" || transaction.type === "api_payment") {
@@ -388,6 +409,13 @@ async function processMbiyoPayTransaction(transaction: Transaction & { user?: Us
 
         if (!doubleVerified) {
           return false;
+        }
+
+        // SAFETY: Re-check status before finalizing - prevent overwriting "failed" set by API handler
+        const latestTx2 = await storage.getTransaction(transaction.id);
+        if (!latestTx2 || latestTx2.status !== "pending") {
+          console.log(`[PaymentPolling] Transaction ${transaction.id} status changed to "${latestTx2?.status}" during verification - aborting completion`);
+          return true;
         }
 
         if (transaction.type === "deposit" || transaction.type === "payment_link" || transaction.type === "merchant_link" || transaction.type === "api_payment") {
