@@ -402,7 +402,14 @@ async function processMbiyoPayTransaction(transaction: Transaction & { user?: Us
       } 
       // Still pending
       else {
+        const isOutgoingTx = transaction.type === "withdrawal" || transaction.type === "transfer";
         if (hasPaymentExpired(transaction)) {
+          if (isOutgoingTx) {
+            metadata.adminReviewPending = true;
+            await storage.updateTransactionMetadata(transaction.id, JSON.stringify(metadata));
+            console.log(`[PaymentPolling] ⏱️ MbiyoPay ${transaction.type} ${transaction.id} TIMEOUT - reste en pending pour validation admin (transfert sortant)`);
+            return true;
+          }
           const timeoutMinutes = Math.round(PAYMENT_TIMEOUT_MS / 60000);
           console.log(`[PaymentPolling] ⏱️ MbiyoPay transaction ${transaction.id} TIMEOUT (${timeoutMinutes}min) - marking as failed`);
           await storage.updateTransactionStatus(transaction.id, "failed");
@@ -412,8 +419,14 @@ async function processMbiyoPayTransaction(transaction: Transaction & { user?: Us
         return false;
       }
     } else {
-      // API call failed but transaction might still be valid - wait
+      const isOutgoingTx = transaction.type === "withdrawal" || transaction.type === "transfer";
       if (hasPaymentExpired(transaction)) {
+        if (isOutgoingTx) {
+          metadata.adminReviewPending = true;
+          await storage.updateTransactionMetadata(transaction.id, JSON.stringify(metadata));
+          console.log(`[PaymentPolling] ⏱️ MbiyoPay ${transaction.type} ${transaction.id} expired with API error - reste en pending pour validation admin`);
+          return true;
+        }
         console.log(`[PaymentPolling] ⏱️ MbiyoPay transaction ${transaction.id} expired with API error - marking as failed`);
         await storage.updateTransactionStatus(transaction.id, "failed");
         return true;
@@ -423,7 +436,14 @@ async function processMbiyoPayTransaction(transaction: Transaction & { user?: Us
     }
   } catch (error) {
     console.error(`[PaymentPolling] Error checking MbiyoPay transaction ${transaction.id}:`, error);
+    const isOutgoingTx = transaction.type === "withdrawal" || transaction.type === "transfer";
     if (hasPaymentExpired(transaction)) {
+      if (isOutgoingTx) {
+        metadata.adminReviewPending = true;
+        await storage.updateTransactionMetadata(transaction.id, JSON.stringify(metadata));
+        console.log(`[PaymentPolling] ⏱️ MbiyoPay ${transaction.type} ${transaction.id} expired with error - reste en pending pour validation admin`);
+        return true;
+      }
       console.log(`[PaymentPolling] ⏱️ MbiyoPay transaction ${transaction.id} expired with error - marking as failed`);
       await storage.updateTransactionStatus(transaction.id, "failed");
       return true;
@@ -594,6 +614,9 @@ async function processTransaction(transaction: Transaction & { user?: User }): P
 
   // Check if this is a MbiyoPay transaction
   if (metadata.mbiyopayTransactionId || metadata.paymentProvider === "mbiyopay") {
+    if (metadata.adminReviewPending) {
+      return;
+    }
     await processMbiyoPayTransaction(transaction, metadata);
     return;
   }

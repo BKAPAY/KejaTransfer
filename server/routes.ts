@@ -6926,10 +6926,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Cette transaction n'est pas en attente" });
       }
 
-      // Update transaction status to completed
       await storage.updateTransactionStatus(transactionId, "completed");
 
-      // If it's an incoming payment, credit the user's balance
+      if (transaction.metadata) {
+        try {
+          const meta = JSON.parse(transaction.metadata);
+          if (meta.adminReviewPending) {
+            delete meta.adminReviewPending;
+            meta.adminValidatedAt = new Date().toISOString();
+            meta.adminValidatedBy = (req as any).user?.id;
+            await storage.updateTransactionMetadata(transactionId, JSON.stringify(meta));
+          }
+        } catch (e) {}
+      }
+
       const incomingTypes = ["deposit", "payment_link", "merchant_link", "api_payment"];
       if (incomingTypes.includes(transaction.type)) {
         await storage.updateUserBalance(transaction.userId, transaction.amount);
@@ -6958,14 +6968,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Cette transaction n'est pas en attente" });
       }
 
-      // Update transaction status to failed
       await storage.updateTransactionStatus(transactionId, "failed");
 
-      // If it's a withdrawal, refund the amount back to user's balance
-      if (transaction.type === "withdrawal") {
-        // The amount stored is net (what user receives), we need to refund gross (amount + fee)
-        const refundAmount = transaction.amount + transaction.fee;
+      if (transaction.metadata) {
+        try {
+          const meta = JSON.parse(transaction.metadata);
+          if (meta.adminReviewPending) {
+            delete meta.adminReviewPending;
+            meta.adminRejectedAt = new Date().toISOString();
+            meta.adminRejectedBy = (req as any).user?.id;
+            await storage.updateTransactionMetadata(transactionId, JSON.stringify(meta));
+          }
+        } catch (e) {}
+      }
+
+      if (transaction.type === "withdrawal" || transaction.type === "transfer") {
+        let refundAmount: number;
+        if (transaction.metadata) {
+          try {
+            const meta = JSON.parse(transaction.metadata);
+            refundAmount = meta.deductedFromBalance || meta.totalDebited || (transaction.amount + transaction.fee);
+          } catch (e) {
+            refundAmount = transaction.amount + transaction.fee;
+          }
+        } else {
+          refundAmount = transaction.amount + transaction.fee;
+        }
         await storage.updateUserBalance(transaction.userId, refundAmount);
+        console.log(`[Admin] Refunded ${refundAmount} to user ${transaction.userId} for rejected ${transaction.type} ${transactionId}`);
       }
 
       res.json({ success: true, message: "Transaction rejetée" });

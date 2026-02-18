@@ -222,14 +222,53 @@ export async function handleMbiyoPayWithdrawal(
       beneficiaryName,
     });
 
-    if (!result.success) {
+    if (!result.success && !result.transactionId) {
       await storage.updateUserBalance(userId, feeInfo.totalDeductedFromBalance);
       await storage.updateTransactionStatus(tx.id, "failed");
       return { success: false, transactionId: tx.id, error: result.error || "Retrait echoue" };
     }
 
+    if (!result.success && result.transactionId) {
+      console.log(`[MbiyoPay Withdrawal] API returned transactionId ${result.transactionId} but success=false - keeping pending for admin review`);
+      const updatedMetadata = JSON.stringify({
+        mbiyopayTransactionId: result.transactionId,
+        phone,
+        deductedFromBalance: feeInfo.totalDeductedFromBalance,
+        amountReceived: feeInfo.amountReceived,
+        providerAmount: amountForProvider,
+        providerCurrency: providerCurrency,
+        balanceAmount: grossAmount,
+        balanceCurrency: balanceCurrency,
+        provider: "mbiyopay",
+        paymentProvider: "mbiyopay",
+        orderId,
+        startTime,
+      });
+      await storage.updateTransactionMetadata(tx.id, updatedMetadata);
+      return {
+        success: true,
+        transactionId: tx.id,
+        message: "Retrait en cours de traitement. Veuillez patienter.",
+      };
+    }
+
     if (result.pending) {
       console.log(`[MbiyoPay Withdrawal] Ambiguous API response - transaction ${tx.id} stays pending, waiting for webhook`);
+      const updatedMetadata = JSON.stringify({
+        mbiyopayTransactionId: result.transactionId,
+        phone,
+        deductedFromBalance: feeInfo.totalDeductedFromBalance,
+        amountReceived: feeInfo.amountReceived,
+        providerAmount: amountForProvider,
+        providerCurrency: providerCurrency,
+        balanceAmount: grossAmount,
+        balanceCurrency: balanceCurrency,
+        provider: "mbiyopay",
+        paymentProvider: "mbiyopay",
+        orderId,
+        startTime,
+      });
+      await storage.updateTransactionMetadata(tx.id, updatedMetadata);
       return {
         success: true,
         transactionId: tx.id,
@@ -356,15 +395,52 @@ export async function handleMbiyoPayTransfer(
       beneficiaryName,
     });
 
-    if (!result.success) {
+    if (!result.success && !result.transactionId) {
       await storage.updateUserBalance(userId, totalToDebit);
       await storage.updateTransactionStatus(tx.id, "failed");
       const errorMsg = result.error ? result.error.replace("Retrait", "Transfert") : "Transfert echoue";
       return { success: false, transactionId: tx.id, error: errorMsg };
     }
 
+    if (!result.success && result.transactionId) {
+      console.log(`[MbiyoPay Transfer] API returned transactionId ${result.transactionId} but success=false - keeping pending for admin review`);
+      const updatedMetadata = JSON.stringify({
+        mbiyopayTransactionId: result.transactionId,
+        phone,
+        totalDebited: totalToDebit,
+        providerAmount: amountForProvider,
+        providerCurrency: providerCurrency,
+        balanceAmount: netAmount,
+        balanceCurrency: balanceCurrency,
+        provider: "mbiyopay",
+        paymentProvider: "mbiyopay",
+        orderId,
+        startTime,
+      });
+      await storage.updateTransactionMetadata(tx.id, updatedMetadata);
+      return {
+        success: true,
+        transactionId: tx.id,
+        message: "Transfert en cours de traitement. Veuillez patienter.",
+      };
+    }
+
     if (result.pending) {
       console.log(`[MbiyoPay Transfer] Ambiguous API response - transaction ${tx.id} stays pending, waiting for webhook`);
+      const updatedMetadata = JSON.stringify({
+        mbiyopayTransactionId: result.transactionId,
+        phone,
+        totalDebited: totalToDebit,
+        providerAmount: amountForProvider,
+        providerCurrency: providerCurrency,
+        balanceAmount: netAmount,
+        balanceCurrency: balanceCurrency,
+        provider: "mbiyopay",
+        paymentProvider: "mbiyopay",
+        orderId,
+        startTime,
+      });
+      await storage.updateTransactionMetadata(tx.id, updatedMetadata);
       return {
         success: true,
         transactionId: tx.id,
