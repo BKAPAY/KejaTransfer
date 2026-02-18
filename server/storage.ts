@@ -777,7 +777,6 @@ export class DbStorage implements IStorage {
     
     const transaction = results[0];
     
-    // Check metadata for customerPaysFee and netAmountForUser
     let customerPaysFee = false;
     let netAmountFromMetadata: number | null = null;
     
@@ -785,20 +784,12 @@ export class DbStorage implements IStorage {
       try {
         const metadata = JSON.parse(transaction.metadata);
         customerPaysFee = metadata.customerPaysFee === true;
-        // Use netAmountForUser from metadata if available (most accurate)
         if (typeof metadata.netAmountForUser === 'number') {
           netAmountFromMetadata = metadata.netAmountForUser;
-        } else if (typeof metadata.balanceAmount === 'number') {
-          // Fallback to balanceAmount for API payments
-          netAmountFromMetadata = metadata.balanceAmount;
         }
       } catch (e) {}
     }
     
-    // Priority for determining net amount:
-    // 1. Use metadata.netAmountForUser or metadata.balanceAmount if available
-    // 2. If customerPaysFee is true: use transaction.amount (base amount, no fee deduction)
-    // 3. If customerPaysFee is false: deduct fees from amount
     let netAmount: number;
     if (netAmountFromMetadata !== null) {
       netAmount = netAmountFromMetadata;
