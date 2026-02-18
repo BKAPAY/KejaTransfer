@@ -411,6 +411,7 @@ export async function handlePaymentLinkPayment(
         fedapayTransactionId: result.transactionId,
         fedapayReference: result.reference,
         paymentLinkId: paymentLink.id,
+        customerPaysFee: customerPaysFee,
         netAmountForUser: feeInfo.netAmount,
         providerAmount: grossAmount,
         providerCurrency: providerCurrency,
@@ -610,6 +611,13 @@ export async function handleApiPayment(
         fedapayReference: result.reference,
         apiKeyId: apiKey.id,
         apiKeyPublicKey: apiKey.publicKey,
+        customerPaysFee: customerPaysFee,
+        netAmountForUser: feeInfo.netAmount,
+        provider: "fedapay",
+        providerAmount: grossAmount,
+        providerCurrency: "XOF",
+        balanceAmount: feeInfo.netAmount,
+        balanceCurrency: "XOF",
       }),
     });
 
