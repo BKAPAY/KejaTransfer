@@ -869,9 +869,8 @@ export default function Admin() {
                       </div>
                       <div className="text-right shrink-0">
                         <p className="font-bold text-base tabular-nums">
-                          {formatAmount(tx.amount)}
+                          {formatAmount(tx.amount, tx.currency || getUserCurrency((tx as any).user?.country))}
                         </p>
-                        <p className="text-xs text-muted-foreground">{tx.currency || "XOF"}</p>
                       </div>
                     </div>
                   ))}

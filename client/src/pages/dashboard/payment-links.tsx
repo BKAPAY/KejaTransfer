@@ -120,17 +120,11 @@ export default function PaymentLinks() {
 
   const { paymentLinkMin } = useConvertedMinimums(userBalanceCurrency);
 
-  // Set default currency based on user's country
   useEffect(() => {
-    if (userCountry && hasMultipleCurrencies(userCountry)) {
-      const currencies = getMbiyoPayCurrenciesForCountry(userCountry);
-      if (currencies.length > 0) {
-        setSelectedCurrency(currencies[0]);
-      }
-    } else if (userBalanceCurrency) {
+    if (userBalanceCurrency) {
       setSelectedCurrency(userBalanceCurrency);
     }
-  }, [userCountry, userBalanceCurrency]);
+  }, [userBalanceCurrency]);
 
   // Fetch enabled countries for deposits (incoming payments)
   const { data: enabledCountriesOperators } = useQuery<Record<string, string[]>>({
@@ -487,12 +481,10 @@ export default function PaymentLinks() {
                   )}
                 />
 
-                {hasMultipleCurrencies(userCountry) && (
-                  <CurrencySelector
-                    countryCode={userCountry}
-                    selectedCurrency={selectedCurrency}
-                    onCurrencyChange={setSelectedCurrency}
-                  />
+                {userBalanceCurrency && (
+                  <div className="text-sm text-muted-foreground">
+                    Devise : <span className="font-medium text-foreground">{userBalanceCurrency}</span>
+                  </div>
                 )}
 
                 {/* Section Photos - désactivée si vidéo existe */}

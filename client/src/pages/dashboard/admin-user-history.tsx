@@ -222,9 +222,8 @@ export default function AdminUserHistory() {
                     </div>
                     <div className="text-right shrink-0">
                       <p className="font-bold text-base tabular-nums">
-                        {formatAmount(tx.amount)}
+                        {formatAmount(tx.amount, tx.currency || userCurrency)}
                       </p>
-                      <p className="text-xs text-muted-foreground">{tx.currency}</p>
                     </div>
                   </div>
                 ))}
