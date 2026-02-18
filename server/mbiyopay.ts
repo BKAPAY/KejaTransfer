@@ -148,10 +148,11 @@ export function formatPhoneForMbiyoPay(phone: string, countryCode: string): stri
     return "+" + sanitized;
   }
   
-  // Countries that KEEP the leading 0 (Benin and Ivory Coast changed their formats)
+  // Countries that KEEP the leading 0 in international format
   // BJ: 01XXXXXXXX (10 digits, keep leading 0)
   // CI: 0XXXXXXXXX (10 digits, keep leading 0)
-  const keepLeadingZero = ["bj", "ci"];
+  // CG: 0XXXXXXXX (9 digits, keep leading 0 - MTN Congo Brazzaville)
+  const keepLeadingZero = ["bj", "ci", "cg"];
   
   // Remove leading 0 ONLY for countries that don't keep it
   if (sanitized.startsWith("0") && !keepLeadingZero.includes(countryLower)) {
