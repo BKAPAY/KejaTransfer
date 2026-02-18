@@ -276,14 +276,37 @@ async function processMbiyoPayTransaction(transaction: Transaction & { user?: Us
           // Process the status immediately
           const foundStatus = (searchResult.status || "").toLowerCase();
           if (foundStatus === "successful") {
+            // SECURITY: Double-verification - confirm via getMbiyoPayTransactionStatus before crediting
+            let doubleVerified = false;
+            try {
+              const verifyResult = await getMbiyoPayTransactionStatus(searchResult.transactionId!);
+              if (verifyResult.success && verifyResult.status) {
+                const verifyStatus = verifyResult.status.toLowerCase();
+                if (verifyStatus === "successful") {
+                  doubleVerified = true;
+                  console.log(`[SECURITY] Double-verification PASSED for transaction ${transaction.id} (order_id search -> getMbiyoPayTransactionStatus both say "successful")`);
+                } else {
+                  console.warn(`[SECURITY] Double-verification FAILED for transaction ${transaction.id} - order_id search says "successful" but getMbiyoPayTransactionStatus says "${verifyStatus}" - leaving pending for admin review`);
+                }
+              } else {
+                console.warn(`[SECURITY] Double-verification FAILED for transaction ${transaction.id} - getMbiyoPayTransactionStatus returned error: ${verifyResult.error} - leaving pending for admin review`);
+              }
+            } catch (verifyError) {
+              console.warn(`[SECURITY] Double-verification FAILED for transaction ${transaction.id} - verification call threw error: ${verifyError} - leaving pending for admin review`);
+            }
+
+            if (!doubleVerified) {
+              return false;
+            }
+
             if (transaction.type === "deposit" || transaction.type === "payment_link" || transaction.type === "merchant_link" || transaction.type === "api_payment") {
               const result = await storage.finalizeIncomingTransaction(transaction.id, {});
               if (result) {
-                console.log(`[PaymentPolling] ✅ MbiyoPay transaction ${transaction.id} CONFIRMED via order_id search - credited=${result.credited}`);
+                console.log(`[PaymentPolling] ✅ MbiyoPay transaction ${transaction.id} CONFIRMED via order_id search (double-verified) - credited=${result.credited}`);
               }
             } else {
               await storage.updateTransactionStatus(transaction.id, "completed");
-              console.log(`[PaymentPolling] ✅ MbiyoPay ${transaction.type} ${transaction.id} COMPLETED via order_id search`);
+              console.log(`[PaymentPolling] ✅ MbiyoPay ${transaction.type} ${transaction.id} COMPLETED via order_id search (double-verified)`);
             }
             return true;
           } else if (foundStatus === "failed" || foundStatus === "cancelled") {
@@ -339,16 +362,44 @@ async function processMbiyoPayTransaction(transaction: Transaction & { user?: Us
       
       // MbiyoPay official status: successful = payment confirmed (per API docs)
       if (status === "successful") {
+        // SECURITY: Double-verification via searchMbiyoPayTransactionByOrderId if orderId available
+        let doubleVerified = false;
+        if (metadata.orderId) {
+          try {
+            const verifyResult = await searchMbiyoPayTransactionByOrderId(metadata.orderId);
+            if (verifyResult.success && verifyResult.status) {
+              const verifyStatus = verifyResult.status.toLowerCase();
+              if (verifyStatus === "successful") {
+                doubleVerified = true;
+                console.log(`[SECURITY] Double-verification PASSED for transaction ${transaction.id} (getMbiyoPayTransactionStatus -> order_id search both say "successful")`);
+              } else {
+                console.warn(`[SECURITY] Double-verification FAILED for transaction ${transaction.id} - getMbiyoPayTransactionStatus says "successful" but order_id search says "${verifyStatus}" - leaving pending for admin review`);
+              }
+            } else {
+              console.warn(`[SECURITY] Double-verification FAILED for transaction ${transaction.id} - order_id search returned error: ${verifyResult.error} - leaving pending for admin review`);
+            }
+          } catch (verifyError) {
+            console.warn(`[SECURITY] Double-verification FAILED for transaction ${transaction.id} - order_id search threw error: ${verifyError} - leaving pending for admin review`);
+          }
+        } else {
+          doubleVerified = true;
+          console.log(`[SECURITY] Double-verification SKIPPED for transaction ${transaction.id} - no orderId in metadata, trusting getMbiyoPayTransactionStatus`);
+        }
+
+        if (!doubleVerified) {
+          return false;
+        }
+
         if (transaction.type === "deposit" || transaction.type === "payment_link" || transaction.type === "merchant_link" || transaction.type === "api_payment") {
           const result = await storage.finalizeIncomingTransaction(transaction.id, {});
           if (result) {
-            console.log(`[PaymentPolling] ✅ MbiyoPay transaction ${transaction.id} CONFIRMED - finalized: credited=${result.credited}`);
+            console.log(`[PaymentPolling] ✅ MbiyoPay transaction ${transaction.id} CONFIRMED (double-verified) - finalized: credited=${result.credited}`);
           } else {
             console.log(`[PaymentPolling] MbiyoPay transaction ${transaction.id} already processed - skipping`);
           }
         } else {
           await storage.updateTransactionStatus(transaction.id, "completed");
-          console.log(`[PaymentPolling] ✅ MbiyoPay ${transaction.type} ${transaction.id} COMPLETED`);
+          console.log(`[PaymentPolling] ✅ MbiyoPay ${transaction.type} ${transaction.id} COMPLETED (double-verified)`);
         }
         return true;
       } 

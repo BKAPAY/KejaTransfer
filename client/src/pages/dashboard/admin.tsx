@@ -1089,6 +1089,7 @@ export default function Admin() {
         transaction={selectedTransaction}
         open={transactionDialogOpen}
         onOpenChange={setTransactionDialogOpen}
+        isAdmin={true}
       />
 
       {/* Dialogue de code d'accès */}

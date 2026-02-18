@@ -6861,6 +6861,117 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/admin/transaction/:transactionId/change-status", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { transactionId } = req.params;
+      const { newStatus } = req.body;
+
+      if (!newStatus || !["completed", "failed"].includes(newStatus)) {
+        return res.status(400).json({ error: "Statut invalide. Utilisez 'completed' ou 'failed'." });
+      }
+
+      const transaction = await storage.getTransaction(transactionId);
+      if (!transaction) {
+        return res.status(404).json({ error: "Transaction introuvable" });
+      }
+
+      const oldStatus = transaction.status;
+      if (oldStatus === newStatus) {
+        return res.status(400).json({ error: `La transaction est déjà en statut '${newStatus}'` });
+      }
+
+      const user = await storage.getUser(transaction.userId);
+      if (!user) {
+        return res.status(404).json({ error: "Utilisateur introuvable" });
+      }
+
+      let metadata: any = {};
+      try { metadata = JSON.parse(transaction.metadata || "{}"); } catch {}
+
+      const isIncoming = ["deposit", "payment_link", "merchant_link", "api_payment"].includes(transaction.type);
+      const isOutgoing = ["withdrawal", "transfer"].includes(transaction.type);
+
+      let netAmountForUser = metadata.netAmountForUser;
+      if (typeof netAmountForUser !== "number") {
+        if (metadata.customerPaysFee) {
+          netAmountForUser = transaction.amount;
+        } else {
+          netAmountForUser = transaction.amount - (transaction.fee || 0);
+        }
+      }
+
+      const adminSession = req.session as any;
+      const adminUser = await storage.getUser(adminSession.userId);
+      const adminEmail = adminUser?.email || "admin";
+
+      // Update status FIRST to prevent race conditions (if status already changed, this is a no-op)
+      const statusUpdateResult = await storage.updateTransactionStatus(transactionId, newStatus);
+      if (!statusUpdateResult) {
+        return res.status(409).json({ error: "La transaction a déjà été modifiée par un autre processus." });
+      }
+
+      // Re-verify the transaction was actually in the expected old status
+      // by checking that our update succeeded from the right state
+      if (newStatus === "failed" && oldStatus === "completed") {
+        if (isIncoming) {
+          if (user.balance < netAmountForUser) {
+            // Rollback status
+            await storage.updateTransactionStatus(transactionId, oldStatus);
+            return res.status(400).json({ 
+              error: `Solde insuffisant. Le solde de l'utilisateur (${user.balance}) est inférieur au montant à déduire (${netAmountForUser}).` 
+            });
+          }
+          await storage.updateUserBalance(transaction.userId, -netAmountForUser);
+          console.log(`[Admin] ${adminEmail} changed tx ${transactionId} completed->failed: deducted ${netAmountForUser} from user ${transaction.userId} (balance: ${user.balance} -> ${user.balance - netAmountForUser})`);
+        } else if (isOutgoing) {
+          const refundAmount = metadata.deductedFromBalance || metadata.totalDebited || transaction.amount;
+          await storage.updateUserBalance(transaction.userId, refundAmount);
+          console.log(`[Admin] ${adminEmail} changed tx ${transactionId} completed->failed: refunded ${refundAmount} to user ${transaction.userId}`);
+        }
+      } else if (newStatus === "completed" && (oldStatus === "failed" || oldStatus === "pending")) {
+        if (isIncoming) {
+          await storage.updateUserBalance(transaction.userId, netAmountForUser);
+          console.log(`[Admin] ${adminEmail} changed tx ${transactionId} ${oldStatus}->completed: credited ${netAmountForUser} to user ${transaction.userId} (balance: ${user.balance} -> ${user.balance + netAmountForUser})`);
+        } else if (isOutgoing) {
+          if (oldStatus === "pending") {
+            console.log(`[Admin] ${adminEmail} changed outgoing tx ${transactionId} pending->completed: no balance change (already debited)`);
+          } else {
+            const debitAmount = metadata.deductedFromBalance || metadata.totalDebited || transaction.amount;
+            if (user.balance < debitAmount) {
+              // Rollback status
+              await storage.updateTransactionStatus(transactionId, oldStatus);
+              return res.status(400).json({ 
+                error: `Solde insuffisant pour marquer comme complété. Solde: ${user.balance}, à débiter: ${debitAmount}` 
+              });
+            }
+            await storage.updateUserBalance(transaction.userId, -debitAmount);
+            console.log(`[Admin] ${adminEmail} changed tx ${transactionId} failed->completed: debited ${debitAmount} from user ${transaction.userId}`);
+          }
+        }
+      }
+
+      metadata.adminStatusChange = metadata.adminStatusChange || [];
+      metadata.adminStatusChange.push({
+        from: transaction.status,
+        to: newStatus,
+        by: adminEmail,
+        at: new Date().toISOString(),
+      });
+      await storage.updateTransactionMetadata(transactionId, JSON.stringify(metadata));
+
+      const updatedUser = await storage.getUser(transaction.userId);
+
+      res.json({ 
+        success: true, 
+        message: `Statut changé de '${transaction.status}' à '${newStatus}' avec succès`,
+        newBalance: updatedUser?.balance,
+      });
+    } catch (error: any) {
+      console.error("[Admin] Change transaction status error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
   // Get all transactions for admin (with user info)
   app.get("/api/admin/all-transactions", requireAdmin, async (req: Request, res: Response) => {
     try {

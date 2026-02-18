@@ -1,5 +1,6 @@
 import * as React from "react";
 import { useQuery } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
 import { useLocation, useParams } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -310,6 +311,11 @@ export default function AdminUserHistory() {
         transaction={selectedTransaction}
         open={dialogOpen}
         onOpenChange={setDialogOpen}
+        isAdmin={true}
+        onStatusChanged={() => {
+          queryClient.invalidateQueries({ queryKey: [`/api/admin/user/${userId}/transactions`] });
+          queryClient.invalidateQueries({ queryKey: [`/api/admin/user/${userId}/profile`] });
+        }}
       />
     </div>
   );

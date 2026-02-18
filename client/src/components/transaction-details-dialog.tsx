@@ -6,16 +6,20 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import type { Transaction } from "@shared/schema";
-import { Copy, Mail, Phone, Wallet } from "lucide-react";
+import { Copy, Mail, Phone, Wallet, AlertTriangle, CheckCircle, XCircle } from "lucide-react";
 import { CryptoIcon } from "@/components/crypto-icon";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 interface TransactionDetailsDialogProps {
   transaction: Transaction | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  isAdmin?: boolean;
+  onStatusChanged?: () => void;
 }
 
 interface TransactionMetadata {
@@ -40,8 +44,11 @@ export function TransactionDetailsDialog({
   transaction,
   open,
   onOpenChange,
+  isAdmin = false,
+  onStatusChanged,
 }: TransactionDetailsDialogProps) {
   const { toast } = useToast();
+  const [confirmAction, setConfirmAction] = useState<string | null>(null);
 
   const metadata = useMemo<TransactionMetadata | null>(() => {
     if (!transaction?.metadata) return null;
@@ -51,6 +58,28 @@ export function TransactionDetailsDialog({
       return null;
     }
   }, [transaction?.metadata]);
+
+  const changeStatusMutation = useMutation({
+    mutationFn: async ({ transactionId, newStatus }: { transactionId: string; newStatus: string }) => {
+      const res = await apiRequest("POST", `/api/admin/transaction/${transactionId}/change-status`, { newStatus });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({ title: "Statut modifié", description: data.message });
+      setConfirmAction(null);
+      queryClient.invalidateQueries({ queryKey: [`/api/admin/user`] });
+      queryClient.invalidateQueries({ predicate: (query) => {
+        const key = query.queryKey[0] as string;
+        return typeof key === "string" && (key.includes("/transactions") || key.includes("/admin/user"));
+      }});
+      onStatusChanged?.();
+      onOpenChange(false);
+    },
+    onError: (error: any) => {
+      toast({ title: "Erreur", description: error.message || "Impossible de changer le statut", variant: "destructive" });
+      setConfirmAction(null);
+    },
+  });
 
   if (!transaction) return null;
 
@@ -336,6 +365,70 @@ export function TransactionDetailsDialog({
                   </div>
                 )}
               </div>
+            </div>
+          )}
+
+          {isAdmin && (transaction.status === "completed" || transaction.status === "failed" || transaction.status === "pending") && (
+            <div className="space-y-4 border-t pt-4">
+              <h3 className="font-semibold text-lg flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-orange-500" />
+                Actions administrateur
+              </h3>
+
+              {!confirmAction ? (
+                <div className="flex flex-wrap gap-2">
+                  {transaction.status === "completed" && (
+                    <Button
+                      variant="destructive"
+                      onClick={() => setConfirmAction("failed")}
+                      data-testid="button-admin-mark-failed"
+                    >
+                      <XCircle className="w-4 h-4 mr-2" />
+                      Marquer comme Echoué
+                    </Button>
+                  )}
+                  {(transaction.status === "failed" || transaction.status === "pending") && (
+                    <Button
+                      variant="default"
+                      onClick={() => setConfirmAction("completed")}
+                      data-testid="button-admin-mark-completed"
+                    >
+                      <CheckCircle className="w-4 h-4 mr-2" />
+                      Marquer comme Complété
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <div className="bg-destructive/10 border border-destructive/20 rounded-md p-4 space-y-3">
+                  <p className="text-sm font-medium">
+                    {confirmAction === "failed" 
+                      ? "Confirmer le passage en Echoué ? Le montant sera déduit du solde de l'utilisateur."
+                      : "Confirmer le passage en Complété ? Le montant sera crédité au solde de l'utilisateur."
+                    }
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      variant={confirmAction === "failed" ? "destructive" : "default"}
+                      onClick={() => changeStatusMutation.mutate({ 
+                        transactionId: transaction.id, 
+                        newStatus: confirmAction 
+                      })}
+                      disabled={changeStatusMutation.isPending}
+                      data-testid="button-admin-confirm-status"
+                    >
+                      {changeStatusMutation.isPending ? "En cours..." : "Confirmer"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => setConfirmAction(null)}
+                      disabled={changeStatusMutation.isPending}
+                      data-testid="button-admin-cancel-status"
+                    >
+                      Annuler
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
