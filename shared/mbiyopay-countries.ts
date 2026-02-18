@@ -125,6 +125,7 @@ export const MBIYOPAY_COUNTRIES: MbiyoPayCountry[] = [
     operators: [
       { code: "orange", name: "Orange Money", requiresOtp: false, requiresRedirect: false, payin: true, payout: true },
       { code: "mtn", name: "MTN Mobile Money", requiresOtp: false, requiresRedirect: false, payin: true, payout: true },
+      { code: "moov", name: "Moov Money", requiresOtp: false, requiresRedirect: false, payin: true, payout: true },
     ],
   },
   {
@@ -133,7 +134,7 @@ export const MBIYOPAY_COUNTRIES: MbiyoPayCountry[] = [
     flag: "🇨🇬",
     phoneCode: "+242",
     phoneDigits: 9,
-    phoneFormat: "XXXXXXXXX",
+    phoneFormat: "0XXXXXXXX",
     currency: "XAF",
     operators: [
       { code: "mtn", name: "MTN Mobile Money", requiresOtp: false, requiresRedirect: false, payin: true, payout: true },

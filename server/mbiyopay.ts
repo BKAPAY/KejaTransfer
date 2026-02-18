@@ -36,7 +36,7 @@ export const MBIYOPAY_OPERATORS: Record<string, string[]> = {
   tg: ["moov", "togocom"],
   ml: ["orange", "moov"],
   gn: ["orange"],
-  cm: ["orange", "mtn"],
+  cm: ["orange", "mtn", "moov"],
   cg: ["mtn"],
   cd: ["mpesa", "airtel", "orange", "afrimoney"],
   gm: ["afrimoney", "qmoney", "wave"],
@@ -93,6 +93,7 @@ export const MBIYOPAY_OPERATOR_API_CODES: Record<string, Record<string, string>>
   cm: {
     orange: "orange",
     mtn: "mtn",
+    moov: "moov",
   },
   cg: {
     mtn: "mtn",
@@ -263,9 +264,9 @@ export async function createMbiyoPayPayin(params: MbiyoPayPayinParams): Promise<
     console.log(`[MbiyoPay Payin] Phone formatting: input="${params.phone}" -> output="${formattedPhone}" (country=${params.countryCode})`);
     console.log(`[MbiyoPay Payin] Operator mapping: ${params.network} -> ${apiOperatorCode}`);
     
-    // MbiyoPay documentation shows network in UPPERCASE in the example (e.g., "ORANGE")
+    // MbiyoPay API docs specify network in lowercase (e.g., "orange", "moov", "mtn")
     const metadata: Record<string, string> = {
-      network: apiOperatorCode.toUpperCase(),
+      network: apiOperatorCode.toLowerCase(),
       phone_number: formattedPhone,
       country_code: params.countryCode.toUpperCase(),
     };
