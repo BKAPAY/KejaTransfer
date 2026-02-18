@@ -279,7 +279,7 @@ async function processMbiyoPayTransaction(transaction: Transaction & { user?: Us
             // SECURITY: Double-verification - confirm via getMbiyoPayTransactionStatus before crediting
             let doubleVerified = false;
             try {
-              const verifyResult = await getMbiyoPayTransactionStatus(searchResult.transactionId!);
+              const verifyResult = await getMbiyoPayTransactionStatus(searchResult.transactionId);
               if (verifyResult.success && verifyResult.status) {
                 const verifyStatus = verifyResult.status.toLowerCase();
                 if (verifyStatus === "successful") {
