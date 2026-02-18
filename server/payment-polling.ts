@@ -282,74 +282,29 @@ async function processMbiyoPayTransaction(transaction: Transaction & { user?: Us
       try {
         const searchResult = await searchMbiyoPayTransactionByOrderId(orderId);
         if (searchResult.success && searchResult.transactionId) {
-          // Found the transaction! Update metadata with the real MbiyoPay transaction ID
+          // SAFETY: Validate that the found transaction matches our expected amount/currency
+          // to prevent false positives from MbiyoPay's search API
+          const expectedAmount = metadata.providerAmount || transaction.amount;
+          const expectedCurrency = metadata.providerCurrency || transaction.currency;
+          if (searchResult.amount && Math.abs(searchResult.amount - expectedAmount) > 1) {
+            console.warn(`[SECURITY] Order_id search returned transaction with WRONG amount: expected=${expectedAmount}, got=${searchResult.amount} for ${transaction.id} - ignoring match`);
+            return false;
+          }
+          if (searchResult.currency && expectedCurrency && searchResult.currency.toUpperCase() !== expectedCurrency.toUpperCase()) {
+            console.warn(`[SECURITY] Order_id search returned transaction with WRONG currency: expected=${expectedCurrency}, got=${searchResult.currency} for ${transaction.id} - ignoring match`);
+            return false;
+          }
+
+          // Found the transaction! Store the MbiyoPay transaction ID in metadata
+          // IMPORTANT: We NEVER finalize/credit based on order_id search alone
+          // We only store the ID and let the NEXT polling cycle verify via direct API (getMbiyoPayTransactionStatus)
+          // This ensures the authoritative direct API is ALWAYS the source for crediting decisions
           metadata.mbiyopayTransactionId = searchResult.transactionId;
           await storage.updateTransactionMetadata(transaction.id, JSON.stringify(metadata));
-          console.log(`[PaymentPolling] Found MbiyoPay transaction ID ${searchResult.transactionId} for order ${orderId} - status: ${searchResult.status}`);
-          
-          // Process the status immediately
-          const foundStatus = (searchResult.status || "").toLowerCase();
-          if (foundStatus === "successful") {
-            // SECURITY: Double-verification - confirm via getMbiyoPayTransactionStatus before crediting
-            let doubleVerified = false;
-            try {
-              const verifyResult = await getMbiyoPayTransactionStatus(searchResult.transactionId);
-              if (verifyResult.success && verifyResult.status) {
-                const verifyStatus = verifyResult.status.toLowerCase();
-                if (verifyStatus === "successful") {
-                  doubleVerified = true;
-                  console.log(`[SECURITY] Double-verification PASSED for transaction ${transaction.id} (order_id search -> getMbiyoPayTransactionStatus both say "successful")`);
-                } else {
-                  console.warn(`[SECURITY] Double-verification FAILED for transaction ${transaction.id} - order_id search says "successful" but getMbiyoPayTransactionStatus says "${verifyStatus}" - leaving pending for admin review`);
-                }
-              } else {
-                console.warn(`[SECURITY] Double-verification FAILED for transaction ${transaction.id} - getMbiyoPayTransactionStatus returned error: ${verifyResult.error} - leaving pending for admin review`);
-              }
-            } catch (verifyError) {
-              console.warn(`[SECURITY] Double-verification FAILED for transaction ${transaction.id} - verification call threw error: ${verifyError} - leaving pending for admin review`);
-            }
-
-            if (!doubleVerified) {
-              return false;
-            }
-
-            // SAFETY: Re-check status before finalizing - prevent overwriting "failed" set by API handler
-            const latestTx = await storage.getTransaction(transaction.id);
-            if (!latestTx || latestTx.status !== "pending") {
-              console.log(`[PaymentPolling] Transaction ${transaction.id} status changed to "${latestTx?.status}" during verification - aborting completion`);
-              return true;
-            }
-
-            if (transaction.type === "deposit" || transaction.type === "payment_link" || transaction.type === "merchant_link" || transaction.type === "api_payment") {
-              const result = await storage.finalizeIncomingTransaction(transaction.id, {});
-              if (result) {
-                console.log(`[PaymentPolling] ✅ MbiyoPay transaction ${transaction.id} CONFIRMED via order_id search (double-verified) - credited=${result.credited}`);
-              }
-            } else {
-              await storage.updateTransactionStatus(transaction.id, "completed");
-              console.log(`[PaymentPolling] ✅ MbiyoPay ${transaction.type} ${transaction.id} COMPLETED via order_id search (double-verified)`);
-            }
-            return true;
-          } else if (foundStatus === "failed" || foundStatus === "cancelled" || foundStatus === "expired" || foundStatus === "rejected" || foundStatus === "error") {
-            const isOutgoing = transaction.type === "withdrawal" || transaction.type === "transfer";
-            const MBIYOPAY_FAILED_GRACE_PERIOD_MS = isOutgoing ? 15 * 1000 : 60 * 1000;
-            const txAge = getTransactionAge(transaction);
-            if (txAge < MBIYOPAY_FAILED_GRACE_PERIOD_MS) {
-              const graceRemaining = Math.round((MBIYOPAY_FAILED_GRACE_PERIOD_MS - txAge) / 1000);
-              console.log(`[PaymentPolling] ⏳ MbiyoPay transaction ${transaction.id} shows "${foundStatus}" via order_id but too recent - waiting ${graceRemaining}s grace period`);
-              return false; // Keep polling
-            }
-            console.log(`[PaymentPolling] ❌ MbiyoPay transaction ${transaction.id} ${foundStatus} via order_id search (after grace period)`);
-            if (transaction.type === "withdrawal" || transaction.type === "transfer") {
-              const refundAmount = metadata.deductedFromBalance || metadata.totalDebited || transaction.amount;
-              await storage.updateUserBalance(transaction.userId, refundAmount);
-              console.log(`[PaymentPolling] Refunded ${refundAmount} to user ${transaction.userId}`);
-            }
-            await storage.updateTransactionStatus(transaction.id, "failed");
-            return true;
-          }
-          // If pending, we now have the ID and will use normal polling next cycle
-          console.log(`[PaymentPolling] MbiyoPay transaction ${transaction.id} still ${foundStatus} - will poll by ID next cycle`);
+          console.log(`[PaymentPolling] Found MbiyoPay transaction ID ${searchResult.transactionId} for order ${orderId} - status: ${searchResult.status}, amount: ${searchResult.amount}, currency: ${searchResult.currency}`);
+          console.log(`[PaymentPolling] Stored mbiyopayTransactionId - will verify via direct API on next polling cycle`);
+          // Don't process the status here - let the next cycle handle it through the standard path
+          // which uses getMbiyoPayTransactionStatus (the authoritative, direct API)
           return false;
         } else {
           console.log(`[PaymentPolling] Could not find MbiyoPay transaction by order_id ${orderId}: ${searchResult.error}`);
@@ -442,35 +397,9 @@ async function processMbiyoPayTransaction(transaction: Transaction & { user?: Us
           return false; // Keep polling
         }
         
-        // Grace period passed - do a final confirmation check via order_id search before trusting "failed"
-        if (metadata.orderId) {
-          try {
-            const finalCheck = await searchMbiyoPayTransactionByOrderId(metadata.orderId);
-            if (finalCheck.success && finalCheck.status) {
-              const finalStatus = finalCheck.status.toLowerCase();
-              if (finalStatus === "successful") {
-                console.log(`[PaymentPolling] ✅ MbiyoPay transaction ${transaction.id} actually SUCCESSFUL on final check (was "${status}")!`);
-                if (transaction.type === "deposit" || transaction.type === "payment_link" || transaction.type === "merchant_link" || transaction.type === "api_payment") {
-                  const result = await storage.finalizeIncomingTransaction(transaction.id, {});
-                  if (result) {
-                    console.log(`[PaymentPolling] ✅ Finalized: credited=${result.credited}`);
-                  }
-                } else {
-                  await storage.updateTransactionStatus(transaction.id, "completed");
-                }
-                return true;
-              } else if (finalStatus !== "failed" && finalStatus !== "cancelled") {
-                console.log(`[PaymentPolling] MbiyoPay transaction ${transaction.id} shows "${finalStatus}" on final check - continuing to poll`);
-                return false;
-              }
-            }
-          } catch (finalCheckError) {
-            console.log(`[PaymentPolling] Final check error for ${transaction.id}:`, finalCheckError);
-          }
-        }
-        
-        // Confirmed failed after grace period and final check
-        console.log(`[PaymentPolling] ❌ MbiyoPay transaction ${transaction.id} confirmed failed after grace period (status: ${status})`);
+        // Grace period passed - getMbiyoPayTransactionStatus with the real mbiyopayTransactionId is the AUTHORITATIVE source
+        // We trust the direct API status and do NOT override it with order_id search which can return wrong transactions
+        console.log(`[PaymentPolling] ❌ MbiyoPay transaction ${transaction.id} confirmed ${status} after grace period (authoritative source: getMbiyoPayTransactionStatus with ID ${mbiyopayTransactionId})`);
         if (transaction.type === "withdrawal" || transaction.type === "transfer") {
           const refundAmount = metadata.deductedFromBalance || metadata.totalDebited || transaction.amount;
           await storage.updateUserBalance(transaction.userId, refundAmount);
