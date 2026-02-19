@@ -151,7 +151,7 @@ export const MBIYOPAY_COUNTRIES: MbiyoPayCountry[] = [
     operators: [
       { code: "mpesa", name: "M-Pesa", requiresOtp: false, requiresRedirect: false, payin: true, payout: true },
       { code: "airtel", name: "Airtel Money", requiresOtp: false, requiresRedirect: false, payin: true, payout: true },
-      { code: "orange", name: "Orange Money", requiresOtp: true, requiresRedirect: true, payin: true, payout: true },
+      { code: "orange", name: "Orange Money", requiresOtp: false, requiresRedirect: false, payin: true, payout: true },
       { code: "afrimoney", name: "Afrimoney", requiresOtp: false, requiresRedirect: false, payin: true, payout: true },
     ],
   },
