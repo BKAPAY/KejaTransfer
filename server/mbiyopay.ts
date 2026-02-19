@@ -159,7 +159,7 @@ export function formatPhoneForMbiyoPay(phone: string, countryCode: string): stri
   // BJ: 01XXXXXXXX (10 digits, keep leading 0)
   // CI: 0XXXXXXXXX (10 digits, keep leading 0)
   // CG: 0XXXXXXXX (9 digits, keep leading 0 - MTN Congo Brazzaville)
-  const keepLeadingZero = ["bj", "ci", "cg"];
+  const keepLeadingZero = ["bj", "ci", "cg", "ga"];
   
   // Remove leading 0 ONLY for countries that don't keep it
   if (sanitized.startsWith("0") && !keepLeadingZero.includes(countryLower)) {
