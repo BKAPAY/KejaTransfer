@@ -52,14 +52,14 @@ import waveImage from "@assets/wave (1)_1763835083242.png";
 import freeImage from "@assets/mixxByYas-web-page_1763835083140.png";
 import tmonyImage from "@assets/e-money_1763835083190.png";
 import wizallImage from "@assets/wizall_1763835083090.png";
-import airtelImage from "@assets/airtel-logo.png";
-import mpesaImage from "@assets/mpesa-logo.png";
-import celtiisImage from "@assets/celtiis-logo.png";
-import expressoImage from "@assets/expresso-logo.png";
-import corisImage from "@assets/coris-logo.png";
-import afrimoneyImage from "@assets/afrimoney-logo.png";
-import qmoneyImage from "@assets/qmoney-logo.png";
-import telecelImage from "@assets/telecel-logo.png";
+import airtelImage from "@assets/image_search_1771486869310_1771487355059.png";
+import mpesaImage from "@assets/image_search_1771486907537_1771487355101.png";
+import celtiisImage from "@assets/image_search_1771486943445_1771487355123.jpg";
+import expressoImage from "@assets/image_search_1771487048520_1771487355151.png";
+import corisImage from "@assets/image_search_1771487069905_1771487355176.png";
+import afrimoneyImage from "@assets/image_search_1771487089985_1771487355198.png";
+import qmoneyImage from "@assets/image_search_1771487154605_1771487355255.jpg";
+import telecelImage from "@assets/image_search_1771487186999_1771487355289.jpg";
 
 const OPERATOR_LOGOS: Record<string, string> = {
   orange: omImage,
