@@ -12,7 +12,7 @@ function extractMessage(msg: any): string {
   return String(msg);
 }
 
-export const MBIYOPAY_SUPPORTED_COUNTRIES = ["bj", "bf", "ci", "sn", "tg", "ml", "gn", "cm", "cg", "cd", "gm"];
+export const MBIYOPAY_SUPPORTED_COUNTRIES = ["bj", "bf", "ci", "sn", "tg", "ml", "gn", "cm", "cg", "cd", "gm", "ga"];
 
 export const MBIYOPAY_COUNTRY_CURRENCIES: Record<string, string> = {
   bj: "XOF",
@@ -26,6 +26,7 @@ export const MBIYOPAY_COUNTRY_CURRENCIES: Record<string, string> = {
   cg: "XAF",
   cd: "CDF",
   gm: "GMD",
+  ga: "XAF",
 };
 
 export const MBIYOPAY_OPERATORS: Record<string, string[]> = {
@@ -40,6 +41,7 @@ export const MBIYOPAY_OPERATORS: Record<string, string[]> = {
   cg: ["mtn"],
   cd: ["mpesa", "airtel", "orange", "afrimoney"],
   gm: ["afrimoney", "qmoney", "wave"],
+  ga: ["moov", "airtel"],
 };
 
 export const COUNTRY_PHONE_PREFIXES: Record<string, string> = {
@@ -54,6 +56,7 @@ export const COUNTRY_PHONE_PREFIXES: Record<string, string> = {
   cg: "+242",
   cd: "+243",
   gm: "+220",
+  ga: "+241",
 };
 
 // Map internal operator codes to MbiyoPay API codes
@@ -107,6 +110,10 @@ export const MBIYOPAY_OPERATOR_API_CODES: Record<string, Record<string, string>>
     afrimoney: "afrimoney",
     qmoney: "qmoney",
     wave: "wave",
+  },
+  ga: {
+    moov: "moov",
+    airtel: "airtel",
   },
 };
 

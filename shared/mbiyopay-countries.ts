@@ -169,6 +169,19 @@ export const MBIYOPAY_COUNTRIES: MbiyoPayCountry[] = [
       { code: "wave", name: "Wave", requiresOtp: false, requiresRedirect: true, payin: true, payout: true },
     ],
   },
+  {
+    code: "GA",
+    name: "Gabon",
+    flag: "🇬🇦",
+    phoneCode: "+241",
+    phoneDigits: 8,
+    phoneFormat: "0XXXXXXX",
+    currency: "XAF",
+    operators: [
+      { code: "moov", name: "Moov Money", requiresOtp: false, requiresRedirect: false, payin: true, payout: true },
+      { code: "airtel", name: "Airtel Money", requiresOtp: false, requiresRedirect: false, payin: true, payout: true },
+    ],
+  },
 ];
 
 export const getMbiyoPayCountryByCode = (code: string): MbiyoPayCountry | undefined => {
