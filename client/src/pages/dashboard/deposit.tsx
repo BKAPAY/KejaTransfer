@@ -21,7 +21,8 @@ import { PaymentMethodSelector } from "@/components/payment-method-selector";
 import { CryptoPaymentFlow } from "@/components/crypto-payment-flow";
 import { CurrencySelector, getCurrencyLabel } from "@/components/currency-selector";
 import { OperatorSelector } from "@/components/operator-selector";
-import { hasMultipleCurrencies, getMbiyoPayCurrencyForCountry, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
+import { hasMultipleCurrencies, getMbiyoPayCurrencyForCountry, getMbiyoPayCurrenciesForCountry, operatorRequiresOtp as mbiyoOperatorRequiresOtp, getOtpInstructionsForCountry } from "@shared/mbiyopay-countries";
+import { operatorRequiresOtpForCountry as paydunyaOperatorRequiresOtp, getOtpInstructionsForOperator as getPaydunyaOtpInstructions } from "@shared/afribapay-countries";
 import { useConvertedMinimums } from "@/hooks/use-converted-minimums";
 import { getCurrencyDecimals } from "@/lib/currency";
 import { usePaymentCountdown, DEFAULT_COUNTDOWN_DURATION } from "@/hooks/use-payment-countdown";
@@ -131,6 +132,19 @@ export default function Deposit() {
   const selectedCountry = form.watch("country");
   const selectedOperator = form.watch("operator");
   const amount = depositAmount;
+
+  const currentOperatorNeedsOtp = selectedCountry && selectedOperator
+    ? (mbiyoOperatorRequiresOtp(selectedCountry, selectedOperator) || paydunyaOperatorRequiresOtp(selectedCountry, selectedOperator))
+    : false;
+
+  const currentOtpInstructions = selectedCountry && selectedOperator && currentOperatorNeedsOtp
+    ? (mbiyoOperatorRequiresOtp(selectedCountry, selectedOperator)
+        ? getOtpInstructionsForCountry(selectedCountry)
+        : (() => {
+            const instr = getPaydunyaOtpInstructions(selectedCountry, selectedOperator);
+            return instr ? { ussdCode: "", instructions: instr, hint: "" } : { ussdCode: "#144#", instructions: "Composez le code USSD pour obtenir votre code OTP", hint: "" };
+          })())
+    : null;
 
   // Auto-detect country from IP address
   useEffect(() => {
@@ -253,7 +267,6 @@ export default function Deposit() {
 
   const depositMutation = useMutation({
     mutationFn: async (data: DepositFormData) => {
-      // Send converted amount to provider, original amount for balance credit
       const providerAmount = needsConversion && conversionData?.convertedAmount 
         ? conversionData.convertedAmount 
         : depositAmount;
@@ -267,6 +280,7 @@ export default function Deposit() {
         currency: providerCurrency,
         originalAmount: depositAmount,
         originalCurrency: userBalanceCurrency,
+        ...(currentOperatorNeedsOtp && otpCode.trim() ? { otpCode: otpCode.trim() } : {}),
       });
       return res.json();
     },
@@ -284,7 +298,7 @@ export default function Deposit() {
           provider: response.provider,
         });
         
-        if (response.requiresOTP) {
+        if (response.requiresOTP && !currentOperatorNeedsOtp) {
           countdown.resetCountdown();
           setPaymentStep("otp");
           toast({
@@ -292,13 +306,19 @@ export default function Deposit() {
             description: response.ussdInstruction || "Generez votre code de paiement",
           });
         } else if (response.redirectUrl) {
+          countdown.startCountdown();
           setPaymentStep("redirect");
+          setOtpCode("");
           toast({
             title: "Redirection requise",
             description: "Cliquez sur le bouton pour finaliser le paiement",
           });
+        } else {
+          countdown.startCountdown();
+          setPaymentStep("polling");
+          setOtpCode("");
         }
-      } else if (response.requiresOTP) {
+      } else if (response.requiresOTP && !currentOperatorNeedsOtp) {
         countdown.resetCountdown();
         setPaymentData({
           otpInstructions: response.otpInstructions,
@@ -440,8 +460,18 @@ export default function Deposit() {
       });
       return;
     }
-    countdown.startCountdown();
-    setPaymentStep("polling");
+    if (currentOperatorNeedsOtp && !otpCode.trim()) {
+      toast({
+        title: "Code OTP requis",
+        description: "Veuillez entrer le code OTP avant de continuer",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!currentOperatorNeedsOtp) {
+      countdown.startCountdown();
+      setPaymentStep("polling");
+    }
     depositMutation.mutate(data);
   };
 
@@ -808,7 +838,7 @@ export default function Deposit() {
                               <OperatorSelector
                                 operators={countryOperators}
                                 selectedOperator={field.value}
-                                onSelect={field.onChange}
+                                onSelect={(val) => { field.onChange(val); setOtpCode(""); }}
                                 isLoading={isLoadingOperators}
                               />
                             )}
@@ -872,10 +902,45 @@ export default function Deposit() {
                       </div>
                     )}
 
+                    {currentOperatorNeedsOtp && currentOtpInstructions && (
+                      <div className="space-y-3">
+                        <Alert className="bg-orange-50 dark:bg-orange-950 border-orange-200 dark:border-orange-800">
+                          <Info className="h-4 w-4 text-orange-600" />
+                          <AlertDescription className="text-sm text-orange-800 dark:text-orange-200">
+                            <p className="font-semibold mb-1">Instructions pour obtenir votre code OTP :</p>
+                            <p className="whitespace-pre-line">{currentOtpInstructions.instructions}</p>
+                            {currentOtpInstructions.ussdCode && (
+                              <div className="bg-white dark:bg-gray-900 border border-orange-300 dark:border-orange-700 rounded-md px-3 py-2 my-2 text-center">
+                                <code className="text-lg font-bold text-orange-700 dark:text-orange-400">
+                                  {currentOtpInstructions.ussdCode}
+                                </code>
+                              </div>
+                            )}
+                            {currentOtpInstructions.hint && (
+                              <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">{currentOtpInstructions.hint}</p>
+                            )}
+                          </AlertDescription>
+                        </Alert>
+                        <div className="space-y-2">
+                          <label htmlFor="otp-code-inline" className="block text-sm font-medium">
+                            Code de paiement OTP
+                          </label>
+                          <Input
+                            id="otp-code-inline"
+                            type="text"
+                            value={otpCode}
+                            onChange={(e) => setOtpCode(e.target.value)}
+                            placeholder="Entrez le code OTP obtenu"
+                            data-testid="input-otp-code-inline"
+                          />
+                        </div>
+                      </div>
+                    )}
+
                     <Button
                       type="submit"
                       className="w-full"
-                      disabled={depositMutation.isPending || countryOperators.length === 0}
+                      disabled={depositMutation.isPending || countryOperators.length === 0 || (currentOperatorNeedsOtp && !otpCode.trim())}
                       data-testid="button-submit-deposit"
                     >
                       {depositMutation.isPending ? (
@@ -886,7 +951,7 @@ export default function Deposit() {
                       ) : (
                         <>
                           <CheckCircle2 className="h-4 w-4 mr-2" />
-                          Continuer
+                          {currentOperatorNeedsOtp ? "Valider le paiement" : "Continuer"}
                         </>
                       )}
                     </Button>

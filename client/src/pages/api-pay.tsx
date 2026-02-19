@@ -25,7 +25,7 @@ import logoImage from "@assets/bkapay-logo.png";
 import { getCurrencyDecimals } from "@/lib/currency";
 import { CurrencySelector, getCurrencyLabel } from "@/components/currency-selector";
 import { OperatorSelector } from "@/components/operator-selector";
-import { hasMultipleCurrencies, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
+import { hasMultipleCurrencies, getMbiyoPayCurrenciesForCountry, operatorRequiresOtp as mbiyoOperatorRequiresOtp, getOtpInstructionsForCountry } from "@shared/mbiyopay-countries";
 import { CountryFlag } from "@/components/country-flag";
 
 interface ApiKeyInfo {
@@ -309,12 +309,12 @@ export default function ApiPay() {
   
   const noOperatorsAvailable = !isLoadingOperators && !!country && countryOperators.length === 0;
 
-  // Vérifier si l'opérateur sélectionné est Orange (nécessite code OTP)
-  // IMPORTANT: Orange RDC (CD) utilise MbiyoPay qui ne nécessite PAS d'OTP
-  // Seuls certains pays avec Paydunya/FedaPay nécessitent OTP pour Orange
-  const ORANGE_OTP_COUNTRIES = ["SN", "CI", "BF", "ML", "GN", "NE", "BJ", "TG"]; // Exclure CD et CM
-  const isOrangeOperator = operator?.toLowerCase().includes("orange");
-  const showOrangeOtpOnForm = isOrangeOperator && country && ORANGE_OTP_COUNTRIES.includes(country);
+  const showOtpOnForm = country && operator 
+    ? (mbiyoOperatorRequiresOtp(country, operator) || 
+       (operator?.toLowerCase().includes("orange") && ["SN", "CI", "BF", "ML", "GN", "NE", "BJ", "TG"].includes(country)))
+    : false;
+  const isMbiyoOtpOperator = country && operator ? mbiyoOperatorRequiresOtp(country, operator) : false;
+  const mbiyoOtpInfo = isMbiyoOtpOperator && country ? getOtpInstructionsForCountry(country) : null;
 
   const fetchConversion = useCallback(async (amountToConvert: number, fromCurrency: string, toCurrency: string) => {
     if (!amountToConvert || amountToConvert <= 0 || toCurrency === fromCurrency) {
@@ -504,8 +504,8 @@ export default function ApiPay() {
         currency: selectedCurrency,
         callbackUrl: callbackUrl || null,
       };
-      if (mbiyoOtpCode) {
-        bodyData.otpCode = mbiyoOtpCode;
+      if (mbiyoOtpCode || authCode) {
+        bodyData.otpCode = mbiyoOtpCode || authCode;
       }
       const response = await fetch("/api/api-pay/init", {
         method: "POST",
@@ -517,7 +517,7 @@ export default function ApiPay() {
       return data;
     },
     onSuccess: (data) => {
-      if (!data.success && data.requiresOTP) {
+      if (!data.success && data.requiresOTP && !showOtpOnForm) {
         countdown.resetCountdown();
         setMbiyoOtpInstructions(data.otpInstructions || "");
         setMbiyoOtpUssdCode(data.otpUssdCode || "");
@@ -550,12 +550,16 @@ export default function ApiPay() {
       } else if (data.requiresTwoStep) {
         countdown.resetCountdown();
         newStage = "ussd";
-      } else if (data.requiresOTP) {
+      } else if (data.requiresOTP && !showOtpOnForm) {
         countdown.resetCountdown();
         newStage = "otp";
       }
       
       setPaymentStage(newStage);
+      
+      if (newStage === "polling") {
+        countdown.startCountdown();
+      }
       
       if (key) {
         savePaymentState(key, {
@@ -661,8 +665,10 @@ export default function ApiPay() {
       });
       return;
     }
-    countdown.startCountdown();
-    setPaymentStage("polling");
+    if (!showOtpOnForm) {
+      countdown.startCountdown();
+      setPaymentStage("polling");
+    }
     initMutation.mutate();
   };
 
@@ -1368,42 +1374,59 @@ export default function ApiPay() {
         )}
       </div>
 
-      {/* Instructions OTP Orange sur le formulaire */}
-      {showOrangeOtpOnForm && (
+      {showOtpOnForm && (
         <div className="space-y-3">
           <Alert className="bg-orange-50 dark:bg-orange-950 border-orange-200 dark:border-orange-800">
             <AlertCircle className="h-4 w-4 text-orange-600" />
             <AlertDescription className="text-sm text-orange-800 dark:text-orange-200">
-              <strong>Instructions Orange Money :</strong>
-              <div className="mt-2 flex items-center gap-2">
-                <div className="flex-1 bg-white dark:bg-gray-900 border border-orange-300 dark:border-orange-700 rounded-md px-3 py-2">
-                  <code className="text-base font-bold text-orange-700 dark:text-orange-400">
-                    {getOrangeUssdCode(country)}
-                  </code>
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => copyUssdCode(getOrangeUssdCode(country))}
-                  className="border-orange-300 hover:bg-orange-100 dark:hover:bg-orange-900"
-                  data-testid="button-copy-ussd-form"
-                >
-                  {copiedUssd ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
-                </Button>
-              </div>
-              <p className="mt-2 text-xs text-orange-700 dark:text-orange-400">
-                {getOrangeUssdHint(country)}
-              </p>
+              <strong>Instructions pour obtenir votre code OTP :</strong>
+              {isMbiyoOtpOperator && mbiyoOtpInfo ? (
+                <>
+                  <p className="mt-1 whitespace-pre-line">{mbiyoOtpInfo.instructions}</p>
+                  {mbiyoOtpInfo.ussdCode && (
+                    <div className="mt-2 bg-white dark:bg-gray-900 border border-orange-300 dark:border-orange-700 rounded-md px-3 py-2 text-center">
+                      <code className="text-lg font-bold text-orange-700 dark:text-orange-400">
+                        {mbiyoOtpInfo.ussdCode}
+                      </code>
+                    </div>
+                  )}
+                  {mbiyoOtpInfo.hint && (
+                    <p className="mt-1 text-xs text-orange-600 dark:text-orange-400">{mbiyoOtpInfo.hint}</p>
+                  )}
+                </>
+              ) : (
+                <>
+                  <div className="mt-2 flex items-center gap-2">
+                    <div className="flex-1 bg-white dark:bg-gray-900 border border-orange-300 dark:border-orange-700 rounded-md px-3 py-2">
+                      <code className="text-base font-bold text-orange-700 dark:text-orange-400">
+                        {getOrangeUssdCode(country)}
+                      </code>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => copyUssdCode(getOrangeUssdCode(country))}
+                      className="border-orange-300 hover:bg-orange-100 dark:hover:bg-orange-900"
+                      data-testid="button-copy-ussd-form"
+                    >
+                      {copiedUssd ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                  <p className="mt-2 text-xs text-orange-700 dark:text-orange-400">
+                    {getOrangeUssdHint(country)}
+                  </p>
+                </>
+              )}
             </AlertDescription>
           </Alert>
           
           <div className="space-y-2">
-            <Label>Code OTP Orange Money</Label>
+            <Label>Code OTP</Label>
             <Input
               placeholder="Entrez le code obtenu"
-              value={authCode}
-              onChange={(e) => setAuthCode(e.target.value)}
+              value={isMbiyoOtpOperator ? mbiyoOtpCode : authCode}
+              onChange={(e) => isMbiyoOtpOperator ? setMbiyoOtpCode(e.target.value) : setAuthCode(e.target.value)}
               data-testid="input-otp-form"
             />
             <p className="text-xs text-muted-foreground">
@@ -1436,7 +1459,7 @@ export default function ApiPay() {
 
       <Button
         onClick={handleSubmit}
-        disabled={initMutation.isPending || noOperatorsAvailable || (Boolean(showOrangeOtpOnForm) && !authCode.trim())}
+        disabled={initMutation.isPending || noOperatorsAvailable || (Boolean(showOtpOnForm) && !(isMbiyoOtpOperator ? mbiyoOtpCode.trim() : authCode.trim()))}
         className="w-full"
         size="lg"
         data-testid="button-submit-payment"

@@ -242,3 +242,44 @@ export const operatorRequiresOtp = (countryCode: string, operatorCode: string): 
   const operator = operators.find((op) => op.code.toLowerCase() === operatorCode.toLowerCase());
   return operator?.requiresOtp || false;
 };
+
+export const getOtpInstructionsForCountry = (countryCode: string): { ussdCode: string; instructions: string; hint: string } => {
+  const country = countryCode.toUpperCase();
+  const codes: Record<string, { ussdCode: string; instructions: string; hint: string }> = {
+    SN: {
+      ussdCode: "#144#391#",
+      instructions: "Composez #144#391# puis entrez votre code secret Orange Money pour obtenir votre code de paiement",
+      hint: "Entrez votre code secret Orange Money quand demande",
+    },
+    CI: {
+      ussdCode: "#144*82#",
+      instructions: "Composez #144*82# puis choisissez l'option 2 pour generer votre code de paiement",
+      hint: "Selectionnez l'option 2 dans le menu",
+    },
+    BF: {
+      ussdCode: "#144*4*6#",
+      instructions: "Composez #144*4*6# puis suivez les instructions pour obtenir votre code de paiement",
+      hint: "Entrez votre code secret Orange Money quand demande",
+    },
+    ML: {
+      ussdCode: "#144*8#",
+      instructions: "Composez #144*8# puis suivez les instructions pour obtenir votre code de paiement",
+      hint: "Entrez votre code secret Orange Money quand demande",
+    },
+    GN: {
+      ussdCode: "#144#",
+      instructions: "Composez #144# puis selectionnez 'Paiement marchand' pour obtenir votre code de paiement",
+      hint: "Selectionnez l'option Paiement marchand dans le menu",
+    },
+    CM: {
+      ussdCode: "#150*50#",
+      instructions: "Composez #150*50# puis suivez les instructions pour obtenir votre code de paiement",
+      hint: "Entrez votre code secret Orange Money quand demande",
+    },
+  };
+  return codes[country] || {
+    ussdCode: "#144#",
+    instructions: "Composez #144# sur votre telephone Orange pour obtenir votre code de paiement",
+    hint: "Suivez les instructions pour obtenir votre code",
+  };
+};
