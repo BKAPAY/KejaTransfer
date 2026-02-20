@@ -4953,8 +4953,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         const effectiveCustomerName = customerName || "Client";
         
-        // Calculate amount based on customerPaysFee setting - using converted amount
-        let amountForProvider: number;
+        // CRITICAL: Calculate fees on OWNER's amount (paymentLink.amount in owner's currency)
+        // NOT on the converted payer amount. This ensures netAmountForUser is in owner's currency.
         let feeAmount: number;
         let feePercentage: number;
         let netAmountForUser: number;
@@ -4963,23 +4963,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const apiLinkFeeConfig = await getDynamicFees(storage, country, operator);
         
         if (paymentLink.customerPaysFee) {
-          const feeInfo = calculateCustomerPaysFee(amountInPayerCurrency, apiLinkFeeConfig.incoming);
-          amountForProvider = feeInfo.totalForProvider;
+          const feeInfo = calculateCustomerPaysFee(paymentLink.amount, apiLinkFeeConfig.incoming);
           feeAmount = feeInfo.feeAmount;
           feePercentage = feeInfo.feePercentage;
-          netAmountForUser = feeInfo.baseAmount;
+          netAmountForUser = paymentLink.amount; // User receives full base amount in their currency
         } else {
-          const feeInfo = calculateIncomingFee(amountInPayerCurrency, apiLinkFeeConfig.incoming);
-          amountForProvider = feeInfo.grossAmount;
+          const feeInfo = calculateIncomingFee(paymentLink.amount, apiLinkFeeConfig.incoming);
           feeAmount = feeInfo.feeAmount;
           feePercentage = feeInfo.feePercentage;
-          netAmountForUser = feeInfo.netAmount;
+          netAmountForUser = feeInfo.netAmount; // User receives base - fee in their currency
         }
+        
+        // Calculate provider amount in payer's currency
+        // If customerPaysFee: provider collects converted(baseAmount + fee)
+        // If user pays fee: provider collects converted(baseAmount)
+        let amountForProvider: number;
+        if (conversionApplied) {
+          if (paymentLink.customerPaysFee) {
+            // Convert total (base + fee) to payer's currency
+            const totalInOwnerCurrency = paymentLink.amount + feeAmount;
+            const totalConversion = await convertCurrency(totalInOwnerCurrency, ownerCurrency, payerCurrency);
+            amountForProvider = totalConversion.success ? Math.floor(totalConversion.convertedAmount) : Math.floor(amountInPayerCurrency * (1 + (apiLinkFeeConfig.incoming / 1000)));
+          } else {
+            amountForProvider = Math.floor(amountInPayerCurrency); // Just the base amount converted
+          }
+        } else {
+          if (paymentLink.customerPaysFee) {
+            const feeInfo = calculateCustomerPaysFee(paymentLink.amount, apiLinkFeeConfig.incoming);
+            amountForProvider = feeInfo.totalForProvider;
+          } else {
+            amountForProvider = paymentLink.amount;
+          }
+        }
+        
+        console.log(`[PAYMENT_LINK] Paydunya fees: baseAmount=${paymentLink.amount} ${ownerCurrency}, netForUser=${netAmountForUser} ${ownerCurrency}, providerAmount=${amountForProvider} ${payerCurrency}, customerPaysFee=${paymentLink.customerPaysFee}`);
         
         const paydunyaData = {
           invoice: {
             total_amount: Math.floor(amountForProvider),
-            description: paymentLink.description || `Paiement de ${amountInPayerCurrency} ${payerCurrency}`,
+            description: paymentLink.description || `Paiement de ${paymentLink.amount} ${ownerCurrency}`,
             customer: {
               name: effectiveCustomerName,
               email: "noreply@bkapay.com",
@@ -5010,10 +5032,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await storage.createTransaction({
             userId: paymentLink.userId,
             type: "payment_link",
-            amount: amountForProvider,
+            amount: paymentLink.amount, // Store in OWNER's currency
             fee: feeAmount,
             feePercentage: feePercentage,
-            currency: payerCurrency,
+            currency: ownerCurrency, // Owner's currency for correct balance credit
             status: "pending",
             country,
             operator,
@@ -5030,10 +5052,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
               customerPaysFee: paymentLink.customerPaysFee,
               originalAmount: paymentLink.amount,
               originalCurrency: ownerCurrency,
+              providerAmount: amountForProvider,
+              providerCurrency: payerCurrency,
               convertedAmount: amountInPayerCurrency,
               conversionRate: conversionRate,
               conversionApplied: conversionApplied,
-              netAmountForUser: netAmountForUser,
+              netAmountForUser: netAmountForUser, // In OWNER's currency
+              balanceAmount: netAmountForUser,
+              balanceCurrency: ownerCurrency,
             }),
           });
 
