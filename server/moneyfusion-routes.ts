@@ -109,10 +109,13 @@ export async function handleMoneyFusionWithdrawal(
     });
     await storage.updateTransactionMetadata(tx.id, updatedMetadata);
 
+    await storage.updateTransactionStatus(tx.id, "completed");
+    console.log(`[MoneyFusion Withdrawal] Transaction ${tx.id} marked as COMPLETED (provider accepted with tokenPay: ${result.tokenPay})`);
+
     return {
       success: true,
       transactionId: tx.id,
-      message: result.message || "Operation en cours de traitement. Veuillez patienter.",
+      message: "Operation effectuee avec succes.",
     };
   } catch (error: any) {
     console.error("[MoneyFusion Withdrawal] Error:", error);
@@ -224,10 +227,13 @@ export async function handleMoneyFusionTransfer(
     });
     await storage.updateTransactionMetadata(tx.id, updatedMetadata);
 
+    await storage.updateTransactionStatus(tx.id, "completed");
+    console.log(`[MoneyFusion Transfer] Transaction ${tx.id} marked as COMPLETED (provider accepted with tokenPay: ${result.tokenPay})`);
+
     return {
       success: true,
       transactionId: tx.id,
-      message: result.message || "Operation en cours de traitement. Veuillez patienter.",
+      message: "Operation effectuee avec succes.",
     };
   } catch (error: any) {
     console.error("[MoneyFusion Transfer] Error:", error);
