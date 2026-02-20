@@ -153,8 +153,13 @@ export async function handleMbiyoPayWithdrawal(
     }
 
     const grossAmount = Math.floor(amount);
-    const providerCurrency = getCurrencyForCountry(country);
+    const defaultCurrency = getCurrencyForCountry(country);
+    const { getMbiyoPayCurrenciesForCountry } = await import("@shared/mbiyopay-countries");
+    const supportedCurrencies = getMbiyoPayCurrenciesForCountry(country.toUpperCase());
+    const providerCurrency = (userCurrency && supportedCurrencies.includes(userCurrency)) ? userCurrency : defaultCurrency;
     const balanceCurrency = userCurrency || providerCurrency;
+    
+    console.log(`[MbiyoPay Withdrawal] Currency selection: userCurrency=${userCurrency}, defaultCurrency=${defaultCurrency}, supportedCurrencies=${supportedCurrencies.join(",")}, providerCurrency=${providerCurrency}`);
     
     const feeConfig = await getFeeFromDatabase(storage, "mbiyopay", country, operator);
     const feeInfo = calculateOutgoingFee(grossAmount, feeConfig.outgoing);
@@ -326,8 +331,13 @@ export async function handleMbiyoPayTransfer(
     }
 
     const netAmount = Math.floor(amount);
-    const providerCurrency = getCurrencyForCountry(country);
+    const defaultCurrency = getCurrencyForCountry(country);
+    const { getMbiyoPayCurrenciesForCountry } = await import("@shared/mbiyopay-countries");
+    const supportedCurrencies = getMbiyoPayCurrenciesForCountry(country.toUpperCase());
+    const providerCurrency = (userCurrency && supportedCurrencies.includes(userCurrency)) ? userCurrency : defaultCurrency;
     const balanceCurrency = userCurrency || providerCurrency;
+    
+    console.log(`[MbiyoPay Transfer] Currency selection: userCurrency=${userCurrency}, defaultCurrency=${defaultCurrency}, supportedCurrencies=${supportedCurrencies.join(",")}, providerCurrency=${providerCurrency}`);
     
     const feeConfig = await getFeeFromDatabase(storage, "mbiyopay", country, operator);
     const feeInfo = calculateOutgoingFee(netAmount, feeConfig.outgoing);
