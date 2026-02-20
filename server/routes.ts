@@ -5257,11 +5257,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`[MERCHANT_LINK] Using Paydunya SOFTPAY for ${country}/${operator}`);
         
         const effectiveCustomerName = customerName || "Client";
+        const providerCurrency = "XOF";
+        
+        // CRITICAL: Calculate base amount in owner's currency for balance credit
+        const baseAmountInOwnerCurrency = originalAmount ? Math.floor(originalAmount) : Math.floor(amount);
+        
+        // Convert amount to provider currency (XOF) if needed
+        let convertedAmountForProvider = Math.floor(amount);
+        if (ownerCurrency !== providerCurrency && !originalAmount) {
+          const { convertCurrency: convertCurrencyFn } = await import("./currency-converter");
+          const conversionResult = await convertCurrencyFn(baseAmountInOwnerCurrency, ownerCurrency, providerCurrency);
+          if (conversionResult.success) {
+            convertedAmountForProvider = Math.floor(conversionResult.convertedAmount);
+          }
+        }
         
         const paydunyaData = {
           invoice: {
-            total_amount: Math.floor(amount),
-            description: `Paiement ${merchantLink.merchantName} - ${amount} XOF`,
+            total_amount: convertedAmountForProvider,
+            description: `Paiement ${merchantLink.merchantName} - ${baseAmountInOwnerCurrency} ${ownerCurrency}`,
             customer: {
               name: effectiveCustomerName,
               email: "noreply@bkapay.com",
@@ -5287,19 +5301,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const paydunyaResponse = await callPaydunyaAPI("/checkout-invoice/create", paydunyaData);
 
         if (paydunyaResponse.response_code === "00" && paydunyaResponse.token) {
-          // Calculate fees for INCOMING payment with dynamic fee from database (auto-detect active provider)
-          const grossAmount = Math.floor(amount);
+          // Calculate fees on the OWNER's currency amount (not the provider XOF amount)
           const merchantPaydunyaFeeConfig = await getDynamicFees(storage, country, operator);
-          const feeInfo = calculateIncomingFee(grossAmount, merchantPaydunyaFeeConfig.incoming);
+          const feeInfo = calculateIncomingFee(baseAmountInOwnerCurrency, merchantPaydunyaFeeConfig.incoming);
           
           const transactionId = randomUUID();
           await storage.createTransaction({
             userId: merchantLink.userId,
             type: "merchant_link",
-            amount: feeInfo.grossAmount,
+            amount: baseAmountInOwnerCurrency,
             fee: feeInfo.feeAmount,
             feePercentage: feeInfo.feePercentage,
-            currency: "XOF",
+            currency: ownerCurrency,
             status: "pending",
             country,
             operator,
@@ -5313,6 +5326,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
               customerName: effectiveCustomerName,
               provider: "paydunya",
               merchantLinkId: merchantLink.id,
+              netAmountForUser: feeInfo.netAmount,
+              providerAmount: convertedAmountForProvider,
+              providerCurrency: providerCurrency,
+              balanceAmount: feeInfo.netAmount,
+              balanceCurrency: ownerCurrency,
             }),
           });
 
