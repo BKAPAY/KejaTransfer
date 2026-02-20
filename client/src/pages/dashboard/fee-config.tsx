@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { FeeConfig } from "@shared/schema";
 import { MBIYOPAY_COUNTRIES } from "@shared/mbiyopay-countries";
 import { FEDAPAY_COUNTRIES } from "@shared/fedapay-countries";
+import { MONEYFUSION_COUNTRIES } from "@shared/moneyfusion-countries";
 
 interface ProviderCountry {
   code: string;
@@ -137,6 +138,16 @@ const PROVIDERS: ProviderInfo[] = [
         { code: "moov", name: "Moov Money" },
       ]},
     ],
+  },
+  {
+    id: "moneyfusion",
+    name: "MoneyFusion",
+    color: "bg-rose-500",
+    countries: MONEYFUSION_COUNTRIES.map(c => ({
+      code: c.code,
+      name: c.name,
+      operators: c.operators.map(op => ({ code: op.code, name: op.name })),
+    })),
   },
   {
     id: "paydunya",
