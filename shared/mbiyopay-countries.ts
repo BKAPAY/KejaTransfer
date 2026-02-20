@@ -147,7 +147,7 @@ export const MBIYOPAY_COUNTRIES: MbiyoPayCountry[] = [
     phoneDigits: 9,
     phoneFormat: "XXXXXXXXX",
     currency: "CDF",
-    currencies: ["CDF", "USD"],
+    currencies: ["CDF"],
     operators: [
       { code: "mpesa", name: "M-Pesa", requiresOtp: false, requiresRedirect: false, payin: true, payout: true },
       { code: "airtel", name: "Airtel Money", requiresOtp: false, requiresRedirect: false, payin: true, payout: true },
