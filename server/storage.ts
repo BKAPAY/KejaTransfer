@@ -1425,6 +1425,26 @@ export class DbStorage implements IStorage {
           .catch(() => {});
       }
     }
+
+    // Initialize MoneyFusion (payout-only)
+    const { MONEYFUSION_COUNTRIES } = await import("@shared/moneyfusion-countries");
+    for (const country of MONEYFUSION_COUNTRIES) {
+      for (const operator of country.operators) {
+        const key = `moneyfusion-${country.code}-${operator.code}`;
+        if (existingSet.has(key)) continue;
+        
+        await db
+          .insert(schema.countryOperatorConfig)
+          .values({
+            provider: "moneyfusion",
+            country: country.code,
+            operator: operator.code,
+            incomingEnabled: false,
+            outgoingEnabled: false,
+          })
+          .catch(() => {});
+      }
+    }
   }
 
   // Country Status Methods (for country-level payin/payout control per provider)
@@ -1555,6 +1575,23 @@ export class DbStorage implements IStorage {
         .insert(schema.countryStatus)
         .values({
           provider: "nowpayments",
+          country: country.code,
+          payinEnabled: false,
+          payoutEnabled: false,
+        })
+        .catch(() => {});
+    }
+
+    // Initialize MoneyFusion countries (payout-only)
+    const { MONEYFUSION_COUNTRIES } = await import("@shared/moneyfusion-countries");
+    for (const country of MONEYFUSION_COUNTRIES) {
+      const key = `moneyfusion-${country.code}`;
+      if (existingSet.has(key)) continue;
+      
+      await db
+        .insert(schema.countryStatus)
+        .values({
+          provider: "moneyfusion",
           country: country.code,
           payinEnabled: false,
           payoutEnabled: false,
