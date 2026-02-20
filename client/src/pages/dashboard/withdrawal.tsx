@@ -513,23 +513,28 @@ export default function Withdrawal() {
                                 }).format(feeInfo.amountReceived)}
                               </span>
                             </div>
-                            {needsConversion && conversionData && !conversionData.isLoading && (
-                              <div className="flex justify-between font-semibold text-blue-600 dark:text-blue-400">
-                                <span>Equivalent en {conversionData.targetCurrency}:</span>
-                                <span data-testid="text-converted-amount">
-                                  {new Intl.NumberFormat("fr-FR", {
-                                    style: "currency",
-                                    currency: conversionData.targetCurrency,
-                                    minimumFractionDigits: getCurrencyDecimals(conversionData.targetCurrency),
-                                    maximumFractionDigits: getCurrencyDecimals(conversionData.targetCurrency),
-                                  }).format(conversionData.convertedAmount)}
-                                </span>
+                            {needsConversion && conversionData && !conversionData.isLoading && conversionData.convertedAmount > 0 && (
+                              <div className="bg-blue-50 dark:bg-blue-950/30 p-3 rounded-md">
+                                <div className="flex justify-between font-semibold text-blue-700 dark:text-blue-400">
+                                  <span>Equivalent en {conversionData.targetCurrency}:</span>
+                                  <span data-testid="text-converted-amount">
+                                    {new Intl.NumberFormat("fr-FR", {
+                                      style: "currency",
+                                      currency: conversionData.targetCurrency,
+                                      minimumFractionDigits: getCurrencyDecimals(conversionData.targetCurrency),
+                                      maximumFractionDigits: getCurrencyDecimals(conversionData.targetCurrency),
+                                    }).format(conversionData.convertedAmount)}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Taux: 1 {userBalanceCurrency} = {conversionData.conversionRate.toFixed(6)} {conversionData.targetCurrency}
+                                </p>
                               </div>
                             )}
-                            {needsConversion && conversionData?.isLoading && (
+                            {needsConversion && (conversionData?.isLoading || !conversionData) && (
                               <div className="flex items-center gap-2 text-muted-foreground">
                                 <Loader2 className="h-3 w-3 animate-spin" />
-                                <span className="text-xs">Calcul de la conversion...</span>
+                                <span className="text-xs">Calcul de la conversion {userBalanceCurrency} → {withdrawalCurrency}...</span>
                               </div>
                             )}
                             <div className="border-t pt-2 flex justify-between">
@@ -542,11 +547,6 @@ export default function Withdrawal() {
                                 }).format(feeInfo.totalDeductedFromBalance)}
                               </span>
                             </div>
-                            {needsConversion && conversionData && !conversionData.isLoading && (
-                              <p className="text-xs text-muted-foreground">
-                                Taux: 1 {userBalanceCurrency} = {conversionData.conversionRate.toFixed(6)} {conversionData.targetCurrency}
-                              </p>
-                            )}
                           </div>
                         </div>
                       </div>

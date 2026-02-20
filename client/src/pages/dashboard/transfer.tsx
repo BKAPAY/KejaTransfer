@@ -177,15 +177,21 @@ export default function Transfer() {
 
   const transferMutation = useMutation({
     mutationFn: async (data: { formData: TransferFormData; securityCode: string }) => {
-      // Always send the original amount in user's currency - backend handles conversion
+      const providerAmount = needsConversion && conversionData?.convertedAmount 
+        ? conversionData.convertedAmount 
+        : data.formData.amount;
+      const providerCurrency = needsConversion && conversionData?.targetCurrency
+        ? conversionData.targetCurrency
+        : targetCurrency;
+      
       const res = await apiRequest("POST", "/api/fedapay/withdrawal", {
-        amount: data.formData.amount, // Original amount in user's currency
+        amount: providerAmount,
         phone: data.formData.phone,
         country: data.formData.country,
         operator: data.formData.operator,
         type: "transfer",
         securityCode: data.securityCode,
-        currency: userBalanceCurrency, // User's currency (e.g., CDF)
+        currency: providerCurrency,
         originalAmount: data.formData.amount,
         originalCurrency: userBalanceCurrency,
       });
@@ -516,9 +522,9 @@ export default function Transfer() {
                                 }).format(amount + feeInfo.feeAmount)}
                               </span>
                             </div>
-                            {needsConversion && conversionData && !conversionData.isLoading && (
-                              <div className="border-t pt-2 mt-2">
-                                <div className="flex justify-between text-green-600 dark:text-green-400 font-semibold">
+                            {needsConversion && conversionData && !conversionData.isLoading && conversionData.convertedAmount > 0 && (
+                              <div className="border-t pt-2 mt-2 bg-green-50 dark:bg-green-950/30 p-3 rounded-md">
+                                <div className="flex justify-between text-green-700 dark:text-green-400 font-semibold">
                                   <span>Destinataire recevra:</span>
                                   <span data-testid="text-converted-amount">
                                     {new Intl.NumberFormat("fr-FR", {
@@ -534,10 +540,10 @@ export default function Transfer() {
                                 </p>
                               </div>
                             )}
-                            {needsConversion && conversionData?.isLoading && (
+                            {needsConversion && (conversionData?.isLoading || !conversionData) && (
                               <div className="border-t pt-2 mt-2 flex items-center gap-2 text-muted-foreground">
                                 <Loader2 className="h-3 w-3 animate-spin" />
-                                <span className="text-xs">Calcul de la conversion...</span>
+                                <span className="text-xs">Calcul de la conversion {userBalanceCurrency} → {targetCurrency}...</span>
                               </div>
                             )}
                           </div>
