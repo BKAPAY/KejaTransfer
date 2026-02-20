@@ -485,6 +485,33 @@ async function processMbiyoPayTransaction(transaction: Transaction & { user?: Us
   }
 }
 
+async function processMoneyFusionPayout(transaction: Transaction & { user?: User }, metadata: any): Promise<boolean> {
+  const tokenPay = metadata.moneyFusionTokenPay;
+  const age = getTransactionAge(transaction);
+  const ageMinutes = Math.round(age / 60000);
+
+  if (!tokenPay) {
+    console.log(`[PaymentPolling] MoneyFusion payout ${transaction.id} - no tokenPay, waiting for webhook`);
+    return false;
+  }
+
+  const logIntervalMs = 60000;
+  const lastLogTime = metadata._lastMfLogTime || 0;
+  const now = Date.now();
+  if (now - lastLogTime < logIntervalMs) {
+    return false;
+  }
+
+  try {
+    const updatedMeta = { ...metadata, _lastMfLogTime: now };
+    await storage.updateTransactionMetadata(transaction.id, JSON.stringify(updatedMeta));
+  } catch (e) {}
+
+  console.log(`[PaymentPolling] MoneyFusion payout ${transaction.id} (tokenPay: ${tokenPay}) still pending - age: ${ageMinutes}min - waiting for webhook callback`);
+
+  return false;
+}
+
 async function processFedaPayPayout(transaction: Transaction & { user?: User }, metadata: any): Promise<boolean> {
   const fedapayPayoutId = metadata.fedapayPayoutId;
   const transactionAge = getTransactionAge(transaction);
@@ -628,11 +655,8 @@ async function processTransaction(transaction: Transaction & { user?: User }): P
   }
 
   // Check if this is a MoneyFusion transaction (payout only)
-  // MoneyFusion transactions have NO timeout - they stay pending until webhook confirms
   if (metadata.paymentProvider === "moneyfusion" || metadata.moneyFusionTokenPay) {
-    const age = getTransactionAge(transaction);
-    const ageMinutes = Math.round(age / 60000);
-    console.log(`[PaymentPolling] MoneyFusion payout transaction ${transaction.id} (tokenPay: ${metadata.moneyFusionTokenPay || 'unknown'}) still pending - age: ${ageMinutes}min - waiting for webhook (no timeout)`);
+    await processMoneyFusionPayout(transaction, metadata);
     return;
   }
 

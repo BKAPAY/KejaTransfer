@@ -131,6 +131,51 @@ export async function createMoneyFusionPayout(params: MoneyFusionPayoutParams): 
   }
 }
 
+export interface MoneyFusionPayoutStatusResult {
+  success: boolean;
+  status?: "pending" | "paid" | "failure" | "no paid";
+  tokenPay?: string;
+  montant?: number;
+  moyen?: string;
+  error?: string;
+}
+
+export async function checkMoneyFusionPayoutStatus(tokenPay: string): Promise<MoneyFusionPayoutStatusResult> {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+
+    let response: Response;
+    try {
+      response = await fetch(`https://www.pay.moneyfusion.net/paiementNotif/${tokenPay}`, {
+        method: "GET",
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    const data = await response.json();
+    console.log(`[MoneyFusion StatusCheck] tokenPay=${tokenPay} response:`, JSON.stringify(data));
+
+    if (data.statut === true && data.data) {
+      const paymentStatus = (data.data.statut || "").toLowerCase();
+      return {
+        success: true,
+        status: paymentStatus as any,
+        tokenPay: data.data.tokenPay,
+        montant: data.data.Montant,
+        moyen: data.data.moyen,
+      };
+    }
+
+    return { success: false, error: data.message || "Unknown error" };
+  } catch (error: any) {
+    console.error(`[MoneyFusion StatusCheck] Error for tokenPay=${tokenPay}:`, error.message);
+    return { success: false, error: error.message };
+  }
+}
+
 export interface MoneyFusionWebhookPayload {
   event: string;
   tokenPay: string;
@@ -142,25 +187,26 @@ export interface MoneyFusionWebhookPayload {
 }
 
 export function validateMoneyFusionWebhook(payload: any): MoneyFusionWebhookPayload | null {
-  if (!payload || !payload.event || !payload.tokenPay) {
-    console.error("[MoneyFusion Webhook] Invalid payload - missing event or tokenPay");
+  if (!payload || !payload.tokenPay) {
+    console.error("[MoneyFusion Webhook] Invalid payload - missing tokenPay");
     return null;
   }
 
-  const validEvents = ["payout.session.completed", "payout.session.cancelled"];
-  if (!validEvents.includes(payload.event)) {
-    console.error(`[MoneyFusion Webhook] Unknown event: ${payload.event}`);
+  const event = payload.event || "";
+  const validEvents = ["payout.session.completed", "payout.session.cancelled", "payout.session.pending"];
+  if (event && !validEvents.includes(event)) {
+    console.error(`[MoneyFusion Webhook] Unknown event: ${event}`);
     return null;
   }
 
   return {
-    event: payload.event,
+    event: event,
     tokenPay: payload.tokenPay,
-    montant: payload.montant,
-    numeroRetrait: payload.numeroRetrait,
-    moyen: payload.moyen,
+    montant: payload.montant || payload.Montant,
+    numeroRetrait: payload.numeroRetrait || payload.numeroSend || "",
+    moyen: payload.moyen || "",
     webhook_url: payload.webhook_url,
-    createdAt: payload.createdAt,
+    createdAt: payload.createdAt || "",
   };
 }
 
