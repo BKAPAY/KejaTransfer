@@ -75,6 +75,13 @@ const PROVIDER_INFO = {
     fields: ["apiKey", "publicKey"],
     countries: "11 pays (Bénin, BF, CI, Sénégal, Togo, Mali, Guinée, Cameroun, Congo, RDC, Gambie)",
   },
+  moneyfusion: {
+    name: "MoneyFusion",
+    description: "Passerelle de paiement sortant (retraits/transferts) pour 24 pays africains",
+    color: "bg-rose-500",
+    fields: ["apiKey"],
+    countries: "24 pays (CI, SN, BF, BJ, TG, ML, CM, CD, GA, GN, GM, GH, etc.)",
+  },
   nowpayments: {
     name: "NOWPayments",
     description: "Paiements en cryptomonnaies (Bitcoin, Ethereum, USDT, etc.)",
@@ -123,6 +130,9 @@ const getFieldLabel = (provider: string, field: string): string => {
   if (provider === "mbiyopay") {
     if (field === "apiKey") return "Clé API Merchant MbiyoPay (Bearer Token)";
     if (field === "publicKey") return "Clé Publique MbiyoPay";
+  }
+  if (provider === "moneyfusion") {
+    if (field === "apiKey") return "Clé Privée MoneyFusion (moneyfusion-private-key)";
   }
   if (provider === "exchangerate") {
     if (field === "apiKey") return "Clé API ExchangeRate (exchangerate-api.com)";
@@ -278,6 +288,7 @@ export default function FournisseursPage() {
     paydunya: { apiKey: "", secretKey: "", publicKey: "", masterKey: "", token: "", ipnSecret: "" },
     fedapay: { apiKey: "", secretKey: "", publicKey: "", masterKey: "", token: "", ipnSecret: "" },
     mbiyopay: { apiKey: "", secretKey: "", publicKey: "", masterKey: "", token: "", ipnSecret: "" },
+    moneyfusion: { apiKey: "", secretKey: "", publicKey: "", masterKey: "", token: "", ipnSecret: "" },
     nowpayments: { apiKey: "", secretKey: "", publicKey: "", masterKey: "", token: "", ipnSecret: "" },
     exchangerate: { apiKey: "", secretKey: "", publicKey: "", masterKey: "", token: "", ipnSecret: "" },
     mailtrap: { apiKey: "", secretKey: "", publicKey: "", masterKey: "", token: "", ipnSecret: "", enableKycSubmitted: "", enableKycVerified: "", enableKycRejected: "" },

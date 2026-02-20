@@ -620,6 +620,15 @@ async function processTransaction(transaction: Transaction & { user?: User }): P
     return;
   }
 
+  // Check if this is a MoneyFusion transaction (payout only)
+  // MoneyFusion transactions have NO timeout - they stay pending until webhook confirms
+  if (metadata.paymentProvider === "moneyfusion" || metadata.moneyFusionTokenPay) {
+    const age = getTransactionAge(transaction);
+    const ageMinutes = Math.round(age / 60000);
+    console.log(`[PaymentPolling] MoneyFusion payout transaction ${transaction.id} (tokenPay: ${metadata.moneyFusionTokenPay || 'unknown'}) still pending - age: ${ageMinutes}min - waiting for webhook (no timeout)`);
+    return;
+  }
+
   // Check if this is a MbiyoPay transaction
   if (metadata.mbiyopayTransactionId || metadata.paymentProvider === "mbiyopay") {
     if (metadata.adminReviewPending) {

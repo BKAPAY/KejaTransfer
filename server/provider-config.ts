@@ -206,6 +206,28 @@ export async function getNowPaymentsConfig(): Promise<NowPaymentsConfig | null> 
   };
 }
 
+export interface MoneyFusionConfig {
+  apiKey: string;
+}
+
+export async function getMoneyFusionConfig(): Promise<MoneyFusionConfig | null> {
+  const config = await storage.getProviderConfig("moneyfusion");
+
+  if (!config || !config.isActive) {
+    console.log("[Provider Config] MoneyFusion is not active or not configured");
+    return null;
+  }
+
+  if (!config.apiKey) {
+    console.log("[Provider Config] MoneyFusion API key is missing");
+    return null;
+  }
+
+  return {
+    apiKey: config.apiKey,
+  };
+}
+
 export async function isProviderActive(provider: string): Promise<boolean> {
   const config = await storage.getProviderConfig(provider);
   return config?.isActive ?? false;

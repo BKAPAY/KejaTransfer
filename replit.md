@@ -24,7 +24,7 @@ The frontend uses React 18 with TypeScript, Shadcn UI, and Tailwind CSS for a pr
 - **Database**: PostgreSQL storing `users`, `payment_links`, `merchant_links`, `api_keys`, and `transactions` with various statuses.
 - **Authentication**: Persistent sessions using `connect-pg-simple`, configured for production environments (`app.set("trust proxy", 1)`, `sameSite: 'lax'`).
 - **Automatic Database Migrations**: `db-bootstrap.ts` script handles Drizzle ORM migrations on startup with intelligent reconciliation and SHA256 hash verification.
-- **Multi-Provider System**: Supports AfribaPay, Paydunya, FedaPay, MbiyoPay, and NOWPayments (cryptocurrency) with mutual exclusivity per country (for both payin and payout).
+- **Multi-Provider System**: Supports AfribaPay, Paydunya, FedaPay, MbiyoPay, MoneyFusion (payout-only), and NOWPayments (cryptocurrency) with mutual exclusivity per country (for both payin and payout).
 - **Payment Gateway Integration**: FedaPay is a primary gateway for collect (incoming) and payout (outgoing) payments across 7 countries. Payments involve FedaPay redirect and webhook/polling confirmation.
 - **Withdrawal Flows**: Utilizes FedaPay Payout API, including KYC validation, balance checks, and phone number sanitization. Transfer and Withdrawal pages feature a `PaymentMethodSelector` toggle between Mobile Money and Cryptocurrency options.
 - **Crypto Withdrawals/Transfers (NOWPayments)**: Users can withdraw or transfer funds to a crypto wallet address via the `CryptoWithdrawalFlow` component. Backend validates security code, crypto minimums, wallet address, and balance, then automatically calls the NOWPayments Payout API (`POST /v1/payout`) to initiate the withdrawal. If the API call fails, the user's balance is refunded. A dedicated webhook (`POST /api/webhooks/nowpayments/payout`) handles payout status notifications (FINISHED, FAILED, etc.) with mandatory IPN signature verification and idempotent processing to prevent double refunds. Transaction metadata stores `payoutId` and `payoutWithdrawalId` for tracking.
@@ -52,6 +52,7 @@ The frontend uses React 18 with TypeScript, Shadcn UI, and Tailwind CSS for a pr
 - **Paydunya API**: Payment gateway.
 - **FedaPay API**: Payment gateway.
 - **MbiyoPay API**: Payment gateway.
+- **MoneyFusion API**: Payout-only payment gateway (24 countries, withdrawals/transfers only).
 - **NOWPayments API**: Cryptocurrency payment gateway.
 - **PostgreSQL**: Primary database.
 - **Drizzle ORM**: Database interactions.

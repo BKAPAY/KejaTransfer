@@ -91,6 +91,15 @@ import {
   mapAfribaPayStatus,
   getAfribaPayConfig,
 } from "./afribapay";
+import {
+  handleMoneyFusionWithdrawal,
+  handleMoneyFusionTransfer,
+} from "./moneyfusion-routes";
+import {
+  validateMoneyFusionWebhook,
+  isMoneyFusionPayoutCompleted,
+  isMoneyFusionPayoutFailed,
+} from "./moneyfusion";
 import { AFRIBAPAY_COUNTRIES, getCurrencyForCountry as getAfribaCurrency, getPaymentInstructions as getAfribaPaymentInstructions } from "@shared/afribapay-countries";
 
 declare module "express-session" {
@@ -4042,6 +4051,90 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(result);
   });
 
+  // ===== MoneyFusion Payout Webhook =====
+  app.post("/api/webhooks/moneyfusion/payout", async (req: Request, res: Response) => {
+    try {
+      console.log("[MoneyFusion Webhook] Received:", JSON.stringify(req.body));
+
+      const mfConfig = await storage.getProviderConfig("moneyfusion");
+      if (mfConfig?.ipnSecret) {
+        const webhookSignature = req.headers["x-moneyfusion-signature"] || req.headers["moneyfusion-signature"];
+        if (webhookSignature && webhookSignature !== mfConfig.ipnSecret) {
+          console.error("[MoneyFusion Webhook] Signature mismatch - rejecting");
+          return res.status(403).json({ error: "Invalid signature" });
+        }
+      }
+
+      const payload = validateMoneyFusionWebhook(req.body);
+      if (!payload) {
+        console.error("[MoneyFusion Webhook] Invalid payload");
+        return res.status(400).json({ error: "Invalid webhook payload" });
+      }
+
+      const { event, tokenPay, montant, createdAt } = payload;
+      console.log(`[MoneyFusion Webhook] Event: ${event}, tokenPay: ${tokenPay}, montant: ${montant}`);
+
+      const allPending = await storage.getAllPendingTransactions();
+      let matchedTx = null;
+
+      for (const tx of allPending) {
+        if (!tx.metadata) continue;
+        try {
+          const meta = JSON.parse(tx.metadata);
+          if (meta.paymentProvider === "moneyfusion" && meta.moneyFusionTokenPay === tokenPay) {
+            matchedTx = tx;
+            break;
+          }
+        } catch (e) {}
+      }
+
+      if (!matchedTx) {
+        console.log(`[MoneyFusion Webhook] No matching transaction for tokenPay: ${tokenPay}`);
+        return res.json({ received: true, matched: false });
+      }
+
+      console.log(`[MoneyFusion Webhook] Matched transaction: ${matchedTx.id}, type: ${matchedTx.type}`);
+
+      let meta: any = {};
+      try { meta = JSON.parse(matchedTx.metadata || "{}"); } catch (e) {}
+
+      if (isMoneyFusionPayoutCompleted(event)) {
+        const providerAmount = meta.providerAmount || 0;
+        if (montant && providerAmount && montant !== providerAmount) {
+          console.error(`[MoneyFusion Webhook] AMOUNT MISMATCH: webhook=${montant}, expected=${providerAmount} for tx ${matchedTx.id} - REJECTING`);
+          return res.status(400).json({ received: true, matched: true, error: "amount_mismatch" });
+        }
+
+        if (createdAt) {
+          const webhookTime = new Date(createdAt).getTime();
+          const txStartTime = meta.startTime || new Date(matchedTx.createdAt).getTime();
+          if (webhookTime < txStartTime - 60000) {
+            console.error(`[MoneyFusion Webhook] TIME MISMATCH: webhook createdAt=${createdAt} is before transaction start for tx ${matchedTx.id}`);
+            return res.json({ received: true, matched: true, warning: "time_mismatch" });
+          }
+        }
+
+        await storage.updateTransactionStatus(matchedTx.id, "completed");
+        console.log(`[MoneyFusion Webhook] Transaction ${matchedTx.id} marked as COMPLETED`);
+      } else if (isMoneyFusionPayoutFailed(event)) {
+        await storage.updateTransactionStatus(matchedTx.id, "failed");
+
+        const deductedAmount = meta.deductedFromBalance || meta.totalDebited || 0;
+        if (deductedAmount > 0 && matchedTx.userId) {
+          await storage.updateUserBalance(matchedTx.userId, deductedAmount);
+          console.log(`[MoneyFusion Webhook] Refunded ${deductedAmount} to user ${matchedTx.userId}`);
+        }
+
+        console.log(`[MoneyFusion Webhook] Transaction ${matchedTx.id} marked as FAILED, balance refunded`);
+      }
+
+      return res.json({ received: true, matched: true, processed: true });
+    } catch (error) {
+      console.error("[MoneyFusion Webhook] Error:", error);
+      return res.status(500).json({ error: "Webhook processing error" });
+    }
+  });
+
   // ===== Currency Conversion Route =====
   app.post("/api/convert-currency", async (req: Request, res: Response) => {
     try {
@@ -4756,6 +4849,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
             transactionId: result.transactionId,
             message: result.message || (isTransfer ? "Transfert effectue avec succes" : "Retrait effectue avec succes"),
             provider: "afribapay",
+          });
+        } else {
+          return res.status(400).json({ success: false, error: result.error });
+        }
+      } else if (activeProvider === "moneyfusion") {
+        console.log(`[WITHDRAWAL] Using MoneyFusion for ${country}/${operator}, userCurrency=${userCurrency}`);
+        
+        const result = isTransfer 
+          ? await handleMoneyFusionTransfer(req.session.userId!, user, amount, country, operator, phone, userCurrency)
+          : await handleMoneyFusionWithdrawal(req.session.userId!, user, amount, country, operator, phone, userCurrency);
+
+        if (result.success) {
+          return res.json({
+            success: true,
+            transactionId: result.transactionId,
+            message: result.message || (isTransfer ? "Transfert en cours de traitement" : "Retrait en cours de traitement"),
           });
         } else {
           return res.status(400).json({ success: false, error: result.error });
@@ -8248,6 +8357,10 @@ SUPPORT ET CONTACT:
                 const result = await handleAfribaPayWithdrawal(userId, user, Math.floor(amount), country, operator, sanitizedPhone, userCurrencyW);
                 if (result.success) return JSON.stringify({ success: true, message: `Retrait envoyé avec succès. Transaction ID: ${result.transactionId}` });
                 return JSON.stringify({ success: false, error: result.error || "Erreur lors du retrait" });
+              } else if (activeProviderW === "moneyfusion") {
+                const result = await handleMoneyFusionWithdrawal(userId, user, Math.floor(amount), country, operator, sanitizedPhone, userCurrencyW);
+                if (result.success) return JSON.stringify({ success: true, message: `Retrait envoyé avec succès. Transaction ID: ${result.transactionId}` });
+                return JSON.stringify({ success: false, error: result.error || "Erreur lors du retrait" });
               }
 
               return JSON.stringify({ success: false, error: "Cette opération n'est pas disponible actuellement. Veuillez réessayer plus tard." });
@@ -8354,6 +8467,10 @@ SUPPORT ET CONTACT:
                 return JSON.stringify({ success: false, error: result.error || "Erreur lors du transfert" });
               } else if (activeProviderT === "afribapay") {
                 const result = await handleAfribaPayTransfer(userId, user, Math.floor(amount), country, operator, sanitizedPhoneT, userCurrencyT);
+                if (result.success) return JSON.stringify({ success: true, message: `Transfert envoyé avec succès. Transaction ID: ${result.transactionId}` });
+                return JSON.stringify({ success: false, error: result.error || "Erreur lors du transfert" });
+              } else if (activeProviderT === "moneyfusion") {
+                const result = await handleMoneyFusionTransfer(userId, user, Math.floor(amount), country, operator, sanitizedPhoneT, userCurrencyT);
                 if (result.success) return JSON.stringify({ success: true, message: `Transfert envoyé avec succès. Transaction ID: ${result.transactionId}` });
                 return JSON.stringify({ success: false, error: result.error || "Erreur lors du transfert" });
               }
