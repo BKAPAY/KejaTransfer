@@ -19,7 +19,7 @@ import { calculateOutgoingFee, fetchFeeConfig, formatFeePercentage } from "@/lib
 import { useLocation } from "wouter";
 import { CurrencySelector, getCurrencyLabel } from "@/components/currency-selector";
 import { OperatorSelector } from "@/components/operator-selector";
-import { hasMultipleCurrencies, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
+import { hasMultiplePayoutCurrencies, getMbiyoPayPayoutCurrenciesForCountry } from "@shared/mbiyopay-countries";
 import { useConvertedMinimums } from "@/hooks/use-converted-minimums";
 import { getCurrencyDecimals } from "@/lib/currency";
 import { PaymentMethodSelector } from "@/components/payment-method-selector";
@@ -101,8 +101,8 @@ export default function Withdrawal() {
 
   // Handle currency selection when country changes
   useEffect(() => {
-    if (userCountry && hasMultipleCurrencies(userCountry)) {
-      const currencies = getMbiyoPayCurrenciesForCountry(userCountry);
+    if (userCountry && hasMultiplePayoutCurrencies(userCountry)) {
+      const currencies = getMbiyoPayPayoutCurrenciesForCountry(userCountry);
       setSelectedCurrency(currencies[0]);
     } else if (userCountry) {
       const countryCurrency = COUNTRIES.find(c => c.code === userCountry)?.currency || "XOF";
@@ -113,7 +113,7 @@ export default function Withdrawal() {
   // Currency conversion: user balance currency -> withdrawal currency
   // IMPORTANT: Only calculate withdrawal currency if user country is defined
   const withdrawalCurrency = userCountry 
-    ? (hasMultipleCurrencies(userCountry) 
+    ? (hasMultiplePayoutCurrencies(userCountry) 
         ? selectedCurrency 
         : (COUNTRIES.find(c => c.code === userCountry)?.currency || userBalanceCurrency))
     : userBalanceCurrency; // Default to user's currency when country not loaded
@@ -448,11 +448,12 @@ export default function Withdrawal() {
                       </p>
                     </div>
 
-                    {hasMultipleCurrencies(userCountry) && (
+                    {hasMultiplePayoutCurrencies(userCountry) && (
                       <CurrencySelector
                         countryCode={userCountry}
                         selectedCurrency={selectedCurrency}
                         onCurrencyChange={setSelectedCurrency}
+                        mode="payout"
                       />
                     )}
 

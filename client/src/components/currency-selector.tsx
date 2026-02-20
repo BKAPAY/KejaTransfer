@@ -1,12 +1,13 @@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { MBIYOPAY_CURRENCY_INFO, getMbiyoPayCurrenciesForCountry, hasMultipleCurrencies } from "@shared/mbiyopay-countries";
+import { MBIYOPAY_CURRENCY_INFO, getMbiyoPayCurrenciesForCountry, getMbiyoPayPayoutCurrenciesForCountry, hasMultipleCurrencies, hasMultiplePayoutCurrencies } from "@shared/mbiyopay-countries";
 
 interface CurrencySelectorProps {
   countryCode: string;
   selectedCurrency: string;
   onCurrencyChange: (currency: string) => void;
   className?: string;
+  mode?: "payin" | "payout";
 }
 
 export function CurrencySelector({
@@ -14,12 +15,19 @@ export function CurrencySelector({
   selectedCurrency,
   onCurrencyChange,
   className = "",
+  mode = "payin",
 }: CurrencySelectorProps) {
-  if (!hasMultipleCurrencies(countryCode)) {
+  const hasMultiple = mode === "payout" 
+    ? hasMultiplePayoutCurrencies(countryCode)
+    : hasMultipleCurrencies(countryCode);
+
+  if (!hasMultiple) {
     return null;
   }
 
-  const currencies = getMbiyoPayCurrenciesForCountry(countryCode);
+  const currencies = mode === "payout"
+    ? getMbiyoPayPayoutCurrenciesForCountry(countryCode)
+    : getMbiyoPayCurrenciesForCountry(countryCode);
 
   return (
     <div className={`space-y-2 ${className}`}>

@@ -16,6 +16,7 @@ export interface MbiyoPayCountry {
   phoneFormat: string;
   currency: string;
   currencies?: string[];
+  payoutCurrencies?: string[];
   operators: MbiyoPayOperator[];
 }
 
@@ -147,7 +148,8 @@ export const MBIYOPAY_COUNTRIES: MbiyoPayCountry[] = [
     phoneDigits: 9,
     phoneFormat: "XXXXXXXXX",
     currency: "CDF",
-    currencies: ["CDF"],
+    currencies: ["CDF", "USD"],
+    payoutCurrencies: ["CDF"],
     operators: [
       { code: "mpesa", name: "M-Pesa", requiresOtp: false, requiresRedirect: false, payin: true, payout: true },
       { code: "airtel", name: "Airtel Money", requiresOtp: false, requiresRedirect: false, payin: true, payout: true },
@@ -226,8 +228,27 @@ export const getMbiyoPayCurrenciesForCountry = (countryCode: string): string[] =
   return [country?.currency || "XOF"];
 };
 
+export const getMbiyoPayPayoutCurrenciesForCountry = (countryCode: string): string[] => {
+  const country = getMbiyoPayCountryByCode(countryCode);
+  if (country?.payoutCurrencies && country.payoutCurrencies.length > 0) {
+    return country.payoutCurrencies;
+  }
+  if (country?.currencies && country.currencies.length > 0) {
+    return country.currencies;
+  }
+  return [country?.currency || "XOF"];
+};
+
 export const hasMultipleCurrencies = (countryCode: string): boolean => {
   const country = getMbiyoPayCountryByCode(countryCode);
+  return (country?.currencies?.length || 0) > 1;
+};
+
+export const hasMultiplePayoutCurrencies = (countryCode: string): boolean => {
+  const country = getMbiyoPayCountryByCode(countryCode);
+  if (country?.payoutCurrencies) {
+    return country.payoutCurrencies.length > 1;
+  }
   return (country?.currencies?.length || 0) > 1;
 };
 
