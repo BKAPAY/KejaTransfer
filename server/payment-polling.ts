@@ -9,6 +9,41 @@ const PAYDUNYA_MASTER_KEY = process.env.PAYDUNYA_MASTER_KEY;
 const PAYDUNYA_PRIVATE_KEY = process.env.PAYDUNYA_PRIVATE_KEY;
 const PAYDUNYA_TOKEN = process.env.PAYDUNYA_TOKEN;
 
+export async function safeRefundOutgoingTransaction(
+  transactionId: string,
+  userId: string,
+  metadata: any,
+  source: string
+): Promise<boolean> {
+  const latestTx = await storage.getTransaction(transactionId);
+  if (!latestTx) {
+    console.log(`[SafeRefund] Transaction ${transactionId} not found - skipping refund (source: ${source})`);
+    return false;
+  }
+
+  const latestMeta = JSON.parse(latestTx.metadata || "{}");
+  if (latestMeta.refunded === true) {
+    console.log(`[SafeRefund] Transaction ${transactionId} already refunded - skipping (source: ${source})`);
+    return false;
+  }
+
+  const refundAmount = latestMeta.deductedFromBalance || latestMeta.totalDebited || latestTx.amount;
+  if (!refundAmount || refundAmount <= 0) {
+    console.log(`[SafeRefund] Transaction ${transactionId} no valid refund amount - skipping (source: ${source})`);
+    return false;
+  }
+
+  latestMeta.refunded = true;
+  latestMeta.refundedAt = new Date().toISOString();
+  latestMeta.refundedBy = source;
+  latestMeta.refundedAmount = refundAmount;
+  await storage.updateTransactionMetadata(transactionId, JSON.stringify(latestMeta));
+
+  await storage.updateUserBalance(userId, refundAmount);
+  console.log(`[SafeRefund] ✅ Refunded ${refundAmount} to user ${userId} for transaction ${transactionId} (source: ${source})`);
+  return true;
+}
+
 // Polling every 5 seconds for active transactions
 const POLLING_INTERVAL = 5000;
 const PAYMENT_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes timeout (Mobile Money)
@@ -317,9 +352,7 @@ async function processMbiyoPayTransaction(transaction: Transaction & { user?: Us
     if (hasPaymentExpired(transaction)) {
       console.log(`[PaymentPolling] MbiyoPay transaction ${transaction.id} expired without receiving mbiyopayTransactionId - marking as failed`);
       if (transaction.type === "withdrawal" || transaction.type === "transfer") {
-        const refundAmount = metadata.deductedFromBalance || metadata.totalDebited || transaction.amount;
-        await storage.updateUserBalance(transaction.userId, refundAmount);
-        console.log(`[PaymentPolling] Refunded ${refundAmount} to user ${transaction.userId} for expired MbiyoPay ${transaction.type}`);
+        await safeRefundOutgoingTransaction(transaction.id, transaction.userId, metadata, "polling-mbiyopay-expired-no-id");
       }
       await storage.updateTransactionStatus(transaction.id, "failed");
       return true;
@@ -401,9 +434,7 @@ async function processMbiyoPayTransaction(transaction: Transaction & { user?: Us
         // We trust the direct API status and do NOT override it with order_id search which can return wrong transactions
         console.log(`[PaymentPolling] ❌ MbiyoPay transaction ${transaction.id} confirmed ${status} after grace period (authoritative source: getMbiyoPayTransactionStatus with ID ${mbiyopayTransactionId})`);
         if (transaction.type === "withdrawal" || transaction.type === "transfer") {
-          const refundAmount = metadata.deductedFromBalance || metadata.totalDebited || transaction.amount;
-          await storage.updateUserBalance(transaction.userId, refundAmount);
-          console.log(`[PaymentPolling] Refunded ${refundAmount} to user ${transaction.userId} for failed MbiyoPay ${transaction.type}`);
+          await safeRefundOutgoingTransaction(transaction.id, transaction.userId, metadata, "polling-mbiyopay-failed");
         }
         await storage.updateTransactionStatus(transaction.id, "failed");
         return true;
@@ -479,27 +510,15 @@ async function processFedaPayPayout(transaction: Transaction & { user?: User }, 
       return true;
     } else if (payoutStatus.status === "declined" || payoutStatus.status === "canceled" || payoutStatus.status === "failed") {
       console.log(`[PaymentPolling] ❌ FedaPay payout ${transaction.id} failed (status: ${payoutStatus.status})`);
+      await safeRefundOutgoingTransaction(transaction.id, transaction.userId, metadata, "polling-fedapay-failed");
       await storage.updateTransactionStatus(transaction.id, "failed");
-      
-      // Refund the balance
-      const deductedAmount = metadata.deductedFromBalance;
-      if (deductedAmount) {
-        await storage.updateUserBalance(transaction.userId, deductedAmount);
-        console.log(`[PaymentPolling] Refunded ${deductedAmount} to user ${transaction.userId}`);
-      }
       return true;
     } else {
       // Still pending
       if (hasPaymentExpired(transaction)) {
         console.log(`[PaymentPolling] ⏱️ FedaPay payout ${transaction.id} TIMEOUT (10min) - marking as failed`);
+        await safeRefundOutgoingTransaction(transaction.id, transaction.userId, metadata, "polling-fedapay-timeout");
         await storage.updateTransactionStatus(transaction.id, "failed");
-        
-        // Refund the balance
-        const deductedAmount = metadata.deductedFromBalance;
-        if (deductedAmount) {
-          await storage.updateUserBalance(transaction.userId, deductedAmount);
-          console.log(`[PaymentPolling] Refunded ${deductedAmount} to user ${transaction.userId}`);
-        }
         return true;
       }
       console.log(`[PaymentPolling] ⏳ FedaPay payout ${transaction.id} still pending (${remainingSeconds}s remaining)`);
@@ -509,14 +528,8 @@ async function processFedaPayPayout(transaction: Transaction & { user?: User }, 
     console.error(`[PaymentPolling] Error checking FedaPay payout ${transaction.id}:`, error);
     if (hasPaymentExpired(transaction)) {
       console.log(`[PaymentPolling] ⏱️ FedaPay payout ${transaction.id} expired with error - marking as failed`);
+      await safeRefundOutgoingTransaction(transaction.id, transaction.userId, metadata, "polling-fedapay-error-timeout");
       await storage.updateTransactionStatus(transaction.id, "failed");
-      
-      // Refund the balance
-      const deductedAmount = metadata.deductedFromBalance;
-      if (deductedAmount) {
-        await storage.updateUserBalance(transaction.userId, deductedAmount);
-        console.log(`[PaymentPolling] Refunded ${deductedAmount} to user ${transaction.userId}`);
-      }
       return true;
     }
     return false;

@@ -55,6 +55,7 @@ import {
   handleMbiyoPayResendWebhook,
   pollMbiyoPayTransaction,
 } from "./mbiyopay-routes";
+import { safeRefundOutgoingTransaction } from "./payment-polling";
 import {
   MBIYOPAY_SUPPORTED_COUNTRIES,
   MBIYOPAY_OPERATORS,
@@ -2530,9 +2531,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 });
               }
               if (transaction.type === "withdrawal" || transaction.type === "transfer") {
-                const refundAmount = metadata.deductedFromBalance || metadata.totalDebited || transaction.amount;
-                await storage.updateUserBalance(transaction.userId, refundAmount);
-                console.log(`[TransactionStatus] MbiyoPay FAILED - refunding ${refundAmount} for ${transaction.type}`);
+                await safeRefundOutgoingTransaction(transaction.id, transaction.userId, metadata, "status-check-mbiyopay-failed");
               }
               await storage.updateTransactionStatus(transaction.id, "failed");
               return res.json({ 
@@ -4117,15 +4116,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.updateTransactionStatus(matchedTx.id, "completed");
         console.log(`[MoneyFusion Webhook] Transaction ${matchedTx.id} marked as COMPLETED`);
       } else if (isMoneyFusionPayoutFailed(event)) {
+        await safeRefundOutgoingTransaction(matchedTx.id, matchedTx.userId, meta, "webhook-moneyfusion-failed");
         await storage.updateTransactionStatus(matchedTx.id, "failed");
-
-        const deductedAmount = meta.deductedFromBalance || meta.totalDebited || 0;
-        if (deductedAmount > 0 && matchedTx.userId) {
-          await storage.updateUserBalance(matchedTx.userId, deductedAmount);
-          console.log(`[MoneyFusion Webhook] Refunded ${deductedAmount} to user ${matchedTx.userId}`);
-        }
-
-        console.log(`[MoneyFusion Webhook] Transaction ${matchedTx.id} marked as FAILED, balance refunded`);
+        console.log(`[MoneyFusion Webhook] Transaction ${matchedTx.id} marked as FAILED`);
       }
 
       return res.json({ received: true, matched: true, processed: true });
@@ -7033,9 +7026,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await storage.updateUserBalance(transaction.userId, -netAmountForUser);
           console.log(`[Admin] ${adminEmail} changed tx ${transactionId} completed->failed: deducted ${netAmountForUser} from user ${transaction.userId} (balance: ${user.balance} -> ${user.balance - netAmountForUser})`);
         } else if (isOutgoing) {
-          const refundAmount = metadata.deductedFromBalance || metadata.totalDebited || transaction.amount;
-          await storage.updateUserBalance(transaction.userId, refundAmount);
-          console.log(`[Admin] ${adminEmail} changed tx ${transactionId} completed->failed: refunded ${refundAmount} to user ${transaction.userId}`);
+          await safeRefundOutgoingTransaction(transactionId, transaction.userId, metadata, "admin-status-completed-to-failed");
+          console.log(`[Admin] ${adminEmail} changed tx ${transactionId} completed->failed`);
         }
       } else if (newStatus === "completed" && (oldStatus === "failed" || oldStatus === "pending")) {
         if (isIncoming) {
@@ -7207,19 +7199,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (transaction.type === "withdrawal" || transaction.type === "transfer") {
-        let refundAmount: number;
-        if (transaction.metadata) {
-          try {
-            const meta = JSON.parse(transaction.metadata);
-            refundAmount = meta.deductedFromBalance || meta.totalDebited || (transaction.amount + transaction.fee);
-          } catch (e) {
-            refundAmount = transaction.amount + transaction.fee;
-          }
-        } else {
-          refundAmount = transaction.amount + transaction.fee;
-        }
-        await storage.updateUserBalance(transaction.userId, refundAmount);
-        console.log(`[Admin] Refunded ${refundAmount} to user ${transaction.userId} for rejected ${transaction.type} ${transactionId}`);
+        const meta = JSON.parse(transaction.metadata || "{}");
+        await safeRefundOutgoingTransaction(transactionId, transaction.userId, meta, "admin-reject");
       }
 
       res.json({ success: true, message: "Transaction rejetée" });

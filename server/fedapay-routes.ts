@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import { storage } from "./storage";
 import { randomUUID } from "crypto";
 import { calculateIncomingFee, calculateOutgoingFee, getFeeFromDatabase } from "./utils/fees";
+import { safeRefundOutgoingTransaction } from "./payment-polling";
 import { 
   createCollect, 
   createPayout, 
@@ -692,14 +693,10 @@ export async function handleFedaPayWebhook(req: Request, res: Response) {
       console.log(`[FedaPay Webhook] Payment failed for transaction ${transaction.id}`);
       await storage.updateTransactionStatus(transaction.id, "failed");
 
-      if (transaction.type === "withdrawal") {
+      if (transaction.type === "withdrawal" || transaction.type === "transfer") {
         try {
           const metadata = JSON.parse(transaction.metadata || "{}");
-          const deductedAmount = metadata.deductedFromBalance;
-          if (deductedAmount) {
-            await storage.updateUserBalance(transaction.userId, deductedAmount);
-            console.log(`[FedaPay Webhook] Refunded ${deductedAmount} to user ${transaction.userId}`);
-          }
+          await safeRefundOutgoingTransaction(transaction.id, transaction.userId, metadata, "webhook-fedapay-failed");
         } catch (e) {
           console.error("[FedaPay Webhook] Refund error:", e);
         }

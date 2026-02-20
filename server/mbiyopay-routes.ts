@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import { storage } from "./storage";
 
 import { calculateIncomingFee, calculateOutgoingFee, getFeeFromDatabase } from "./utils/fees";
+import { safeRefundOutgoingTransaction } from "./payment-polling";
 import { 
   createMbiyoPayPayin, 
   createMbiyoPayPayout, 
@@ -990,12 +991,9 @@ export async function handleMbiyoPayWebhook(req: Request, res: Response) {
         console.log(`[MbiyoPay Webhook] Withdrawal/Transfer completed: ${tx.id}`);
       }
     } else if (status === "failed" || status === "cancelled" || status === "expired" || status === "rejected" || status === "error") {
-      // For failed transactions, we can trust the webhook (no risk of fraud)
       if (tx.type === "withdrawal" || tx.type === "transfer") {
         const metadata = JSON.parse(tx.metadata || "{}");
-        const refundAmount = metadata.deductedFromBalance || metadata.totalDebited || tx.amount;
-        await storage.updateUserBalance(tx.userId, refundAmount);
-        console.log(`[MbiyoPay Webhook] Refunding ${refundAmount} for failed ${tx.type}`);
+        await safeRefundOutgoingTransaction(tx.id, tx.userId, metadata, "webhook-mbiyopay-failed");
       }
       await storage.updateTransactionStatus(tx.id, "failed");
       console.log(`[MbiyoPay Webhook] Transaction failed: ${tx.id}`);
