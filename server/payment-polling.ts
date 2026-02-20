@@ -12,7 +12,7 @@ const PAYDUNYA_TOKEN = process.env.PAYDUNYA_TOKEN;
 export async function safeRefundOutgoingTransaction(
   transactionId: string,
   userId: string,
-  metadata: any,
+  _metadata: any,
   source: string
 ): Promise<boolean> {
   const latestTx = await storage.getTransaction(transactionId);
@@ -22,24 +22,18 @@ export async function safeRefundOutgoingTransaction(
   }
 
   const latestMeta = JSON.parse(latestTx.metadata || "{}");
-  if (latestMeta.refunded === true) {
-    console.log(`[SafeRefund] Transaction ${transactionId} already refunded - skipping (source: ${source})`);
-    return false;
-  }
-
   const refundAmount = latestMeta.deductedFromBalance || latestMeta.totalDebited || latestTx.amount;
   if (!refundAmount || refundAmount <= 0) {
     console.log(`[SafeRefund] Transaction ${transactionId} no valid refund amount - skipping (source: ${source})`);
     return false;
   }
 
-  latestMeta.refunded = true;
-  latestMeta.refundedAt = new Date().toISOString();
-  latestMeta.refundedBy = source;
-  latestMeta.refundedAmount = refundAmount;
-  await storage.updateTransactionMetadata(transactionId, JSON.stringify(latestMeta));
+  const success = await storage.atomicMarkRefundedAndCredit(transactionId, userId, refundAmount, source);
+  if (!success) {
+    console.log(`[SafeRefund] Transaction ${transactionId} not eligible for refund (already refunded or wrong status) - skipping (source: ${source})`);
+    return false;
+  }
 
-  await storage.updateUserBalance(userId, refundAmount);
   console.log(`[SafeRefund] ✅ Refunded ${refundAmount} to user ${userId} for transaction ${transactionId} (source: ${source})`);
   return true;
 }

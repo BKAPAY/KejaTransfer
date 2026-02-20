@@ -94,6 +94,7 @@ export interface IStorage {
   updateTransactionStatus(id: string, status: string, paydunyaData?: any): Promise<Transaction | undefined>;
   updateTransaction(id: string, updates: Partial<Pick<Transaction, 'paydunyaToken' | 'country' | 'operator' | 'status' | 'metadata' | 'paydunyaReceiptUrl'>>): Promise<Transaction | undefined>;
   updateTransactionMetadata(id: string, metadata: string): Promise<Transaction | undefined>;
+  atomicMarkRefundedAndCredit(transactionId: string, userId: string, refundAmount: number, source: string): Promise<boolean>;
   finalizeIncomingTransaction(id: string, extras?: { paydunyaReceiptUrl?: string }): Promise<{ transaction: Transaction; credited: boolean } | null>;
   getUserStats(userId: string): Promise<{
     totalBalance: number;
@@ -754,6 +755,43 @@ export class DbStorage implements IStorage {
       .where(eq(schema.transactions.id, id))
       .returning();
     return results[0];
+  }
+
+  async atomicMarkRefundedAndCredit(transactionId: string, userId: string, refundAmount: number, source: string): Promise<boolean> {
+    const result = await client.begin(async (tx) => {
+      const updated = await tx`
+        UPDATE transactions 
+        SET metadata = jsonb_set(
+          jsonb_set(
+            jsonb_set(
+              jsonb_set(
+                COALESCE(metadata::jsonb, '{}'::jsonb),
+                '{refunded}', 'true'::jsonb
+              ),
+              '{refundedAt}', to_jsonb(now()::text)
+            ),
+            '{refundedBy}', to_jsonb(${source}::text)
+          ),
+          '{refundedAmount}', to_jsonb(${refundAmount}::numeric)
+        )::text
+        WHERE id = ${transactionId}
+          AND status IN ('failed', 'expired', 'canceled', 'cancelled')
+          AND (metadata IS NULL OR NOT (metadata::jsonb ? 'refunded' AND (metadata::jsonb->>'refunded')::boolean = true))
+        RETURNING id
+      `;
+      
+      if (updated.length === 0) {
+        return false;
+      }
+
+      await tx`
+        UPDATE users SET balance = balance + ${refundAmount} WHERE id = ${userId}
+      `;
+      
+      return true;
+    });
+    
+    return result;
   }
 
   async finalizeIncomingTransaction(id: string, extras?: { paydunyaReceiptUrl?: string }): Promise<{ transaction: Transaction; credited: boolean } | null> {

@@ -6,6 +6,7 @@ import QRCode from "qrcode";
 import { getFeeFromDatabase, calculateOutgoingFee } from "./utils/fees";
 import { sendPaymentCallback } from "./utils/callback";
 import bcrypt from "bcrypt";
+import { safeRefundOutgoingTransaction } from "./payment-polling";
 
 const router = Router();
 
@@ -608,11 +609,9 @@ router.post("/api/webhooks/nowpayments/payout", async (req: Request, res: Respon
       const metadata = transaction.metadata ? JSON.parse(transaction.metadata) : {};
       metadata.payoutStatus = normalizedStatus;
       metadata.payoutError = body.error || null;
-      metadata.refunded = true;
       await storage.updateTransactionMetadata(transaction.id, JSON.stringify(metadata));
-      const refundAmount = transaction.amount + (transaction.fee || 0);
-      await storage.addFundsToUser(transaction.userId, refundAmount);
-      console.log(`[NOWPayments Payout Webhook] Transaction ${transaction.id} failed (${normalizedStatus}) - refunded ${refundAmount} to user ${transaction.userId}`);
+      await safeRefundOutgoingTransaction(transaction.id, transaction.userId, metadata, "webhook-nowpayments-failed");
+      console.log(`[NOWPayments Payout Webhook] Transaction ${transaction.id} failed (${normalizedStatus}) - refund processed via safeRefund`);
     } else {
       const metadata = transaction.metadata ? JSON.parse(transaction.metadata) : {};
       metadata.payoutStatus = normalizedStatus;
