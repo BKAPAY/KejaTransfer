@@ -170,22 +170,15 @@ export default function Withdrawal() {
         throw new Error("Numero de retrait invalide");
       }
       
-      // Send converted amount to provider, original amount for balance debit
-      const providerAmount = needsConversion && conversionData?.convertedAmount 
-        ? conversionData.convertedAmount 
-        : data.formData.amount;
-      const providerCurrency = needsConversion && conversionData?.targetCurrency
-        ? conversionData.targetCurrency
-        : selectedCurrency;
-      
       const res = await apiRequest("POST", "/api/fedapay/withdrawal", {
-        amount: providerAmount,
+        amount: data.formData.amount,
         phone: selectedPhone,
         operator: data.formData.operator,
         country: userCountry,
         securityCode: data.securityCode,
         type: "withdrawal",
-        currency: providerCurrency,
+        currency: userBalanceCurrency,
+        targetCurrency: selectedCurrency,
         originalAmount: data.formData.amount,
         originalCurrency: userBalanceCurrency,
       });

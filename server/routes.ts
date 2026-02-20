@@ -4536,7 +4536,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Transfer/Withdrawal Route - Multi-Provider
   app.post("/api/fedapay/withdrawal", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { amount, country, operator, phone, type, securityCode, originalAmount, originalCurrency } = req.body;
+      const { amount, country, operator, phone, type, securityCode, originalAmount, originalCurrency, targetCurrency: reqTargetCurrency } = req.body;
       const user = await storage.getUser(req.session.userId!);
 
       if (!user) {
@@ -4645,10 +4645,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Get user's currency for conversion
+      // Get user's balance currency and target currency for provider
       const userCurrency = user.country ? getCurrencyForCountry(user.country) : "XOF";
+      const targetCurrency = reqTargetCurrency || userCurrency;
       
-      console.log(`[WITHDRAWAL] Using provider: ${activeProvider} for ${country}/${operator}, userCurrency=${userCurrency}`);
+      console.log(`[WITHDRAWAL] Using provider: ${activeProvider} for ${country}/${operator}, userCurrency=${userCurrency}, targetCurrency=${targetCurrency}`);
 
       if (activeProvider === "fedapay") {
         // Use FedaPay - pass user's currency for conversion
@@ -4811,12 +4812,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ success: false, error: errorMsg });
         }
       } else if (activeProvider === "mbiyopay") {
-        // Use MbiyoPay for withdrawals/transfers - pass user's currency for conversion
-        console.log(`[WITHDRAWAL] Using MbiyoPay for ${country}/${operator}, userCurrency=${userCurrency}`);
+        // Use MbiyoPay for withdrawals/transfers - pass user's balance currency and target currency
+        console.log(`[WITHDRAWAL] Using MbiyoPay for ${country}/${operator}, userCurrency=${userCurrency}, targetCurrency=${targetCurrency}`);
         
         const result = isTransfer 
-          ? await handleMbiyoPayTransfer(req.session.userId!, user, amount, country, operator, phone, userCurrency)
-          : await handleMbiyoPayWithdrawal(req.session.userId!, user, amount, country, operator, phone, userCurrency);
+          ? await handleMbiyoPayTransfer(req.session.userId!, user, amount, country, operator, phone, userCurrency, targetCurrency)
+          : await handleMbiyoPayWithdrawal(req.session.userId!, user, amount, country, operator, phone, userCurrency, targetCurrency);
 
         if (result.success) {
           return res.json({
