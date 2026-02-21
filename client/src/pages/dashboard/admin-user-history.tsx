@@ -219,19 +219,14 @@ export default function AdminUserHistory() {
                           )}
                         </div>
                       )}
-                      {tx.paydunyaToken && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          <span className="font-medium">Token:</span> {tx.paydunyaToken}
-                        </p>
-                      )}
                       {(() => {
                         try {
                           const meta = tx.metadata ? JSON.parse(tx.metadata as string) : null;
-                          const providerId = meta?.fedapayTransactionId || meta?.mbiyopayTransactionId || meta?.afribaPayTransactionId || (meta?.provider === "moneyfusion" && meta?.orderId);
-                          if (providerId && !tx.paydunyaToken) {
+                          const refId = tx.paydunyaToken || meta?.fedapayTransactionId || meta?.mbiyopayTransactionId || meta?.afribaPayTransactionId || (meta?.provider === "moneyfusion" && meta?.orderId);
+                          if (refId) {
                             return (
                               <p className="text-xs text-muted-foreground mt-1">
-                                <span className="font-medium">Réf:</span> {providerId}
+                                <span className="font-medium">Réf:</span> {refId}
                               </p>
                             );
                           }

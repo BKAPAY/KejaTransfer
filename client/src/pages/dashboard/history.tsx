@@ -236,19 +236,14 @@ export default function History() {
                           )}
                         </div>
                       )}
-                      {transaction.paydunyaToken && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          <span className="font-medium">Token:</span> {transaction.paydunyaToken}
-                        </p>
-                      )}
                       {(() => {
                         try {
                           const meta = transaction.metadata ? JSON.parse(transaction.metadata as string) : null;
-                          const providerId = meta?.fedapayTransactionId || meta?.mbiyopayTransactionId || meta?.afribaPayTransactionId || (meta?.provider === "moneyfusion" && meta?.orderId);
-                          if (providerId && !transaction.paydunyaToken) {
+                          const refId = transaction.paydunyaToken || meta?.fedapayTransactionId || meta?.mbiyopayTransactionId || meta?.afribaPayTransactionId || (meta?.provider === "moneyfusion" && meta?.orderId);
+                          if (refId) {
                             return (
                               <p className="text-xs text-muted-foreground mt-1">
-                                <span className="font-medium">Réf:</span> {providerId}
+                                <span className="font-medium">Réf:</span> {refId}
                               </p>
                             );
                           }
