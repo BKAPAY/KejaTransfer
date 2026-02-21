@@ -443,7 +443,7 @@ export default function Pay() {
   // Seuls certains pays avec Paydunya/FedaPay nécessitent OTP pour Orange
   const showOtpOnForm = selectedCountry && selectedOperator 
     ? (mbiyoOperatorRequiresOtp(selectedCountry, selectedOperator) || 
-       (selectedOperator?.toLowerCase().includes("orange") && ["SN", "CI", "BF", "ML", "GN", "NE", "BJ", "TG"].includes(selectedCountry)))
+       (selectedOperator?.toLowerCase().includes("orange") && ["CI", "BF", "GN"].includes(selectedCountry)))
     : false;
   const isMbiyoOtpOperator = selectedCountry && selectedOperator ? mbiyoOperatorRequiresOtp(selectedCountry, selectedOperator) : false;
   const mbiyoOtpInfo = isMbiyoOtpOperator && selectedCountry ? getOtpInstructionsForCountry(selectedCountry) : null;

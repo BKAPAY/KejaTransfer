@@ -311,7 +311,7 @@ export default function ApiPay() {
 
   const showOtpOnForm = country && operator 
     ? (mbiyoOperatorRequiresOtp(country, operator) || 
-       (operator?.toLowerCase().includes("orange") && ["SN", "CI", "BF", "ML", "GN", "NE", "BJ", "TG"].includes(country)))
+       (operator?.toLowerCase().includes("orange") && ["CI", "BF", "GN"].includes(country)))
     : false;
   const isMbiyoOtpOperator = country && operator ? mbiyoOperatorRequiresOtp(country, operator) : false;
   const mbiyoOtpInfo = isMbiyoOtpOperator && country ? getOtpInstructionsForCountry(country) : null;

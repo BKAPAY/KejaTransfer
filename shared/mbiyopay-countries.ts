@@ -73,7 +73,7 @@ export const MBIYOPAY_COUNTRIES: MbiyoPayCountry[] = [
     phoneFormat: "7XXXXXXXX",
     currency: "XOF",
     operators: [
-      { code: "orange", name: "Orange Money", requiresOtp: true, requiresRedirect: true, payin: true, payout: true },
+      { code: "orange", name: "Orange Money", requiresOtp: false, requiresRedirect: true, payin: true, payout: true },
       { code: "free", name: "Free Money", requiresOtp: false, requiresRedirect: false, payin: true, payout: true },
     ],
   },
