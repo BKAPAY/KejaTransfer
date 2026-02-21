@@ -25,7 +25,7 @@ import logoImage from "@assets/bkapay-logo.png";
 import { getCurrencyDecimals } from "@/lib/currency";
 import { CurrencySelector, getCurrencyLabel } from "@/components/currency-selector";
 import { OperatorSelector } from "@/components/operator-selector";
-import { hasMultipleCurrencies, getMbiyoPayCurrenciesForCountry, operatorRequiresOtp as mbiyoOperatorRequiresOtp, getOtpInstructionsForCountry } from "@shared/mbiyopay-countries";
+import { hasMultipleCurrencies, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
 import { CountryFlag } from "@/components/country-flag";
 
 interface ApiKeyInfo {
@@ -195,6 +195,17 @@ export default function ApiPay() {
     queryKey: ["/api/countries-operators/deposits"],
   });
 
+  interface OtpDetailInfo {
+    provider: string;
+    requiresOtp: boolean;
+    otpInstructions?: string;
+    otpUssdCode?: string;
+    otpHint?: string;
+  }
+  const { data: depositsDetails } = useQuery<Record<string, Record<string, OtpDetailInfo>>>({
+    queryKey: ["/api/countries-operators/deposits/details"],
+  });
+
   // Auto-detect country from IP address
   useEffect(() => {
     const detectCountry = async () => {
@@ -309,12 +320,14 @@ export default function ApiPay() {
   
   const noOperatorsAvailable = !isLoadingOperators && !!country && countryOperators.length === 0;
 
-  const showOtpOnForm = country && operator 
-    ? (mbiyoOperatorRequiresOtp(country, operator) || 
-       (operator?.toLowerCase().includes("orange") && ["CI", "BF", "GN"].includes(country)))
-    : false;
-  const isMbiyoOtpOperator = country && operator ? mbiyoOperatorRequiresOtp(country, operator) : false;
-  const mbiyoOtpInfo = isMbiyoOtpOperator && country ? getOtpInstructionsForCountry(country) : null;
+  const operatorOtpDetail = country && operator && depositsDetails
+    ? depositsDetails[country]?.[operator]
+    : null;
+  const showOtpOnForm = operatorOtpDetail?.requiresOtp || false;
+  const isMbiyoOtpOperator = operatorOtpDetail?.provider === "mbiyopay" && showOtpOnForm;
+  const mbiyoOtpInfo = isMbiyoOtpOperator && operatorOtpDetail
+    ? { ussdCode: operatorOtpDetail.otpUssdCode || "", instructions: operatorOtpDetail.otpInstructions || "", hint: operatorOtpDetail.otpHint || "" }
+    : null;
 
   const fetchConversion = useCallback(async (amountToConvert: number, fromCurrency: string, toCurrency: string) => {
     if (!amountToConvert || amountToConvert <= 0 || toCurrency === fromCurrency) {

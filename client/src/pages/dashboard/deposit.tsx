@@ -21,8 +21,7 @@ import { PaymentMethodSelector } from "@/components/payment-method-selector";
 import { CryptoPaymentFlow } from "@/components/crypto-payment-flow";
 import { CurrencySelector, getCurrencyLabel } from "@/components/currency-selector";
 import { OperatorSelector } from "@/components/operator-selector";
-import { hasMultipleCurrencies, getMbiyoPayCurrencyForCountry, getMbiyoPayCurrenciesForCountry, operatorRequiresOtp as mbiyoOperatorRequiresOtp, getOtpInstructionsForCountry } from "@shared/mbiyopay-countries";
-import { paydunyaRequiresOtp, getPaydunyaOtpConfig } from "@shared/paydunya-otp";
+import { hasMultipleCurrencies, getMbiyoPayCurrencyForCountry, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
 import { useConvertedMinimums } from "@/hooks/use-converted-minimums";
 import { getCurrencyDecimals } from "@/lib/currency";
 import { usePaymentCountdown, DEFAULT_COUNTDOWN_DURATION } from "@/hooks/use-payment-countdown";
@@ -120,6 +119,17 @@ export default function Deposit() {
     queryKey: ["/api/countries-operators/deposits"],
   });
 
+  interface OtpDetailInfo {
+    provider: string;
+    requiresOtp: boolean;
+    otpInstructions?: string;
+    otpUssdCode?: string;
+    otpHint?: string;
+  }
+  const { data: depositsDetails } = useQuery<Record<string, Record<string, OtpDetailInfo>>>({
+    queryKey: ["/api/countries-operators/deposits/details"],
+  });
+
   const form = useForm<DepositFormData>({
     resolver: zodResolver(depositSchema),
     defaultValues: {
@@ -133,17 +143,18 @@ export default function Deposit() {
   const selectedOperator = form.watch("operator");
   const amount = depositAmount;
 
-  const currentOperatorNeedsOtp = selectedCountry && selectedOperator
-    ? (mbiyoOperatorRequiresOtp(selectedCountry, selectedOperator) || paydunyaRequiresOtp(selectedCountry, selectedOperator))
-    : false;
+  const operatorOtpDetail = selectedCountry && selectedOperator && depositsDetails
+    ? depositsDetails[selectedCountry]?.[selectedOperator]
+    : null;
 
-  const currentOtpInstructions = selectedCountry && selectedOperator && currentOperatorNeedsOtp
-    ? (mbiyoOperatorRequiresOtp(selectedCountry, selectedOperator)
-        ? getOtpInstructionsForCountry(selectedCountry)
-        : (() => {
-            const config = getPaydunyaOtpConfig(selectedCountry, selectedOperator);
-            return config && config.instructions ? { ussdCode: config.ussdCode || "", instructions: config.instructions, hint: config.hint || "" } : { ussdCode: "#144#", instructions: "Composez le code USSD pour obtenir votre code OTP", hint: "" };
-          })())
+  const currentOperatorNeedsOtp = operatorOtpDetail?.requiresOtp || false;
+
+  const currentOtpInstructions = currentOperatorNeedsOtp && operatorOtpDetail
+    ? {
+        ussdCode: operatorOtpDetail.otpUssdCode || "",
+        instructions: operatorOtpDetail.otpInstructions || "Composez le code USSD pour obtenir votre code OTP",
+        hint: operatorOtpDetail.otpHint || "",
+      }
     : null;
 
   // Auto-detect country from IP address

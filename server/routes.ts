@@ -7355,6 +7355,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/countries-operators/deposits/details", async (req: Request, res: Response) => {
+    try {
+      const [configs, countryStatuses] = await Promise.all([
+        storage.getCountryOperatorConfigs(),
+        storage.getCountryStatuses(),
+      ]);
+      
+      const payinEnabledMap = new Map<string, boolean>();
+      for (const cs of countryStatuses) {
+        if (cs.payinEnabled) {
+          payinEnabledMap.set(`${cs.provider}-${cs.country}`, true);
+        }
+      }
+      
+      const enabledConfigs = configs.filter(
+        (c) => c.incomingEnabled && payinEnabledMap.has(`${c.provider}-${c.country}`)
+      );
+      
+      const result: Record<string, Record<string, { provider: string; requiresOtp: boolean; otpInstructions?: string; otpUssdCode?: string; otpHint?: string }>> = {};
+      
+      for (const config of enabledConfigs) {
+        if (!result[config.country]) {
+          result[config.country] = {};
+        }
+        if (result[config.country][config.operator]) continue;
+        
+        let requiresOtp = false;
+        let otpInstructions: string | undefined;
+        let otpUssdCode: string | undefined;
+        let otpHint: string | undefined;
+        
+        if (config.provider === "paydunya") {
+          const { requiresOTP, getUSSDInstruction } = await import("./paydunya-softpay");
+          const operatorKey = `${config.operator}_${config.country.toLowerCase()}`;
+          requiresOtp = requiresOTP(operatorKey);
+          if (requiresOtp) {
+            otpInstructions = getUSSDInstruction(operatorKey) || undefined;
+          }
+        } else if (config.provider === "mbiyopay") {
+          const { mbiyoPayOperatorRequiresOtp, getMbiyoPayOtpInstructions } = await import("./mbiyopay");
+          requiresOtp = mbiyoPayOperatorRequiresOtp(config.country, config.operator);
+          if (requiresOtp) {
+            const info = getMbiyoPayOtpInstructions(config.country);
+            otpInstructions = info.instructions;
+            otpUssdCode = info.ussdCode;
+            otpHint = info.hint;
+          }
+        } else if (config.provider === "afribapay") {
+          const { operatorRequiresOtpForCountry, getOtpInstructionsForOperator } = await import("@shared/afribapay-countries");
+          requiresOtp = operatorRequiresOtpForCountry(config.country, config.operator);
+          if (requiresOtp) {
+            otpInstructions = getOtpInstructionsForOperator(config.country, config.operator) || undefined;
+          }
+        }
+        
+        result[config.country][config.operator] = {
+          provider: config.provider,
+          requiresOtp,
+          ...(otpInstructions && { otpInstructions }),
+          ...(otpUssdCode && { otpUssdCode }),
+          ...(otpHint && { otpHint }),
+        };
+      }
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("Get deposits details config error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
   // Public endpoint - get enabled countries/operators for withdrawals (outgoing)
   // Returns countries where payout is enabled at country-level, with their enabled operators
   // Countries appear even if no operators are enabled (empty array) - UI shows "no operators" message

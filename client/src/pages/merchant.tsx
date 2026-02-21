@@ -22,7 +22,7 @@ import { CryptoPaymentFlow } from "@/components/crypto-payment-flow";
 import { CurrencySelector, getCurrencyLabel } from "@/components/currency-selector";
 import { OperatorSelector } from "@/components/operator-selector";
 import { CountryFlag } from "@/components/country-flag";
-import { hasMultipleCurrencies, getMbiyoPayCurrenciesForCountry, operatorRequiresOtp as mbiyoOperatorRequiresOtp, getOtpInstructionsForCountry } from "@shared/mbiyopay-countries";
+import { hasMultipleCurrencies, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
 import { getCurrencyDecimals } from "@/lib/currency";
 
 interface ConversionData {
@@ -223,6 +223,17 @@ export default function Merchant() {
     queryKey: ["/api/countries-operators/deposits"],
   });
 
+  interface OtpDetailInfo {
+    provider: string;
+    requiresOtp: boolean;
+    otpInstructions?: string;
+    otpUssdCode?: string;
+    otpHint?: string;
+  }
+  const { data: depositsDetails } = useQuery<Record<string, Record<string, OtpDetailInfo>>>({
+    queryKey: ["/api/countries-operators/deposits/details"],
+  });
+
   const form = useForm<MerchantPaymentFormData>({
     resolver: zodResolver(merchantPaymentSchema),
     defaultValues: {
@@ -294,15 +305,14 @@ export default function Merchant() {
     }
   }, [enabledCountriesOperators, selectedCountry, savedCountry, form]);
   
-  // Vérifier si l'opérateur sélectionné est Orange (nécessite code OTP)
-  // IMPORTANT: Orange RDC (CD) utilise MbiyoPay qui ne nécessite PAS d'OTP
-  // Seuls certains pays avec Paydunya/FedaPay nécessitent OTP pour Orange
-  const showOtpOnForm = selectedCountry && selectedOperator 
-    ? (mbiyoOperatorRequiresOtp(selectedCountry, selectedOperator) || 
-       (selectedOperator?.toLowerCase().includes("orange") && ["CI", "BF", "GN"].includes(selectedCountry)))
-    : false;
-  const isMbiyoOtpOperator = selectedCountry && selectedOperator ? mbiyoOperatorRequiresOtp(selectedCountry, selectedOperator) : false;
-  const mbiyoOtpInfo = isMbiyoOtpOperator && selectedCountry ? getOtpInstructionsForCountry(selectedCountry) : null;
+  const operatorOtpDetail = selectedCountry && selectedOperator && depositsDetails
+    ? depositsDetails[selectedCountry]?.[selectedOperator]
+    : null;
+  const showOtpOnForm = operatorOtpDetail?.requiresOtp || false;
+  const isMbiyoOtpOperator = operatorOtpDetail?.provider === "mbiyopay" && showOtpOnForm;
+  const mbiyoOtpInfo = isMbiyoOtpOperator && operatorOtpDetail
+    ? { ussdCode: operatorOtpDetail.otpUssdCode || "", instructions: operatorOtpDetail.otpInstructions || "", hint: operatorOtpDetail.otpHint || "" }
+    : null;
   
   // Filtrer les opérateurs selon la configuration admin
   const allCountryOperators = selectedCountry
