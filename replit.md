@@ -52,7 +52,7 @@ The frontend uses React 18 with TypeScript, Shadcn UI, and Tailwind CSS for a pr
 - **Paydunya API**: Payment gateway.
 - **FedaPay API**: Payment gateway.
 - **MbiyoPay API**: Payment gateway.
-- **MoneyFusion API**: Payout-only payment gateway (24 countries, withdrawals/transfers only).
+- **MoneyFusion API**: Payout-only payment gateway (24 countries, withdrawals/transfers only). Documentation officielle: https://docs.moneyfusion.net/fr/payout. Endpoint: `POST https://pay.moneyfusion.net/api/v1/withdraw`. Header: `moneyfusion-private-key`. Body: `{countryCode, phone (format local sans préfixe), amount, withdraw_mode, webhook_url}`. Webhooks: `payout.session.completed` / `payout.session.cancelled`. IP du serveur doit être whitelistée dans le dashboard MoneyFusion.
 - **NOWPayments API**: Cryptocurrency payment gateway.
 - **PostgreSQL**: Primary database.
 - **Drizzle ORM**: Database interactions.

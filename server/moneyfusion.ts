@@ -239,7 +239,7 @@ export function validateMoneyFusionWebhook(payload: any): MoneyFusionWebhookPayl
   }
 
   const event = payload.event || "";
-  const validEvents = ["payout.session.completed", "payout.session.cancelled", "payout.session.pending"];
+  const validEvents = ["payout.session.completed", "payout.session.cancelled"];
   if (event && !validEvents.includes(event)) {
     console.error(`[MoneyFusion Webhook] Unknown event: ${event}`);
     return null;

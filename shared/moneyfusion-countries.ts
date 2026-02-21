@@ -84,6 +84,8 @@ export const MONEYFUSION_COUNTRIES: MoneyFusionCountry[] = [
     countryCode: "cg",
     currency: "XAF",
     operators: [
+      // withdraw_mode "orange-money-mali" for CG is per official MoneyFusion docs (docs.moneyfusion.net/fr/payout)
+      { code: "orange", name: "Orange Money", withdrawMode: "orange-money-mali", payin: false, payout: true },
       { code: "mtn", name: "MTN Mobile Money", withdrawMode: "mtn-cg", payin: false, payout: true },
     ],
   },
@@ -113,6 +115,7 @@ export const MONEYFUSION_COUNTRIES: MoneyFusionCountry[] = [
     currency: "XAF",
     operators: [
       { code: "airtel", name: "Airtel Money", withdrawMode: "airtel-money-ga", payin: false, payout: true },
+      { code: "libertis", name: "Libertis", withdrawMode: "libertis-ga", payin: false, payout: true },
     ],
   },
   {
@@ -180,6 +183,7 @@ export const MONEYFUSION_COUNTRIES: MoneyFusionCountry[] = [
     operators: [
       { code: "airtel", name: "Airtel Money", withdrawMode: "airtel-money-ne", payin: false, payout: true },
       { code: "mtn", name: "MTN Mobile Money", withdrawMode: "mtn-ne", payin: false, payout: true },
+      { code: "mauritel", name: "Mauritel", withdrawMode: "mauritel-ne", payin: false, payout: true },
     ],
   },
   {
