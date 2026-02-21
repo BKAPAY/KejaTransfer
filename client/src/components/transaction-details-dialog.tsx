@@ -153,8 +153,8 @@ export function TransactionDetailsDialog({
     || (metadata?.fedapayTransactionId ? String(metadata.fedapayTransactionId) : null)
     || metadata?.mbiyopayTransactionId
     || metadata?.afribaPayTransactionId
-    || (metadata?.provider === "moneyfusion" && metadata?.orderId ? String(metadata.orderId) : null)
     || (metadata?.nowpaymentsId ? String(metadata.nowpaymentsId) : null)
+    || (metadata?.orderId ? String(metadata.orderId) : null)
     || transaction.id;
 
   return (

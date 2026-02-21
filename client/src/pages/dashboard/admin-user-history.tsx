@@ -222,7 +222,7 @@ export default function AdminUserHistory() {
                       {(() => {
                         try {
                           const meta = tx.metadata ? JSON.parse(tx.metadata as string) : null;
-                          const refId = tx.paydunyaToken || meta?.fedapayTransactionId || meta?.mbiyopayTransactionId || meta?.afribaPayTransactionId || (meta?.provider === "moneyfusion" && meta?.orderId);
+                          const refId = tx.paydunyaToken || meta?.fedapayTransactionId || meta?.mbiyopayTransactionId || meta?.afribaPayTransactionId || meta?.nowpaymentsId || meta?.orderId;
                           if (refId) {
                             return (
                               <p className="text-xs text-muted-foreground mt-1">

@@ -239,7 +239,7 @@ export default function History() {
                       {(() => {
                         try {
                           const meta = transaction.metadata ? JSON.parse(transaction.metadata as string) : null;
-                          const refId = transaction.paydunyaToken || meta?.fedapayTransactionId || meta?.mbiyopayTransactionId || meta?.afribaPayTransactionId || (meta?.provider === "moneyfusion" && meta?.orderId);
+                          const refId = transaction.paydunyaToken || meta?.fedapayTransactionId || meta?.mbiyopayTransactionId || meta?.afribaPayTransactionId || meta?.nowpaymentsId || meta?.orderId;
                           if (refId) {
                             return (
                               <p className="text-xs text-muted-foreground mt-1">
