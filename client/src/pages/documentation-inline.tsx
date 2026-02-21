@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Copy, Code, Globe, AlertTriangle, ArrowLeft, ArrowRight, Clock, Webhook, Layers, Monitor, Shield, DollarSign, MessageSquare, HelpCircle, CheckCircle, XCircle, Info } from "lucide-react";
+import { Copy, Code, Globe, AlertTriangle, ArrowLeft, ArrowRight, Clock, Webhook, Layers, Monitor, Shield, MessageSquare, HelpCircle, CheckCircle, XCircle, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
@@ -455,9 +455,9 @@ app.post('/api/webhook/bkapay', express.json(), (req, res) => {
   
   if (eventType === 'payment.completed' && status === 'completed') {
     // Le solde du marchand a deja ete credite automatiquement
-    // netAmount = montant recu par le marchand (apres frais de 6%)
+    // netAmount = montant net recu par le marchand
     console.log(\`Paiement recu: \${amount} \${currency}\`);
-    console.log(\`Montant net (apres frais): \${netAmount} \${currency}\`);
+    console.log(\`Montant net: \${netAmount} \${currency}\`);
     console.log(\`Client: \${customerName} (\${customerEmail})\`);
     
     // Activer l'abonnement ou livrer la commande
@@ -506,8 +506,8 @@ if ($data['event'] === 'payment.completed' && $data['status'] === 'completed') {
     // Le solde du marchand a deja ete credite automatiquement
     $transactionId = $data['transactionId'];
     $montant = $data['amount'];        // Montant paye par le client
-    $frais = $data['fee'];             // Frais BKApay (6%)
-    $montantNet = $data['netAmount'];  // Montant recu par le marchand
+    $frais = $data['fee'];             // Frais de service
+    $montantNet = $data['netAmount'];  // Montant net recu par le marchand
     $email = $data['customerEmail'];
     $reference = $data['externalReference'];
     
@@ -559,7 +559,7 @@ def webhook_bkapay():
     if data['event'] == 'payment.completed' and data['status'] == 'completed':
         # Le solde du marchand a deja ete credite automatiquement
         transaction_id = data['transactionId']
-        montant_net = data['netAmount']  # Montant apres frais de 6%
+        montant_net = data['netAmount']  # Montant net recu
         email = data.get('customerEmail')
         reference = data.get('externalReference')
         
@@ -573,8 +573,8 @@ def webhook_bkapay():
   "transactionId": "abc123-def456",
   "externalReference": "CMD-2024-001",
   "amount": 5000,
-  "fee": 300,
-  "netAmount": 4700,
+  "fee": 0,
+  "netAmount": 5000,
   "currency": "XOF",
   "status": "completed",
   "customerName": "Jean Dupont",
@@ -664,7 +664,7 @@ def webhook_bkapay():
               <div className="flex items-center justify-center w-7 h-7 rounded-full bg-primary text-primary-foreground text-xs font-bold shrink-0">5</div>
               <div>
                 <p className="font-semibold">Le paiement est traite</p>
-                <p className="text-muted-foreground">BKApay traite le paiement via l'operateur mobile money. Le solde du marchand est credite automatiquement (moins les frais de 6%). Aucune action requise de votre part.</p>
+                <p className="text-muted-foreground">BKApay traite le paiement via l'operateur mobile money. Le solde du marchand est credite automatiquement. Aucune action requise de votre part.</p>
               </div>
             </div>
             <div className="flex items-start gap-3 p-3 rounded-lg bg-background/60">
@@ -678,68 +678,6 @@ def webhook_bkapay():
         </CardContent>
       </Card>
 
-      {/* Section 2: Traitement automatique des soldes */}
-      <Card className="border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/20">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2">
-            <DollarSign className="w-5 h-5 text-green-600" />
-            Traitement automatique des soldes
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4 text-sm">
-          <p className="text-muted-foreground">
-            Quand un paiement est complete via l'integration Inline, le systeme BKApay credite <strong>automatiquement</strong> le solde 
-            de votre compte marchand. Vous n'avez aucune action a effectuer pour recevoir les fonds.
-          </p>
-
-          <Alert className="border-green-200 bg-green-50 dark:bg-green-950 dark:border-green-800">
-            <CheckCircle className="h-4 w-4 text-green-600" />
-            <AlertTitle className="text-green-800 dark:text-green-200">Credit automatique</AlertTitle>
-            <AlertDescription className="text-green-700 dark:text-green-300 text-sm">
-              Des qu'un paiement est confirme, la fonction interne <code className="bg-green-100 dark:bg-green-900 px-1 rounded font-mono text-xs">finalizeIncomingTransaction</code> effectue 
-              atomiquement deux operations : elle marque la transaction comme "completed" ET credite votre solde marchand.
-              Ces deux operations sont indissociables - il n'y a aucun risque de paiement confirme sans credit de solde.
-            </AlertDescription>
-          </Alert>
-
-          <div className="space-y-3">
-            <h4 className="font-semibold">Frais de service : 6%</h4>
-            <p className="text-muted-foreground">
-              BKApay preleve des frais de 6% sur chaque transaction. Ces frais sont deduits automatiquement du montant 
-              paye par le client. Le montant net est credite sur votre solde.
-            </p>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="p-3 rounded-lg bg-background border">
-                <p className="text-xs text-muted-foreground mb-1">Exemple 1</p>
-                <p className="font-semibold">Client paie : 5 000 XOF</p>
-                <p className="text-muted-foreground">Frais BKApay (6%) : -300 XOF</p>
-                <p className="text-green-600 dark:text-green-400 font-semibold">Vous recevez : 4 700 XOF</p>
-              </div>
-              <div className="p-3 rounded-lg bg-background border">
-                <p className="text-xs text-muted-foreground mb-1">Exemple 2</p>
-                <p className="font-semibold">Client paie : 10 000 XOF</p>
-                <p className="text-muted-foreground">Frais BKApay (6%) : -600 XOF</p>
-                <p className="text-green-600 dark:text-green-400 font-semibold">Vous recevez : 9 400 XOF</p>
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Formule : <code className="bg-muted px-1 rounded font-mono">montantNet = montant - (montant * 0.06)</code>. 
-              Dans le webhook, les champs <code className="bg-muted px-1 rounded font-mono">amount</code>, <code className="bg-muted px-1 rounded font-mono">fee</code> et <code className="bg-muted px-1 rounded font-mono">netAmount</code> vous 
-              donnent respectivement le montant paye, les frais et le montant credite.
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <h4 className="font-semibold">Points importants</h4>
-            <ul className="list-disc list-inside space-y-1 text-muted-foreground">
-              <li>Le credit de solde est instantane des que le paiement est confirme par l'operateur</li>
-              <li>Vous pouvez consulter votre solde en temps reel dans le tableau de bord BKApay</li>
-              <li>Le montant net (apres frais) est visible dans l'historique des transactions</li>
-              <li>Les retraits de votre solde BKApay peuvent etre effectues depuis le tableau de bord</li>
-            </ul>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Section 3: Securite - Verification serveur obligatoire */}
       <Card className="border-red-200 dark:border-red-800">
@@ -1023,7 +961,7 @@ def webhook_bkapay():
               </div>
               <p className="text-muted-foreground mb-2">
                 Ce callback est appele quand le paiement a ete confirme avec succes par l'operateur mobile money. 
-                A ce moment, le solde du marchand a deja ete credite automatiquement (montant - 6% de frais).
+                A ce moment, le solde du marchand a deja ete credite automatiquement.
               </p>
               <p className="text-muted-foreground mb-2">
                 <strong>Timing :</strong> Appele immediatement apres la confirmation du paiement. La fenetre de paiement 
@@ -1409,15 +1347,15 @@ def webhook_bkapay():
                 </div>
                 <div className="flex flex-col gap-1 p-2 rounded bg-muted/50">
                   <Badge variant="outline">amount</Badge>
-                  <p className="text-xs text-muted-foreground">Montant total paye par le client (avant deduction des frais)</p>
+                  <p className="text-xs text-muted-foreground">Montant total paye par le client</p>
                 </div>
                 <div className="flex flex-col gap-1 p-2 rounded bg-muted/50">
                   <Badge variant="outline">fee</Badge>
-                  <p className="text-xs text-muted-foreground">Montant des frais BKApay (6% du montant). Ex: 300 pour un paiement de 5000</p>
+                  <p className="text-xs text-muted-foreground">Frais de service deduits</p>
                 </div>
                 <div className="flex flex-col gap-1 p-2 rounded bg-muted/50">
                   <Badge variant="outline">netAmount</Badge>
-                  <p className="text-xs text-muted-foreground">Montant net credite sur votre solde marchand (amount - fee). Ex: 4700 pour un paiement de 5000</p>
+                  <p className="text-xs text-muted-foreground">Montant net credite sur votre solde marchand (amount - fee)</p>
                 </div>
                 <div className="flex flex-col gap-1 p-2 rounded bg-muted/50">
                   <Badge variant="outline">currency</Badge>
@@ -1618,7 +1556,7 @@ def webhook_bkapay():
               <p className="font-semibold mb-1" data-testid="text-faq-7">Ou se trouve mon solde apres un paiement reussi ?</p>
               <p className="text-muted-foreground">
                 Votre solde est credite automatiquement et instantanement apres la confirmation du paiement. 
-                Le montant net (apres deduction des frais de 6%) est ajoute a votre solde BKApay visible dans le tableau de bord.
+                Le montant net est ajoute a votre solde BKApay visible dans le tableau de bord.
                 Aucune action de votre part n'est necessaire pour recevoir les fonds.
               </p>
             </div>
