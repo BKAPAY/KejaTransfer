@@ -219,11 +219,43 @@ export default function AdminUserHistory() {
                           )}
                         </div>
                       )}
+                      {tx.paydunyaToken && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          <span className="font-medium">Token:</span> {tx.paydunyaToken}
+                        </p>
+                      )}
+                      {(() => {
+                        try {
+                          const meta = tx.metadata ? JSON.parse(tx.metadata as string) : null;
+                          const providerId = meta?.fedapayTransactionId || meta?.mbiyopayTransactionId || meta?.afribaPayTransactionId || (meta?.provider === "moneyfusion" && meta?.orderId);
+                          if (providerId && !tx.paydunyaToken) {
+                            return (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                <span className="font-medium">Réf:</span> {providerId}
+                              </p>
+                            );
+                          }
+                          return null;
+                        } catch { return null; }
+                      })()}
                     </div>
                     <div className="text-right shrink-0">
                       <p className="font-bold text-base tabular-nums">
                         {formatAmount(tx.amount, tx.currency || userCurrency)}
                       </p>
+                      {(() => {
+                        try {
+                          const meta = tx.metadata ? JSON.parse(tx.metadata as string) : null;
+                          if (meta?.providerAmount && meta?.providerCurrency && meta.providerCurrency !== tx.currency) {
+                            return (
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                (envoyé: {meta.providerAmount.toLocaleString("fr-FR")} {meta.providerCurrency})
+                              </p>
+                            );
+                          }
+                          return null;
+                        } catch { return null; }
+                      })()}
                     </div>
                   </div>
                 ))}

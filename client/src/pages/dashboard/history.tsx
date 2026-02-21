@@ -236,12 +236,44 @@ export default function History() {
                           )}
                         </div>
                       )}
+                      {transaction.paydunyaToken && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          <span className="font-medium">Token:</span> {transaction.paydunyaToken}
+                        </p>
+                      )}
+                      {(() => {
+                        try {
+                          const meta = transaction.metadata ? JSON.parse(transaction.metadata as string) : null;
+                          const providerId = meta?.fedapayTransactionId || meta?.mbiyopayTransactionId || meta?.afribaPayTransactionId || (meta?.provider === "moneyfusion" && meta?.orderId);
+                          if (providerId && !transaction.paydunyaToken) {
+                            return (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                <span className="font-medium">Réf:</span> {providerId}
+                              </p>
+                            );
+                          }
+                          return null;
+                        } catch { return null; }
+                      })()}
                     </div>
                     <div className="text-right shrink-0">
                       <p className="font-bold text-base tabular-nums">
                         {formatAmount(transaction.amount)}
                       </p>
                       <p className="text-xs text-muted-foreground">{transaction.currency}</p>
+                      {(() => {
+                        try {
+                          const meta = transaction.metadata ? JSON.parse(transaction.metadata as string) : null;
+                          if (meta?.providerAmount && meta?.providerCurrency && meta.providerCurrency !== transaction.currency) {
+                            return (
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                (envoyé: {meta.providerAmount.toLocaleString("fr-FR")} {meta.providerCurrency})
+                              </p>
+                            );
+                          }
+                          return null;
+                        } catch { return null; }
+                      })()}
                     </div>
                   </div>
                 ))}

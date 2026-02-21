@@ -30,6 +30,11 @@ interface TransactionMetadata {
   paymentId?: string;
   nowpaymentsId?: string;
   fedapayTransactionId?: number;
+  fedapayReference?: string;
+  mbiyopayTransactionId?: string;
+  afribaPayTransactionId?: string;
+  afribaPayOrderId?: string;
+  moneyfusionRef?: string;
   wizallTransactionId?: string;
   operatorKey?: string;
   provider?: string;
@@ -219,9 +224,21 @@ export function TransactionDetailsDialog({
                 </div>
               )}
 
+              {metadata?.providerAmount && metadata?.providerCurrency && metadata.providerCurrency !== transaction.currency && (
+                <div className="space-y-1 col-span-2">
+                  <p className="text-xs text-muted-foreground">Montant envoyé au fournisseur</p>
+                  <p className="text-sm font-medium">
+                    {metadata.providerAmount.toLocaleString("fr-FR")} {metadata.providerCurrency}
+                    {metadata.conversionRate && (
+                      <span className="text-xs text-muted-foreground ml-2">(taux: {metadata.conversionRate})</span>
+                    )}
+                  </p>
+                </div>
+              )}
+
               {transaction.paydunyaToken && (
                 <div className="space-y-1 col-span-2">
-                  <p className="text-xs text-muted-foreground">Token de paiement</p>
+                  <p className="text-xs text-muted-foreground">Token Paydunya</p>
                   <div className="flex items-center gap-2">
                     <p className="text-xs font-mono bg-muted p-2 rounded flex-1 truncate">
                       {transaction.paydunyaToken}
@@ -229,12 +246,114 @@ export function TransactionDetailsDialog({
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => copyToClipboard(transaction.paydunyaToken!, "Token")}
+                      onClick={() => copyToClipboard(transaction.paydunyaToken!, "Token Paydunya")}
                       data-testid="button-copy-token"
                     >
                       <Copy className="w-4 h-4" />
                     </Button>
                   </div>
+                </div>
+              )}
+
+              {metadata?.fedapayTransactionId && (
+                <div className="space-y-1 col-span-2">
+                  <p className="text-xs text-muted-foreground">ID Transaction FedaPay</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs font-mono bg-muted p-2 rounded flex-1 truncate">
+                      {metadata.fedapayTransactionId}
+                    </p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => copyToClipboard(String(metadata.fedapayTransactionId), "ID FedaPay")}
+                      data-testid="button-copy-fedapay-id"
+                    >
+                      <Copy className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {metadata?.mbiyopayTransactionId && (
+                <div className="space-y-1 col-span-2">
+                  <p className="text-xs text-muted-foreground">ID Transaction MbiyoPay</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs font-mono bg-muted p-2 rounded flex-1 truncate">
+                      {metadata.mbiyopayTransactionId}
+                    </p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => copyToClipboard(String(metadata.mbiyopayTransactionId), "ID MbiyoPay")}
+                      data-testid="button-copy-mbiyopay-id"
+                    >
+                      <Copy className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {metadata?.afribaPayTransactionId && (
+                <div className="space-y-1 col-span-2">
+                  <p className="text-xs text-muted-foreground">ID Transaction AfribaPay</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs font-mono bg-muted p-2 rounded flex-1 truncate">
+                      {metadata.afribaPayTransactionId}
+                    </p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => copyToClipboard(String(metadata.afribaPayTransactionId), "ID AfribaPay")}
+                      data-testid="button-copy-afribapay-id"
+                    >
+                      <Copy className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {metadata?.provider === "moneyfusion" && metadata?.orderId && (
+                <div className="space-y-1 col-span-2">
+                  <p className="text-xs text-muted-foreground">Référence MoneyFusion</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs font-mono bg-muted p-2 rounded flex-1 truncate">
+                      {metadata.orderId}
+                    </p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => copyToClipboard(String(metadata.orderId), "Réf MoneyFusion")}
+                      data-testid="button-copy-moneyfusion-ref"
+                    >
+                      <Copy className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {metadata?.nowpaymentsId && (
+                <div className="space-y-1 col-span-2">
+                  <p className="text-xs text-muted-foreground">ID NOWPayments</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs font-mono bg-muted p-2 rounded flex-1 truncate">
+                      {metadata.nowpaymentsId}
+                    </p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => copyToClipboard(String(metadata.nowpaymentsId), "ID NOWPayments")}
+                      data-testid="button-copy-nowpayments-id"
+                    >
+                      <Copy className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {metadata?.provider && (
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">Fournisseur</p>
+                  <p className="text-sm font-medium capitalize">{metadata.provider}</p>
                 </div>
               )}
             </div>
