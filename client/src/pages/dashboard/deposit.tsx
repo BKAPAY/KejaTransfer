@@ -22,7 +22,7 @@ import { CryptoPaymentFlow } from "@/components/crypto-payment-flow";
 import { CurrencySelector, getCurrencyLabel } from "@/components/currency-selector";
 import { OperatorSelector } from "@/components/operator-selector";
 import { hasMultipleCurrencies, getMbiyoPayCurrencyForCountry, getMbiyoPayCurrenciesForCountry, operatorRequiresOtp as mbiyoOperatorRequiresOtp, getOtpInstructionsForCountry } from "@shared/mbiyopay-countries";
-import { operatorRequiresOtpForCountry as paydunyaOperatorRequiresOtp, getOtpInstructionsForOperator as getPaydunyaOtpInstructions } from "@shared/afribapay-countries";
+import { paydunyaRequiresOtp, getPaydunyaOtpConfig } from "@shared/paydunya-otp";
 import { useConvertedMinimums } from "@/hooks/use-converted-minimums";
 import { getCurrencyDecimals } from "@/lib/currency";
 import { usePaymentCountdown, DEFAULT_COUNTDOWN_DURATION } from "@/hooks/use-payment-countdown";
@@ -134,15 +134,15 @@ export default function Deposit() {
   const amount = depositAmount;
 
   const currentOperatorNeedsOtp = selectedCountry && selectedOperator
-    ? (mbiyoOperatorRequiresOtp(selectedCountry, selectedOperator) || paydunyaOperatorRequiresOtp(selectedCountry, selectedOperator))
+    ? (mbiyoOperatorRequiresOtp(selectedCountry, selectedOperator) || paydunyaRequiresOtp(selectedCountry, selectedOperator))
     : false;
 
   const currentOtpInstructions = selectedCountry && selectedOperator && currentOperatorNeedsOtp
     ? (mbiyoOperatorRequiresOtp(selectedCountry, selectedOperator)
         ? getOtpInstructionsForCountry(selectedCountry)
         : (() => {
-            const instr = getPaydunyaOtpInstructions(selectedCountry, selectedOperator);
-            return instr ? { ussdCode: "", instructions: instr, hint: "" } : { ussdCode: "#144#", instructions: "Composez le code USSD pour obtenir votre code OTP", hint: "" };
+            const config = getPaydunyaOtpConfig(selectedCountry, selectedOperator);
+            return config && config.instructions ? { ussdCode: config.ussdCode || "", instructions: config.instructions, hint: config.hint || "" } : { ussdCode: "#144#", instructions: "Composez le code USSD pour obtenir votre code OTP", hint: "" };
           })())
     : null;
 

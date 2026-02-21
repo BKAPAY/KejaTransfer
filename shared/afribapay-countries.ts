@@ -76,7 +76,7 @@ export const AFRIBAPAY_COUNTRIES: AfribaPayCountry[] = [
     phoneFormat: "7XXXXXXXX",
     currency: "XOF",
     operators: [
-      { code: "orange", name: "Orange Money", requiresOtp: false, payin: true, payout: true },
+      { code: "orange", name: "Orange Money", requiresOtp: true, payin: true, payout: true },
       { code: "free", name: "Free Money", requiresOtp: false, payin: true, payout: true },
       { code: "expresso", name: "Expresso", requiresOtp: false, payin: true, payout: true },
       { code: "wave", name: "Wave", requiresOtp: false, payin: true, payout: true },

@@ -187,7 +187,7 @@ export function mbiyoPayOperatorRequiresOtp(countryCode: string, network: string
   const op = network.toLowerCase();
   if (op !== "orange") return false;
   if (country === "cd") return false;
-  const countriesWithOrangeOtp = ["bf", "ci", "gn"];
+  const countriesWithOrangeOtp = ["bf", "ci", "sn", "ml", "gn"];
   return countriesWithOrangeOtp.includes(country);
 }
 
