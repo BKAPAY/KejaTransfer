@@ -226,7 +226,7 @@ export function TransactionDetailsDialog({
 
               {metadata?.providerAmount && metadata?.providerCurrency && metadata.providerCurrency !== transaction.currency && (
                 <div className="space-y-1 col-span-2">
-                  <p className="text-xs text-muted-foreground">Montant envoyé au fournisseur</p>
+                  <p className="text-xs text-muted-foreground">Montant envoyé</p>
                   <p className="text-sm font-medium">
                     {metadata.providerAmount.toLocaleString("fr-FR")} {metadata.providerCurrency}
                     {metadata.conversionRate && (
@@ -257,7 +257,7 @@ export function TransactionDetailsDialog({
 
               {metadata?.fedapayTransactionId && (
                 <div className="space-y-1 col-span-2">
-                  <p className="text-xs text-muted-foreground">ID Transaction FedaPay</p>
+                  <p className="text-xs text-muted-foreground">Référence de transaction</p>
                   <div className="flex items-center gap-2">
                     <p className="text-xs font-mono bg-muted p-2 rounded flex-1 truncate">
                       {metadata.fedapayTransactionId}
@@ -265,7 +265,7 @@ export function TransactionDetailsDialog({
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => copyToClipboard(String(metadata.fedapayTransactionId), "ID FedaPay")}
+                      onClick={() => copyToClipboard(String(metadata.fedapayTransactionId), "Référence")}
                       data-testid="button-copy-fedapay-id"
                     >
                       <Copy className="w-4 h-4" />
@@ -276,7 +276,7 @@ export function TransactionDetailsDialog({
 
               {metadata?.mbiyopayTransactionId && (
                 <div className="space-y-1 col-span-2">
-                  <p className="text-xs text-muted-foreground">ID Transaction MbiyoPay</p>
+                  <p className="text-xs text-muted-foreground">Référence de transaction</p>
                   <div className="flex items-center gap-2">
                     <p className="text-xs font-mono bg-muted p-2 rounded flex-1 truncate">
                       {metadata.mbiyopayTransactionId}
@@ -284,7 +284,7 @@ export function TransactionDetailsDialog({
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => copyToClipboard(String(metadata.mbiyopayTransactionId), "ID MbiyoPay")}
+                      onClick={() => copyToClipboard(String(metadata.mbiyopayTransactionId), "Référence")}
                       data-testid="button-copy-mbiyopay-id"
                     >
                       <Copy className="w-4 h-4" />
@@ -295,7 +295,7 @@ export function TransactionDetailsDialog({
 
               {metadata?.afribaPayTransactionId && (
                 <div className="space-y-1 col-span-2">
-                  <p className="text-xs text-muted-foreground">ID Transaction AfribaPay</p>
+                  <p className="text-xs text-muted-foreground">Référence de transaction</p>
                   <div className="flex items-center gap-2">
                     <p className="text-xs font-mono bg-muted p-2 rounded flex-1 truncate">
                       {metadata.afribaPayTransactionId}
@@ -303,7 +303,7 @@ export function TransactionDetailsDialog({
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => copyToClipboard(String(metadata.afribaPayTransactionId), "ID AfribaPay")}
+                      onClick={() => copyToClipboard(String(metadata.afribaPayTransactionId), "Référence")}
                       data-testid="button-copy-afribapay-id"
                     >
                       <Copy className="w-4 h-4" />
@@ -314,7 +314,7 @@ export function TransactionDetailsDialog({
 
               {metadata?.provider === "moneyfusion" && metadata?.orderId && (
                 <div className="space-y-1 col-span-2">
-                  <p className="text-xs text-muted-foreground">Référence MoneyFusion</p>
+                  <p className="text-xs text-muted-foreground">Référence de transaction</p>
                   <div className="flex items-center gap-2">
                     <p className="text-xs font-mono bg-muted p-2 rounded flex-1 truncate">
                       {metadata.orderId}
@@ -322,7 +322,7 @@ export function TransactionDetailsDialog({
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => copyToClipboard(String(metadata.orderId), "Réf MoneyFusion")}
+                      onClick={() => copyToClipboard(String(metadata.orderId), "Référence")}
                       data-testid="button-copy-moneyfusion-ref"
                     >
                       <Copy className="w-4 h-4" />
@@ -333,7 +333,7 @@ export function TransactionDetailsDialog({
 
               {metadata?.nowpaymentsId && (
                 <div className="space-y-1 col-span-2">
-                  <p className="text-xs text-muted-foreground">ID NOWPayments</p>
+                  <p className="text-xs text-muted-foreground">Référence de transaction</p>
                   <div className="flex items-center gap-2">
                     <p className="text-xs font-mono bg-muted p-2 rounded flex-1 truncate">
                       {metadata.nowpaymentsId}
@@ -341,7 +341,7 @@ export function TransactionDetailsDialog({
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => copyToClipboard(String(metadata.nowpaymentsId), "ID NOWPayments")}
+                      onClick={() => copyToClipboard(String(metadata.nowpaymentsId), "Référence")}
                       data-testid="button-copy-nowpayments-id"
                     >
                       <Copy className="w-4 h-4" />
@@ -350,12 +350,6 @@ export function TransactionDetailsDialog({
                 </div>
               )}
 
-              {metadata?.provider && (
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">Fournisseur</p>
-                  <p className="text-sm font-medium capitalize">{metadata.provider}</p>
-                </div>
-              )}
             </div>
           </div>
 
