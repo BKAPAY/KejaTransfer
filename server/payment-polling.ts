@@ -133,6 +133,30 @@ async function processFedaPayTransaction(transaction: Transaction & { user?: Use
       const result = await storage.finalizeIncomingTransaction(transaction.id, {});
       if (result) {
         console.log(`[PaymentPolling] ✅ FedaPay transaction ${transaction.id} CONFIRMED - finalized: credited=${result.credited}`);
+        if (result.transaction.type === "api_payment") {
+          try {
+            let apiKeyPublicKey: string | undefined;
+            if (result.transaction.metadata) {
+              try {
+                const meta = JSON.parse(result.transaction.metadata);
+                apiKeyPublicKey = meta.apiKeyPublicKey;
+              } catch (e) {}
+            }
+            if (apiKeyPublicKey) {
+              const apiKey = await storage.getApiKeyByPublicKey(apiKeyPublicKey);
+              if (apiKey && apiKey.callbackUrl) {
+                const updatedTx = await storage.getTransaction(transaction.id);
+                if (updatedTx) {
+                  sendPaymentCallback(updatedTx, apiKey, 'payment.completed')
+                    .then(r => console.log(`[PaymentPolling] FedaPay developer callback sent:`, r))
+                    .catch(e => console.error(`[PaymentPolling] FedaPay developer callback error:`, e));
+                }
+              }
+            }
+          } catch (callbackError) {
+            console.error("[PaymentPolling] Error sending FedaPay developer callback:", callbackError);
+          }
+        }
       } else {
         console.log(`[PaymentPolling] FedaPay transaction ${transaction.id} already processed - skipping`);
       }
@@ -404,6 +428,30 @@ async function processMbiyoPayTransaction(transaction: Transaction & { user?: Us
           const result = await storage.finalizeIncomingTransaction(transaction.id, {});
           if (result) {
             console.log(`[PaymentPolling] ✅ MbiyoPay transaction ${transaction.id} CONFIRMED (double-verified) - finalized: credited=${result.credited}`);
+            if (result.transaction.type === "api_payment") {
+              try {
+                let apiKeyPublicKey: string | undefined;
+                if (result.transaction.metadata) {
+                  try {
+                    const meta = JSON.parse(result.transaction.metadata);
+                    apiKeyPublicKey = meta.apiKeyPublicKey;
+                  } catch (e) {}
+                }
+                if (apiKeyPublicKey) {
+                  const apiKey = await storage.getApiKeyByPublicKey(apiKeyPublicKey);
+                  if (apiKey && apiKey.callbackUrl) {
+                    const updatedTx = await storage.getTransaction(transaction.id);
+                    if (updatedTx) {
+                      sendPaymentCallback(updatedTx, apiKey, 'payment.completed')
+                        .then(r => console.log(`[PaymentPolling] MbiyoPay developer callback sent:`, r))
+                        .catch(e => console.error(`[PaymentPolling] MbiyoPay developer callback error:`, e));
+                    }
+                  }
+                }
+              } catch (callbackError) {
+                console.error("[PaymentPolling] Error sending MbiyoPay developer callback:", callbackError);
+              }
+            }
           } else {
             console.log(`[PaymentPolling] MbiyoPay transaction ${transaction.id} already processed - skipping`);
           }
@@ -606,6 +654,30 @@ async function processPaydunyaTransaction(transaction: Transaction & { user?: Us
 
     if (result) {
       console.log(`[PaymentPolling] ✅ Paydunya transaction ${transaction.id} CONFIRMED - finalized: credited=${result.credited}`);
+      if (result.transaction.type === "api_payment") {
+        try {
+          let apiKeyPublicKey: string | undefined;
+          if (result.transaction.metadata) {
+            try {
+              const meta = JSON.parse(result.transaction.metadata);
+              apiKeyPublicKey = meta.apiKeyPublicKey;
+            } catch (e) {}
+          }
+          if (apiKeyPublicKey) {
+            const apiKey = await storage.getApiKeyByPublicKey(apiKeyPublicKey);
+            if (apiKey && apiKey.callbackUrl) {
+              const updatedTx = await storage.getTransaction(transaction.id);
+              if (updatedTx) {
+                sendPaymentCallback(updatedTx, apiKey, 'payment.completed')
+                  .then(r => console.log(`[PaymentPolling] Paydunya developer callback sent:`, r))
+                  .catch(e => console.error(`[PaymentPolling] Paydunya developer callback error:`, e));
+              }
+            }
+          }
+        } catch (callbackError) {
+          console.error("[PaymentPolling] Error sending Paydunya developer callback:", callbackError);
+        }
+      }
     } else {
       console.log(`[PaymentPolling] Paydunya transaction ${transaction.id} already processed - skipping`);
     }
