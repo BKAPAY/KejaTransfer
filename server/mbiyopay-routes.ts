@@ -3,7 +3,7 @@ import { storage } from "./storage";
 
 import { calculateIncomingFee, calculateOutgoingFee, getFeeFromDatabase } from "./utils/fees";
 import { safeRefundOutgoingTransaction } from "./payment-polling";
-import { sendPaymentCallback } from "./utils/callback";
+import { trySendPaymentCallback } from "./utils/callback";
 import { 
   createMbiyoPayPayin, 
   createMbiyoPayPayout, 
@@ -992,29 +992,9 @@ export async function handleMbiyoPayWebhook(req: Request, res: Response) {
         const result = await storage.finalizeIncomingTransaction(tx.id, {});
         if (result) {
           console.log(`[MbiyoPay Webhook] Deposit completed: ${tx.id}, credited=${result.credited}, netAmount=${result.transaction.amount - (result.transaction.fee || 0)}`);
-          if (result.transaction.type === "api_payment") {
-            try {
-              let apiKeyPublicKey: string | undefined;
-              if (result.transaction.metadata) {
-                try {
-                  const meta = JSON.parse(result.transaction.metadata);
-                  apiKeyPublicKey = meta.apiKeyPublicKey;
-                } catch (e) {}
-              }
-              if (apiKeyPublicKey) {
-                const apiKey = await storage.getApiKeyByPublicKey(apiKeyPublicKey);
-                if (apiKey && apiKey.callbackUrl) {
-                  const updatedTx = await storage.getTransaction(tx.id);
-                  if (updatedTx) {
-                    sendPaymentCallback(updatedTx, apiKey, 'payment.completed')
-                      .then(r => console.log(`[MbiyoPay Webhook] Developer callback sent:`, r))
-                      .catch(e => console.error(`[MbiyoPay Webhook] Developer callback error:`, e));
-                  }
-                }
-              }
-            } catch (callbackError) {
-              console.error("[MbiyoPay Webhook] Error sending developer callback:", callbackError);
-            }
+          const updatedTx = await storage.getTransaction(tx.id);
+          if (updatedTx) {
+            trySendPaymentCallback(updatedTx, 'payment.completed', '[MbiyoPay Webhook]');
           }
         } else {
           console.log(`[MbiyoPay Webhook] Transaction ${tx.id} already processed by polling - skipping`);

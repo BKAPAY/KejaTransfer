@@ -12,7 +12,7 @@ import { insertUserSchema, insertPaymentLinkSchema, insertMerchantLinkSchema, in
 import { validatePhoneOperator } from "@shared/phone-utils";
 import { randomUUID } from "crypto";
 import { calculateIncomingFee, calculateOutgoingFee, calculateCustomerPaysFee, getFeeFromDatabase, getDynamicFees, getDynamicOutgoingFees, getActiveProviderForCountry, getActivePayoutProviderForCountry } from "./utils/fees";
-import { sendPaymentCallback } from "./utils/callback";
+import { trySendPaymentCallback } from "./utils/callback";
 import { recordLoginLog } from "./utils/login-tracker";
 import { 
   SOFTPAY_OPERATORS, 
@@ -3950,34 +3950,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             netAmount: result.transaction.amount - (result.transaction.fee || 0)
           });
           
-          // Send callback for API payments
-          if (result.transaction.type === "api_payment") {
-            try {
-              // Get API key from transaction metadata to find callback URL
-              let apiKeyPublicKey: string | undefined;
-              if (result.transaction.metadata) {
-                try {
-                  const metadata = JSON.parse(result.transaction.metadata);
-                  apiKeyPublicKey = metadata.apiKeyPublicKey;
-                } catch (e) {}
-              }
-              
-              if (apiKeyPublicKey) {
-                const apiKey = await storage.getApiKeyByPublicKey(apiKeyPublicKey);
-                if (apiKey && apiKey.callbackUrl) {
-                  sendPaymentCallback(result.transaction, apiKey, 'payment.completed')
-                    .then(callbackResult => {
-                      console.log("[WEBHOOK] Callback sent:", callbackResult);
-                    })
-                    .catch(err => {
-                      console.error("[WEBHOOK] Callback error:", err);
-                    });
-                }
-              }
-            } catch (callbackError) {
-              console.error("[WEBHOOK] Error processing callback:", callbackError);
-            }
-          }
+          trySendPaymentCallback(result.transaction, 'payment.completed', '[WEBHOOK/Paydunya]');
         } else {
           console.log("[WEBHOOK] Transaction already processed (not pending):", { transactionId: transaction.id });
         }
@@ -3985,35 +3958,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.updateTransactionStatus(transaction.id, "failed");
         console.log("[WEBHOOK] Transaction marked as failed:", { transactionId: transaction.id });
         
-        // Send failed callback for API payments
-        if (transaction.type === "api_payment") {
-          try {
-            let apiKeyPublicKey: string | undefined;
-            if (transaction.metadata) {
-              try {
-                const metadata = JSON.parse(transaction.metadata);
-                apiKeyPublicKey = metadata.apiKeyPublicKey;
-              } catch (e) {}
-            }
-            
-            if (apiKeyPublicKey) {
-              const apiKey = await storage.getApiKeyByPublicKey(apiKeyPublicKey);
-              if (apiKey && apiKey.callbackUrl) {
-                const updatedTx = await storage.getTransaction(transaction.id);
-                if (updatedTx) {
-                  sendPaymentCallback(updatedTx, apiKey, 'payment.failed')
-                    .then(callbackResult => {
-                      console.log("[WEBHOOK] Failed callback sent:", callbackResult);
-                    })
-                    .catch(err => {
-                      console.error("[WEBHOOK] Failed callback error:", err);
-                    });
-                }
-              }
-            }
-          } catch (callbackError) {
-            console.error("[WEBHOOK] Error processing failed callback:", callbackError);
-          }
+        const failedTx = await storage.getTransaction(transaction.id);
+        if (failedTx) {
+          trySendPaymentCallback(failedTx, 'payment.failed', '[WEBHOOK/Paydunya]');
         }
       }
 
@@ -6095,6 +6042,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           paydunyaToken: paydunyaResponse.token, // Store in dedicated column
           metadata: JSON.stringify({
             api_key_id: apiKey.id,
+            apiKeyPublicKey: publicKey,
+            callbackUrl: callbackUrl || null,
+            provider: "paydunya",
           }),
         });
         

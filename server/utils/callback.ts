@@ -1,5 +1,53 @@
 import crypto from 'crypto';
 import type { Transaction, ApiKey } from '@shared/schema';
+import { storage } from '../storage';
+
+export async function resolveApiKeyForCallback(transaction: Transaction): Promise<ApiKey | null> {
+  if (transaction.type !== "api_payment") return null;
+  
+  let apiKeyPublicKey: string | undefined;
+  let apiKeyId: string | undefined;
+  
+  if (transaction.metadata) {
+    try {
+      const meta = JSON.parse(transaction.metadata);
+      apiKeyPublicKey = meta.apiKeyPublicKey;
+      apiKeyId = meta.api_key_id || meta.apiKeyId;
+    } catch (e) {}
+  }
+  
+  let apiKey: ApiKey | undefined;
+  
+  if (apiKeyPublicKey) {
+    apiKey = await storage.getApiKeyByPublicKey(apiKeyPublicKey);
+  }
+  
+  if (!apiKey && apiKeyId) {
+    apiKey = await storage.getApiKeyById(apiKeyId);
+  }
+  
+  if (apiKey && apiKey.callbackUrl) {
+    return apiKey;
+  }
+  
+  return null;
+}
+
+export async function trySendPaymentCallback(
+  transaction: Transaction,
+  event: 'payment.completed' | 'payment.failed',
+  logPrefix: string = '[Callback]'
+): Promise<void> {
+  try {
+    const apiKey = await resolveApiKeyForCallback(transaction);
+    if (apiKey) {
+      const result = await sendPaymentCallback(transaction, apiKey, event);
+      console.log(`${logPrefix} Developer callback ${event} sent:`, result);
+    }
+  } catch (error) {
+    console.error(`${logPrefix} Error sending developer callback:`, error);
+  }
+}
 
 interface CallbackPayload {
   event: 'payment.completed' | 'payment.failed';
