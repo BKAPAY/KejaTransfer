@@ -12,9 +12,6 @@ export const OTP_INSTRUCTIONS: Record<string, Record<string, string>> = {
   CI: {
     orange: "Pour generer votre code OTP Orange Money:\n1. Composez *144*82#\n2. Choisissez l'option 2 (Paiement marchand)\n3. Selectionnez 'Generer un code'\n4. Entrez votre code secret\n5. Un code OTP a 6 chiffres vous sera envoye par SMS",
   },
-  SN: {
-    orange: "Pour generer votre code OTP Orange Money:\n1. Composez *144#\n2. Selectionnez 'Paiement marchand'\n3. Choisissez 'Generer un code'\n4. Entrez votre code secret\n5. Un code OTP a 6 chiffres vous sera envoye par SMS",
-  },
   BF: {
     orange: "Pour generer votre code OTP Orange Money:\n1. Composez *144#\n2. Selectionnez 'Payer'\n3. Choisissez 'Marchand'\n4. Selectionnez 'Generer un code'\n5. Entrez votre code secret\n6. Un code OTP a 4-6 chiffres vous sera envoye par SMS",
   },
@@ -79,7 +76,7 @@ export const AFRIBAPAY_COUNTRIES: AfribaPayCountry[] = [
     phoneFormat: "7XXXXXXXX",
     currency: "XOF",
     operators: [
-      { code: "orange", name: "Orange Money", requiresOtp: true, payin: true, payout: true },
+      { code: "orange", name: "Orange Money", requiresOtp: false, payin: true, payout: true },
       { code: "free", name: "Free Money", requiresOtp: false, payin: true, payout: true },
       { code: "expresso", name: "Expresso", requiresOtp: false, payin: true, payout: true },
       { code: "wave", name: "Wave", requiresOtp: false, payin: true, payout: true },
