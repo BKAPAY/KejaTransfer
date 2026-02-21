@@ -3,7 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Users, UserCheck, TrendingDown, TrendingUp, Search, Settings, Globe, RefreshCw, Database, AlertCircle, CheckCircle2, Eye, History, MapPin, Mail, Phone, CreditCard, Percent, Lock, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Bot, Power } from "lucide-react";
+import { Users, UserCheck, TrendingDown, TrendingUp, Search, Settings, Globe, RefreshCw, Database, AlertCircle, CheckCircle2, Eye, History, MapPin, Mail, Phone, CreditCard, Percent, Lock, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Bot, Power, Network } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -401,6 +401,15 @@ export default function Admin() {
           >
             <Bot className="w-4 h-4" />
             {emaliStatus?.enabled !== false ? "EMALI AI : ON" : "EMALI AI : OFF"}
+          </Button>
+          <Button
+            onClick={() => handleProtectedNavigation("/dashboard/ip-addresses")}
+            data-testid="button-ip-addresses"
+            className="gap-2"
+            variant="outline"
+          >
+            <Network className="w-4 h-4" />
+            Adresses IP
           </Button>
         </div>
       </div>

@@ -1,8 +1,38 @@
 import { storage } from "./storage";
 import { getMoneyFusionWithdrawMode, getMoneyFusionCurrency, isMoneyFusionSupported } from "@shared/moneyfusion-countries";
+import postgres from "postgres";
 
 const MONEYFUSION_API_URL = "https://pay.moneyfusion.net/api/v1";
 const MONEYFUSION_TIMEOUT_MS = 30000;
+
+let cachedServerIp: string | null = null;
+
+async function getServerPublicIp(): Promise<string> {
+  if (cachedServerIp) return cachedServerIp;
+  try {
+    const res = await fetch("https://api.ipify.org?format=json", { signal: AbortSignal.timeout(5000) });
+    const data = await res.json();
+    cachedServerIp = data.ip || "unknown";
+    return cachedServerIp!;
+  } catch {
+    return "unknown";
+  }
+}
+
+async function logMoneyFusionIpError(errorMessage: string, countryCode: string, operatorCode: string) {
+  try {
+    const ip = await getServerPublicIp();
+    const client = postgres(process.env.DATABASE_URL!);
+    await client`
+      INSERT INTO moneyfusion_ip_logs (ip_address, error_message, country_code, operator_code)
+      VALUES (${ip}, ${errorMessage}, ${countryCode}, ${operatorCode})
+    `;
+    await client.end();
+    console.log(`[MoneyFusion IP Log] Logged IP ${ip} for ${countryCode}/${operatorCode}`);
+  } catch (e) {
+    console.error("[MoneyFusion IP Log] Failed to log IP error:", e);
+  }
+}
 
 async function getMoneyFusionApiKey(): Promise<string | null> {
   try {
@@ -50,9 +80,24 @@ export async function createMoneyFusionPayout(params: MoneyFusionPayoutParams): 
       return { success: false, error: "L'operation n'est pas disponible pour le moment. Veuillez reessayer plus tard." };
     }
 
+    const COUNTRY_DIAL_CODES: Record<string, string> = {
+      "bj": "229", "ci": "225", "sn": "221", "bf": "226", "tg": "228",
+      "ml": "223", "cg": "242", "cm": "237", "cd": "243", "ga": "241",
+      "gn": "224", "gm": "220", "gh": "233", "gw": "245", "ke": "254",
+      "mr": "222", "ne": "227", "ug": "256", "cf": "236", "rw": "250",
+      "sl": "232", "tz": "255", "td": "235", "et": "251",
+    };
+
     let cleanPhone = params.phone.replace(/[\s\-\.]+/g, "");
     if (cleanPhone.startsWith("+")) {
       cleanPhone = cleanPhone.substring(1);
+    }
+    const dialCode = COUNTRY_DIAL_CODES[countryLower];
+    if (dialCode && cleanPhone.startsWith(dialCode)) {
+      cleanPhone = cleanPhone.substring(dialCode.length);
+    }
+    if (cleanPhone.startsWith("00") && dialCode && cleanPhone.startsWith("00" + dialCode)) {
+      cleanPhone = cleanPhone.substring(2 + dialCode.length);
     }
 
     const baseUrl = process.env.BASE_URL || "https://bkapay.com";
@@ -108,6 +153,7 @@ export async function createMoneyFusionPayout(params: MoneyFusionPayoutParams): 
     }
     if (msgLower.includes("ip") || msgLower.includes("adresse") || msgLower.includes("autoris")) {
       console.error("[MoneyFusion Payout] IP not whitelisted");
+      logMoneyFusionIpError(data.message || "IP non autorisée", countryLower, params.operatorCode);
       return { success: false, error: "Le service est temporairement indisponible. Veuillez reessayer plus tard." };
     }
     if (msgLower.includes("phone") || msgLower.includes("numero") || msgLower.includes("tel")) {

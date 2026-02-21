@@ -36,6 +36,7 @@ import FeeConfig from "@/pages/dashboard/fee-config";
 import Diagnostic from "@/pages/dashboard/diagnostic";
 import Fournisseurs from "@/pages/dashboard/fournisseurs";
 import SupportConfig from "@/pages/dashboard/support-config";
+import IpAddresses from "@/pages/dashboard/ip-addresses";
 import AdminUserProfile from "@/pages/dashboard/admin-user-profile";
 import AdminUserHistory from "@/pages/dashboard/admin-user-history";
 import AdminUserLinks from "@/pages/dashboard/admin-user-links";
@@ -203,6 +204,7 @@ function Router() {
           <Route path="/dashboard/diagnostic" component={Diagnostic} />
           <Route path="/dashboard/fournisseurs" component={Fournisseurs} />
           <Route path="/dashboard/support-config" component={SupportConfig} />
+          <Route path="/dashboard/ip-addresses" component={IpAddresses} />
           <Route path="/dashboard/admin/user/:userId/profile" component={AdminUserProfile} />
           <Route path="/dashboard/admin/user/:userId/history" component={AdminUserHistory} />
           <Route path="/dashboard/admin/user/:userId/links" component={AdminUserLinks} />

@@ -8679,6 +8679,55 @@ SUPPORT ET CONTACT:
     }
   });
 
+  // MoneyFusion IP Logs - Admin routes
+  app.get("/api/admin/moneyfusion-ip-logs", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+      const result = await pool.query("SELECT * FROM moneyfusion_ip_logs ORDER BY created_at DESC LIMIT 100");
+      await pool.end();
+      res.json(result.rows);
+    } catch (error: any) {
+      console.error("[Admin IP Logs] Error:", error);
+      res.json([]);
+    }
+  });
+
+  app.post("/api/admin/moneyfusion-ip-logs/:id/resolve", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+      await pool.query("UPDATE moneyfusion_ip_logs SET resolved = TRUE WHERE id = $1", [req.params.id]);
+      await pool.end();
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[Admin IP Logs] Resolve error:", error);
+      res.status(500).json({ error: "Erreur" });
+    }
+  });
+
+  app.delete("/api/admin/moneyfusion-ip-logs/resolved", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+      await pool.query("DELETE FROM moneyfusion_ip_logs WHERE resolved = TRUE");
+      await pool.end();
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[Admin IP Logs] Delete resolved error:", error);
+      res.status(500).json({ error: "Erreur" });
+    }
+  });
+
+  app.delete("/api/admin/moneyfusion-ip-logs/:id", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+      await pool.query("DELETE FROM moneyfusion_ip_logs WHERE id = $1", [req.params.id]);
+      await pool.end();
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[Admin IP Logs] Delete error:", error);
+      res.status(500).json({ error: "Erreur" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

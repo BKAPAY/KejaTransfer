@@ -198,6 +198,27 @@ async function bootstrapDatabase() {
     }
     await loginLogsClient.end();
 
+    // Step 6c: Ensure moneyfusion_ip_logs table exists
+    console.log("⚙️ Ensuring moneyfusion_ip_logs table exists...");
+    const ipLogsClient = postgres(DATABASE_URL);
+    try {
+      await ipLogsClient`
+        CREATE TABLE IF NOT EXISTS moneyfusion_ip_logs (
+          id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+          ip_address TEXT NOT NULL,
+          error_message TEXT,
+          country_code TEXT,
+          operator_code TEXT,
+          resolved BOOLEAN DEFAULT FALSE,
+          created_at TIMESTAMP DEFAULT NOW()
+        )
+      `;
+      console.log("✅ MoneyFusion IP logs table ready");
+    } catch (e) {
+      console.error("⚠️ MoneyFusion IP logs setup error:", e);
+    }
+    await ipLogsClient.end();
+
     // Step 7: Ensure primary admin exists
     console.log("👤 Ensuring primary admin exists...");
     const seedClient = postgres(DATABASE_URL);
