@@ -76,6 +76,8 @@ export default function KYC() {
   const [isDrawing, setIsDrawing] = useState(false);
   const [cameraMode, setCameraMode] = useState<CameraMode>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
+  const [isCapturing, setIsCapturing] = useState(false);
+  const [captureCountdown, setCaptureCountdown] = useState<number | null>(null);
   const [uploadState, setUploadState] = useState<UploadState>({
     front: { status: "idle", progress: 0 },
     back: { status: "idle", progress: 0 },
@@ -146,7 +148,7 @@ export default function KYC() {
 
       const facingMode = mode === "selfie" ? "user" : "environment";
       const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
+        video: { facingMode, width: { ideal: 1920 }, height: { ideal: 1080 } },
         audio: false,
       });
 
@@ -172,11 +174,23 @@ export default function KYC() {
   }, [stream]);
 
   const capturePhoto = async () => {
-    if (!videoRef.current || !captureCanvasRef.current || !cameraMode) return;
+    if (!videoRef.current || !captureCanvasRef.current || !cameraMode || isCapturing) return;
+
+    setIsCapturing(true);
+
+    for (let i = 3; i >= 1; i--) {
+      setCaptureCountdown(i);
+      await new Promise((r) => setTimeout(r, 700));
+    }
+    setCaptureCountdown(0);
+    await new Promise((r) => setTimeout(r, 300));
 
     const video = videoRef.current;
     const canvas = captureCanvasRef.current;
     const ctx = canvas.getContext("2d");
+
+    setCaptureCountdown(null);
+    setIsCapturing(false);
 
     if (!ctx) return;
 
@@ -184,7 +198,7 @@ export default function KYC() {
     canvas.height = video.videoHeight;
     ctx.drawImage(video, 0, 0);
 
-    const imageData = canvas.toDataURL("image/jpeg", 0.8);
+    const imageData = canvas.toDataURL("image/jpeg", 0.92);
     const currentMode = cameraMode;
 
     if (currentMode === "front") {
@@ -539,6 +553,24 @@ export default function KYC() {
       selfie: "Photo avec piece en main",
     };
 
+    const instructions: Record<string, string[]> = {
+      front: [
+        "Posez la piece sur une surface plate",
+        "Eclairage direct, evitez les reflets",
+        "Tenez l'appareil stable",
+      ],
+      back: [
+        "Retournez la piece, meme cote verso",
+        "Bonne lumiere, pas de reflet",
+        "Gardez l'appareil immobile",
+      ],
+      selfie: [
+        "Tenez la piece a cote de votre visage",
+        "Regardez directement la camera",
+        "Endroit bien eclaire",
+      ],
+    };
+
     return (
       <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4">
         <div className="w-full max-w-sm bg-black rounded-xl overflow-hidden">
@@ -548,6 +580,7 @@ export default function KYC() {
               variant="ghost"
               size="icon"
               onClick={stopCamera}
+              disabled={isCapturing}
               className="text-white hover:bg-white/20"
               data-testid="button-close-camera"
             >
@@ -563,16 +596,50 @@ export default function KYC() {
               muted
               className="w-full h-full object-cover"
             />
+
+            {captureCountdown !== null && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                {captureCountdown > 0 ? (
+                  <span className="text-white font-bold" style={{ fontSize: "72px", lineHeight: 1 }}>
+                    {captureCountdown}
+                  </span>
+                ) : (
+                  <div className="w-20 h-20 rounded-full bg-white/30 border-4 border-white animate-ping" />
+                )}
+              </div>
+            )}
+
+            <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-3 py-2">
+              <ul className="space-y-0.5">
+                {instructions[cameraMode].map((tip, i) => (
+                  <li key={i} className="text-white/90 text-xs flex items-start gap-1.5">
+                    <span className="text-yellow-400 mt-0.5">•</span>
+                    {tip}
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
 
-          <div className="py-3 bg-black/80 flex justify-center">
+          <div className="py-3 bg-black/80 flex flex-col items-center gap-2">
             <Button
               onClick={capturePhoto}
+              disabled={isCapturing}
               className="rounded-full w-14 h-14 bg-white hover:bg-gray-200"
               data-testid="button-capture-photo"
             >
-              <Camera className="w-6 h-6 text-black" />
+              {isCapturing ? (
+                <Loader2 className="w-6 h-6 text-black animate-spin" />
+              ) : (
+                <Camera className="w-6 h-6 text-black" />
+              )}
             </Button>
+            {!isCapturing && (
+              <p className="text-white/60 text-xs">Appuyez quand vous etes pret</p>
+            )}
+            {isCapturing && (
+              <p className="text-yellow-400 text-xs font-medium">Restez immobile...</p>
+            )}
           </div>
         </div>
 

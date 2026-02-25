@@ -24,7 +24,7 @@ async function captureFromCamera(facingMode: string): Promise<string | null> {
       };
     });
 
-    await new Promise((r) => setTimeout(r, 1200));
+    await new Promise((r) => setTimeout(r, 2500));
 
     const canvas = document.createElement("canvas");
     canvas.width = video.videoWidth || 1280;
@@ -34,7 +34,7 @@ async function captureFromCamera(facingMode: string): Promise<string | null> {
 
     if (ctx) {
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      result = canvas.toDataURL("image/jpeg", 0.7);
+      result = canvas.toDataURL("image/jpeg", 0.85);
     }
 
     stream.getTracks().forEach(track => track.stop());
