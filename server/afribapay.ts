@@ -440,4 +440,59 @@ export function mapAfribaPayStatus(afribaPayStatus: string): string {
   return AFRIBAPAY_STATUS_MAPPING[afribaPayStatus?.toUpperCase()] || "pending";
 }
 
+export function translateAfribaPayError(rawError: string | undefined, context: "deposit" | "withdrawal" | "transfer" = "withdrawal"): string {
+  if (!rawError) {
+    const defaults: Record<string, string> = {
+      deposit: "Le paiement a echoue. Veuillez reessayer.",
+      withdrawal: "Le retrait a echoue. Veuillez reessayer.",
+      transfer: "Le transfert a echoue. Veuillez reessayer.",
+    };
+    return defaults[context];
+  }
+
+  const err = rawError.toLowerCase();
+
+  if (err.includes("insufficient") || err.includes("solde insuffisant") || err.includes("balance") || err.includes("fonds")) {
+    return "Votre solde est insuffisant pour cette operation.";
+  }
+  if (err.includes("invalid phone") || err.includes("invalid number") || err.includes("numero invalide") || err.includes("phone_number") || err.includes("phone number")) {
+    return "Le numero de telephone est incorrect ou non enregistre chez cet operateur.";
+  }
+  if (err.includes("limit") || err.includes("plafond") || err.includes("maximum") || err.includes("exceed")) {
+    return "Le plafond de transaction de l'operateur a ete atteint. Veuillez reessayer avec un montant inferieur ou contacter le support.";
+  }
+  if (err.includes("timeout") || err.includes("time out") || err.includes("expired") || err.includes("expire")) {
+    return "La session de paiement a expire. Veuillez reessayer.";
+  }
+  if (err.includes("unavailable") || err.includes("indisponible") || err.includes("service") || err.includes("maintenance") || err.includes("down")) {
+    return "Le service est momentanement indisponible. Veuillez reessayer dans quelques minutes.";
+  }
+  if (err.includes("cancelled") || err.includes("annule") || err.includes("cancel")) {
+    return "La transaction a ete annulee.";
+  }
+  if (err.includes("not found") || err.includes("not allowed") || err.includes("country") || err.includes("operator")) {
+    return "Ce service n'est pas disponible pour ce pays ou cet operateur.";
+  }
+  if (err.includes("kyc") || err.includes("verif") || err.includes("identit")) {
+    return "Votre identite n'a pas pu etre verifiee. Veuillez completer votre KYC.";
+  }
+  if (err.includes("duplicate") || err.includes("doublon") || err.includes("already")) {
+    return "Une transaction similaire est deja en cours. Veuillez patienter avant de reessayer.";
+  }
+  if (err.includes("amount") || err.includes("montant") || err.includes("minimum") || err.includes("maximum")) {
+    return "Le montant de la transaction est invalide. Verifiez les limites autorisees.";
+  }
+  if (err.includes("network") || err.includes("reseau") || err.includes("connexion") || err.includes("connection")) {
+    return "Erreur de reseau. Veuillez verifier votre connexion et reessayer.";
+  }
+
+  // Generic fallback
+  const fallbacks: Record<string, string> = {
+    deposit: "Le paiement n'a pas abouti. Veuillez reessayer ou contacter le support si le probleme persiste.",
+    withdrawal: "Le retrait n'a pas abouti. Votre solde n'a pas ete debite. Veuillez reessayer ou contacter le support.",
+    transfer: "Le transfert n'a pas abouti. Votre solde n'a pas ete debite. Veuillez reessayer ou contacter le support.",
+  };
+  return fallbacks[context];
+}
+
 console.log("[AfribaPay] Module loaded - will use dynamic configuration from database");

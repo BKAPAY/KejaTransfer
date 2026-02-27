@@ -11,6 +11,7 @@ import {
   getOtpInstructions,
   mapAfribaPayStatus,
   getAfribaPayConfig,
+  translateAfribaPayError,
 } from "./afribapay";
 import { AFRIBAPAY_COUNTRIES, getCurrencyForCountry, getPaymentInstructions } from "@shared/afribapay-countries";
 
@@ -189,7 +190,7 @@ export async function handleAfribaPayWithdrawal(
     });
 
     if (!result.success) {
-      return { success: false, error: result.error || "Retrait echoue" };
+      return { success: false, error: translateAfribaPayError(result.error, "withdrawal") };
     }
 
     await storage.updateUserBalance(userId, -feeInfo.totalDeductedFromBalance);
@@ -201,7 +202,7 @@ export async function handleAfribaPayWithdrawal(
       fee: feeInfo.feeAmount,
       feePercentage: feeInfo.feePercentage,
       currency: balanceCurrency,
-      status: "completed",
+      status: "pending",
       country: countryCode,
       operator: operator,
       description: `Retrait de ${amountForProvider} ${providerCurrency}`,
@@ -215,17 +216,19 @@ export async function handleAfribaPayWithdrawal(
         providerCurrency,
         balanceAmount: feeInfo.totalDeductedFromBalance,
         balanceCurrency,
+        deductedFromBalance: feeInfo.totalDeductedFromBalance,
+        totalDebited: feeInfo.totalDeductedFromBalance,
       }),
     });
 
     return {
       success: true,
       transactionId: tx.id,
-      message: "Retrait effectue avec succes",
+      message: "Retrait en cours de traitement",
     };
   } catch (error: any) {
     console.error("[AfribaPay Withdrawal] Error:", error);
-    return { success: false, error: "Retrait echoue" };
+    return { success: false, error: "Le retrait n'a pas abouti. Votre solde n'a pas ete debite. Veuillez reessayer ou contacter le support." };
   }
 }
 
@@ -293,7 +296,7 @@ export async function handleAfribaPayTransfer(
     });
 
     if (!result.success) {
-      return { success: false, error: result.error || "Transfert echoue" };
+      return { success: false, error: translateAfribaPayError(result.error, "transfer") };
     }
 
     await storage.updateUserBalance(userId, -totalDeducted);
@@ -305,7 +308,7 @@ export async function handleAfribaPayTransfer(
       fee: feeAmount,
       feePercentage: feePercentage,
       currency: balanceCurrency,
-      status: "completed",
+      status: "pending",
       country: countryCode,
       operator: operator,
       description: `Transfert de ${amountForProvider} ${providerCurrency}`,
@@ -319,17 +322,19 @@ export async function handleAfribaPayTransfer(
         providerCurrency,
         balanceAmount: totalDeducted,
         balanceCurrency,
+        deductedFromBalance: totalDeducted,
+        totalDebited: totalDeducted,
       }),
     });
 
     return {
       success: true,
       transactionId: tx.id,
-      message: "Transfert effectue avec succes",
+      message: "Transfert en cours de traitement",
     };
   } catch (error: any) {
     console.error("[AfribaPay Transfer] Error:", error);
-    return { success: false, error: "Transfert echoue" };
+    return { success: false, error: "Le transfert n'a pas abouti. Votre solde n'a pas ete debite. Veuillez reessayer ou contacter le support." };
   }
 }
 
@@ -673,26 +678,12 @@ router.post("/webhook", async (req: Request, res: Response) => {
   try {
     console.log("[AfribaPay Webhook] Received:", JSON.stringify(req.body));
 
-    const { transaction_id, order_id, status, amount, currency, operator, country } = req.body?.data || req.body;
+    const payload = req.body?.data || req.body;
+    const { transaction_id, status } = payload;
 
     if (!transaction_id) {
       console.log("[AfribaPay Webhook] Missing transaction_id");
       return res.status(400).json({ error: "Missing transaction_id" });
-    }
-
-    const verification = await verifyAfribaPayPayment(transaction_id);
-    if (!verification.verified && verification.status?.toUpperCase() !== "SUCCESS") {
-      console.log(`[AfribaPay Webhook] Transaction ${transaction_id} not verified: ${verification.status}`);
-      
-      if (verification.status?.toUpperCase() === "FAILED" || verification.status?.toUpperCase() === "CANCELLED") {
-        const tx = await storage.getTransactionByAfribaPayId(transaction_id);
-        if (tx && tx.status === "pending") {
-          await storage.updateTransactionStatus(tx.id, "failed");
-          console.log(`[AfribaPay Webhook] Transaction ${tx.id} marked as failed`);
-        }
-      }
-      
-      return res.json({ success: true, message: "Webhook processed - payment not verified" });
     }
 
     const tx = await storage.getTransactionByAfribaPayId(transaction_id);
@@ -701,16 +692,54 @@ router.post("/webhook", async (req: Request, res: Response) => {
       return res.status(404).json({ error: "Transaction not found" });
     }
 
-    if (tx.status === "completed") {
-      console.log(`[AfribaPay Webhook] Transaction ${tx.id} already completed`);
-      return res.json({ success: true, message: "Transaction already completed" });
+    if (tx.status !== "pending") {
+      console.log(`[AfribaPay Webhook] Transaction ${tx.id} already in status "${tx.status}" - skipping`);
+      return res.json({ success: true, message: "Transaction already processed" });
     }
 
-    const result = await storage.finalizeIncomingTransaction(tx.id);
-    if (result?.credited) {
-      console.log(`[AfribaPay Webhook] Transaction ${tx.id} completed and user credited`);
+    const isOutgoing = tx.type === "withdrawal" || tx.type === "transfer";
+
+    // Verify status with AfribaPay API (authoritative source)
+    const verification = await verifyAfribaPayPayment(transaction_id);
+    const rawStatus = (verification.status || status || "").toUpperCase();
+    const isSuccess = rawStatus === "SUCCESS" || rawStatus === "SUCCESSFUL";
+    const isFailed = rawStatus === "FAILED" || rawStatus === "CANCELLED" || rawStatus === "EXPIRED";
+
+    console.log(`[AfribaPay Webhook] Transaction ${tx.id} type=${tx.type} rawStatus=${rawStatus} isSuccess=${isSuccess} isFailed=${isFailed}`);
+
+    if (isOutgoing) {
+      const metadata = tx.metadata ? JSON.parse(tx.metadata) : {};
+      if (isSuccess) {
+        await storage.updateTransactionStatus(tx.id, "completed");
+        console.log(`[AfribaPay Webhook] ✅ Payout ${tx.id} COMPLETED`);
+      } else if (isFailed) {
+        const { safeRefundOutgoingTransaction } = await import("./payment-polling");
+        await safeRefundOutgoingTransaction(tx.id, tx.userId, metadata, "webhook-afribapay-payout-failed");
+        await storage.updateTransactionStatus(tx.id, "failed");
+        console.log(`[AfribaPay Webhook] ❌ Payout ${tx.id} FAILED - user refunded`);
+      } else {
+        console.log(`[AfribaPay Webhook] Payout ${tx.id} status still pending (rawStatus: ${rawStatus}) - waiting for polling`);
+      }
     } else {
-      console.log(`[AfribaPay Webhook] Transaction ${tx.id} finalized but not credited (already processed)`);
+      // Incoming transaction
+      if (isSuccess) {
+        const result = await storage.finalizeIncomingTransaction(tx.id);
+        if (result?.credited) {
+          console.log(`[AfribaPay Webhook] ✅ Incoming ${tx.id} CONFIRMED and user credited`);
+          const updatedTx = await storage.getTransaction(tx.id);
+          if (updatedTx) {
+            const { trySendPaymentCallback } = await import("./utils/callback");
+            trySendPaymentCallback(updatedTx, 'payment.completed', '[AfribaPay Webhook]');
+          }
+        } else {
+          console.log(`[AfribaPay Webhook] Incoming ${tx.id} finalized but not credited (already processed)`);
+        }
+      } else if (isFailed) {
+        await storage.updateTransactionStatus(tx.id, "failed");
+        console.log(`[AfribaPay Webhook] ❌ Incoming ${tx.id} FAILED (rawStatus: ${rawStatus})`);
+      } else {
+        console.log(`[AfribaPay Webhook] Incoming ${tx.id} not yet confirmed (rawStatus: ${rawStatus})`);
+      }
     }
 
     res.json({ success: true, message: "Webhook processed successfully" });

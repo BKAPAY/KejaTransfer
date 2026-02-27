@@ -2283,6 +2283,112 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         return res.json(response);
+      } else if (activeProvider === "afribapay") {
+        // Use AfribaPay for API payments
+        const { createAfribaPayPayin } = await import("./afribapay");
+        const { getCurrencyForCountry: getAfribaCurrency, getPaymentInstructions, operatorRequiresOtpForCountry, getOtpUssdCode } = await import("@shared/afribapay-countries");
+        const { otpCode } = req.body;
+
+        const providerCurrency = requestCurrency || getAfribaCurrency(country.toUpperCase());
+
+        // Convert amount from owner's currency to provider currency if different
+        let convertedAmountForProvider = amountForProvider;
+        if (ownerCurrency !== providerCurrency) {
+          const { convertCurrency } = await import("./currency-converter");
+          const conversionResult = await convertCurrency(amountForProvider, ownerCurrency, providerCurrency);
+          if (conversionResult.success) {
+            convertedAmountForProvider = Math.floor(conversionResult.convertedAmount);
+          } else {
+            return res.status(500).json({ error: "Erreur de conversion de devise" });
+          }
+        }
+
+        // Check if OTP is required
+        const needsOtp = operatorRequiresOtpForCountry(country.toUpperCase(), operator);
+        if (needsOtp && !otpCode) {
+          const instructions = getPaymentInstructions(country.toUpperCase(), operator);
+          const ussdCode = getOtpUssdCode(country.toUpperCase(), operator);
+          return res.json({
+            success: false,
+            requiresOTP: true,
+            otpInstructions: instructions.otpInstructions || undefined,
+            otpUssdCode: ussdCode || undefined,
+            provider: "afribapay",
+            error: "Code OTP requis pour ce paiement",
+          });
+        }
+
+        const afribaOrderId = `BKAPAY-APIPAY-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const baseUrl = process.env.BASE_URL || "https://bkapay.com";
+
+        console.log(`[API-PAY INIT] Using AfribaPay for ${country}/${operator}, phone=${customerPhone}, providerCurrency=${providerCurrency}`);
+
+        const afribaResult = await createAfribaPayPayin({
+          amount: convertedAmountForProvider,
+          currency: providerCurrency,
+          phone: customerPhone,
+          countryCode: country.toUpperCase(),
+          operator: operator,
+          otpCode: otpCode,
+          orderId: afribaOrderId,
+          referenceId: description || "Paiement via API",
+          notifyUrl: `${baseUrl}/api/afribapay/webhook`,
+          returnUrl: `${baseUrl}/payment-success`,
+          cancelUrl: `${baseUrl}/payment-failed`,
+        });
+
+        if (!afribaResult.success) {
+          const { translateAfribaPayError } = await import("./afribapay");
+          return res.status(400).json({ success: false, error: translateAfribaPayError(afribaResult.error, "deposit") });
+        }
+
+        const tx = await storage.createTransaction({
+          userId: apiKey.userId,
+          type: "api_payment",
+          amount: baseAmount,
+          fee: feeAmount,
+          feePercentage: feePercentage,
+          currency: ownerCurrency,
+          status: "pending",
+          country: country.toUpperCase(),
+          operator: operator,
+          description: description || "Paiement via API",
+          customerPhone: customerPhone,
+          customerName: customerName || "Client",
+          customerEmail: customerEmail || null,
+          metadata: JSON.stringify({
+            afribaPayTransactionId: afribaResult.transactionId,
+            afribaPayOrderId: afribaOrderId,
+            providerLink: afribaResult.providerLink,
+            apiKeyId: apiKey.id,
+            apiKeyPublicKey: publicKey,
+            callbackUrl: callbackUrl || null,
+            orderId: orderId || null,
+            provider: "afribapay",
+            netAmountForUser: netAmountForUser,
+            providerAmount: convertedAmountForProvider,
+            providerCurrency: providerCurrency,
+            balanceAmount: netAmountForUser,
+            balanceCurrency: ownerCurrency,
+            customerPaysFee: apiKey.customerPaysFee,
+            feeAmount: feeAmount,
+          }),
+        });
+
+        const apiPayResponse: any = {
+          success: true,
+          transactionId: tx.id,
+          token: tx.id,
+          message: afribaResult.message || "Paiement initie. Veuillez valider sur votre telephone.",
+          provider: "afribapay",
+        };
+
+        // Wave redirect URL
+        if (afribaResult.providerLink) {
+          apiPayResponse.redirectUrl = afribaResult.providerLink;
+        }
+
+        return res.json(apiPayResponse);
       } else {
         return res.status(503).json({ 
           success: false, 
@@ -2541,6 +2647,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           } catch (checkError) {
             console.log(`[TransactionStatus] Error checking MbiyoPay for ${transaction.id}:`, checkError);
+          }
+        }
+
+        // Check AfribaPay if we have an AfribaPay transaction ID
+        if (metadata.afribaPayTransactionId && metadata.provider === "afribapay") {
+          try {
+            const { getAfribaPayTransaction, mapAfribaPayStatus } = await import("./afribapay");
+            const afribaStatus = await getAfribaPayTransaction(metadata.afribaPayTransactionId);
+            console.log(`[TransactionStatus] AfribaPay check for ${transaction.id}: raw status = ${afribaStatus.status}`);
+
+            if (afribaStatus.success) {
+              const mappedStatus = mapAfribaPayStatus(afribaStatus.status || "");
+
+              if (mappedStatus === "completed") {
+                const isIncoming = transaction.type === "deposit" || transaction.type === "payment_link" || transaction.type === "merchant_link" || transaction.type === "api_payment";
+                if (isIncoming) {
+                  const result = await storage.finalizeIncomingTransaction(transaction.id, {});
+                  console.log(`[TransactionStatus] AfribaPay CONFIRMED - finalized: ${result ? 'new' : 'already processed'}`);
+                  if (result) {
+                    const updatedTx = await storage.getTransaction(transaction.id);
+                    if (updatedTx) {
+                      trySendPaymentCallback(updatedTx, 'payment.completed', '[TransactionStatus/AfribaPay]');
+                    }
+                  }
+                } else {
+                  await storage.updateTransactionStatus(transaction.id, "completed");
+                }
+                return res.json({ status: "completed", message: "Paiement confirme" });
+              } else if (mappedStatus === "failed") {
+                const isOutgoing = transaction.type === "withdrawal" || transaction.type === "transfer";
+                if (isOutgoing) {
+                  await safeRefundOutgoingTransaction(transaction.id, transaction.userId, metadata, "status-check-afribapay-failed");
+                }
+                await storage.updateTransactionStatus(transaction.id, "failed");
+                return res.json({ status: "failed", message: "Paiement echoue ou annule" });
+              }
+              // Still pending - continue
+            }
+          } catch (checkError) {
+            console.log(`[TransactionStatus] Error checking AfribaPay for ${transaction.id}:`, checkError);
           }
         }
 
@@ -4790,7 +4936,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.json({
             success: true,
             transactionId: result.transactionId,
-            message: result.message || (isTransfer ? "Transfert effectue avec succes" : "Retrait effectue avec succes"),
+            message: result.message || (isTransfer ? "Transfert en cours de traitement" : "Retrait en cours de traitement"),
             provider: "afribapay",
           });
         } else {

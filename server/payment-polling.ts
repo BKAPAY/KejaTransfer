@@ -3,6 +3,7 @@ import type { Transaction, User } from "@shared/schema";
 import { getTransactionStatus as getFedaPayTransactionStatus, getPayoutStatus as getFedaPayPayoutStatus } from "./fedapay";
 import { NowPaymentsClient } from "./nowpayments";
 import { getMbiyoPayTransactionStatus, searchMbiyoPayTransactionByOrderId } from "./mbiyopay";
+import { getAfribaPayTransaction, mapAfribaPayStatus } from "./afribapay";
 import { trySendPaymentCallback } from "./utils/callback";
 
 const PAYDUNYA_MASTER_KEY = process.env.PAYDUNYA_MASTER_KEY;
@@ -465,6 +466,138 @@ async function processMbiyoPayTransaction(transaction: Transaction & { user?: Us
   }
 }
 
+async function processAfribaPayIncoming(transaction: Transaction & { user?: User }, metadata: any): Promise<boolean> {
+  const afribaPayTransactionId = metadata.afribaPayTransactionId;
+  const transactionAge = getTransactionAge(transaction);
+  const remainingTime = Math.max(0, PAYMENT_TIMEOUT_MS - transactionAge);
+  const remainingSeconds = Math.round(remainingTime / 1000);
+
+  const currentTx = await storage.getTransaction(transaction.id);
+  if (!currentTx || currentTx.status !== "pending") {
+    console.log(`[PaymentPolling] AfribaPay incoming ${transaction.id} no longer pending (status: ${currentTx?.status || 'not found'}) - skipping`);
+    return true;
+  }
+
+  console.log(`[PaymentPolling] Checking AfribaPay incoming ${transaction.id} (afribaPayId: ${afribaPayTransactionId}, ${remainingSeconds}s remaining)`);
+
+  try {
+    const result = await getAfribaPayTransaction(afribaPayTransactionId);
+
+    if (!result.success) {
+      if (hasPaymentExpired(transaction)) {
+        console.log(`[PaymentPolling] ⏱️ AfribaPay incoming ${transaction.id} TIMEOUT - API error - marking failed`);
+        await storage.updateTransactionStatus(transaction.id, "failed");
+        return true;
+      }
+      console.log(`[PaymentPolling] AfribaPay incoming ${transaction.id} API error: ${result.error}, will retry (${remainingSeconds}s remaining)`);
+      return false;
+    }
+
+    const mappedStatus = mapAfribaPayStatus(result.status || "");
+    console.log(`[PaymentPolling] AfribaPay incoming ${transaction.id} raw status: ${result.status} → mapped: ${mappedStatus}`);
+
+    if (mappedStatus === "completed") {
+      const finalizeResult = await storage.finalizeIncomingTransaction(transaction.id, {});
+      if (finalizeResult) {
+        console.log(`[PaymentPolling] ✅ AfribaPay incoming ${transaction.id} CONFIRMED - credited=${finalizeResult.credited}`);
+        const updatedTx = await storage.getTransaction(transaction.id);
+        if (updatedTx) {
+          trySendPaymentCallback(updatedTx, 'payment.completed', '[PaymentPolling/AfribaPay]');
+        }
+      } else {
+        console.log(`[PaymentPolling] AfribaPay incoming ${transaction.id} already processed - skipping`);
+      }
+      return true;
+    } else if (mappedStatus === "failed") {
+      console.log(`[PaymentPolling] ❌ AfribaPay incoming ${transaction.id} failed (raw status: ${result.status})`);
+      await storage.updateTransactionStatus(transaction.id, "failed");
+      const failedTx = await storage.getTransaction(transaction.id);
+      if (failedTx) {
+        trySendPaymentCallback(failedTx, 'payment.failed', '[PaymentPolling/AfribaPay]');
+      }
+      return true;
+    } else {
+      if (hasPaymentExpired(transaction)) {
+        console.log(`[PaymentPolling] ⏱️ AfribaPay incoming ${transaction.id} TIMEOUT (10min) - marking failed`);
+        await storage.updateTransactionStatus(transaction.id, "failed");
+        return true;
+      }
+      console.log(`[PaymentPolling] ⏳ AfribaPay incoming ${transaction.id} still pending (raw: ${result.status}, ${remainingSeconds}s remaining)`);
+      return false;
+    }
+  } catch (error) {
+    console.error(`[PaymentPolling] Error checking AfribaPay incoming ${transaction.id}:`, error);
+    if (hasPaymentExpired(transaction)) {
+      console.log(`[PaymentPolling] ⏱️ AfribaPay incoming ${transaction.id} expired with error - marking failed`);
+      await storage.updateTransactionStatus(transaction.id, "failed");
+      return true;
+    }
+    return false;
+  }
+}
+
+async function processAfribaPayPayout(transaction: Transaction & { user?: User }, metadata: any): Promise<boolean> {
+  const afribaPayTransactionId = metadata.afribaPayTransactionId;
+  const transactionAge = getTransactionAge(transaction);
+  const remainingTime = Math.max(0, PAYMENT_TIMEOUT_MS - transactionAge);
+  const remainingSeconds = Math.round(remainingTime / 1000);
+
+  const currentTx = await storage.getTransaction(transaction.id);
+  if (!currentTx || currentTx.status !== "pending") {
+    console.log(`[PaymentPolling] AfribaPay payout ${transaction.id} no longer pending (status: ${currentTx?.status || 'not found'}) - skipping`);
+    return true;
+  }
+
+  console.log(`[PaymentPolling] Checking AfribaPay payout ${transaction.id} (afribaPayId: ${afribaPayTransactionId}, ${remainingSeconds}s remaining)`);
+
+  try {
+    const result = await getAfribaPayTransaction(afribaPayTransactionId);
+
+    if (!result.success) {
+      if (hasPaymentExpired(transaction)) {
+        console.log(`[PaymentPolling] ⏱️ AfribaPay payout ${transaction.id} TIMEOUT - API error - marking pending for admin review`);
+        metadata.adminReviewPending = true;
+        await storage.updateTransactionMetadata(transaction.id, JSON.stringify(metadata));
+        return true;
+      }
+      console.log(`[PaymentPolling] AfribaPay payout ${transaction.id} API error: ${result.error}, will retry (${remainingSeconds}s remaining)`);
+      return false;
+    }
+
+    const mappedStatus = mapAfribaPayStatus(result.status || "");
+    console.log(`[PaymentPolling] AfribaPay payout ${transaction.id} raw status: ${result.status} → mapped: ${mappedStatus}`);
+
+    if (mappedStatus === "completed") {
+      await storage.updateTransactionStatus(transaction.id, "completed");
+      console.log(`[PaymentPolling] ✅ AfribaPay payout ${transaction.id} COMPLETED`);
+      return true;
+    } else if (mappedStatus === "failed") {
+      console.log(`[PaymentPolling] ❌ AfribaPay payout ${transaction.id} FAILED (raw: ${result.status}) - refunding user`);
+      await safeRefundOutgoingTransaction(transaction.id, transaction.userId, metadata, "polling-afribapay-payout-failed");
+      await storage.updateTransactionStatus(transaction.id, "failed");
+      return true;
+    } else {
+      if (hasPaymentExpired(transaction)) {
+        console.log(`[PaymentPolling] ⏱️ AfribaPay payout ${transaction.id} TIMEOUT (10min) - marking pending for admin review`);
+        metadata.adminReviewPending = true;
+        await storage.updateTransactionMetadata(transaction.id, JSON.stringify(metadata));
+        return true;
+      }
+      console.log(`[PaymentPolling] ⏳ AfribaPay payout ${transaction.id} still pending (raw: ${result.status}, ${remainingSeconds}s remaining)`);
+      return false;
+    }
+  } catch (error) {
+    console.error(`[PaymentPolling] Error checking AfribaPay payout ${transaction.id}:`, error);
+    if (hasPaymentExpired(transaction)) {
+      console.log(`[PaymentPolling] ⏱️ AfribaPay payout ${transaction.id} expired with error - marking pending for admin review`);
+      metadata.adminReviewPending = true;
+      await storage.updateTransactionMetadata(transaction.id, JSON.stringify(metadata));
+      return true;
+    }
+    return false;
+  }
+}
+
 async function processMoneyFusionPayout(transaction: Transaction & { user?: User }, metadata: any): Promise<boolean> {
   const tokenPay = metadata.moneyFusionTokenPay;
   const age = getTransactionAge(transaction);
@@ -635,6 +768,17 @@ async function processTransaction(transaction: Transaction & { user?: User }): P
   // Check if this is a FedaPay payout (withdrawal)
   if (metadata.fedapayPayoutId) {
     await processFedaPayPayout(transaction, metadata);
+    return;
+  }
+
+  // Check if this is an AfribaPay transaction (incoming or outgoing)
+  if (metadata.provider === "afribapay" && metadata.afribaPayTransactionId) {
+    const isOutgoing = transaction.type === "withdrawal" || transaction.type === "transfer";
+    if (isOutgoing) {
+      await processAfribaPayPayout(transaction, metadata);
+    } else {
+      await processAfribaPayIncoming(transaction, metadata);
+    }
     return;
   }
 
