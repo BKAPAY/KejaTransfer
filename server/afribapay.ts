@@ -15,6 +15,7 @@ export interface AfribaPayConfig {
   apiUser: string;
   apiKey: string;
   merchantKey: string;
+  agentId?: string | null;
   isLive: boolean;
 }
 
@@ -35,11 +36,12 @@ export async function getAfribaPayConfig(): Promise<AfribaPayConfig | null> {
       console.log("[AfribaPay] Missing configuration (apiUser, apiKey, or merchantKey)");
       return null;
     }
-    const isLive = config.apiKey?.startsWith("pk_") && !config.apiKey?.includes("sandbox");
+    const isLive = config.publicKey?.startsWith("pk_") && !config.publicKey?.includes("sandbox");
     return {
       apiUser: config.publicKey,
       apiKey: config.apiKey,
       merchantKey: config.secretKey,
+      agentId: config.masterKey,
       isLive: isLive,
     };
   } catch (error) {

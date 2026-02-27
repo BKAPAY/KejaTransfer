@@ -18,6 +18,9 @@ export const OTP_INSTRUCTIONS: Record<string, Record<string, string>> = {
   GN: {
     orange: "Pour generer votre code OTP Orange Money:\n1. Composez *144#\n2. Selectionnez 'Paiement'\n3. Choisissez 'Generer code OTP'\n4. Entrez votre code secret\n5. Un code OTP vous sera envoye par SMS",
   },
+  SN: {
+    orange: "Pour generer votre code OTP Orange Money:\n1. Composez *144#\n2. Selectionnez 'Paiement'\n3. Choisissez 'Generer un code OTP'\n4. Entrez votre code PIN Orange Money\n5. Un code OTP vous sera envoye par SMS",
+  },
 };
 
 export const WAVE_INSTRUCTIONS: Record<string, string> = {
@@ -225,19 +228,6 @@ export const AFRIBAPAY_COUNTRIES: AfribaPayCountry[] = [
     operators: [
       { code: "airtel", name: "Airtel Money", requiresOtp: false, payin: true, payout: true },
       { code: "moov", name: "Moov Money", requiresOtp: false, payin: true, payout: true },
-    ],
-  },
-  {
-    code: "RW",
-    name: "Rwanda",
-    flag: "🇷🇼",
-    phoneCode: "+250",
-    phoneDigits: 9,
-    phoneFormat: "7XXXXXXXX",
-    currency: "RWF",
-    operators: [
-      { code: "mtn", name: "MTN Mobile Money", requiresOtp: false, payin: true, payout: true },
-      { code: "airtel", name: "Airtel Money", requiresOtp: false, payin: true, payout: true },
     ],
   },
 ];

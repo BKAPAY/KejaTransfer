@@ -49,10 +49,10 @@ interface ProviderForm {
 const PROVIDER_INFO = {
   afribapay: {
     name: "AfribaPay",
-    description: "Fournisseur principal couvrant 15 pays africains",
+    description: "Fournisseur principal couvrant 14 pays africains",
     color: "bg-purple-500",
-    fields: ["apiKey"],
-    countries: "15 pays (Bénin, Togo, CI, Sénégal, Ghana, Cameroun, etc.)",
+    fields: ["publicKey", "apiKey", "secretKey", "masterKey"],
+    countries: "14 pays (CI, BF, ML, SN, TG, GN, CM, BJ, CD, NE, TD, CG, CF, GA)",
   },
   paydunya: {
     name: "Paydunya",
@@ -106,6 +106,15 @@ const PROVIDER_INFO = {
 };
 
 const getFieldLabel = (provider: string, field: string): string => {
+  if (provider === "afribapay") {
+    switch (field) {
+      case "publicKey": return "Utilisateur API (pk_...)";
+      case "apiKey": return "Clé Secrète API (sk_...)";
+      case "secretKey": return "Clé Marchand (mk_...)";
+      case "masterKey": return "Identifiant Agent (APM...)";
+      default: return field;
+    }
+  }
   if (provider === "paydunya") {
     switch (field) {
       case "masterKey": return "Clé Principale";

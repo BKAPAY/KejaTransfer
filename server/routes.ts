@@ -4461,7 +4461,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.json({
             success: true,
             transactionId: result.transactionId,
-            providerLink: result.providerLink,
+            redirectUrl: result.providerLink,
             message: result.message || "Paiement initie avec succes",
             provider: "afribapay",
           });
@@ -5127,7 +5127,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.json({
             success: true,
             transactionId: result.transactionId,
-            providerLink: result.providerLink,
+            redirectUrl: result.providerLink,
             message: result.message || "Paiement initie avec succes",
             provider: "afribapay",
           });
@@ -5399,7 +5399,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.json({
             success: true,
             transactionId: result.transactionId,
-            providerLink: result.providerLink,
+            redirectUrl: result.providerLink,
             message: result.message || "Paiement initie avec succes",
             provider: "afribapay",
           });
@@ -5650,7 +5650,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.json({
             success: true,
             transactionId: transaction.id,
-            providerLink: result.providerLink,
+            redirectUrl: result.providerLink,
             message: result.message || "Paiement initie avec succes",
             provider: "afribapay",
           });
