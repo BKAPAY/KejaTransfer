@@ -101,12 +101,21 @@ export function formatPhoneForAfribaPay(phone: string, countryCode: string): str
   
   const prefixDigits = country.phoneCode.replace("+", "");
   
+  // Si le numéro commence par le préfixe pays (ex: 229...), on le retire
   if (sanitized.startsWith(prefixDigits)) {
     return sanitized.substring(prefixDigits.length);
   }
   
-  if (sanitized.startsWith("0")) {
-    sanitized = sanitized.substring(1);
+  // Si le numéro a déjà la bonne longueur, on le retourne tel quel
+  // (Exemple: Bénin "01XXXXXXXX" = 10 chiffres, le 0 est partie du numéro)
+  if (sanitized.length === country.phoneDigits) {
+    return sanitized;
+  }
+  
+  // Si le numéro est trop long d'un chiffre et commence par "0",
+  // c'est un indicatif national à retirer (ex: CM "0656..." → "656...")
+  if (sanitized.startsWith("0") && sanitized.length === country.phoneDigits + 1) {
+    return sanitized.substring(1);
   }
   
   return sanitized;
