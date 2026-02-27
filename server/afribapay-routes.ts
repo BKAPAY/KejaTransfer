@@ -698,41 +698,62 @@ router.post("/webhook", async (req: Request, res: Response) => {
     }
 
     const isOutgoing = tx.type === "withdrawal" || tx.type === "transfer";
+    const txMetadata = tx.metadata ? JSON.parse(tx.metadata) : {};
 
-    // Verify status with AfribaPay API (authoritative source)
-    const verification = await verifyAfribaPayPayment(transaction_id);
-    const rawStatus = (verification.status || status || "").toUpperCase();
+    // Vérification authoritative via API AfribaPay (récupère montant + téléphone pour fingerprint)
+    const apiResult = await getAfribaPayTransaction(transaction_id);
+    const rawStatus = (apiResult.success ? apiResult.status : status || "").toUpperCase() || "";
     const isSuccess = rawStatus === "SUCCESS" || rawStatus === "SUCCESSFUL";
     const isFailed = rawStatus === "FAILED" || rawStatus === "CANCELLED" || rawStatus === "EXPIRED";
 
     console.log(`[AfribaPay Webhook] Transaction ${tx.id} type=${tx.type} rawStatus=${rawStatus} isSuccess=${isSuccess} isFailed=${isFailed}`);
 
     if (isOutgoing) {
-      const metadata = tx.metadata ? JSON.parse(tx.metadata) : {};
       if (isSuccess) {
+        // Validation fingerprint pour les paiements sortants (montant + téléphone + age)
+        if (apiResult.success) {
+          const { validateAfribaPayFingerprint } = await import("./afribapay");
+          const fingerprint = validateAfribaPayFingerprint(apiResult, txMetadata, tx);
+          fingerprint.warnings.forEach(w => console.warn(`[AfribaPay Webhook] ⚠️ fingerprint warning (${tx.id}): ${w}`));
+          if (!fingerprint.valid) {
+            console.error(`[AfribaPay Webhook] 🚨 Fingerprint INVALIDE payout ${tx.id}: ${fingerprint.reason} - ignoré`);
+            return res.json({ success: true, message: "Webhook recu - validation fingerprint echouee" });
+          }
+        }
         await storage.updateTransactionStatus(tx.id, "completed");
-        console.log(`[AfribaPay Webhook] ✅ Payout ${tx.id} COMPLETED`);
+        console.log(`[AfribaPay Webhook] ✅ Payout ${tx.id} COMPLETED (fingerprint OK)`);
       } else if (isFailed) {
         const { safeRefundOutgoingTransaction } = await import("./payment-polling");
-        await safeRefundOutgoingTransaction(tx.id, tx.userId, metadata, "webhook-afribapay-payout-failed");
+        await safeRefundOutgoingTransaction(tx.id, tx.userId, txMetadata, "webhook-afribapay-payout-failed");
         await storage.updateTransactionStatus(tx.id, "failed");
-        console.log(`[AfribaPay Webhook] ❌ Payout ${tx.id} FAILED - user refunded`);
+        console.log(`[AfribaPay Webhook] ❌ Payout ${tx.id} FAILED - utilisateur remboursé`);
       } else {
         console.log(`[AfribaPay Webhook] Payout ${tx.id} status still pending (rawStatus: ${rawStatus}) - waiting for polling`);
       }
     } else {
-      // Incoming transaction
+      // Paiement entrant
       if (isSuccess) {
+        // Validation fingerprint obligatoire avant crédit
+        if (apiResult.success) {
+          const { validateAfribaPayFingerprint } = await import("./afribapay");
+          const fingerprint = validateAfribaPayFingerprint(apiResult, txMetadata, tx);
+          fingerprint.warnings.forEach(w => console.warn(`[AfribaPay Webhook] ⚠️ fingerprint warning (${tx.id}): ${w}`));
+          if (!fingerprint.valid) {
+            console.error(`[AfribaPay Webhook] 🚨 Fingerprint INVALIDE incoming ${tx.id}: ${fingerprint.reason} - CREDIT BLOQUE`);
+            await storage.updateTransactionStatus(tx.id, "failed");
+            return res.json({ success: true, message: "Webhook recu - validation fingerprint echouee" });
+          }
+        }
         const result = await storage.finalizeIncomingTransaction(tx.id);
         if (result?.credited) {
-          console.log(`[AfribaPay Webhook] ✅ Incoming ${tx.id} CONFIRMED and user credited`);
+          console.log(`[AfribaPay Webhook] ✅ Incoming ${tx.id} CONFIRMÉ (fingerprint OK) - utilisateur crédité`);
           const updatedTx = await storage.getTransaction(tx.id);
           if (updatedTx) {
             const { trySendPaymentCallback } = await import("./utils/callback");
             trySendPaymentCallback(updatedTx, 'payment.completed', '[AfribaPay Webhook]');
           }
         } else {
-          console.log(`[AfribaPay Webhook] Incoming ${tx.id} finalized but not credited (already processed)`);
+          console.log(`[AfribaPay Webhook] Incoming ${tx.id} déjà traité - ignoré`);
         }
       } else if (isFailed) {
         await storage.updateTransactionStatus(tx.id, "failed");

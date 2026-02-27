@@ -497,9 +497,21 @@ async function processAfribaPayIncoming(transaction: Transaction & { user?: User
     console.log(`[PaymentPolling] AfribaPay incoming ${transaction.id} raw status: ${result.status} → mapped: ${mappedStatus}`);
 
     if (mappedStatus === "completed") {
+      // Validation multi-critères avant tout crédit
+      const { validateAfribaPayFingerprint } = await import("./afribapay");
+      const fingerprint = validateAfribaPayFingerprint(result, metadata, transaction);
+      if (fingerprint.warnings.length > 0) {
+        fingerprint.warnings.forEach(w => console.warn(`[PaymentPolling] ⚠️ AfribaPay fingerprint warning (${transaction.id}): ${w}`));
+      }
+      if (!fingerprint.valid) {
+        console.error(`[PaymentPolling] 🚨 AfribaPay fingerprint INVALIDE pour ${transaction.id}: ${fingerprint.reason} - CREDIT BLOQUE`);
+        await storage.updateTransactionStatus(transaction.id, "failed");
+        return true;
+      }
+
       const finalizeResult = await storage.finalizeIncomingTransaction(transaction.id, {});
       if (finalizeResult) {
-        console.log(`[PaymentPolling] ✅ AfribaPay incoming ${transaction.id} CONFIRMED - credited=${finalizeResult.credited}`);
+        console.log(`[PaymentPolling] ✅ AfribaPay incoming ${transaction.id} CONFIRMÉ (fingerprint OK) - credited=${finalizeResult.credited}`);
         const updatedTx = await storage.getTransaction(transaction.id);
         if (updatedTx) {
           trySendPaymentCallback(updatedTx, 'payment.completed', '[PaymentPolling/AfribaPay]');

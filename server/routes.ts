@@ -2661,10 +2661,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
               const mappedStatus = mapAfribaPayStatus(afribaStatus.status || "");
 
               if (mappedStatus === "completed") {
+                // Validation multi-critères avant tout crédit
+                const { validateAfribaPayFingerprint } = await import("./afribapay");
+                const fingerprint = validateAfribaPayFingerprint(afribaStatus, metadata, transaction);
+                fingerprint.warnings.forEach(w => console.warn(`[TransactionStatus] ⚠️ AfribaPay fingerprint warning (${transaction.id}): ${w}`));
+                if (!fingerprint.valid) {
+                  console.error(`[TransactionStatus] 🚨 Fingerprint INVALIDE AfribaPay ${transaction.id}: ${fingerprint.reason} - CREDIT BLOQUE`);
+                  await storage.updateTransactionStatus(transaction.id, "failed");
+                  return res.json({ status: "failed", message: "Paiement non valide - anomalie detectee" });
+                }
+
                 const isIncoming = transaction.type === "deposit" || transaction.type === "payment_link" || transaction.type === "merchant_link" || transaction.type === "api_payment";
                 if (isIncoming) {
                   const result = await storage.finalizeIncomingTransaction(transaction.id, {});
-                  console.log(`[TransactionStatus] AfribaPay CONFIRMED - finalized: ${result ? 'new' : 'already processed'}`);
+                  console.log(`[TransactionStatus] AfribaPay CONFIRMED (fingerprint OK) - finalized: ${result ? 'new' : 'already processed'}`);
                   if (result) {
                     const updatedTx = await storage.getTransaction(transaction.id);
                     if (updatedTx) {

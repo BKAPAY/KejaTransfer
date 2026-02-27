@@ -415,6 +415,78 @@ export async function verifyAfribaPayPayment(transactionId: string): Promise<{
   };
 }
 
+/**
+ * Validation multi-critères pour prévenir les doubles crédits AfribaPay.
+ * Croise l'ID transaction, le montant, le numéro de téléphone et le timestamp.
+ */
+export function validateAfribaPayFingerprint(
+  apiResult: AfribaPayTransactionResult,
+  metadata: Record<string, any>,
+  transaction: { customerPhone?: string | null; createdAt: Date | string; amount: number }
+): { valid: boolean; reason?: string; warnings: string[] } {
+  const warnings: string[] = [];
+
+  // 1. Vérification montant: compare le montant AfribaPay vs montant attendu en devise fournisseur
+  const expectedProviderAmount = metadata.providerAmount ?? transaction.amount;
+  if (apiResult.amount !== undefined && expectedProviderAmount !== undefined) {
+    const diff = Math.abs((apiResult.amount as number) - expectedProviderAmount);
+    const tolerance = Math.max(2, expectedProviderAmount * 0.01); // 1% ou 2 unités min
+    if (diff > tolerance) {
+      return {
+        valid: false,
+        reason: `Montant incohérent: AfribaPay=${apiResult.amount} vs attendu=${expectedProviderAmount} (écart=${diff}, tolérance=${tolerance})`,
+        warnings,
+      };
+    }
+  } else {
+    warnings.push("Montant AfribaPay non disponible dans la réponse API - vérification du montant ignorée");
+  }
+
+  // 2. Vérification numéro de téléphone (comparaison des 8 derniers chiffres)
+  const normalizePhone = (p: string | null | undefined): string =>
+    (p || "").replace(/\D/g, "").slice(-8);
+  const afribaPhone = normalizePhone(apiResult.phone);
+  const expectedPhone = normalizePhone(transaction.customerPhone || metadata.customerPhone);
+  if (afribaPhone && expectedPhone) {
+    if (afribaPhone !== expectedPhone) {
+      return {
+        valid: false,
+        reason: `Numéro de téléphone incohérent: AfribaPay=${apiResult.phone} vs attendu=${transaction.customerPhone || metadata.customerPhone}`,
+        warnings,
+      };
+    }
+  } else {
+    warnings.push("Téléphone non disponible pour comparaison - vérification du numéro ignorée");
+  }
+
+  // 3. Vérification orderId si stocké en metadata
+  if (metadata.afribaPayOrderId && apiResult.orderId) {
+    if (apiResult.orderId !== metadata.afribaPayOrderId) {
+      return {
+        valid: false,
+        reason: `Order ID incohérent: AfribaPay=${apiResult.orderId} vs attendu=${metadata.afribaPayOrderId}`,
+        warnings,
+      };
+    }
+  }
+
+  // 4. Vérification anti-rejeu: transaction ne doit pas avoir plus de 24h
+  const createdAt = typeof transaction.createdAt === "string"
+    ? new Date(transaction.createdAt)
+    : transaction.createdAt;
+  const ageMs = Date.now() - createdAt.getTime();
+  const MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 heures
+  if (ageMs > MAX_AGE_MS) {
+    return {
+      valid: false,
+      reason: `Transaction trop ancienne (${Math.round(ageMs / 3600000)}h) - rejet anti-rejeu`,
+      warnings,
+    };
+  }
+
+  return { valid: true, warnings };
+}
+
 export function operatorRequiresOtp(countryCode: string, operator: string): boolean {
   return operatorRequiresOtpForCountry(countryCode, operator);
 }
