@@ -4449,11 +4449,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
 
         if (result.requiresOtp) {
+          const { getOtpUssdCode } = await import("@shared/afribapay-countries");
           return res.status(400).json({
             success: false,
             error: result.error,
-            requiresOtp: true,
+            requiresOTP: true,
             otpInstructions: result.otpInstructions,
+            otpUssdCode: getOtpUssdCode(country, operator) || undefined,
           });
         }
 
@@ -5115,11 +5117,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
 
         if (result.requiresOtp) {
+          const { getOtpUssdCode } = await import("@shared/afribapay-countries");
           return res.status(400).json({
             success: false,
             error: result.error,
-            requiresOtp: true,
+            requiresOTP: true,
             otpInstructions: result.otpInstructions,
+            otpUssdCode: getOtpUssdCode(country, operator) || undefined,
           });
         }
 
@@ -5387,11 +5391,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
 
         if (result.requiresOtp) {
+          const { getOtpUssdCode } = await import("@shared/afribapay-countries");
           return res.status(400).json({
             success: false,
             error: result.error,
-            requiresOtp: true,
+            requiresOTP: true,
             otpInstructions: result.otpInstructions,
+            otpUssdCode: getOtpUssdCode(country, operator) || undefined,
           });
         }
 
@@ -5628,11 +5634,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
 
         if (result.requiresOtp) {
+          const { getOtpUssdCode } = await import("@shared/afribapay-countries");
           return res.status(400).json({
             success: false,
             error: result.error,
-            requiresOtp: true,
+            requiresOTP: true,
             otpInstructions: result.otpInstructions,
+            otpUssdCode: getOtpUssdCode(country, operator) || undefined,
           });
         }
 
@@ -7353,10 +7361,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             otpHint = info.hint;
           }
         } else if (config.provider === "afribapay") {
-          const { operatorRequiresOtpForCountry, getOtpInstructionsForOperator } = await import("@shared/afribapay-countries");
+          const { operatorRequiresOtpForCountry, getOtpInstructionsForOperator, getOtpUssdCode } = await import("@shared/afribapay-countries");
           requiresOtp = operatorRequiresOtpForCountry(config.country, config.operator);
           if (requiresOtp) {
             otpInstructions = getOtpInstructionsForOperator(config.country, config.operator) || undefined;
+            otpUssdCode = getOtpUssdCode(config.country, config.operator) || undefined;
           }
         }
         
