@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
 import { storage } from "./storage";
 
-import { calculateIncomingFee, calculateOutgoingFee, getFeeFromDatabase } from "./utils/fees";
+import { calculateIncomingFee, calculateOutgoingFee, calculateOutgoingFeeFromNet, getFeeFromDatabase } from "./utils/fees";
 import { safeRefundOutgoingTransaction } from "./payment-polling";
 import { trySendPaymentCallback } from "./utils/callback";
 import { 
@@ -141,7 +141,8 @@ export async function handleMbiyoPayWithdrawal(
   operator: string,
   phone: string,
   userCurrency?: string,
-  targetCurrency?: string
+  targetCurrency?: string,
+  netMode?: boolean
 ): Promise<{ success: boolean; transactionId?: string; message?: string; error?: string }> {
   try {
     const countryLower = country.toLowerCase();
@@ -166,7 +167,9 @@ export async function handleMbiyoPayWithdrawal(
     console.log(`[MbiyoPay Withdrawal] Currency selection: userCurrency=${userCurrency}, targetCurrency=${targetCurrency}, defaultCurrency=${defaultCurrency}, supportedCurrencies=${supportedCurrencies.join(",")}, providerCurrency=${providerCurrency}, balanceCurrency=${balanceCurrency}`);
     
     const feeConfig = await getFeeFromDatabase(storage, "mbiyopay", country, operator);
-    const feeInfo = calculateOutgoingFee(grossAmount, feeConfig.outgoing);
+    const feeInfo = netMode
+      ? calculateOutgoingFeeFromNet(grossAmount, feeConfig.outgoing)
+      : calculateOutgoingFee(grossAmount, feeConfig.outgoing);
 
     if (user.balance < feeInfo.totalDeductedFromBalance) {
       return { success: false, error: "Solde insuffisant" };

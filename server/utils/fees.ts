@@ -325,3 +325,39 @@ export function calculateOutgoingFee(grossAmount: number, feePercentageValue?: n
     totalDeductedFromBalance,
   };
 }
+
+/**
+ * Calculate fees for API PAYOUT — the recipient receives the EXACT NET amount.
+ * Fees are added ON TOP and deducted from the merchant's BKApay balance.
+ *
+ * @param netAmount - The exact amount the recipient should receive (e.g., 10000)
+ * @param feePercentageValue - Fee percentage from database (60 = 6%) or undefined for default
+ * @returns same interface as calculateOutgoingFee so handlers can use it transparently
+ *
+ * LOGIQUE:
+ * - Le développeur envoie amount: 10000 (le destinataire reçoit exactement 10000)
+ * - Les frais (e.g., 6% = 600) sont ajoutés PAR-DESSUS
+ * - Le solde du marchand est débité de 10600 (net + frais)
+ * - Le fournisseur envoie exactement 10000 au destinataire
+ */
+export function calculateOutgoingFeeFromNet(netAmount: number, feePercentageValue?: number | string): {
+  grossAmount: number;
+  feeAmount: number;
+  feePercentage: number;
+  amountReceived: number;
+  totalDeductedFromBalance: number;
+} {
+  const feePercentage = typeof feePercentageValue === 'string'
+    ? DEFAULT_FEE_PERCENTAGE
+    : getFeePercentage(feePercentageValue);
+  const feeAmount = Math.floor((netAmount * feePercentage) / 1000);
+  const totalDeductedFromBalance = netAmount + feeAmount;
+
+  return {
+    grossAmount: netAmount,
+    feeAmount,
+    feePercentage,
+    amountReceived: netAmount,
+    totalDeductedFromBalance,
+  };
+}

@@ -77,7 +77,7 @@ export default function DocumentationPayout({ version }: DocumentationPayoutProp
     phone: "+221771234567",   // Numero avec indicatif international
     operator: "orange",        // Nom de l'operateur
     country: "SN",             // Code ISO du pays (2 lettres)
-    amount: 10000,             // Montant brut a envoyer
+    amount: 10000,             // Montant EXACT que le destinataire recoit
     currency: "XOF",           // Devise (optionnel, defaut: devise du pays)
     reference: "order_789"     // Votre reference interne (optionnel)
   })
@@ -86,7 +86,12 @@ export default function DocumentationPayout({ version }: DocumentationPayoutProp
 const data = await response.json();
 
 if (data.success) {
+  // data.recipientAmount = 10000 (recoit exactement ce montant)
+  // data.fee             = 600   (preleve sur votre solde BKApay)
+  // data.totalDeducted   = 10600 (total debite de votre solde)
   console.log("Payout initie:", data.transactionId, data.status);
+  console.log("Destinataire recoit: " + data.recipientAmount + " " + data.currency);
+  console.log("Frais preleves:      " + data.fee + " " + data.currency);
 } else {
   console.error("Erreur:", data.error.code, data.error.message);
 }`;
@@ -183,7 +188,11 @@ app.post('/webhook/bkapay-payout', express.json(), (req, res) => {
   "success": true,
   "transactionId": "txn_abc123def456",
   "status": "pending",
-  "message": "Payout initie avec succes"
+  "message": "Payout initie avec succes",
+  "recipientAmount": 10000,
+  "fee": 600,
+  "totalDeducted": 10600,
+  "currency": "XOF"
 }`;
 
   const errorResponseExample = `{
@@ -198,7 +207,9 @@ app.post('/webhook/bkapay-payout', express.json(), (req, res) => {
   "event": "payout.completed",
   "transactionId": "txn_abc123def456",
   "reference": "order_789",
-  "amount": 10000,
+  "recipientAmount": 10000,
+  "fee": 600,
+  "totalDeducted": 10600,
   "currency": "XOF",
   "status": "completed",
   "country": "SN",
@@ -347,7 +358,7 @@ app.post('/webhook/bkapay-payout', express.json(), (req, res) => {
                   ["phone", "string", true, "Numero du destinataire avec indicatif (+221771234567)"],
                   ["operator", "string", true, "Operateur mobile: orange, mtn, moov, wave, free, airtel..."],
                   ["country", "string", true, "Code ISO 2 lettres du pays: SN, CI, BF, BJ, TG, ML, GN..."],
-                  ["amount", "number", true, "Montant brut a envoyer (le destinataire recoit le net)"],
+                  ["amount", "number", true, "Montant exact que le destinataire recoit (les frais sont preleves en sus sur votre solde)"],
                   ["currency", "string", false, "Devise: XOF, XAF, CDF, GNF. Defaut: devise du pays"],
                   ["reference", "string", false, "Votre reference interne (order_id, facture_123, etc.)"],
                 ].map(([param, type, req, desc]) => (

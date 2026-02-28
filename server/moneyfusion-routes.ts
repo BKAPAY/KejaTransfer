@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import { storage } from "./storage";
-import { calculateOutgoingFee, getFeeFromDatabase } from "./utils/fees";
+import { calculateOutgoingFee, calculateOutgoingFeeFromNet, getFeeFromDatabase } from "./utils/fees";
 import { createMoneyFusionPayout } from "./moneyfusion";
 import { getMoneyFusionCurrency, isMoneyFusionSupported } from "@shared/moneyfusion-countries";
 
@@ -11,7 +11,8 @@ export async function handleMoneyFusionWithdrawal(
   country: string,
   operator: string,
   phone: string,
-  userCurrency?: string
+  userCurrency?: string,
+  netMode?: boolean
 ): Promise<{ success: boolean; transactionId?: string; message?: string; error?: string }> {
   try {
     const countryLower = country.toLowerCase();
@@ -29,7 +30,9 @@ export async function handleMoneyFusionWithdrawal(
     const balanceCurrency = userCurrency || providerCurrency;
 
     const feeConfig = await getFeeFromDatabase(storage, "moneyfusion", country, operator);
-    const feeInfo = calculateOutgoingFee(grossAmount, feeConfig.outgoing);
+    const feeInfo = netMode
+      ? calculateOutgoingFeeFromNet(grossAmount, feeConfig.outgoing)
+      : calculateOutgoingFee(grossAmount, feeConfig.outgoing);
 
     if (user.balance < feeInfo.totalDeductedFromBalance) {
       return { success: false, error: "L'operation ne peut pas etre effectuee pour le moment. Veuillez reessayer plus tard." };

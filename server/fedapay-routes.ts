@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
 import { storage } from "./storage";
 import { randomUUID } from "crypto";
-import { calculateIncomingFee, calculateOutgoingFee, getFeeFromDatabase } from "./utils/fees";
+import { calculateIncomingFee, calculateOutgoingFee, calculateOutgoingFeeFromNet, getFeeFromDatabase } from "./utils/fees";
 import { safeRefundOutgoingTransaction } from "./payment-polling";
 import { 
   createCollect, 
@@ -110,7 +110,8 @@ export async function handleFedaPayWithdrawal(
   country: string,
   operator: string,
   phone: string,
-  userCurrency?: string
+  userCurrency?: string,
+  netMode?: boolean
 ): Promise<{ success: boolean; transactionId?: string; message?: string; error?: string }> {
   try {
     if (!FEDAPAY_SUPPORTED_COUNTRIES_PAYOUT.includes(country.toLowerCase())) {
@@ -134,7 +135,9 @@ export async function handleFedaPayWithdrawal(
     
     // Get dynamic fees from database for fedapay
     const feeConfig = await getFeeFromDatabase(storage, "fedapay", country, operator);
-    const feeInfo = calculateOutgoingFee(grossAmount, feeConfig.outgoing);
+    const feeInfo = netMode
+      ? calculateOutgoingFeeFromNet(grossAmount, feeConfig.outgoing)
+      : calculateOutgoingFee(grossAmount, feeConfig.outgoing);
 
     if (user.balance < feeInfo.totalDeductedFromBalance) {
       return { success: false, error: "Solde insuffisant" };

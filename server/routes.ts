@@ -12,7 +12,7 @@ import path from "path";
 import { insertUserSchema, insertPaymentLinkSchema, insertMerchantLinkSchema, insertApiKeySchema } from "@shared/schema";
 import { validatePhoneOperator } from "@shared/phone-utils";
 import { randomUUID } from "crypto";
-import { calculateIncomingFee, calculateOutgoingFee, calculateCustomerPaysFee, getFeeFromDatabase, getDynamicFees, getDynamicOutgoingFees, getActiveProviderForCountry, getActivePayoutProviderForCountry } from "./utils/fees";
+import { calculateIncomingFee, calculateOutgoingFee, calculateOutgoingFeeFromNet, calculateCustomerPaysFee, getFeeFromDatabase, getDynamicFees, getDynamicOutgoingFees, getActiveProviderForCountry, getActivePayoutProviderForCountry } from "./utils/fees";
 import { trySendPaymentCallback } from "./utils/callback";
 import { recordLoginLog } from "./utils/login-tracker";
 import { 
@@ -2702,33 +2702,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         amountInUserCurrency = Math.floor(conv.convertedAmount);
       }
 
-      // 11. Pre-check balance (handlers do their own check but we return a clean error)
+      // 11. Pre-check balance using netMode: recipient gets exact amount, fees added on top
       const feeConfig = await getFeeFromDatabase(storage, activeProvider, countryCode, normalizedOperator);
-      const feeInfo = calculateOutgoingFee(amountInUserCurrency, feeConfig.outgoing);
+      const feeInfo = calculateOutgoingFeeFromNet(amountInUserCurrency, feeConfig.outgoing);
       if (user.balance < feeInfo.totalDeductedFromBalance) {
         return res.status(400).json({
           success: false,
-          error: { code: "INSUFFICIENT_FUNDS", message: "Solde insuffisant pour effectuer ce payout" }
+          error: { code: "INSUFFICIENT_FUNDS", message: `Solde insuffisant. Requis: ${feeInfo.totalDeductedFromBalance} ${userCurrency} (montant ${amountInUserCurrency} + frais ${feeInfo.feeAmount})` }
         });
       }
 
-      // 12. Route to the appropriate provider handler
+      // 12. Route to the appropriate provider handler (netMode=true: recipient gets exact amount)
       let result: { success: boolean; transactionId?: string; error?: string; message?: string };
 
       if (activeProvider === "fedapay") {
-        result = await handleFedaPayWithdrawal(apiKey.userId, user, amountInUserCurrency, countryCode, normalizedOperator, localPhone, userCurrency);
+        result = await handleFedaPayWithdrawal(apiKey.userId, user, amountInUserCurrency, countryCode, normalizedOperator, localPhone, userCurrency, true);
       } else if (activeProvider === "mbiyopay") {
-        result = await handleMbiyoPayWithdrawal(apiKey.userId, user, amountInUserCurrency, countryCode, normalizedOperator, localPhone, userCurrency, requestedCurrency);
+        result = await handleMbiyoPayWithdrawal(apiKey.userId, user, amountInUserCurrency, countryCode, normalizedOperator, localPhone, userCurrency, requestedCurrency, true);
       } else if (activeProvider === "moneyfusion") {
-        result = await handleMoneyFusionWithdrawal(apiKey.userId, user, amountInUserCurrency, countryCode, normalizedOperator, localPhone, userCurrency);
+        result = await handleMoneyFusionWithdrawal(apiKey.userId, user, amountInUserCurrency, countryCode, normalizedOperator, localPhone, userCurrency, true);
       } else if (activeProvider === "paydunya") {
-        // Paydunya inline payout
+        // Paydunya inline payout — netMode: send exact amountInUserCurrency to provider, add fee on top
         result = await (async () => {
-          const withdrawModeMap: Record<string, string> = {
-            "orange": "orange-money", "free": "free-money", "expresso": "expresso",
-            "wave": "wave", "wizall": "wizall", "mtn": "mtn",
-            "moov": "moov", "tmoney": "t-money",
-          };
           const countryWithdrawModes: Record<string, Record<string, string>> = {
             "SN": { "orange": "orange-money-senegal", "free": "free-money-senegal", "expresso": "expresso-senegal", "wave": "wave-senegal", "wizall": "wizall-senegal" },
             "CI": { "orange": "orange-money-ci", "mtn": "mtn-ci", "moov": "moov-ci", "wave": "wave-ci" },
@@ -2742,10 +2737,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return { success: false, error: "Opérateur non supporté via ce fournisseur" };
           }
           const providerCurrency = "XOF";
-          let amountForProvider = feeInfo.amountReceived;
+          // netMode: send the exact requested amount to the provider
+          let amountForProvider = amountInUserCurrency;
           if (userCurrency !== providerCurrency) {
             const { convertCurrency } = await import("./currency-converter");
-            const conv = await convertCurrency(feeInfo.amountReceived, userCurrency, providerCurrency);
+            const conv = await convertCurrency(amountInUserCurrency, userCurrency, providerCurrency);
             if (conv.success) amountForProvider = Math.floor(conv.convertedAmount);
           }
           const callbackBaseUrl = process.env.BASE_URL || "https://bkapay.com";
@@ -2763,6 +2759,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (submitResp.response_code !== "00") {
             return { success: false, error: "Échec de l'envoi du payout" };
           }
+          // Debit: exact amount + fees from user balance
           await storage.updateUserBalance(apiKey.userId, -feeInfo.totalDeductedFromBalance);
           const tx = await storage.createTransaction({
             userId: apiKey.userId, type: "withdrawal",
@@ -2775,6 +2772,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               provider: "paydunya", apiKeyId: apiKey.id, reference,
               paydunyaTransactionId: submitResp.transaction_id,
               providerAmount: amountForProvider, providerCurrency,
+              netMode: true,
             }),
           });
           return { success: true, transactionId: tx.id, message: "Payout effectué avec succès" };
@@ -2818,9 +2816,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               event,
               transactionId: tx.id,
               reference: reference || undefined,
-              amount: tx.amount,
+              recipientAmount: tx.amount,
               fee: tx.fee || 0,
-              netAmount: tx.amount - (tx.fee || 0),
+              totalDeducted: tx.amount + (tx.fee || 0),
               currency: tx.currency || userCurrency,
               status: tx.status,
               country: tx.country || countryCode,
@@ -2854,6 +2852,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         transactionId: result.transactionId,
         status: "pending",
         message: result.message || "Payout initié avec succès",
+        recipientAmount: amountInUserCurrency,
+        fee: feeInfo.feeAmount,
+        totalDeducted: feeInfo.totalDeductedFromBalance,
+        currency: userCurrency,
       });
 
     } catch (error: any) {
