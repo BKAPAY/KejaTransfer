@@ -154,21 +154,30 @@ else:
   const webhookHandlerExample = `// Webhook BKApay Payout — Node.js / Express
 const crypto = require('crypto');
 
-app.post('/webhook/bkapay-payout', express.json(), (req, res) => {
+// IMPORTANT : utilisez express.raw() pour lire le corps brut avant parsing
+// La signature est calculee sur le corps JSON brut (pas le corps re-serialise)
+app.post('/webhook/bkapay-payout', express.raw({ type: 'application/json' }), (req, res) => {
   const signature = req.headers['x-bkapay-signature'];
-  const secret = process.env.BKAPAY_CALLBACK_SECRET;
+  const secret = process.env.BKAPAY_CALLBACK_SECRET; // Votre secret de signature
 
-  // Verifier la signature HMAC-SHA256
+  if (!signature || !secret) {
+    return res.status(401).json({ error: 'Signature manquante' });
+  }
+
+  // Verifier la signature HMAC-SHA256 sur le corps BRUT (Buffer -> string)
+  const rawBody = req.body.toString('utf8');
   const expectedSig = crypto
     .createHmac('sha256', secret)
-    .update(JSON.stringify(req.body))
+    .update(rawBody)
     .digest('hex');
 
   if (signature !== expectedSig) {
     return res.status(401).json({ error: 'Signature invalide' });
   }
 
-  const { event, transactionId, reference, status } = req.body;
+  // Parser le corps apres verification
+  const payload = JSON.parse(rawBody);
+  const { event, transactionId, reference, status } = payload;
 
   if (event === 'payout.completed') {
     // Payout reussi — mettre a jour votre base de donnees
@@ -178,6 +187,8 @@ app.post('/webhook/bkapay-payout', express.json(), (req, res) => {
     notifyFailure(transactionId, reference);
   }
 
+  // Repondre 200 rapidement pour confirmer la reception
+  // BKApay retente toutes les 5s pendant 10 min si pas de 2xx
   res.json({ received: true });
 });`;
 
@@ -518,8 +529,15 @@ app.post('/webhook/bkapay-payout', express.json(), (req, res) => {
           </div>
 
           <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800">
-            <AlertDescription className="text-blue-800 dark:text-blue-200 text-xs">
-              Chaque webhook est signe avec votre secret de callback via HMAC-SHA256. Verifiez toujours la signature dans le header <code className="font-mono">X-BKApay-Signature</code> avant de traiter le webhook.
+            <AlertDescription className="text-blue-800 dark:text-blue-200 text-xs space-y-1">
+              <p>
+                Chaque webhook est signe avec votre <strong>secret de signature</strong> (visible dans la section API Payout) via HMAC-SHA256.
+                Verifiez toujours la signature dans le header <code className="font-mono bg-blue-100 dark:bg-blue-900 px-1 rounded">X-BKApay-Signature</code> avant de traiter le webhook.
+              </p>
+              <p>
+                <strong>Retry automatique :</strong> BKApay renvoie le webhook toutes les <strong>5 secondes pendant 10 minutes</strong> si votre serveur ne repond pas avec un code HTTP 2xx (200, 201...).
+                Repondez <code className="font-mono bg-blue-100 dark:bg-blue-900 px-1 rounded">{"{ received: true }"}</code> avec un statut 200 rapidement pour stopper les retentatives.
+              </p>
             </AlertDescription>
           </Alert>
         </CardContent>
@@ -536,7 +554,7 @@ app.post('/webhook/bkapay-payout', express.json(), (req, res) => {
           <ul className="space-y-2 text-muted-foreground">
             {[
               "Stockez toujours le transactionId retourne par l'API pour suivre le statut du payout.",
-              "Implementez la verification de signature HMAC pour valider l'authenticite des webhooks.",
+              "Verifiez la signature HMAC-SHA256 sur le corps brut (raw body) de la requete — pas sur le corps re-serialise — pour garantir la correspondance exacte.",
               "Verifiez votre solde avant d'initier de nombreux payouts en serie pour eviter les erreurs INSUFFICIENT_FUNDS.",
               "Gardez votre cle privee uniquement cote serveur — ne l'exposez jamais dans votre frontend.",
               "Implementez un systeme de file d'attente pour les volumes importants afin d'eviter les erreurs de rate limiting.",
