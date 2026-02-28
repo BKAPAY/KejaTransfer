@@ -8,50 +8,96 @@ import { trySendPaymentCallback } from "./utils/callback";
 import crypto from "crypto";
 
 /**
- * Sends the developer callback webhook when an API Payout transaction status changes.
- * Only fires if metadata contains apiKeyId (= initiated via /api/v1/payout).
+ * Attempts a single webhook delivery. Returns true if server responded with 2xx, false otherwise.
  */
-export async function sendApiPayoutCallback(transactionId: string, metadata: any, finalStatus: "completed" | "failed"): Promise<void> {
-  if (!metadata.apiKeyId) return;
+async function tryDeliverApiPayoutWebhook(
+  callbackUrl: string,
+  callbackSecret: string,
+  payloadStr: string,
+  event: string,
+  timestamp: string,
+): Promise<boolean> {
   try {
-    const apiKey = await storage.getApiKeyById(metadata.apiKeyId);
-    if (!apiKey || !apiKey.callbackUrl || !apiKey.callbackSecret) return;
-
-    const tx = await storage.getTransaction(transactionId);
-    if (!tx) return;
-
-    const event = finalStatus === "completed" ? "payout.completed" : "payout.failed";
-    const payoutPayload = {
-      event,
-      transactionId: tx.id,
-      reference: metadata.reference || undefined,
-      recipientAmount: tx.amount,
-      currency: tx.currency,
-      status: finalStatus,
-      country: tx.country,
-      operator: tx.operator,
-      recipientPhone: metadata.phone || tx.customerPhone,
-      timestamp: new Date().toISOString(),
-    };
-    const payloadStr = JSON.stringify(payoutPayload);
-    const signature = crypto.createHmac("sha256", apiKey.callbackSecret).update(payloadStr).digest("hex");
+    const signature = crypto.createHmac("sha256", callbackSecret).update(payloadStr).digest("hex");
     const controller = new AbortController();
     const tid = setTimeout(() => controller.abort(), 10000);
-    await fetch(apiKey.callbackUrl, {
+    const response = await fetch(callbackUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "X-BKApay-Signature": signature,
         "X-BKApay-Event": event,
-        "X-BKApay-Timestamp": payoutPayload.timestamp,
+        "X-BKApay-Timestamp": timestamp,
       },
       body: payloadStr,
       signal: controller.signal,
     }).finally(() => clearTimeout(tid));
-    console.log(`[ApiPayoutCallback] ✅ Webhook sent to ${apiKey.callbackUrl} for tx ${transactionId} (${event})`);
-  } catch (e) {
-    console.error(`[ApiPayoutCallback] Failed to send webhook for tx ${transactionId}:`, e);
+    return response.ok;
+  } catch {
+    return false;
   }
+}
+
+/**
+ * Sends the developer callback webhook when an API Payout transaction status changes.
+ * Only fires if metadata contains apiKeyId (= initiated via /api/v1/payout).
+ * Retries every 5 seconds for up to 10 minutes if the server doesn't respond with 2xx.
+ */
+export async function sendApiPayoutCallback(transactionId: string, metadata: any, finalStatus: "completed" | "failed"): Promise<void> {
+  if (!metadata.apiKeyId) return;
+
+  const apiKey = await storage.getApiKeyById(metadata.apiKeyId);
+  if (!apiKey || !apiKey.callbackUrl || !apiKey.callbackSecret) return;
+
+  const tx = await storage.getTransaction(transactionId);
+  if (!tx) return;
+
+  const event = finalStatus === "completed" ? "payout.completed" : "payout.failed";
+  const timestamp = new Date().toISOString();
+  const payoutPayload = {
+    event,
+    transactionId: tx.id,
+    reference: metadata.reference || undefined,
+    recipientAmount: tx.amount,
+    currency: tx.currency,
+    status: finalStatus,
+    country: tx.country,
+    operator: tx.operator,
+    recipientPhone: metadata.phone || tx.customerPhone,
+    timestamp,
+  };
+  const payloadStr = JSON.stringify(payoutPayload);
+
+  const MAX_ATTEMPTS = 120;   // 10 minutes at 5s intervals
+  const RETRY_INTERVAL_MS = 5000;
+
+  let attempt = 0;
+
+  const attempt_send = async () => {
+    attempt++;
+    const success = await tryDeliverApiPayoutWebhook(
+      apiKey.callbackUrl!,
+      apiKey.callbackSecret!,
+      payloadStr,
+      event,
+      timestamp,
+    );
+
+    if (success) {
+      console.log(`[ApiPayoutCallback] ✅ Webhook delivered to ${apiKey.callbackUrl} for tx ${transactionId} (${event}) — attempt ${attempt}`);
+      return;
+    }
+
+    console.warn(`[ApiPayoutCallback] ⚠️ Webhook attempt ${attempt}/${MAX_ATTEMPTS} failed for tx ${transactionId} — retrying in ${RETRY_INTERVAL_MS / 1000}s`);
+
+    if (attempt < MAX_ATTEMPTS) {
+      setTimeout(attempt_send, RETRY_INTERVAL_MS);
+    } else {
+      console.error(`[ApiPayoutCallback] ❌ Gave up after ${MAX_ATTEMPTS} attempts for tx ${transactionId} (${event})`);
+    }
+  };
+
+  attempt_send();
 }
 
 const PAYDUNYA_MASTER_KEY = process.env.PAYDUNYA_MASTER_KEY;
