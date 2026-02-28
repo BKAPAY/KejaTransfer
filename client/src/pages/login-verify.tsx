@@ -1,20 +1,128 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { ShieldCheck, AlertTriangle, Loader2 } from "lucide-react";
+import { ShieldCheck, AlertTriangle, Loader2, MapPin, Wifi } from "lucide-react";
 import logoImage from "@assets/bkapay-logo.png";
 
 type VerifyStep = "ready" | "loading" | "denied";
+
+function getConnectionType(): string {
+  try {
+    const conn = (navigator as any).connection || (navigator as any).mozConnection || (navigator as any).webkitConnection;
+    if (conn) {
+      const type = conn.type || "";
+      const effectiveType = conn.effectiveType || "";
+      if (type === "wifi") return "WiFi";
+      if (type === "cellular") return `Cellulaire (${effectiveType.toUpperCase()})`;
+      if (type === "ethernet") return "Ethernet";
+      if (effectiveType) return effectiveType.toUpperCase();
+    }
+  } catch (e) {}
+  return "Inconnu";
+}
+
+async function getPositionFast(): Promise<GeolocationPosition> {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error("geolocation_unsupported"));
+      return;
+    }
+
+    let resolved = false;
+    let bestPos: GeolocationPosition | null = null;
+
+    // Tentative rapide : position réseau (pas de GPS haute précision)
+    // Résultat en moins d'une seconde sur la plupart des appareils
+    const tryLowAccuracy = () =>
+      new Promise<GeolocationPosition>((res, rej) => {
+        navigator.geolocation.getCurrentPosition(res, rej, {
+          enableHighAccuracy: false,
+          timeout: 4000,
+          maximumAge: 30000,
+        });
+      });
+
+    // Tentative haute précision en parallèle (GPS réel)
+    let watchId: number | null = null;
+    const highAccuracyTimeout = setTimeout(() => {
+      if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+      if (!resolved) {
+        if (bestPos) {
+          resolved = true;
+          resolve(bestPos);
+        }
+      }
+    }, 8000);
+
+    watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        if (resolved) return;
+        if (!bestPos || pos.coords.accuracy < bestPos.coords.accuracy) {
+          bestPos = pos;
+        }
+        // Accepter dès qu'on a une position précise OU après 2 secondes si on a n'importe quelle position
+        if (pos.coords.accuracy <= 100) {
+          clearTimeout(highAccuracyTimeout);
+          navigator.geolocation.clearWatch(watchId!);
+          resolved = true;
+          resolve(pos);
+        }
+      },
+      () => {},
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+    );
+
+    // Lancer la tentative rapide simultanément
+    tryLowAccuracy()
+      .then((pos) => {
+        if (!resolved) {
+          // On a une position rapide — on l'utilise immédiatement
+          // mais on laisse la haute précision continuer 2 secondes
+          bestPos = bestPos
+            ? bestPos.coords.accuracy < pos.coords.accuracy ? bestPos : pos
+            : pos;
+
+          setTimeout(() => {
+            if (!resolved) {
+              clearTimeout(highAccuracyTimeout);
+              if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+              resolved = true;
+              resolve(bestPos!);
+            }
+          }, 2000);
+        }
+      })
+      .catch(() => {
+        // La tentative rapide a échoué → on attend la haute précision
+      });
+
+    // Timeout global de sécurité : 10 secondes max
+    setTimeout(() => {
+      if (!resolved) {
+        clearTimeout(highAccuracyTimeout);
+        if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+        if (bestPos) {
+          resolved = true;
+          resolve(bestPos);
+        } else {
+          reject(new Error("timeout"));
+        }
+      }
+    }, 10000);
+  });
+}
 
 export default function LoginVerify() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [step, setStep] = useState<VerifyStep>("ready");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [loadingMsg, setLoadingMsg] = useState("Localisation en cours...");
+  const loadingMsgRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   const { data: verifyStatus, isLoading: statusLoading, error: statusError } = useQuery<{ verified: boolean }>({
     queryKey: ["/api/auth/login-verify-status"],
@@ -35,21 +143,6 @@ export default function LoginVerify() {
     }
   }, [verifyStatus, setLocation]);
 
-  const getConnectionType = (): string => {
-    try {
-      const conn = (navigator as any).connection || (navigator as any).mozConnection || (navigator as any).webkitConnection;
-      if (conn) {
-        const type = conn.type || "";
-        const effectiveType = conn.effectiveType || "";
-        if (type === "wifi") return "WiFi";
-        if (type === "cellular") return `Cellulaire (${effectiveType.toUpperCase()})`;
-        if (type === "ethernet") return "Ethernet";
-        if (effectiveType) return effectiveType.toUpperCase();
-      }
-    } catch (e) {}
-    return "Inconnu";
-  };
-
   const gpsMutation = useMutation({
     mutationFn: async (data: { latitude: number; longitude: number; accuracy: number }) => {
       const connectionType = getConnectionType();
@@ -62,7 +155,7 @@ export default function LoginVerify() {
       return await response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/login-verify-status"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
       setLocation("/dashboard");
     },
     onError: (error: any) => {
@@ -75,73 +168,44 @@ export default function LoginVerify() {
     },
   });
 
+  const clearLoadingTimers = () => {
+    loadingMsgRef.current.forEach((t) => clearTimeout(t));
+    loadingMsgRef.current = [];
+  };
+
   const handleAuthorize = async () => {
     setStep("loading");
     setErrorMsg(null);
+    setLoadingMsg("Localisation en cours...");
 
-    if (!navigator.geolocation) {
-      setErrorMsg("La géolocalisation n'est pas supportée par votre navigateur.");
-      setStep("denied");
-      return;
-    }
-
-    let bestPosition: GeolocationPosition | null = null;
-    let watchId: number | null = null;
+    // Messages de progression pour rassurer l'utilisateur
+    const t1 = setTimeout(() => setLoadingMsg("Recherche du signal GPS..."), 2000);
+    const t2 = setTimeout(() => setLoadingMsg("Connexion au serveur..."), 5000);
+    const t3 = setTimeout(() => setLoadingMsg("Finalisation..."), 8000);
+    loadingMsgRef.current = [t1, t2, t3];
 
     try {
-      await new Promise<void>((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          if (watchId !== null) navigator.geolocation.clearWatch(watchId);
-          if (bestPosition) {
-            resolve();
-          } else {
-            reject(new Error("timeout"));
-          }
-        }, 20000);
-
-        watchId = navigator.geolocation.watchPosition(
-          (position) => {
-            if (!bestPosition || position.coords.accuracy < bestPosition.coords.accuracy) {
-              bestPosition = position;
-            }
-            if (position.coords.accuracy <= 50) {
-              clearTimeout(timeout);
-              if (watchId !== null) navigator.geolocation.clearWatch(watchId);
-              resolve();
-            }
-          },
-          (err) => {
-            clearTimeout(timeout);
-            if (watchId !== null) navigator.geolocation.clearWatch(watchId);
-            reject(err);
-          },
-          {
-            enableHighAccuracy: true,
-            timeout: 20000,
-            maximumAge: 0,
-          }
-        );
+      const pos = await getPositionFast();
+      clearLoadingTimers();
+      setLoadingMsg("Connexion au serveur...");
+      gpsMutation.mutate({
+        latitude: pos.coords.latitude,
+        longitude: pos.coords.longitude,
+        accuracy: pos.coords.accuracy,
       });
-
-      if (bestPosition) {
-        const pos = bestPosition as GeolocationPosition;
-        gpsMutation.mutate({
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-          accuracy: pos.coords.accuracy,
-        });
-      } else {
-        setErrorMsg("Impossible d'obtenir votre position. Activez le GPS et réessayez.");
-        setStep("denied");
-      }
     } catch (err: any) {
-      console.error("[LoginVerify] GPS error:", err);
-      setErrorMsg("Vous devez activer la localisation GPS pour accéder à votre compte. Vérifiez que le GPS est activé dans les paramètres de votre appareil.");
+      clearLoadingTimers();
+      if (err?.code === 1 || err?.message === "geolocation_unsupported") {
+        setErrorMsg("Vous devez autoriser la localisation GPS pour accéder à votre compte. Activez-la dans les paramètres de votre navigateur/appareil.");
+      } else {
+        setErrorMsg("Impossible d'obtenir votre position. Vérifiez que le GPS est activé et réessayez.");
+      }
       setStep("denied");
     }
   };
 
   const handleLogout = async () => {
+    clearLoadingTimers();
     try {
       await apiRequest("POST", "/api/auth/logout");
     } catch (e) {}
@@ -169,6 +233,10 @@ export default function LoginVerify() {
         <CardContent>
           {step === "ready" && (
             <div className="space-y-4">
+              <div className="flex items-start gap-3 bg-muted/50 rounded-md p-3 text-sm text-muted-foreground">
+                <MapPin className="h-4 w-4 mt-0.5 shrink-0" />
+                <span>Une localisation GPS est requise pour sécuriser votre connexion.</span>
+              </div>
               <Button
                 className="w-full"
                 onClick={handleAuthorize}
@@ -189,9 +257,15 @@ export default function LoginVerify() {
           )}
 
           {step === "loading" && (
-            <div className="flex flex-col items-center gap-3 py-4">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">Connexion en cours...</p>
+            <div className="flex flex-col items-center gap-3 py-6">
+              <div className="relative">
+                <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                <MapPin className="h-4 w-4 text-primary absolute inset-0 m-auto" />
+              </div>
+              <p className="text-sm font-medium">{loadingMsg}</p>
+              <p className="text-xs text-muted-foreground text-center">
+                Si cela prend du temps, vérifiez que le GPS est activé.
+              </p>
             </div>
           )}
 
@@ -204,7 +278,7 @@ export default function LoginVerify() {
               </div>
               <Button
                 className="w-full"
-                onClick={() => setStep("ready")}
+                onClick={handleAuthorize}
                 data-testid="button-retry"
               >
                 Réessayer

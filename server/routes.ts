@@ -1100,25 +1100,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (photoBase64) updateData.photoBase64 = photoBase64;
         if (connectionType) updateData.connectionType = connectionType;
 
-        try {
-          const controller = new AbortController();
-          const timeout = setTimeout(() => controller.abort(), 5000);
-          const geoRes = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&accept-language=fr&zoom=18&addressdetails=1`,
-            { signal: controller.signal, headers: { "User-Agent": "BKApay/1.0" } }
-          );
-          clearTimeout(timeout);
-          if (geoRes.ok) {
-            const geoData = await geoRes.json();
-            if (geoData.display_name) {
-              updateData.gpsAddress = geoData.display_name;
-            }
-          }
-        } catch (e) {
-          console.log("[LoginVerify] Reverse geocoding failed, continuing without address");
-        }
-
+        // Sauvegarder les coordonnées GPS immédiatement (sans attendre la géocodification)
         await storage.updateLoginLog(loginLogId, updateData);
+
+        // Géocodification inverse en arrière-plan (ne bloque pas la réponse)
+        setImmediate(async () => {
+          try {
+            const controller = new AbortController();
+            const geoTimeout = setTimeout(() => controller.abort(), 6000);
+            const geoRes = await fetch(
+              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&accept-language=fr&zoom=18&addressdetails=1`,
+              { signal: controller.signal, headers: { "User-Agent": "BKApay/1.0" } }
+            );
+            clearTimeout(geoTimeout);
+            if (geoRes.ok) {
+              const geoData = await geoRes.json();
+              if (geoData.display_name) {
+                await storage.updateLoginLog(loginLogId, { gpsAddress: geoData.display_name });
+              }
+            }
+          } catch (e) {
+            console.log("[LoginVerify] Reverse geocoding failed (background), continuing without address");
+          }
+        });
       }
 
       req.session.loginVerified = true;
