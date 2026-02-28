@@ -219,6 +219,18 @@ async function bootstrapDatabase() {
     }
     await ipLogsClient.end();
 
+    // Step 6d: Ensure payout_api_enabled column exists in users table
+    const payoutColClient = postgres(DATABASE_URL);
+    try {
+      await payoutColClient`
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS payout_api_enabled BOOLEAN NOT NULL DEFAULT FALSE
+      `;
+      console.log("✅ users.payout_api_enabled column ready");
+    } catch (e) {
+      console.error("⚠️ payout_api_enabled column setup error:", e);
+    }
+    await payoutColClient.end();
+
     // Step 7: Ensure primary admin exists
     console.log("👤 Ensuring primary admin exists...");
     const seedClient = postgres(DATABASE_URL);

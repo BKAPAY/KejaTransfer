@@ -2553,6 +2553,318 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== API Payout v1 - Mobile Money Payout via API key =====
+  app.post("/api/v1/payout", async (req: Request, res: Response) => {
+    try {
+      // 1. Extract private key from Authorization header or body
+      let privateKey = req.headers.authorization?.replace(/^Bearer\s+/i, "").trim();
+      if (!privateKey) privateKey = req.body.privateKey;
+
+      if (!privateKey || !privateKey.startsWith("sk_")) {
+        return res.status(401).json({
+          success: false,
+          error: { code: "INVALID_API_KEY", message: "Clé API privée invalide ou manquante. Utilisez: Authorization: Bearer sk_live_..." }
+        });
+      }
+
+      // 2. Validate API key
+      const apiKey = await storage.getApiKeyByPrivateKey(privateKey);
+      if (!apiKey || !apiKey.isActive) {
+        return res.status(401).json({
+          success: false,
+          error: { code: "INVALID_API_KEY", message: "Clé API invalide ou désactivée" }
+        });
+      }
+
+      // 3. Get account owner
+      const user = await storage.getUser(apiKey.userId);
+      if (!user) {
+        return res.status(401).json({
+          success: false,
+          error: { code: "INVALID_API_KEY", message: "Compte associé introuvable" }
+        });
+      }
+
+      // 4. Account status checks
+      if (user.suspended) {
+        return res.status(403).json({
+          success: false,
+          error: { code: "ACCOUNT_SUSPENDED", message: "Ce compte a été suspendu. Contactez le support." }
+        });
+      }
+
+      if (user.kycStatus !== "verified") {
+        return res.status(403).json({
+          success: false,
+          error: { code: "ACCOUNT_NOT_VERIFIED", message: "Votre compte n'est pas encore vérifié (KYC). Complétez la vérification d'identité pour activer le payout API." }
+        });
+      }
+
+      if (!(user as any).payoutApiEnabled) {
+        return res.status(403).json({
+          success: false,
+          error: { code: "PAYOUT_NOT_ACTIVATED", message: "Le payout API n'est pas activé sur votre compte. Contactez le support pour l'activer." }
+        });
+      }
+
+      // 5. Validate required parameters
+      const { phone, operator, country, amount, currency, reference } = req.body;
+
+      if (!phone || !operator || !country || !amount) {
+        return res.status(400).json({
+          success: false,
+          error: { code: "INVALID_PARAMETERS", message: "Les champs phone, operator, country et amount sont obligatoires" }
+        });
+      }
+
+      const parsedAmount = Number(amount);
+      if (isNaN(parsedAmount) || parsedAmount <= 0) {
+        return res.status(400).json({
+          success: false,
+          error: { code: "INVALID_PARAMETERS", message: "Le montant doit être un nombre positif" }
+        });
+      }
+
+      const requestedAmount = Math.floor(parsedAmount);
+      const countryCode = String(country).toUpperCase();
+
+      // 6. Normalize operator: lowercase, strip country suffix, strip common suffixes
+      let normalizedOperator = String(operator).toLowerCase()
+        .replace(/\s+/g, "-")
+        .replace(/-[a-z]{2}$/i, "")      // strip -sn, -ci, -cd, -cm, etc.
+        .replace(/[-_]money$/i, "")       // orange-money → orange
+        .replace(/[-_]mobile$/i, "")      // mtn-mobile → mtn
+        .replace(/[-_]cash$/i, "");       // moov-cash → moov
+
+      // 7. Strip international prefix from phone number
+      const countryPhoneMap: Record<string, { code: string; digits: number[] }> = {
+        "SN": { code: "221", digits: [9] }, "CI": { code: "225", digits: [10] },
+        "BF": { code: "226", digits: [8] }, "BJ": { code: "229", digits: [8, 10] },
+        "TG": { code: "228", digits: [8] }, "ML": { code: "223", digits: [8] },
+        "GN": { code: "224", digits: [9] }, "CM": { code: "237", digits: [9] },
+        "CD": { code: "243", digits: [9] }, "CG": { code: "242", digits: [9] },
+        "RW": { code: "250", digits: [9] }, "GA": { code: "241", digits: [8] },
+        "MG": { code: "261", digits: [9] }, "GM": { code: "220", digits: [7] },
+      };
+
+      let rawPhone = String(phone).replace(/[\s\-\.]+/g, "");
+      if (!/^\+?\d+$/.test(rawPhone)) {
+        return res.status(400).json({
+          success: false,
+          error: { code: "INVALID_PHONE", message: "Numéro de téléphone invalide. Utilisez le format international: +221XXXXXXXXX" }
+        });
+      }
+
+      let localPhone = rawPhone;
+      const pInfo = countryPhoneMap[countryCode];
+      if (pInfo) {
+        if (localPhone.startsWith("+")) localPhone = localPhone.substring(1);
+        if (localPhone.startsWith("00")) localPhone = localPhone.substring(2);
+        if (localPhone.startsWith(pInfo.code)) {
+          const withoutCode = localPhone.substring(pInfo.code.length);
+          if (pInfo.digits.includes(withoutCode.length)) localPhone = withoutCode;
+        }
+      }
+
+      // 8. Find active provider for this country/operator
+      const activeProvider = await getActiveProviderForWithdrawal(countryCode, normalizedOperator);
+      if (!activeProvider) {
+        // Try to determine if country is fully unavailable vs operator
+        const [allCsConfigs] = await Promise.all([storage.getCountryStatuses()]);
+        const countryHasAny = allCsConfigs.some(cs => cs.country.toUpperCase() === countryCode && cs.payoutEnabled);
+        if (!countryHasAny) {
+          return res.status(400).json({
+            success: false,
+            error: { code: "COUNTRY_UNAVAILABLE", message: `Le pays ${countryCode} n'est pas disponible pour le payout` }
+          });
+        }
+        return res.status(400).json({
+          success: false,
+          error: { code: "OPERATOR_UNAVAILABLE", message: `L'opérateur ${operator} n'est pas disponible pour le payout en ${countryCode}` }
+        });
+      }
+
+      // 9. Determine currencies
+      const userCurrency = user.country ? getCurrencyForCountry(user.country) : "XOF";
+      const requestedCurrency = currency ? String(currency).toUpperCase() : getCurrencyForCountry(countryCode);
+
+      // 10. Convert requested amount to user's balance currency if different
+      let amountInUserCurrency = requestedAmount;
+      if (requestedCurrency !== userCurrency) {
+        const { convertCurrency } = await import("./currency-converter");
+        const conv = await convertCurrency(requestedAmount, requestedCurrency, userCurrency);
+        if (!conv.success) {
+          return res.status(400).json({
+            success: false,
+            error: { code: "CURRENCY_CONVERSION_FAILED", message: `Impossible de convertir ${requestedCurrency} → ${userCurrency}` }
+          });
+        }
+        amountInUserCurrency = Math.floor(conv.convertedAmount);
+      }
+
+      // 11. Pre-check balance (handlers do their own check but we return a clean error)
+      const feeConfig = await getFeeFromDatabase(storage, activeProvider, countryCode, normalizedOperator);
+      const feeInfo = calculateOutgoingFee(amountInUserCurrency, feeConfig.outgoing);
+      if (user.balance < feeInfo.totalDeductedFromBalance) {
+        return res.status(400).json({
+          success: false,
+          error: { code: "INSUFFICIENT_FUNDS", message: "Solde insuffisant pour effectuer ce payout" }
+        });
+      }
+
+      // 12. Route to the appropriate provider handler
+      let result: { success: boolean; transactionId?: string; error?: string; message?: string };
+
+      if (activeProvider === "fedapay") {
+        result = await handleFedaPayWithdrawal(apiKey.userId, user, amountInUserCurrency, countryCode, normalizedOperator, localPhone, userCurrency);
+      } else if (activeProvider === "mbiyopay") {
+        result = await handleMbiyoPayWithdrawal(apiKey.userId, user, amountInUserCurrency, countryCode, normalizedOperator, localPhone, userCurrency, requestedCurrency);
+      } else if (activeProvider === "moneyfusion") {
+        result = await handleMoneyFusionWithdrawal(apiKey.userId, user, amountInUserCurrency, countryCode, normalizedOperator, localPhone, userCurrency);
+      } else if (activeProvider === "paydunya") {
+        // Paydunya inline payout
+        result = await (async () => {
+          const withdrawModeMap: Record<string, string> = {
+            "orange": "orange-money", "free": "free-money", "expresso": "expresso",
+            "wave": "wave", "wizall": "wizall", "mtn": "mtn",
+            "moov": "moov", "tmoney": "t-money",
+          };
+          const countryWithdrawModes: Record<string, Record<string, string>> = {
+            "SN": { "orange": "orange-money-senegal", "free": "free-money-senegal", "expresso": "expresso-senegal", "wave": "wave-senegal", "wizall": "wizall-senegal" },
+            "CI": { "orange": "orange-money-ci", "mtn": "mtn-ci", "moov": "moov-ci", "wave": "wave-ci" },
+            "BF": { "orange": "orange-money-burkina", "moov": "moov-burkina-faso" },
+            "BJ": { "moov": "moov-benin", "mtn": "mtn-benin" },
+            "TG": { "tmoney": "t-money-togo", "moov": "moov-togo" },
+            "ML": { "orange": "orange-money-mali", "moov": "moov-mali" },
+          };
+          const withdrawMode = countryWithdrawModes[countryCode]?.[normalizedOperator];
+          if (!withdrawMode) {
+            return { success: false, error: "Opérateur non supporté via ce fournisseur" };
+          }
+          const providerCurrency = "XOF";
+          let amountForProvider = feeInfo.amountReceived;
+          if (userCurrency !== providerCurrency) {
+            const { convertCurrency } = await import("./currency-converter");
+            const conv = await convertCurrency(feeInfo.amountReceived, userCurrency, providerCurrency);
+            if (conv.success) amountForProvider = Math.floor(conv.convertedAmount);
+          }
+          const callbackBaseUrl = process.env.BASE_URL || "https://bkapay.com";
+          const getInvoiceResp = await callPaydunyaAPIv2("/disburse/get-invoice", {
+            account_alias: localPhone, amount: amountForProvider,
+            withdraw_mode: withdrawMode, callback_url: `${callbackBaseUrl}/api/webhooks/paydunya-disburse`,
+          });
+          if (getInvoiceResp.response_code !== "00" || !getInvoiceResp.disburse_token) {
+            return { success: false, error: "Échec de l'initialisation du payout" };
+          }
+          const submitResp = await callPaydunyaAPIv2("/disburse/submit-invoice", {
+            disburse_invoice: getInvoiceResp.disburse_token,
+            disburse_id: `apipayout-${apiKey.userId.substring(0, 8)}-${Date.now()}`,
+          });
+          if (submitResp.response_code !== "00") {
+            return { success: false, error: "Échec de l'envoi du payout" };
+          }
+          await storage.updateUserBalance(apiKey.userId, -feeInfo.totalDeductedFromBalance);
+          const tx = await storage.createTransaction({
+            userId: apiKey.userId, type: "withdrawal",
+            amount: amountInUserCurrency, fee: feeInfo.feeAmount,
+            feePercentage: feeInfo.feePercentage, currency: userCurrency,
+            status: "completed", country: countryCode, operator: normalizedOperator,
+            customerPhone: localPhone,
+            description: `Payout API ${amountInUserCurrency} ${userCurrency}`,
+            metadata: JSON.stringify({
+              provider: "paydunya", apiKeyId: apiKey.id, reference,
+              paydunyaTransactionId: submitResp.transaction_id,
+              providerAmount: amountForProvider, providerCurrency,
+            }),
+          });
+          return { success: true, transactionId: tx.id, message: "Payout effectué avec succès" };
+        })();
+      } else {
+        return res.status(400).json({
+          success: false,
+          error: { code: "OPERATOR_UNAVAILABLE", message: "Aucun fournisseur disponible pour cette opération" }
+        });
+      }
+
+      if (!result.success) {
+        return res.status(400).json({
+          success: false,
+          error: { code: "TRANSACTION_FAILED", message: result.error || "La transaction a échoué" }
+        });
+      }
+
+      // 13. Update transaction metadata with API key reference
+      if (result.transactionId) {
+        try {
+          const tx = await storage.getTransaction(result.transactionId);
+          if (tx && tx.metadata) {
+            const meta = JSON.parse(tx.metadata);
+            meta.apiKeyId = apiKey.id;
+            meta.apiKeyPublicKey = apiKey.publicKey;
+            if (reference) meta.reference = reference;
+            await storage.updateTransactionMetadata(result.transactionId, JSON.stringify(meta));
+          }
+        } catch (e) {}
+      }
+
+      // 14. Send async callback webhook if configured
+      if (result.transactionId && apiKey.callbackUrl && apiKey.callbackSecret) {
+        setImmediate(async () => {
+          try {
+            const tx = await storage.getTransaction(result.transactionId!);
+            if (!tx) return;
+            const event = tx.status === "completed" ? "payout.completed" : tx.status === "failed" ? "payout.failed" : "payout.pending";
+            const payoutPayload = {
+              event,
+              transactionId: tx.id,
+              reference: reference || undefined,
+              amount: tx.amount,
+              fee: tx.fee || 0,
+              netAmount: tx.amount - (tx.fee || 0),
+              currency: tx.currency || userCurrency,
+              status: tx.status,
+              country: tx.country || countryCode,
+              operator: tx.operator || normalizedOperator,
+              recipientPhone: phone,
+              timestamp: new Date().toISOString(),
+            };
+            const payloadStr = JSON.stringify(payoutPayload);
+            const signature = require("crypto").createHmac("sha256", apiKey.callbackSecret).update(payloadStr).digest("hex");
+            const controller = new AbortController();
+            const tid = setTimeout(() => controller.abort(), 10000);
+            await fetch(apiKey.callbackUrl!, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "X-BKApay-Signature": signature,
+                "X-BKApay-Event": event,
+                "X-BKApay-Timestamp": payoutPayload.timestamp,
+              },
+              body: payloadStr,
+              signal: controller.signal,
+            }).finally(() => clearTimeout(tid));
+          } catch (e) {
+            console.error("[API Payout] Callback error:", e);
+          }
+        });
+      }
+
+      return res.json({
+        success: true,
+        transactionId: result.transactionId,
+        status: "pending",
+        message: result.message || "Payout initié avec succès",
+      });
+
+    } catch (error: any) {
+      console.error("[API Payout] Unhandled error:", error);
+      res.status(500).json({
+        success: false,
+        error: { code: "INTERNAL_ERROR", message: "Une erreur interne est survenue" }
+      });
+    }
+  });
+
   // ===== Inline Payment Status (public, safe for external callers) =====
   app.get("/api/inline-pay/status/:id", async (req: Request, res: Response) => {
     try {
@@ -6924,6 +7236,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true, withdrawalsEnabled: result.rows[0].withdrawals_enabled });
     } catch (error: any) {
       console.error("Toggle withdrawals error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
+  app.post("/api/admin/toggle-payout-api", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { userId, enabled } = req.body;
+      if (!userId || typeof enabled !== "boolean") {
+        return res.status(400).json({ error: "Paramètres invalides" });
+      }
+      const result = await pgPool.query(
+        "UPDATE users SET payout_api_enabled = $1 WHERE id = $2 RETURNING payout_api_enabled",
+        [enabled, userId]
+      );
+      if (result.rows.length === 0) return res.status(404).json({ error: "Utilisateur non trouvé" });
+      res.json({ success: true, payoutApiEnabled: result.rows[0].payout_api_enabled });
+    } catch (error: any) {
+      console.error("Toggle payout API error:", error);
       res.status(500).json({ error: "Une erreur est survenue" });
     }
   });

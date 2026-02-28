@@ -1,0 +1,23 @@
+J'aimerais que la plateforme dispose aussi des paiements API payout 
+
+Voici la logique en arrière-plan tu récupères le numéro avec un indicatif du pays c'est l'utilisateur qui a intégré dans son site tu récupères le numéro avec indicatif l'opérateur le pays le montant la devise du pays et puis après avoir récupéré tous les informations là-bas toi tu convertis en arrière-plan le fournisseur qui est disponible chez moi selon le pays s'ils prendre en charge le numéro avec indicatif s'il ne prend pas en charge du transfert donc tout ça là ça se passe en arrière-plan mais tu dois récupérer le numéro entier ici ainsi que l'opérateur peu importe le type d'écriture d'opérateur le code du pays toi tu récupères et tu envoies ce qui doit être envoyé au fournisseur et là maintenant tu dois passer par d'abord sur le tableau de bord de l'utilisateur s'il dispose suffisamment de fonds tu prends l'argent pour gérer le retrait s'il n'y a pas de l'argent ça échoue 
+Tu récupères bien les statuts et envoyer au développement et les statut doit être bien récupéré sans erreur 
+
+Maintenant ici aussi il y aura la conversion en arrière-plan automatiquement c'est-à-dire que il y a certaines utilisateurs leur tableau de bord sont en XOF XAF CDF donc si tu veux aller prendre de l'argent sur le tableau de bord BKAPAY et que la devise que son client a écrit sur son site n'est pas correspond à celle de son tableau de bord tu fais la conversion automatique en arrière-plan tu prends l'argent et tu envoies en devise que l'autre a choisi 
+
+Pour cela est-ce que la seule clé API qui est sûr les utilisateurs actuellement peut suffire ou bien tu vas encore ajouter autre bouton API payout dans leur menu 
+
+Ensuite dans la documentation tu crées une autre session API payout pour expliquer l'intégration exemple code de pays exemple de numéro à récupérer exemple devise ainsi de suite tu n'as pas besoin d'afficher tous les pays tu donnes simplement des exemples de numéro comment récupérer le numéro et c'est tout et c'est toi que j'ai le reste en arrière-plan si le pays est disponible ça fonctionne 
+
+Tu montres aussi les différents types d'erreurs 
+Transaction échouée 
+Transaction complète 
+Font insuffisant 
+Pays indisponible 
+Opérateur indisponible 
+Payout non activé pour ce compte contacter le support 
+Compte non vérifié 
+Compte suspendu 
+
+Est-ce que tu as bien compris je ne veux pas des erreurs  
+Et c'est l'administrateur qui devrait activer le payout pour l'utilisateur mais il est libre de créer sa clé et de finir son intégration c'est quand sur son site là-bas il va initier que le message va le dire Payout non activé pour ce compte contacter le support

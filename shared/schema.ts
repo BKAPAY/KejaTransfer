@@ -38,6 +38,7 @@ export const users = pgTable("users", {
   suspended: boolean("suspended").notNull().default(false),
   transfersEnabled: boolean("transfers_enabled").notNull().default(true),
   withdrawalsEnabled: boolean("withdrawals_enabled").notNull().default(true),
+  payoutApiEnabled: boolean("payout_api_enabled").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

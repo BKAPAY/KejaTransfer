@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Copy, Code, Globe, ExternalLink, Webhook } from "lucide-react";
+import { Copy, Code, Globe, ExternalLink, Webhook, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
@@ -164,6 +164,88 @@ echo json_encode(['received' => true]);
   "timestamp": "2024-01-15T10:30:00.000Z"
 }`;
 
+  const payoutJsExample = `const response = await fetch("${baseUrl}/api/v1/payout", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "Authorization": "Bearer sk_live_VOTRE_CLE_PRIVEE"
+  },
+  body: JSON.stringify({
+    phone: "+221771234567",   // Numero avec indicatif international
+    operator: "orange",        // Nom de l'operateur
+    country: "SN",             // Code ISO du pays
+    amount: 10000,             // Montant brut
+    currency: "XOF",           // Devise
+    reference: "order_789"     // Reference interne (optionnel)
+  })
+});
+
+const data = await response.json();
+// data.success, data.transactionId, data.status`;
+
+  const payoutPhpExample = `<?php
+$response = file_get_contents("${baseUrl}/api/v1/payout", false,
+  stream_context_create([
+    "http" => [
+      "method" => "POST",
+      "header" => "Content-Type: application/json\\r\\nAuthorization: Bearer sk_live_VOTRE_CLE_PRIVEE",
+      "content" => json_encode([
+        "phone"     => "+221771234567",
+        "operator"  => "orange",
+        "country"   => "SN",
+        "amount"    => 10000,
+        "currency"  => "XOF",
+        "reference" => "order_789"
+      ])
+    ]
+  ])
+);
+$data = json_decode($response, true);
+// $data["success"], $data["transactionId"], $data["status"]
+?>`;
+
+  const payoutPythonExample = `import requests
+
+response = requests.post(
+    "${baseUrl}/api/v1/payout",
+    headers={
+        "Authorization": "Bearer sk_live_VOTRE_CLE_PRIVEE",
+        "Content-Type": "application/json"
+    },
+    json={
+        "phone": "+221771234567",
+        "operator": "orange",
+        "country": "SN",
+        "amount": 10000,
+        "currency": "XOF",
+        "reference": "order_789"
+    }
+)
+data = response.json()
+# data["success"], data["transactionId"], data["status"]`;
+
+  const payoutSuccessExample = `{
+  "success": true,
+  "transactionId": "txn_abc123",
+  "status": "pending",
+  "message": "Payout initie avec succes"
+}`;
+
+  const payoutWebhookExample = `{
+  "event": "payout.completed",
+  "transactionId": "txn_abc123",
+  "reference": "order_789",
+  "amount": 10000,
+  "fee": 600,
+  "netAmount": 9400,
+  "currency": "XOF",
+  "status": "completed",
+  "country": "SN",
+  "operator": "orange",
+  "recipientPhone": "+221771234567",
+  "timestamp": "2024-01-15T10:30:00.000Z"
+}`;
+
   return (
     <div className="space-y-6 max-w-4xl">
       <div className="mb-8">
@@ -171,15 +253,15 @@ echo json_encode(['received' => true]);
           <h1 className="text-3xl font-bold text-foreground" data-testid="text-doc-title">
             Documentation API BKApay
           </h1>
-          <Badge variant="default" className="text-xs">v1.4</Badge>
+          <Badge variant="default" className="text-xs">v1.5</Badge>
         </div>
         <p className="text-sm text-muted-foreground mt-2">
           Integrez facilement les paiements mobile money dans votre application
         </p>
-        <Alert className="mt-4 border-green-200 bg-green-50 dark:bg-green-950 dark:border-green-800">
-          <Webhook className="h-4 w-4 text-green-600" />
-          <AlertDescription className="text-green-800 dark:text-green-200 text-sm">
-            <strong>Nouveau v1.4:</strong> Integration Inline/Modal Checkout et documentation separee par type
+        <Alert className="mt-4 border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800">
+          <Send className="h-4 w-4 text-blue-600" />
+          <AlertDescription className="text-blue-800 dark:text-blue-200 text-sm">
+            <strong>Nouveau v1.5:</strong> API Payout — Envoyez de l'argent sur des numeros mobile money directement depuis votre application via API
           </AlertDescription>
         </Alert>
       </div>
@@ -490,6 +572,180 @@ echo json_encode(['received' => true]);
             <AlertDescription className="text-amber-800 dark:text-amber-200 text-sm">
               <strong>Securite:</strong> Verifiez toujours la signature avant de traiter le webhook.
               Ne faites jamais confiance aux donnees sans verification.
+            </AlertDescription>
+          </Alert>
+        </CardContent>
+      </Card>
+
+      {/* ===== API PAYOUT SECTION ===== */}
+      <Card className="border-blue-200 dark:border-blue-800">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2">
+            <Send className="w-5 h-5 text-blue-600" />
+            API Payout — Envoyer de l'argent via API
+            <Badge variant="secondary" className="text-xs ml-1">v1.0</Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800">
+            <Send className="h-4 w-4 text-blue-600" />
+            <AlertDescription className="text-blue-800 dark:text-blue-200 text-sm">
+              L'API Payout vous permet d'envoyer de l'argent directement sur des numeros mobile money depuis votre application.
+              Le paiement est prelevé sur votre solde. <strong>Activation requise — contactez le support.</strong>
+            </AlertDescription>
+          </Alert>
+
+          {/* Endpoint */}
+          <div>
+            <h3 className="font-semibold mb-2">Endpoint</h3>
+            <div className="bg-muted rounded-md p-3 font-mono text-sm flex items-center gap-2 flex-wrap">
+              <Badge variant="default" className="text-xs">POST</Badge>
+              <span className="break-all">{baseUrl}/api/v1/payout</span>
+            </div>
+          </div>
+
+          {/* Authentication */}
+          <div>
+            <h3 className="font-semibold mb-2">Authentification</h3>
+            <p className="text-sm text-muted-foreground mb-2">
+              Utilisez votre <strong>cle privee</strong> (sk_live_...) dans le header Authorization. Ne partagez jamais cette cle.
+            </p>
+            <div className="bg-muted rounded-md p-3 font-mono text-sm">
+              Authorization: Bearer sk_live_VOTRE_CLE_PRIVEE
+            </div>
+          </div>
+
+          {/* Parameters */}
+          <div>
+            <h3 className="font-semibold mb-3">Parametres de la requete (JSON)</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  <tr className="bg-muted">
+                    <th className="text-left p-2 font-semibold border border-border rounded-tl">Parametre</th>
+                    <th className="text-left p-2 font-semibold border border-border">Type</th>
+                    <th className="text-left p-2 font-semibold border border-border">Requis</th>
+                    <th className="text-left p-2 font-semibold border border-border rounded-tr">Description</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[
+                    ["phone", "string", "Oui", "Numero avec indicatif international. Ex: +221771234567"],
+                    ["operator", "string", "Oui", "Operateur mobile. Ex: orange, mtn, moov, wave, free"],
+                    ["country", "string", "Oui", "Code ISO du pays (2 lettres). Ex: SN, CI, BF, BJ, TG, ML"],
+                    ["amount", "number", "Oui", "Montant brut a envoyer (le destinataire reçoit montant - frais)"],
+                    ["currency", "string", "Non", "Devise du montant. Ex: XOF, XAF, CDF. Defaut: devise du pays"],
+                    ["reference", "string", "Non", "Votre reference interne (order_id, etc.)"],
+                  ].map(([param, type, req, desc]) => (
+                    <tr key={param} className="border-b border-border">
+                      <td className="p-2 border border-border font-mono text-xs">{param}</td>
+                      <td className="p-2 border border-border text-muted-foreground">{type}</td>
+                      <td className="p-2 border border-border">
+                        <Badge variant={req === "Oui" ? "default" : "secondary"} className="text-xs">{req}</Badge>
+                      </td>
+                      <td className="p-2 border border-border text-muted-foreground text-xs">{desc}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Phone format */}
+          <div className="bg-muted/50 rounded-md p-4 text-sm space-y-1">
+            <p className="font-semibold">Format du numero de telephone</p>
+            <p className="text-muted-foreground">Envoyez toujours le numero complet avec indicatif. BKApay extrait automatiquement le numero local pour le fournisseur.</p>
+            <div className="font-mono text-xs mt-2 space-y-1">
+              <div><span className="text-green-600">+221771234567</span> → Senegal, Orange (SN)</div>
+              <div><span className="text-green-600">+22507000000</span> → Cote d'Ivoire, MTN (CI)</div>
+              <div><span className="text-green-600">+22670000000</span> → Burkina Faso, Orange (BF)</div>
+              <div><span className="text-green-600">+243812345678</span> → Congo RDC (CD)</div>
+            </div>
+          </div>
+
+          {/* Code Examples */}
+          <div>
+            <h3 className="font-semibold mb-3">Exemples d'integration</h3>
+            <div className="space-y-4">
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm font-medium text-muted-foreground">JavaScript / Node.js</span>
+                  <Button size="sm" variant="ghost" onClick={() => copyCode(payoutJsExample)} data-testid="button-copy-payout-js">
+                    <Copy className="w-3 h-3 mr-1" /> Copier
+                  </Button>
+                </div>
+                <pre className="bg-muted rounded-md p-3 text-xs overflow-x-auto whitespace-pre-wrap">{payoutJsExample}</pre>
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm font-medium text-muted-foreground">PHP</span>
+                  <Button size="sm" variant="ghost" onClick={() => copyCode(payoutPhpExample)} data-testid="button-copy-payout-php">
+                    <Copy className="w-3 h-3 mr-1" /> Copier
+                  </Button>
+                </div>
+                <pre className="bg-muted rounded-md p-3 text-xs overflow-x-auto whitespace-pre-wrap">{payoutPhpExample}</pre>
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm font-medium text-muted-foreground">Python</span>
+                  <Button size="sm" variant="ghost" onClick={() => copyCode(payoutPythonExample)} data-testid="button-copy-payout-python">
+                    <Copy className="w-3 h-3 mr-1" /> Copier
+                  </Button>
+                </div>
+                <pre className="bg-muted rounded-md p-3 text-xs overflow-x-auto whitespace-pre-wrap">{payoutPythonExample}</pre>
+              </div>
+            </div>
+          </div>
+
+          {/* Success Response */}
+          <div>
+            <h3 className="font-semibold mb-2">Reponse en cas de succes</h3>
+            <pre className="bg-muted rounded-md p-3 text-xs overflow-x-auto">{payoutSuccessExample}</pre>
+          </div>
+
+          {/* Error Codes */}
+          <div>
+            <h3 className="font-semibold mb-3">Codes d'erreur</h3>
+            <div className="space-y-2">
+              {[
+                { code: "INVALID_API_KEY", http: "401", desc: "Cle API invalide ou manquante" },
+                { code: "ACCOUNT_SUSPENDED", http: "403", desc: "Compte suspendu — contacter le support" },
+                { code: "ACCOUNT_NOT_VERIFIED", http: "403", desc: "KYC non verifie — completez la verification d'identite" },
+                { code: "PAYOUT_NOT_ACTIVATED", http: "403", desc: "Payout API non active — contactez le support pour l'activer" },
+                { code: "INSUFFICIENT_FUNDS", http: "400", desc: "Solde insuffisant sur votre compte" },
+                { code: "COUNTRY_UNAVAILABLE", http: "400", desc: "Pays non disponible pour le payout" },
+                { code: "OPERATOR_UNAVAILABLE", http: "400", desc: "Operateur non supporte dans ce pays" },
+                { code: "TRANSACTION_FAILED", http: "400", desc: "La transaction a echoue cote fournisseur" },
+                { code: "INVALID_PHONE", http: "400", desc: "Numero de telephone invalide" },
+                { code: "INVALID_PARAMETERS", http: "400", desc: "Parametres manquants ou incorrects" },
+                { code: "INTERNAL_ERROR", http: "500", desc: "Erreur interne — reessayez plus tard" },
+              ].map(({ code, http, desc }) => (
+                <div key={code} className="flex items-start gap-3 text-sm border border-border rounded-md p-2">
+                  <Badge variant="outline" className="font-mono text-xs shrink-0">{http}</Badge>
+                  <code className="font-mono text-xs text-destructive shrink-0">{code}</code>
+                  <span className="text-muted-foreground text-xs">{desc}</span>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              Les erreurs sont retournees dans le format: <code className="font-mono">{"{ \"success\": false, \"error\": { \"code\": \"...\", \"message\": \"...\" } }"}</code>
+            </p>
+          </div>
+
+          {/* Webhook Callback */}
+          <div>
+            <h3 className="font-semibold mb-2">Webhook de statut (optionnel)</h3>
+            <p className="text-sm text-muted-foreground mb-2">
+              Si vous avez configure un webhook dans vos cles API, vous recevrez une notification automatique avec le statut final du payout.
+              Les evenements possibles sont: <code className="font-mono text-xs">payout.completed</code>, <code className="font-mono text-xs">payout.failed</code>, <code className="font-mono text-xs">payout.pending</code>.
+              Le header <code className="font-mono text-xs">X-BKApay-Signature</code> permet de verifier l'authenticite.
+            </p>
+            <pre className="bg-muted rounded-md p-3 text-xs overflow-x-auto">{payoutWebhookExample}</pre>
+          </div>
+
+          <Alert className="border-amber-200 bg-amber-50 dark:bg-amber-950 dark:border-amber-800">
+            <AlertDescription className="text-amber-800 dark:text-amber-200 text-sm">
+              <strong>Important:</strong> Les frais de transaction sont automatiquement deduits du montant envoye. La conversion de devise est effectuee automatiquement si la devise de votre compte differe de celle demandee.
             </AlertDescription>
           </Alert>
         </CardContent>

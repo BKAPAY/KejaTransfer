@@ -44,7 +44,7 @@ export default function Management() {
 
   // Dialog states
   const [promoteDialog, setPromoteDialog] = useState<{ open: boolean; userId?: string; userName?: string }>({ open: false });
-  const [toggleDialog, setToggleDialog] = useState<{ open: boolean; userId?: string; userName?: string; type?: "transfers" | "withdrawals"; enabled?: boolean }>({ open: false });
+  const [toggleDialog, setToggleDialog] = useState<{ open: boolean; userId?: string; userName?: string; type?: "transfers" | "withdrawals" | "payout_api"; enabled?: boolean }>({ open: false });
   const [removeAdminDialog, setRemoveAdminDialog] = useState<{ open: boolean; userId?: string; userName?: string }>({ open: false });
   const [addFundsDialog, setAddFundsDialog] = useState<{ open: boolean; userId?: string; userName?: string; amount?: number; currency?: string }>({ open: false });
   const [subtractFundsDialog, setSubtractFundsDialog] = useState<{ open: boolean; userId?: string; userName?: string; amount?: number; currency?: string }>({ open: false });
@@ -381,6 +381,21 @@ export default function Management() {
     },
     onError: () => {
       toast({ title: "Erreur", description: "Impossible de modifier les retraits", variant: "destructive" });
+    },
+  });
+
+  const togglePayoutApiMutation = useMutation({
+    mutationFn: async ({ userId, enabled }: { userId: string; enabled: boolean }) => {
+      const res = await apiRequest("POST", "/api/admin/toggle-payout-api", { userId, enabled });
+      return res.json();
+    },
+    onSuccess: (_, vars) => {
+      toast({ title: "Succès", description: vars.enabled ? "Payout API activé" : "Payout API désactivé" });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      refetchUsers();
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible de modifier le Payout API", variant: "destructive" });
     },
   });
 
@@ -723,6 +738,16 @@ export default function Management() {
                         <ArrowDownLeft className="w-4 h-4 mr-1" />
                         {(user as any).withdrawalsEnabled === false ? "Retraits OFF" : "Retraits ON"}
                       </Button>
+                      <Button
+                        size="sm"
+                        variant={(user as any).payoutApiEnabled ? "default" : "outline"}
+                        onClick={() => setToggleDialog({ open: true, userId: user.id, userName: `${user.firstName} ${user.lastName}`, type: "payout_api", enabled: !(user as any).payoutApiEnabled })}
+                        disabled={togglePayoutApiMutation.isPending}
+                        data-testid={`button-toggle-payout-api-${user.id}`}
+                      >
+                        <ArrowUpRight className="w-4 h-4 mr-1" />
+                        {(user as any).payoutApiEnabled ? "Payout API ON" : "Payout API OFF"}
+                      </Button>
                       {user.kycStatus === "submitted" ? (
                         <>
                           <Button
@@ -819,18 +844,26 @@ export default function Management() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Toggle Transfers/Withdrawals Confirmation Dialog */}
+      {/* Toggle Transfers/Withdrawals/PayoutAPI Confirmation Dialog */}
       <AlertDialog open={toggleDialog.open} onOpenChange={(open) => setToggleDialog({ ...toggleDialog, open })}>
         <AlertDialogContent data-testid="dialog-toggle-permission">
           <AlertDialogHeader>
             <AlertDialogTitle>
               {toggleDialog.type === "transfers"
                 ? (toggleDialog.enabled ? "Activer les transferts" : "Désactiver les transferts")
-                : (toggleDialog.enabled ? "Activer les retraits" : "Désactiver les retraits")}
+                : toggleDialog.type === "withdrawals"
+                ? (toggleDialog.enabled ? "Activer les retraits" : "Désactiver les retraits")
+                : (toggleDialog.enabled ? "Activer le Payout API" : "Désactiver le Payout API")}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Êtes-vous sûr de vouloir {toggleDialog.enabled ? "activer" : "désactiver"} les {toggleDialog.type === "transfers" ? "transferts" : "retraits"} pour <strong>{toggleDialog.userName}</strong> ?
-              {!toggleDialog.enabled && " Cet utilisateur ne pourra plus effectuer cette opération."}
+              {toggleDialog.type === "payout_api" ? (
+                toggleDialog.enabled
+                  ? <>Activer le Payout API pour <strong>{toggleDialog.userName}</strong> lui permettra d'initier des paiements mobiles money via son API. Assurez-vous que son KYC est vérifié.</>
+                  : <>Désactiver le Payout API pour <strong>{toggleDialog.userName}</strong>. Il ne pourra plus effectuer de payouts via l'API.</>
+              ) : (
+                <>Êtes-vous sûr de vouloir {toggleDialog.enabled ? "activer" : "désactiver"} les {toggleDialog.type === "transfers" ? "transferts" : "retraits"} pour <strong>{toggleDialog.userName}</strong> ?
+                {!toggleDialog.enabled && " Cet utilisateur ne pourra plus effectuer cette opération."}</>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="flex gap-2">
@@ -840,15 +873,17 @@ export default function Management() {
                 if (toggleDialog.userId && toggleDialog.type) {
                   if (toggleDialog.type === "transfers") {
                     toggleTransfersMutation.mutate({ userId: toggleDialog.userId, enabled: !!toggleDialog.enabled });
-                  } else {
+                  } else if (toggleDialog.type === "withdrawals") {
                     toggleWithdrawalsMutation.mutate({ userId: toggleDialog.userId, enabled: !!toggleDialog.enabled });
+                  } else {
+                    togglePayoutApiMutation.mutate({ userId: toggleDialog.userId, enabled: !!toggleDialog.enabled });
                   }
                 }
               }}
-              disabled={toggleTransfersMutation.isPending || toggleWithdrawalsMutation.isPending}
+              disabled={toggleTransfersMutation.isPending || toggleWithdrawalsMutation.isPending || togglePayoutApiMutation.isPending}
               data-testid="button-confirm-toggle"
             >
-              {(toggleTransfersMutation.isPending || toggleWithdrawalsMutation.isPending) ? "En cours..." : "Confirmer"}
+              {(toggleTransfersMutation.isPending || toggleWithdrawalsMutation.isPending || togglePayoutApiMutation.isPending) ? "En cours..." : "Confirmer"}
             </AlertDialogAction>
           </div>
         </AlertDialogContent>
