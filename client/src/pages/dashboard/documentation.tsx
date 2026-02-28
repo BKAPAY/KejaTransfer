@@ -654,7 +654,7 @@ data = response.json()
           {/* Phone format */}
           <div className="bg-muted/50 rounded-md p-4 text-sm space-y-1">
             <p className="font-semibold">Format du numero de telephone</p>
-            <p className="text-muted-foreground">Envoyez toujours le numero complet avec indicatif. BKApay extrait automatiquement le numero local pour le fournisseur.</p>
+            <p className="text-muted-foreground">Envoyez toujours le numero complet avec indicatif.</p>
             <div className="font-mono text-xs mt-2 space-y-1">
               <div><span className="text-green-600">+221771234567</span> → Senegal, Orange (SN)</div>
               <div><span className="text-green-600">+22507000000</span> → Cote d'Ivoire, MTN (CI)</div>

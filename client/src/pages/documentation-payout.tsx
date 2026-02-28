@@ -366,7 +366,7 @@ app.post('/webhook/bkapay-payout', express.json(), (req, res) => {
 
           <div className="bg-muted/50 rounded-md p-3 text-xs space-y-2 mt-2">
             <p className="font-semibold text-foreground">Format du numero de telephone</p>
-            <p className="text-muted-foreground">Envoyez toujours le numero complet avec indicatif international. BKApay extrait automatiquement le numero local pour le fournisseur de paiement.</p>
+            <p className="text-muted-foreground">Envoyez toujours le numero complet avec indicatif international.</p>
             <div className="font-mono space-y-1 mt-1">
               <div><span className="text-green-600">+221771234567</span> <span className="text-muted-foreground">→ Senegal (SN), operateur Orange</span></div>
               <div><span className="text-green-600">+22507000000</span> <span className="text-muted-foreground">→ Cote d'Ivoire (CI), operateur MTN</span></div>
