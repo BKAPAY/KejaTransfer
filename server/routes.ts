@@ -56,7 +56,7 @@ import {
   handleMbiyoPayResendWebhook,
   pollMbiyoPayTransaction,
 } from "./mbiyopay-routes";
-import { safeRefundOutgoingTransaction } from "./payment-polling";
+import { safeRefundOutgoingTransaction, sendApiPayoutCallback } from "./payment-polling";
 import {
   MBIYOPAY_SUPPORTED_COUNTRIES,
   MBIYOPAY_OPERATORS,
@@ -2804,7 +2804,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!result.success) {
         return res.status(400).json({
           success: false,
-          error: { code: "TRANSACTION_FAILED", message: result.error || "La transaction a échoué" }
+          error: { code: "TRANSACTION_FAILED", message: "La transaction a échoué. Vérifiez le numéro, l'opérateur et réessayez." }
         });
       }
 
@@ -4553,10 +4553,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         await storage.updateTransactionStatus(matchedTx.id, "completed");
         console.log(`[MoneyFusion Webhook] Transaction ${matchedTx.id} marked as COMPLETED`);
+        setImmediate(() => sendApiPayoutCallback(matchedTx.id, meta, "completed"));
       } else if (isMoneyFusionPayoutFailed(event)) {
         await safeRefundOutgoingTransaction(matchedTx.id, matchedTx.userId, meta, "webhook-moneyfusion-failed");
         await storage.updateTransactionStatus(matchedTx.id, "failed");
         console.log(`[MoneyFusion Webhook] Transaction ${matchedTx.id} marked as FAILED`);
+        setImmediate(() => sendApiPayoutCallback(matchedTx.id, meta, "failed"));
       }
 
       return res.json({ received: true, matched: true, processed: true });

@@ -11,7 +11,7 @@ import crypto from "crypto";
  * Sends the developer callback webhook when an API Payout transaction status changes.
  * Only fires if metadata contains apiKeyId (= initiated via /api/v1/payout).
  */
-async function sendApiPayoutCallback(transactionId: string, metadata: any, finalStatus: "completed" | "failed"): Promise<void> {
+export async function sendApiPayoutCallback(transactionId: string, metadata: any, finalStatus: "completed" | "failed"): Promise<void> {
   if (!metadata.apiKeyId) return;
   try {
     const apiKey = await storage.getApiKeyById(metadata.apiKeyId);
@@ -634,11 +634,13 @@ async function processAfribaPayPayout(transaction: Transaction & { user?: User }
     if (mappedStatus === "completed") {
       await storage.updateTransactionStatus(transaction.id, "completed");
       console.log(`[PaymentPolling] ✅ AfribaPay payout ${transaction.id} COMPLETED`);
+      setImmediate(() => sendApiPayoutCallback(transaction.id, metadata, "completed"));
       return true;
     } else if (mappedStatus === "failed") {
       console.log(`[PaymentPolling] ❌ AfribaPay payout ${transaction.id} FAILED (raw: ${result.status}) - refunding user`);
       await safeRefundOutgoingTransaction(transaction.id, transaction.userId, metadata, "polling-afribapay-payout-failed");
       await storage.updateTransactionStatus(transaction.id, "failed");
+      setImmediate(() => sendApiPayoutCallback(transaction.id, metadata, "failed"));
       return true;
     } else {
       if (hasPaymentExpired(transaction)) {

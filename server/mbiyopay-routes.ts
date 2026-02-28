@@ -2,7 +2,7 @@ import type { Request, Response } from "express";
 import { storage } from "./storage";
 
 import { calculateIncomingFee, calculateOutgoingFee, calculateOutgoingFeeFromNet, getFeeFromDatabase } from "./utils/fees";
-import { safeRefundOutgoingTransaction } from "./payment-polling";
+import { safeRefundOutgoingTransaction, sendApiPayoutCallback } from "./payment-polling";
 import { trySendPaymentCallback } from "./utils/callback";
 import { 
   createMbiyoPayPayin, 
@@ -1021,14 +1021,20 @@ export async function handleMbiyoPayWebhook(req: Request, res: Response) {
         }
         await storage.updateTransactionStatus(tx.id, "completed");
         console.log(`[MbiyoPay Webhook] Withdrawal/Transfer completed: ${tx.id}`);
+        const outMeta = JSON.parse(tx.metadata || "{}");
+        setImmediate(() => sendApiPayoutCallback(tx.id, outMeta, "completed"));
       }
     } else if (status === "failed" || status === "cancelled" || status === "expired" || status === "rejected" || status === "error") {
       if (tx.type === "withdrawal" || tx.type === "transfer") {
         const metadata = JSON.parse(tx.metadata || "{}");
         await safeRefundOutgoingTransaction(tx.id, tx.userId, metadata, "webhook-mbiyopay-failed");
+        await storage.updateTransactionStatus(tx.id, "failed");
+        console.log(`[MbiyoPay Webhook] Transaction failed: ${tx.id}`);
+        setImmediate(() => sendApiPayoutCallback(tx.id, metadata, "failed"));
+      } else {
+        await storage.updateTransactionStatus(tx.id, "failed");
+        console.log(`[MbiyoPay Webhook] Transaction failed: ${tx.id}`);
       }
-      await storage.updateTransactionStatus(tx.id, "failed");
-      console.log(`[MbiyoPay Webhook] Transaction failed: ${tx.id}`);
     }
 
     res.json({ success: true });
