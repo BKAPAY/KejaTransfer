@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ExternalLink, AlertTriangle, ArrowRight, Clock, Monitor } from "lucide-react";
+import { ExternalLink, AlertTriangle, ArrowRight, Clock, Monitor, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -181,11 +181,11 @@ export default function DocumentationVersion({ version }: DocumentationVersionPr
       <div className="space-y-4">
         <h2 className="text-xl font-semibold text-foreground">Choisissez votre type d'integration</h2>
         <p className="text-sm text-muted-foreground">
-          BKApay propose deux methodes d'integration. Cliquez sur celle qui convient a votre projet.
+          BKApay propose trois methodes d'integration. Cliquez sur celle qui convient a votre projet.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card 
           className="cursor-pointer hover-elevate transition-colors border-2 border-border"
           onClick={() => setLocation(`${basePath}/redirect/${docVersion.version}`)}
@@ -254,6 +254,43 @@ export default function DocumentationVersion({ version }: DocumentationVersionPr
               </li>
             </ul>
             <Button className="w-full gap-2" data-testid="button-go-inline">
+              Voir la documentation
+              <ArrowRight className="w-4 h-4" />
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card 
+          className="cursor-pointer hover-elevate transition-colors border-2 border-border"
+          onClick={() => setLocation(`${basePath}/payout/${docVersion.version}`)}
+          data-testid="card-payout-api"
+        >
+          <CardHeader>
+            <div className="w-12 h-12 rounded-lg bg-blue-500/10 flex items-center justify-center mb-3">
+              <Send className="w-6 h-6 text-blue-600" />
+            </div>
+            <CardTitle className="text-lg">API Payout</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Envoyez de l'argent directement sur des numeros mobile money depuis votre serveur. 
+              Ideal pour les marketplaces et remuneration automatisee.
+            </p>
+            <ul className="space-y-2 text-sm text-muted-foreground">
+              <li className="flex items-start gap-2">
+                <span className="text-blue-600 mt-0.5">•</span>
+                Envoi vers n'importe quel numero mobile money
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-blue-600 mt-0.5">•</span>
+                Integration server-to-server via API REST
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-blue-600 mt-0.5">•</span>
+                Confirmation automatique par webhook
+              </li>
+            </ul>
+            <Button className="w-full gap-2 bg-blue-600 text-white" data-testid="button-go-payout">
               Voir la documentation
               <ArrowRight className="w-4 h-4" />
             </Button>

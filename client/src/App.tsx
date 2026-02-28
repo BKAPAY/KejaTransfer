@@ -55,6 +55,7 @@ import Cookies from "@/pages/cookies";
 import DocumentationVersion from "@/pages/documentation-version";
 import DocumentationRedirect from "@/pages/documentation-redirect";
 import DocumentationInline from "@/pages/documentation-inline";
+import DocumentationPayout from "@/pages/documentation-payout";
 import ForgotPassword from "@/pages/forgot-password";
 import LoginVerify from "@/pages/login-verify";
 import { CURRENT_VERSION } from "@/lib/doc-versions";
@@ -180,6 +181,9 @@ function Router() {
           <Route path="/dashboard/documentation/inline/:version">
             {(params) => <DocumentationInline version={params.version} />}
           </Route>
+          <Route path="/dashboard/documentation/payout/:version">
+            {(params) => <DocumentationPayout version={params.version} />}
+          </Route>
           <Route path="/dashboard/documentation/:version">
             {(params) => <DocumentationVersion version={params.version} />}
           </Route>
@@ -225,6 +229,9 @@ function Router() {
       </Route>
       <Route path="/documentation/inline/:version">
         {(params) => <DocumentationInline version={params.version} />}
+      </Route>
+      <Route path="/documentation/payout/:version">
+        {(params) => <DocumentationPayout version={params.version} />}
       </Route>
       <Route path="/documentation/:version">
         {(params) => <DocumentationVersion version={params.version} />}
