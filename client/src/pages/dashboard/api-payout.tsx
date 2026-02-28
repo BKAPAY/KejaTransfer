@@ -1,17 +1,39 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Copy, Eye, EyeOff, Send, Lock, ExternalLink, AlertTriangle, CheckCircle, Key } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormDescription, FormMessage } from "@/components/ui/form";
+import { Copy, Eye, EyeOff, Send, Plus, Trash2, RefreshCw, Check, X, Key, Webhook, Info, AlertTriangle, Lock } from "lucide-react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import type { ApiKey, User } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
-import { Link } from "wouter";
-import { CURRENT_VERSION } from "@/lib/doc-versions";
+
+const apiKeySchema = z.object({
+  name: z.string().min(1, "Le nom de la cle est requis"),
+  siteName: z.string().min(2, "Le nom du site est requis (min. 2 caracteres)"),
+});
+
+type ApiKeyFormData = z.infer<typeof apiKeySchema>;
 
 export default function ApiPayoutPage() {
-  const [showKey, setShowKey] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [visibleKeys, setVisibleKeys] = useState<Record<string, boolean>>({});
+  const [editingCallback, setEditingCallback] = useState<string | null>(null);
+  const [callbackUrls, setCallbackUrls] = useState<Record<string, string>>({});
   const { toast } = useToast();
 
   const { data: user } = useQuery<User>({
@@ -22,250 +44,393 @@ export default function ApiPayoutPage() {
     queryKey: ["/api/api-keys"],
   });
 
-  const baseUrl = typeof window !== "undefined" ? window.location.origin : "https://bkapay.com";
+  const isKycVerified = user?.kycStatus === "verified";
+  const isPayoutActivated = user?.payoutApiEnabled === true;
 
-  const firstKey = apiKeys && apiKeys.length > 0 ? apiKeys[0] : null;
-  const secretKey = firstKey?.secretKey ?? null;
-  const maskedKey = secretKey
-    ? secretKey.slice(0, 10) + "••••••••••••••••••••••••" + secretKey.slice(-4)
-    : null;
+  const form = useForm<ApiKeyFormData>({
+    resolver: zodResolver(apiKeySchema),
+    defaultValues: { name: "", siteName: "" },
+  });
 
-  const copyKey = () => {
-    if (secretKey) {
-      navigator.clipboard.writeText(secretKey);
-      toast({ title: "Cle privee copiee !", description: "Ne partagez jamais cette cle." });
-    }
+  const createMutation = useMutation({
+    mutationFn: async (data: ApiKeyFormData) => {
+      return await apiRequest("POST", "/api/api-keys", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/api-keys"] });
+      toast({ title: "Cle API creee", description: "Votre cle privee payout a ete creee avec succes." });
+      setDialogOpen(false);
+      form.reset();
+    },
+    onError: (error: any) => {
+      toast({ title: "Erreur", description: error.message || "Erreur lors de la creation", variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiRequest("DELETE", `/api/api-keys/${id}`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/api-keys"] });
+      toast({ title: "Cle supprimee" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Erreur", description: error.message || "Erreur lors de la suppression", variant: "destructive" });
+    },
+  });
+
+  const callbackMutation = useMutation({
+    mutationFn: async ({ id, callbackUrl }: { id: string; callbackUrl: string }) => {
+      const res = await apiRequest("PATCH", `/api/api-keys/${id}/callback`, { callbackUrl });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/api-keys"] });
+      setEditingCallback(null);
+      toast({ title: "Webhook configure", description: "L'URL de webhook payout a ete enregistree." });
+    },
+    onError: (error: any) => {
+      toast({ title: "Erreur", description: error.message || "Erreur", variant: "destructive" });
+    },
+  });
+
+  const regenerateSecretMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("POST", `/api/api-keys/${id}/regenerate-secret`, {});
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/api-keys"] });
+      toast({ title: "Secret regenere", description: "Mettez a jour votre serveur avec le nouveau secret." });
+    },
+    onError: (error: any) => {
+      toast({ title: "Erreur", description: error.message || "Erreur", variant: "destructive" });
+    },
+  });
+
+  const toggleKeyVisibility = (id: string) => {
+    setVisibleKeys((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const codeExample = secretKey
-    ? `fetch("${baseUrl}/api/v1/payout", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-    "Authorization": "Bearer ${secretKey}"
-  },
-  body: JSON.stringify({
-    phone: "+221771234567",
-    operator: "orange",
-    country: "SN",
-    amount: 10000,
-    currency: "XOF"
-  })
-})`
-    : `fetch("${baseUrl}/api/v1/payout", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-    "Authorization": "Bearer sk_live_VOTRE_CLE_PRIVEE"
-  },
-  body: JSON.stringify({
-    phone: "+221771234567",
-    operator: "orange",
-    country: "SN",
-    amount: 10000,
-    currency: "XOF"
-  })
-})`;
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast({ title: "Copie", description: `${label} copie dans le presse-papiers` });
+  };
 
-  const isActivated = user?.payoutApiEnabled === true;
-  const hasApiKey = !isLoading && firstKey !== null;
+  const maskKey = (key: string) => key.substring(0, 12) + "..." + key.substring(key.length - 8);
+
+  const onSubmit = (data: ApiKeyFormData) => {
+    if (!isKycVerified) {
+      toast({
+        title: "Verification requise",
+        description: "Rendez-vous dans la section Verification KYC pour verifier votre compte.",
+        variant: "destructive",
+      });
+      setDialogOpen(false);
+      return;
+    }
+    createMutation.mutate(data);
+  };
 
   return (
-    <div className="space-y-6 max-w-3xl">
-      <div>
-        <div className="flex items-center gap-3 flex-wrap">
-          <h1 className="text-2xl font-bold text-foreground" data-testid="text-payout-api-title">
+    <div className="flex flex-col h-full">
+      <div className="flex items-center justify-between gap-2 flex-wrap mb-4">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground mb-1" data-testid="text-payout-api-title">
             API Payout
           </h1>
-          {isActivated ? (
-            <Badge variant="default" className="text-xs gap-1">
-              <CheckCircle className="w-3 h-3" /> Active
-            </Badge>
-          ) : (
-            <Badge variant="secondary" className="text-xs gap-1">
-              <Lock className="w-3 h-3" /> Non activee
-            </Badge>
-          )}
+          <p className="text-sm text-muted-foreground">
+            Generez votre cle privee pour envoyer des paiements mobile money via API
+          </p>
         </div>
-        <p className="text-sm text-muted-foreground mt-1">
-          Envoyez de l'argent directement sur des numeros mobile money via API depuis votre serveur.
-        </p>
-      </div>
 
-      {/* Statut d'activation */}
-      {!isActivated ? (
-        <Alert className="border-amber-200 bg-amber-50 dark:bg-amber-950 dark:border-amber-800">
-          <AlertTriangle className="h-4 w-4 text-amber-600" />
-          <AlertDescription className="text-amber-800 dark:text-amber-200 text-sm">
-            <strong>Activation requise.</strong> L'API Payout n'est pas encore activee sur votre compte.
-            Contactez le support BKApay pour en faire la demande. Une fois activee, vous pourrez utiliser
-            votre cle privee pour initier des paiements sortants.
-          </AlertDescription>
-        </Alert>
-      ) : (
-        <Alert className="border-green-200 bg-green-50 dark:bg-green-950 dark:border-green-800">
-          <CheckCircle className="h-4 w-4 text-green-600" />
-          <AlertDescription className="text-green-800 dark:text-green-200 text-sm">
-            <strong>API Payout activee.</strong> Vous pouvez utiliser votre cle privee pour envoyer des paiements
-            mobiles money directement depuis votre application.
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* Pas de cle API */}
-      {!isLoading && !hasApiKey && (
-        <Alert className="border-destructive/30 bg-destructive/5">
-          <AlertTriangle className="h-4 w-4 text-destructive" />
-          <AlertDescription className="text-destructive text-sm">
-            Vous n'avez pas encore de cle API. Rendez-vous dans{" "}
-            <Link href="/dashboard/api" className="underline font-medium">API Payin</Link>{" "}
-            pour creer votre premiere cle.
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* Cle privee */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Key className="w-4 h-4" />
-            Votre cle privee (secret key)
-          </CardTitle>
-          <CardDescription>
-            Utilisez cette cle dans le header <code className="font-mono text-xs bg-muted px-1 rounded">Authorization: Bearer ...</code> de vos requetes API Payout.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {isLoading ? (
-            <div className="h-10 bg-muted animate-pulse rounded-md" />
-          ) : hasApiKey ? (
-            <>
-              <div className="flex items-center gap-2">
-                <div className="flex-1 bg-muted rounded-md px-3 py-2 font-mono text-sm break-all">
-                  {showKey ? secretKey : maskedKey}
-                </div>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  onClick={() => setShowKey(!showKey)}
-                  data-testid="button-toggle-key-visibility"
-                >
-                  {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </Button>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  onClick={copyKey}
-                  data-testid="button-copy-payout-key"
-                >
-                  <Copy className="w-4 h-4" />
-                </Button>
-              </div>
-              <Alert className="border-destructive/30 bg-destructive/5">
-                <AlertDescription className="text-destructive text-xs">
-                  Ne partagez jamais votre cle privee. Ne la mettez pas dans votre code frontend.
-                  En cas de compromission, regenerez-la depuis la page <Link href="/dashboard/api" className="underline">API Payin</Link>.
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogTrigger asChild>
+            <Button data-testid="button-create-payout-key">
+              <Plus className="w-4 h-4 mr-2" />
+              Nouvelle cle
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Creer une cle API Payout</DialogTitle>
+              <DialogDescription>
+                Cette cle privee vous permettra d'initier des paiements sortants via l'API
+              </DialogDescription>
+            </DialogHeader>
+            {!isKycVerified ? (
+              <Alert className="border-amber-200 bg-amber-50 dark:bg-amber-950 dark:border-amber-800">
+                <AlertTriangle className="h-4 w-4 text-amber-600" />
+                <AlertDescription className="text-amber-800 dark:text-amber-200 text-sm">
+                  Votre compte doit etre verifie (KYC) avant de pouvoir generer une cle API.
+                  Rendez-vous dans la section <strong>Verification KYC</strong>.
                 </AlertDescription>
               </Alert>
-            </>
-          ) : (
-            <p className="text-sm text-muted-foreground">Aucune cle API disponible.</p>
-          )}
-        </CardContent>
-      </Card>
+            ) : (
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Nom de la cle</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Ex: Production, Test..." data-testid="input-key-name" {...field} />
+                        </FormControl>
+                        <FormDescription>Un nom pour identifier cette cle</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="siteName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Nom de votre application</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Ex: MonApp, MonService..." data-testid="input-site-name" {...field} />
+                        </FormControl>
+                        <FormDescription>Le nom de votre application ou service</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <Button type="submit" className="w-full" disabled={createMutation.isPending} data-testid="button-submit-create-key">
+                    {createMutation.isPending ? "Creation..." : "Creer la cle"}
+                  </Button>
+                </form>
+              </Form>
+            )}
+          </DialogContent>
+        </Dialog>
+      </div>
 
-      {/* Endpoint */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Send className="w-4 h-4" />
-            Endpoint
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4 text-sm">
-          <div className="bg-muted rounded-md p-3 font-mono text-sm flex items-center gap-3 flex-wrap">
-            <Badge variant="default" className="text-xs shrink-0">POST</Badge>
-            <span className="break-all">{baseUrl}/api/v1/payout</span>
-          </div>
+      {/* Note informationnelle sur l'activation — non bloquante */}
+      {!isPayoutActivated && (
+        <Alert className="mb-4 border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800">
+          <Info className="h-4 w-4 text-blue-600" />
+          <AlertDescription className="text-blue-800 dark:text-blue-200 text-sm">
+            <strong>Information :</strong> Vous pouvez generer votre cle maintenant. L'activation du Payout API
+            se fait par le support BKApay. Une fois que vous integrerez la cle sur votre site, les appels API
+            fonctionneront automatiquement des que votre acces sera active.
+          </AlertDescription>
+        </Alert>
+      )}
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs border-collapse">
-              <thead>
-                <tr className="bg-muted">
-                  <th className="text-left p-2 font-semibold border border-border">Parametre</th>
-                  <th className="text-left p-2 font-semibold border border-border">Type</th>
-                  <th className="text-left p-2 font-semibold border border-border">Requis</th>
-                  <th className="text-left p-2 font-semibold border border-border">Description</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[
-                  ["phone", "string", true, "Numero destinataire avec indicatif (+221771234567)"],
-                  ["operator", "string", true, "Operateur: orange, mtn, moov, wave, free, airtel..."],
-                  ["country", "string", true, "Code ISO du pays: SN, CI, BF, BJ, TG, ML, GN, CD..."],
-                  ["amount", "number", true, "Montant brut a envoyer"],
-                  ["currency", "string", false, "Devise: XOF, XAF, CDF, GNF. Defaut: devise du pays"],
-                  ["reference", "string", false, "Votre reference interne (optionnel)"],
-                ].map(([param, type, req, desc]) => (
-                  <tr key={String(param)} className="border-b border-border">
-                    <td className="p-2 border border-border font-mono">{param}</td>
-                    <td className="p-2 border border-border text-muted-foreground">{type}</td>
-                    <td className="p-2 border border-border">
-                      <Badge variant={req ? "default" : "secondary"} className="text-xs">{req ? "Oui" : "Non"}</Badge>
-                    </td>
-                    <td className="p-2 border border-border text-muted-foreground">{desc}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Exemple de code */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Exemple d'appel</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="relative">
-            <Button
-              size="sm"
-              variant="ghost"
-              className="absolute top-2 right-2 z-10 gap-1"
-              onClick={() => {
-                navigator.clipboard.writeText(codeExample);
-                toast({ title: "Code copie !" });
-              }}
-              data-testid="button-copy-code-example"
-            >
-              <Copy className="w-3 h-3" /> Copier
-            </Button>
-            <pre className="bg-muted rounded-md p-4 text-xs overflow-x-auto whitespace-pre-wrap pt-8">{codeExample}</pre>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            En cas de succes, vous recevez <code className="font-mono bg-muted px-1 rounded">{"{ success: true, transactionId: \"...\", status: \"pending\" }"}</code>
-          </p>
-        </CardContent>
-      </Card>
-
-      {/* Lien documentation */}
-      <Card className="border-primary/20 bg-primary/5">
-        <CardContent className="pt-5 flex items-center justify-between flex-wrap gap-4">
-          <div>
-            <p className="font-medium text-foreground">Documentation complete</p>
-            <p className="text-sm text-muted-foreground">
-              Codes d'erreur, webhooks, exemples PHP et Python, bonnes pratiques.
+      {/* Liste des cles */}
+      {isLoading ? (
+        <div className="space-y-4">
+          {[1, 2].map((i) => (
+            <Card key={i}><CardContent className="pt-6"><div className="h-20 bg-muted animate-pulse rounded-md" /></CardContent></Card>
+          ))}
+        </div>
+      ) : !apiKeys || apiKeys.length === 0 ? (
+        <Card>
+          <CardContent className="pt-6 flex flex-col items-center justify-center py-12 text-center">
+            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
+              <Send className="w-8 h-8 text-muted-foreground" />
+            </div>
+            <h3 className="font-semibold text-foreground mb-2">Aucune cle API</h3>
+            <p className="text-sm text-muted-foreground mb-4 max-w-sm">
+              Creez votre premiere cle privee pour commencer a integrer l'API Payout dans votre application.
             </p>
-          </div>
-          <Link href={`/dashboard/documentation/payout/${CURRENT_VERSION}`}>
-            <Button className="gap-2" data-testid="button-go-payout-docs">
-              <ExternalLink className="w-4 h-4" />
-              Voir la documentation
+            <Button onClick={() => setDialogOpen(true)} data-testid="button-create-first-key">
+              <Plus className="w-4 h-4 mr-2" />
+              Creer ma premiere cle
             </Button>
-          </Link>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-4">
+          {apiKeys.map((apiKey) => (
+            <Card key={apiKey.id} data-testid={`card-api-key-${apiKey.id}`}>
+              <CardHeader className="pb-3">
+                <div className="flex items-start justify-between gap-2 flex-wrap">
+                  <div>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Key className="w-4 h-4" />
+                      {apiKey.name}
+                    </CardTitle>
+                    <CardDescription className="text-xs mt-0.5">{(apiKey as any).siteName}</CardDescription>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {isPayoutActivated ? (
+                      <Badge variant="default" className="text-xs gap-1">
+                        <Lock className="w-3 h-3" /> Active
+                      </Badge>
+                    ) : (
+                      <Badge variant="secondary" className="text-xs">En attente d'activation</Badge>
+                    )}
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => deleteMutation.mutate(apiKey.id)}
+                      disabled={deleteMutation.isPending}
+                      data-testid={`button-delete-key-${apiKey.id}`}
+                    >
+                      <Trash2 className="w-4 h-4 text-destructive" />
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+
+              <CardContent className="space-y-4">
+                {/* Cle privee (secretKey) */}
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+                    Cle privee — <span className="text-foreground">A utiliser dans Authorization: Bearer ...</span>
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 bg-muted rounded-md px-3 py-2 font-mono text-xs break-all">
+                      {visibleKeys[apiKey.id + "-secret"]
+                        ? apiKey.secretKey
+                        : maskKey(apiKey.secretKey)}
+                    </div>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => toggleKeyVisibility(apiKey.id + "-secret")}
+                      data-testid={`button-toggle-secret-${apiKey.id}`}
+                    >
+                      {visibleKeys[apiKey.id + "-secret"] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => copyToClipboard(apiKey.secretKey, "Cle privee")}
+                      data-testid={`button-copy-secret-${apiKey.id}`}
+                    >
+                      <Copy className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  <Alert className="mt-2 border-destructive/30 bg-destructive/5 py-2">
+                    <AlertDescription className="text-destructive text-xs">
+                      Ne partagez jamais cette cle. Ne la mettez pas dans votre code frontend (JavaScript navigateur).
+                    </AlertDescription>
+                  </Alert>
+                </div>
+
+                {/* Webhook Payout */}
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Webhook className="w-4 h-4 text-muted-foreground" />
+                    <label className="text-xs font-medium text-muted-foreground">
+                      URL Webhook Payout (notifications de statut)
+                    </label>
+                  </div>
+
+                  {editingCallback === apiKey.id ? (
+                    <div className="space-y-2">
+                      <Input
+                        placeholder="https://votresite.com/webhook/payout"
+                        value={callbackUrls[apiKey.id] ?? ""}
+                        onChange={(e) => setCallbackUrls((prev) => ({ ...prev, [apiKey.id]: e.target.value }))}
+                        className="text-sm font-mono"
+                        data-testid={`input-callback-${apiKey.id}`}
+                      />
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => callbackMutation.mutate({ id: apiKey.id, callbackUrl: callbackUrls[apiKey.id] ?? "" })}
+                          disabled={callbackMutation.isPending}
+                          data-testid={`button-save-callback-${apiKey.id}`}
+                        >
+                          <Check className="w-4 h-4 mr-1" />
+                          {callbackMutation.isPending ? "..." : "Enregistrer"}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => { setEditingCallback(null); setCallbackUrls((prev) => { const c = { ...prev }; delete c[apiKey.id]; return c; }); }}
+                          data-testid={`button-cancel-callback-${apiKey.id}`}
+                        >
+                          <X className="w-4 h-4 mr-1" />
+                          Annuler
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {(apiKey as any).callbackUrl ? (
+                        <>
+                          <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-md">
+                            <code className="flex-1 text-xs font-mono truncate text-green-700 dark:text-green-300">
+                              {(apiKey as any).callbackUrl}
+                            </code>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => copyToClipboard((apiKey as any).callbackUrl, "URL webhook")}
+                              data-testid={`button-copy-callback-${apiKey.id}`}
+                            >
+                              <Copy className="w-4 h-4" />
+                            </Button>
+                          </div>
+
+                          {(apiKey as any).callbackSecret && (
+                            <div>
+                              <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                                Secret de signature (pour verifier les webhooks)
+                              </label>
+                              <div className="flex items-center gap-2 p-2 bg-muted rounded-md">
+                                <code className="flex-1 text-xs font-mono truncate">
+                                  {visibleKeys[apiKey.id + "-sig"]
+                                    ? (apiKey as any).callbackSecret
+                                    : maskKey((apiKey as any).callbackSecret)}
+                                </code>
+                                <Button variant="ghost" size="sm" onClick={() => toggleKeyVisibility(apiKey.id + "-sig")} data-testid={`button-toggle-sig-${apiKey.id}`}>
+                                  {visibleKeys[apiKey.id + "-sig"] ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                                </Button>
+                                <Button variant="ghost" size="sm" onClick={() => copyToClipboard((apiKey as any).callbackSecret, "Secret")} data-testid={`button-copy-sig-${apiKey.id}`}>
+                                  <Copy className="w-3 h-3" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => regenerateSecretMutation.mutate(apiKey.id)}
+                                  disabled={regenerateSecretMutation.isPending}
+                                  title="Regenerer le secret"
+                                  data-testid={`button-regenerate-sig-${apiKey.id}`}
+                                >
+                                  <RefreshCw className="w-3 h-3" />
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => { setCallbackUrls((prev) => ({ ...prev, [apiKey.id]: (apiKey as any).callbackUrl || "" })); setEditingCallback(apiKey.id); }}
+                              data-testid={`button-edit-callback-${apiKey.id}`}
+                            >
+                              Modifier le webhook
+                            </Button>
+                          </div>
+                        </>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setEditingCallback(apiKey.id)}
+                          data-testid={`button-add-callback-${apiKey.id}`}
+                        >
+                          <Webhook className="w-4 h-4 mr-2" />
+                          Configurer un webhook
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
