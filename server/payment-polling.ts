@@ -5,6 +5,56 @@ import { NowPaymentsClient } from "./nowpayments";
 import { getMbiyoPayTransactionStatus, searchMbiyoPayTransactionByOrderId } from "./mbiyopay";
 import { getAfribaPayTransaction, mapAfribaPayStatus } from "./afribapay";
 import { trySendPaymentCallback } from "./utils/callback";
+import crypto from "crypto";
+
+/**
+ * Sends the developer callback webhook when an API Payout transaction status changes.
+ * Only fires if metadata contains apiKeyId (= initiated via /api/v1/payout).
+ */
+async function sendApiPayoutCallback(transactionId: string, metadata: any, finalStatus: "completed" | "failed"): Promise<void> {
+  if (!metadata.apiKeyId) return;
+  try {
+    const apiKey = await storage.getApiKeyById(metadata.apiKeyId);
+    if (!apiKey || !apiKey.callbackUrl || !apiKey.callbackSecret) return;
+
+    const tx = await storage.getTransaction(transactionId);
+    if (!tx) return;
+
+    const event = finalStatus === "completed" ? "payout.completed" : "payout.failed";
+    const payoutPayload = {
+      event,
+      transactionId: tx.id,
+      reference: metadata.reference || undefined,
+      recipientAmount: tx.amount,
+      fee: tx.fee || 0,
+      totalDeducted: tx.amount + (tx.fee || 0),
+      currency: tx.currency,
+      status: finalStatus,
+      country: tx.country,
+      operator: tx.operator,
+      recipientPhone: metadata.phone || tx.customerPhone,
+      timestamp: new Date().toISOString(),
+    };
+    const payloadStr = JSON.stringify(payoutPayload);
+    const signature = crypto.createHmac("sha256", apiKey.callbackSecret).update(payloadStr).digest("hex");
+    const controller = new AbortController();
+    const tid = setTimeout(() => controller.abort(), 10000);
+    await fetch(apiKey.callbackUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-BKApay-Signature": signature,
+        "X-BKApay-Event": event,
+        "X-BKApay-Timestamp": payoutPayload.timestamp,
+      },
+      body: payloadStr,
+      signal: controller.signal,
+    }).finally(() => clearTimeout(tid));
+    console.log(`[ApiPayoutCallback] ✅ Webhook sent to ${apiKey.callbackUrl} for tx ${transactionId} (${event})`);
+  } catch (e) {
+    console.error(`[ApiPayoutCallback] Failed to send webhook for tx ${transactionId}:`, e);
+  }
+}
 
 const PAYDUNYA_MASTER_KEY = process.env.PAYDUNYA_MASTER_KEY;
 const PAYDUNYA_PRIVATE_KEY = process.env.PAYDUNYA_PRIVATE_KEY;
@@ -326,6 +376,7 @@ async function processMbiyoPayTransaction(transaction: Transaction & { user?: Us
         await safeRefundOutgoingTransaction(transaction.id, transaction.userId, metadata, "polling-mbiyopay-expired-no-id");
       }
       await storage.updateTransactionStatus(transaction.id, "failed");
+      setImmediate(() => sendApiPayoutCallback(transaction.id, metadata, "failed"));
       return true;
     }
     console.log(`[PaymentPolling] Waiting for MbiyoPay transaction ID for ${transaction.id} (${remainingSeconds}s remaining)`);
@@ -391,6 +442,7 @@ async function processMbiyoPayTransaction(transaction: Transaction & { user?: Us
         } else {
           await storage.updateTransactionStatus(transaction.id, "completed");
           console.log(`[PaymentPolling] ✅ MbiyoPay ${transaction.type} ${transaction.id} COMPLETED (double-verified)`);
+          setImmediate(() => sendApiPayoutCallback(transaction.id, metadata, "completed"));
         }
         return true;
       } 
@@ -412,6 +464,7 @@ async function processMbiyoPayTransaction(transaction: Transaction & { user?: Us
           await safeRefundOutgoingTransaction(transaction.id, transaction.userId, metadata, "polling-mbiyopay-failed");
         }
         await storage.updateTransactionStatus(transaction.id, "failed");
+        setImmediate(() => sendApiPayoutCallback(transaction.id, metadata, "failed"));
         return true;
       } 
       // Still pending
@@ -427,6 +480,7 @@ async function processMbiyoPayTransaction(transaction: Transaction & { user?: Us
           const timeoutMinutes = Math.round(PAYMENT_TIMEOUT_MS / 60000);
           console.log(`[PaymentPolling] ⏱️ MbiyoPay transaction ${transaction.id} TIMEOUT (${timeoutMinutes}min) - marking as failed`);
           await storage.updateTransactionStatus(transaction.id, "failed");
+          setImmediate(() => sendApiPayoutCallback(transaction.id, metadata, "failed"));
           return true;
         }
         console.log(`[PaymentPolling] ⏳ MbiyoPay transaction ${transaction.id} still pending (status: ${status}, ${remainingSeconds}s remaining)`);
@@ -653,11 +707,13 @@ async function processFedaPayPayout(transaction: Transaction & { user?: User }, 
     if (payoutStatus.status === "sent" || payoutStatus.status === "approved") {
       await storage.updateTransactionStatus(transaction.id, "completed");
       console.log(`[PaymentPolling] ✅ FedaPay payout ${transaction.id} COMPLETED`);
+      setImmediate(() => sendApiPayoutCallback(transaction.id, metadata, "completed"));
       return true;
     } else if (payoutStatus.status === "declined" || payoutStatus.status === "canceled" || payoutStatus.status === "failed") {
       console.log(`[PaymentPolling] ❌ FedaPay payout ${transaction.id} failed (status: ${payoutStatus.status})`);
       await safeRefundOutgoingTransaction(transaction.id, transaction.userId, metadata, "polling-fedapay-failed");
       await storage.updateTransactionStatus(transaction.id, "failed");
+      setImmediate(() => sendApiPayoutCallback(transaction.id, metadata, "failed"));
       return true;
     } else {
       // Still pending
@@ -665,6 +721,7 @@ async function processFedaPayPayout(transaction: Transaction & { user?: User }, 
         console.log(`[PaymentPolling] ⏱️ FedaPay payout ${transaction.id} TIMEOUT (10min) - marking as failed`);
         await safeRefundOutgoingTransaction(transaction.id, transaction.userId, metadata, "polling-fedapay-timeout");
         await storage.updateTransactionStatus(transaction.id, "failed");
+        setImmediate(() => sendApiPayoutCallback(transaction.id, metadata, "failed"));
         return true;
       }
       console.log(`[PaymentPolling] ⏳ FedaPay payout ${transaction.id} still pending (${remainingSeconds}s remaining)`);
@@ -676,6 +733,7 @@ async function processFedaPayPayout(transaction: Transaction & { user?: User }, 
       console.log(`[PaymentPolling] ⏱️ FedaPay payout ${transaction.id} expired with error - marking as failed`);
       await safeRefundOutgoingTransaction(transaction.id, transaction.userId, metadata, "polling-fedapay-error-timeout");
       await storage.updateTransactionStatus(transaction.id, "failed");
+      setImmediate(() => sendApiPayoutCallback(transaction.id, metadata, "failed"));
       return true;
     }
     return false;

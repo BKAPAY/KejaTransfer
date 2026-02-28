@@ -2625,6 +2625,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      const PAYOUT_MIN_AMOUNT = 500;
+      if (parsedAmount < PAYOUT_MIN_AMOUNT) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: "AMOUNT_TOO_LOW",
+            message: `Le montant minimum est de ${PAYOUT_MIN_AMOUNT} ${currency || "XOF"}. Valeur reçue: ${parsedAmount}`
+          }
+        });
+      }
+
       const requestedAmount = Math.floor(parsedAmount);
       const countryCode = String(country).toUpperCase();
 
