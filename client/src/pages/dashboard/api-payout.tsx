@@ -278,29 +278,29 @@ export default function ApiPayoutPage() {
               </CardHeader>
 
               <CardContent className="space-y-4">
-                {/* Cle privee (secretKey) */}
+                {/* Cle privee (privateKey = sk_live_...) */}
                 <div>
                   <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
                     Cle privee — <span className="text-foreground">A utiliser dans Authorization: Bearer ...</span>
                   </label>
                   <div className="flex items-center gap-2">
                     <div className="flex-1 bg-muted rounded-md px-3 py-2 font-mono text-xs break-all">
-                      {visibleKeys[apiKey.id + "-secret"]
-                        ? (apiKey.secretKey || "—")
-                        : maskKey(apiKey.secretKey || "")}
+                      {visibleKeys[apiKey.id + "-private"]
+                        ? (apiKey.privateKey || "—")
+                        : maskKey(apiKey.privateKey || "")}
                     </div>
                     <Button
                       size="icon"
                       variant="ghost"
-                      onClick={() => toggleKeyVisibility(apiKey.id + "-secret")}
+                      onClick={() => toggleKeyVisibility(apiKey.id + "-private")}
                       data-testid={`button-toggle-secret-${apiKey.id}`}
                     >
-                      {visibleKeys[apiKey.id + "-secret"] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      {visibleKeys[apiKey.id + "-private"] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </Button>
                     <Button
                       size="icon"
                       variant="ghost"
-                      onClick={() => copyToClipboard(apiKey.secretKey, "Cle privee")}
+                      onClick={() => copyToClipboard(apiKey.privateKey || "", "Cle privee")}
                       data-testid={`button-copy-secret-${apiKey.id}`}
                     >
                       <Copy className="w-4 h-4" />
