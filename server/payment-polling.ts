@@ -26,8 +26,6 @@ async function sendApiPayoutCallback(transactionId: string, metadata: any, final
       transactionId: tx.id,
       reference: metadata.reference || undefined,
       recipientAmount: tx.amount,
-      fee: tx.fee || 0,
-      totalDeducted: tx.amount + (tx.fee || 0),
       currency: tx.currency,
       status: finalStatus,
       country: tx.country,

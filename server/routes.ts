@@ -2719,7 +2719,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (user.balance < feeInfo.totalDeductedFromBalance) {
         return res.status(400).json({
           success: false,
-          error: { code: "INSUFFICIENT_FUNDS", message: `Solde insuffisant. Requis: ${feeInfo.totalDeductedFromBalance} ${userCurrency} (montant ${amountInUserCurrency} + frais ${feeInfo.feeAmount})` }
+          error: { code: "INSUFFICIENT_FUNDS", message: `Solde insuffisant sur votre compte BKApay` }
         });
       }
 
@@ -2834,8 +2834,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
               transactionId: tx.id,
               reference: reference || undefined,
               recipientAmount: tx.amount,
-              fee: tx.fee || 0,
-              totalDeducted: tx.amount + (tx.fee || 0),
               currency: tx.currency || userCurrency,
               status: tx.status,
               country: tx.country || countryCode,
@@ -2870,8 +2868,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: "pending",
         message: result.message || "Payout initié avec succès",
         recipientAmount: amountInUserCurrency,
-        fee: feeInfo.feeAmount,
-        totalDeducted: feeInfo.totalDeductedFromBalance,
         currency: userCurrency,
       });
 
