@@ -118,7 +118,7 @@ export default function ApiPayoutPage() {
     toast({ title: "Copie", description: `${label} copie dans le presse-papiers` });
   };
 
-  const maskKey = (key: string) => key.substring(0, 12) + "..." + key.substring(key.length - 8);
+  const maskKey = (key: string) => key ? key.substring(0, 12) + "..." + key.substring(key.length - 8) : "";
 
   const onSubmit = (data: ApiKeyFormData) => {
     if (!isKycVerified) {
@@ -286,8 +286,8 @@ export default function ApiPayoutPage() {
                   <div className="flex items-center gap-2">
                     <div className="flex-1 bg-muted rounded-md px-3 py-2 font-mono text-xs break-all">
                       {visibleKeys[apiKey.id + "-secret"]
-                        ? apiKey.secretKey
-                        : maskKey(apiKey.secretKey)}
+                        ? (apiKey.secretKey || "—")
+                        : maskKey(apiKey.secretKey || "")}
                     </div>
                     <Button
                       size="icon"
