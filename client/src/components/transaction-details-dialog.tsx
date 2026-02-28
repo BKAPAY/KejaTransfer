@@ -6,7 +6,7 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import type { Transaction } from "@shared/schema";
-import { Copy, Mail, Phone, Wallet, AlertTriangle, CheckCircle, XCircle, Lock, ShieldCheck } from "lucide-react";
+import { Copy, Mail, Phone, Wallet, AlertTriangle, CheckCircle, XCircle, Lock, ShieldCheck, RotateCcw, Webhook } from "lucide-react";
 import { CryptoIcon } from "@/components/crypto-icon";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -58,6 +58,7 @@ export function TransactionDetailsDialog({
   const [adminStep, setAdminStep] = useState<"idle" | "code" | "confirm">("idle");
   const [adminCode, setAdminCode] = useState("");
   const [adminCodeError, setAdminCodeError] = useState(false);
+  const [webhookSent, setWebhookSent] = useState(false);
 
   const metadata = useMemo<TransactionMetadata | null>(() => {
     if (!transaction?.metadata) return null;
@@ -93,6 +94,25 @@ export function TransactionDetailsDialog({
       setAdminStep("idle");
       setAdminCode("");
       setAdminCodeError(false);
+    },
+  });
+
+  const resendWebhookMutation = useMutation({
+    mutationFn: async (txId: string) => {
+      const res = await apiRequest("POST", `/api/payout-transactions/${txId}/resend-webhook`, {});
+      return res.json();
+    },
+    onSuccess: (data) => {
+      if (data.success) {
+        setWebhookSent(true);
+        toast({ title: "Webhook renvoyé", description: "Le statut a été renvoyé à votre URL de callback." });
+        setTimeout(() => setWebhookSent(false), 3000);
+      } else {
+        toast({ title: "Erreur", description: data.error || "Echec du renvoi", variant: "destructive" });
+      }
+    },
+    onError: (error: any) => {
+      toast({ title: "Erreur", description: error.message || "Echec du renvoi du webhook", variant: "destructive" });
     },
   });
 
@@ -382,6 +402,31 @@ export function TransactionDetailsDialog({
                   </div>
                 )}
               </div>
+            </div>
+          )}
+
+          {!isAdmin && metadata?.apiKeyId && (transaction.status === "completed" || transaction.status === "failed") && (
+            <div className="space-y-3 border-t pt-4">
+              <h3 className="font-semibold text-base flex items-center gap-2">
+                <Webhook className="w-4 h-4 text-muted-foreground" />
+                Webhook Payout API
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                Si votre serveur n'a pas reçu la notification de statut, vous pouvez la renvoyer manuellement.
+              </p>
+              <Button
+                variant="outline"
+                onClick={() => resendWebhookMutation.mutate(transaction.id)}
+                disabled={resendWebhookMutation.isPending || webhookSent}
+                data-testid="button-resend-payout-webhook"
+              >
+                <RotateCcw className={`w-4 h-4 mr-2 ${resendWebhookMutation.isPending ? "animate-spin" : ""}`} />
+                {resendWebhookMutation.isPending
+                  ? "Envoi en cours..."
+                  : webhookSent
+                  ? "Webhook envoyé !"
+                  : "Renvoyer le webhook"}
+              </Button>
             </div>
           )}
 

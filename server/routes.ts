@@ -1816,6 +1816,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== Payout Transaction History + Webhook Resend =====
+
+  app.get("/api/payout-transactions", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session.userId!;
+      const allTxs = await storage.getTransactions(userId, 200);
+      const payoutTxs = allTxs.filter((tx) => {
+        if (tx.type !== "withdrawal" && tx.type !== "transfer") return false;
+        try {
+          const meta = JSON.parse(tx.metadata || "{}");
+          return !!meta.apiKeyId;
+        } catch { return false; }
+      });
+      return res.json(payoutTxs);
+    } catch (error) {
+      console.error("Error fetching payout transactions:", error);
+      res.status(500).json({ error: "Erreur interne" });
+    }
+  });
+
+  app.post("/api/payout-transactions/:txId/resend-webhook", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session.userId!;
+      const { txId } = req.params;
+      const tx = await storage.getTransaction(txId);
+      if (!tx || tx.userId !== userId) {
+        return res.status(404).json({ error: "Transaction introuvable" });
+      }
+      let meta: any = {};
+      try { meta = JSON.parse(tx.metadata || "{}"); } catch {}
+      if (!meta.apiKeyId) {
+        return res.status(400).json({ error: "Cette transaction n'est pas un payout API" });
+      }
+      const apiKey = await storage.getApiKeyById(meta.apiKeyId);
+      if (!apiKey || !apiKey.callbackUrl) {
+        return res.status(400).json({ error: "Aucun webhook configuré pour cette clé API. Ajoutez une URL de webhook dans la section clé API." });
+      }
+      const finalStatus = tx.status === "completed" ? "completed" : "failed";
+      await sendApiPayoutCallback(txId, meta, finalStatus);
+      return res.json({ success: true, message: "Webhook renvoyé avec succès" });
+    } catch (error) {
+      console.error("Error resending payout webhook:", error);
+      res.status(500).json({ error: "Erreur lors du renvoi du webhook" });
+    }
+  });
+
   // ===== API Pay Routes (Redirect-based API payments) =====
   
   // Get API key info by public key (for payment page)

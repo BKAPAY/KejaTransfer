@@ -208,7 +208,7 @@ export default function ApiPayoutPage() {
         </Dialog>
       </div>
 
-      {/* Note informationnelle sur l'activation — non bloquante */}
+      {/* Note informationnelle sur l'activation */}
       {!isPayoutActivated && (
         <Alert className="mb-4 border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800">
           <Info className="h-4 w-4 text-blue-600" />
@@ -278,7 +278,7 @@ export default function ApiPayoutPage() {
               </CardHeader>
 
               <CardContent className="space-y-4">
-                {/* Cle privee (privateKey = sk_live_...) */}
+                {/* Cle privee */}
                 <div>
                   <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
                     Cle privee — <span className="text-foreground">A utiliser dans Authorization: Bearer ...</span>
@@ -289,20 +289,10 @@ export default function ApiPayoutPage() {
                         ? (apiKey.privateKey || "—")
                         : maskKey(apiKey.privateKey || "")}
                     </div>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => toggleKeyVisibility(apiKey.id + "-private")}
-                      data-testid={`button-toggle-secret-${apiKey.id}`}
-                    >
+                    <Button size="icon" variant="ghost" onClick={() => toggleKeyVisibility(apiKey.id + "-private")} data-testid={`button-toggle-secret-${apiKey.id}`}>
                       {visibleKeys[apiKey.id + "-private"] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => copyToClipboard(apiKey.privateKey || "", "Cle privee")}
-                      data-testid={`button-copy-secret-${apiKey.id}`}
-                    >
+                    <Button size="icon" variant="ghost" onClick={() => copyToClipboard(apiKey.privateKey || "", "Cle privee")} data-testid={`button-copy-secret-${apiKey.id}`}>
                       <Copy className="w-4 h-4" />
                     </Button>
                   </div>
@@ -360,12 +350,7 @@ export default function ApiPayoutPage() {
                             <code className="flex-1 text-xs font-mono truncate text-green-700 dark:text-green-300">
                               {(apiKey as any).callbackUrl}
                             </code>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => copyToClipboard((apiKey as any).callbackUrl, "URL webhook")}
-                              data-testid={`button-copy-callback-${apiKey.id}`}
-                            >
+                            <Button variant="ghost" size="sm" onClick={() => copyToClipboard((apiKey as any).callbackUrl, "URL webhook")} data-testid={`button-copy-callback-${apiKey.id}`}>
                               <Copy className="w-4 h-4" />
                             </Button>
                           </div>
@@ -431,6 +416,7 @@ export default function ApiPayoutPage() {
           ))}
         </div>
       )}
+
     </div>
   );
 }
