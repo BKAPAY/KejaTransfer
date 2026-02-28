@@ -97,21 +97,34 @@ export async function recordLoginLog(req: Request, userId: string): Promise<stri
     const userAgent = req.headers["user-agent"] || "";
     const ip = getClientIp(req);
     const { deviceType, browser, os, deviceModel } = parseUserAgent(userAgent);
-    const geo = await getGeoFromIp(ip);
 
     const log = await storage.createLoginLog({
       userId,
       ipAddress: ip,
-      city: geo.city,
-      region: geo.region,
-      country: geo.country,
-      isp: geo.isp,
+      city: "...",
+      region: "...",
+      country: "...",
+      isp: "...",
       deviceType,
       deviceModel: deviceModel || undefined,
       browser,
       os,
       userAgent,
     });
+
+    setImmediate(async () => {
+      try {
+        const geo = await getGeoFromIp(ip);
+        await storage.updateLoginLog(log.id, {
+          city: geo.city,
+          region: geo.region,
+          country: geo.country,
+          isp: geo.isp,
+        });
+      } catch (e) {
+      }
+    });
+
     return log.id;
   } catch (error) {
     console.error("[LoginTracker] Error recording login log:", error);

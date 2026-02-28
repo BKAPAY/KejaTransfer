@@ -11,7 +11,7 @@ import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Mail, Lock, KeyRound, ArrowLeft, AlertTriangle } from "lucide-react";
+import { Mail, Lock, KeyRound, ArrowLeft, AlertTriangle, Loader2 } from "lucide-react";
 
 const loginSchema = z.object({
   email: z.string().email("Email invalide"),
@@ -328,7 +328,12 @@ export default function Login() {
                   disabled={sendCodeMutation.isPending}
                   data-testid="button-submit"
                 >
-                  {sendCodeMutation.isPending ? "Vérification..." : "Continuer"}
+                  {sendCodeMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Connexion...
+                    </>
+                  ) : "Continuer"}
                 </Button>
               </form>
             </Form>
