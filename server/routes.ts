@@ -1,5 +1,6 @@
-import type { Express, Request, Response } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
+import { registerOgRoutes } from "./og-middleware";
 import { storage } from "./storage";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
@@ -495,6 +496,9 @@ async function callPaydunyaSoftpay(
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Open Graph social media preview routes (must be before Vite/SPA handler)
+  registerOgRoutes(app);
+
   // Configure session - SESSION_SECRET doit être défini dans les variables d'environnement
   if (!process.env.SESSION_SECRET) {
     console.error("ERREUR: SESSION_SECRET doit être configuré dans les variables d'environnement");
