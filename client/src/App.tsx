@@ -18,6 +18,7 @@ import Profile from "@/pages/dashboard/profile";
 import PaymentLinks from "@/pages/dashboard/payment-links";
 import MerchantLinks from "@/pages/dashboard/merchant-links";
 import ApiPage from "@/pages/dashboard/api";
+import ApiPayoutPage from "@/pages/dashboard/api-payout";
 import Analytics from "@/pages/dashboard/analytics";
 import History from "@/pages/dashboard/history";
 import Settings from "@/pages/dashboard/settings";
@@ -172,6 +173,7 @@ function Router() {
           <Route path="/dashboard/payment-links" component={PaymentLinks} />
           <Route path="/dashboard/merchant-links" component={MerchantLinks} />
           <Route path="/dashboard/api" component={ApiPage} />
+          <Route path="/dashboard/api-payout" component={ApiPayoutPage} />
           <Route path="/dashboard/analytics" component={Analytics} />
           <Route path="/dashboard/history" component={History} />
           <Route path="/dashboard/settings" component={Settings} />

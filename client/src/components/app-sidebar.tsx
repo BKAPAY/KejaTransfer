@@ -27,6 +27,7 @@ import {
   TrendingUp,
   Shield,
   Globe,
+  Send,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import type { User as UserType } from "@shared/schema";
@@ -63,10 +64,16 @@ const menuItems = [
     testId: "nav-merchant-links",
   },
   {
-    title: "API",
+    title: "API Payin",
     url: "/dashboard/api",
     icon: Code,
     testId: "nav-api",
+  },
+  {
+    title: "API Payout",
+    url: "/dashboard/api-payout",
+    icon: Send,
+    testId: "nav-api-payout",
   },
   {
     title: "Analytics",
