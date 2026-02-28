@@ -12,7 +12,8 @@ export async function handleMoneyFusionWithdrawal(
   operator: string,
   phone: string,
   userCurrency?: string,
-  netMode?: boolean
+  netMode?: boolean,
+  providerAmountOverride?: number
 ): Promise<{ success: boolean; transactionId?: string; message?: string; error?: string }> {
   try {
     const countryLower = country.toLowerCase();
@@ -38,16 +39,23 @@ export async function handleMoneyFusionWithdrawal(
       return { success: false, error: "L'operation ne peut pas etre effectuee pour le moment. Veuillez reessayer plus tard." };
     }
 
-    let amountForProvider = feeInfo.amountReceived;
-    if (balanceCurrency !== providerCurrency) {
-      const { convertCurrency } = await import("./currency-converter");
-      const conversionResult = await convertCurrency(feeInfo.amountReceived, balanceCurrency, providerCurrency);
-      if (conversionResult.success) {
-        amountForProvider = Math.floor(conversionResult.convertedAmount);
-        console.log(`[MoneyFusion Withdrawal] Currency conversion: ${feeInfo.amountReceived} ${balanceCurrency} -> ${amountForProvider} ${providerCurrency}`);
-      } else {
-        console.error("[MoneyFusion Withdrawal] Currency conversion failed:", conversionResult.error);
-        return { success: false, error: "Erreur de conversion de devise" };
+    // Use providerAmountOverride when set (avoids double-conversion in cross-currency API payouts)
+    let amountForProvider: number;
+    if (providerAmountOverride !== undefined) {
+      amountForProvider = providerAmountOverride;
+      console.log(`[MoneyFusion Withdrawal] Using provider amount override: ${amountForProvider} ${providerCurrency}`);
+    } else {
+      amountForProvider = feeInfo.amountReceived;
+      if (balanceCurrency !== providerCurrency) {
+        const { convertCurrency } = await import("./currency-converter");
+        const conversionResult = await convertCurrency(feeInfo.amountReceived, balanceCurrency, providerCurrency);
+        if (conversionResult.success) {
+          amountForProvider = Math.floor(conversionResult.convertedAmount);
+          console.log(`[MoneyFusion Withdrawal] Currency conversion: ${feeInfo.amountReceived} ${balanceCurrency} -> ${amountForProvider} ${providerCurrency}`);
+        } else {
+          console.error("[MoneyFusion Withdrawal] Currency conversion failed:", conversionResult.error);
+          return { success: false, error: "Erreur de conversion de devise" };
+        }
       }
     }
 

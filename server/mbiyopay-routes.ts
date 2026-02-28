@@ -142,7 +142,8 @@ export async function handleMbiyoPayWithdrawal(
   phone: string,
   userCurrency?: string,
   targetCurrency?: string,
-  netMode?: boolean
+  netMode?: boolean,
+  providerAmountOverride?: number
 ): Promise<{ success: boolean; transactionId?: string; message?: string; error?: string }> {
   try {
     const countryLower = country.toLowerCase();
@@ -175,16 +176,23 @@ export async function handleMbiyoPayWithdrawal(
       return { success: false, error: "Solde insuffisant" };
     }
 
-    let amountForProvider = feeInfo.amountReceived;
-    if (balanceCurrency !== providerCurrency) {
-      const { convertCurrency } = await import("./currency-converter");
-      const conversionResult = await convertCurrency(feeInfo.amountReceived, balanceCurrency, providerCurrency);
-      if (conversionResult.success) {
-        amountForProvider = Math.floor(conversionResult.convertedAmount);
-        console.log(`[MbiyoPay Withdrawal] Currency conversion: ${feeInfo.amountReceived} ${balanceCurrency} -> ${amountForProvider} ${providerCurrency}`);
-      } else {
-        console.error("[MbiyoPay Withdrawal] Currency conversion failed:", conversionResult.error);
-        return { success: false, error: "Erreur de conversion de devise" };
+    // Use providerAmountOverride when set (avoids double-conversion in cross-currency API payouts)
+    let amountForProvider: number;
+    if (providerAmountOverride !== undefined) {
+      amountForProvider = providerAmountOverride;
+      console.log(`[MbiyoPay Withdrawal] Using provider amount override: ${amountForProvider} ${providerCurrency}`);
+    } else {
+      amountForProvider = feeInfo.amountReceived;
+      if (balanceCurrency !== providerCurrency) {
+        const { convertCurrency } = await import("./currency-converter");
+        const conversionResult = await convertCurrency(feeInfo.amountReceived, balanceCurrency, providerCurrency);
+        if (conversionResult.success) {
+          amountForProvider = Math.floor(conversionResult.convertedAmount);
+          console.log(`[MbiyoPay Withdrawal] Currency conversion: ${feeInfo.amountReceived} ${balanceCurrency} -> ${amountForProvider} ${providerCurrency}`);
+        } else {
+          console.error("[MbiyoPay Withdrawal] Currency conversion failed:", conversionResult.error);
+          return { success: false, error: "Erreur de conversion de devise" };
+        }
       }
     }
 

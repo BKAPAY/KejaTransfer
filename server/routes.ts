@@ -2713,14 +2713,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // 12. Route to the appropriate provider handler (netMode=true: recipient gets exact amount)
+      // crossCurrencyOverride: when developer specified a different currency than merchant's,
+      // pass the original requestedAmount directly to the provider to avoid double-conversion rounding
+      const crossCurrencyOverride = requestedCurrency !== userCurrency ? requestedAmount : undefined;
+
       let result: { success: boolean; transactionId?: string; error?: string; message?: string };
 
       if (activeProvider === "fedapay") {
+        // FedaPay is XOF-only; cross-currency handled by conversion upstream
         result = await handleFedaPayWithdrawal(apiKey.userId, user, amountInUserCurrency, countryCode, normalizedOperator, localPhone, userCurrency, true);
       } else if (activeProvider === "mbiyopay") {
-        result = await handleMbiyoPayWithdrawal(apiKey.userId, user, amountInUserCurrency, countryCode, normalizedOperator, localPhone, userCurrency, requestedCurrency, true);
+        result = await handleMbiyoPayWithdrawal(apiKey.userId, user, amountInUserCurrency, countryCode, normalizedOperator, localPhone, userCurrency, requestedCurrency, true, crossCurrencyOverride);
       } else if (activeProvider === "moneyfusion") {
-        result = await handleMoneyFusionWithdrawal(apiKey.userId, user, amountInUserCurrency, countryCode, normalizedOperator, localPhone, userCurrency, true);
+        result = await handleMoneyFusionWithdrawal(apiKey.userId, user, amountInUserCurrency, countryCode, normalizedOperator, localPhone, userCurrency, true, crossCurrencyOverride);
       } else if (activeProvider === "paydunya") {
         // Paydunya inline payout — netMode: send exact amountInUserCurrency to provider, add fee on top
         result = await (async () => {
@@ -2738,8 +2743,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
           const providerCurrency = "XOF";
           // netMode: send the exact requested amount to the provider
-          let amountForProvider = amountInUserCurrency;
-          if (userCurrency !== providerCurrency) {
+          // crossCurrencyOverride: use original requested amount to avoid double-conversion
+          let amountForProvider = crossCurrencyOverride ?? amountInUserCurrency;
+          if (!crossCurrencyOverride && userCurrency !== providerCurrency) {
             const { convertCurrency } = await import("./currency-converter");
             const conv = await convertCurrency(amountInUserCurrency, userCurrency, providerCurrency);
             if (conv.success) amountForProvider = Math.floor(conv.convertedAmount);
