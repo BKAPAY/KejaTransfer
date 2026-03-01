@@ -158,7 +158,7 @@ const crypto = require('crypto');
 // La signature est calculee sur le corps JSON brut (pas le corps re-serialise)
 app.post('/webhook/bkapay-payout', express.raw({ type: 'application/json' }), (req, res) => {
   const signature = req.headers['x-bkapay-signature'];
-  const secret = process.env.BKAPAY_CALLBACK_SECRET; // Votre secret de signature
+  const secret = process.env.BKAPAY_PAYOUT_CALLBACK_SECRET; // Votre secret de signature payout
 
   if (!signature || !secret) {
     return res.status(401).json({ error: 'Signature manquante' });
@@ -531,7 +531,7 @@ app.post('/webhook/bkapay-payout', express.raw({ type: 'application/json' }), (r
           <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800">
             <AlertDescription className="text-blue-800 dark:text-blue-200 text-xs space-y-1">
               <p>
-                Chaque webhook est signe avec votre <strong>secret de signature</strong> (visible dans la section API Payout) via HMAC-SHA256.
+                Chaque webhook payout est signe avec votre <strong>secret de signature payout</strong> (<code className="font-mono bg-blue-100 dark:bg-blue-900 px-1 rounded">BKAPAY_PAYOUT_CALLBACK_SECRET</code>, visible dans la section API Payout de votre tableau de bord) via HMAC-SHA256.
                 Verifiez toujours la signature dans le header <code className="font-mono bg-blue-100 dark:bg-blue-900 px-1 rounded">X-BKApay-Signature</code> avant de traiter le webhook.
               </p>
               <p>

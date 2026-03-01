@@ -2919,8 +2919,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } catch (e) {}
       }
 
-      // 14. Send async callback webhook if configured
-      if (result.transactionId && apiKey.callbackUrl && apiKey.callbackSecret) {
+      // 14. Send async callback webhook if configured (using payout-specific callback fields)
+      const payoutCbUrlInitial = (apiKey as any).payoutCallbackUrl;
+      const payoutCbSecretInitial = (apiKey as any).payoutCallbackSecret;
+      if (result.transactionId && payoutCbUrlInitial && payoutCbSecretInitial) {
         setImmediate(async () => {
           try {
             const tx = await storage.getTransaction(result.transactionId!);
@@ -2939,10 +2941,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               timestamp: new Date().toISOString(),
             };
             const payloadStr = JSON.stringify(payoutPayload);
-            const signature = require("crypto").createHmac("sha256", apiKey.callbackSecret).update(payloadStr).digest("hex");
+            const signature = require("crypto").createHmac("sha256", payoutCbSecretInitial).update(payloadStr).digest("hex");
             const controller = new AbortController();
             const tid = setTimeout(() => controller.abort(), 10000);
-            await fetch(apiKey.callbackUrl!, {
+            await fetch(payoutCbUrlInitial, {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
