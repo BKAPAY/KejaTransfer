@@ -33,19 +33,35 @@ export async function resolveApiKeyForCallback(transaction: Transaction): Promis
   return null;
 }
 
-export async function trySendPaymentCallback(
-  transaction: Transaction,
-  event: 'payment.completed' | 'payment.failed',
-  logPrefix: string = '[Callback]'
-): Promise<void> {
+function generateSignature(payload: string, secret: string): string {
+  return crypto.createHmac('sha256', secret).update(payload).digest('hex');
+}
+
+async function tryDeliverPayinWebhook(
+  callbackUrl: string,
+  callbackSecret: string,
+  payloadStr: string,
+  event: string,
+  timestamp: string,
+): Promise<boolean> {
   try {
-    const apiKey = await resolveApiKeyForCallback(transaction);
-    if (apiKey) {
-      const result = await sendPaymentCallback(transaction, apiKey, event);
-      console.log(`${logPrefix} Developer callback ${event} sent:`, result);
-    }
-  } catch (error) {
-    console.error(`${logPrefix} Error sending developer callback:`, error);
+    const signature = generateSignature(payloadStr, callbackSecret);
+    const controller = new AbortController();
+    const tid = setTimeout(() => controller.abort(), 10000);
+    const response = await fetch(callbackUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-BKApay-Signature': signature,
+        'X-BKApay-Event': event,
+        'X-BKApay-Timestamp': timestamp,
+      },
+      body: payloadStr,
+      signal: controller.signal,
+    }).finally(() => clearTimeout(tid));
+    return response.ok;
+  } catch {
+    return false;
   }
 }
 
@@ -64,11 +80,9 @@ interface CallbackPayload {
   country?: string;
   operator?: string;
   description?: string;
+  successUrl?: string;
+  cancelUrl?: string;
   timestamp: string;
-}
-
-function generateSignature(payload: string, secret: string): string {
-  return crypto.createHmac('sha256', secret).update(payload).digest('hex');
 }
 
 export async function sendPaymentCallback(
@@ -81,18 +95,18 @@ export async function sendPaymentCallback(
     return { success: false, error: 'No callback URL configured' };
   }
 
-  // Parse metadata to get external reference
   let externalReference: string | undefined;
+  let successUrl: string | undefined;
+  let cancelUrl: string | undefined;
   if (transaction.metadata) {
     try {
       const metadata = JSON.parse(transaction.metadata);
-      externalReference = metadata.externalReference || metadata.reference;
-    } catch (e) {
-      // Ignore parse errors
-    }
+      externalReference = metadata.externalReference || metadata.reference || metadata.orderId;
+      successUrl = metadata.successUrl || undefined;
+      cancelUrl = metadata.cancelUrl || undefined;
+    } catch (e) {}
   }
 
-  // Calculate net amount (amount - fee)
   const netAmount = transaction.amount - (transaction.fee || 0);
 
   const payload: CallbackPayload = {
@@ -110,46 +124,58 @@ export async function sendPaymentCallback(
     country: transaction.country || undefined,
     operator: transaction.operator || undefined,
     description: transaction.description || undefined,
+    successUrl,
+    cancelUrl,
     timestamp: new Date().toISOString(),
   };
 
   const payloadJson = JSON.stringify(payload);
-  const signature = generateSignature(payloadJson, apiKey.callbackSecret);
+  const timestamp = payload.timestamp;
 
-  try {
-    console.log(`[Callback] Sending ${event} callback to ${apiKey.callbackUrl}`);
-    
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+  const MAX_ATTEMPTS = 120;
+  const RETRY_INTERVAL_MS = 5000;
+  let attempt = 0;
 
-    const response = await fetch(apiKey.callbackUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-BKApay-Signature': signature,
-        'X-BKApay-Event': event,
-        'X-BKApay-Timestamp': payload.timestamp,
-      },
-      body: payloadJson,
-      signal: controller.signal,
-    });
+  const attempt_send = async () => {
+    attempt++;
+    const success = await tryDeliverPayinWebhook(
+      apiKey.callbackUrl!,
+      apiKey.callbackSecret!,
+      payloadJson,
+      event,
+      timestamp,
+    );
 
-    clearTimeout(timeoutId);
+    if (success) {
+      console.log(`[Callback] ✅ Webhook ${event} delivre a ${apiKey.callbackUrl} pour tx ${transaction.id} — tentative ${attempt}`);
+      return;
+    }
 
-    if (response.ok) {
-      console.log(`[Callback] Successfully sent to ${apiKey.callbackUrl}, status: ${response.status}`);
-      return { success: true };
+    console.warn(`[Callback] ⚠️ Tentative ${attempt}/${MAX_ATTEMPTS} echouee pour tx ${transaction.id} — nouvel essai dans ${RETRY_INTERVAL_MS / 1000}s`);
+
+    if (attempt < MAX_ATTEMPTS) {
+      setTimeout(attempt_send, RETRY_INTERVAL_MS);
     } else {
-      const errorText = await response.text().catch(() => 'Unknown error');
-      console.error(`[Callback] Failed to send to ${apiKey.callbackUrl}, status: ${response.status}, error: ${errorText}`);
-      return { success: false, error: `HTTP ${response.status}: ${errorText}` };
+      console.error(`[Callback] ❌ Abandon apres ${MAX_ATTEMPTS} tentatives pour tx ${transaction.id} (${event})`);
     }
-  } catch (error: any) {
-    if (error.name === 'AbortError') {
-      console.error(`[Callback] Timeout sending to ${apiKey.callbackUrl}`);
-      return { success: false, error: 'Request timeout' };
+  };
+
+  attempt_send();
+  return { success: true };
+}
+
+export async function trySendPaymentCallback(
+  transaction: Transaction,
+  event: 'payment.completed' | 'payment.failed',
+  logPrefix: string = '[Callback]'
+): Promise<void> {
+  try {
+    const apiKey = await resolveApiKeyForCallback(transaction);
+    if (apiKey) {
+      await sendPaymentCallback(transaction, apiKey, event);
+      console.log(`${logPrefix} Developer callback ${event} initie avec retry pour tx ${transaction.id}`);
     }
-    console.error(`[Callback] Error sending to ${apiKey.callbackUrl}:`, error.message);
-    return { success: false, error: error.message };
+  } catch (error) {
+    console.error(`${logPrefix} Error sending developer callback:`, error);
   }
 }

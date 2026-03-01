@@ -46,6 +46,8 @@ import AdminUserApi from "@/pages/dashboard/admin-user-api";
 import AdminUserConnections from "@/pages/dashboard/admin-user-connections";
 import Pay from "@/pages/pay";
 import Merchant from "@/pages/merchant";
+import PaymentSuccessPage from "@/pages/payment-success";
+import PaymentFailedPage from "@/pages/payment-failed";
 import ApiPayment from "@/pages/api-payment";
 import PaymentStatus from "@/pages/payment-status";
 import ApiDemo from "@/pages/api-demo";
@@ -257,6 +259,8 @@ function Router() {
       <Route path="/payment-status/:transactionId" component={PaymentStatus} />
       <Route path="/demo/api-payment" component={ApiDemo} />
       <Route path="/api-pay/:key" component={ApiPay} />
+      <Route path="/payment-success" component={PaymentSuccessPage} />
+      <Route path="/payment-failed" component={PaymentFailedPage} />
       <Route component={NotFound} />
     </Switch>
   );

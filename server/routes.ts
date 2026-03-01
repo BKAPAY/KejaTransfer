@@ -1950,7 +1950,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Initialize API payment
   app.post("/api/api-pay/init", async (req: Request, res: Response) => {
     try {
-      const { publicKey, amount, description, customerName, customerEmail, customerPhone, country, operator, currency: requestCurrency, callbackUrl, orderId } = req.body;
+      const { publicKey, amount, description, customerName, customerEmail, customerPhone, country, operator, currency: requestCurrency, callbackUrl, orderId, successUrl, cancelUrl } = req.body;
 
       if (!publicKey || !amount || !customerPhone || !country || !operator) {
         return res.status(400).json({ error: "Donnees manquantes" });
@@ -2150,6 +2150,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             apiKeyPublicKey: publicKey,
             callbackUrl: callbackUrl || null,
             orderId: orderId || null,
+            successUrl: successUrl || null,
+            cancelUrl: cancelUrl || null,
             provider: "mbiyopay",
             netAmountForUser: netAmountForUser,
             providerAmount: convertedAmountForProvider,
@@ -2227,6 +2229,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             apiKeyPublicKey: publicKey,
             callbackUrl: callbackUrl || null,
             orderId: orderId || null,
+            successUrl: successUrl || null,
+            cancelUrl: cancelUrl || null,
             provider: "fedapay",
             netAmountForUser: netAmountForUser,
             providerAmount: convertedAmountForProvider,
@@ -2320,6 +2324,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             apiKeyPublicKey: publicKey,
             callbackUrl: callbackUrl || null,
             orderId: orderId || null,
+            successUrl: successUrl || null,
+            cancelUrl: cancelUrl || null,
             provider: "paydunya",
             country: country.toUpperCase(),
             operator: operator,
@@ -2428,6 +2434,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         console.log(`[API-PAY INIT] Using AfribaPay for ${country}/${operator}, phone=${customerPhone}, providerCurrency=${providerCurrency}`);
 
+        const afribaSuccessUrl = successUrl
+          ? `${baseUrl}/payment-success?redirect=${encodeURIComponent(successUrl)}&ref=${afribaOrderId}`
+          : `${baseUrl}/payment-success?ref=${afribaOrderId}`;
+        const afribaCancelUrl = cancelUrl
+          ? `${baseUrl}/payment-failed?redirect=${encodeURIComponent(cancelUrl)}&ref=${afribaOrderId}`
+          : `${baseUrl}/payment-failed?ref=${afribaOrderId}`;
+
         const afribaResult = await createAfribaPayPayin({
           amount: convertedAmountForProvider,
           currency: providerCurrency,
@@ -2438,8 +2451,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           orderId: afribaOrderId,
           referenceId: description || "Paiement via API",
           notifyUrl: `${baseUrl}/api/afribapay/webhook`,
-          returnUrl: `${baseUrl}/payment-success`,
-          cancelUrl: `${baseUrl}/payment-failed`,
+          returnUrl: afribaSuccessUrl,
+          cancelUrl: afribaCancelUrl,
         });
 
         if (!afribaResult.success) {
@@ -2469,6 +2482,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             apiKeyPublicKey: publicKey,
             callbackUrl: callbackUrl || null,
             orderId: orderId || null,
+            successUrl: successUrl || null,
+            cancelUrl: cancelUrl || null,
             provider: "afribapay",
             netAmountForUser: netAmountForUser,
             providerAmount: convertedAmountForProvider,
@@ -2998,6 +3013,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       console.error("Inline pay status error:", error);
+      res.status(500).json({ error: "Erreur serveur" });
+    }
+  });
+
+  // Developer polling endpoint — check API payment status by transactionId
+  // Authentication: publicKey must match the API key that created the transaction
+  app.get("/api/pay/status/:transactionId", async (req: Request, res: Response) => {
+    try {
+      const { transactionId } = req.params;
+      const publicKey = req.query.publicKey as string | undefined;
+
+      const transaction = await storage.getTransaction(transactionId);
+      if (!transaction || transaction.type !== "api_payment") {
+        return res.status(404).json({ error: "Transaction introuvable" });
+      }
+
+      let meta: any = {};
+      try { meta = JSON.parse(transaction.metadata || "{}"); } catch {}
+
+      if (publicKey) {
+        if (meta.apiKeyPublicKey && meta.apiKeyPublicKey !== publicKey) {
+          return res.status(403).json({ error: "Acces refuse" });
+        }
+      }
+
+      return res.json({
+        transactionId: transaction.id,
+        status: transaction.status,
+        amount: transaction.amount,
+        fee: transaction.fee || 0,
+        netAmount: transaction.amount - (transaction.fee || 0),
+        currency: transaction.currency || "XOF",
+        country: transaction.country || undefined,
+        operator: transaction.operator || undefined,
+        customerPhone: transaction.customerPhone || undefined,
+        customerName: transaction.customerName || undefined,
+        description: transaction.description || undefined,
+        externalReference: meta.orderId || undefined,
+        createdAt: transaction.createdAt,
+      });
+    } catch (error: any) {
+      console.error("[PayStatus] Error:", error);
       res.status(500).json({ error: "Erreur serveur" });
     }
   });
