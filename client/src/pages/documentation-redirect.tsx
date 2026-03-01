@@ -1130,11 +1130,6 @@ def webhook_bkapay():
               <p className="text-xs text-muted-foreground">
                 Le header <code className="bg-muted px-1 py-0.5 rounded">Content-Type</code> est toujours <code className="bg-muted px-1 py-0.5 rounded">application/json</code>.
               </p>
-              <Alert className="border-green-200 bg-green-50 dark:bg-green-950 dark:border-green-800">
-                <AlertDescription className="text-green-800 dark:text-green-200 text-xs">
-                  <strong>Astuce :</strong> vous pouvez configurer la meme URL (<code className="font-mono bg-green-100 dark:bg-green-900 px-1 rounded">https://votre-site.com/api/webhook/bkapay</code>) pour les webhooks payin et les webhooks payout. Distinguez-les par le champ <code className="font-mono bg-green-100 dark:bg-green-900 px-1 rounded">event</code> du payload : <code className="font-mono bg-green-100 dark:bg-green-900 px-1 rounded">payment.X</code> pour le payin, <code className="font-mono bg-green-100 dark:bg-green-900 px-1 rounded">payout.X</code> pour le payout. Pensez a choisir le bon secret HMAC selon l'evenement.
-                </AlertDescription>
-              </Alert>
             </div>
 
             <div className="space-y-3">

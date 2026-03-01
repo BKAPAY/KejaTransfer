@@ -315,22 +315,12 @@ export default function ApiPayoutPage() {
                   {editingCallback === apiKey.id ? (
                     <div className="space-y-2">
                       <Input
-                        placeholder="https://votre-site.com/api/webhook/bkapay"
+                        placeholder="https://votre-site.com/api/webhook/bkapay-payout"
                         value={callbackUrls[apiKey.id] ?? ""}
                         onChange={(e) => setCallbackUrls((prev) => ({ ...prev, [apiKey.id]: e.target.value }))}
                         className="text-sm font-mono"
                         data-testid={`input-callback-${apiKey.id}`}
                       />
-                      {(apiKey as any).callbackUrl && !callbackUrls[apiKey.id] && (
-                        <button
-                          type="button"
-                          className="text-xs text-primary underline"
-                          onClick={() => setCallbackUrls((prev) => ({ ...prev, [apiKey.id]: (apiKey as any).callbackUrl }))}
-                          data-testid={`button-use-same-url-${apiKey.id}`}
-                        >
-                          Utiliser la meme URL que le webhook payin ({(apiKey as any).callbackUrl})
-                        </button>
-                      )}
                       <div className="flex gap-2">
                         <Button
                           size="sm"
@@ -396,18 +386,6 @@ export default function ApiPayoutPage() {
                             </div>
                           )}
 
-                          {(apiKey as any).callbackUrl && (
-                            <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-md">
-                              <span className="text-xs text-muted-foreground shrink-0">Webhook payin :</span>
-                              <code className="flex-1 text-xs font-mono truncate text-muted-foreground">
-                                {(apiKey as any).callbackUrl}
-                              </code>
-                              {(apiKey as any).callbackUrl === (apiKey as any).payoutCallbackUrl && (
-                                <span className="text-xs text-green-600 dark:text-green-400 shrink-0">Meme URL</span>
-                              )}
-                            </div>
-                          )}
-
                           <div className="flex gap-2">
                             <Button
                               size="sm"
@@ -420,25 +398,15 @@ export default function ApiPayoutPage() {
                           </div>
                         </>
                       ) : (
-                        <div className="space-y-2">
-                          {(apiKey as any).callbackUrl && (
-                            <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-md">
-                              <span className="text-xs text-muted-foreground shrink-0">Webhook payin :</span>
-                              <code className="flex-1 text-xs font-mono truncate text-muted-foreground">
-                                {(apiKey as any).callbackUrl}
-                              </code>
-                            </div>
-                          )}
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setEditingCallback(apiKey.id)}
-                            data-testid={`button-add-callback-${apiKey.id}`}
-                          >
-                            <Webhook className="w-4 h-4 mr-2" />
-                            Configurer un webhook payout
-                          </Button>
-                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setEditingCallback(apiKey.id)}
+                          data-testid={`button-add-callback-${apiKey.id}`}
+                        >
+                          <Webhook className="w-4 h-4 mr-2" />
+                          Configurer un webhook payout
+                        </Button>
                       )}
                     </div>
                   )}
