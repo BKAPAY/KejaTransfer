@@ -1783,6 +1783,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update payout callback URL (separate from payin callback)
+  app.patch("/api/api-keys/:id/payout-callback", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const keyId = req.params.id;
+      const userId = req.session.userId!;
+      const { payoutCallbackUrl } = req.body;
+
+      if (payoutCallbackUrl && payoutCallbackUrl.trim() !== "") {
+        try {
+          const url = new URL(payoutCallbackUrl);
+          if (!["http:", "https:"].includes(url.protocol)) throw new Error();
+        } catch {
+          return res.status(400).json({ error: "URL de webhook payout invalide. Utilisez une URL HTTP/HTTPS valide." });
+        }
+      }
+
+      const updatedKey = await storage.updateApiKeyPayoutCallback(keyId, userId, payoutCallbackUrl || null);
+      if (!updatedKey) return res.status(404).json({ error: "Clé API non trouvée" });
+
+      res.json({
+        success: true,
+        payoutCallbackUrl: (updatedKey as any).payoutCallbackUrl,
+        payoutCallbackSecret: (updatedKey as any).payoutCallbackSecret,
+        message: payoutCallbackUrl ? "Webhook payout configuré avec succès" : "Webhook payout supprimé"
+      });
+    } catch (error: any) {
+      console.error("Error updating payout callback:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
+  // Regenerate payout callback secret
+  app.post("/api/api-keys/:id/regenerate-payout-secret", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const keyId = req.params.id;
+      const userId = req.session.userId!;
+
+      const updatedKey = await storage.regenerateApiKeyPayoutSecret(keyId, userId);
+      if (!updatedKey) return res.status(404).json({ error: "Clé API non trouvée" });
+
+      res.json({
+        success: true,
+        payoutCallbackSecret: (updatedKey as any).payoutCallbackSecret,
+        message: "Secret payout régénéré avec succès"
+      });
+    } catch (error: any) {
+      console.error("Error regenerating payout secret:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
   // Update API key settings (allowed countries and customer pays fee)
   app.patch("/api/api-keys/:id/settings", requireAuth, async (req: Request, res: Response) => {
     try {
@@ -1850,8 +1901,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Cette transaction n'est pas un payout API" });
       }
       const apiKey = await storage.getApiKeyById(meta.apiKeyId);
-      if (!apiKey || !apiKey.callbackUrl) {
-        return res.status(400).json({ error: "Aucun webhook configuré pour cette clé API. Ajoutez une URL de webhook dans la section clé API." });
+      if (!apiKey || !(apiKey as any).payoutCallbackUrl) {
+        return res.status(400).json({ error: "Aucun webhook payout configuré pour cette clé API. Configurez une URL de webhook dans la section API Payout." });
       }
       const finalStatus = tx.status === "completed" ? "completed" : "failed";
       await sendApiPayoutCallback(txId, meta, finalStatus);

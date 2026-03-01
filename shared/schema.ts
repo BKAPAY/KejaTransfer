@@ -78,8 +78,10 @@ export const apiKeys = pgTable("api_keys", {
   siteName: text("site_name").notNull().default("Mon Site"), // Nom du site qui sera affiché "Payer à [siteName]"
   publicKey: text("public_key").notNull().unique(),
   privateKey: text("private_key").notNull().unique(),
-  callbackUrl: text("callback_url"), // URL to receive payment notifications for auto activation
-  callbackSecret: text("callback_secret"), // HMAC secret for signing callbacks
+  callbackUrl: text("callback_url"), // URL to receive payin payment notifications
+  callbackSecret: text("callback_secret"), // (legacy - unused for payin, kept for compat)
+  payoutCallbackUrl: text("payout_callback_url"), // URL to receive payout status notifications
+  payoutCallbackSecret: text("payout_callback_secret"), // HMAC secret for signing payout webhooks
   isActive: boolean("is_active").notNull().default(true),
   allowedCountries: text("allowed_countries").array().default([]), // Empty array = all countries allowed
   customerPaysFee: boolean("customer_pays_fee").notNull().default(false), // If true, customer pays the 6% fee for mobile money

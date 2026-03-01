@@ -47,7 +47,9 @@ export async function sendApiPayoutCallback(transactionId: string, metadata: any
   if (!metadata.apiKeyId) return;
 
   const apiKey = await storage.getApiKeyById(metadata.apiKeyId);
-  if (!apiKey || !apiKey.callbackUrl || !apiKey.callbackSecret) return;
+  const payoutCbUrl = (apiKey as any)?.payoutCallbackUrl;
+  const payoutCbSecret = (apiKey as any)?.payoutCallbackSecret;
+  if (!apiKey || !payoutCbUrl || !payoutCbSecret) return;
 
   const tx = await storage.getTransaction(transactionId);
   if (!tx) return;
@@ -76,15 +78,15 @@ export async function sendApiPayoutCallback(transactionId: string, metadata: any
   const attempt_send = async () => {
     attempt++;
     const success = await tryDeliverApiPayoutWebhook(
-      apiKey.callbackUrl!,
-      apiKey.callbackSecret!,
+      payoutCbUrl,
+      payoutCbSecret,
       payloadStr,
       event,
       timestamp,
     );
 
     if (success) {
-      console.log(`[ApiPayoutCallback] ✅ Webhook delivered to ${apiKey.callbackUrl} for tx ${transactionId} (${event}) — attempt ${attempt}`);
+      console.log(`[ApiPayoutCallback] ✅ Webhook delivered to ${payoutCbUrl} for tx ${transactionId} (${event}) — attempt ${attempt}`);
       return;
     }
 

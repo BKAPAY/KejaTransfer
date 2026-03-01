@@ -231,6 +231,17 @@ async function bootstrapDatabase() {
     }
     await payoutColClient.end();
 
+    // Step 6e: Ensure payout_callback_url and payout_callback_secret columns exist in api_keys
+    const payoutCbClient = postgres(DATABASE_URL);
+    try {
+      await payoutCbClient`ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS payout_callback_url TEXT`;
+      await payoutCbClient`ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS payout_callback_secret TEXT`;
+      console.log("✅ api_keys payout callback columns ready");
+    } catch (e) {
+      console.error("⚠️ payout callback columns setup error:", e);
+    }
+    await payoutCbClient.end();
+
     // Step 7: Ensure primary admin exists
     console.log("👤 Ensuring primary admin exists...");
     const seedClient = postgres(DATABASE_URL);

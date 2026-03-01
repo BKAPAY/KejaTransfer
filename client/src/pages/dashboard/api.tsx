@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Copy, Eye, EyeOff, Trash2, Key, AlertCircle, ExternalLink, Webhook, RefreshCw, Check, X, Settings, Globe } from "lucide-react";
+import { Plus, Copy, Eye, EyeOff, Trash2, Key, AlertCircle, ExternalLink, Webhook, Check, X, Settings, Globe } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -137,26 +137,6 @@ export default function ApiPage() {
     },
   });
 
-  const regenerateSecretMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const res = await apiRequest("POST", `/api/api-keys/${id}/regenerate-secret`, {});
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/api-keys"] });
-      toast({
-        title: "Secret regenere",
-        description: "Le secret de callback a ete regenere. Mettez a jour votre serveur.",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Erreur",
-        description: error.message || "Erreur lors de la regeneration",
-        variant: "destructive",
-      });
-    },
-  });
 
   const settingsMutation = useMutation({
     mutationFn: async ({ id, allowedCountries, customerPaysFee, customerPaysCryptoFee }: { id: string; allowedCountries: string[]; customerPaysFee: boolean; customerPaysCryptoFee: boolean }) => {
@@ -445,50 +425,6 @@ export default function ApiPage() {
                             </Button>
                           </div>
                           
-                          {(apiKey as any).callbackSecret && (
-                            <div>
-                              <div className="flex items-center gap-2 mb-1">
-                                <label className="text-xs font-medium text-muted-foreground">Secret de signature</label>
-                              </div>
-                              <div className="flex items-center gap-2 p-2 bg-muted rounded-md">
-                                <code className="flex-1 text-xs font-mono truncate">
-                                  {visibleKeys[apiKey.id + '-secret'] 
-                                    ? (apiKey as any).callbackSecret 
-                                    : maskKey((apiKey as any).callbackSecret)}
-                                </code>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => toggleKeyVisibility(apiKey.id + '-secret')}
-                                  data-testid={`button-toggle-secret-${apiKey.id}`}
-                                >
-                                  {visibleKeys[apiKey.id + '-secret'] ? (
-                                    <EyeOff className="w-3 h-3" />
-                                  ) : (
-                                    <Eye className="w-3 h-3" />
-                                  )}
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => copyToClipboard((apiKey as any).callbackSecret, "Secret")}
-                                  data-testid={`button-copy-secret-${apiKey.id}`}
-                                >
-                                  <Copy className="w-3 h-3" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => regenerateSecretMutation.mutate(apiKey.id)}
-                                  disabled={regenerateSecretMutation.isPending}
-                                  title="Regenerer le secret"
-                                  data-testid={`button-regenerate-secret-${apiKey.id}`}
-                                >
-                                  <RefreshCw className="w-3 h-3" />
-                                </Button>
-                              </div>
-                            </div>
-                          )}
                           
                           <div className="flex gap-2">
                             <Button

@@ -78,6 +78,8 @@ export interface IStorage {
   deleteApiKey(id: string, userId: string): Promise<boolean>;
   updateApiKeyCallback(id: string, userId: string, callbackUrl: string | null): Promise<ApiKey | undefined>;
   regenerateApiKeyCallbackSecret(id: string, userId: string): Promise<ApiKey | undefined>;
+  updateApiKeyPayoutCallback(id: string, userId: string, payoutCallbackUrl: string | null): Promise<ApiKey | undefined>;
+  regenerateApiKeyPayoutSecret(id: string, userId: string): Promise<ApiKey | undefined>;
   updateApiKeySettings(id: string, userId: string, settings: { allowedCountries?: string[]; customerPaysFee?: boolean; customerPaysCryptoFee?: boolean }): Promise<ApiKey | undefined>;
 
   // Transactions
@@ -525,6 +527,47 @@ export class DbStorage implements IStorage {
     const results = await db
       .update(schema.apiKeys)
       .set({ callbackSecret: newSecret })
+      .where(eq(schema.apiKeys.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async updateApiKeyPayoutCallback(id: string, userId: string, payoutCallbackUrl: string | null): Promise<ApiKey | undefined> {
+    const existing = await db.select().from(schema.apiKeys)
+      .where(eq(schema.apiKeys.id, id))
+      .limit(1);
+
+    if (!existing[0] || existing[0].userId !== userId) return undefined;
+
+    const updateData: any = { payoutCallbackUrl };
+
+    if (payoutCallbackUrl && !(existing[0] as any).payoutCallbackSecret) {
+      updateData.payoutCallbackSecret = `cs_${randomUUID().replace(/-/g, '')}`;
+    }
+    if (!payoutCallbackUrl) {
+      updateData.payoutCallbackSecret = null;
+    }
+
+    const results = await db
+      .update(schema.apiKeys)
+      .set(updateData)
+      .where(eq(schema.apiKeys.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async regenerateApiKeyPayoutSecret(id: string, userId: string): Promise<ApiKey | undefined> {
+    const existing = await db.select().from(schema.apiKeys)
+      .where(eq(schema.apiKeys.id, id))
+      .limit(1);
+
+    if (!existing[0] || existing[0].userId !== userId) return undefined;
+
+    const newSecret = `cs_${randomUUID().replace(/-/g, '')}`;
+
+    const results = await db
+      .update(schema.apiKeys)
+      .set({ payoutCallbackSecret: newSecret } as any)
       .where(eq(schema.apiKeys.id, id))
       .returning();
     return results[0];
