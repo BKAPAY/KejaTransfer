@@ -895,14 +895,27 @@ def webhook_bkapay():
           </p>
 
           <div className="space-y-3">
-            <h4 className="font-semibold text-sm">Endpoint de verification</h4>
-            <div className="bg-muted p-4 rounded-lg">
-              <div className="flex items-center gap-2 mb-2">
-                <Badge variant="default" className="text-xs">GET</Badge>
+            <h4 className="font-semibold text-sm">Endpoints de verification</h4>
+            <div className="space-y-2">
+              <div className="bg-muted p-4 rounded-lg">
+                <div className="flex items-center gap-2 mb-2">
+                  <Badge variant="default" className="text-xs">GET</Badge>
+                  <span className="text-xs text-muted-foreground">Verification simple (par token)</span>
+                </div>
+                <code className="text-sm font-mono break-all text-primary" data-testid="text-status-endpoint">
+                  {baseUrl}/api/inline-pay/status/{"{transactionId}"}
+                </code>
               </div>
-              <code className="text-sm font-mono break-all text-primary" data-testid="text-status-endpoint">
-                {baseUrl}/api/inline-pay/status/{"{transactionId}"}
-              </code>
+              <div className="bg-muted p-4 rounded-lg">
+                <div className="flex items-center gap-2 mb-2">
+                  <Badge variant="default" className="text-xs">GET</Badge>
+                  <span className="text-xs text-muted-foreground">Verification complete (avec cle publique)</span>
+                </div>
+                <code className="text-sm font-mono break-all text-primary" data-testid="text-status-endpoint-v2">
+                  {baseUrl}/api/pay/status/{"{transactionId}"}?publicKey={"{votreClePublique}"}
+                </code>
+                <p className="text-xs text-muted-foreground mt-2">Retourne egalement : frais, montant net, pays, operateur, telephone client, reference externe.</p>
+              </div>
             </div>
           </div>
 
@@ -1313,18 +1326,18 @@ def webhook_bkapay():
             <div className="space-y-3">
               <h4 className="font-semibold">Comportement de retry</h4>
               <p className="text-sm text-muted-foreground">
-                Si votre endpoint ne repond pas avec un code HTTP 200 dans les <strong>10 secondes</strong>,
-                BKApay considere l'envoi comme echoue. Actuellement, BKApay effectue <strong>un seul essai</strong> d'envoi.
-                Il est donc important que votre endpoint soit toujours disponible et reponde rapidement.
+                Si votre endpoint ne repond pas avec un code HTTP 2xx dans les <strong>10 secondes</strong>,
+                BKApay retente automatiquement l'envoi <strong>toutes les 5 secondes pendant 10 minutes</strong> (120 tentatives au total).
+                Votre service peut donc etre momentanement indisponible sans manquer une notification.
               </p>
               <div className="bg-muted p-4 rounded-lg space-y-2 text-xs">
                 <p className="font-semibold">Bonnes pratiques pour votre endpoint :</p>
                 <ul className="space-y-1 text-muted-foreground list-disc list-inside">
                   <li>Repondez HTTP 200 immediatement, avant de traiter le webhook en profondeur</li>
                   <li>Traitez le webhook de maniere asynchrone si necessaire (queue, background job)</li>
-                  <li>Implementez l'idempotence : si vous recevez deux fois le meme transactionId, ne traitez qu'une fois</li>
+                  <li>Implementez l'idempotence : si vous recevez deux fois le meme <code className="font-mono bg-muted px-0.5 rounded">transactionId</code>, ne traitez qu'une seule fois</li>
                   <li>Loguez les webhooks recus pour le debugging</li>
-                  <li>Utilisez la verification du statut comme fallback si un webhook est manque</li>
+                  <li>Utilisez le polling de statut comme fallback complementaire</li>
                 </ul>
               </div>
             </div>

@@ -1145,10 +1145,26 @@ def webhook_bkapay():
             Cette verification est votre garantie que le paiement a bien ete effectue et confirme par BKApay.
           </p>
 
-          <div className="bg-muted p-4 rounded-lg">
-            <code className="text-sm font-mono break-all text-primary">
-              GET {baseUrl}/api/inline-pay/status/TRANSACTION_ID
-            </code>
+          <div className="space-y-2">
+            <div className="bg-muted p-4 rounded-lg">
+              <div className="flex items-center gap-2 mb-1">
+                <Badge variant="default" className="text-xs">GET</Badge>
+                <span className="text-xs text-muted-foreground">Verification simple</span>
+              </div>
+              <code className="text-sm font-mono break-all text-primary">
+                {baseUrl}/api/inline-pay/status/TRANSACTION_ID
+              </code>
+            </div>
+            <div className="bg-muted p-4 rounded-lg">
+              <div className="flex items-center gap-2 mb-1">
+                <Badge variant="default" className="text-xs">GET</Badge>
+                <span className="text-xs text-muted-foreground">Verification complete avec cle publique</span>
+              </div>
+              <code className="text-sm font-mono break-all text-primary">
+                {baseUrl}/api/pay/status/TRANSACTION_ID?publicKey=votreClePublique
+              </code>
+              <p className="text-xs text-muted-foreground mt-2">Retourne egalement frais, montant net, pays, operateur, telephone client et reference externe (<code className="font-mono bg-muted px-0.5 rounded">orderId</code>).</p>
+            </div>
           </div>
 
           <div className="space-y-2 text-sm">
@@ -1462,6 +1478,23 @@ def webhook_bkapay():
                 <Copy className="w-4 h-4 mr-2" />
                 Copier
               </Button>
+            </div>
+
+            <div className="space-y-3">
+              <h4 className="font-semibold">Comportement de retry automatique</h4>
+              <p className="text-sm text-muted-foreground">
+                Si votre endpoint ne repond pas avec un code HTTP 2xx dans les <strong>10 secondes</strong>,
+                BKApay retente automatiquement l'envoi <strong>toutes les 5 secondes pendant 10 minutes</strong> (120 tentatives au total).
+                Votre service peut donc etre momentanement indisponible sans manquer une notification.
+              </p>
+              <div className="bg-muted p-3 rounded-lg text-xs text-muted-foreground space-y-1">
+                <p className="font-semibold text-foreground">Ce que cela signifie pour vous :</p>
+                <ul className="list-disc list-inside space-y-1">
+                  <li>Un redemarrage de votre serveur ne fait pas perdre le webhook</li>
+                  <li>Une indisponibilite de moins de 10 minutes est toleree</li>
+                  <li>Votre endpoint doit etre <strong>idempotent</strong> : le meme <code className="font-mono bg-muted px-0.5 rounded">transactionId</code> peut arriver plusieurs fois</li>
+                </ul>
+              </div>
             </div>
 
             <div className="space-y-3">
