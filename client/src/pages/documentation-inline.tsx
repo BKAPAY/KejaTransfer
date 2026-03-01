@@ -1276,6 +1276,11 @@ def webhook_bkapay():
                   </div>
                 </div>
               </div>
+              <Alert className="border-green-200 bg-green-50 dark:bg-green-950 dark:border-green-800">
+                <AlertDescription className="text-green-800 dark:text-green-200 text-xs">
+                  <strong>Astuce :</strong> la meme URL (<code className="font-mono bg-green-100 dark:bg-green-900 px-1 rounded">https://votre-site.com/api/webhook/bkapay</code>) peut recevoir a la fois les webhooks payin (<code className="font-mono bg-green-100 dark:bg-green-900 px-1 rounded">payment.completed</code>, <code className="font-mono bg-green-100 dark:bg-green-900 px-1 rounded">payment.failed</code>) et les webhooks payout (<code className="font-mono bg-green-100 dark:bg-green-900 px-1 rounded">payout.completed</code>, ...). Identifiez le type par le champ <code className="font-mono bg-green-100 dark:bg-green-900 px-1 rounded">event</code> du payload.
+                </AlertDescription>
+              </Alert>
             </div>
 
             <div className="space-y-3">

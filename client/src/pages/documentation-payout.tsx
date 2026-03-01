@@ -151,21 +151,28 @@ else:
     error_code = data["error"]["code"]
     error_msg  = data["error"]["message"]`;
 
-  const webhookHandlerExample = `// Webhook BKApay Payout — Node.js / Express
+  const webhookHandlerExample = `// Webhook BKApay — Node.js / Express
+// Cette meme URL gere a la fois les evenements payin (payment.X) et payout (payout.X)
 const crypto = require('crypto');
 
 // IMPORTANT : utilisez express.raw() pour lire le corps brut avant parsing
 // La signature est calculee sur le corps JSON brut (pas le corps re-serialise)
-app.post('/webhook/bkapay-payout', express.raw({ type: 'application/json' }), (req, res) => {
+app.post('/api/webhook/bkapay', express.raw({ type: 'application/json' }), (req, res) => {
+  const rawBody = req.body.toString('utf8');
+  const payload = JSON.parse(rawBody);
   const signature = req.headers['x-bkapay-signature'];
-  const secret = process.env.BKAPAY_PAYOUT_CALLBACK_SECRET; // Votre secret de signature payout
+
+  // Choisir le bon secret selon le type d'evenement
+  const isPayin = payload.event.startsWith('payment.');
+  const secret = isPayin
+    ? process.env.BKAPAY_CALLBACK_SECRET        // Secret webhook payin
+    : process.env.BKAPAY_PAYOUT_CALLBACK_SECRET; // Secret webhook payout
 
   if (!signature || !secret) {
     return res.status(401).json({ error: 'Signature manquante' });
   }
 
-  // Verifier la signature HMAC-SHA256 sur le corps BRUT (Buffer -> string)
-  const rawBody = req.body.toString('utf8');
+  // Verifier la signature HMAC-SHA256 sur le corps BRUT
   const expectedSig = crypto
     .createHmac('sha256', secret)
     .update(rawBody)
@@ -175,16 +182,17 @@ app.post('/webhook/bkapay-payout', express.raw({ type: 'application/json' }), (r
     return res.status(401).json({ error: 'Signature invalide' });
   }
 
-  // Parser le corps apres verification
-  const payload = JSON.parse(rawBody);
-  const { event, transactionId, reference, status } = payload;
+  const { event, transactionId, reference } = payload;
 
+  // Traiter selon le type d'evenement
   if (event === 'payout.completed') {
-    // Payout reussi — mettre a jour votre base de donnees
-    updateOrderStatus(reference, 'paid');
+    updatePayoutStatus(reference, 'paid');       // Payout reussi
   } else if (event === 'payout.failed') {
-    // Payout echoue — notifier votre equipe
-    notifyFailure(transactionId, reference);
+    notifyFailure(transactionId, reference);     // Payout echoue
+  } else if (event === 'payment.completed') {
+    activateOrder(reference);                    // Paiement entrant reussi
+  } else if (event === 'payment.failed') {
+    cancelOrder(reference);                      // Paiement entrant echoue
   }
 
   // Repondre 200 rapidement pour confirmer la reception
@@ -528,10 +536,17 @@ app.post('/webhook/bkapay-payout', express.raw({ type: 'application/json' }), (r
             <pre className="bg-muted rounded-md p-3 text-xs overflow-x-auto whitespace-pre-wrap">{webhookHandlerExample}</pre>
           </div>
 
+          <Alert className="border-green-200 bg-green-50 dark:bg-green-950 dark:border-green-800">
+            <AlertDescription className="text-green-800 dark:text-green-200 text-xs space-y-1">
+              <p>
+                <strong>Une seule URL pour tout :</strong> vous pouvez utiliser la meme URL webhook (<code className="font-mono bg-green-100 dark:bg-green-900 px-1 rounded">https://votre-site.com/api/webhook/bkapay</code>) pour les paiements entrants (payin) ET les virements sortants (payout). Distinguez-les par le champ <code className="font-mono bg-green-100 dark:bg-green-900 px-1 rounded">event</code> : <code className="font-mono bg-green-100 dark:bg-green-900 px-1 rounded">payment.X</code> pour le payin, <code className="font-mono bg-green-100 dark:bg-green-900 px-1 rounded">payout.X</code> pour le payout. Choisissez le bon secret HMAC selon l'evenement recu.
+              </p>
+            </AlertDescription>
+          </Alert>
           <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800">
             <AlertDescription className="text-blue-800 dark:text-blue-200 text-xs space-y-1">
               <p>
-                Chaque webhook payout est signe avec votre <strong>secret de signature payout</strong> (<code className="font-mono bg-blue-100 dark:bg-blue-900 px-1 rounded">BKAPAY_PAYOUT_CALLBACK_SECRET</code>, visible dans la section API Payout de votre tableau de bord) via HMAC-SHA256.
+                Chaque webhook est signe via HMAC-SHA256. Les webhooks payout utilisent <code className="font-mono bg-blue-100 dark:bg-blue-900 px-1 rounded">BKAPAY_PAYOUT_CALLBACK_SECRET</code>, les webhooks payin utilisent <code className="font-mono bg-blue-100 dark:bg-blue-900 px-1 rounded">BKAPAY_CALLBACK_SECRET</code>. Les deux secrets sont visibles dans votre tableau de bord.
                 Verifiez toujours la signature dans le header <code className="font-mono bg-blue-100 dark:bg-blue-900 px-1 rounded">X-BKApay-Signature</code> avant de traiter le webhook.
               </p>
               <p>
