@@ -404,9 +404,10 @@ export default function Management() {
       const res = await apiRequest("POST", "/api/admin/toggle-wave-payin", { userId, enabled });
       return res.json();
     },
-    onSuccess: (_, vars) => {
+    onSuccess: (data, vars) => {
       toast({ title: "Succès", description: vars.enabled ? "Wave payin activé" : "Wave payin désactivé" });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/search"] });
       refetchUsers();
     },
     onError: () => {
@@ -765,10 +766,13 @@ export default function Management() {
                       </Button>
                       <Button
                         size="sm"
-                        variant={(user as any).wavePayinEnabled ? "default" : "outline"}
+                        variant="outline"
                         onClick={() => setToggleDialog({ open: true, userId: user.id, userName: `${user.firstName} ${user.lastName}`, type: "wave_payin", enabled: !(user as any).wavePayinEnabled })}
                         disabled={toggleWavePayinMutation.isPending}
                         data-testid={`button-toggle-wave-payin-${user.id}`}
+                        className={(user as any).wavePayinEnabled
+                          ? "border-green-500 text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/30"
+                          : "border-red-400 text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/30"}
                       >
                         <Waves className="w-4 h-4 mr-1" />
                         {(user as any).wavePayinEnabled ? "Wave ON" : "Wave OFF"}

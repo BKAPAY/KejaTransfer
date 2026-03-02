@@ -368,7 +368,7 @@ export default function Admin() {
           <Button
             onClick={() => handleProtectedNavigation("/dashboard/management")}
             data-testid="button-management"
-            className="gap-2"
+            className="gap-2 border-yellow-500 text-yellow-700 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-950/30"
             variant="outline"
           >
             <Lock className="w-4 h-4" />
