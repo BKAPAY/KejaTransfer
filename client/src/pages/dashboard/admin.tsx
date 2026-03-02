@@ -258,42 +258,33 @@ export default function Admin() {
     enabled: searchQuery.length > 0,
   });
 
-  // Get all transactions for admin
+  // Get all transactions for admin (recent 500 for display)
   const { data: allTransactions = [], isLoading: transactionsLoading } = useQuery<TransactionWithUser[]>({
     queryKey: ["/api/admin/all-transactions"],
     enabled: mainTab === "transactions",
+  });
+
+  // Server-side full-database transaction search (triggered when a search query is set)
+  const { data: txSearchResults = [], isLoading: txSearchLoading } = useQuery<TransactionWithUser[]>({
+    queryKey: ["/api/admin/search-transactions", txSearchQuery],
+    queryFn: async () => {
+      if (!txSearchQuery.trim()) return [];
+      const res = await fetch(`/api/admin/search-transactions?q=${encodeURIComponent(txSearchQuery.trim())}`);
+      if (!res.ok) throw new Error("Search failed");
+      return res.json();
+    },
+    enabled: txSearchQuery.trim().length >= 2 && mainTab === "transactions",
+    staleTime: 10000,
   });
 
   // Display filtered results if searching, otherwise show all users
   const displayedUsers = searchQuery.length > 0 ? searchResults : allUsers;
   const isLoading = searchQuery.length > 0 ? searchLoading : usersLoading;
 
-  // Filter and paginate transactions
-  const filteredTransactions = useMemo(() => {
-    if (!allTransactions) return [];
-    if (!txSearchQuery.trim()) return allTransactions;
-
-    const query = txSearchQuery.toLowerCase().trim();
-    return allTransactions.filter((tx) => {
-      const customerName = (tx.customerName || "").toLowerCase();
-      const customerEmail = (tx.customerEmail || "").toLowerCase();
-      const customerPhone = (tx.customerPhone || "").toLowerCase();
-      const paydunyaToken = (tx.paydunyaToken || "").toLowerCase();
-      const txId = tx.id.toLowerCase();
-      const description = (tx.description || "").toLowerCase();
-      const userName = tx.user ? `${tx.user.firstName} ${tx.user.lastName}`.toLowerCase() : "";
-      
-      return (
-        customerName.includes(query) ||
-        customerEmail.includes(query) ||
-        customerPhone.includes(query) ||
-        paydunyaToken.includes(query) ||
-        txId.includes(query) ||
-        description.includes(query) ||
-        userName.includes(query)
-      );
-    });
-  }, [allTransactions, txSearchQuery]);
+  // When searching: use server-side results. Otherwise: show the 500 recent transactions.
+  const filteredTransactions: TransactionWithUser[] = txSearchQuery.trim().length >= 2
+    ? txSearchResults
+    : allTransactions;
 
   const txTotalPages = Math.ceil(filteredTransactions.length / txItemsPerPage);
 
@@ -825,12 +816,12 @@ export default function Admin() {
             </div>
             {txSearchQuery && (
               <p className="text-xs text-muted-foreground mt-2">
-                {filteredTransactions.length} résultat(s) pour "{txSearchQuery}"
+                {txSearchLoading ? "Recherche en cours…" : `${filteredTransactions.length} résultat(s) pour "${txSearchQuery}" (base entière)`}
               </p>
             )}
           </CardHeader>
           <CardContent>
-            {transactionsLoading ? (
+            {(transactionsLoading && !txSearchQuery) || (txSearchLoading && txSearchQuery) ? (
               <div className="space-y-2">
                 {[1, 2, 3, 4, 5].map((i) => (
                   <div key={i} className="flex items-center gap-4">

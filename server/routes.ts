@@ -7755,6 +7755,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Full-database transaction search for admin — no limit, searches by ID, phone, name, token, description
+  app.get("/api/admin/search-transactions", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const q = (req.query.q as string || "").trim().toLowerCase();
+      if (!q || q.length < 2) return res.json([]);
+
+      const allTx = await storage.getAllTransactionsForAdmin(999999);
+      const results = allTx.filter((tx: any) => {
+        const txId = tx.id.toLowerCase();
+        const customerName = (tx.customerName || "").toLowerCase();
+        const customerEmail = (tx.customerEmail || "").toLowerCase();
+        const customerPhone = (tx.customerPhone || "").toLowerCase();
+        const paydunyaToken = (tx.paydunyaToken || "").toLowerCase();
+        const description = (tx.description || "").toLowerCase();
+        const userName = tx.user ? `${tx.user.firstName} ${tx.user.lastName}`.toLowerCase() : "";
+        return (
+          txId.includes(q) ||
+          customerName.includes(q) ||
+          customerEmail.includes(q) ||
+          customerPhone.includes(q) ||
+          paydunyaToken.includes(q) ||
+          description.includes(q) ||
+          userName.includes(q)
+        );
+      });
+
+      res.json(results.slice(0, 200));
+    } catch (error: any) {
+      console.error("Search transactions error:", error);
+      res.status(500).json({ error: "Erreur lors de la recherche" });
+    }
+  });
+
   app.get("/api/admin/user/:userId/payment-links", requireAdmin, async (req: Request, res: Response) => {
     try {
       const links = await storage.getPaymentLinks(req.params.userId);
