@@ -47,6 +47,7 @@ export default function History() {
       const paydunyaToken = (transaction.paydunyaToken || "").toLowerCase();
       const txId = transaction.id.toLowerCase();
       const description = (transaction.description || "").toLowerCase();
+      const metadata = (transaction.metadata || "").toLowerCase();
       
       return (
         customerName.includes(query) ||
@@ -54,7 +55,8 @@ export default function History() {
         customerPhone.includes(query) ||
         paydunyaToken.includes(query) ||
         txId.includes(query) ||
-        description.includes(query)
+        description.includes(query) ||
+        metadata.includes(query)
       );
     });
   }, [transactions, searchQuery]);

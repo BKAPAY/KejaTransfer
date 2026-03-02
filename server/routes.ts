@@ -7769,6 +7769,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const customerPhone = (tx.customerPhone || "").toLowerCase();
         const paydunyaToken = (tx.paydunyaToken || "").toLowerCase();
         const description = (tx.description || "").toLowerCase();
+        const metadata = (tx.metadata || "").toLowerCase();
         const userName = tx.user ? `${tx.user.firstName} ${tx.user.lastName}`.toLowerCase() : "";
         return (
           txId.includes(q) ||
@@ -7777,6 +7778,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           customerPhone.includes(q) ||
           paydunyaToken.includes(q) ||
           description.includes(q) ||
+          metadata.includes(q) ||
           userName.includes(q)
         );
       });

@@ -91,13 +91,15 @@ export default function AdminUserHistory() {
       const customerPhone = (tx.customerPhone || "").toLowerCase();
       const paydunyaToken = (tx.paydunyaToken || "").toLowerCase();
       const txId = tx.id.toLowerCase();
+      const metadata = (tx.metadata || "").toLowerCase();
       
       return (
         customerName.includes(query) ||
         customerEmail.includes(query) ||
         customerPhone.includes(query) ||
         paydunyaToken.includes(query) ||
-        txId.includes(query)
+        txId.includes(query) ||
+        metadata.includes(query)
       );
     });
   }, [transactions, searchQuery]);

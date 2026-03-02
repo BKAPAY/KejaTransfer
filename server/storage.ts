@@ -1065,12 +1065,16 @@ export class DbStorage implements IStorage {
         u.lastName.toLowerCase().includes(lowerQuery)
     );
     
-    // Also search by transaction token (paydunyaToken or transaction ID)
+    // Also search by transaction token, ID, or any external reference in metadata
     const allTransactions = await db.select().from(schema.transactions);
     const matchingTransactions = allTransactions.filter(
       (t) =>
         (t.paydunyaToken && t.paydunyaToken.toLowerCase().includes(lowerQuery)) ||
-        t.id.toLowerCase().includes(lowerQuery)
+        t.id.toLowerCase().includes(lowerQuery) ||
+        (t.metadata && t.metadata.toLowerCase().includes(lowerQuery)) ||
+        (t.customerPhone && t.customerPhone.toLowerCase().includes(lowerQuery)) ||
+        (t.customerName && t.customerName.toLowerCase().includes(lowerQuery)) ||
+        (t.customerEmail && t.customerEmail.toLowerCase().includes(lowerQuery))
     );
     
     // Get user IDs from matching transactions
