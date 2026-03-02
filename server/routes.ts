@@ -3362,6 +3362,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Ce lien n'existe pas ou a été supprimé" });
       }
 
+      // Wave payin activation check (on behalf of the merchant)
+      if (operator && operator.toLowerCase() === "wave" && !owner?.wavePayinEnabled) {
+        return res.status(403).json({ success: false, error: "Le wave de votre marchand n'est pas activée" });
+      }
+
       // Get owner's currency and payer's currency
       const ownerCurrency = owner?.country ? getCurrencyForCountry(owner.country) : "XOF";
       const payerCurrency = getCurrencyForCountry(country) || "XOF";
@@ -3929,6 +3934,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const owner = await storage.getUser(paymentLink.userId);
       if (owner?.suspended) {
         return res.status(404).json({ error: "Ce lien n'existe pas ou a été supprimé" });
+      }
+
+      // Wave payin activation check (on behalf of the merchant)
+      if (operator && operator.toLowerCase() === "wave" && !owner?.wavePayinEnabled) {
+        return res.status(403).json({ success: false, error: "Le wave de votre marchand n'est pas activée" });
       }
 
       // Create Paydunya invoice with customer info
@@ -6654,6 +6664,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const apiOwner = await storage.getUser(apiKey.userId);
       if (apiOwner?.suspended) {
         return res.status(401).json({ error: "Clé API invalide ou inactive" });
+      }
+
+      // Wave payin activation check (on behalf of the merchant)
+      if (operator && operator.toLowerCase() === "wave" && !apiOwner?.wavePayinEnabled) {
+        return res.status(403).json({ error: "Le wave de votre marchand n'est pas activée" });
       }
 
       // ANTI-DUPLICATE: Check for existing transaction with same description in last 5 minutes
