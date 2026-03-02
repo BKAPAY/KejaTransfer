@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Users, Shield, Trash2, Plus, Minus, History, Link as LinkIcon, Store, Key, User as UserIcon, Check, X, FileCheck, AlertCircle, Unlock, Lock, Clock, CheckCircle, XCircle, ArrowDownLeft, ArrowUpRight, Loader2, Monitor, RotateCcw } from "lucide-react";
+import { Users, Shield, Trash2, Plus, Minus, History, Link as LinkIcon, Store, Key, User as UserIcon, Check, X, FileCheck, AlertCircle, Unlock, Lock, Clock, CheckCircle, XCircle, ArrowDownLeft, ArrowUpRight, Loader2, Monitor, RotateCcw, Waves } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
@@ -44,7 +44,7 @@ export default function Management() {
 
   // Dialog states
   const [promoteDialog, setPromoteDialog] = useState<{ open: boolean; userId?: string; userName?: string }>({ open: false });
-  const [toggleDialog, setToggleDialog] = useState<{ open: boolean; userId?: string; userName?: string; type?: "transfers" | "withdrawals" | "payout_api"; enabled?: boolean }>({ open: false });
+  const [toggleDialog, setToggleDialog] = useState<{ open: boolean; userId?: string; userName?: string; type?: "transfers" | "withdrawals" | "payout_api" | "wave_payin"; enabled?: boolean }>({ open: false });
   const [removeAdminDialog, setRemoveAdminDialog] = useState<{ open: boolean; userId?: string; userName?: string }>({ open: false });
   const [addFundsDialog, setAddFundsDialog] = useState<{ open: boolean; userId?: string; userName?: string; amount?: number; currency?: string }>({ open: false });
   const [subtractFundsDialog, setSubtractFundsDialog] = useState<{ open: boolean; userId?: string; userName?: string; amount?: number; currency?: string }>({ open: false });
@@ -399,6 +399,21 @@ export default function Management() {
     },
   });
 
+  const toggleWavePayinMutation = useMutation({
+    mutationFn: async ({ userId, enabled }: { userId: string; enabled: boolean }) => {
+      const res = await apiRequest("POST", "/api/admin/toggle-wave-payin", { userId, enabled });
+      return res.json();
+    },
+    onSuccess: (_, vars) => {
+      toast({ title: "Succès", description: vars.enabled ? "Wave payin activé" : "Wave payin désactivé" });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      refetchUsers();
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible de modifier le Wave payin", variant: "destructive" });
+    },
+  });
+
   // Helper function to get currency for a user's country
   const getCurrencyForUser = (user: User) => {
     return user?.country 
@@ -748,6 +763,16 @@ export default function Management() {
                         <ArrowUpRight className="w-4 h-4 mr-1" />
                         {(user as any).payoutApiEnabled ? "Payout API ON" : "Payout API OFF"}
                       </Button>
+                      <Button
+                        size="sm"
+                        variant={(user as any).wavePayinEnabled ? "default" : "outline"}
+                        onClick={() => setToggleDialog({ open: true, userId: user.id, userName: `${user.firstName} ${user.lastName}`, type: "wave_payin", enabled: !(user as any).wavePayinEnabled })}
+                        disabled={toggleWavePayinMutation.isPending}
+                        data-testid={`button-toggle-wave-payin-${user.id}`}
+                      >
+                        <Waves className="w-4 h-4 mr-1" />
+                        {(user as any).wavePayinEnabled ? "Wave ON" : "Wave OFF"}
+                      </Button>
                       {user.kycStatus === "submitted" ? (
                         <>
                           <Button
@@ -853,6 +878,8 @@ export default function Management() {
                 ? (toggleDialog.enabled ? "Activer les transferts" : "Désactiver les transferts")
                 : toggleDialog.type === "withdrawals"
                 ? (toggleDialog.enabled ? "Activer les retraits" : "Désactiver les retraits")
+                : toggleDialog.type === "wave_payin"
+                ? (toggleDialog.enabled ? "Activer Wave (encaissement)" : "Désactiver Wave (encaissement)")
                 : (toggleDialog.enabled ? "Activer le Payout API" : "Désactiver le Payout API")}
             </AlertDialogTitle>
             <AlertDialogDescription>
@@ -860,6 +887,10 @@ export default function Management() {
                 toggleDialog.enabled
                   ? <>Activer le Payout API pour <strong>{toggleDialog.userName}</strong> lui permettra d'initier des paiements mobiles money via son API. Assurez-vous que son KYC est vérifié.</>
                   : <>Désactiver le Payout API pour <strong>{toggleDialog.userName}</strong>. Il ne pourra plus effectuer de payouts via l'API.</>
+              ) : toggleDialog.type === "wave_payin" ? (
+                toggleDialog.enabled
+                  ? <>Activer Wave (encaissement) pour <strong>{toggleDialog.userName}</strong> lui permettra de recevoir des paiements via Wave sur ses liens et son API. Le client a fait la demande.</>
+                  : <>Désactiver Wave (encaissement) pour <strong>{toggleDialog.userName}</strong>. Il ne pourra plus recevoir de paiements entrants via Wave.</>
               ) : (
                 <>Êtes-vous sûr de vouloir {toggleDialog.enabled ? "activer" : "désactiver"} les {toggleDialog.type === "transfers" ? "transferts" : "retraits"} pour <strong>{toggleDialog.userName}</strong> ?
                 {!toggleDialog.enabled && " Cet utilisateur ne pourra plus effectuer cette opération."}</>
@@ -875,15 +906,17 @@ export default function Management() {
                     toggleTransfersMutation.mutate({ userId: toggleDialog.userId, enabled: !!toggleDialog.enabled });
                   } else if (toggleDialog.type === "withdrawals") {
                     toggleWithdrawalsMutation.mutate({ userId: toggleDialog.userId, enabled: !!toggleDialog.enabled });
+                  } else if (toggleDialog.type === "wave_payin") {
+                    toggleWavePayinMutation.mutate({ userId: toggleDialog.userId, enabled: !!toggleDialog.enabled });
                   } else {
                     togglePayoutApiMutation.mutate({ userId: toggleDialog.userId, enabled: !!toggleDialog.enabled });
                   }
                 }
               }}
-              disabled={toggleTransfersMutation.isPending || toggleWithdrawalsMutation.isPending || togglePayoutApiMutation.isPending}
+              disabled={toggleTransfersMutation.isPending || toggleWithdrawalsMutation.isPending || togglePayoutApiMutation.isPending || toggleWavePayinMutation.isPending}
               data-testid="button-confirm-toggle"
             >
-              {(toggleTransfersMutation.isPending || toggleWithdrawalsMutation.isPending || togglePayoutApiMutation.isPending) ? "En cours..." : "Confirmer"}
+              {(toggleTransfersMutation.isPending || toggleWithdrawalsMutation.isPending || togglePayoutApiMutation.isPending || toggleWavePayinMutation.isPending) ? "En cours..." : "Confirmer"}
             </AlertDialogAction>
           </div>
         </AlertDialogContent>

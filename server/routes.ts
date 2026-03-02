@@ -1968,6 +1968,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Ce service est temporairement indisponible" });
       }
 
+      // Wave payin activation check (on behalf of the merchant)
+      if (operator && operator.toLowerCase() === "wave" && !apiOwner?.wavePayinEnabled) {
+        return res.status(403).json({ error: "Le wave de votre marchand n'est pas activée" });
+      }
+
       // DEDUPLICATION: Check for duplicate transactions to prevent double payments
       // If orderId is provided, check for existing transaction with same orderId
       if (orderId) {
@@ -3517,6 +3522,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Ce lien n'existe pas ou a été supprimé" });
       }
 
+      // Wave payin activation check (on behalf of the merchant)
+      if (operator && operator.toLowerCase() === "wave" && !owner?.wavePayinEnabled) {
+        return res.status(403).json({ success: false, error: "Le wave de votre marchand n'est pas activée" });
+      }
+
       // Get owner's currency and provider currency
       const ownerCurrency = owner?.country ? getCurrencyForCountry(owner.country) : "XOF";
       const providerCurrency = "XOF"; // Paydunya only accepts XOF
@@ -3645,6 +3655,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!country || !operator || !phone) {
         return res.status(400).json({ error: "Pays, opérateur et numéro de téléphone requis" });
+      }
+
+      // Wave payin activation check
+      if (operator.toLowerCase() === "wave" && !user?.wavePayinEnabled) {
+        return res.status(403).json({ error: "Pour faire les opérations Via wave, contacter le support pour l'activer" });
       }
 
       // Create Paydunya invoice to get token
@@ -4874,6 +4889,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ success: false, error: "Pays, operateur et telephone requis" });
       }
 
+      // Wave payin activation check
+      if (operator.toLowerCase() === "wave" && !user?.wavePayinEnabled) {
+        return res.status(403).json({ success: false, error: "Pour faire les opérations Via wave, contacter le support pour l'activer" });
+      }
+
       // Determine which provider to use based on configuration
       const activeProvider = await getActiveProviderForDeposit(country, operator);
       
@@ -5490,6 +5510,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ success: false, error: "Ce lien n'existe pas" });
       }
 
+      // Wave payin activation check (on behalf of the merchant)
+      if (operator && operator.toLowerCase() === "wave" && !owner?.wavePayinEnabled) {
+        return res.status(403).json({ success: false, error: "Le wave de votre marchand n'est pas activée" });
+      }
+
       // Get owner's currency and payer's currency for cross-currency conversion
       // IMPORTANT: Use currency from request if provided (for multi-currency countries like RDC)
       const ownerCurrency = owner?.country ? getCurrencyForCountry(owner.country) : "XOF";
@@ -5814,6 +5839,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (owner?.suspended) {
         return res.status(404).json({ success: false, error: "Ce lien n'existe pas" });
       }
+
+      // Wave payin activation check (on behalf of the merchant)
+      if (operator && operator.toLowerCase() === "wave" && !owner?.wavePayinEnabled) {
+        return res.status(403).json({ success: false, error: "Le wave de votre marchand n'est pas activée" });
+      }
       
       // Get owner's currency for balance credit
       // IMPORTANT: Use currency from request if provided (for multi-currency countries like RDC)
@@ -6091,6 +6121,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const apiKey = (req as any).apiKey;
       if (!apiKey) {
         return res.status(401).json({ success: false, error: "Cle API non valide" });
+      }
+
+      // Wave payin activation check (on behalf of the API merchant)
+      if (operator && operator.toLowerCase() === "wave") {
+        const apiOwnerForWave = await storage.getUser(apiKey.userId);
+        if (!apiOwnerForWave?.wavePayinEnabled) {
+          return res.status(403).json({ success: false, error: "Le wave de votre marchand n'est pas activée" });
+        }
       }
 
       const activeProvider = await getActiveProviderForDeposit(country, operator);
@@ -7427,6 +7465,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true, payoutApiEnabled: result.rows[0].payout_api_enabled });
     } catch (error: any) {
       console.error("Toggle payout API error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
+  app.post("/api/admin/toggle-wave-payin", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { userId, enabled } = req.body;
+      if (!userId || typeof enabled !== "boolean") {
+        return res.status(400).json({ error: "Paramètres invalides" });
+      }
+      const result = await pgPool.query(
+        "UPDATE users SET wave_payin_enabled = $1 WHERE id = $2 RETURNING wave_payin_enabled",
+        [enabled, userId]
+      );
+      if (result.rows.length === 0) return res.status(404).json({ error: "Utilisateur non trouvé" });
+      res.json({ success: true, wavePayinEnabled: result.rows[0].wave_payin_enabled });
+    } catch (error: any) {
+      console.error("Toggle wave payin error:", error);
       res.status(500).json({ error: "Une erreur est survenue" });
     }
   });

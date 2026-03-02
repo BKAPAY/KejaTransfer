@@ -231,6 +231,18 @@ async function bootstrapDatabase() {
     }
     await payoutColClient.end();
 
+    // Step 6d2: Ensure wave_payin_enabled column exists in users table
+    const waveColClient = postgres(DATABASE_URL);
+    try {
+      await waveColClient`
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS wave_payin_enabled BOOLEAN NOT NULL DEFAULT FALSE
+      `;
+      console.log("✅ users.wave_payin_enabled column ready");
+    } catch (e) {
+      console.error("⚠️ wave_payin_enabled column setup error:", e);
+    }
+    await waveColClient.end();
+
     // Step 6e: Ensure payout_callback_url and payout_callback_secret columns exist in api_keys
     const payoutCbClient = postgres(DATABASE_URL);
     try {
