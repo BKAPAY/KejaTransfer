@@ -1383,6 +1383,7 @@ export default function ApiPay() {
             onSelect={setOperator}
             disabled={!country || isLoadingOperators}
             isLoading={isLoadingOperators}
+            disabledOperators={!(apiKeyInfo as any)?.ownerWavePayinEnabled ? { wave: "Le wave de ce marchand n'est pas activé." } : {}}
           />
         )}
       </div>

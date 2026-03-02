@@ -851,6 +851,7 @@ export default function Deposit() {
                                 selectedOperator={field.value}
                                 onSelect={(val) => { field.onChange(val); setOtpCode(""); }}
                                 isLoading={isLoadingOperators}
+                                disabledOperators={!user?.wavePayinEnabled ? { wave: "Pour faire les opérations via Wave, contactez le support pour l'activer." } : {}}
                               />
                             )}
                             <FormMessage />

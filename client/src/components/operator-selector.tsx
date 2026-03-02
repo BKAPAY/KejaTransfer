@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
-import { Check } from "lucide-react";
+import { Check, AlertCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 import omImage from "@assets/om_1763835083036.png";
 import mtnImage from "@assets/mtn (1)_1763835082904.png";
@@ -29,6 +30,7 @@ interface OperatorSelectorProps {
   onSelect: (code: string) => void;
   disabled?: boolean;
   isLoading?: boolean;
+  disabledOperators?: Record<string, string>;
 }
 
 const OPERATOR_LOGOS: Record<string, { image?: string; color: string; bgColor: string; textColor: string }> = {
@@ -71,7 +73,8 @@ export function OperatorSelector({
   selectedOperator, 
   onSelect, 
   disabled = false,
-  isLoading = false 
+  isLoading = false,
+  disabledOperators = {},
 }: OperatorSelectorProps) {
   if (isLoading) {
     return (
@@ -90,59 +93,90 @@ export function OperatorSelector({
     return null;
   }
 
+  const activeDisabledMessage = selectedOperator
+    ? disabledOperators[selectedOperator.toLowerCase()]
+    : undefined;
+
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-      {operators.map((op) => {
-        const style = getOperatorStyle(op.code);
-        const isSelected = selectedOperator === op.code;
-        
-        return (
-          <button
-            key={op.code}
-            type="button"
-            disabled={disabled}
-            onClick={() => onSelect(op.code)}
-            data-testid={`operator-${op.code}`}
-            className={cn(
-              "relative flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all duration-200",
-              "min-h-[70px] hover-elevate",
-              isSelected 
-                ? "border-primary bg-primary/5 dark:bg-primary/10 shadow-md" 
-                : "border-border hover:border-primary/50 bg-card",
-              disabled && "opacity-50 cursor-not-allowed"
-            )}
-          >
-            {isSelected && (
-              <div className="absolute top-1 right-1">
-                <Check className="h-4 w-4 text-primary" />
-              </div>
-            )}
-            
-            {style.image ? (
-              <img 
-                src={style.image} 
-                alt={op.name} 
-                className="w-10 h-10 object-contain rounded-full"
-              />
-            ) : (
-              <div className={cn(
-                "w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm",
-                style.bgColor,
-                style.textColor
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        {operators.map((op) => {
+          const style = getOperatorStyle(op.code);
+          const isSelected = selectedOperator === op.code;
+          const isOpDisabled = !!disabledOperators[op.code.toLowerCase()];
+          
+          return (
+            <button
+              key={op.code}
+              type="button"
+              disabled={disabled}
+              onClick={() => onSelect(op.code)}
+              data-testid={`operator-${op.code}`}
+              className={cn(
+                "relative flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all duration-200",
+                "min-h-[70px] hover-elevate",
+                isSelected && isOpDisabled
+                  ? "border-amber-500 bg-amber-50 dark:bg-amber-950/30"
+                  : isSelected 
+                    ? "border-primary bg-primary/5 dark:bg-primary/10 shadow-md" 
+                    : "border-border hover:border-primary/50 bg-card",
+                disabled && "opacity-50 cursor-not-allowed"
+              )}
+            >
+              {isSelected && !isOpDisabled && (
+                <div className="absolute top-1 right-1">
+                  <Check className="h-4 w-4 text-primary" />
+                </div>
+              )}
+              {isSelected && isOpDisabled && (
+                <div className="absolute top-1 right-1">
+                  <AlertCircle className="h-4 w-4 text-amber-600" />
+                </div>
+              )}
+              
+              {style.image ? (
+                <img 
+                  src={style.image} 
+                  alt={op.name} 
+                  className={cn(
+                    "w-10 h-10 object-contain rounded-full",
+                    isOpDisabled && "opacity-60"
+                  )}
+                />
+              ) : (
+                <div className={cn(
+                  "w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm",
+                  style.bgColor,
+                  style.textColor,
+                  isOpDisabled && "opacity-60"
+                )}>
+                  {getOperatorInitials(op.name)}
+                </div>
+              )}
+              
+              <span className={cn(
+                "mt-1.5 text-xs font-medium text-center leading-tight",
+                isSelected && isOpDisabled
+                  ? "text-amber-700 dark:text-amber-400"
+                  : isSelected 
+                    ? "text-primary" 
+                    : "text-foreground"
               )}>
-                {getOperatorInitials(op.name)}
-              </div>
-            )}
-            
-            <span className={cn(
-              "mt-1.5 text-xs font-medium text-center leading-tight",
-              isSelected ? "text-primary" : "text-foreground"
-            )}>
-              {op.name}
-            </span>
-          </button>
-        );
-      })}
+                {op.name}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {activeDisabledMessage && (
+        <Alert className="bg-amber-50 dark:bg-amber-950/30 border-amber-300 dark:border-amber-700">
+          <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+          <AlertDescription className="text-sm text-amber-800 dark:text-amber-200">
+            {activeDisabledMessage}
+          </AlertDescription>
+        </Alert>
+      )}
     </div>
   );
 }

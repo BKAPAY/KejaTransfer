@@ -1505,6 +1505,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...link,
         ownerCountry: owner?.country || null,
         ownerCurrency,
+        ownerWavePayinEnabled: owner?.wavePayinEnabled || false,
       });
     } catch (error: any) {
       res.status(500).json({ error: "Une erreur est survenue" });
@@ -1629,6 +1630,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...link,
         ownerCountry: owner?.country || null,
         ownerCurrency,
+        ownerWavePayinEnabled: owner?.wavePayinEnabled || false,
       });
     } catch (error: any) {
       res.status(500).json({ error: "Une erreur est survenue" });
@@ -1941,6 +1943,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customerPaysCryptoFee: (apiKey as any).customerPaysCryptoFee || false,
         ownerCountry: owner?.country || null,
         ownerCurrency,
+        ownerWavePayinEnabled: owner?.wavePayinEnabled || false,
       });
     } catch (error: any) {
       res.status(500).json({ error: "Une erreur est survenue" });

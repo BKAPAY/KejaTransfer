@@ -1508,6 +1508,7 @@ export default function Pay() {
                   onSelect={field.onChange}
                   disabled={isLoadingOperators}
                   isLoading={isLoadingOperators}
+                  disabledOperators={!(paymentLink as any)?.ownerWavePayinEnabled ? { wave: "Le wave de ce marchand n'est pas activé." } : {}}
                 />
               )}
               <FormMessage />

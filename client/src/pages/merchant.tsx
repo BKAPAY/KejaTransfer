@@ -1358,6 +1358,7 @@ export default function Merchant() {
                   onSelect={field.onChange}
                   disabled={isLoadingOperators}
                   isLoading={isLoadingOperators}
+                  disabledOperators={!(merchantLink as any)?.ownerWavePayinEnabled ? { wave: "Le wave de ce marchand n'est pas activé." } : {}}
                 />
               )}
               <FormMessage />
