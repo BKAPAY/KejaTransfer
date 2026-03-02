@@ -7554,11 +7554,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!userId || amount === undefined) {
         return res.status(400).json({ error: "Identifiant utilisateur et montant requis" });
       }
-      // Check if target user is primary admin
-      const targetUser = await storage.getUser(userId);
-      if (targetUser?.isPrimaryAdmin) {
-        return res.status(403).json({ error: "Impossible de modifier l'argent de l'administrateur principal" });
-      }
       const user = await storage.addFundsToUser(userId, amount);
       res.json(user);
     } catch (error: any) {
@@ -7572,11 +7567,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { userId, amount } = req.body;
       if (!userId || amount === undefined) {
         return res.status(400).json({ error: "Identifiant utilisateur et montant requis" });
-      }
-      // Check if target user is primary admin
-      const targetUser = await storage.getUser(userId);
-      if (targetUser?.isPrimaryAdmin) {
-        return res.status(403).json({ error: "Impossible de modifier l'argent de l'administrateur principal" });
       }
       const user = await storage.subtractFundsFromUser(userId, amount);
       res.json(user);
