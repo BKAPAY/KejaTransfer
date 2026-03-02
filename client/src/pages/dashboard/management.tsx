@@ -227,7 +227,10 @@ export default function Management() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, amount }),
       });
-      if (!response.ok) throw new Error("Failed to add funds");
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || "Impossible d'ajouter les fonds");
+      }
       return response.json();
     },
     onSuccess: () => {
@@ -236,8 +239,8 @@ export default function Management() {
       setFundAmount({});
       refetchUsers();
     },
-    onError: () => {
-      toast({ title: "Erreur", description: "Impossible d'ajouter les fonds", variant: "destructive" });
+    onError: (error: Error) => {
+      toast({ title: "Erreur", description: error.message || "Impossible d'ajouter les fonds", variant: "destructive" });
     },
   });
 
