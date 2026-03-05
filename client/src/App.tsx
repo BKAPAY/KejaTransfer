@@ -61,6 +61,7 @@ import DocumentationInline from "@/pages/documentation-inline";
 import DocumentationPayout from "@/pages/documentation-payout";
 import ForgotPassword from "@/pages/forgot-password";
 import LoginVerify from "@/pages/login-verify";
+import ComplianceDocs from "@/pages/compliance-docs";
 import { CURRENT_VERSION } from "@/lib/doc-versions";
 import { COUNTRIES } from "@shared/schema";
 import type { User } from "@shared/schema";
@@ -261,6 +262,7 @@ function Router() {
       <Route path="/api-pay/:key" component={ApiPay} />
       <Route path="/payment-success" component={PaymentSuccessPage} />
       <Route path="/payment-failed" component={PaymentFailedPage} />
+      <Route path="/compliance-docs" component={ComplianceDocs} />
       <Route component={NotFound} />
     </Switch>
   );
