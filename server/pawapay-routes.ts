@@ -297,9 +297,116 @@ export async function handlePawaPayTransfer(
   amount: number,
   country: string,
   operator: string,
-  phone: string
+  phone: string,
+  userCurrency?: string,
+  targetCurrency?: string
 ): Promise<{ success: boolean; transactionId?: string; message?: string; error?: string }> {
-  return handlePawaPayWithdrawal(userId, user, amount, country, operator, phone);
+  try {
+    const countryUpper = country.toUpperCase();
+    if (!PAWAPAY_SUPPORTED_COUNTRIES.includes(country.toLowerCase())) {
+      return { success: false, error: "Transfert échoué" };
+    }
+
+    if (user.kycStatus !== "verified") {
+      return { success: false, error: "Vérification KYC requise" };
+    }
+
+    const grossAmount = Math.floor(amount);
+    const defaultCurrency = getCurrencyForOperator(countryUpper, operator);
+    const providerCurrency = targetCurrency || defaultCurrency;
+    const balanceCurrency = userCurrency || providerCurrency;
+
+    const feeConfig = await getFeeFromDatabase(storage, "pawapay", country, operator);
+    const feeInfo = calculateOutgoingFee(grossAmount, feeConfig.outgoing);
+
+    if (user.balance < feeInfo.totalDeductedFromBalance) {
+      return { success: false, error: "Solde insuffisant sur votre compte. Veuillez effectuer un dépôt avant de transférer." };
+    }
+
+    let amountForProvider = feeInfo.amountReceived;
+    if (balanceCurrency !== providerCurrency) {
+      const { convertCurrency } = await import("./currency-converter");
+      const conversionResult = await convertCurrency(feeInfo.amountReceived, balanceCurrency, providerCurrency);
+      if (conversionResult.success) {
+        amountForProvider = Math.floor(conversionResult.convertedAmount);
+      } else {
+        return { success: false, error: "Erreur de conversion de devise" };
+      }
+    }
+
+    const orderId = `BKAPAY-TF-${Date.now()}`;
+    const startTime = Date.now();
+
+    await storage.updateUserBalance(userId, -feeInfo.totalDeductedFromBalance);
+
+    const tx = await storage.createTransaction({
+      userId,
+      type: "transfer",
+      amount: grossAmount,
+      fee: feeInfo.feeAmount,
+      feePercentage: feeInfo.feePercentage,
+      currency: balanceCurrency,
+      status: "pending",
+      country: countryUpper,
+      operator,
+      description: `Transfert de ${grossAmount} ${balanceCurrency} (reçu: ${amountForProvider} ${providerCurrency})`,
+      customerPhone: phone,
+      metadata: JSON.stringify({
+        phone,
+        deductedFromBalance: feeInfo.totalDeductedFromBalance,
+        amountReceived: feeInfo.amountReceived,
+        providerAmount: amountForProvider,
+        providerCurrency,
+        balanceAmount: grossAmount,
+        balanceCurrency,
+        provider: "pawapay",
+        paymentProvider: "pawapay",
+        orderId,
+        startTime,
+      }),
+    });
+
+    const result = await createPawaPayPayout({
+      amount: amountForProvider,
+      currency: providerCurrency,
+      country: countryUpper,
+      operator,
+      phone,
+      description: "Transfert BKApay",
+      externalId: randomUUID(),
+    });
+
+    if (!result.success) {
+      await storage.updateUserBalance(userId, feeInfo.totalDeductedFromBalance);
+      await storage.updateTransactionStatus(tx.id, "failed");
+      return { success: false, transactionId: tx.id, error: result.error || "Transfert échoué" };
+    }
+
+    const updatedMetadata = JSON.stringify({
+      pawaPayPayoutId: result.payoutId,
+      phone,
+      deductedFromBalance: feeInfo.totalDeductedFromBalance,
+      amountReceived: feeInfo.amountReceived,
+      providerAmount: amountForProvider,
+      providerCurrency,
+      balanceAmount: grossAmount,
+      balanceCurrency,
+      provider: "pawapay",
+      paymentProvider: "pawapay",
+      orderId,
+      startTime,
+    });
+    await storage.updateTransactionMetadata(tx.id, updatedMetadata);
+
+    return {
+      success: true,
+      transactionId: tx.id,
+      message: result.message || "Transfert initié avec succès",
+    };
+  } catch (error: any) {
+    console.error("[PawaPay Transfer Handler] Error:", error);
+    return { success: false, error: "Transfert échoué" };
+  }
 }
 
 export async function handlePawaPayWebhook(req: Request, res: Response): Promise<void> {
