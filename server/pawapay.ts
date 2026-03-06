@@ -1,5 +1,5 @@
 import { storage } from "./storage";
-import { PAWAPAY_COUNTRIES, getCorrespondent, getCurrencyForCountry, getIso3ForCountry } from "@shared/pawapay-countries";
+import { PAWAPAY_COUNTRIES, getCorrespondent } from "@shared/pawapay-countries";
 import { randomUUID } from "crypto";
 
 const PAWAPAY_SANDBOX_URL = "https://api.sandbox.pawapay.io";
@@ -22,7 +22,7 @@ export async function getPawaPayConfig(): Promise<PawaPayConfig | null> {
       console.log("[PawaPay] Missing API token");
       return null;
     }
-    const isSandbox = config.secretKey === "sandbox" || !config.secretKey || config.secretKey !== "live";
+    const isSandbox = config.secretKey !== "live";
     return {
       apiToken: config.apiKey,
       isSandbox,
@@ -95,7 +95,6 @@ export async function createPawaPayDeposit(params: PawaPayDepositParams): Promis
     return { success: false, error: `Opérateur ${params.operator} non supporté pour ${params.country} avec PawaPay` };
   }
 
-  const iso3 = getIso3ForCountry(params.country);
   const depositId = params.externalId || randomUUID();
   const amountStr = Math.floor(params.amount).toString();
 
@@ -104,28 +103,32 @@ export async function createPawaPayDeposit(params: PawaPayDepositParams): Promis
     sanitizedPhone = sanitizedPhone.substring(1);
   }
 
-  const statementDescription = (params.description || "Paiement").substring(0, 22).padEnd(4, " ");
+  // v2 API format: customerMessage must be 4–22 chars
+  const customerMessage = (params.description || "Paiement BKApay").substring(0, 22).padEnd(4, " ").substring(0, 22);
 
+  // PawaPay v2 deposit body
   const body: any = {
     depositId,
     amount: amountStr,
     currency: params.currency,
-    correspondent,
     payer: {
-      type: "MSISDN",
-      address: { value: sanitizedPhone },
+      type: "MMO",
+      accountDetails: {
+        phoneNumber: sanitizedPhone,
+        provider: correspondent,
+      },
     },
-    customerTimestamp: new Date().toISOString(),
-    statementDescription: statementDescription.substring(0, 22),
+    customerMessage,
   };
 
-  if (iso3) body.country = iso3;
-  if (params.preAuthorisationCode) body.preAuthorisationCode = params.preAuthorisationCode;
+  if (params.preAuthorisationCode) {
+    body.preAuthorisationCode = params.preAuthorisationCode;
+  }
 
   console.log(`[PawaPay Deposit] Initiating ${amountStr} ${params.currency} via ${correspondent}, phone: ***${sanitizedPhone.slice(-4)}${params.preAuthorisationCode ? " [OTP provided]" : ""}`);
 
   try {
-    const result = await pawaPayRequest(config, "POST", "/deposits", body);
+    const result = await pawaPayRequest(config, "POST", "/v2/deposits", body);
 
     if (result.status === 200 && result.data.status === "ACCEPTED") {
       return {
@@ -137,7 +140,7 @@ export async function createPawaPayDeposit(params: PawaPayDepositParams): Promis
     }
 
     if (result.data.status === "REJECTED") {
-      const reason = result.data.rejectionReason?.rejectionCode || "UNKNOWN";
+      const reason = result.data.failureReason?.rejectionCode || result.data.failureReason?.message || "UNKNOWN";
       console.error(`[PawaPay Deposit] Rejected: ${reason}`);
       return { success: false, error: `Dépôt refusé: ${reason}` };
     }
@@ -179,7 +182,6 @@ export async function createPawaPayPayout(params: PawaPayPayoutParams): Promise<
     return { success: false, error: `Opérateur ${params.operator} non supporté pour ${params.country} avec PawaPay` };
   }
 
-  const iso3 = getIso3ForCountry(params.country);
   const payoutId = params.externalId || randomUUID();
   const amountStr = Math.floor(params.amount).toString();
 
@@ -188,27 +190,28 @@ export async function createPawaPayPayout(params: PawaPayPayoutParams): Promise<
     sanitizedPhone = sanitizedPhone.substring(1);
   }
 
-  const statementDescription = (params.description || "Retrait").substring(0, 22).padEnd(4, " ");
+  // v2 API format: customerMessage must be 4–22 chars
+  const customerMessage = (params.description || "Retrait BKApay").substring(0, 22).padEnd(4, " ").substring(0, 22);
 
+  // PawaPay v2 payout body
   const body: any = {
     payoutId,
     amount: amountStr,
     currency: params.currency,
-    correspondent,
     recipient: {
-      type: "MSISDN",
-      address: { value: sanitizedPhone },
+      type: "MMO",
+      accountDetails: {
+        phoneNumber: sanitizedPhone,
+        provider: correspondent,
+      },
     },
-    customerTimestamp: new Date().toISOString(),
-    statementDescription: statementDescription.substring(0, 22),
+    customerMessage,
   };
-
-  if (iso3) body.country = iso3;
 
   console.log(`[PawaPay Payout] Initiating ${amountStr} ${params.currency} via ${correspondent}, phone: ***${sanitizedPhone.slice(-4)}`);
 
   try {
-    const result = await pawaPayRequest(config, "POST", "/payouts", body);
+    const result = await pawaPayRequest(config, "POST", "/v2/payouts", body);
 
     if (result.status === 200 && result.data.status === "ACCEPTED") {
       return {
@@ -220,7 +223,7 @@ export async function createPawaPayPayout(params: PawaPayPayoutParams): Promise<
     }
 
     if (result.data.status === "REJECTED") {
-      const reason = result.data.rejectionReason?.rejectionCode || "UNKNOWN";
+      const reason = result.data.failureReason?.rejectionCode || result.data.failureReason?.message || "UNKNOWN";
       console.error(`[PawaPay Payout] Rejected: ${reason}`);
       return { success: false, error: `Retrait refusé: ${reason}` };
     }
@@ -238,7 +241,7 @@ export async function getPawaPayDepositStatus(depositId: string): Promise<{ stat
   if (!config) return { status: "error" };
 
   try {
-    const result = await pawaPayRequest(config, "GET", `/deposits/${depositId}`);
+    const result = await pawaPayRequest(config, "GET", `/v2/deposits/${depositId}`);
     if (result.ok && result.data) {
       return { status: result.data.status || "UNKNOWN", data: result.data };
     }
@@ -254,7 +257,7 @@ export async function getPawaPayPayoutStatus(payoutId: string): Promise<{ status
   if (!config) return { status: "error" };
 
   try {
-    const result = await pawaPayRequest(config, "GET", `/payouts/${payoutId}`);
+    const result = await pawaPayRequest(config, "GET", `/v2/payouts/${payoutId}`);
     if (result.ok && result.data) {
       return { status: result.data.status || "UNKNOWN", data: result.data };
     }
