@@ -283,8 +283,13 @@ export async function getPawaPayDepositStatus(depositId: string): Promise<{ stat
 
   try {
     const result = await pawaPayRequest(config, "GET", `/v2/deposits/${depositId}`);
+    console.log(`[PawaPay] Deposit status raw response: ok=${result.ok} status=${result.status} data=${JSON.stringify(result.data).substring(0, 600)}`);
     if (result.ok && result.data) {
-      return { status: result.data.status || "UNKNOWN", data: result.data };
+      // PawaPay response: {"data": {depositObject}, "status": "FOUND"}
+      // The real transaction status is in result.data.data.status
+      const deposit = result.data?.data || (Array.isArray(result.data) ? result.data[0] : result.data);
+      const txStatus = deposit?.status || "UNKNOWN";
+      return { status: txStatus, data: deposit };
     }
     return { status: "error" };
   } catch (error) {
@@ -299,8 +304,12 @@ export async function getPawaPayPayoutStatus(payoutId: string): Promise<{ status
 
   try {
     const result = await pawaPayRequest(config, "GET", `/v2/payouts/${payoutId}`);
+    console.log(`[PawaPay] Payout status raw response: ok=${result.ok} status=${result.status} data=${JSON.stringify(result.data).substring(0, 600)}`);
     if (result.ok && result.data) {
-      return { status: result.data.status || "UNKNOWN", data: result.data };
+      // PawaPay response: {"data": {payoutObject}, "status": "FOUND"}
+      const payout = result.data?.data || (Array.isArray(result.data) ? result.data[0] : result.data);
+      const txStatus = payout?.status || "UNKNOWN";
+      return { status: txStatus, data: payout };
     }
     return { status: "error" };
   } catch (error) {

@@ -3,6 +3,7 @@ import type { Transaction, User } from "@shared/schema";
 import { getTransactionStatus as getFedaPayTransactionStatus, getPayoutStatus as getFedaPayPayoutStatus } from "./fedapay";
 import { NowPaymentsClient } from "./nowpayments";
 import { getMbiyoPayTransactionStatus, searchMbiyoPayTransactionByOrderId } from "./mbiyopay";
+import { getPawaPayDepositStatus, getPawaPayPayoutStatus, mapPawaPayStatus } from "./pawapay";
 import { getAfribaPayTransaction, mapAfribaPayStatus } from "./afribapay";
 import { trySendPaymentCallback } from "./utils/callback";
 import crypto from "crypto";
@@ -857,6 +858,93 @@ async function processPaydunyaTransaction(transaction: Transaction & { user?: Us
   }
 }
 
+async function processPawaPayDeposit(transaction: Transaction & { user?: User }, metadata: any): Promise<void> {
+  const depositId = metadata.pawaPayDepositId;
+  const transactionAge = getTransactionAge(transaction);
+  const remainingTime = Math.max(0, PAYMENT_TIMEOUT_MS - transactionAge);
+  const remainingSeconds = Math.round(remainingTime / 1000);
+
+  console.log(`[PaymentPolling] Checking PawaPay deposit ${transaction.id} (depositId: ${depositId}, ${remainingSeconds}s remaining)`);
+
+  try {
+    const result = await getPawaPayDepositStatus(depositId);
+    const mappedStatus = mapPawaPayStatus(result.status);
+
+    console.log(`[PaymentPolling] PawaPay deposit ${transaction.id} - raw: ${result.status} → mapped: ${mappedStatus}`);
+
+    if (mappedStatus === "completed") {
+      const finalized = await storage.finalizeIncomingTransaction(transaction.id, {});
+      if (finalized) {
+        console.log(`[PaymentPolling] ✅ PawaPay deposit ${transaction.id} CONFIRMED - credited=${finalized.credited}`);
+        const updatedTx = await storage.getTransaction(transaction.id);
+        if (updatedTx) {
+          trySendPaymentCallback(updatedTx, 'payment.completed', '[PaymentPolling/PawaPay]');
+        }
+      } else {
+        console.log(`[PaymentPolling] PawaPay deposit ${transaction.id} already processed - skipping`);
+      }
+    } else if (mappedStatus === "failed") {
+      console.log(`[PaymentPolling] ❌ PawaPay deposit ${transaction.id} failed (raw status: ${result.status})`);
+      await storage.updateTransactionStatus(transaction.id, "failed");
+    } else {
+      if (hasPaymentExpired(transaction)) {
+        console.log(`[PaymentPolling] ⏱️ PawaPay deposit ${transaction.id} TIMEOUT - marking as failed`);
+        await storage.updateTransactionStatus(transaction.id, "failed");
+      } else {
+        console.log(`[PaymentPolling] ⏳ PawaPay deposit ${transaction.id} still pending (${remainingSeconds}s remaining)`);
+      }
+    }
+  } catch (error) {
+    console.error(`[PaymentPolling] Error checking PawaPay deposit ${transaction.id}:`, error);
+    if (hasPaymentExpired(transaction)) {
+      await storage.updateTransactionStatus(transaction.id, "failed");
+    }
+  }
+}
+
+async function processPawaPayPayout(transaction: Transaction & { user?: User }, metadata: any): Promise<void> {
+  const payoutId = metadata.pawaPayPayoutId;
+  const transactionAge = getTransactionAge(transaction);
+  const remainingTime = Math.max(0, PAYMENT_TIMEOUT_MS - transactionAge);
+  const remainingSeconds = Math.round(remainingTime / 1000);
+
+  console.log(`[PaymentPolling] Checking PawaPay payout ${transaction.id} (payoutId: ${payoutId}, ${remainingSeconds}s remaining)`);
+
+  try {
+    const result = await getPawaPayPayoutStatus(payoutId);
+    const mappedStatus = mapPawaPayStatus(result.status);
+
+    console.log(`[PaymentPolling] PawaPay payout ${transaction.id} - raw: ${result.status} → mapped: ${mappedStatus}`);
+
+    if (mappedStatus === "completed") {
+      await storage.updateTransactionStatus(transaction.id, "completed");
+      console.log(`[PaymentPolling] ✅ PawaPay payout ${transaction.id} COMPLETED`);
+      const updatedTx = await storage.getTransaction(transaction.id);
+      if (updatedTx) {
+        trySendPaymentCallback(updatedTx, 'payment.completed', '[PaymentPolling/PawaPay/Payout]');
+      }
+    } else if (mappedStatus === "failed") {
+      console.log(`[PaymentPolling] ❌ PawaPay payout ${transaction.id} failed (raw: ${result.status}) - refunding`);
+      await safeRefundOutgoingTransaction(transaction.id, transaction.userId, metadata, "polling-pawapay-payout-failed");
+      await storage.updateTransactionStatus(transaction.id, "failed");
+    } else {
+      if (hasPaymentExpired(transaction)) {
+        console.log(`[PaymentPolling] ⏱️ PawaPay payout ${transaction.id} TIMEOUT - refunding`);
+        await safeRefundOutgoingTransaction(transaction.id, transaction.userId, metadata, "polling-pawapay-payout-timeout");
+        await storage.updateTransactionStatus(transaction.id, "failed");
+      } else {
+        console.log(`[PaymentPolling] ⏳ PawaPay payout ${transaction.id} still pending (${remainingSeconds}s remaining)`);
+      }
+    }
+  } catch (error) {
+    console.error(`[PaymentPolling] Error checking PawaPay payout ${transaction.id}:`, error);
+    if (hasPaymentExpired(transaction)) {
+      await safeRefundOutgoingTransaction(transaction.id, transaction.userId, metadata, "polling-pawapay-payout-error");
+      await storage.updateTransactionStatus(transaction.id, "failed");
+    }
+  }
+}
+
 async function processTransaction(transaction: Transaction & { user?: User }): Promise<void> {
   // Parse metadata to determine which payment provider to check
   let metadata: any = {};
@@ -912,6 +1000,17 @@ async function processTransaction(transaction: Transaction & { user?: User }): P
       return;
     }
     await processMbiyoPayTransaction(transaction, metadata);
+    return;
+  }
+
+  // Check if this is a PawaPay transaction (deposit or payout)
+  if (metadata.paymentProvider === "pawapay" || metadata.pawaPayDepositId || metadata.pawaPayPayoutId) {
+    const isOutgoing = transaction.type === "withdrawal" || transaction.type === "transfer";
+    if (isOutgoing && metadata.pawaPayPayoutId) {
+      await processPawaPayPayout(transaction, metadata);
+    } else if (metadata.pawaPayDepositId) {
+      await processPawaPayDeposit(transaction, metadata);
+    }
     return;
   }
 
