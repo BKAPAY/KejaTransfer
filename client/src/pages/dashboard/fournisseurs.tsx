@@ -96,6 +96,13 @@ const PROVIDER_INFO = {
     fields: ["apiKey"],
     countries: "Global - Conversion XOF, XAF, CDF, USD",
   },
+  pawapay: {
+    name: "PawaPay",
+    description: "Agrégateur mobile money pan-africain couvrant 19 pays (dépôts et retraits)",
+    color: "bg-yellow-500",
+    fields: ["apiKey", "secretKey"],
+    countries: "19 pays (BJ, BF, CM, CG, CD, CI, GA, GH, KE, LS, MW, MZ, NG, RW, SN, SL, TZ, UG, ZM)",
+  },
   mailtrap: {
     name: "Mailtrap",
     description: "Service d'envoi d'emails transactionnels (inscription, mot de passe, connexion)",
@@ -142,6 +149,10 @@ const getFieldLabel = (provider: string, field: string): string => {
   }
   if (provider === "moneyfusion") {
     if (field === "apiKey") return "Clé Privée MoneyFusion (moneyfusion-private-key)";
+  }
+  if (provider === "pawapay") {
+    if (field === "apiKey") return "Token API PawaPay (Bearer Token du Dashboard PawaPay)";
+    if (field === "secretKey") return "Environnement : entrez 'live' pour production, laisser vide pour sandbox";
   }
   if (provider === "exchangerate") {
     if (field === "apiKey") return "Clé API ExchangeRate (exchangerate-api.com)";
@@ -299,6 +310,7 @@ export default function FournisseursPage() {
     mbiyopay: { apiKey: "", secretKey: "", publicKey: "", masterKey: "", token: "", ipnSecret: "" },
     moneyfusion: { apiKey: "", secretKey: "", publicKey: "", masterKey: "", token: "", ipnSecret: "" },
     nowpayments: { apiKey: "", secretKey: "", publicKey: "", masterKey: "", token: "", ipnSecret: "" },
+    pawapay: { apiKey: "", secretKey: "", publicKey: "", masterKey: "", token: "", ipnSecret: "" },
     exchangerate: { apiKey: "", secretKey: "", publicKey: "", masterKey: "", token: "", ipnSecret: "" },
     mailtrap: { apiKey: "", secretKey: "", publicKey: "", masterKey: "", token: "", ipnSecret: "", enableKycSubmitted: "", enableKycVerified: "", enableKycRejected: "" },
   });

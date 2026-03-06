@@ -228,6 +228,32 @@ export async function getMoneyFusionConfig(): Promise<MoneyFusionConfig | null> 
   };
 }
 
+export interface PawaPayConfig {
+  apiToken: string;
+  isSandbox: boolean;
+}
+
+export async function getPawaPayConfigFromStorage(): Promise<PawaPayConfig | null> {
+  const config = await storage.getProviderConfig("pawapay");
+
+  if (!config || !config.isActive) {
+    console.log("[Provider Config] PawaPay is not active or not configured");
+    return null;
+  }
+
+  if (!config.apiKey) {
+    console.log("[Provider Config] PawaPay API token is missing");
+    return null;
+  }
+
+  const isSandbox = config.secretKey !== "live";
+
+  return {
+    apiToken: config.apiKey,
+    isSandbox,
+  };
+}
+
 export async function isProviderActive(provider: string): Promise<boolean> {
   const config = await storage.getProviderConfig(provider);
   return config?.isActive ?? false;

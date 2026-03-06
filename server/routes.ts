@@ -56,6 +56,13 @@ import {
   handleMbiyoPayResendWebhook,
   pollMbiyoPayTransaction,
 } from "./mbiyopay-routes";
+import {
+  handlePawaPayDeposit,
+  handlePawaPayWithdrawal,
+  handlePawaPayTransfer,
+  handlePawaPayWebhook,
+  pollPawaPayTransaction,
+} from "./pawapay-routes";
 import { safeRefundOutgoingTransaction, sendApiPayoutCallback } from "./payment-polling";
 import {
   MBIYOPAY_SUPPORTED_COUNTRIES,
@@ -2517,6 +2524,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         return res.json(apiPayResponse);
+      } else if (activeProvider === "pawapay") {
+        // Use PawaPay for API payments
+        const { createPawaPayDeposit } = await import("./pawapay");
+        const { getCurrencyForCountry: getPawaPayCurrency } = await import("@shared/pawapay-countries");
+
+        const providerCurrency = getPawaPayCurrency(country.toUpperCase()) || "XOF";
+
+        let convertedAmountForProvider = amountForProvider;
+        if (ownerCurrency !== providerCurrency) {
+          const { convertCurrency } = await import("./currency-converter");
+          const conv = await convertCurrency(amountForProvider, ownerCurrency, providerCurrency);
+          if (conv.success) {
+            convertedAmountForProvider = Math.floor(conv.convertedAmount);
+          } else {
+            return res.status(500).json({ error: "Erreur de conversion de devise" });
+          }
+        }
+
+        const externalId = `BKAPAY-APIPAY-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+        const pawaResult = await createPawaPayDeposit({
+          amount: convertedAmountForProvider,
+          currency: providerCurrency,
+          country: country.toUpperCase(),
+          operator: operator,
+          phone: customerPhone,
+          description: description || "Paiement API BKApay",
+          externalId,
+        });
+
+        if (!pawaResult.success) {
+          return res.status(400).json({ success: false, error: pawaResult.error || "Echec de l'initiation PawaPay" });
+        }
+
+        const tx = await storage.createTransaction({
+          userId: apiKey.userId,
+          type: "api_payment",
+          amount: baseAmount,
+          fee: feeAmount,
+          feePercentage: feePercentage,
+          currency: ownerCurrency,
+          status: "pending",
+          country: country.toUpperCase(),
+          operator: operator,
+          description: description || "Paiement via API",
+          customerPhone: customerPhone,
+          customerName: customerName || "Client",
+          customerEmail: customerEmail || null,
+          metadata: JSON.stringify({
+            pawaPayDepositId: pawaResult.depositId || externalId,
+            apiKeyId: apiKey.id,
+            apiKeyPublicKey: publicKey,
+            callbackUrl: callbackUrl || null,
+            orderId: orderId || null,
+            successUrl: successUrl || null,
+            cancelUrl: cancelUrl || null,
+            provider: "pawapay",
+            netAmountForUser: netAmountForUser,
+            providerAmount: convertedAmountForProvider,
+            providerCurrency: providerCurrency,
+            balanceAmount: netAmountForUser,
+            balanceCurrency: ownerCurrency,
+            customerPaysFee: apiKey.customerPaysFee,
+            feeAmount: feeAmount,
+          }),
+        });
+
+        return res.json({
+          success: true,
+          transactionId: tx.id,
+          token: tx.id,
+          message: pawaResult.message || "Paiement initie. Veuillez valider sur votre telephone.",
+          provider: "pawapay",
+        });
       } else {
         return res.status(503).json({ 
           success: false, 
@@ -2857,6 +2938,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         result = await handleMbiyoPayWithdrawal(apiKey.userId, user, amountInUserCurrency, countryCode, normalizedOperator, localPhone, userCurrency, requestedCurrency, true, crossCurrencyOverride);
       } else if (activeProvider === "moneyfusion") {
         result = await handleMoneyFusionWithdrawal(apiKey.userId, user, amountInUserCurrency, countryCode, normalizedOperator, localPhone, userCurrency, true, crossCurrencyOverride);
+      } else if (activeProvider === "pawapay") {
+        result = await handlePawaPayWithdrawal(apiKey.userId, user, amountInUserCurrency, countryCode, normalizedOperator, localPhone, userCurrency, requestedCurrency, true, crossCurrencyOverride);
       } else if (activeProvider === "paydunya") {
         // Paydunya inline payout — netMode: send exact amountInUserCurrency to provider, add fee on top
         result = await (async () => {
@@ -3146,6 +3229,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           } catch (checkError) {
             console.log(`[TransactionStatus] Error checking MbiyoPay for ${transaction.id}:`, checkError);
+          }
+        }
+
+        // Check PawaPay if we have a PawaPay deposit/payout ID
+        if ((metadata.pawaPayDepositId || metadata.pawaPayPayoutId) && metadata.provider === "pawapay") {
+          try {
+            await pollPawaPayTransaction(transaction.id);
+            const updatedTx = await storage.getTransaction(transaction.id);
+            if (updatedTx?.status === "completed") {
+              return res.json({ status: "completed", message: "Paiement confirme" });
+            } else if (updatedTx?.status === "failed") {
+              return res.json({ status: "failed", message: "Paiement echoue ou annule" });
+            }
+          } catch (checkError) {
+            console.log(`[TransactionStatus] Error checking PawaPay for ${transaction.id}:`, checkError);
           }
         }
 
@@ -4661,6 +4759,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Admin endpoint to resend MbiyoPay webhook for stuck transactions
   app.post("/api/admin/mbiyopay/resend-webhook", handleMbiyoPayResendWebhook);
 
+  // ===== PawaPay Webhook =====
+  app.post("/api/webhooks/pawapay", handlePawaPayWebhook);
+
   // Admin diagnostic endpoint to check MbiyoPay merchant account status
   app.get("/api/admin/mbiyopay/diagnostic", async (req: Request, res: Response) => {
     if (!req.session?.userId) return res.status(401).json({ error: "Non authentifie" });
@@ -5148,6 +5249,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
             redirectUrl: result.providerLink,
             message: result.message || "Paiement initie avec succes",
             provider: "afribapay",
+          });
+        } else {
+          return res.status(400).json({ success: false, error: result.error });
+        }
+      } else if (activeProvider === "pawapay") {
+        // Use PawaPay for deposit
+        console.log(`[DEPOSIT] Using PawaPay for ${country}/${operator}`);
+        const result = await handlePawaPayDeposit(
+          req.session.userId!,
+          user,
+          providerAmount,
+          country,
+          operator,
+          phone,
+          providerCurrency,
+          balanceAmount,
+          userCurrency
+        );
+        if (result.success) {
+          return res.json({
+            success: true,
+            transactionId: result.transactionId,
+            message: result.message || "Demande de depot initiee. Validez sur votre telephone.",
+            provider: "pawapay",
           });
         } else {
           return res.status(400).json({ success: false, error: result.error });
