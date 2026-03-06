@@ -2527,7 +2527,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else if (activeProvider === "pawapay") {
         // Use PawaPay for API payments
         const { createPawaPayDeposit } = await import("./pawapay");
-        const { getCurrencyForCountry: getPawaPayCurrency } = await import("@shared/pawapay-countries");
+        const { getCurrencyForCountry: getPawaPayCurrency, pawaPayOperatorRequiresOtp: pawaRequiresOtp, getPawaPayOtpInstructions: pawaOtpInfo } = await import("@shared/pawapay-countries");
+
+        const { otpCode: apiPayOtpCode } = req.body;
+
+        const needsOtp = pawaRequiresOtp(country.toUpperCase(), operator);
+        if (needsOtp && !apiPayOtpCode) {
+          const otpInfo = pawaOtpInfo(country.toUpperCase());
+          return res.json({
+            success: false,
+            requiresOTP: true,
+            otpInstructions: otpInfo.instructions,
+            otpUssdCode: otpInfo.ussdCode,
+            otpHint: otpInfo.hint,
+            provider: "pawapay",
+            error: "Code OTP Orange Money requis pour ce paiement",
+          });
+        }
 
         const providerCurrency = getPawaPayCurrency(country.toUpperCase()) || "XOF";
 
@@ -2552,6 +2568,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           phone: customerPhone,
           description: description || "Paiement API BKApay",
           externalId,
+          preAuthorisationCode: apiPayOtpCode,
         });
 
         if (!pawaResult.success) {
@@ -5256,6 +5273,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else if (activeProvider === "pawapay") {
         // Use PawaPay for deposit
         console.log(`[DEPOSIT] Using PawaPay for ${country}/${operator}`);
+        const { otpCode } = req.body;
         const result = await handlePawaPayDeposit(
           req.session.userId!,
           user,
@@ -5265,8 +5283,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           phone,
           providerCurrency,
           balanceAmount,
-          userCurrency
+          userCurrency,
+          otpCode
         );
+        if (result.requiresOTP) {
+          return res.json({
+            success: false,
+            requiresOTP: true,
+            otpInstructions: result.otpInstructions,
+            otpUssdCode: result.otpUssdCode,
+            otpHint: result.otpHint,
+            provider: "pawapay",
+            error: result.error,
+          });
+        }
         if (result.success) {
           return res.json({
             success: true,

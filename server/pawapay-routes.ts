@@ -18,6 +18,8 @@ import {
   getCurrencyForCountry,
   getPayinOperatorsForCountry,
   getPayoutOperatorsForCountry,
+  pawaPayOperatorRequiresOtp,
+  getPawaPayOtpInstructions,
 } from "@shared/pawapay-countries";
 
 export async function handlePawaPayDeposit(
@@ -29,8 +31,19 @@ export async function handlePawaPayDeposit(
   phone: string,
   currency?: string,
   originalAmount?: number,
-  originalCurrency?: string
-): Promise<{ success: boolean; transactionId?: string; pawaPayDepositId?: string; message?: string; error?: string }> {
+  originalCurrency?: string,
+  otpCode?: string
+): Promise<{
+  success: boolean;
+  transactionId?: string;
+  pawaPayDepositId?: string;
+  message?: string;
+  error?: string;
+  requiresOTP?: boolean;
+  otpInstructions?: string;
+  otpUssdCode?: string;
+  otpHint?: string;
+}> {
   try {
     const countryUpper = country.toUpperCase();
     if (!PAWAPAY_SUPPORTED_COUNTRIES.includes(country.toLowerCase())) {
@@ -41,6 +54,19 @@ export async function handlePawaPayDeposit(
     const operatorConfig = availableOperators.find(o => o.code.toLowerCase() === operator.toLowerCase());
     if (!operatorConfig) {
       return { success: false, error: `Opérateur ${operator} non supporté pour ${country} avec PawaPay` };
+    }
+
+    const needsOtp = pawaPayOperatorRequiresOtp(countryUpper, operator);
+    if (needsOtp && !otpCode) {
+      const otpInfo = getPawaPayOtpInstructions(countryUpper);
+      return {
+        success: false,
+        requiresOTP: true,
+        otpInstructions: otpInfo.instructions,
+        otpUssdCode: otpInfo.ussdCode,
+        otpHint: otpInfo.hint,
+        error: "Code OTP Orange Money requis pour ce paiement",
+      };
     }
 
     const providerAmount = Math.floor(amount);
@@ -88,6 +114,7 @@ export async function handlePawaPayDeposit(
       phone,
       description: "Depot BKApay",
       externalId: randomUUID(),
+      preAuthorisationCode: otpCode,
     });
 
     if (!result.success) {

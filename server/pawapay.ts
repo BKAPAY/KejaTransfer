@@ -73,6 +73,7 @@ export interface PawaPayDepositParams {
   phone: string;
   description: string;
   externalId?: string;
+  preAuthorisationCode?: string;
 }
 
 export interface PawaPayDepositResult {
@@ -119,8 +120,9 @@ export async function createPawaPayDeposit(params: PawaPayDepositParams): Promis
   };
 
   if (iso3) body.country = iso3;
+  if (params.preAuthorisationCode) body.preAuthorisationCode = params.preAuthorisationCode;
 
-  console.log(`[PawaPay Deposit] Initiating ${amountStr} ${params.currency} via ${correspondent}, phone: ***${sanitizedPhone.slice(-4)}`);
+  console.log(`[PawaPay Deposit] Initiating ${amountStr} ${params.currency} via ${correspondent}, phone: ***${sanitizedPhone.slice(-4)}${params.preAuthorisationCode ? " [OTP provided]" : ""}`);
 
   try {
     const result = await pawaPayRequest(config, "POST", "/deposits", body);
