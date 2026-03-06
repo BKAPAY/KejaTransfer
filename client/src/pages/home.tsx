@@ -99,7 +99,7 @@ const features = [
   {
     icon: Zap,
     title: "Traitement Rapide",
-    description: "Recevez vos paiements instantanément via mobile money dans toute l'Afrique de l'Ouest.",
+    description: "Recevez vos paiements instantanément via mobile money dans toute l'Afrique.",
     image: fastPaymentImage,
   },
 ];
@@ -227,7 +227,7 @@ export default function Home() {
           <div className="space-y-3 sm:space-y-6 lg:space-y-8 max-w-2xl">
             <div className="space-y-2 sm:space-y-4">
               <h1 className="animate-on-scroll anim-slide-left text-xl sm:text-2xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-white leading-tight">
-                Paiements Mobile Money pour l'Afrique de l'Ouest
+                Paiements Mobile Money pour l'Afrique
               </h1>
               <p className="animate-on-scroll anim-slide-left anim-delay-1 text-xs sm:text-sm md:text-base lg:text-lg text-white/80">
                 Acceptez les paiements Orange Money, MTN, Moov, Wave et plus dans 15 pays. Plateforme simple, sécurisée et fiable.
@@ -254,7 +254,7 @@ export default function Home() {
         <div className="container mx-auto px-2 sm:px-4 md:px-8 max-w-7xl">
           <div className="text-center mb-4 sm:mb-8">
             <h2 className="animate-on-scroll anim-fade-up text-lg sm:text-xl md:text-3xl lg:text-4xl font-bold mb-2 sm:mb-4 text-foreground">Disponible dans 15 pays</h2>
-            <p className="animate-on-scroll anim-fade-up anim-delay-1 text-xs sm:text-sm md:text-base lg:text-lg text-muted-foreground">Couvrant toute l'Afrique de l'Ouest francophone</p>
+            <p className="animate-on-scroll anim-fade-up anim-delay-1 text-xs sm:text-sm md:text-base lg:text-lg text-muted-foreground">Couvrant toute l'Afrique francophone et anglophone</p>
           </div>
           <div className="flex gap-2 sm:gap-4 carousel-scroll">
             {[...countries, ...countries].map((country, index) => (
@@ -293,7 +293,7 @@ export default function Home() {
                 Paiements Mobile Money
               </h2>
               <p className="text-xs sm:text-sm md:text-base text-muted-foreground mb-4 sm:mb-6 leading-relaxed">
-                Acceptez les paiements via tous les opérateurs Mobile Money d'Afrique de l'Ouest. Orange Money, MTN, Moov, Wave, Free Money, T-Money et bien plus. Transactions instantanées, sécurisées et fiables.
+                Acceptez les paiements via tous les opérateurs Mobile Money d'Afrique. Orange Money, MTN, Moov, Wave, Free Money, T-Money et bien plus. Transactions instantanées, sécurisées et fiables.
               </p>
               <div className="flex flex-wrap gap-2 sm:gap-3">
                 <span className="inline-flex items-center gap-1.5 px-2 py-1 sm:px-3 sm:py-1.5 bg-orange-100 dark:bg-orange-950 text-orange-700 dark:text-orange-400 rounded-md text-xs sm:text-sm font-medium"><img src={omImage} alt="OM" className="w-4 h-4 rounded-full object-contain" /> Orange Money</span>
@@ -463,7 +463,7 @@ export default function Home() {
                 <img src={logoImage} alt="BKApay" className="h-6 sm:h-8 w-auto" />
               </div>
               <p className="text-xs sm:text-sm text-muted-foreground">
-                Plateforme de paiement mobile money pour l'Afrique de l'Ouest
+                Plateforme de paiement mobile money pour l'Afrique
               </p>
             </div>
             <div className="hidden md:block">

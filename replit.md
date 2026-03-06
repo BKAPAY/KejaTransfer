@@ -1,7 +1,7 @@
 # BKApay - Mobile Money Payment Platform
 
 ## Overview
-BKApay is a mobile money payment platform for West Africa, enabling businesses and individuals to accept payments via various mobile money services across multiple countries. It supports deposits, withdrawals, payment links, and API integrations with a uniform 6% transaction fee. The platform's vision is to become a leading payment solution in the region, simplifying financial transactions and fostering economic growth.
+BKApay is a mobile money payment platform for Africa, enabling businesses and individuals to accept payments via various mobile money services across multiple countries. It supports deposits, withdrawals, payment links, and API integrations with a uniform 6% transaction fee. The platform's vision is to become a leading payment solution in the region, simplifying financial transactions and fostering economic growth.
 
 ## User Preferences
 TOUTES les communications avec l'utilisateur doivent être en français. Pas d'anglais dans les messages, explications, résumés ou descriptions de tâches.

@@ -56,7 +56,7 @@ const PROVIDER_INFO = {
   },
   paydunya: {
     name: "Paydunya",
-    description: "Solution de paiement mobile pour l'Afrique de l'Ouest",
+    description: "Solution de paiement mobile pour l'Afrique",
     color: "bg-blue-500",
     fields: ["masterKey", "publicKey", "secretKey", "token"],
     countries: "6 pays (Bénin, Togo, CI, Sénégal, BF, Mali)",

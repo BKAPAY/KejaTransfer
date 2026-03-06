@@ -1,5 +1,5 @@
 // Phone number utilities for auto-detection of country and operator
-// Based on West African mobile network operator prefixes
+// Based on African mobile network operator prefixes
 
 export interface DetectedPhone {
   country: string;

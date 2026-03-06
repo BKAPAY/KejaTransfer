@@ -649,7 +649,7 @@ def webhook_bkapay():
                 <div>
                   <p className="text-muted-foreground">Montant a payer en unite monetaire entiere (pas de decimales). Minimum : 200.</p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    La devise depend de votre pays d'inscription : XOF (Afrique de l'Ouest), XAF (Afrique Centrale), CDF (RD Congo).
+                    La devise depend de votre pays d'inscription : XOF (Afrique francophone zone UEMOA), XAF (Afrique Centrale), CDF (RD Congo).
                     Consultez votre tableau de bord pour connaitre votre devise.
                   </p>
                 </div>

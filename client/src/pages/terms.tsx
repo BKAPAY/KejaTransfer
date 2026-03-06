@@ -54,7 +54,7 @@ export default function Terms() {
             </CardHeader>
             <CardContent className="space-y-4 text-sm text-muted-foreground">
               <p>
-                BKApay est une plateforme de paiement mobile money pour l'Afrique de l'Ouest qui permet :
+                BKApay est une plateforme de paiement mobile money pour l'Afrique qui permet :
               </p>
               <ul className="list-disc list-inside space-y-2 ml-4">
                 <li>L'acceptation de paiements via mobile money dans 6 pays (Bénin, Togo, Côte d'Ivoire, Sénégal, Burkina Faso, Mali)</li>

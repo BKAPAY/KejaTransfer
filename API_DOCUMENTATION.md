@@ -2,7 +2,7 @@
 
 ## Vue d'ensemble
 
-BKApay est une plateforme de paiement mobile money pour l'Afrique de l'Ouest. Cette documentation API permet aux développeurs tiers d'intégrer facilement les paiements dans leurs applications.
+BKApay est une plateforme de paiement mobile money pour l'Afrique. Cette documentation API permet aux développeurs tiers d'intégrer facilement les paiements dans leurs applications.
 
 **Base URL:** `https://bkapay.app/api`
 

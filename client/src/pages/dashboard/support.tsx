@@ -13,7 +13,7 @@ const faqs = [
   },
   {
     question: "Quels sont les opérateurs mobiles supportés?",
-    answer: "BKApay supporte les principaux opérateurs mobiles de l'Afrique de l'Ouest : Orange Money, MTN, Moov, Wave, Free Money, T-Money, Wizall et Expresso. La disponibilité dépend du pays du client."
+    answer: "BKApay supporte les principaux opérateurs mobiles d'Afrique : Orange Money, MTN, Moov, Wave, Free Money, T-Money, Wizall et Expresso. La disponibilité dépend du pays du client."
   },
   {
     question: "Combien de temps prend le traitement d'un paiement?",

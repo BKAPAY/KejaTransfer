@@ -8834,7 +8834,7 @@ ${recentTxLines.length > 0 ? recentTxLines.join("\n") : "  Aucune transaction r�
 `;
       }
 
-      const systemPrompt = `Tu es EMALI AI, l'assistant intelligent de BKApay, une plateforme de paiement mobile money en Afrique de l'Ouest et Centrale. Tu réponds UNIQUEMENT en français.
+      const systemPrompt = `Tu es EMALI AI, l'assistant intelligent de BKApay, une plateforme de paiement mobile money en Afrique. Tu réponds UNIQUEMENT en français.
 
 RÈGLES IMPORTANTES:
 - Tu peux donner à l'utilisateur actuel ses propres informations de compte (solde, transactions, statut KYC, etc.) car elles sont fournies ci-dessous.
