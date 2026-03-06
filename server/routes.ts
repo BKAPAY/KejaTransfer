@@ -5650,6 +5650,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } else {
           return res.status(400).json({ success: false, error: result.error });
         }
+      } else if (activeProvider === "pawapay") {
+        console.log(`[WITHDRAWAL] Using PawaPay for ${country}/${operator}, userCurrency=${userCurrency}`);
+
+        const result = isTransfer
+          ? await handlePawaPayTransfer(req.session.userId!, user, amount, country, operator, phone, userCurrency, targetCurrency)
+          : await handlePawaPayWithdrawal(req.session.userId!, user, amount, country, operator, phone, userCurrency, targetCurrency);
+
+        if (result.success) {
+          return res.json({
+            success: true,
+            transactionId: result.transactionId,
+            message: result.message || (isTransfer ? "Transfert PawaPay en cours" : "Retrait PawaPay en cours"),
+            provider: "pawapay",
+          });
+        } else {
+          return res.status(400).json({ success: false, error: result.error });
+        }
       } else {
         return res.status(503).json({ 
           success: false, 
