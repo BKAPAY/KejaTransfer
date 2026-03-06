@@ -2559,7 +2559,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
 
-        const externalId = `BKAPAY-APIPAY-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const externalId = randomUUID();
 
         const pawaResult = await createPawaPayDeposit({
           amount: convertedAmountForProvider,
