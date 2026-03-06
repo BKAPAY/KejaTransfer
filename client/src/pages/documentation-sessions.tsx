@@ -75,8 +75,8 @@ const response = await fetch("${baseUrl}/api/v1/payment-sessions", {
     "Authorization": "Bearer sk_live_VOTRE_CLE_SECRETE"
   },
   body: JSON.stringify({
-    amount: 5000,                                    // Montant en XOF (verrouille)
-    currency: "XOF",                                 // Devise (optionnel)
+    amount: 5000,                                    // Montant (verrouille)
+    // currency: "XOF",                             // Optionnel — defaut: devise de votre compte
     description: "Commande #1042 - T-shirt XL",     // Description affichee au client
     success_url: "https://votresite.com/merci",      // Redirection apres succes
     cancel_url: "https://votresite.com/annule",      // Redirection si annulation
@@ -103,7 +103,7 @@ curl_setopt_array($ch, [
   ],
   CURLOPT_POSTFIELDS => json_encode([
     "amount" => 5000,
-    "currency" => "XOF",
+    // "currency" => "XOF",  // Optionnel — defaut: devise de votre compte
     "description" => "Commande #1042 - T-shirt XL",
     "success_url" => "https://votresite.com/merci",
     "cancel_url" => "https://votresite.com/annule",
@@ -129,7 +129,7 @@ response = requests.post(
     },
     json={
         "amount": 5000,
-        "currency": "XOF",
+        # "currency": "XOF",  # Optionnel — defaut: devise de votre compte
         "description": "Commande #1042 - T-shirt XL",
         "success_url": "https://votresite.com/merci",
         "cancel_url": "https://votresite.com/annule",
@@ -387,7 +387,7 @@ app.post("/webhook/bkapay", express.raw({ type: "application/json" }), (req, res
               { param: "cancel_url", type: "string", required: false, desc: "URL de redirection si le client abandonne." },
               { param: "callback_url", type: "string", required: false, desc: "URL de notification webhook POST (fortement recommande)." },
               { param: "order_id", type: "string", required: false, desc: "Votre reference de commande interne, incluse dans le webhook." },
-              { param: "currency", type: "string", required: false, desc: "Devise. Defaut : XOF." },
+              { param: "currency", type: "string", required: false, desc: "Devise du paiement (ex: XOF, XAF, CDF, GNF). Defaut : la devise de votre compte selon votre pays d'inscription." },
               { param: "expires_in", type: "number", required: false, desc: "Duree de validite de la session en minutes. Defaut : 60." },
             ].map(({ param, type, required, desc }) => (
               <div key={param} className="flex gap-3 items-start py-2 border-b last:border-0">
