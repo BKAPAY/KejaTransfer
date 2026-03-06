@@ -211,23 +211,23 @@ export default function Transfer() {
           setShowSecurityModal(false);
           setSecurityCode("");
           toast({
-            title: "Erreur",
-            description: response.error || "Erreur lors du transfert",
+            title: "Transfert échoué",
+            description: "Votre transfert n'a pas pu être effectué. Veuillez réessayer plus tard.",
             variant: "destructive",
           });
         }
       }
     },
     onError: (error: any) => {
-      const errorMessage = error.message || "Erreur lors du transfert";
+      const errorMessage = error.message || "";
       if (errorMessage.includes("Code de securite") || errorMessage.includes("incorrect")) {
         setSecurityError(errorMessage);
       } else {
         setShowSecurityModal(false);
         setSecurityCode("");
         toast({
-          title: "Erreur",
-          description: errorMessage,
+          title: "Transfert échoué",
+          description: "Votre transfert n'a pas pu être effectué. Veuillez réessayer plus tard.",
           variant: "destructive",
         });
       }

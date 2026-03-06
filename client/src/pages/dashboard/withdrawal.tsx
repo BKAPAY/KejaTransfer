@@ -210,23 +210,23 @@ export default function Withdrawal() {
           setShowSecurityModal(false);
           setSecurityCode("");
           toast({
-            title: "Erreur",
-            description: response.error || "Erreur lors du retrait",
+            title: "Retrait échoué",
+            description: "Votre retrait n'a pas pu être effectué. Veuillez réessayer plus tard.",
             variant: "destructive",
           });
         }
       }
     },
     onError: (error: any) => {
-      const errorMessage = error.message || "Erreur lors du retrait";
+      const errorMessage = error.message || "";
       if (errorMessage.includes("Code de securite") || errorMessage.includes("incorrect")) {
         setSecurityError(errorMessage);
       } else {
         setShowSecurityModal(false);
         setSecurityCode("");
         toast({
-          title: "Erreur",
-          description: errorMessage,
+          title: "Retrait échoué",
+          description: "Votre retrait n'a pas pu être effectué. Veuillez réessayer plus tard.",
           variant: "destructive",
         });
       }
