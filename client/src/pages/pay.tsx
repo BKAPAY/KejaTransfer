@@ -483,6 +483,13 @@ export default function Pay() {
   // 2. Les pays autorisés dans le lien de paiement (si défini)
   const adminEnabledCountries = enabledCountriesOperators 
     ? COUNTRIES.filter(c => Object.keys(enabledCountriesOperators).includes(c.code))
+        .sort((a, b) => {
+          const aHasOps = (enabledCountriesOperators[a.code] || []).length > 0;
+          const bHasOps = (enabledCountriesOperators[b.code] || []).length > 0;
+          if (aHasOps && !bHasOps) return -1;
+          if (!aHasOps && bHasOps) return 1;
+          return 0;
+        })
     : [];
   
   const allowedCountries = paymentLink?.allowedCountries && paymentLink.allowedCountries.length > 0

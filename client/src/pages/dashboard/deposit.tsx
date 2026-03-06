@@ -191,6 +191,13 @@ export default function Deposit() {
   // Note: countries may have empty operator lists, UI will show "no operators" message
   const collectCountries = enabledCountriesOperators 
     ? COUNTRIES.filter(c => Object.keys(enabledCountriesOperators).includes(c.code))
+        .sort((a, b) => {
+          const aHasOps = (enabledCountriesOperators[a.code] || []).length > 0;
+          const bHasOps = (enabledCountriesOperators[b.code] || []).length > 0;
+          if (aHasOps && !bHasOps) return -1;
+          if (!aHasOps && bHasOps) return 1;
+          return 0;
+        })
     : [];
   
   const allCountryOperators = selectedCountry

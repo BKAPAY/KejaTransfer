@@ -1301,6 +1301,13 @@ export default function Merchant() {
                 <SelectContent>
                   {(enabledCountriesOperators 
                     ? COUNTRIES.filter(c => Object.keys(enabledCountriesOperators).includes(c.code))
+                        .sort((a, b) => {
+                          const aHasOps = (enabledCountriesOperators[a.code] || []).length > 0;
+                          const bHasOps = (enabledCountriesOperators[b.code] || []).length > 0;
+                          if (aHasOps && !bHasOps) return -1;
+                          if (!aHasOps && bHasOps) return 1;
+                          return 0;
+                        })
                     : []
                   ).map((country) => (
                     <SelectItem key={country.code} value={country.code}>
