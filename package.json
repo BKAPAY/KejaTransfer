@@ -61,7 +61,7 @@
     "fedapay": "^1.2.5",
     "framer-motion": "^11.13.1",
     "input-otp": "^1.4.2",
-    "jspdf": "^4.0.0",
+    "jspdf": "^4.2.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.453.0",
     "memorystore": "^1.6.7",
@@ -121,5 +121,8 @@
   },
   "optionalDependencies": {
     "bufferutil": "^4.0.8"
+  },
+  "overrides": {
+    "axios": "0.30.3"
   }
 }
