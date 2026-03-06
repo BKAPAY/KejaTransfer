@@ -185,7 +185,7 @@ export async function handlePawaPayWithdrawal(
       : calculateOutgoingFee(grossAmount, feeConfig.outgoing);
 
     if (user.balance < feeInfo.totalDeductedFromBalance) {
-      return { success: false, error: "Solde insuffisant" };
+      return { success: false, error: "Solde insuffisant sur votre compte. Veuillez effectuer un dépôt avant de retirer." };
     }
 
     let amountForProvider: number;

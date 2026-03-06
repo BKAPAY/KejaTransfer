@@ -126,7 +126,7 @@ function mapPaymentErrorCode(code: string): string {
   if (c.includes("NOT_ALLOWED") || c.includes("NOT_ACTIVATED")) return "Service temporairement indisponible pour cet opérateur. Veuillez contacter le support.";
   if (c.includes("DECLINED") || c.includes("PAYER_DECLINED") || c.includes("REFUSED")) return "Transaction refusée. Veuillez réessayer ou utiliser un autre moyen de paiement.";
   if (c.includes("LIMIT") || c.includes("MAX_AMOUNT") || c.includes("MIN_AMOUNT")) return "Montant hors des limites autorisées pour cet opérateur.";
-  if (c.includes("INSUFFICIENT")) return "Solde insuffisant sur le compte mobile money.";
+  if (c.includes("INSUFFICIENT")) return "Solde insuffisant. Veuillez recharger votre compte mobile money avant de réessayer.";
   if (c.includes("DUPLICATE")) return "Transaction en cours. Veuillez patienter avant de réessayer.";
   if (c.includes("UNAVAILABLE") || c.includes("TEMPORARILY")) return "Service temporairement indisponible. Veuillez réessayer dans quelques minutes.";
   if (c.includes("INVALID_PHONE") || c.includes("INVALID_MSISDN")) return "Numéro de téléphone invalide ou non enregistré chez l'opérateur.";
