@@ -105,24 +105,22 @@ export async function createPawaPayDeposit(params: PawaPayDepositParams): Promis
     sanitizedPhone = sanitizedPhone.substring(1);
   }
 
-  // v2 API: statementDescription must be 4–22 chars
-  const statementDescription = (params.description || "Paiement BKApay").substring(0, 22).padEnd(4, " ").substring(0, 22);
-  const customerTimestamp = new Date().toISOString();
+  // v2 API: customerMessage must be 4–22 chars
+  const customerMessage = (params.description || "Paiement BKApay").substring(0, 22).padEnd(4, " ").substring(0, 22);
 
-  // PawaPay v2 deposit body — correspondent is top-level, payer uses MSISDN + address.value
+  // PawaPay v2 deposit body — exact format from official documentation
   const body: any = {
     depositId,
     amount: amountStr,
     currency: params.currency,
-    correspondent,
     payer: {
-      type: "MSISDN",
-      address: {
-        value: sanitizedPhone,
+      type: "MMO",
+      accountDetails: {
+        phoneNumber: sanitizedPhone,
+        provider: correspondent,
       },
     },
-    customerTimestamp,
-    statementDescription,
+    customerMessage,
   };
 
   if (params.preAuthorisationCode) {
@@ -199,24 +197,22 @@ export async function createPawaPayPayout(params: PawaPayPayoutParams): Promise<
     sanitizedPhone = sanitizedPhone.substring(1);
   }
 
-  // v2 API: statementDescription must be 4–22 chars
-  const statementDescription = (params.description || "Retrait BKApay").substring(0, 22).padEnd(4, " ").substring(0, 22);
-  const customerTimestamp = new Date().toISOString();
+  // v2 API: customerMessage must be 4–22 chars
+  const customerMessage = (params.description || "Retrait BKApay").substring(0, 22).padEnd(4, " ").substring(0, 22);
 
-  // PawaPay v2 payout body — correspondent is top-level, recipient uses MSISDN + address.value
+  // PawaPay v2 payout body — exact format from official documentation
   const body: any = {
     payoutId,
     amount: amountStr,
     currency: params.currency,
-    correspondent,
     recipient: {
-      type: "MSISDN",
-      address: {
-        value: sanitizedPhone,
+      type: "MMO",
+      accountDetails: {
+        phoneNumber: sanitizedPhone,
+        provider: correspondent,
       },
     },
-    customerTimestamp,
-    statementDescription,
+    customerMessage,
   };
 
   const mode = config.isSandbox ? "SANDBOX" : "PRODUCTION";
