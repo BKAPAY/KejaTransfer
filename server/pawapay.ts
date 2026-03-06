@@ -5,6 +5,24 @@ import { randomUUID } from "crypto";
 const PAWAPAY_SANDBOX_URL = "https://api.sandbox.pawapay.io";
 const PAWAPAY_PRODUCTION_URL = "https://api.pawapay.io";
 
+/**
+ * Sanitize phone number to PawaPay MSISDN format.
+ * Rules: digits only, no +, no trunk prefix 0 after country code.
+ * Example: "+229 0146447319" → "229146447319"
+ */
+function sanitizePhoneForPawaPay(phone: string): string {
+  // Remove spaces and non-digit/+ chars, strip leading +
+  let n = phone.replace(/\s+/g, "").replace(/[^0-9+]/g, "");
+  if (n.startsWith("+")) n = n.substring(1);
+  // All PawaPay-supported countries have 3-digit country codes.
+  // Remove the trunk prefix 0 that appears right after the country code.
+  // e.g. 2290146447319 (13 digits) → 229146447319 (12 digits)
+  if (n.length >= 12 && n[3] === "0") {
+    n = n.slice(0, 3) + n.slice(4);
+  }
+  return n;
+}
+
 export interface PawaPayConfig {
   apiToken: string;
   isSandbox: boolean;
@@ -100,10 +118,7 @@ export async function createPawaPayDeposit(params: PawaPayDepositParams): Promis
   const depositId = params.externalId || randomUUID();
   const amountStr = Math.floor(params.amount).toString();
 
-  let sanitizedPhone = params.phone.replace(/\s+/g, "").replace(/[^0-9+]/g, "");
-  if (sanitizedPhone.startsWith("+")) {
-    sanitizedPhone = sanitizedPhone.substring(1);
-  }
+  const sanitizedPhone = sanitizePhoneForPawaPay(params.phone);
 
   // v2 API: customerMessage must be 4–22 chars
   const customerMessage = (params.description || "Paiement BKApay").substring(0, 22).padEnd(4, " ").substring(0, 22);
@@ -192,10 +207,7 @@ export async function createPawaPayPayout(params: PawaPayPayoutParams): Promise<
   const payoutId = params.externalId || randomUUID();
   const amountStr = Math.floor(params.amount).toString();
 
-  let sanitizedPhone = params.phone.replace(/\s+/g, "").replace(/[^0-9+]/g, "");
-  if (sanitizedPhone.startsWith("+")) {
-    sanitizedPhone = sanitizedPhone.substring(1);
-  }
+  const sanitizedPhone = sanitizePhoneForPawaPay(params.phone);
 
   // v2 API: customerMessage must be 4–22 chars
   const customerMessage = (params.description || "Retrait BKApay").substring(0, 22).padEnd(4, " ").substring(0, 22);
