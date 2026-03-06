@@ -121,15 +121,29 @@ export interface PawaPayDepositResult {
   error?: string;
 }
 
+function mapPaymentErrorCode(code: string): string {
+  const c = (code || "").toUpperCase();
+  if (c.includes("NOT_ALLOWED") || c.includes("NOT_ACTIVATED")) return "Service temporairement indisponible pour cet opérateur. Veuillez contacter le support.";
+  if (c.includes("DECLINED") || c.includes("PAYER_DECLINED") || c.includes("REFUSED")) return "Transaction refusée. Veuillez réessayer ou utiliser un autre moyen de paiement.";
+  if (c.includes("LIMIT") || c.includes("MAX_AMOUNT") || c.includes("MIN_AMOUNT")) return "Montant hors des limites autorisées pour cet opérateur.";
+  if (c.includes("INSUFFICIENT")) return "Solde insuffisant sur le compte mobile money.";
+  if (c.includes("DUPLICATE")) return "Transaction en cours. Veuillez patienter avant de réessayer.";
+  if (c.includes("UNAVAILABLE") || c.includes("TEMPORARILY")) return "Service temporairement indisponible. Veuillez réessayer dans quelques minutes.";
+  if (c.includes("INVALID_PHONE") || c.includes("INVALID_MSISDN")) return "Numéro de téléphone invalide ou non enregistré chez l'opérateur.";
+  if (c.includes("TIMEOUT") || c.includes("TIMED_OUT")) return "Délai de validation dépassé. Veuillez réessayer.";
+  if (c.includes("SYSTEM") || c.includes("INTERNAL")) return "Erreur technique. Veuillez réessayer.";
+  return "Paiement non effectué. Veuillez réessayer ou utiliser un autre moyen de paiement.";
+}
+
 export async function createPawaPayDeposit(params: PawaPayDepositParams): Promise<PawaPayDepositResult> {
   const config = await getPawaPayConfig();
   if (!config) {
-    return { success: false, error: "PawaPay n'est pas configuré. Veuillez configurer le token API dans l'interface administrateur." };
+    return { success: false, error: "Service de paiement non disponible. Veuillez contacter le support." };
   }
 
   const correspondent = getCorrespondent(params.country, params.operator);
   if (!correspondent) {
-    return { success: false, error: `Opérateur ${params.operator} non supporté pour ${params.country} avec PawaPay` };
+    return { success: false, error: "Opérateur non disponible pour ce pays." };
   }
 
   const depositId = params.externalId || randomUUID();
@@ -179,16 +193,16 @@ export async function createPawaPayDeposit(params: PawaPayDepositParams): Promis
     if (result.data.status === "REJECTED") {
       const fr = result.data.failureReason;
       const reason = fr?.failureCode || fr?.rejectionCode || fr?.failureMessage || fr?.message || fr?.code || (typeof fr === "string" ? fr : null) || "UNKNOWN";
-      const hint = config.isSandbox ? " [MODE SANDBOX — entrez 'live' dans le champ Environnement pour utiliser la production]" : "";
+      const hint = config.isSandbox ? " [MODE SANDBOX]" : "";
       console.error(`[PawaPay Deposit] [${mode}] Rejected: ${reason}${hint}`, fr ? JSON.stringify(fr) : "(failureReason null)");
-      return { success: false, error: `Dépôt refusé: ${reason}` };
+      return { success: false, error: mapPaymentErrorCode(reason) };
     }
 
     console.error(`[PawaPay Deposit] [${mode}] Unexpected response:`, JSON.stringify(result.data).substring(0, 400));
-    return { success: false, error: "Erreur lors de l'initiation du dépôt PawaPay" };
+    return { success: false, error: "Paiement non effectué. Veuillez réessayer." };
   } catch (error: any) {
     console.error(`[PawaPay Deposit] [${mode}] Error:`, error);
-    return { success: false, error: error?.message || "Erreur de connexion à PawaPay" };
+    return { success: false, error: "Service momentanément indisponible. Veuillez réessayer." };
   }
 }
 
@@ -213,12 +227,12 @@ export interface PawaPayPayoutResult {
 export async function createPawaPayPayout(params: PawaPayPayoutParams): Promise<PawaPayPayoutResult> {
   const config = await getPawaPayConfig();
   if (!config) {
-    return { success: false, error: "PawaPay n'est pas configuré. Veuillez configurer le token API dans l'interface administrateur." };
+    return { success: false, error: "Service de retrait non disponible. Veuillez contacter le support." };
   }
 
   const correspondent = getCorrespondent(params.country, params.operator);
   if (!correspondent) {
-    return { success: false, error: `Opérateur ${params.operator} non supporté pour ${params.country} avec PawaPay` };
+    return { success: false, error: "Opérateur non disponible pour ce pays." };
   }
 
   const payoutId = params.externalId || randomUUID();
@@ -264,16 +278,16 @@ export async function createPawaPayPayout(params: PawaPayPayoutParams): Promise<
     if (result.data.status === "REJECTED") {
       const fr = result.data.failureReason;
       const reason = fr?.failureCode || fr?.rejectionCode || fr?.failureMessage || fr?.message || fr?.code || (typeof fr === "string" ? fr : null) || "UNKNOWN";
-      const hint = config.isSandbox ? " [MODE SANDBOX — entrez 'live' dans le champ Environnement pour utiliser la production]" : "";
+      const hint = config.isSandbox ? " [MODE SANDBOX]" : "";
       console.error(`[PawaPay Payout] [${mode}] Rejected: ${reason}${hint}`, fr ? JSON.stringify(fr) : "(failureReason null)");
-      return { success: false, error: `Retrait refusé: ${reason}` };
+      return { success: false, error: mapPaymentErrorCode(reason) };
     }
 
     console.error(`[PawaPay Payout] [${mode}] Unexpected response:`, JSON.stringify(result.data).substring(0, 400));
-    return { success: false, error: "Erreur lors de l'initiation du retrait PawaPay" };
+    return { success: false, error: "Retrait non effectué. Veuillez réessayer." };
   } catch (error: any) {
     console.error(`[PawaPay Payout] [${mode}] Error:`, error);
-    return { success: false, error: error?.message || "Erreur de connexion à PawaPay" };
+    return { success: false, error: "Service momentanément indisponible. Veuillez réessayer." };
   }
 }
 

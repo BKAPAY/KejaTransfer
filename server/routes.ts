@@ -2573,7 +2573,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
 
         if (!pawaResult.success) {
-          return res.status(400).json({ success: false, error: pawaResult.error || "Echec de l'initiation PawaPay" });
+          return res.status(400).json({ success: false, error: pawaResult.error || "Paiement non effectué. Veuillez réessayer." });
         }
 
         const tx = await storage.createTransaction({
@@ -5661,7 +5661,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.json({
             success: true,
             transactionId: result.transactionId,
-            message: result.message || (isTransfer ? "Transfert PawaPay en cours" : "Retrait PawaPay en cours"),
+            message: result.message || (isTransfer ? "Transfert en cours de traitement." : "Retrait en cours de traitement."),
             provider: "pawapay",
           });
         } else {
@@ -6644,7 +6644,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
 
         if (!pawaResult.success) {
-          return res.status(400).json({ success: false, error: pawaResult.error || "Echec de l'initiation PawaPay" });
+          return res.status(400).json({ success: false, error: pawaResult.error || "Paiement non effectué. Veuillez réessayer." });
         }
 
         const existingMeta = JSON.parse(transaction.metadata || "{}");

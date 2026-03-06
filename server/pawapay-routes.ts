@@ -48,13 +48,13 @@ export async function handlePawaPayDeposit(
   try {
     const countryUpper = country.toUpperCase();
     if (!PAWAPAY_SUPPORTED_COUNTRIES.includes(country.toLowerCase())) {
-      return { success: false, error: `Ce pays n'est pas disponible via PawaPay` };
+      return { success: false, error: `Ce pays n'est pas disponible pour ce moyen de paiement.` };
     }
 
     const availableOperators = getPayinOperatorsForCountry(countryUpper);
     const operatorConfig = availableOperators.find(o => o.code.toLowerCase() === operator.toLowerCase());
     if (!operatorConfig) {
-      return { success: false, error: `Opérateur ${operator} non supporté pour ${country} avec PawaPay` };
+      return { success: false, error: `Opérateur non disponible pour ce pays.` };
     }
 
     const needsOtp = pawaPayOperatorRequiresOtp(countryUpper, operator);
