@@ -311,22 +311,23 @@ export async function handlePawaPayTransfer(
       return { success: false, error: "Vérification KYC requise" };
     }
 
-    const grossAmount = Math.floor(amount);
+    const netAmount = Math.floor(amount);
     const defaultCurrency = getCurrencyForOperator(countryUpper, operator);
     const providerCurrency = targetCurrency || defaultCurrency;
     const balanceCurrency = userCurrency || providerCurrency;
 
     const feeConfig = await getFeeFromDatabase(storage, "pawapay", country, operator);
-    const feeInfo = calculateOutgoingFee(grossAmount, feeConfig.outgoing);
+    // Transfer: recipient gets full amount, fee is added ON TOP of balance deduction
+    const feeInfo = calculateOutgoingFeeFromNet(netAmount, feeConfig.outgoing);
 
     if (user.balance < feeInfo.totalDeductedFromBalance) {
       return { success: false, error: "Solde insuffisant sur votre compte. Veuillez effectuer un dépôt avant de transférer." };
     }
 
-    let amountForProvider = feeInfo.amountReceived;
+    let amountForProvider = netAmount;
     if (balanceCurrency !== providerCurrency) {
       const { convertCurrency } = await import("./currency-converter");
-      const conversionResult = await convertCurrency(feeInfo.amountReceived, balanceCurrency, providerCurrency);
+      const conversionResult = await convertCurrency(netAmount, balanceCurrency, providerCurrency);
       if (conversionResult.success) {
         amountForProvider = Math.floor(conversionResult.convertedAmount);
       } else {
@@ -342,22 +343,21 @@ export async function handlePawaPayTransfer(
     const tx = await storage.createTransaction({
       userId,
       type: "transfer",
-      amount: grossAmount,
+      amount: netAmount,
       fee: feeInfo.feeAmount,
       feePercentage: feeInfo.feePercentage,
       currency: balanceCurrency,
       status: "pending",
       country: countryUpper,
       operator,
-      description: `Transfert de ${grossAmount} ${balanceCurrency} (reçu: ${amountForProvider} ${providerCurrency})`,
+      description: `Transfert de ${netAmount} ${balanceCurrency}`,
       customerPhone: phone,
       metadata: JSON.stringify({
         phone,
-        deductedFromBalance: feeInfo.totalDeductedFromBalance,
-        amountReceived: feeInfo.amountReceived,
+        totalDebited: feeInfo.totalDeductedFromBalance,
         providerAmount: amountForProvider,
         providerCurrency,
-        balanceAmount: grossAmount,
+        balanceAmount: netAmount,
         balanceCurrency,
         provider: "pawapay",
         paymentProvider: "pawapay",
@@ -385,11 +385,10 @@ export async function handlePawaPayTransfer(
     const updatedMetadata = JSON.stringify({
       pawaPayPayoutId: result.payoutId,
       phone,
-      deductedFromBalance: feeInfo.totalDeductedFromBalance,
-      amountReceived: feeInfo.amountReceived,
+      totalDebited: feeInfo.totalDeductedFromBalance,
       providerAmount: amountForProvider,
       providerCurrency,
-      balanceAmount: grossAmount,
+      balanceAmount: netAmount,
       balanceCurrency,
       provider: "pawapay",
       paymentProvider: "pawapay",
