@@ -33,7 +33,14 @@ export async function handlePawaPayDeposit(
   currency?: string,
   originalAmount?: number,
   originalCurrency?: string,
-  otpCode?: string
+  otpCode?: string,
+  options?: {
+    transactionType?: "deposit" | "payment_link" | "merchant_link";
+    transactionDescription?: string;
+    customerName?: string;
+    customerEmail?: string;
+    extraMetadata?: Record<string, any>;
+  }
 ): Promise<{
   success: boolean;
   transactionId?: string;
@@ -71,7 +78,6 @@ export async function handlePawaPayDeposit(
     }
 
     const providerAmount = Math.floor(amount);
-    // Use operator-specific currency (e.g. USD for Vodacom/Orange COD) or fall back to country currency
     const providerCurrency = currency || getCurrencyForOperator(countryUpper, operator);
     const balanceAmount = originalAmount ? Math.floor(originalAmount) : providerAmount;
     const userCurrency = originalCurrency || providerCurrency;
@@ -79,12 +85,14 @@ export async function handlePawaPayDeposit(
     const feeConfig = await getFeeFromDatabase(storage, "pawapay", country, operator);
     const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming);
 
+    const txType = options?.transactionType || "deposit";
+    const txDescription = options?.transactionDescription || `Dépôt de ${providerAmount} ${providerCurrency}`;
     const orderId = `BKAPAY-DEP-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const startTime = Date.now();
 
     const tx = await storage.createTransaction({
       userId,
-      type: "deposit",
+      type: txType,
       amount: feeInfo.grossAmount,
       fee: feeInfo.feeAmount,
       feePercentage: feeInfo.feePercentage,
@@ -92,8 +100,10 @@ export async function handlePawaPayDeposit(
       status: "pending",
       country: countryUpper,
       operator,
-      description: `Dépôt de ${providerAmount} ${providerCurrency}`,
+      description: txDescription,
       customerPhone: phone,
+      customerName: options?.customerName || null,
+      customerEmail: options?.customerEmail || null,
       metadata: JSON.stringify({
         phone,
         provider: "pawapay",
@@ -105,6 +115,7 @@ export async function handlePawaPayDeposit(
         balanceCurrency: userCurrency,
         orderId,
         startTime,
+        ...(options?.extraMetadata || {}),
       }),
     });
 
@@ -136,6 +147,7 @@ export async function handlePawaPayDeposit(
       balanceCurrency: userCurrency,
       orderId,
       startTime,
+      ...(options?.extraMetadata || {}),
     });
     await storage.updateTransactionMetadata(tx.id, updatedMetadata);
 

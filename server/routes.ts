@@ -6457,7 +6457,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           payerCurrency,
           undefined,
           ownerCurrency !== payerCurrency ? ownerCurrency : undefined,
-          otpCode
+          otpCode,
+          {
+            transactionType: "payment_link",
+            transactionDescription: `Paiement - ${paymentLink.productName}`,
+            customerName: customerName || undefined,
+            customerEmail: customerEmail || undefined,
+            extraMetadata: { paymentLinkId: paymentLink.id },
+          }
         );
         if (result.requiresOTP) {
           return res.json({
@@ -6772,7 +6779,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           payerCurrency,
           undefined,
           ownerCurrency !== payerCurrency ? ownerCurrency : undefined,
-          otpCode
+          otpCode,
+          {
+            transactionType: "merchant_link",
+            transactionDescription: `Paiement marchand - ${merchantLink.merchantName}`,
+            customerName: customerName || undefined,
+            customerEmail: customerEmail || undefined,
+            extraMetadata: { merchantLinkId: merchantLink.id },
+          }
         );
         if (result.requiresOTP) {
           return res.json({
