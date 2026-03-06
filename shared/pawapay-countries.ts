@@ -73,7 +73,6 @@ export const PAWAPAY_COUNTRIES: PawaPayCountry[] = [
     currency: "XAF",
     operators: [
       { code: "airtel", name: "Airtel Money", correspondent: "AIRTEL_COG", payin: true, payout: true },
-      { code: "mtn", name: "MTN Mobile Money", correspondent: "MTN_MOMO_COG", payin: true, payout: true },
     ],
   },
   {
@@ -87,7 +86,8 @@ export const PAWAPAY_COUNTRIES: PawaPayCountry[] = [
     currency: "CDF",
     operators: [
       { code: "airtel", name: "Airtel Money", correspondent: "AIRTEL_COD", payin: true, payout: true },
-      { code: "vodacom", name: "Vodacom M-Pesa", correspondent: "VODACOM_COD", payin: true, payout: true },
+      { code: "orange", name: "Orange Money", correspondent: "ORANGE_COD", payin: true, payout: true },
+      { code: "vodacom", name: "Vodacom M-Pesa", correspondent: "VODACOM_MPESA_COD", payin: true, payout: true },
     ],
   },
   {
@@ -102,7 +102,6 @@ export const PAWAPAY_COUNTRIES: PawaPayCountry[] = [
     operators: [
       { code: "mtn", name: "MTN Mobile Money", correspondent: "MTN_MOMO_CIV", payin: true, payout: true },
       { code: "orange", name: "Orange Money", correspondent: "ORANGE_CIV", payin: true, payout: true, requiresOtp: true },
-      { code: "moov", name: "Moov Money", correspondent: "MOOV_CIV", payin: true, payout: true },
     ],
   },
   {
@@ -144,7 +143,6 @@ export const PAWAPAY_COUNTRIES: PawaPayCountry[] = [
     currency: "KES",
     operators: [
       { code: "mpesa", name: "M-Pesa (Safaricom)", correspondent: "MPESA_KEN", payin: true, payout: true },
-      { code: "airtel", name: "Airtel Money", correspondent: "AIRTEL_KEN", payin: true, payout: true },
     ],
   },
   {
@@ -238,7 +236,7 @@ export const PAWAPAY_COUNTRIES: PawaPayCountry[] = [
     phoneCode: "+232",
     phoneDigits: 8,
     phoneFormat: "XXXXXXXX",
-    currency: "SLL",
+    currency: "SLE",
     operators: [
       { code: "orange", name: "Orange Money", correspondent: "ORANGE_SLE", payin: true, payout: true },
     ],
@@ -254,7 +252,6 @@ export const PAWAPAY_COUNTRIES: PawaPayCountry[] = [
     currency: "TZS",
     operators: [
       { code: "airtel", name: "Airtel Money", correspondent: "AIRTEL_TZA", payin: true, payout: true },
-      { code: "vodacom", name: "Vodacom M-Pesa", correspondent: "VODACOM_TZA", payin: true, payout: true },
       { code: "tigo", name: "Tigo Pesa", correspondent: "TIGO_TZA", payin: true, payout: true },
       { code: "halotel", name: "Halotel", correspondent: "HALOTEL_TZA", payin: true, payout: true },
     ],
@@ -352,29 +349,11 @@ export function getPawaPayOtpInstructions(countryCode: string): PawaPayOtpInstru
         "Composez *144*4*6# sur votre telephone Orange, entrez votre code secret, puis saisissez le code OTP recu par SMS",
       hint: "Entrez votre code PIN Orange Money quand demande pour generer le code OTP",
     },
-    CM: {
-      ussdCode: "#144#",
-      instructions:
-        "Composez #144# sur votre telephone Orange, selectionnez l'option pour generer un code de paiement OTP, puis saisissez ce code",
-      hint: "Naviguez dans le menu Orange Money pour trouver l'option 'Code de paiement'",
-    },
     CI: {
       ussdCode: "#144*82#",
       instructions:
         "Composez #144*82# sur votre telephone Orange, selectionnez l'option 2 pour generer votre code de paiement temporaire, puis saisissez ce code",
       hint: "Selectionnez l'option 2 dans le menu pour obtenir le code de paiement a 4 chiffres",
-    },
-    SN: {
-      ussdCode: "#144#",
-      instructions:
-        "Composez #144# sur votre telephone Orange, naviguez vers 'Code de paiement' ou 'Generer un code', entrez votre code secret pour obtenir le code OTP, puis saisissez ce code",
-      hint: "Utilisez aussi l'application Orange Money Senegal pour generer le code plus facilement",
-    },
-    SL: {
-      ussdCode: "#144#",
-      instructions:
-        "Composez #144# sur votre telephone Orange, naviguez vers l'option de paiement en ligne pour generer votre code OTP, puis saisissez ce code",
-      hint: "Entrez votre code PIN Orange Money quand demande dans le menu USSD",
     },
   };
 
