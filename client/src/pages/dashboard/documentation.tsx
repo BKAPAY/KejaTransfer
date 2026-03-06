@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Copy, Code, Globe, ExternalLink, Webhook, Send } from "lucide-react";
+import { Copy, Code, Globe, ExternalLink, Webhook, Send, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
@@ -253,15 +253,21 @@ data = response.json()
           <h1 className="text-3xl font-bold text-foreground" data-testid="text-doc-title">
             Documentation API BKApay
           </h1>
-          <Badge variant="default" className="text-xs">v1.5</Badge>
+          <Badge variant="default" className="text-xs">v1.6</Badge>
         </div>
         <p className="text-sm text-muted-foreground mt-2">
           Integrez facilement les paiements mobile money dans votre application
         </p>
-        <Alert className="mt-4 border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800">
+        <Alert className="mt-4 border-green-200 bg-green-50 dark:bg-green-950 dark:border-green-800">
+          <ShieldCheck className="h-4 w-4 text-green-600" />
+          <AlertDescription className="text-green-800 dark:text-green-200 text-sm">
+            <strong>Nouveau v1.6:</strong> Sessions de paiement securisees — Le montant est verrouille cote serveur, jamais expose dans l'URL.
+          </AlertDescription>
+        </Alert>
+        <Alert className="mt-2 border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800">
           <Send className="h-4 w-4 text-blue-600" />
           <AlertDescription className="text-blue-800 dark:text-blue-200 text-sm">
-            <strong>Nouveau v1.5:</strong> API Payout — Envoyez de l'argent sur des numeros mobile money directement depuis votre application via API
+            <strong>v1.5:</strong> API Payout — Envoyez de l'argent sur des numeros mobile money directement depuis votre application via API
           </AlertDescription>
         </Alert>
       </div>
@@ -746,6 +752,134 @@ data = response.json()
           <Alert className="border-amber-200 bg-amber-50 dark:bg-amber-950 dark:border-amber-800">
             <AlertDescription className="text-amber-800 dark:text-amber-200 text-sm">
               <strong>Important:</strong> Les frais de transaction sont automatiquement deduits du montant envoye. La conversion de devise est effectuee automatiquement si la devise de votre compte differe de celle demandee.
+            </AlertDescription>
+          </Alert>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 flex-wrap gap-y-1">
+            <ShieldCheck className="w-5 h-5" />
+            Sessions de paiement securisees
+            <Badge variant="default" className="text-xs">Nouveau v1.6</Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-5 text-sm">
+          <p className="text-muted-foreground">
+            Avec les sessions de paiement, le montant est verrouille cote serveur grace a votre cle secrete.
+            Vos clients recoivent une URL propre <code className="font-mono text-xs bg-muted px-1 rounded">/checkout/SESSION_ID</code> — le montant n'apparait jamais dans l'URL.
+          </p>
+
+          <div className="space-y-3">
+            <h3 className="font-semibold">Flux de paiement</h3>
+            <ol className="list-decimal pl-5 space-y-1 text-muted-foreground">
+              <li>Votre serveur appelle <code className="font-mono text-xs bg-muted px-1 rounded">POST /api/v1/payment-sessions</code> avec votre cle secrete <code className="font-mono text-xs bg-muted px-1 rounded">sk_live_...</code></li>
+              <li>BKApay retourne une <code className="font-mono text-xs bg-muted px-1 rounded">payment_url</code> unique avec un ID de session</li>
+              <li>Vous redirigez votre client vers cette URL</li>
+              <li>Le client choisit son pays/operateur et paie — le montant est fixe et securise</li>
+              <li>Votre webhook (ou <code className="font-mono text-xs bg-muted px-1 rounded">success_url</code>) est notifie apres confirmation</li>
+            </ol>
+          </div>
+
+          <div className="space-y-3">
+            <h3 className="font-semibold">Endpoint</h3>
+            <div className="flex items-center gap-2 bg-muted rounded-md p-3 flex-wrap">
+              <span className="bg-primary text-primary-foreground text-xs font-bold px-2 py-0.5 rounded">POST</span>
+              <code className="font-mono text-xs break-all">{baseUrl}/api/v1/payment-sessions</code>
+              <Button size="sm" variant="ghost" className="ml-auto" onClick={() => copyCode(`${baseUrl}/api/v1/payment-sessions`)} data-testid="button-copy-sessions-url">
+                <Copy className="w-3.5 h-3.5" />
+              </Button>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <h3 className="font-semibold">Parametres</h3>
+            <div className="border rounded-md overflow-hidden">
+              <table className="w-full text-xs">
+                <thead className="bg-muted">
+                  <tr>
+                    <th className="text-left px-3 py-2 font-medium">Parametre</th>
+                    <th className="text-left px-3 py-2 font-medium">Type</th>
+                    <th className="text-left px-3 py-2 font-medium">Requis</th>
+                    <th className="text-left px-3 py-2 font-medium">Description</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  <tr><td className="px-3 py-2 font-mono">amount</td><td className="px-3 py-2">number</td><td className="px-3 py-2 text-green-600">Oui</td><td className="px-3 py-2 text-muted-foreground">Montant a payer (minimum 200)</td></tr>
+                  <tr><td className="px-3 py-2 font-mono">currency</td><td className="px-3 py-2">string</td><td className="px-3 py-2 text-muted-foreground">Non</td><td className="px-3 py-2 text-muted-foreground">Devise (defaut: XOF)</td></tr>
+                  <tr><td className="px-3 py-2 font-mono">description</td><td className="px-3 py-2">string</td><td className="px-3 py-2 text-muted-foreground">Non</td><td className="px-3 py-2 text-muted-foreground">Description du paiement</td></tr>
+                  <tr><td className="px-3 py-2 font-mono">success_url</td><td className="px-3 py-2">string</td><td className="px-3 py-2 text-muted-foreground">Non</td><td className="px-3 py-2 text-muted-foreground">URL de redirection apres succes</td></tr>
+                  <tr><td className="px-3 py-2 font-mono">cancel_url</td><td className="px-3 py-2">string</td><td className="px-3 py-2 text-muted-foreground">Non</td><td className="px-3 py-2 text-muted-foreground">URL de redirection apres echec/annulation</td></tr>
+                  <tr><td className="px-3 py-2 font-mono">callback_url</td><td className="px-3 py-2">string</td><td className="px-3 py-2 text-muted-foreground">Non</td><td className="px-3 py-2 text-muted-foreground">Webhook de notification</td></tr>
+                  <tr><td className="px-3 py-2 font-mono">order_id</td><td className="px-3 py-2">string</td><td className="px-3 py-2 text-muted-foreground">Non</td><td className="px-3 py-2 text-muted-foreground">Identifiant de commande (votre systeme)</td></tr>
+                  <tr><td className="px-3 py-2 font-mono">expires_in</td><td className="px-3 py-2">number</td><td className="px-3 py-2 text-muted-foreground">Non</td><td className="px-3 py-2 text-muted-foreground">Duree de validite en secondes (defaut: 3600, max: 86400)</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="font-semibold">Exemple JavaScript</h3>
+              <Button size="sm" variant="ghost" onClick={() => copyCode(`const response = await fetch("${baseUrl}/api/v1/payment-sessions", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "Authorization": "Bearer sk_live_VOTRE_CLE_SECRETE"
+  },
+  body: JSON.stringify({
+    amount: 5000,
+    currency: "XOF",
+    description: "Commande #1234",
+    success_url: "https://votresite.com/success",
+    cancel_url: "https://votresite.com/cancel",
+    order_id: "cmd-1234"
+  })
+});
+const data = await response.json();
+// Rediriger le client vers data.payment_url
+window.location.href = data.payment_url;`)} data-testid="button-copy-sessions-js">
+                <Copy className="w-3.5 h-3.5 mr-1" /> Copier
+              </Button>
+            </div>
+            <pre className="bg-muted rounded-md p-3 text-xs overflow-x-auto whitespace-pre-wrap">{`const response = await fetch("${baseUrl}/api/v1/payment-sessions", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "Authorization": "Bearer sk_live_VOTRE_CLE_SECRETE"
+  },
+  body: JSON.stringify({
+    amount: 5000,
+    currency: "XOF",
+    description: "Commande #1234",
+    success_url: "https://votresite.com/success",
+    cancel_url: "https://votresite.com/cancel",
+    order_id: "cmd-1234"
+  })
+});
+const data = await response.json();
+// Rediriger le client vers data.payment_url
+window.location.href = data.payment_url;`}</pre>
+          </div>
+
+          <div className="space-y-2">
+            <h3 className="font-semibold">Reponse</h3>
+            <pre className="bg-muted rounded-md p-3 text-xs overflow-x-auto">{`{
+  "success": true,
+  "session_id": "a1b2c3d4-...",
+  "payment_url": "${baseUrl}/checkout/a1b2c3d4-...",
+  "expires_at": "2026-03-06T20:00:00.000Z",
+  "amount": 5000,
+  "currency": "XOF"
+}`}</pre>
+          </div>
+
+          <Alert className="border-green-200 bg-green-50 dark:bg-green-950 dark:border-green-800">
+            <ShieldCheck className="h-4 w-4 text-green-600" />
+            <AlertDescription className="text-green-800 dark:text-green-200 text-sm">
+              <strong>Securite:</strong> Utilisez toujours votre cle secrete (<code className="font-mono text-xs">sk_live_</code>) uniquement cote serveur.
+              Ne l'exposez jamais dans votre code frontend ou dans une URL.
             </AlertDescription>
           </Alert>
         </CardContent>

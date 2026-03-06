@@ -618,5 +618,32 @@ export const loginLogs = pgTable("login_logs", {
 
 export type LoginLog = typeof loginLogs.$inferSelect;
 
+// Payment Sessions (Secure API Payment Sessions — no amount in URL)
+export const paymentSessions = pgTable("payment_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  apiKeyId: varchar("api_key_id").notNull().references(() => apiKeys.id),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  amount: integer("amount").notNull(),
+  currency: text("currency").notNull().default("XOF"),
+  description: text("description"),
+  successUrl: text("success_url"),
+  cancelUrl: text("cancel_url"),
+  callbackUrl: text("callback_url"),
+  orderId: text("order_id"),
+  status: text("status").notNull().default("pending"), // pending | processing | completed | failed | expired
+  transactionId: varchar("transaction_id"),
+  metadata: text("metadata"),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertPaymentSessionSchema = createInsertSchema(paymentSessions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type PaymentSession = typeof paymentSessions.$inferSelect;
+export type InsertPaymentSession = z.infer<typeof insertPaymentSessionSchema>;
+
 // Chat schema for EMALI AI
 export * from "./models/chat";

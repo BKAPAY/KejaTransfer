@@ -19,6 +19,8 @@ import type {
   FeeConfig,
   InsertFeeConfig,
   SupportSettings,
+  PaymentSession,
+  InsertPaymentSession,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { MBIYOPAY_COUNTRIES } from "@shared/mbiyopay-countries";
@@ -82,6 +84,12 @@ export interface IStorage {
   updateApiKeyPayoutCallback(id: string, userId: string, payoutCallbackUrl: string | null): Promise<ApiKey | undefined>;
   regenerateApiKeyPayoutSecret(id: string, userId: string): Promise<ApiKey | undefined>;
   updateApiKeySettings(id: string, userId: string, settings: { allowedCountries?: string[]; customerPaysFee?: boolean; customerPaysCryptoFee?: boolean }): Promise<ApiKey | undefined>;
+
+  // Payment Sessions
+  createPaymentSession(session: InsertPaymentSession): Promise<PaymentSession>;
+  getPaymentSession(id: string): Promise<PaymentSession | undefined>;
+  updatePaymentSession(id: string, updates: Partial<Pick<PaymentSession, 'status' | 'transactionId'>>): Promise<PaymentSession | undefined>;
+  expireOldPaymentSessions(): Promise<void>;
 
   // Transactions
   getTransaction(id: string): Promise<Transaction | undefined>;
@@ -608,6 +616,38 @@ export class DbStorage implements IStorage {
       .where(eq(schema.apiKeys.id, id))
       .returning();
     return results[0];
+  }
+
+  // Payment Sessions
+  async createPaymentSession(session: InsertPaymentSession): Promise<PaymentSession> {
+    const results = await db.insert(schema.paymentSessions).values(session).returning();
+    return results[0];
+  }
+
+  async getPaymentSession(id: string): Promise<PaymentSession | undefined> {
+    const results = await db.select().from(schema.paymentSessions).where(eq(schema.paymentSessions.id, id)).limit(1);
+    return results[0];
+  }
+
+  async updatePaymentSession(id: string, updates: Partial<Pick<PaymentSession, 'status' | 'transactionId'>>): Promise<PaymentSession | undefined> {
+    const results = await db
+      .update(schema.paymentSessions)
+      .set(updates)
+      .where(eq(schema.paymentSessions.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async expireOldPaymentSessions(): Promise<void> {
+    await db
+      .update(schema.paymentSessions)
+      .set({ status: "expired" })
+      .where(
+        and(
+          eq(schema.paymentSessions.status, "pending"),
+          sql`${schema.paymentSessions.expiresAt} < NOW()`
+        )
+      );
   }
 
   // Transactions

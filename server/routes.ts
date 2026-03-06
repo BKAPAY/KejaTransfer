@@ -2772,6 +2772,452 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== Payment Sessions v1 - Secure API Payment (no amount in URL) =====
+
+  // POST /api/v1/payment-sessions — Create a payment session (requires secret key)
+  app.post("/api/v1/payment-sessions", async (req: Request, res: Response) => {
+    try {
+      let privateKey = req.headers.authorization?.replace(/^Bearer\s+/i, "").trim();
+      if (!privateKey) privateKey = req.body.private_key;
+
+      if (!privateKey || !privateKey.startsWith("sk_")) {
+        return res.status(401).json({
+          success: false,
+          error: { code: "INVALID_API_KEY", message: "Clé API secrète invalide. Utilisez: Authorization: Bearer sk_live_..." }
+        });
+      }
+
+      const apiKey = await storage.getApiKeyByPrivateKey(privateKey);
+      if (!apiKey || !apiKey.isActive) {
+        return res.status(401).json({
+          success: false,
+          error: { code: "INVALID_API_KEY", message: "Clé API invalide ou désactivée" }
+        });
+      }
+
+      const owner = await storage.getUser(apiKey.userId);
+      if (!owner || owner.suspended) {
+        return res.status(403).json({
+          success: false,
+          error: { code: "ACCOUNT_SUSPENDED", message: "Ce service est temporairement indisponible" }
+        });
+      }
+
+      const { amount, currency, description, success_url, cancel_url, callback_url, order_id, expires_in } = req.body;
+
+      if (!amount || isNaN(Number(amount)) || Number(amount) < 200) {
+        return res.status(400).json({
+          success: false,
+          error: { code: "INVALID_AMOUNT", message: "Montant invalide. Minimum: 200" }
+        });
+      }
+
+      const sessionCurrency = currency || "XOF";
+      const expiresInSeconds = Math.min(Number(expires_in) || 3600, 86400);
+      const expiresAt = new Date(Date.now() + expiresInSeconds * 1000);
+
+      const session = await storage.createPaymentSession({
+        apiKeyId: apiKey.id,
+        userId: apiKey.userId,
+        amount: Math.floor(Number(amount)),
+        currency: sessionCurrency,
+        description: description || null,
+        successUrl: success_url || null,
+        cancelUrl: cancel_url || null,
+        callbackUrl: callback_url || apiKey.callbackUrl || null,
+        orderId: order_id || null,
+        status: "pending",
+        transactionId: null,
+        metadata: null,
+        expiresAt,
+      });
+
+      const baseUrl = process.env.BASE_URL || "https://bkapay.com";
+
+      return res.json({
+        success: true,
+        session_id: session.id,
+        payment_url: `${baseUrl}/checkout/${session.id}`,
+        expires_at: expiresAt.toISOString(),
+        amount: session.amount,
+        currency: session.currency,
+      });
+    } catch (error: any) {
+      console.error("[Payment Session Create] Error:", error);
+      return res.status(500).json({ success: false, error: { code: "SERVER_ERROR", message: "Erreur lors de la création de la session" } });
+    }
+  });
+
+  // GET /api/v1/payment-sessions/:id — Get session info (limited fields for checkout page)
+  app.get("/api/v1/payment-sessions/:id", async (req: Request, res: Response) => {
+    try {
+      const session = await storage.getPaymentSession(req.params.id);
+      if (!session) {
+        return res.status(404).json({ success: false, error: "Session introuvable" });
+      }
+
+      if (session.status === "expired" || new Date() > session.expiresAt) {
+        if (session.status === "pending") {
+          await storage.updatePaymentSession(session.id, { status: "expired" });
+        }
+        return res.json({ success: false, status: "expired", error: "Cette session de paiement a expiré" });
+      }
+
+      if (session.status === "completed") {
+        return res.json({ success: true, status: "completed", amount: session.amount, currency: session.currency });
+      }
+
+      const apiKey = await storage.getApiKeyById(session.apiKeyId);
+      const merchant = apiKey?.siteName || "BKApay";
+
+      return res.json({
+        success: true,
+        session_id: session.id,
+        status: session.status,
+        amount: session.amount,
+        currency: session.currency,
+        description: session.description,
+        merchant,
+        success_url: session.successUrl,
+        cancel_url: session.cancelUrl,
+        expires_at: session.expiresAt.toISOString(),
+      });
+    } catch (error: any) {
+      console.error("[Payment Session Get] Error:", error);
+      return res.status(500).json({ success: false, error: "Erreur serveur" });
+    }
+  });
+
+  // POST /api/v1/payment-sessions/:id/pay — Initiate payment for a session
+  app.post("/api/v1/payment-sessions/:id/pay", async (req: Request, res: Response) => {
+    try {
+      const session = await storage.getPaymentSession(req.params.id);
+      if (!session) {
+        return res.status(404).json({ success: false, error: "Session introuvable" });
+      }
+
+      if (session.status === "expired" || new Date() > session.expiresAt) {
+        return res.status(400).json({ success: false, error: "Cette session de paiement a expiré" });
+      }
+
+      if (session.status === "processing" || session.status === "completed") {
+        return res.status(400).json({ success: false, error: "Cette session a déjà été payée ou est en cours de traitement" });
+      }
+
+      const apiKey = await storage.getApiKeyById(session.apiKeyId);
+      if (!apiKey || !apiKey.isActive) {
+        return res.status(400).json({ success: false, error: "Clé API invalide" });
+      }
+
+      const owner = await storage.getUser(apiKey.userId);
+      if (!owner || owner.suspended) {
+        return res.status(403).json({ success: false, error: "Service temporairement indisponible" });
+      }
+
+      const { country, operator, customerPhone, customerName, customerEmail, otpCode } = req.body;
+
+      if (!country || !operator || !customerPhone) {
+        return res.status(400).json({ success: false, error: "Pays, opérateur et téléphone requis" });
+      }
+
+      if (operator.toLowerCase() === "wave" && !owner.wavePayinEnabled) {
+        return res.status(403).json({ success: false, error: "Le wave de votre marchand n'est pas activée" });
+      }
+
+      if (apiKey.allowedCountries && apiKey.allowedCountries.length > 0 && !apiKey.allowedCountries.includes(country)) {
+        return res.status(400).json({ success: false, error: "Ce pays n'est pas autorisé pour cette clé API" });
+      }
+
+      const activeProvider = await getActiveProviderForDeposit(country, operator);
+      console.log(`[SESSION PAY] Provider for ${country}/${operator}: ${activeProvider}, sessionId: ${session.id}`);
+
+      if (!activeProvider) {
+        return res.status(503).json({ success: false, error: "Aucun fournisseur configuré pour ce pays et opérateur" });
+      }
+
+      const ownerCurrency = owner.country ? getCurrencyForCountry(owner.country) : "XOF";
+      const { calculateIncomingFee, calculateCustomerPaysFee, getFeeFromDatabase } = await import("./utils/fees");
+      const feeConfig = await getFeeFromDatabase(storage, activeProvider, country, operator);
+
+      let amountForProvider: number;
+      let feeAmount: number;
+      let feePercentage: number;
+      let netAmountForUser: number;
+
+      if (apiKey.customerPaysFee) {
+        const feeInfo = calculateCustomerPaysFee(session.amount, feeConfig.incoming);
+        amountForProvider = feeInfo.totalForProvider;
+        feeAmount = feeInfo.feeAmount;
+        feePercentage = feeInfo.feePercentage;
+        netAmountForUser = feeInfo.baseAmount;
+      } else {
+        const feeInfo = calculateIncomingFee(session.amount, feeConfig.incoming);
+        amountForProvider = feeInfo.grossAmount;
+        feeAmount = feeInfo.feeAmount;
+        feePercentage = feeInfo.feePercentage;
+        netAmountForUser = feeInfo.netAmount;
+      }
+
+      // Mark session as processing
+      await storage.updatePaymentSession(session.id, { status: "processing" });
+
+      if (activeProvider === "pawapay") {
+        const { createPawaPayDeposit } = await import("./pawapay");
+        const { getCurrencyForOperator: getPawaPayCurrencyForOp, pawaPayOperatorRequiresOtp: pawaRequiresOtp, getPawaPayOtpInstructions: pawaOtpInfo } = await import("@shared/pawapay-countries");
+
+        const needsOtp = pawaRequiresOtp(country.toUpperCase(), operator);
+        if (needsOtp && !otpCode) {
+          await storage.updatePaymentSession(session.id, { status: "pending" });
+          const otpInfo = pawaOtpInfo(country.toUpperCase());
+          return res.json({
+            success: false,
+            requiresOTP: true,
+            otpInstructions: otpInfo.instructions,
+            otpUssdCode: otpInfo.ussdCode,
+            otpHint: otpInfo.hint,
+            provider: "pawapay",
+            error: "Code OTP Orange Money requis",
+          });
+        }
+
+        const providerCurrency = getPawaPayCurrencyForOp(country.toUpperCase(), operator);
+        let convertedAmount = amountForProvider;
+        if (ownerCurrency !== providerCurrency) {
+          const { convertCurrency } = await import("./currency-converter");
+          const conv = await convertCurrency(amountForProvider, ownerCurrency, providerCurrency);
+          if (conv.success) {
+            convertedAmount = Math.floor(conv.convertedAmount);
+          } else {
+            await storage.updatePaymentSession(session.id, { status: "pending" });
+            return res.status(500).json({ success: false, error: "Erreur de conversion de devise" });
+          }
+        }
+
+        const pawaResult = await createPawaPayDeposit({
+          amount: convertedAmount,
+          currency: providerCurrency,
+          country: country.toUpperCase(),
+          operator,
+          phone: customerPhone,
+          description: session.description || "Paiement BKApay",
+          externalId: randomUUID(),
+          preAuthorisationCode: otpCode,
+        });
+
+        if (!pawaResult.success) {
+          await storage.updatePaymentSession(session.id, { status: "pending" });
+          return res.status(400).json({ success: false, error: pawaResult.error || "Paiement non effectué. Veuillez réessayer." });
+        }
+
+        const tx = await storage.createTransaction({
+          userId: apiKey.userId,
+          type: "api_payment",
+          amount: session.amount,
+          fee: feeAmount,
+          feePercentage,
+          currency: ownerCurrency,
+          status: "pending",
+          country: country.toUpperCase(),
+          operator,
+          description: session.description || "Paiement API BKApay",
+          customerPhone,
+          customerName: customerName || "Client",
+          customerEmail: customerEmail || null,
+          metadata: JSON.stringify({
+            pawaPayDepositId: pawaResult.depositId,
+            provider: "pawapay",
+            paymentProvider: "pawapay",
+            sessionId: session.id,
+            apiKeyId: apiKey.id,
+            successUrl: session.successUrl,
+            cancelUrl: session.cancelUrl,
+            callbackUrl: session.callbackUrl,
+            orderId: session.orderId,
+            netAmountForUser,
+            providerAmount: convertedAmount,
+            providerCurrency,
+          }),
+        });
+
+        await storage.updatePaymentSession(session.id, { transactionId: tx.id });
+
+        return res.json({
+          success: true,
+          transactionId: tx.id,
+          message: pawaResult.message || "Paiement initié. Validez sur votre téléphone.",
+          provider: "pawapay",
+        });
+
+      } else if (activeProvider === "fedapay") {
+        const { handleApiPayment } = await import("./fedapay");
+        const result = await handleApiPayment(
+          apiKey, session.amount, session.description || "Paiement via API",
+          customerName || "Client", "noreply@bkapay.com", customerPhone, country, operator
+        );
+
+        if (!result.success) {
+          await storage.updatePaymentSession(session.id, { status: "pending" });
+          return res.status(400).json({ success: false, error: result.error });
+        }
+
+        const tx = await storage.createTransaction({
+          userId: apiKey.userId, type: "api_payment", amount: session.amount,
+          fee: feeAmount, feePercentage, currency: ownerCurrency, status: "pending",
+          country: country.toUpperCase(), operator,
+          description: session.description || "Paiement API",
+          customerPhone, customerName: customerName || "Client", customerEmail: customerEmail || null,
+          metadata: JSON.stringify({
+            sessionId: session.id, apiKeyId: apiKey.id,
+            successUrl: session.successUrl, cancelUrl: session.cancelUrl,
+            callbackUrl: session.callbackUrl, orderId: session.orderId,
+            fedapayTransactionId: result.transactionId,
+          }),
+        });
+
+        await storage.updatePaymentSession(session.id, { transactionId: tx.id });
+        return res.json({ success: true, transactionId: tx.id, message: result.message, provider: "fedapay" });
+
+      } else if (activeProvider === "paydunya") {
+        const paydunyaData = {
+          invoice: {
+            total_amount: Math.floor(amountForProvider),
+            description: session.description || "Paiement API BKApay",
+            customer: { name: customerName || "Client", email: "noreply@bkapay.com", phone: customerPhone },
+          },
+          store: { name: "BKApay" },
+          custom_data: { session_id: session.id, type: "api_payment", country, operator, phone: customerPhone },
+          actions: { callback_url: `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/paydunya` },
+        };
+
+        const paydunyaResp = await callPaydunyaAPI("/checkout-invoice/create", paydunyaData);
+        if (paydunyaResp.response_code !== "00" || !paydunyaResp.token) {
+          await storage.updatePaymentSession(session.id, { status: "pending" });
+          return res.status(400).json({ success: false, error: paydunyaResp.response_text || "Erreur lors de la création de la facture" });
+        }
+
+        const tx = await storage.createTransaction({
+          userId: apiKey.userId, type: "api_payment", amount: session.amount,
+          fee: feeAmount, feePercentage, currency: ownerCurrency, status: "pending",
+          country: country.toUpperCase(), operator,
+          description: session.description || "Paiement API",
+          customerPhone, customerName: customerName || "Client", customerEmail: customerEmail || null,
+          paydunyaToken: paydunyaResp.token,
+          metadata: JSON.stringify({
+            sessionId: session.id, apiKeyId: apiKey.id,
+            successUrl: session.successUrl, cancelUrl: session.cancelUrl,
+            callbackUrl: session.callbackUrl, orderId: session.orderId,
+          }),
+        });
+
+        await storage.updatePaymentSession(session.id, { transactionId: tx.id });
+
+        const { getOperatorKey, requiresOTP, requiresTwoStep } = await import("@shared/paydunya-countries");
+        const { callPaydunyaSoftpay, SoftpayPaymentData } = await import("./paydunya");
+        const opKey = getOperatorKey(operator, country);
+        if (opKey && !requiresOTP(opKey) && !requiresTwoStep(opKey)) {
+          const softpayResult = await callPaydunyaSoftpay(operator, country, {
+            customerName: customerName || "Client", customerEmail: "noreply@bkapay.com",
+            phoneNumber: customerPhone, invoiceToken: paydunyaResp.token,
+          } as SoftpayPaymentData);
+          if (softpayResult.success) {
+            return res.json({ success: true, transactionId: tx.id, token: paydunyaResp.token, message: softpayResult.message, provider: "paydunya" });
+          }
+          return res.status(400).json({ success: false, error: softpayResult.message || "Erreur de paiement" });
+        }
+        return res.json({ success: true, transactionId: tx.id, token: paydunyaResp.token, provider: "paydunya" });
+
+      } else if (activeProvider === "mbiyopay") {
+        const { createMbiyoPayPayin, getCurrencyForCountry: getMbiyoCurrency, mbiyoPayOperatorRequiresOtp: mbiyoNeedsOtp, getMbiyoPayOtpInstructions: getMbiyoOtpInfo } = await import("./mbiyopay");
+        const providerCurrency = getMbiyoCurrency(country);
+        const needsOtp = mbiyoNeedsOtp(country, operator);
+        if (needsOtp && !otpCode) {
+          await storage.updatePaymentSession(session.id, { status: "pending" });
+          const otpInfo = getMbiyoOtpInfo(country);
+          return res.json({ success: false, requiresOTP: true, otpInstructions: otpInfo.instructions, otpUssdCode: otpInfo.ussdCode, otpHint: otpInfo.hint, provider: "mbiyopay", error: "Code OTP requis" });
+        }
+        let convertedAmount = amountForProvider;
+        if (ownerCurrency !== providerCurrency) {
+          const { convertCurrency } = await import("./currency-converter");
+          const conv = await convertCurrency(amountForProvider, ownerCurrency, providerCurrency);
+          if (conv.success) convertedAmount = Math.floor(conv.convertedAmount);
+        }
+        const result = await createMbiyoPayPayin({ amount: convertedAmount, currency: providerCurrency, phone: customerPhone, countryCode: country, network: operator, orderId: `BKAPAY-SESSION-${Date.now()}`, callbackUrl: `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/mbiyopay`, otpCode });
+        if (!result.success) {
+          await storage.updatePaymentSession(session.id, { status: "pending" });
+          return res.status(400).json({ success: false, error: result.error || "Erreur de paiement" });
+        }
+        const tx = await storage.createTransaction({
+          userId: apiKey.userId, type: "api_payment", amount: session.amount,
+          fee: feeAmount, feePercentage, currency: ownerCurrency, status: "pending",
+          country: country.toUpperCase(), operator,
+          description: session.description || "Paiement API", customerPhone,
+          customerName: customerName || "Client", customerEmail: customerEmail || null,
+          metadata: JSON.stringify({ sessionId: session.id, apiKeyId: apiKey.id, successUrl: session.successUrl, cancelUrl: session.cancelUrl, callbackUrl: session.callbackUrl, orderId: session.orderId, provider: "mbiyopay", mbiyopayTransactionId: result.transactionId }),
+        });
+        await storage.updatePaymentSession(session.id, { transactionId: tx.id });
+        return res.json({ success: true, transactionId: tx.id, redirectUrl: result.redirectUrl, instructions: result.instructions, message: result.message || "Paiement initié", provider: "mbiyopay" });
+
+      } else if (activeProvider === "afribapay") {
+        const { handleAfribaPayApiPayment } = await import("./afribapay");
+        const result = await handleAfribaPayApiPayment(apiKey, amountForProvider, session.description || "Paiement API", customerName || "Client", "noreply@bkapay.com", customerPhone, country, operator, otpCode);
+        if (result.requiresOtp) {
+          await storage.updatePaymentSession(session.id, { status: "pending" });
+          return res.status(400).json({ success: false, error: result.error, requiresOTP: true, otpInstructions: result.otpInstructions });
+        }
+        if (!result.success) {
+          await storage.updatePaymentSession(session.id, { status: "pending" });
+          return res.status(400).json({ success: false, error: result.error });
+        }
+        const tx = await storage.createTransaction({
+          userId: apiKey.userId, type: "api_payment", amount: session.amount,
+          fee: feeAmount, feePercentage, currency: ownerCurrency, status: "pending",
+          country: country.toUpperCase(), operator, description: session.description || "Paiement API",
+          customerPhone, customerName: customerName || "Client", customerEmail: customerEmail || null,
+          metadata: JSON.stringify({ sessionId: session.id, apiKeyId: apiKey.id, successUrl: session.successUrl, cancelUrl: session.cancelUrl, callbackUrl: session.callbackUrl, orderId: session.orderId, provider: "afribapay", afribaPayTransactionId: result.afribaPayTransactionId }),
+        });
+        await storage.updatePaymentSession(session.id, { transactionId: tx.id });
+        return res.json({ success: true, transactionId: tx.id, redirectUrl: result.providerLink, message: result.message || "Paiement initié", provider: "afribapay" });
+
+      } else {
+        await storage.updatePaymentSession(session.id, { status: "pending" });
+        return res.status(503).json({ success: false, error: "Fournisseur de paiement non supporté" });
+      }
+    } catch (error: any) {
+      console.error("[SESSION PAY] Error:", error);
+      try { await storage.updatePaymentSession(req.params.id, { status: "pending" }); } catch {}
+      return res.status(500).json({ success: false, error: "Erreur lors du paiement" });
+    }
+  });
+
+  // GET /api/v1/payment-sessions/:id/status — Check session payment status
+  app.get("/api/v1/payment-sessions/:id/status", async (req: Request, res: Response) => {
+    try {
+      const session = await storage.getPaymentSession(req.params.id);
+      if (!session) return res.status(404).json({ success: false, error: "Session introuvable" });
+
+      if (session.status === "completed") return res.json({ success: true, status: "completed" });
+      if (session.status === "failed") return res.json({ success: false, status: "failed" });
+      if (session.status === "expired" || new Date() > session.expiresAt) return res.json({ success: false, status: "expired" });
+
+      if (session.transactionId) {
+        const tx = await storage.getTransaction(session.transactionId);
+        if (tx?.status === "completed") {
+          await storage.updatePaymentSession(session.id, { status: "completed" });
+          return res.json({ success: true, status: "completed" });
+        }
+        if (tx?.status === "failed") {
+          await storage.updatePaymentSession(session.id, { status: "failed" });
+          return res.json({ success: false, status: "failed" });
+        }
+      }
+
+      return res.json({ success: true, status: session.status });
+    } catch (error: any) {
+      console.error("[SESSION STATUS] Error:", error);
+      return res.status(500).json({ success: false, error: "Erreur serveur" });
+    }
+  });
+
   // ===== API Payout v1 - Mobile Money Payout via API key =====
   app.post("/api/v1/payout", async (req: Request, res: Response) => {
     try {
