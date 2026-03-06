@@ -5,21 +5,38 @@ import { randomUUID } from "crypto";
 const PAWAPAY_SANDBOX_URL = "https://api.sandbox.pawapay.io";
 const PAWAPAY_PRODUCTION_URL = "https://api.pawapay.io";
 
+// Mapping of PawaPay country codes to international dial codes
+const COUNTRY_DIAL_CODES: Record<string, string> = {
+  BJ: "229", BF: "226", CM: "237", CD: "243", GH: "233",
+  GM: "220", GN: "224", CI: "225", KE: "254", MW: "265",
+  ML: "223", MZ: "258", NG: "234", RW: "250", SN: "221",
+  SL: "232", TZ: "255", TG: "228", UG: "256", ZM: "260",
+  ZW: "263", MG: "261", EG: "20",
+};
+
 /**
  * Sanitize phone number to PawaPay MSISDN format.
- * Rules: digits only, no +, no trunk prefix 0 after country code.
- * Example: "+229 0146447319" → "229146447319"
+ * Rules: digits only, no leading +, country code prepended if missing.
+ * The local number is kept intact (including any "01" prefix in Benin, etc.)
+ * Example: "0146447319" + country "BJ" → "2290146447319"
+ * Example: "+2290146447319" → "2290146447319"
  */
-function sanitizePhoneForPawaPay(phone: string): string {
-  // Remove spaces and non-digit/+ chars, strip leading +
+function sanitizePhoneForPawaPay(phone: string, country: string): string {
   let n = phone.replace(/\s+/g, "").replace(/[^0-9+]/g, "");
   if (n.startsWith("+")) n = n.substring(1);
-  // All PawaPay-supported countries have 3-digit country codes.
-  // Remove the trunk prefix 0 that appears right after the country code.
-  // e.g. 2290146447319 (13 digits) → 229146447319 (12 digits)
-  if (n.length >= 12 && n[3] === "0") {
-    n = n.slice(0, 3) + n.slice(4);
+
+  const dialCode = COUNTRY_DIAL_CODES[country.toUpperCase()] || "";
+  console.log(`[PawaPay Phone] Raw="${n}" country=${country} dialCode=${dialCode}`);
+
+  if (!dialCode || n.startsWith(dialCode)) {
+    // Already has country code or unknown country — keep as is
+    console.log(`[PawaPay Phone] Final MSISDN: "${n}" (len=${n.length})`);
+    return n;
   }
+
+  // No country code yet — prepend it (keep full local number including leading digits)
+  n = dialCode + n;
+  console.log(`[PawaPay Phone] Added dial code → Final MSISDN: "${n}" (len=${n.length})`);
   return n;
 }
 
@@ -118,7 +135,7 @@ export async function createPawaPayDeposit(params: PawaPayDepositParams): Promis
   const depositId = params.externalId || randomUUID();
   const amountStr = Math.floor(params.amount).toString();
 
-  const sanitizedPhone = sanitizePhoneForPawaPay(params.phone);
+  const sanitizedPhone = sanitizePhoneForPawaPay(params.phone, params.country);
 
   // v2 API: customerMessage must be 4–22 chars
   const customerMessage = (params.description || "Paiement BKApay").substring(0, 22).padEnd(4, " ").substring(0, 22);
@@ -207,7 +224,7 @@ export async function createPawaPayPayout(params: PawaPayPayoutParams): Promise<
   const payoutId = params.externalId || randomUUID();
   const amountStr = Math.floor(params.amount).toString();
 
-  const sanitizedPhone = sanitizePhoneForPawaPay(params.phone);
+  const sanitizedPhone = sanitizePhoneForPawaPay(params.phone, params.country);
 
   // v2 API: customerMessage must be 4–22 chars
   const customerMessage = (params.description || "Retrait BKApay").substring(0, 22).padEnd(4, " ").substring(0, 22);
