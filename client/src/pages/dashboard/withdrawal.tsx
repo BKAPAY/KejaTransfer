@@ -20,6 +20,7 @@ import { useLocation } from "wouter";
 import { CurrencySelector, getCurrencyLabel } from "@/components/currency-selector";
 import { OperatorSelector } from "@/components/operator-selector";
 import { hasMultiplePayoutCurrencies, getMbiyoPayPayoutCurrenciesForCountry } from "@shared/mbiyopay-countries";
+import { getCurrencyForOperator as getPawaPayOperatorCurrency } from "@shared/pawapay-countries";
 import { useConvertedMinimums } from "@/hooks/use-converted-minimums";
 import { getCurrencyDecimals } from "@/lib/currency";
 import { PaymentMethodSelector } from "@/components/payment-method-selector";
@@ -110,13 +111,25 @@ export default function Withdrawal() {
     }
   }, [userCountry]);
 
+  // Operator-specific currency override (e.g. USD for Vodacom/Orange in DRC via PawaPay)
+  const operatorSpecificCurrency = userCountry && selectedOperator
+    ? (() => {
+        const opCurrency = getPawaPayOperatorCurrency(userCountry, selectedOperator);
+        const countryCurrency = COUNTRIES.find(c => c.code === userCountry)?.currency || "XOF";
+        return opCurrency !== countryCurrency ? opCurrency : null;
+      })()
+    : null;
+
   // Currency conversion: user balance currency -> withdrawal currency
-  // IMPORTANT: Only calculate withdrawal currency if user country is defined
-  const withdrawalCurrency = userCountry 
-    ? (hasMultiplePayoutCurrencies(userCountry) 
-        ? selectedCurrency 
-        : (COUNTRIES.find(c => c.code === userCountry)?.currency || userBalanceCurrency))
-    : userBalanceCurrency; // Default to user's currency when country not loaded
+  // Priority: 1. operator-specific currency (e.g. USD for Vodacom/Orange in DRC)
+  //           2. MbiyoPay multi-currency selector
+  //           3. Country default currency
+  const withdrawalCurrency = userCountry
+    ? (operatorSpecificCurrency
+        || (hasMultiplePayoutCurrencies(userCountry)
+            ? selectedCurrency
+            : (COUNTRIES.find(c => c.code === userCountry)?.currency || userBalanceCurrency)))
+    : userBalanceCurrency;
   // Only need conversion if user country is loaded AND currencies differ
   const needsConversion = userCountry && withdrawalCurrency !== userBalanceCurrency;
 
@@ -178,7 +191,7 @@ export default function Withdrawal() {
         securityCode: data.securityCode,
         type: "withdrawal",
         currency: userBalanceCurrency,
-        targetCurrency: selectedCurrency,
+        targetCurrency: withdrawalCurrency,
         originalAmount: data.formData.amount,
         originalCurrency: userBalanceCurrency,
       });

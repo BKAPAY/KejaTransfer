@@ -5,6 +5,7 @@ export interface PawaPayOperator {
   payin: boolean;
   payout: boolean;
   requiresOtp?: boolean;
+  currency?: string;
 }
 
 export interface PawaPayCountry {
@@ -86,8 +87,8 @@ export const PAWAPAY_COUNTRIES: PawaPayCountry[] = [
     currency: "CDF",
     operators: [
       { code: "airtel", name: "Airtel Money", correspondent: "AIRTEL_COD", payin: true, payout: true },
-      { code: "orange", name: "Orange Money", correspondent: "ORANGE_COD", payin: true, payout: true },
-      { code: "vodacom", name: "Vodacom M-Pesa", correspondent: "VODACOM_MPESA_COD", payin: true, payout: true },
+      { code: "orange", name: "Orange Money", correspondent: "ORANGE_COD", currency: "USD", payin: true, payout: true },
+      { code: "vodacom", name: "Vodacom M-Pesa", correspondent: "VODACOM_MPESA_COD", currency: "USD", payin: true, payout: true },
     ],
   },
   {
@@ -292,6 +293,15 @@ export function getCurrencyForCountry(countryCode: string): string {
     c => c.code.toUpperCase() === countryCode.toUpperCase() || c.iso3.toUpperCase() === countryCode.toUpperCase()
   );
   return country?.currency || "XOF";
+}
+
+export function getCurrencyForOperator(countryCode: string, operatorCode: string): string {
+  const country = PAWAPAY_COUNTRIES.find(
+    c => c.code.toUpperCase() === countryCode.toUpperCase() || c.iso3.toUpperCase() === countryCode.toUpperCase()
+  );
+  if (!country) return "XOF";
+  const op = country.operators.find(o => o.code.toLowerCase() === operatorCode.toLowerCase());
+  return op?.currency || country.currency;
 }
 
 export function getCorrespondent(countryCode: string, operatorCode: string): string | null {

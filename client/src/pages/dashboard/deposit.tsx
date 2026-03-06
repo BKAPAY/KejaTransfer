@@ -125,6 +125,7 @@ export default function Deposit() {
     otpInstructions?: string;
     otpUssdCode?: string;
     otpHint?: string;
+    currency?: string;
   }
   const { data: depositsDetails } = useQuery<Record<string, Record<string, OtpDetailInfo>>>({
     queryKey: ["/api/countries-operators/deposits/details"],
@@ -156,6 +157,9 @@ export default function Deposit() {
         hint: operatorOtpDetail.otpHint || "",
       }
     : null;
+
+  // Operator-specific currency override (e.g. USD for Vodacom/Orange in DRC via PawaPay)
+  const operatorSpecificCurrency = operatorOtpDetail?.currency || null;
 
   // Auto-detect country from IP address
   useEffect(() => {
@@ -221,14 +225,16 @@ export default function Deposit() {
     }
   }, [selectedCountry]);
 
-  // Currency conversion: user's balance currency -> payment currency (country selected)
-  // User enters amount in THEIR currency, we show converted amount in the SELECTED country's currency
-  // IMPORTANT: Only calculate payment currency if a country is actually selected
-  const paymentCurrency = selectedCountry 
-    ? (hasMultipleCurrencies(selectedCountry) 
-        ? selectedCurrency 
-        : (COUNTRIES.find(c => c.code === selectedCountry)?.currency || userBalanceCurrency))
-    : userBalanceCurrency; // Default to user's currency when no country selected
+  // Currency conversion: user's balance currency -> payment currency (country/operator selected)
+  // Priority: 1. operator-specific currency (e.g. USD for Vodacom/Orange in DRC)
+  //           2. MbiyoPay multi-currency selector
+  //           3. Country default currency
+  const paymentCurrency = selectedCountry
+    ? (operatorSpecificCurrency
+        || (hasMultipleCurrencies(selectedCountry)
+            ? selectedCurrency
+            : (COUNTRIES.find(c => c.code === selectedCountry)?.currency || userBalanceCurrency)))
+    : userBalanceCurrency;
   // Only need conversion if a country is selected AND its currency differs from user's currency
   const needsConversion = selectedCountry && paymentCurrency !== userBalanceCurrency;
 

@@ -2527,7 +2527,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else if (activeProvider === "pawapay") {
         // Use PawaPay for API payments
         const { createPawaPayDeposit } = await import("./pawapay");
-        const { getCurrencyForCountry: getPawaPayCurrency, pawaPayOperatorRequiresOtp: pawaRequiresOtp, getPawaPayOtpInstructions: pawaOtpInfo } = await import("@shared/pawapay-countries");
+        const { getCurrencyForOperator: getPawaPayCurrencyForOp, pawaPayOperatorRequiresOtp: pawaRequiresOtp, getPawaPayOtpInstructions: pawaOtpInfo } = await import("@shared/pawapay-countries");
 
         const { otpCode: apiPayOtpCode } = req.body;
 
@@ -2545,7 +2545,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
 
-        const providerCurrency = getPawaPayCurrency(country.toUpperCase()) || "XOF";
+        // Use operator-specific currency (e.g. USD for Vodacom/Orange in DRC)
+        const providerCurrency = getPawaPayCurrencyForOp(country.toUpperCase(), operator);
 
         let convertedAmountForProvider = amountForProvider;
         if (ownerCurrency !== providerCurrency) {
@@ -8252,7 +8253,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         (c) => c.incomingEnabled && payinEnabledMap.has(`${c.provider}-${c.country}`)
       );
       
-      const result: Record<string, Record<string, { provider: string; requiresOtp: boolean; otpInstructions?: string; otpUssdCode?: string; otpHint?: string }>> = {};
+      const result: Record<string, Record<string, { provider: string; requiresOtp: boolean; otpInstructions?: string; otpUssdCode?: string; otpHint?: string; currency?: string }>> = {};
       
       for (const config of enabledConfigs) {
         if (!result[config.country]) {
@@ -8264,6 +8265,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         let otpInstructions: string | undefined;
         let otpUssdCode: string | undefined;
         let otpHint: string | undefined;
+        let operatorCurrency: string | undefined;
         
         if (config.provider === "paydunya") {
           const { requiresOTP, getUSSDInstruction } = await import("./paydunya-softpay");
@@ -8289,7 +8291,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             otpUssdCode = getOtpUssdCode(config.country, config.operator) || undefined;
           }
         } else if (config.provider === "pawapay") {
-          const { pawaPayOperatorRequiresOtp, getPawaPayOtpInstructions } = await import("@shared/pawapay-countries");
+          const { pawaPayOperatorRequiresOtp, getPawaPayOtpInstructions, getCurrencyForOperator: pawaGetCurrency } = await import("@shared/pawapay-countries");
           requiresOtp = pawaPayOperatorRequiresOtp(config.country, config.operator);
           if (requiresOtp) {
             const info = getPawaPayOtpInstructions(config.country);
@@ -8297,6 +8299,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             otpUssdCode = info.ussdCode;
             otpHint = info.hint;
           }
+          operatorCurrency = pawaGetCurrency(config.country, config.operator);
         }
         
         result[config.country][config.operator] = {
@@ -8305,6 +8308,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ...(otpInstructions && { otpInstructions }),
           ...(otpUssdCode && { otpUssdCode }),
           ...(otpHint && { otpHint }),
+          ...(operatorCurrency && { currency: operatorCurrency }),
         };
       }
       

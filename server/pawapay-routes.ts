@@ -16,6 +16,7 @@ import {
 import {
   PAWAPAY_COUNTRIES,
   getCurrencyForCountry,
+  getCurrencyForOperator,
   getPayinOperatorsForCountry,
   getPayoutOperatorsForCountry,
   pawaPayOperatorRequiresOtp,
@@ -70,7 +71,8 @@ export async function handlePawaPayDeposit(
     }
 
     const providerAmount = Math.floor(amount);
-    const providerCurrency = currency || getCurrencyForCountry(countryUpper);
+    // Use operator-specific currency (e.g. USD for Vodacom/Orange COD) or fall back to country currency
+    const providerCurrency = currency || getCurrencyForOperator(countryUpper, operator);
     const balanceAmount = originalAmount ? Math.floor(originalAmount) : providerAmount;
     const userCurrency = originalCurrency || providerCurrency;
 
@@ -172,8 +174,9 @@ export async function handlePawaPayWithdrawal(
     }
 
     const grossAmount = Math.floor(amount);
-    const defaultCurrency = getCurrencyForCountry(countryUpper);
-    const providerCurrency = targetCurrency || userCurrency || defaultCurrency;
+    // Use operator-specific currency as default (e.g. USD for Vodacom/Orange COD)
+    const defaultCurrency = getCurrencyForOperator(countryUpper, operator);
+    const providerCurrency = targetCurrency || defaultCurrency;
     const balanceCurrency = userCurrency || providerCurrency;
 
     const feeConfig = await getFeeFromDatabase(storage, "pawapay", country, operator);
