@@ -208,13 +208,22 @@ export function EmaliChatButton() {
     }
   };
 
+  const escapeHtml = (str: string) =>
+    str
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#x27;");
+
   const renderMarkdown = (text: string) => {
-    return text
+    const safe = escapeHtml(text);
+    return safe
       .replace(/### (.*?)(\n|$)/g, '<strong class="text-sm block mt-2 mb-1">$1</strong>')
       .replace(/## (.*?)(\n|$)/g, '<strong class="text-sm block mt-2 mb-1">$1</strong>')
       .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
         '<a href="$2" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 px-2 py-1 mt-1 mb-1 rounded-md bg-primary/10 text-primary text-xs font-medium hover:bg-primary/20 transition-colors" style="text-decoration:none">$1</a>')
-      .replace(/(?<!["\w])(https?:\/\/[^\s<)]+)/g,
+      .replace(/(?<!["\w])(https?:\/\/[^\s&lt;)]+)/g,
         '<a href="$1" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 px-2 py-1 mt-1 mb-1 rounded-md bg-primary/10 text-primary text-xs font-medium hover:bg-primary/20 transition-colors" style="text-decoration:none">$1</a>')
       .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
       .replace(/\*(.*?)\*/g, "<em>$1</em>")
