@@ -88,9 +88,9 @@ export const PAWAPAY_COUNTRIES: PawaPayCountry[] = [
     currency: "CDF",
     currencies: ["CDF", "USD"],
     operators: [
-      { code: "airtel", name: "Airtel Money", correspondent: "AIRTEL_COD", payin: true, payout: true },
-      { code: "orange", name: "Orange Money", correspondent: "ORANGE_COD", payin: true, payout: true },
-      { code: "vodacom", name: "Vodacom M-Pesa", correspondent: "VODACOM_MPESA_COD", payin: true, payout: true },
+      { code: "airtel", name: "Airtel Money", correspondent: "AIRTEL_COD", payin: true, payout: true, currency: "CDF" },
+      { code: "orange", name: "Orange Money", correspondent: "ORANGE_COD", payin: true, payout: true, currency: "CDF" },
+      { code: "vodacom", name: "Vodacom M-Pesa", correspondent: "VODACOM_MPESA_COD", payin: true, payout: true, currency: "USD" },
     ],
   },
   {

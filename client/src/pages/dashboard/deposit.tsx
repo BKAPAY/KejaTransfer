@@ -22,7 +22,7 @@ import { CryptoPaymentFlow } from "@/components/crypto-payment-flow";
 import { CurrencySelector, getCurrencyLabel } from "@/components/currency-selector";
 import { OperatorSelector } from "@/components/operator-selector";
 import { hasMultipleCurrencies, getMbiyoPayCurrencyForCountry, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
-import { hasMultiplePawaPayCurrencies, getCurrenciesForCountry as getPawaPayCurrenciesForCountry } from "@shared/pawapay-countries";
+import { hasMultiplePawaPayCurrencies, getCurrenciesForCountry as getPawaPayCurrenciesForCountry, getCurrencyForOperator } from "@shared/pawapay-countries";
 import { useConvertedMinimums } from "@/hooks/use-converted-minimums";
 import { getCurrencyDecimals } from "@/lib/currency";
 import { usePaymentCountdown, DEFAULT_COUNTDOWN_DURATION } from "@/hooks/use-payment-countdown";
@@ -204,9 +204,14 @@ export default function Deposit() {
     ? (OPERATORS[selectedCountry as keyof typeof OPERATORS] || [])
     : [];
   
-  const countryOperators = enabledCountriesOperators && selectedCountry
+  const countryOperators = (enabledCountriesOperators && selectedCountry
     ? allCountryOperators.filter(op => (enabledCountriesOperators[selectedCountry] || []).includes(op.code))
-    : allCountryOperators;
+    : allCountryOperators
+  ).filter(op => {
+    if (!hasMultiplePawaPayCurrencies(selectedCountry || "")) return true;
+    const opCurrency = getCurrencyForOperator(selectedCountry || "", op.code);
+    return opCurrency === selectedCurrency;
+  });
 
   // Fetch dynamic fee from database when country/operator changes
   useEffect(() => {
@@ -232,6 +237,13 @@ export default function Deposit() {
       setSelectedCurrency(countryCurrency);
     }
   }, [selectedCountry]);
+
+  // Reset operator when currency changes for multi-currency PawaPay countries (e.g. DRC: CDF vs USD)
+  useEffect(() => {
+    if (selectedCountry && hasMultiplePawaPayCurrencies(selectedCountry)) {
+      form.setValue("operator", "");
+    }
+  }, [selectedCurrency, selectedCountry]);
 
   // Currency conversion: user's balance currency -> payment currency (country selected)
   // Priority: 1. PawaPay multi-currency selector (e.g. CDF/USD for DRC)
