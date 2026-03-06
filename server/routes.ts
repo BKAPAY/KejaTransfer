@@ -6613,52 +6613,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else if (activeProvider === "pawapay") {
         console.log(`[API_PAYMENT] Using PawaPay for ${country}/${operator}`);
         const { otpCode } = req.body;
+        const { createPawaPayDeposit } = await import("./pawapay");
+        const { getCurrencyForOperator: getPawaPayCurrencyForOp, pawaPayOperatorRequiresOtp: pawaRequiresOtp, getPawaPayOtpInstructions: pawaOtpInfo } = await import("@shared/pawapay-countries");
+
         const effectivePhone = customerPhone || transaction.customerPhone || "";
-        const apiOwner = await storage.getUser(apiKey.userId);
-        const payerCurrency = getCurrencyForCountry(country);
-        const ownerCurrencyApi = apiOwner?.country ? getCurrencyForCountry(apiOwner.country) : "XOF";
-        const result = await handlePawaPayDeposit(
-          apiKey.userId,
-          apiOwner,
-          transaction.amount,
-          country,
-          operator,
-          effectivePhone,
-          payerCurrency,
-          undefined,
-          ownerCurrencyApi !== payerCurrency ? ownerCurrencyApi : undefined,
-          otpCode
-        );
-        if (result.requiresOTP) {
+        const needsOtp = pawaRequiresOtp(country.toUpperCase(), operator);
+        if (needsOtp && !otpCode) {
+          const otpInfo = pawaOtpInfo(country.toUpperCase());
           return res.json({
             success: false,
             requiresOTP: true,
-            otpInstructions: result.otpInstructions,
-            otpUssdCode: result.otpUssdCode,
-            otpHint: result.otpHint,
+            otpInstructions: otpInfo.instructions,
+            otpUssdCode: otpInfo.ussdCode,
+            otpHint: otpInfo.hint,
             provider: "pawapay",
-            error: result.error,
+            error: "Code OTP Orange Money requis pour ce paiement",
           });
         }
-        if (result.success) {
-          await storage.updateTransaction(transaction.id, {
-            country,
-            operator,
-            metadata: JSON.stringify({
-              ...JSON.parse(transaction.metadata || "{}"),
-              provider: "pawapay",
-              pawaPayDepositId: result.pawaPayDepositId,
-            }),
-          });
-          return res.json({
-            success: true,
-            transactionId: result.transactionId || transaction.id,
-            message: result.message || "Paiement initié. Validez sur votre téléphone.",
-            provider: "pawapay",
-          });
-        } else {
-          return res.status(400).json({ success: false, error: result.error });
+
+        const providerCurrency = getPawaPayCurrencyForOp(country.toUpperCase(), operator);
+        const pawaResult = await createPawaPayDeposit({
+          amount: transaction.amount,
+          currency: providerCurrency,
+          country: country.toUpperCase(),
+          operator,
+          phone: effectivePhone,
+          description: transaction.description || "Paiement API BKApay",
+          externalId: randomUUID(),
+          preAuthorisationCode: otpCode,
+        });
+
+        if (!pawaResult.success) {
+          return res.status(400).json({ success: false, error: pawaResult.error || "Echec de l'initiation PawaPay" });
         }
+
+        const existingMeta = JSON.parse(transaction.metadata || "{}");
+        await storage.updateTransaction(transaction.id, {
+          country,
+          operator,
+          customerPhone: effectivePhone,
+          metadata: JSON.stringify({
+            ...existingMeta,
+            pawaPayDepositId: pawaResult.depositId,
+            provider: "pawapay",
+          }),
+        });
+
+        return res.json({
+          success: true,
+          transactionId: transaction.id,
+          message: pawaResult.message || "Paiement initié. Validez sur votre téléphone.",
+          provider: "pawapay",
+        });
       } else {
         return res.status(503).json({
           success: false,
