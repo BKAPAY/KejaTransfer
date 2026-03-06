@@ -74,6 +74,7 @@ export const PAWAPAY_COUNTRIES: PawaPayCountry[] = [
     phoneFormat: "0XXXXXXXX",
     currency: "XAF",
     operators: [
+      { code: "mtn", name: "MTN Mobile Money", correspondent: "MTN_MOMO_COG", payin: true, payout: true },
       { code: "airtel", name: "Airtel Money", correspondent: "AIRTEL_COG", payin: true, payout: true },
     ],
   },

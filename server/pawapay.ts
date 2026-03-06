@@ -7,7 +7,7 @@ const PAWAPAY_PRODUCTION_URL = "https://api.pawapay.io";
 
 // Mapping of PawaPay country codes to international dial codes
 const COUNTRY_DIAL_CODES: Record<string, string> = {
-  BJ: "229", BF: "226", CM: "237", CD: "243", GH: "233",
+  BJ: "229", BF: "226", CM: "237", CD: "243", CG: "242", GH: "233",
   GM: "220", GN: "224", CI: "225", KE: "254", MW: "265",
   ML: "223", MZ: "258", NG: "234", RW: "250", SN: "221",
   SL: "232", TZ: "255", TG: "228", UG: "256", ZM: "260",
