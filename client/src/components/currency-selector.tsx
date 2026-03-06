@@ -8,6 +8,7 @@ interface CurrencySelectorProps {
   onCurrencyChange: (currency: string) => void;
   className?: string;
   mode?: "payin" | "payout";
+  overrideCurrencies?: string[];
 }
 
 export function CurrencySelector({
@@ -16,8 +17,39 @@ export function CurrencySelector({
   onCurrencyChange,
   className = "",
   mode = "payin",
+  overrideCurrencies,
 }: CurrencySelectorProps) {
-  const hasMultiple = mode === "payout" 
+  if (overrideCurrencies && overrideCurrencies.length > 1) {
+    return (
+      <div className={`space-y-2 ${className}`}>
+        <Label className="text-sm font-medium">Devise</Label>
+        <div className="flex flex-wrap gap-4">
+          {overrideCurrencies.map((currency) => {
+            const currencyInfo = MBIYOPAY_CURRENCY_INFO[currency];
+            const isSelected = selectedCurrency === currency;
+            return (
+              <div key={currency} className="flex items-center space-x-2">
+                <Checkbox
+                  id={`currency-${currency}`}
+                  checked={isSelected}
+                  onCheckedChange={() => onCurrencyChange(currency)}
+                  data-testid={`checkbox-currency-${currency.toLowerCase()}`}
+                />
+                <Label
+                  htmlFor={`currency-${currency}`}
+                  className={`cursor-pointer text-sm ${isSelected ? "font-medium text-foreground" : "text-muted-foreground"}`}
+                >
+                  {currencyInfo?.symbol || currency} ({currencyInfo?.name || currency})
+                </Label>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  const hasMultiple = mode === "payout"
     ? hasMultiplePayoutCurrencies(countryCode)
     : hasMultipleCurrencies(countryCode);
 

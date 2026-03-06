@@ -26,6 +26,7 @@ import { getCurrencyDecimals } from "@/lib/currency";
 import { CurrencySelector, getCurrencyLabel } from "@/components/currency-selector";
 import { OperatorSelector } from "@/components/operator-selector";
 import { hasMultipleCurrencies, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
+import { hasMultiplePawaPayCurrencies, getCurrenciesForCountry as getPawaPayCurrenciesForCountry } from "@shared/pawapay-countries";
 import { CountryFlag } from "@/components/country-flag";
 
 interface ApiKeyInfo {
@@ -272,7 +273,10 @@ export default function ApiPay() {
 
   // Handle currency selection when country changes
   useEffect(() => {
-    if (country && hasMultipleCurrencies(country)) {
+    if (country && hasMultiplePawaPayCurrencies(country)) {
+      const currencies = getPawaPayCurrenciesForCountry(country);
+      setSelectedCurrency(currencies[0]);
+    } else if (country && hasMultipleCurrencies(country)) {
       const currencies = getMbiyoPayCurrenciesForCountry(country);
       setSelectedCurrency(currencies[0]);
     } else if (country) {
@@ -281,15 +285,16 @@ export default function ApiPay() {
     }
   }, [country]);
 
-  // Currency conversion for non-XOF countries
-  // IMPORTANT: Only calculate target currency if a country is selected
-  // This prevents conversion from triggering before user selects a country
+  // Currency conversion: owner currency -> target currency (country selected)
+  // Priority: 1. PawaPay multi-currency selector (e.g. CDF/USD for DRC)
+  //           2. MbiyoPay multi-currency selector
+  //           3. Country default currency
   const ownerCurrency = (apiKeyInfo as any)?.ownerCurrency || "XOF";
   const targetCurrency = country
-    ? (hasMultipleCurrencies(country) 
-        ? selectedCurrency 
+    ? ((hasMultiplePawaPayCurrencies(country) || hasMultipleCurrencies(country))
+        ? selectedCurrency
         : (COUNTRIES.find(c => c.code === country)?.currency || ownerCurrency))
-    : ownerCurrency; // Default to owner's currency when no country selected
+    : ownerCurrency;
   const needsConversion = country && targetCurrency !== ownerCurrency;
 
   const copyUssdCode = (code: string) => {
@@ -1346,7 +1351,16 @@ export default function ApiPay() {
       </div>
 
       {/* Currency selector for multi-currency countries (e.g., RDC with CDF/USD) */}
-      {country && hasMultipleCurrencies(country) && (
+      {country && hasMultiplePawaPayCurrencies(country) && (
+        <CurrencySelector
+          countryCode={country}
+          selectedCurrency={selectedCurrency}
+          onCurrencyChange={setSelectedCurrency}
+          overrideCurrencies={getPawaPayCurrenciesForCountry(country)}
+        />
+      )}
+
+      {country && !hasMultiplePawaPayCurrencies(country) && hasMultipleCurrencies(country) && (
         <CurrencySelector
           countryCode={country}
           selectedCurrency={selectedCurrency}

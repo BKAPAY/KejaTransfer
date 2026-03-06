@@ -22,6 +22,7 @@ import { CryptoPaymentFlow } from "@/components/crypto-payment-flow";
 import { CurrencySelector, getCurrencyLabel } from "@/components/currency-selector";
 import { OperatorSelector } from "@/components/operator-selector";
 import { hasMultipleCurrencies, getMbiyoPayCurrencyForCountry, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
+import { hasMultiplePawaPayCurrencies, getCurrenciesForCountry as getPawaPayCurrenciesForCountry } from "@shared/pawapay-countries";
 import { useConvertedMinimums } from "@/hooks/use-converted-minimums";
 import { getCurrencyDecimals } from "@/lib/currency";
 import { usePaymentCountdown, DEFAULT_COUNTDOWN_DURATION } from "@/hooks/use-payment-countdown";
@@ -158,9 +159,6 @@ export default function Deposit() {
       }
     : null;
 
-  // Operator-specific currency override (e.g. USD for Vodacom/Orange in DRC via PawaPay)
-  const operatorSpecificCurrency = operatorOtpDetail?.currency || null;
-
   // Auto-detect country from IP address
   useEffect(() => {
     const detectCountry = async () => {
@@ -216,7 +214,10 @@ export default function Deposit() {
 
   // Handle currency selection when country changes
   useEffect(() => {
-    if (selectedCountry && hasMultipleCurrencies(selectedCountry)) {
+    if (selectedCountry && hasMultiplePawaPayCurrencies(selectedCountry)) {
+      const currencies = getPawaPayCurrenciesForCountry(selectedCountry);
+      setSelectedCurrency(currencies[0]);
+    } else if (selectedCountry && hasMultipleCurrencies(selectedCountry)) {
       const currencies = getMbiyoPayCurrenciesForCountry(selectedCountry);
       setSelectedCurrency(currencies[0]);
     } else if (selectedCountry) {
@@ -225,15 +226,14 @@ export default function Deposit() {
     }
   }, [selectedCountry]);
 
-  // Currency conversion: user's balance currency -> payment currency (country/operator selected)
-  // Priority: 1. operator-specific currency (e.g. USD for Vodacom/Orange in DRC)
+  // Currency conversion: user's balance currency -> payment currency (country selected)
+  // Priority: 1. PawaPay multi-currency selector (e.g. CDF/USD for DRC)
   //           2. MbiyoPay multi-currency selector
   //           3. Country default currency
   const paymentCurrency = selectedCountry
-    ? (operatorSpecificCurrency
-        || (hasMultipleCurrencies(selectedCountry)
-            ? selectedCurrency
-            : (COUNTRIES.find(c => c.code === selectedCountry)?.currency || userBalanceCurrency)))
+    ? ((hasMultiplePawaPayCurrencies(selectedCountry) || hasMultipleCurrencies(selectedCountry))
+        ? selectedCurrency
+        : (COUNTRIES.find(c => c.code === selectedCountry)?.currency || userBalanceCurrency))
     : userBalanceCurrency;
   // Only need conversion if a country is selected AND its currency differs from user's currency
   const needsConversion = selectedCountry && paymentCurrency !== userBalanceCurrency;
@@ -832,7 +832,16 @@ export default function Deposit() {
                       )}
                     />
 
-                    {selectedCountry && hasMultipleCurrencies(selectedCountry) && (
+                    {selectedCountry && hasMultiplePawaPayCurrencies(selectedCountry) && (
+                      <CurrencySelector
+                        countryCode={selectedCountry}
+                        selectedCurrency={selectedCurrency}
+                        onCurrencyChange={setSelectedCurrency}
+                        overrideCurrencies={getPawaPayCurrenciesForCountry(selectedCountry)}
+                      />
+                    )}
+
+                    {selectedCountry && !hasMultiplePawaPayCurrencies(selectedCountry) && hasMultipleCurrencies(selectedCountry) && (
                       <CurrencySelector
                         countryCode={selectedCountry}
                         selectedCurrency={selectedCurrency}

@@ -17,6 +17,7 @@ export interface PawaPayCountry {
   phoneDigits: number;
   phoneFormat: string;
   currency: string;
+  currencies?: string[];
   operators: PawaPayOperator[];
 }
 
@@ -85,10 +86,11 @@ export const PAWAPAY_COUNTRIES: PawaPayCountry[] = [
     phoneDigits: 9,
     phoneFormat: "8XXXXXXXX",
     currency: "CDF",
+    currencies: ["CDF", "USD"],
     operators: [
       { code: "airtel", name: "Airtel Money", correspondent: "AIRTEL_COD", payin: true, payout: true },
-      { code: "orange", name: "Orange Money", correspondent: "ORANGE_COD", currency: "USD", payin: true, payout: true },
-      { code: "vodacom", name: "Vodacom M-Pesa", correspondent: "VODACOM_MPESA_COD", currency: "USD", payin: true, payout: true },
+      { code: "orange", name: "Orange Money", correspondent: "ORANGE_COD", payin: true, payout: true },
+      { code: "vodacom", name: "Vodacom M-Pesa", correspondent: "VODACOM_MPESA_COD", payin: true, payout: true },
     ],
   },
   {
@@ -293,6 +295,20 @@ export function getCurrencyForCountry(countryCode: string): string {
     c => c.code.toUpperCase() === countryCode.toUpperCase() || c.iso3.toUpperCase() === countryCode.toUpperCase()
   );
   return country?.currency || "XOF";
+}
+
+export function getCurrenciesForCountry(countryCode: string): string[] {
+  const country = PAWAPAY_COUNTRIES.find(
+    c => c.code.toUpperCase() === countryCode.toUpperCase() || c.iso3.toUpperCase() === countryCode.toUpperCase()
+  );
+  return country?.currencies || [country?.currency || "XOF"];
+}
+
+export function hasMultiplePawaPayCurrencies(countryCode: string): boolean {
+  const country = PAWAPAY_COUNTRIES.find(
+    c => c.code.toUpperCase() === countryCode.toUpperCase() || c.iso3.toUpperCase() === countryCode.toUpperCase()
+  );
+  return (country?.currencies?.length || 0) > 1;
 }
 
 export function getCurrencyForOperator(countryCode: string, operatorCode: string): string {
