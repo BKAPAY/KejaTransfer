@@ -152,7 +152,7 @@ const getFieldLabel = (provider: string, field: string): string => {
   }
   if (provider === "pawapay") {
     if (field === "apiKey") return "Token API PawaPay (Bearer Token du Dashboard PawaPay)";
-    if (field === "secretKey") return "Environnement : entrez 'live' pour production, laisser vide pour sandbox";
+    if (field === "secretKey") return "Mode : entrez exactement 'live' pour compte production PawaPay (obligatoire pour les vrais paiements). Laisser vide = mode sandbox uniquement.";
   }
   if (provider === "exchangerate") {
     if (field === "apiKey") return "Clé API ExchangeRate (exchangerate-api.com)";

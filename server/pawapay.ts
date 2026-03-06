@@ -22,7 +22,9 @@ export async function getPawaPayConfig(): Promise<PawaPayConfig | null> {
       console.log("[PawaPay] Missing API token");
       return null;
     }
-    const isSandbox = config.secretKey !== "live";
+    const secretKeyLower = (config.secretKey || "").trim().toLowerCase();
+    const isSandbox = secretKeyLower !== "live";
+    console.log(`[PawaPay] Mode: ${isSandbox ? "SANDBOX (api.sandbox.pawapay.io)" : "PRODUCTION (api.pawapay.io)"} — secretKey="${config.secretKey || "(vide)"}"`);
     return {
       apiToken: config.apiKey,
       isSandbox,
@@ -103,32 +105,37 @@ export async function createPawaPayDeposit(params: PawaPayDepositParams): Promis
     sanitizedPhone = sanitizedPhone.substring(1);
   }
 
-  // v2 API format: customerMessage must be 4–22 chars
-  const customerMessage = (params.description || "Paiement BKApay").substring(0, 22).padEnd(4, " ").substring(0, 22);
+  // v2 API: statementDescription must be 4–22 chars
+  const statementDescription = (params.description || "Paiement BKApay").substring(0, 22).padEnd(4, " ").substring(0, 22);
+  const customerTimestamp = new Date().toISOString();
 
-  // PawaPay v2 deposit body
+  // PawaPay v2 deposit body — correspondent is top-level, payer uses MSISDN + address.value
   const body: any = {
     depositId,
     amount: amountStr,
     currency: params.currency,
+    correspondent,
     payer: {
-      type: "MMO",
-      accountDetails: {
-        phoneNumber: sanitizedPhone,
-        provider: correspondent,
+      type: "MSISDN",
+      address: {
+        value: sanitizedPhone,
       },
     },
-    customerMessage,
+    customerTimestamp,
+    statementDescription,
   };
 
   if (params.preAuthorisationCode) {
     body.preAuthorisationCode = params.preAuthorisationCode;
   }
 
-  console.log(`[PawaPay Deposit] Initiating ${amountStr} ${params.currency} via ${correspondent}, phone: ***${sanitizedPhone.slice(-4)}${params.preAuthorisationCode ? " [OTP provided]" : ""}`);
+  const mode = config.isSandbox ? "SANDBOX" : "PRODUCTION";
+  console.log(`[PawaPay Deposit] [${mode}] Initiating ${amountStr} ${params.currency} via ${correspondent}, phone: ***${sanitizedPhone.slice(-4)}${params.preAuthorisationCode ? " [OTP provided]" : ""}`);
 
   try {
     const result = await pawaPayRequest(config, "POST", "/v2/deposits", body);
+
+    console.log(`[PawaPay Deposit] [${mode}] HTTP ${result.status}, status="${result.data?.status}", raw=${JSON.stringify(result.data).substring(0, 400)}`);
 
     if (result.status === 200 && result.data.status === "ACCEPTED") {
       return {
@@ -140,15 +147,17 @@ export async function createPawaPayDeposit(params: PawaPayDepositParams): Promis
     }
 
     if (result.data.status === "REJECTED") {
-      const reason = result.data.failureReason?.rejectionCode || result.data.failureReason?.message || "UNKNOWN";
-      console.error(`[PawaPay Deposit] Rejected: ${reason}`);
+      const fr = result.data.failureReason;
+      const reason = fr?.failureCode || fr?.rejectionCode || fr?.failureMessage || fr?.message || fr?.code || (typeof fr === "string" ? fr : null) || "UNKNOWN";
+      const hint = config.isSandbox ? " [MODE SANDBOX — entrez 'live' dans le champ Environnement pour utiliser la production]" : "";
+      console.error(`[PawaPay Deposit] [${mode}] Rejected: ${reason}${hint}`, fr ? JSON.stringify(fr) : "(failureReason null)");
       return { success: false, error: `Dépôt refusé: ${reason}` };
     }
 
-    console.error("[PawaPay Deposit] Unexpected response:", JSON.stringify(result.data).substring(0, 300));
+    console.error(`[PawaPay Deposit] [${mode}] Unexpected response:`, JSON.stringify(result.data).substring(0, 400));
     return { success: false, error: "Erreur lors de l'initiation du dépôt PawaPay" };
   } catch (error: any) {
-    console.error("[PawaPay Deposit] Error:", error);
+    console.error(`[PawaPay Deposit] [${mode}] Error:`, error);
     return { success: false, error: error?.message || "Erreur de connexion à PawaPay" };
   }
 }
@@ -190,28 +199,33 @@ export async function createPawaPayPayout(params: PawaPayPayoutParams): Promise<
     sanitizedPhone = sanitizedPhone.substring(1);
   }
 
-  // v2 API format: customerMessage must be 4–22 chars
-  const customerMessage = (params.description || "Retrait BKApay").substring(0, 22).padEnd(4, " ").substring(0, 22);
+  // v2 API: statementDescription must be 4–22 chars
+  const statementDescription = (params.description || "Retrait BKApay").substring(0, 22).padEnd(4, " ").substring(0, 22);
+  const customerTimestamp = new Date().toISOString();
 
-  // PawaPay v2 payout body
+  // PawaPay v2 payout body — correspondent is top-level, recipient uses MSISDN + address.value
   const body: any = {
     payoutId,
     amount: amountStr,
     currency: params.currency,
+    correspondent,
     recipient: {
-      type: "MMO",
-      accountDetails: {
-        phoneNumber: sanitizedPhone,
-        provider: correspondent,
+      type: "MSISDN",
+      address: {
+        value: sanitizedPhone,
       },
     },
-    customerMessage,
+    customerTimestamp,
+    statementDescription,
   };
 
-  console.log(`[PawaPay Payout] Initiating ${amountStr} ${params.currency} via ${correspondent}, phone: ***${sanitizedPhone.slice(-4)}`);
+  const mode = config.isSandbox ? "SANDBOX" : "PRODUCTION";
+  console.log(`[PawaPay Payout] [${mode}] Initiating ${amountStr} ${params.currency} via ${correspondent}, phone: ***${sanitizedPhone.slice(-4)}`);
 
   try {
     const result = await pawaPayRequest(config, "POST", "/v2/payouts", body);
+
+    console.log(`[PawaPay Payout] [${mode}] HTTP ${result.status}, status="${result.data?.status}", raw=${JSON.stringify(result.data).substring(0, 400)}`);
 
     if (result.status === 200 && result.data.status === "ACCEPTED") {
       return {
@@ -223,15 +237,17 @@ export async function createPawaPayPayout(params: PawaPayPayoutParams): Promise<
     }
 
     if (result.data.status === "REJECTED") {
-      const reason = result.data.failureReason?.rejectionCode || result.data.failureReason?.message || "UNKNOWN";
-      console.error(`[PawaPay Payout] Rejected: ${reason}`);
+      const fr = result.data.failureReason;
+      const reason = fr?.failureCode || fr?.rejectionCode || fr?.failureMessage || fr?.message || fr?.code || (typeof fr === "string" ? fr : null) || "UNKNOWN";
+      const hint = config.isSandbox ? " [MODE SANDBOX — entrez 'live' dans le champ Environnement pour utiliser la production]" : "";
+      console.error(`[PawaPay Payout] [${mode}] Rejected: ${reason}${hint}`, fr ? JSON.stringify(fr) : "(failureReason null)");
       return { success: false, error: `Retrait refusé: ${reason}` };
     }
 
-    console.error("[PawaPay Payout] Unexpected response:", JSON.stringify(result.data).substring(0, 300));
+    console.error(`[PawaPay Payout] [${mode}] Unexpected response:`, JSON.stringify(result.data).substring(0, 400));
     return { success: false, error: "Erreur lors de l'initiation du retrait PawaPay" };
   } catch (error: any) {
-    console.error("[PawaPay Payout] Error:", error);
+    console.error(`[PawaPay Payout] [${mode}] Error:`, error);
     return { success: false, error: error?.message || "Erreur de connexion à PawaPay" };
   }
 }
