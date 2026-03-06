@@ -414,6 +414,17 @@ export const COUNTRIES = [
   { code: "GA", name: "Gabon", flag: "🇬🇦", phoneCode: "+241", phoneDigits: 8, currency: "XAF" },
   { code: "RW", name: "Rwanda", flag: "🇷🇼", phoneCode: "+250", phoneDigits: 9, currency: "RWF" },
   { code: "GM", name: "Gambie", flag: "🇬🇲", phoneCode: "+220", phoneDigits: 7, currency: "GMD" },
+  // PawaPay countries (East & Southern Africa)
+  { code: "GH", name: "Ghana", flag: "🇬🇭", phoneCode: "+233", phoneDigits: 9, currency: "GHS" },
+  { code: "KE", name: "Kenya", flag: "🇰🇪", phoneCode: "+254", phoneDigits: 9, currency: "KES" },
+  { code: "TZ", name: "Tanzanie", flag: "🇹🇿", phoneCode: "+255", phoneDigits: 9, currency: "TZS" },
+  { code: "UG", name: "Ouganda", flag: "🇺🇬", phoneCode: "+256", phoneDigits: 9, currency: "UGX" },
+  { code: "ZM", name: "Zambie", flag: "🇿🇲", phoneCode: "+260", phoneDigits: 9, currency: "ZMW" },
+  { code: "MW", name: "Malawi", flag: "🇲🇼", phoneCode: "+265", phoneDigits: 9, currency: "MWK" },
+  { code: "MZ", name: "Mozambique", flag: "🇲🇿", phoneCode: "+258", phoneDigits: 9, currency: "MZN" },
+  { code: "NG", name: "Nigeria", flag: "🇳🇬", phoneCode: "+234", phoneDigits: 10, currency: "NGN" },
+  { code: "SL", name: "Sierra Leone", flag: "🇸🇱", phoneCode: "+232", phoneDigits: 8, currency: "SLE" },
+  { code: "LS", name: "Lesotho", flag: "🇱🇸", phoneCode: "+266", phoneDigits: 8, currency: "LSL" },
 ] as const;
 
 // Operators by country for AfribaPay (verified from AfribaPay documentation)
@@ -467,6 +478,7 @@ export const OPERATORS = {
     { code: "airtel", name: "Airtel Money", requiresOtp: false },
     { code: "mpesa", name: "M-Pesa", requiresOtp: false },
     { code: "afrimoney", name: "Afrimoney", requiresOtp: false },
+    { code: "vodacom", name: "Vodacom M-Pesa", requiresOtp: false },
   ],
   TD: [
     { code: "airtel", name: "Airtel Money", requiresOtp: false },
@@ -492,6 +504,47 @@ export const OPERATORS = {
     { code: "afrimoney", name: "Afrimoney", requiresOtp: false },
     { code: "qmoney", name: "QMoney", requiresOtp: false },
     { code: "wave", name: "Wave", requiresOtp: false },
+  ],
+  // PawaPay countries (East & Southern Africa)
+  GH: [
+    { code: "mtn", name: "MTN Mobile Money", requiresOtp: false },
+    { code: "vodafone", name: "Vodafone Cash", requiresOtp: false },
+    { code: "airteltigo", name: "AirtelTigo Money", requiresOtp: false },
+  ],
+  KE: [
+    { code: "mpesa", name: "M-Pesa (Safaricom)", requiresOtp: false },
+  ],
+  TZ: [
+    { code: "airtel", name: "Airtel Money", requiresOtp: false },
+    { code: "tigo", name: "Tigo Pesa", requiresOtp: false },
+    { code: "halotel", name: "Halotel", requiresOtp: false },
+  ],
+  UG: [
+    { code: "mtn", name: "MTN MoMo", requiresOtp: false },
+    { code: "airtel", name: "Airtel Money", requiresOtp: false },
+  ],
+  ZM: [
+    { code: "airtel", name: "Airtel Money", requiresOtp: false },
+    { code: "mtn", name: "MTN MoMo", requiresOtp: false },
+    { code: "zamtel", name: "Zamtel Kwacha", requiresOtp: false },
+  ],
+  MW: [
+    { code: "airtel", name: "Airtel Money", requiresOtp: false },
+    { code: "tnm", name: "TNM Mpamba", requiresOtp: false },
+  ],
+  MZ: [
+    { code: "mpesa", name: "M-Pesa", requiresOtp: false },
+    { code: "movitel", name: "Movitel", requiresOtp: false },
+  ],
+  NG: [
+    { code: "airtel", name: "Airtel Money", requiresOtp: false },
+    { code: "mtn", name: "MTN MoMo", requiresOtp: false },
+  ],
+  SL: [
+    { code: "orange", name: "Orange Money", requiresOtp: false },
+  ],
+  LS: [
+    { code: "mpesa", name: "M-Pesa", requiresOtp: false },
   ],
 } as const;
 

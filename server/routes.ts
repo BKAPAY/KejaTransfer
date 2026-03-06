@@ -8288,6 +8288,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
             otpInstructions = getOtpInstructionsForOperator(config.country, config.operator) || undefined;
             otpUssdCode = getOtpUssdCode(config.country, config.operator) || undefined;
           }
+        } else if (config.provider === "pawapay") {
+          const { pawaPayOperatorRequiresOtp, getPawaPayOtpInstructions } = await import("@shared/pawapay-countries");
+          requiresOtp = pawaPayOperatorRequiresOtp(config.country, config.operator);
+          if (requiresOtp) {
+            const info = getPawaPayOtpInstructions(config.country);
+            otpInstructions = info.instructions;
+            otpUssdCode = info.ussdCode;
+            otpHint = info.hint;
+          }
         }
         
         result[config.country][config.operator] = {
