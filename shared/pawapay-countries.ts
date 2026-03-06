@@ -59,7 +59,7 @@ export const PAWAPAY_COUNTRIES: PawaPayCountry[] = [
     currency: "XAF",
     operators: [
       { code: "mtn", name: "MTN Mobile Money", correspondent: "MTN_MOMO_CMR", payin: true, payout: true },
-      { code: "orange", name: "Orange Money", correspondent: "ORANGE_CMR", payin: true, payout: true, requiresOtp: true },
+      { code: "orange", name: "Orange Money", correspondent: "ORANGE_CMR", payin: true, payout: true },
     ],
   },
   {
@@ -227,7 +227,7 @@ export const PAWAPAY_COUNTRIES: PawaPayCountry[] = [
     currency: "XOF",
     operators: [
       { code: "free", name: "Free Money", correspondent: "FREE_SEN", payin: true, payout: true },
-      { code: "orange", name: "Orange Money", correspondent: "ORANGE_SEN", payin: true, payout: true, requiresOtp: true },
+      { code: "orange", name: "Orange Money", correspondent: "ORANGE_SEN", payin: true, payout: true },
     ],
   },
   {
@@ -240,7 +240,7 @@ export const PAWAPAY_COUNTRIES: PawaPayCountry[] = [
     phoneFormat: "XXXXXXXX",
     currency: "SLL",
     operators: [
-      { code: "orange", name: "Orange Money", correspondent: "ORANGE_SLE", payin: true, payout: true, requiresOtp: true },
+      { code: "orange", name: "Orange Money", correspondent: "ORANGE_SLE", payin: true, payout: true },
     ],
   },
   {
