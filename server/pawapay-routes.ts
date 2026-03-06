@@ -297,47 +297,111 @@ export async function handlePawaPayWebhook(req: Request, res: Response): Promise
 
     const depositId = payload.depositId;
     const payoutId = payload.payoutId;
-    const status = payload.status;
+    const webhookStatus = payload.status;
 
-    console.log(`[PawaPay Webhook] Received: depositId=${depositId}, payoutId=${payoutId}, status=${status}`);
+    console.log(`[PawaPay Webhook] Received: depositId=${depositId}, payoutId=${payoutId}, status=${webhookStatus}`);
 
+    // Acknowledge immediately so PawaPay doesn't retry
     res.status(200).json({ success: true });
-
-    const mappedStatus = mapPawaPayStatus(status);
 
     if (depositId) {
       const transactions = await storage.getTransactionsByMetadata("pawaPayDepositId", depositId);
       for (const tx of transactions) {
-        if (tx.status !== "pending") continue;
-        if (mappedStatus === "completed") {
-          const meta = JSON.parse(tx.metadata || "{}");
-          const netAmount = meta.netAmountForUser || meta.balanceAmount || tx.amount;
-          await storage.updateUserBalance(tx.userId, netAmount);
-          await storage.updateTransactionStatus(tx.id, "completed");
-          console.log(`[PawaPay Webhook] Deposit ${tx.id} completed - credited ${netAmount}`);
-          await trySendPaymentCallback(tx, "completed");
-        } else if (mappedStatus === "failed") {
-          await storage.updateTransactionStatus(tx.id, "failed");
-          console.log(`[PawaPay Webhook] Deposit ${tx.id} failed`);
+        // Skip already-processed transactions
+        if (tx.status !== "pending") {
+          console.log(`[PawaPay Webhook] Deposit ${tx.id} already processed (status=${tx.status}), skipping`);
+          continue;
         }
+
+        // SECURITY: Re-verify status via PawaPay API — never trust webhook payload alone
+        let verifiedStatus: string;
+        let apiData: any;
+        try {
+          const apiResult = await getPawaPayDepositStatus(depositId);
+          verifiedStatus = apiResult.status;
+          apiData = apiResult.data;
+          console.log(`[PawaPay Webhook] API verification for depositId=${depositId}: status=${verifiedStatus}`);
+        } catch (err) {
+          console.error(`[PawaPay Webhook] API verification failed for depositId=${depositId}, aborting:`, err);
+          continue;
+        }
+
+        const mappedStatus = mapPawaPayStatus(verifiedStatus);
+
+        if (mappedStatus === "completed") {
+          // SECURITY: Verify amount from API matches what we stored
+          const meta = JSON.parse(tx.metadata || "{}");
+          if (apiData?.amount) {
+            const apiAmount = Number(apiData.amount);
+            const storedAmount = tx.amount;
+            if (Math.abs(apiAmount - storedAmount) > 1) {
+              console.error(`[PawaPay Webhook] AMOUNT MISMATCH for ${tx.id}: API=${apiAmount}, stored=${storedAmount} — aborting credit`);
+              continue;
+            }
+          }
+
+          // ATOMIC: Use finalizeIncomingTransaction which atomically sets status=completed
+          // WHERE status='pending' — prevents double-credit if webhook fires twice
+          const result = await storage.finalizeIncomingTransaction(tx.id);
+          if (result && result.credited) {
+            console.log(`[PawaPay Webhook] Deposit ${tx.id} finalized and credited to user ${tx.userId}`);
+            await trySendPaymentCallback(tx, "completed");
+          } else if (!result) {
+            console.log(`[PawaPay Webhook] Deposit ${tx.id} was already finalized by another process (race condition prevented)`);
+          }
+        } else if (mappedStatus === "failed") {
+          // ATOMIC: Only fails if still pending
+          const failed = await storage.atomicFailTransaction(tx.id);
+          if (failed) {
+            console.log(`[PawaPay Webhook] Deposit ${tx.id} marked failed (verified via API)`);
+          }
+        }
+        // If status is still "pending" from API, do nothing — let polling handle it
       }
     }
 
     if (payoutId) {
       const transactions = await storage.getTransactionsByMetadata("pawaPayPayoutId", payoutId);
       for (const tx of transactions) {
-        if (tx.status !== "pending") continue;
+        // Skip already-processed transactions
+        if (tx.status !== "pending") {
+          console.log(`[PawaPay Webhook] Payout ${tx.id} already processed (status=${tx.status}), skipping`);
+          continue;
+        }
+
+        // SECURITY: Re-verify status via PawaPay API
+        let verifiedStatus: string;
+        try {
+          const apiResult = await getPawaPayPayoutStatus(payoutId);
+          verifiedStatus = apiResult.status;
+          console.log(`[PawaPay Webhook] API verification for payoutId=${payoutId}: status=${verifiedStatus}`);
+        } catch (err) {
+          console.error(`[PawaPay Webhook] API verification failed for payoutId=${payoutId}, aborting:`, err);
+          continue;
+        }
+
+        const mappedStatus = mapPawaPayStatus(verifiedStatus);
+
         if (mappedStatus === "completed") {
-          await storage.updateTransactionStatus(tx.id, "completed");
-          console.log(`[PawaPay Webhook] Payout ${tx.id} completed`);
-          await sendApiPayoutCallback(tx.id, "completed");
+          // ATOMIC: Only completes if still pending
+          const completed = await storage.atomicCompleteTransaction(tx.id);
+          if (completed) {
+            console.log(`[PawaPay Webhook] Payout ${tx.id} completed`);
+            await sendApiPayoutCallback(tx.id, "completed");
+          } else {
+            console.log(`[PawaPay Webhook] Payout ${tx.id} already processed by another process`);
+          }
         } else if (mappedStatus === "failed") {
           const meta = JSON.parse(tx.metadata || "{}");
           const refundAmount = meta.deductedFromBalance || tx.amount;
-          await storage.updateUserBalance(tx.userId, refundAmount);
-          await storage.updateTransactionStatus(tx.id, "failed");
-          console.log(`[PawaPay Webhook] Payout ${tx.id} failed - refunded ${refundAmount}`);
-          await sendApiPayoutCallback(tx.id, "failed");
+          // ATOMIC: Fails and refunds in one DB transaction — prevents double-refund
+          const refunded = await storage.atomicFailAndRefundPayout(tx.id, tx.userId, refundAmount);
+          if (refunded) {
+            console.log(`[PawaPay Webhook] Payout ${tx.id} failed — refunded ${refundAmount} to user ${tx.userId}`);
+            await sendApiPayoutCallback(tx.id, "failed");
+          } else {
+            console.log(`[PawaPay Webhook] Payout ${tx.id} already processed by another process`);
+          }
         }
       }
     }
@@ -351,6 +415,7 @@ export async function handlePawaPayWebhook(req: Request, res: Response): Promise
 
 export async function pollPawaPayTransaction(txId: string): Promise<void> {
   try {
+    // Re-fetch from DB to get latest state (prevents race with concurrent webhook)
     const tx = await storage.getTransaction(txId);
     if (!tx || tx.status !== "pending") return;
 
@@ -359,29 +424,62 @@ export async function pollPawaPayTransaction(txId: string): Promise<void> {
     const payoutId = meta.pawaPayPayoutId;
 
     if (depositId) {
-      const { status } = await getPawaPayDepositStatus(depositId);
+      const { status, data: apiData } = await getPawaPayDepositStatus(depositId);
       const mappedStatus = mapPawaPayStatus(status);
+
+      console.log(`[PawaPay Poll] depositId=${depositId}, API status=${status}, mapped=${mappedStatus}`);
+
       if (mappedStatus === "completed") {
-        const netAmount = meta.netAmountForUser || meta.balanceAmount || tx.amount;
-        await storage.updateUserBalance(tx.userId, netAmount);
-        await storage.updateTransactionStatus(txId, "completed");
-        await trySendPaymentCallback(tx, "completed");
+        // SECURITY: Verify amount from API matches what we stored
+        if (apiData?.amount) {
+          const apiAmount = Number(apiData.amount);
+          if (Math.abs(apiAmount - tx.amount) > 1) {
+            console.error(`[PawaPay Poll] AMOUNT MISMATCH for ${txId}: API=${apiAmount}, stored=${tx.amount} — aborting`);
+            return;
+          }
+        }
+
+        // ATOMIC: finalizeIncomingTransaction — atomically sets completed WHERE pending
+        const result = await storage.finalizeIncomingTransaction(txId);
+        if (result && result.credited) {
+          console.log(`[PawaPay Poll] Deposit ${txId} finalized and credited to user ${tx.userId}`);
+          await trySendPaymentCallback(tx, "completed");
+        } else if (!result) {
+          console.log(`[PawaPay Poll] Deposit ${txId} already finalized by another process (race condition prevented)`);
+        }
       } else if (mappedStatus === "failed") {
-        await storage.updateTransactionStatus(txId, "failed");
+        const failed = await storage.atomicFailTransaction(txId);
+        if (failed) {
+          console.log(`[PawaPay Poll] Deposit ${txId} marked failed`);
+        }
       }
     }
 
     if (payoutId) {
       const { status } = await getPawaPayPayoutStatus(payoutId);
       const mappedStatus = mapPawaPayStatus(status);
+
+      console.log(`[PawaPay Poll] payoutId=${payoutId}, API status=${status}, mapped=${mappedStatus}`);
+
       if (mappedStatus === "completed") {
-        await storage.updateTransactionStatus(txId, "completed");
-        await sendApiPayoutCallback(txId, "completed");
+        // ATOMIC: Only completes if still pending
+        const completed = await storage.atomicCompleteTransaction(txId);
+        if (completed) {
+          console.log(`[PawaPay Poll] Payout ${txId} completed`);
+          await sendApiPayoutCallback(txId, "completed");
+        } else {
+          console.log(`[PawaPay Poll] Payout ${txId} already processed by another process`);
+        }
       } else if (mappedStatus === "failed") {
         const refundAmount = meta.deductedFromBalance || tx.amount;
-        await storage.updateUserBalance(tx.userId, refundAmount);
-        await storage.updateTransactionStatus(txId, "failed");
-        await sendApiPayoutCallback(txId, "failed");
+        // ATOMIC: Fails and refunds in one DB transaction — prevents double-refund
+        const refunded = await storage.atomicFailAndRefundPayout(txId, tx.userId, refundAmount);
+        if (refunded) {
+          console.log(`[PawaPay Poll] Payout ${txId} failed — refunded ${refundAmount} to user ${tx.userId}`);
+          await sendApiPayoutCallback(txId, "failed");
+        } else {
+          console.log(`[PawaPay Poll] Payout ${txId} already processed by another process`);
+        }
       }
     }
   } catch (error) {

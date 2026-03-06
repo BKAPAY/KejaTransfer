@@ -100,6 +100,9 @@ export interface IStorage {
   updateTransactionMetadata(id: string, metadata: string): Promise<Transaction | undefined>;
   atomicMarkRefundedAndCredit(transactionId: string, userId: string, refundAmount: number, source: string): Promise<boolean>;
   finalizeIncomingTransaction(id: string, extras?: { paydunyaReceiptUrl?: string }): Promise<{ transaction: Transaction; credited: boolean } | null>;
+  atomicFailAndRefundPayout(transactionId: string, userId: string, refundAmount: number): Promise<boolean>;
+  atomicCompleteTransaction(transactionId: string): Promise<boolean>;
+  atomicFailTransaction(transactionId: string): Promise<boolean>;
   getUserStats(userId: string): Promise<{
     totalBalance: number;
     totalDeposits: number;
@@ -900,6 +903,56 @@ export class DbStorage implements IStorage {
     }
     
     return { transaction, credited: false };
+  }
+
+  async atomicFailAndRefundPayout(transactionId: string, userId: string, refundAmount: number): Promise<boolean> {
+    const result = await client.begin(async (tx) => {
+      const updated = await tx`
+        UPDATE transactions
+        SET status = 'failed'
+        WHERE id = ${transactionId}
+          AND status = 'pending'
+        RETURNING id
+      `;
+
+      if (updated.length === 0) {
+        return false;
+      }
+
+      await tx`
+        UPDATE users SET balance = balance + ${refundAmount} WHERE id = ${userId}
+      `;
+
+      return true;
+    });
+
+    return result;
+  }
+
+  async atomicCompleteTransaction(transactionId: string): Promise<boolean> {
+    const updated = await db
+      .update(schema.transactions)
+      .set({ status: "completed" })
+      .where(and(
+        eq(schema.transactions.id, transactionId),
+        eq(schema.transactions.status, "pending")
+      ))
+      .returning({ id: schema.transactions.id });
+
+    return updated.length > 0;
+  }
+
+  async atomicFailTransaction(transactionId: string): Promise<boolean> {
+    const updated = await db
+      .update(schema.transactions)
+      .set({ status: "failed" })
+      .where(and(
+        eq(schema.transactions.id, transactionId),
+        eq(schema.transactions.status, "pending")
+      ))
+      .returning({ id: schema.transactions.id });
+
+    return updated.length > 0;
   }
 
   async getUserStats(userId: string): Promise<{
