@@ -53,7 +53,7 @@ const OPERATOR_LOGOS: Record<string, { image?: string; color: string; bgColor: s
   // PawaPay operators (East & Southern Africa)
   vodafone: { color: "#E60000", bgColor: "bg-red-100 dark:bg-red-950", textColor: "text-red-600 dark:text-red-400" },
   airteltigo: { image: airtelImage, color: "#ED1C24", bgColor: "bg-red-100 dark:bg-red-950", textColor: "text-red-600 dark:text-red-400" },
-  vodacom: { color: "#E60000", bgColor: "bg-red-100 dark:bg-red-950", textColor: "text-red-600 dark:text-red-400" },
+  vodacom: { image: mpesaImage, color: "#E60000", bgColor: "bg-red-100 dark:bg-red-950", textColor: "text-red-600 dark:text-red-400" },
   tigo: { color: "#0072BC", bgColor: "bg-blue-100 dark:bg-blue-950", textColor: "text-blue-600 dark:text-blue-400" },
   halotel: { color: "#00A651", bgColor: "bg-green-100 dark:bg-green-950", textColor: "text-green-600 dark:text-green-400" },
   tnm: { color: "#002868", bgColor: "bg-blue-100 dark:bg-blue-950", textColor: "text-blue-700 dark:text-blue-400" },
