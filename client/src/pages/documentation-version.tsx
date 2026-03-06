@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ExternalLink, AlertTriangle, ArrowRight, Clock, Monitor, Send } from "lucide-react";
+import { ExternalLink, AlertTriangle, ArrowRight, Clock, Monitor, Send, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -181,11 +181,11 @@ export default function DocumentationVersion({ version }: DocumentationVersionPr
       <div className="space-y-4">
         <h2 className="text-xl font-semibold text-foreground">Choisissez votre type d'integration</h2>
         <p className="text-sm text-muted-foreground">
-          BKApay propose trois methodes d'integration. Cliquez sur celle qui convient a votre projet.
+          BKApay propose quatre methodes d'integration. Cliquez sur celle qui convient a votre projet.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card 
           className="cursor-pointer hover-elevate transition-colors border-2 border-border"
           onClick={() => setLocation(`${basePath}/redirect/${docVersion.version}`)}
@@ -291,6 +291,46 @@ export default function DocumentationVersion({ version }: DocumentationVersionPr
               </li>
             </ul>
             <Button className="w-full gap-2 bg-blue-600 text-white" data-testid="button-go-payout">
+              Voir la documentation
+              <ArrowRight className="w-4 h-4" />
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card 
+          className="cursor-pointer hover-elevate transition-colors border-2 border-emerald-500/30"
+          onClick={() => setLocation(`${basePath}/sessions/${docVersion.version}`)}
+          data-testid="card-sessions-api"
+        >
+          <CardHeader>
+            <div className="flex items-center gap-2 mb-1">
+              <Badge variant="default" className="text-xs bg-emerald-600">Nouveau v1.6</Badge>
+            </div>
+            <div className="w-12 h-12 rounded-lg bg-emerald-500/10 flex items-center justify-center mb-3">
+              <ShieldCheck className="w-6 h-6 text-emerald-600" />
+            </div>
+            <CardTitle className="text-lg">Sessions de Paiement Securisees</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Creez une session de paiement depuis votre serveur avec le montant verrouille. 
+              Le client ne peut pas modifier le montant — securite maximale.
+            </p>
+            <ul className="space-y-2 text-sm text-muted-foreground">
+              <li className="flex items-start gap-2">
+                <span className="text-emerald-600 mt-0.5">•</span>
+                Montant defini et verrouille cote serveur
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-emerald-600 mt-0.5">•</span>
+                Authentification par cle secrete sk_live_
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-emerald-600 mt-0.5">•</span>
+                Redirection vers success_url / cancel_url apres paiement
+              </li>
+            </ul>
+            <Button className="w-full gap-2 bg-emerald-600 text-white" data-testid="button-go-sessions">
               Voir la documentation
               <ArrowRight className="w-4 h-4" />
             </Button>
