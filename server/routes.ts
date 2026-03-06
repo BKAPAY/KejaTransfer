@@ -8665,6 +8665,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Initialize fee configs
   await storage.initializeFeeConfigs();
+  await storage.ensurePawaPayFeeConfigs();
 
   // ===== Provider Config Routes (API Keys Management) =====
   app.get("/api/admin/providers", requireAdmin, async (req: Request, res: Response) => {

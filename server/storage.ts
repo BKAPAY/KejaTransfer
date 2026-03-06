@@ -25,6 +25,7 @@ import { MBIYOPAY_COUNTRIES } from "@shared/mbiyopay-countries";
 import { FEDAPAY_COUNTRIES } from "@shared/fedapay-countries";
 import { AFRIBAPAY_COUNTRIES } from "@shared/afribapay-countries";
 import { PAYDUNYA_COUNTRIES } from "@shared/paydunya-countries";
+import { PAWAPAY_COUNTRIES } from "@shared/pawapay-countries";
 
 if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL environment variable is not set");
@@ -163,6 +164,7 @@ export interface IStorage {
   createOrUpdateFeeConfig(config: InsertFeeConfig): Promise<FeeConfig>;
   updateFeeConfig(provider: string, country: string, operator: string, updates: { incomingFeePercentage?: number; outgoingFeePercentage?: number }): Promise<FeeConfig | undefined>;
   initializeFeeConfigs(): Promise<void>;
+  ensurePawaPayFeeConfigs(): Promise<void>;
 
   // Support Settings
   getSupportSettings(): Promise<SupportSettings | undefined>;
@@ -1500,6 +1502,25 @@ export class DbStorage implements IStorage {
           .catch(() => {});
       }
     }
+
+    // Initialize PawaPay
+    for (const country of PAWAPAY_COUNTRIES) {
+      for (const operator of country.operators) {
+        const key = `pawapay-${country.code}-${operator.code}`;
+        if (existingSet.has(key)) continue;
+
+        await db
+          .insert(schema.countryOperatorConfig)
+          .values({
+            provider: "pawapay",
+            country: country.code,
+            operator: operator.code,
+            incomingEnabled: false,
+            outgoingEnabled: false,
+          })
+          .catch(() => {});
+      }
+    }
   }
 
   // Country Status Methods (for country-level payin/payout control per provider)
@@ -1653,6 +1674,22 @@ export class DbStorage implements IStorage {
         })
         .catch(() => {});
     }
+
+    // Initialize PawaPay countries
+    for (const country of PAWAPAY_COUNTRIES) {
+      const key = `pawapay-${country.code}`;
+      if (existingSet.has(key)) continue;
+
+      await db
+        .insert(schema.countryStatus)
+        .values({
+          provider: "pawapay",
+          country: country.code,
+          payinEnabled: false,
+          payoutEnabled: false,
+        })
+        .catch(() => {});
+    }
   }
 
   // ===== Provider Configs =====
@@ -1684,7 +1721,7 @@ export class DbStorage implements IStorage {
   }
 
   async initializeProviderConfigs(): Promise<void> {
-    const providers = ["afribapay", "paydunya", "fedapay", "mbiyopay", "moneyfusion", "nowpayments", "exchangerate", "mailtrap"];
+    const providers = ["afribapay", "paydunya", "fedapay", "mbiyopay", "moneyfusion", "nowpayments", "pawapay", "exchangerate", "mailtrap"];
     const existing = await this.getProviderConfigs();
     const existingSet = new Set(existing.map(p => p.provider));
 
@@ -1971,6 +2008,33 @@ export class DbStorage implements IStorage {
     if (configs.length > 0) {
       await db.insert(schema.feeConfigs).values(configs);
       console.log(`[FeeConfigs] Initialized ${configs.length} fee configurations with default 6%`);
+    }
+  }
+
+  async ensurePawaPayFeeConfigs(): Promise<void> {
+    const existing = await this.getFeeConfigsByProvider("pawapay");
+    const existingSet = new Set(existing.map(c => `${c.country}-${c.operator}`));
+
+    const toInsert: InsertFeeConfig[] = [];
+    for (const country of PAWAPAY_COUNTRIES) {
+      for (const op of country.operators) {
+        const key = `${country.code}-${op.code}`;
+        if (existingSet.has(key)) continue;
+        toInsert.push({
+          provider: "pawapay",
+          country: country.code,
+          operator: op.code,
+          incomingFeePercentage: 60,
+          outgoingFeePercentage: 60,
+        });
+      }
+    }
+
+    if (toInsert.length > 0) {
+      await db.insert(schema.feeConfigs).values(toInsert);
+      console.log(`[FeeConfigs] Added ${toInsert.length} PawaPay fee configurations (default 6%)`);
+    } else {
+      console.log(`[FeeConfigs] PawaPay fee configs already initialized`);
     }
   }
 
