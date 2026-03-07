@@ -2944,7 +2944,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ success: false, error: "Service temporairement indisponible" });
       }
 
-      const { country, operator, customerPhone, customerName, customerEmail, otpCode } = req.body;
+      const { country, operator, customerPhone, customerName, customerEmail, otpCode, currency: requestCurrency } = req.body;
 
       if (!country || !operator || !customerPhone) {
         return res.status(400).json({ success: false, error: "Pays, opérateur et téléphone requis" });
@@ -3157,7 +3157,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       } else if (activeProvider === "mbiyopay") {
         const { createMbiyoPayPayin, getCurrencyForCountry: getMbiyoCurrency, mbiyoPayOperatorRequiresOtp: mbiyoNeedsOtp, getMbiyoPayOtpInstructions: getMbiyoOtpInfo } = await import("./mbiyopay");
-        const providerCurrency = getMbiyoCurrency(country);
+        const providerCurrency = requestCurrency || getMbiyoCurrency(country);
         const needsOtp = mbiyoNeedsOtp(country, operator);
         if (needsOtp && !otpCode) {
           await storage.updatePaymentSession(session.id, { status: "pending" });

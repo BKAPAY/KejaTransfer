@@ -18,6 +18,9 @@ import { COUNTRIES, OPERATORS } from "@shared/schema";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PaymentMethodSelector } from "@/components/payment-method-selector";
 import { CryptoPaymentFlow } from "@/components/crypto-payment-flow";
+import { CurrencySelector } from "@/components/currency-selector";
+import { hasMultiplePawaPayCurrencies, getCurrenciesForCountry as getPawaPayCurrenciesForCountry } from "@shared/pawapay-countries";
+import { hasMultipleCurrencies, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
 
 interface SessionInfo {
   success: boolean;
@@ -122,6 +125,7 @@ export default function Checkout() {
     isLoading: boolean;
   } | null>(null);
   const [dynamicFee, setDynamicFee] = useState<{ feePercentage: number; feeAmount: number } | null>(null);
+  const [selectedCurrency, setSelectedCurrency] = useState<string>("XOF");
   const pollRef = useRef<NodeJS.Timeout | null>(null);
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
   const successUrlRef = useRef<string | null>(null);
@@ -208,7 +212,9 @@ export default function Checkout() {
 
   const sessionCurrency = session?.currency || "XOF";
   const targetCurrency = country
-    ? (COUNTRIES.find(c => c.code === country)?.currency || sessionCurrency)
+    ? ((hasMultiplePawaPayCurrencies(country) || hasMultipleCurrencies(country))
+        ? selectedCurrency
+        : (COUNTRIES.find(c => c.code === country)?.currency || sessionCurrency))
     : sessionCurrency;
   const needsConversion = !!country && targetCurrency !== sessionCurrency;
 
@@ -216,8 +222,6 @@ export default function Checkout() {
   const baseAmount = session?.amount || 0;
   const totalWithFees = (hasOperatorSelected && dynamicFee && session?.customerPaysFee) ? baseAmount + dynamicFee.feeAmount : baseAmount;
   const amountForDisplay = session?.customerPaysFee ? totalWithFees : baseAmount;
-  const displayAmount = conversionData && !conversionData.isLoading ? conversionData.convertedAmount : amountForDisplay;
-  const displayCurrency = conversionData && !conversionData.isLoading ? conversionData.targetCurrency : sessionCurrency;
 
   useEffect(() => {
     const fetchDynamicFee = async () => {
@@ -270,6 +274,19 @@ export default function Checkout() {
     }, 300);
     return () => clearTimeout(timer);
   }, [needsConversion, amountForDisplay, sessionCurrency, targetCurrency]);
+
+  useEffect(() => {
+    if (country && hasMultiplePawaPayCurrencies(country)) {
+      const currencies = getPawaPayCurrenciesForCountry(country);
+      setSelectedCurrency(currencies[0]);
+    } else if (country && hasMultipleCurrencies(country)) {
+      const currencies = getMbiyoPayCurrenciesForCountry(country);
+      setSelectedCurrency(currencies[0]);
+    } else if (country) {
+      const countryCurrency = COUNTRIES.find(c => c.code === country)?.currency || "XOF";
+      setSelectedCurrency(countryCurrency);
+    }
+  }, [country]);
 
   useEffect(() => {
     const detectCountry = async () => {
@@ -475,7 +492,7 @@ export default function Checkout() {
       toast({ title: "Champs requis", description: "Veuillez remplir tous les champs", variant: "destructive" });
       return;
     }
-    const body: any = { country, operator, customerPhone, customerName };
+    const body: any = { country, operator, customerPhone, customerName, currency: selectedCurrency };
     if (customerEmail) body.customerEmail = customerEmail;
     if (showOtpOnForm && otpCode.trim()) body.otpCode = otpCode;
     payMutation.mutate(body);
@@ -771,6 +788,23 @@ export default function Checkout() {
         </Select>
       </div>
 
+      {country && hasMultiplePawaPayCurrencies(country) && (
+        <CurrencySelector
+          countryCode={country}
+          selectedCurrency={selectedCurrency}
+          onCurrencyChange={setSelectedCurrency}
+          overrideCurrencies={getPawaPayCurrenciesForCountry(country)}
+        />
+      )}
+
+      {country && !hasMultiplePawaPayCurrencies(country) && hasMultipleCurrencies(country) && (
+        <CurrencySelector
+          countryCode={country}
+          selectedCurrency={selectedCurrency}
+          onCurrencyChange={setSelectedCurrency}
+        />
+      )}
+
       <div className="space-y-2">
         <Label htmlFor="checkout-phone" className="flex items-center gap-2">
           <Phone className="w-4 h-4" />
@@ -850,6 +884,27 @@ export default function Checkout() {
         </div>
       )}
 
+      {conversionData && (
+        <div className="bg-green-50 dark:bg-green-950 p-3 rounded-md border border-green-200 dark:border-green-800">
+          <p className="text-sm text-green-700 dark:text-green-300 font-medium">
+            Montant à payer
+          </p>
+          {conversionData.isLoading ? (
+            <div className="flex items-center gap-2 mt-1">
+              <Loader2 className="h-4 w-4 animate-spin text-green-600" />
+              <span className="text-sm text-green-600">Conversion en cours...</span>
+            </div>
+          ) : (
+            <p className="text-lg font-bold text-green-800 dark:text-green-200" data-testid="text-converted-amount">
+              {new Intl.NumberFormat("fr-FR", {
+                minimumFractionDigits: getCurrencyDecimals(conversionData.targetCurrency),
+                maximumFractionDigits: getCurrencyDecimals(conversionData.targetCurrency),
+              }).format(conversionData.convertedAmount)} {conversionData.targetCurrency}
+            </p>
+          )}
+        </div>
+      )}
+
       <Button
         onClick={handlePay}
         disabled={payMutation.isPending || !country || !operator || !customerPhone || noOperatorsAvailable || (Boolean(showOtpOnForm) && !otpCode.trim())}
@@ -863,7 +918,7 @@ export default function Checkout() {
             Traitement...
           </>
         ) : (
-          `Payer ${displayAmount ? formatAmount(displayAmount, displayCurrency) : ""}`
+          `Payer ${amountForDisplay ? formatAmount(amountForDisplay, sessionCurrency) : ""}`
         )}
       </Button>
     </div>
@@ -896,7 +951,7 @@ export default function Checkout() {
             <div>
               <p className="text-sm text-muted-foreground mb-1">Montant a payer</p>
               <p className="text-3xl font-bold text-primary" data-testid="text-amount">
-                {displayAmount ? Math.floor(displayAmount).toLocaleString() : ""} <span className="text-lg">{displayCurrency}</span>
+                {amountForDisplay ? Math.floor(amountForDisplay).toLocaleString() : ""} <span className="text-lg">{sessionCurrency}</span>
               </p>
               {needsConversion && conversionData && !conversionData.isLoading && (
                 <p className="text-xs text-muted-foreground mt-1">
