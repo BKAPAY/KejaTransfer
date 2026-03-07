@@ -1622,6 +1622,29 @@ export default function ApiPay() {
                           }, 2000);
                         }
                       }}
+                      onError={() => {
+                        setPaymentStage("failed");
+                        if (key) clearPaymentState(key);
+                        toast({
+                          title: "Paiement echoue",
+                          description: "La transaction crypto a echoue",
+                          variant: "destructive",
+                        });
+                        if (isInlineMode && window.parent !== window) {
+                          setTimeout(() => {
+                            window.parent.postMessage({
+                              type: "bkapay_payment_failed",
+                              transactionId,
+                              amount,
+                              status: "failed",
+                            }, "*");
+                          }, 3000);
+                        } else if (callbackUrl) {
+                          setTimeout(() => {
+                            window.location.href = `${callbackUrl}${callbackUrl.includes('?') ? '&' : '?'}status=failed&amount=${amount}`;
+                          }, 5000);
+                        }
+                      }}
                     />
                     <Button
                       variant="outline"

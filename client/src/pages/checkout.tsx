@@ -91,9 +91,6 @@ export default function Checkout() {
       if (pollRef.current) clearInterval(pollRef.current);
       setStage("completed");
       setPaymentActive(false);
-      setTimeout(() => {
-        if (successUrlRef.current) window.location.href = successUrlRef.current;
-      }, 2500);
     },
     onFailed: () => {
       if (pollRef.current) clearInterval(pollRef.current);
@@ -102,7 +99,7 @@ export default function Checkout() {
     },
     onExpired: () => {
       if (pollRef.current) clearInterval(pollRef.current);
-      setStage("failed");
+      setStage("expired");
       setPaymentActive(false);
     },
   });
@@ -225,9 +222,6 @@ export default function Checkout() {
           setPaymentActive(false);
           paymentCountdown.resetCountdown();
           setStage("completed");
-          setTimeout(() => {
-            if (successUrlRef.current) window.location.href = successUrlRef.current;
-          }, 2500);
         } else if (sessionStatus === "failed") {
           clearInterval(pollRef.current!);
           setPaymentActive(false);
@@ -356,6 +350,33 @@ export default function Checkout() {
     );
   }
 
+  useEffect(() => {
+    if ((session?.status === "completed" || stage === "completed") && successUrlRef.current) {
+      const timer = setTimeout(() => {
+        window.location.href = successUrlRef.current!;
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [session?.status, stage]);
+
+  useEffect(() => {
+    if (stage === "failed" && cancelUrlRef.current) {
+      const timer = setTimeout(() => {
+        window.location.href = cancelUrlRef.current!;
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [stage]);
+
+  useEffect(() => {
+    if (stage === "expired" && cancelUrlRef.current) {
+      const timer = setTimeout(() => {
+        window.location.href = cancelUrlRef.current!;
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [stage]);
+
   if (session?.status === "completed" || stage === "completed") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-accent/5 p-4">
@@ -365,10 +386,14 @@ export default function Checkout() {
             <CheckCircle2 className="w-14 h-14 text-green-500 mx-auto mb-3" />
             <p className="font-semibold text-xl text-foreground mb-1">Paiement réussi</p>
             <p className="text-muted-foreground text-sm">
-              {session.amount && session.currency ? formatAmount(session.amount, session.currency) : ""}
-              {session.description ? ` — ${session.description}` : ""}
+              {session?.amount && session?.currency ? formatAmount(session.amount, session.currency) : ""}
+              {session?.description ? ` — ${session.description}` : ""}
             </p>
-            <p className="text-xs text-muted-foreground mt-4">Redirection en cours...</p>
+            {successUrlRef.current ? (
+              <p className="text-xs text-muted-foreground mt-4">Redirection automatique dans quelques secondes...</p>
+            ) : (
+              <p className="text-xs text-muted-foreground mt-4">Paiement traité avec succès</p>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -384,6 +409,9 @@ export default function Checkout() {
             <Clock className="w-12 h-12 text-amber-500 mx-auto mb-3" />
             <p className="font-semibold text-foreground mb-1">Session expirée</p>
             <p className="text-sm text-muted-foreground">Cette session de paiement a expiré. Contactez le marchand pour générer un nouveau lien.</p>
+            {cancelUrlRef.current && (
+              <p className="text-xs text-muted-foreground mt-4">Redirection automatique dans quelques secondes...</p>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -406,11 +434,14 @@ export default function Checkout() {
                 <RefreshCw className="w-4 h-4 mr-2" /> Réessayer
               </Button>
               {cancelUrlRef.current && (
-                <Button variant="ghost" onClick={() => window.location.href = cancelUrlRef.current!}>
-                  Annuler
+                <Button variant="ghost" onClick={() => window.location.href = cancelUrlRef.current!} data-testid="button-cancel-redirect">
+                  Retour au site
                 </Button>
               )}
             </div>
+            {cancelUrlRef.current && (
+              <p className="text-xs text-muted-foreground mt-4">Redirection automatique dans quelques secondes...</p>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -743,9 +774,9 @@ export default function Checkout() {
                       customerPhone={cryptoCustomerInfo.customerPhone}
                       onSuccess={() => {
                         setStage("completed");
-                        setTimeout(() => {
-                          if (successUrlRef.current) window.location.href = successUrlRef.current;
-                        }, 2500);
+                      }}
+                      onError={() => {
+                        setStage("failed");
                       }}
                     />
                     <Button

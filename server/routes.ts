@@ -3212,6 +3212,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  async function sendSessionCallback(session: any, status: string, tx?: any) {
+    if (!session.callbackUrl) return;
+    try {
+      const payload: any = {
+        event: status === "completed" ? "payment.completed" : "payment.failed",
+        session_id: session.id,
+        status,
+        amount: session.amount,
+        currency: session.currency,
+        order_id: session.orderId || null,
+      };
+      if (tx) {
+        payload.transaction_id = tx.id;
+        payload.customer_phone = tx.customerPhone || null;
+        payload.customer_name = tx.customerName || null;
+        payload.customer_email = tx.customerEmail || null;
+      }
+      console.log(`[SESSION CALLBACK] Sending ${status} callback to ${session.callbackUrl}`);
+      const resp = await fetch(session.callbackUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(10000),
+      });
+      console.log(`[SESSION CALLBACK] Response: ${resp.status}`);
+    } catch (err: any) {
+      console.error(`[SESSION CALLBACK] Error sending callback:`, err.message);
+    }
+  }
+
   // GET /api/v1/payment-sessions/:id/status — Check session payment status
   app.get("/api/v1/payment-sessions/:id/status", async (req: Request, res: Response) => {
     try {
@@ -3225,11 +3255,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (session.transactionId) {
         const tx = await storage.getTransaction(session.transactionId);
         if (tx?.status === "completed") {
+          const wasProcessing = session.status !== "completed";
           await storage.updatePaymentSession(session.id, { status: "completed" });
+          if (wasProcessing) sendSessionCallback(session, "completed", tx).catch(() => {});
           return res.json({ success: true, status: "completed" });
         }
         if (tx?.status === "failed") {
+          const wasProcessing = session.status !== "failed";
           await storage.updatePaymentSession(session.id, { status: "failed" });
+          if (wasProcessing) sendSessionCallback(session, "failed", tx).catch(() => {});
           return res.json({ success: false, status: "failed" });
         }
       }

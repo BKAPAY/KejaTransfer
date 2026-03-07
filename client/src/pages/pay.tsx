@@ -1684,6 +1684,9 @@ export default function Pay() {
                       onSuccess={() => {
                         setPaymentStage("completed");
                       }}
+                      onError={() => {
+                        setPaymentStage("failed");
+                      }}
                     />
                     <Button
                       variant="outline"
