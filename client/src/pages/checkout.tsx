@@ -11,9 +11,6 @@ import { OperatorSelector } from "@/components/operator-selector";
 import { CountryFlag } from "@/components/country-flag";
 import logoImage from "@assets/bkapay-logo.png";
 import { getCurrencyDecimals } from "@/lib/currency";
-import { hasMultiplePawaPayCurrencies, getCurrenciesForCountry as getPawaPayCurrenciesForCountry } from "@shared/pawapay-countries";
-import { hasMultipleCurrencies, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
-import { CurrencySelector } from "@/components/currency-selector";
 import { COUNTRIES, OPERATORS } from "@shared/schema";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -63,7 +60,6 @@ export default function Checkout() {
   const [transactionId, setTransactionId] = useState<string | null>(null);
   const [redirectUrl, setRedirectUrl] = useState<string | null>(null);
   const [paymentMessage, setPaymentMessage] = useState("");
-  const [selectedCurrency, setSelectedCurrency] = useState("");
   const [sessionExpiresAt, setSessionExpiresAt] = useState<Date | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
   const pollRef = useRef<NodeJS.Timeout | null>(null);
@@ -208,7 +204,7 @@ export default function Checkout() {
       toast({ title: "Champs requis", description: "Veuillez remplir tous les champs", variant: "destructive" });
       return;
     }
-    payMutation.mutate({ country, operator, customerPhone, customerName, currency: selectedCurrency || undefined });
+    payMutation.mutate({ country, operator, customerPhone, customerName });
   };
 
   const handleOtpSubmit = () => {
@@ -216,7 +212,7 @@ export default function Checkout() {
       toast({ title: "Code requis", description: "Veuillez entrer le code OTP", variant: "destructive" });
       return;
     }
-    payMutation.mutate({ country, operator, customerPhone, customerName, otpCode, currency: selectedCurrency || undefined });
+    payMutation.mutate({ country, operator, customerPhone, customerName, otpCode });
   };
 
   const handleRetry = () => {
@@ -426,7 +422,7 @@ export default function Checkout() {
               <label className="text-sm font-medium text-foreground mb-1.5 block">Pays</label>
               <Select
                 value={country}
-                onValueChange={(c) => { setCountry(c); setOperator(""); setSelectedCurrency(""); }}
+                onValueChange={(c) => { setCountry(c); setOperator(""); }}
               >
                 <SelectTrigger data-testid="select-country">
                   <SelectValue placeholder="Selectionnez un pays" />
@@ -440,23 +436,6 @@ export default function Checkout() {
                 </SelectContent>
               </Select>
             </div>
-
-            {country && hasMultiplePawaPayCurrencies(country) && (
-              <CurrencySelector
-                countryCode={country}
-                selectedCurrency={selectedCurrency}
-                onCurrencyChange={setSelectedCurrency}
-                overrideCurrencies={getPawaPayCurrenciesForCountry(country)}
-              />
-            )}
-            {country && !hasMultiplePawaPayCurrencies(country) && hasMultipleCurrencies(country) && (
-              <CurrencySelector
-                countryCode={country}
-                selectedCurrency={selectedCurrency}
-                onCurrencyChange={setSelectedCurrency}
-                overrideCurrencies={getMbiyoPayCurrenciesForCountry(country)}
-              />
-            )}
 
             {country && (
               <div>
