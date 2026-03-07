@@ -89,9 +89,9 @@ export const PAWAPAY_COUNTRIES: PawaPayCountry[] = [
     currency: "CDF",
     currencies: ["CDF", "USD"],
     operators: [
-      { code: "airtel", name: "Airtel Money", correspondent: "AIRTEL_COD", payin: true, payout: true, currency: "CDF" },
-      { code: "orange", name: "Orange Money", correspondent: "ORANGE_COD", payin: true, payout: true, currency: "CDF" },
-      { code: "vodacom", name: "Vodacom M-Pesa", correspondent: "VODACOM_MPESA_COD", payin: true, payout: true, currency: "USD" },
+      { code: "airtel", name: "Airtel Money", correspondent: "AIRTEL_COD", payin: true, payout: true, currency: "CDF", currencies: ["CDF", "USD"] },
+      { code: "orange", name: "Orange Money", correspondent: "ORANGE_COD", payin: true, payout: true, currency: "CDF", currencies: ["CDF", "USD"] },
+      { code: "vodacom", name: "Vodacom M-Pesa", correspondent: "VODACOM_MPESA_COD", payin: true, payout: true, currency: "USD", currencies: ["CDF", "USD"] },
     ],
   },
   {
@@ -400,7 +400,14 @@ export function getOperatorCodesForCurrency(countryCode: string, currency: strin
   );
   if (!country || !country.currencies || country.currencies.length <= 1) return [];
   return country.operators
-    .filter(o => o.payin && o.currency?.toUpperCase() === currency.toUpperCase())
+    .filter(o => {
+      if (!o.payin) return false;
+      const operatorCurrencies = (o as any).currencies as string[] | undefined;
+      if (operatorCurrencies && operatorCurrencies.length > 0) {
+        return operatorCurrencies.map(c => c.toUpperCase()).includes(currency.toUpperCase());
+      }
+      return o.currency?.toUpperCase() === currency.toUpperCase();
+    })
     .map(o => o.code);
 }
 
