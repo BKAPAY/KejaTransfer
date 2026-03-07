@@ -699,8 +699,8 @@ export default function Checkout() {
               </div>
             )}
 
-            {session.amount && session.currency && (
-              <p className="text-2xl font-bold text-foreground">{formatAmount(displayAmount, displayCurrency)}</p>
+            {session?.amount && session?.currency && (
+              <p className="text-2xl font-bold text-foreground">{formatAmount(session.amount, session.currency)}</p>
             )}
 
             <p className="text-xs text-muted-foreground">
