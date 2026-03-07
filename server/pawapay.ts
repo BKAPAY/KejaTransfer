@@ -153,8 +153,9 @@ export async function createPawaPayDeposit(params: PawaPayDepositParams): Promis
 
   const sanitizedPhone = sanitizePhoneForPawaPay(params.phone, params.country);
 
-  // v2 API: customerMessage must be 4–22 chars
-  const customerMessage = (params.description || "Paiement BKApay").substring(0, 22).padEnd(4, " ").substring(0, 22);
+  // v2 API: customerMessage must be 4–22 chars, alphanumeric and spaces ONLY
+  const rawMsg = (params.description || "Recharge portefeuille").replace(/[^a-zA-Z0-9 ]/g, "").trim();
+  const customerMessage = rawMsg.substring(0, 22).padEnd(4, " ").substring(0, 22);
 
   // PawaPay v2 deposit body — exact format from official documentation
   const body: any = {
@@ -242,8 +243,9 @@ export async function createPawaPayPayout(params: PawaPayPayoutParams): Promise<
 
   const sanitizedPhone = sanitizePhoneForPawaPay(params.phone, params.country);
 
-  // v2 API: customerMessage must be 4–22 chars
-  const customerMessage = (params.description || "Retrait BKApay").substring(0, 22).padEnd(4, " ").substring(0, 22);
+  // v2 API: customerMessage must be 4–22 chars, alphanumeric and spaces ONLY
+  const rawPayoutMsg = (params.description || "Retrait BKApay").replace(/[^a-zA-Z0-9 ]/g, "").trim();
+  const customerMessage = rawPayoutMsg.substring(0, 22).padEnd(4, " ").substring(0, 22);
 
   // PawaPay v2 payout body — exact format from official documentation
   const body: any = {
