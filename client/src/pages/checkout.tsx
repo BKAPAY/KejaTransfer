@@ -78,6 +78,12 @@ export default function Checkout() {
     customerEmail: string;
     customerPhone: string;
   } | null>(null);
+  const [conversionData, setConversionData] = useState<{
+    convertedAmount: number;
+    targetCurrency: string;
+    conversionRate: number;
+    isLoading: boolean;
+  } | null>(null);
   const pollRef = useRef<NodeJS.Timeout | null>(null);
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
   const successUrlRef = useRef<string | null>(null);
@@ -157,6 +163,41 @@ export default function Checkout() {
     : null;
 
   const showOtpOnForm = operatorOtpDetail?.requiresOtp;
+
+  const sessionCurrency = session?.currency || "XOF";
+  const targetCurrency = country
+    ? (COUNTRIES.find(c => c.code === country)?.currency || sessionCurrency)
+    : sessionCurrency;
+  const needsConversion = !!country && targetCurrency !== sessionCurrency;
+
+  useEffect(() => {
+    if (!needsConversion || !session?.amount) {
+      setConversionData(null);
+      return;
+    }
+    setConversionData(prev => prev ? { ...prev, isLoading: true } : { convertedAmount: 0, targetCurrency, conversionRate: 0, isLoading: true });
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch("/api/convert-currency", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ amount: session.amount, fromCurrency: sessionCurrency, toCurrency: targetCurrency }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setConversionData({ convertedAmount: data.convertedAmount, targetCurrency: data.targetCurrency, conversionRate: data.conversionRate, isLoading: false });
+        } else {
+          setConversionData(null);
+        }
+      } catch {
+        setConversionData(null);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [needsConversion, session?.amount, sessionCurrency, targetCurrency]);
+
+  const displayAmount = conversionData && !conversionData.isLoading ? conversionData.convertedAmount : session?.amount || 0;
+  const displayCurrency = conversionData && !conversionData.isLoading ? conversionData.targetCurrency : sessionCurrency;
 
   useEffect(() => {
     const detectCountry = async () => {
@@ -495,7 +536,7 @@ export default function Checkout() {
             )}
 
             {session.amount && session.currency && (
-              <p className="text-2xl font-bold text-foreground">{formatAmount(session.amount, session.currency)}</p>
+              <p className="text-2xl font-bold text-foreground">{formatAmount(displayAmount, displayCurrency)}</p>
             )}
 
             <p className="text-xs text-muted-foreground">
@@ -704,7 +745,7 @@ export default function Checkout() {
             Traitement...
           </>
         ) : (
-          `Payer ${session.amount && session.currency ? formatAmount(session.amount, session.currency) : ""}`
+          `Payer ${displayAmount ? formatAmount(displayAmount, displayCurrency) : ""}`
         )}
       </Button>
     </div>
@@ -737,8 +778,18 @@ export default function Checkout() {
             <div>
               <p className="text-sm text-muted-foreground mb-1">Montant a payer</p>
               <p className="text-3xl font-bold text-primary" data-testid="text-amount">
-                {session.amount ? session.amount.toLocaleString() : ""} <span className="text-lg">{session.currency || ""}</span>
+                {displayAmount ? Math.floor(displayAmount).toLocaleString() : ""} <span className="text-lg">{displayCurrency}</span>
               </p>
+              {needsConversion && conversionData && !conversionData.isLoading && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  {session.amount?.toLocaleString()} {sessionCurrency} = {Math.floor(conversionData.convertedAmount).toLocaleString()} {conversionData.targetCurrency}
+                </p>
+              )}
+              {needsConversion && conversionData?.isLoading && (
+                <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                  <Loader2 className="w-3 h-3 animate-spin" /> Conversion en cours...
+                </p>
+              )}
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Completez votre paiement en remplissant les informations</p>
@@ -757,7 +808,7 @@ export default function Checkout() {
                   <div className="space-y-4">
                     <div className="bg-muted p-3 rounded-md">
                       <p className="text-sm text-muted-foreground">Montant a payer</p>
-                      <p className="text-xl font-bold">{session.amount?.toLocaleString()} {session.currency}</p>
+                      <p className="text-xl font-bold">{session.amount?.toLocaleString()} {sessionCurrency}</p>
                       <p className="text-xs text-muted-foreground mt-1">
                         {cryptoCustomerInfo.customerName} - {cryptoCustomerInfo.customerEmail}
                       </p>
