@@ -33,6 +33,7 @@ interface SessionInfo {
   error?: string;
   api_key_id?: string;
   customerPaysCryptoFee?: boolean;
+  customerPaysFee?: boolean;
 }
 
 type Stage = "form" | "otp" | "polling" | "completed" | "failed" | "expired" | "redirect";
@@ -120,6 +121,7 @@ export default function Checkout() {
     conversionRate: number;
     isLoading: boolean;
   } | null>(null);
+  const [dynamicFee, setDynamicFee] = useState<{ feePercentage: number; feeAmount: number } | null>(null);
   const pollRef = useRef<NodeJS.Timeout | null>(null);
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
   const successUrlRef = useRef<string | null>(null);
@@ -210,8 +212,41 @@ export default function Checkout() {
     : sessionCurrency;
   const needsConversion = !!country && targetCurrency !== sessionCurrency;
 
+  const hasOperatorSelected = !!country && !!operator;
+  const baseAmount = session?.amount || 0;
+  const totalWithFees = (hasOperatorSelected && dynamicFee && session?.customerPaysFee) ? baseAmount + dynamicFee.feeAmount : baseAmount;
+  const amountForDisplay = session?.customerPaysFee ? totalWithFees : baseAmount;
+  const displayAmount = conversionData && !conversionData.isLoading ? conversionData.convertedAmount : amountForDisplay;
+  const displayCurrency = conversionData && !conversionData.isLoading ? conversionData.targetCurrency : sessionCurrency;
+
   useEffect(() => {
-    if (!needsConversion || !session?.amount) {
+    const fetchDynamicFee = async () => {
+      if (!country || !operator || !session?.amount || session.amount <= 0 || !session?.customerPaysFee) {
+        setDynamicFee(null);
+        return;
+      }
+      try {
+        const res = await fetch(`/api/fees/${country}/${operator}`);
+        if (res.ok) {
+          const data = await res.json();
+          const feePercentage = data.incomingFeePercentage || 60;
+          const feeAmount = Math.floor((session.amount * feePercentage) / 1000);
+          setDynamicFee({ feePercentage, feeAmount });
+        } else {
+          const feeAmount = Math.floor((session.amount * 60) / 1000);
+          setDynamicFee({ feePercentage: 60, feeAmount });
+        }
+      } catch {
+        const feeAmount = Math.floor((session.amount * 60) / 1000);
+        setDynamicFee({ feePercentage: 60, feeAmount });
+      }
+    };
+    const debounceTimer = setTimeout(fetchDynamicFee, 300);
+    return () => clearTimeout(debounceTimer);
+  }, [country, operator, session?.amount, session?.customerPaysFee]);
+
+  useEffect(() => {
+    if (!needsConversion || !amountForDisplay) {
       setConversionData(null);
       return;
     }
@@ -221,7 +256,7 @@ export default function Checkout() {
         const res = await fetch("/api/convert-currency", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ amount: session.amount, fromCurrency: sessionCurrency, toCurrency: targetCurrency }),
+          body: JSON.stringify({ amount: amountForDisplay, fromCurrency: sessionCurrency, toCurrency: targetCurrency }),
         });
         if (res.ok) {
           const data = await res.json();
@@ -234,10 +269,7 @@ export default function Checkout() {
       }
     }, 300);
     return () => clearTimeout(timer);
-  }, [needsConversion, session?.amount, sessionCurrency, targetCurrency]);
-
-  const displayAmount = conversionData && !conversionData.isLoading ? conversionData.convertedAmount : session?.amount || 0;
-  const displayCurrency = conversionData && !conversionData.isLoading ? conversionData.targetCurrency : sessionCurrency;
+  }, [needsConversion, amountForDisplay, sessionCurrency, targetCurrency]);
 
   useEffect(() => {
     const detectCountry = async () => {
@@ -868,7 +900,7 @@ export default function Checkout() {
               </p>
               {needsConversion && conversionData && !conversionData.isLoading && (
                 <p className="text-xs text-muted-foreground mt-1">
-                  {session.amount?.toLocaleString()} {sessionCurrency} = {Math.floor(conversionData.convertedAmount).toLocaleString()} {conversionData.targetCurrency}
+                  {Math.floor(amountForDisplay).toLocaleString()} {sessionCurrency} = {Math.floor(conversionData.convertedAmount).toLocaleString()} {conversionData.targetCurrency}
                 </p>
               )}
               {needsConversion && conversionData?.isLoading && (
