@@ -52,6 +52,42 @@ function formatCountdown(ms: number): string {
   return `${min}:${sec.toString().padStart(2, "0")}`;
 }
 
+interface CheckoutPaymentState {
+  stage: Stage;
+  transactionId: string | null;
+  country: string;
+  operator: string;
+  customerPhone: string;
+  customerName: string;
+  customerEmail: string;
+  paymentMessage: string;
+  redirectUrl: string | null;
+}
+
+function getCheckoutStateKey(sessionId: string): string {
+  return `checkout_payment_state_${sessionId}`;
+}
+
+function saveCheckoutState(sessionId: string, state: CheckoutPaymentState): void {
+  localStorage.setItem(getCheckoutStateKey(sessionId), JSON.stringify(state));
+}
+
+function loadCheckoutState(sessionId: string): CheckoutPaymentState | null {
+  const stored = localStorage.getItem(getCheckoutStateKey(sessionId));
+  if (stored) {
+    try {
+      return JSON.parse(stored);
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+function clearCheckoutState(sessionId: string): void {
+  localStorage.removeItem(getCheckoutStateKey(sessionId));
+}
+
 export default function Checkout() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const { toast } = useToast();
@@ -88,6 +124,7 @@ export default function Checkout() {
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
   const successUrlRef = useRef<string | null>(null);
   const cancelUrlRef = useRef<string | null>(null);
+  const [shouldStartCountdown, setShouldStartCountdown] = useState(false);
 
   const paymentCountdown = usePaymentCountdown({
     invoiceToken: null,
@@ -97,16 +134,19 @@ export default function Checkout() {
       if (pollRef.current) clearInterval(pollRef.current);
       setStage("completed");
       setPaymentActive(false);
+      if (sessionId) clearCheckoutState(sessionId);
     },
     onFailed: () => {
       if (pollRef.current) clearInterval(pollRef.current);
       setStage("failed");
       setPaymentActive(false);
+      if (sessionId) clearCheckoutState(sessionId);
     },
     onExpired: () => {
       if (pollRef.current) clearInterval(pollRef.current);
       setStage("expired");
       setPaymentActive(false);
+      if (sessionId) clearCheckoutState(sessionId);
     },
   });
 
@@ -252,6 +292,34 @@ export default function Checkout() {
     if (session?.cancel_url) cancelUrlRef.current = session.cancel_url;
   }, [session]);
 
+  useEffect(() => {
+    if (!sessionId) return;
+    const savedState = loadCheckoutState(sessionId);
+    if (savedState && savedState.stage === "polling" && savedState.transactionId) {
+      setStage("polling");
+      setTransactionId(savedState.transactionId);
+      setCountry(savedState.country);
+      setOperator(savedState.operator);
+      setCustomerPhone(savedState.customerPhone);
+      setCustomerName(savedState.customerName);
+      setCustomerEmail(savedState.customerEmail);
+      setPaymentMessage(savedState.paymentMessage);
+      setPaymentActive(true);
+      setShouldStartCountdown(true);
+    } else if (savedState && savedState.stage === "redirect" && savedState.redirectUrl) {
+      setStage("redirect");
+      setRedirectUrl(savedState.redirectUrl);
+    }
+  }, [sessionId]);
+
+  useEffect(() => {
+    if (shouldStartCountdown && transactionId) {
+      paymentCountdown.startCountdown();
+      startSessionPolling();
+      setShouldStartCountdown(false);
+    }
+  }, [shouldStartCountdown, transactionId]);
+
   const startSessionPolling = () => {
     if (pollRef.current) clearInterval(pollRef.current);
     const poll = async () => {
@@ -263,11 +331,13 @@ export default function Checkout() {
           setPaymentActive(false);
           paymentCountdown.resetCountdown();
           setStage("completed");
+          if (sessionId) clearCheckoutState(sessionId);
         } else if (sessionStatus === "failed") {
           clearInterval(pollRef.current!);
           setPaymentActive(false);
           paymentCountdown.resetCountdown();
           setStage("failed");
+          if (sessionId) clearCheckoutState(sessionId);
         }
       } catch {}
     };
@@ -334,16 +404,31 @@ export default function Checkout() {
       if (data.redirectUrl) {
         setRedirectUrl(data.redirectUrl);
         setStage("redirect");
+        if (sessionId) {
+          saveCheckoutState(sessionId, {
+            stage: "redirect", transactionId: data.transactionId || null,
+            country, operator, customerPhone, customerName, customerEmail,
+            paymentMessage: "", redirectUrl: data.redirectUrl,
+          });
+        }
         return;
       }
       if (data.transactionId) {
         setTransactionId(data.transactionId);
       }
-      setPaymentMessage(data.message || "Validez le paiement sur votre téléphone.");
+      const msg = data.message || "Validez le paiement sur votre téléphone.";
+      setPaymentMessage(msg);
       setStage("polling");
       setPaymentActive(true);
       paymentCountdown.startCountdown();
       startSessionPolling();
+      if (sessionId) {
+        saveCheckoutState(sessionId, {
+          stage: "polling", transactionId: data.transactionId || null,
+          country, operator, customerPhone, customerName, customerEmail,
+          paymentMessage: msg, redirectUrl: null,
+        });
+      }
     },
     onError: (error: any) => {
       setStage("form");
@@ -373,6 +458,7 @@ export default function Checkout() {
   };
 
   const handleRetry = () => {
+    if (sessionId) clearCheckoutState(sessionId);
     setStage("form");
     setOtpCode("");
     setOtpInstructions("");
