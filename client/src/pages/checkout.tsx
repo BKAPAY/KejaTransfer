@@ -19,7 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { PaymentMethodSelector } from "@/components/payment-method-selector";
 import { CryptoPaymentFlow } from "@/components/crypto-payment-flow";
 import { CurrencySelector } from "@/components/currency-selector";
-import { hasMultiplePawaPayCurrencies, getCurrenciesForCountry as getPawaPayCurrenciesForCountry } from "@shared/pawapay-countries";
+import { hasMultiplePawaPayCurrencies, getCurrenciesForCountry as getPawaPayCurrenciesForCountry, getOperatorCodesForCurrency } from "@shared/pawapay-countries";
 import { hasMultipleCurrencies, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
 
 interface SessionInfo {
@@ -197,10 +197,14 @@ export default function Checkout() {
     ? (OPERATORS[country as keyof typeof OPERATORS] || [])
     : [];
 
-  const countryOperators = (enabledCountriesOperators && country
+  const enabledFilteredOperators = (enabledCountriesOperators && country
     ? allCountryOperators.filter(op => (enabledCountriesOperators[country] || []).includes(op.code))
     : allCountryOperators
   );
+
+  const countryOperators = (country && hasMultiplePawaPayCurrencies(country))
+    ? enabledFilteredOperators.filter(op => getOperatorCodesForCurrency(country, selectedCurrency).includes(op.code))
+    : enabledFilteredOperators;
 
   const noOperatorsAvailable = country && countryOperators.length === 0 && !isLoadingOperators;
 
@@ -792,7 +796,7 @@ export default function Checkout() {
         <CurrencySelector
           countryCode={country}
           selectedCurrency={selectedCurrency}
-          onCurrencyChange={setSelectedCurrency}
+          onCurrencyChange={(c) => { setSelectedCurrency(c); setOperator(""); }}
           overrideCurrencies={getPawaPayCurrenciesForCountry(country)}
         />
       )}

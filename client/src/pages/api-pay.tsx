@@ -26,7 +26,7 @@ import { getCurrencyDecimals } from "@/lib/currency";
 import { CurrencySelector, getCurrencyLabel } from "@/components/currency-selector";
 import { OperatorSelector } from "@/components/operator-selector";
 import { hasMultipleCurrencies, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
-import { hasMultiplePawaPayCurrencies, getCurrenciesForCountry as getPawaPayCurrenciesForCountry } from "@shared/pawapay-countries";
+import { hasMultiplePawaPayCurrencies, getCurrenciesForCountry as getPawaPayCurrenciesForCountry, getOperatorCodesForCurrency } from "@shared/pawapay-countries";
 import { CountryFlag } from "@/components/country-flag";
 
 interface ApiKeyInfo {
@@ -325,9 +325,13 @@ export default function ApiPay() {
     ? (enabledCountriesOperators[country] || [])
     : [];
   
-  const countryOperators = isLoadingOperators 
+  const enabledFilteredOperators = isLoadingOperators 
     ? allCountryOperators
     : allCountryOperators.filter(op => enabledOperatorsForCountry.includes(op.code));
+  
+  const countryOperators = (country && hasMultiplePawaPayCurrencies(country))
+    ? enabledFilteredOperators.filter(op => getOperatorCodesForCurrency(country, selectedCurrency).includes(op.code))
+    : enabledFilteredOperators;
   
   const noOperatorsAvailable = !isLoadingOperators && !!country && countryOperators.length === 0;
 
@@ -1358,7 +1362,7 @@ export default function ApiPay() {
         <CurrencySelector
           countryCode={country}
           selectedCurrency={selectedCurrency}
-          onCurrencyChange={setSelectedCurrency}
+          onCurrencyChange={(c) => { setSelectedCurrency(c); setOperator(""); }}
           overrideCurrencies={getPawaPayCurrenciesForCountry(country)}
         />
       )}

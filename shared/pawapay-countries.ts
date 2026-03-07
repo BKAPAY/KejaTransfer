@@ -394,4 +394,14 @@ export function getPawaPayOtpInstructions(countryCode: string): PawaPayOtpInstru
   );
 }
 
+export function getOperatorCodesForCurrency(countryCode: string, currency: string): string[] {
+  const country = PAWAPAY_COUNTRIES.find(
+    c => c.code.toUpperCase() === countryCode.toUpperCase() || c.iso3.toUpperCase() === countryCode.toUpperCase()
+  );
+  if (!country || !country.currencies || country.currencies.length <= 1) return [];
+  return country.operators
+    .filter(o => o.payin && o.currency?.toUpperCase() === currency.toUpperCase())
+    .map(o => o.code);
+}
+
 export const PAWAPAY_SUPPORTED_COUNTRIES = PAWAPAY_COUNTRIES.map(c => c.code);

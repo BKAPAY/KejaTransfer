@@ -23,6 +23,7 @@ import { CurrencySelector, getCurrencyLabel } from "@/components/currency-select
 import { OperatorSelector } from "@/components/operator-selector";
 import { CountryFlag } from "@/components/country-flag";
 import { hasMultipleCurrencies, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
+import { hasMultiplePawaPayCurrencies, getCurrenciesForCountry as getPawaPayCurrenciesForCountry, getOperatorCodesForCurrency } from "@shared/pawapay-countries";
 import { getCurrencyDecimals } from "@/lib/currency";
 
 interface ConversionData {
@@ -327,11 +328,14 @@ export default function Merchant() {
     ? (enabledCountriesOperators[selectedCountry] || [])
     : [];
   
-  const countryOperators = isLoadingOperators 
+  const enabledFilteredOperators = isLoadingOperators 
     ? allCountryOperators
     : allCountryOperators.filter(op => enabledOperatorsForCountry.includes(op.code));
   
-  // Déterminer si aucun opérateur n'est disponible (après chargement)
+  const countryOperators = (selectedCountry && hasMultiplePawaPayCurrencies(selectedCountry))
+    ? enabledFilteredOperators.filter(op => getOperatorCodesForCurrency(selectedCountry, selectedCurrency).includes(op.code))
+    : enabledFilteredOperators;
+  
   const noOperatorsAvailable = !isLoadingOperators && selectedCountry && countryOperators.length === 0;
 
   // Watch amount for currency conversion
@@ -339,7 +343,10 @@ export default function Merchant() {
 
   // Handle currency selection when country changes
   useEffect(() => {
-    if (selectedCountry && hasMultipleCurrencies(selectedCountry)) {
+    if (selectedCountry && hasMultiplePawaPayCurrencies(selectedCountry)) {
+      const currencies = getPawaPayCurrenciesForCountry(selectedCountry);
+      setSelectedCurrency(currencies[0]);
+    } else if (selectedCountry && hasMultipleCurrencies(selectedCountry)) {
       const currencies = getMbiyoPayCurrenciesForCountry(selectedCountry);
       setSelectedCurrency(currencies[0]);
     } else if (selectedCountry) {
@@ -355,10 +362,10 @@ export default function Merchant() {
   // IMPORTANT: Only calculate target currency if a country is selected
   // This prevents conversion from triggering before user selects a country
   const targetCurrency = selectedCountry
-    ? (hasMultipleCurrencies(selectedCountry) 
+    ? ((hasMultiplePawaPayCurrencies(selectedCountry) || hasMultipleCurrencies(selectedCountry))
         ? selectedCurrency 
         : (COUNTRIES.find(c => c.code === selectedCountry)?.currency || ownerCurrency))
-    : ownerCurrency; // Default to owner's currency when no country selected
+    : ownerCurrency;
   const needsConversion = selectedCountry && targetCurrency !== ownerCurrency;
   
   const fetchConversion = useCallback(async (amountToConvert: number, fromCurrency: string, toCurrency: string) => {
@@ -1320,7 +1327,16 @@ export default function Merchant() {
             </FormItem>
           )}
         />
-        {hasMultipleCurrencies(selectedCountry) && (
+        {selectedCountry && hasMultiplePawaPayCurrencies(selectedCountry) && (
+          <CurrencySelector
+            countryCode={selectedCountry}
+            selectedCurrency={selectedCurrency}
+            onCurrencyChange={(c) => { setSelectedCurrency(c); form.setValue("operator", ""); }}
+            overrideCurrencies={getPawaPayCurrenciesForCountry(selectedCountry)}
+          />
+        )}
+
+        {selectedCountry && !hasMultiplePawaPayCurrencies(selectedCountry) && hasMultipleCurrencies(selectedCountry) && (
           <CurrencySelector
             countryCode={selectedCountry}
             selectedCurrency={selectedCurrency}

@@ -21,6 +21,7 @@ import { PaymentMethodSelector } from "@/components/payment-method-selector";
 import { CryptoPaymentFlow } from "@/components/crypto-payment-flow";
 import { CurrencySelector, getCurrencyLabel } from "@/components/currency-selector";
 import { hasMultipleCurrencies, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
+import { hasMultiplePawaPayCurrencies, getCurrenciesForCountry as getPawaPayCurrenciesForCountry, getOperatorCodesForCurrency } from "@shared/pawapay-countries";
 import { getCurrencyDecimals } from "@/lib/currency";
 import { OperatorSelector } from "@/components/operator-selector";
 import { CountryFlag } from "@/components/country-flag";
@@ -471,11 +472,14 @@ export default function Pay() {
     ? (enabledCountriesOperators[selectedCountry] || [])
     : [];
   
-  const countryOperators = isLoadingOperators 
+  const enabledFilteredOperators = isLoadingOperators 
     ? allCountryOperators
     : allCountryOperators.filter(op => enabledOperatorsForCountry.includes(op.code));
   
-  // Déterminer si aucun opérateur n'est disponible (après chargement)
+  const countryOperators = (selectedCountry && hasMultiplePawaPayCurrencies(selectedCountry))
+    ? enabledFilteredOperators.filter(op => getOperatorCodesForCurrency(selectedCountry, selectedCurrency).includes(op.code))
+    : enabledFilteredOperators;
+  
   const noOperatorsAvailable = !isLoadingOperators && selectedCountry && countryOperators.length === 0;
 
   // Filtrer les pays selon:
@@ -507,7 +511,10 @@ export default function Pay() {
 
   // Handle currency selection when country changes
   useEffect(() => {
-    if (selectedCountry && hasMultipleCurrencies(selectedCountry)) {
+    if (selectedCountry && hasMultiplePawaPayCurrencies(selectedCountry)) {
+      const currencies = getPawaPayCurrenciesForCountry(selectedCountry);
+      setSelectedCurrency(currencies[0]);
+    } else if (selectedCountry && hasMultipleCurrencies(selectedCountry)) {
       const currencies = getMbiyoPayCurrenciesForCountry(selectedCountry);
       setSelectedCurrency(currencies[0]);
     } else if (selectedCountry) {
@@ -523,10 +530,10 @@ export default function Pay() {
   // IMPORTANT: Only calculate target currency if a country is selected
   // This prevents conversion from triggering before user selects a country
   const targetCurrency = selectedCountry
-    ? (hasMultipleCurrencies(selectedCountry) 
+    ? ((hasMultiplePawaPayCurrencies(selectedCountry) || hasMultipleCurrencies(selectedCountry))
         ? selectedCurrency 
         : (COUNTRIES.find(c => c.code === selectedCountry)?.currency || ownerCurrency))
-    : ownerCurrency; // Default to owner's currency when no country selected
+    : ownerCurrency;
   const isConversionNeeded = selectedCountry && targetCurrency !== ownerCurrency;
   const isGuinea = selectedCountry === "GN";
   
@@ -1470,7 +1477,16 @@ export default function Pay() {
             </FormItem>
           )}
         />
-        {hasMultipleCurrencies(selectedCountry) && (
+        {selectedCountry && hasMultiplePawaPayCurrencies(selectedCountry) && (
+          <CurrencySelector
+            countryCode={selectedCountry}
+            selectedCurrency={selectedCurrency}
+            onCurrencyChange={(c) => { setSelectedCurrency(c); form.setValue("operator", ""); }}
+            overrideCurrencies={getPawaPayCurrenciesForCountry(selectedCountry)}
+          />
+        )}
+
+        {selectedCountry && !hasMultiplePawaPayCurrencies(selectedCountry) && hasMultipleCurrencies(selectedCountry) && (
           <CurrencySelector
             countryCode={selectedCountry}
             selectedCurrency={selectedCurrency}
