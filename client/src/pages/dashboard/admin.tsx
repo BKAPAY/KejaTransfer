@@ -3,7 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Users, UserCheck, TrendingDown, TrendingUp, Search, Settings, Globe, RefreshCw, Database, AlertCircle, CheckCircle2, Eye, History, MapPin, Mail, Phone, CreditCard, Percent, Lock, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Bot, Power, Network } from "lucide-react";
+import { Users, UserCheck, TrendingDown, TrendingUp, Search, Settings, Globe, RefreshCw, Database, AlertCircle, CheckCircle2, Eye, History, MapPin, Mail, Phone, CreditCard, Percent, Lock, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Bot, Power, Network, ArrowDownWideNarrow, CalendarArrowDown } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -98,6 +98,7 @@ export default function Admin() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"search" | "all">("all");
   const [mainTab, setMainTab] = useState<"users" | "transactions">("users");
+  const [userSortBy, setUserSortBy] = useState<"balance" | "date">("balance");
   const [isSyncing, setIsSyncing] = useState(false);
   const [isDiagnosing, setIsDiagnosing] = useState(false);
   const [diagnosticResult, setDiagnosticResult] = useState<DiagnosticResult | null>(null);
@@ -277,8 +278,13 @@ export default function Admin() {
     staleTime: 10000,
   });
 
-  // Display filtered results if searching, otherwise show all users
-  const displayedUsers = searchQuery.length > 0 ? searchResults : allUsers;
+  const sortedUsers = [...(searchQuery.length > 0 ? searchResults : allUsers)].sort((a, b) => {
+    if (userSortBy === "date") {
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    }
+    return (b.balance || 0) - (a.balance || 0);
+  });
+  const displayedUsers = sortedUsers;
   const isLoading = searchQuery.length > 0 ? searchLoading : usersLoading;
 
   // When searching: use server-side results. Otherwise: show the 500 recent transactions.
@@ -646,7 +652,7 @@ export default function Admin() {
                 <Users className="w-5 h-5" />
                 Gestion des Utilisateurs
               </CardTitle>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 <Button
                   variant={activeTab === "all" ? "default" : "outline"}
                   size="sm"
@@ -666,6 +672,24 @@ export default function Admin() {
                 >
                   <Search className="w-4 h-4 mr-2" />
                   Rechercher
+                </Button>
+                <Button
+                  variant={userSortBy === "balance" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setUserSortBy("balance")}
+                  data-testid="button-sort-balance"
+                >
+                  <ArrowDownWideNarrow className="w-4 h-4 mr-2" />
+                  Montant
+                </Button>
+                <Button
+                  variant={userSortBy === "date" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setUserSortBy("date")}
+                  data-testid="button-sort-date"
+                >
+                  <CalendarArrowDown className="w-4 h-4 mr-2" />
+                  Date
                 </Button>
               </div>
             </div>
