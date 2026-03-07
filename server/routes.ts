@@ -2924,8 +2924,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ success: false, error: "Cette session de paiement a expiré" });
       }
 
-      if (session.status === "processing" || session.status === "completed") {
-        return res.status(400).json({ success: false, error: "Cette session a déjà été payée ou est en cours de traitement" });
+      if (session.status === "completed") {
+        return res.status(400).json({ success: false, error: "Cette session a déjà été payée" });
+      }
+
+      if (session.status === "processing" || session.status === "failed") {
+        console.log(`[SESSION PAY] Allowing retry for session ${session.id} (status: ${session.status})`);
+        await storage.updatePaymentSession(session.id, { status: "pending" });
       }
 
       const apiKey = await storage.getApiKeyById(session.apiKeyId);
