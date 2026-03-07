@@ -126,6 +126,7 @@ export default function Checkout() {
   } | null>(null);
   const [dynamicFee, setDynamicFee] = useState<{ feePercentage: number; feeAmount: number } | null>(null);
   const [selectedCurrency, setSelectedCurrency] = useState<string>("XOF");
+  const [retryRequested, setRetryRequested] = useState(false);
   const pollRef = useRef<NodeJS.Timeout | null>(null);
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
   const successUrlRef = useRef<string | null>(null);
@@ -410,10 +411,10 @@ export default function Checkout() {
   }, []);
 
   useEffect(() => {
-    if (session?.status === "processing" && stage === "form" && !pollRef.current) {
+    if (session?.status === "processing" && stage === "form" && !retryRequested && !pollRef.current) {
       startSessionPolling();
     }
-  }, [session?.status, stage]);
+  }, [session?.status, stage, retryRequested]);
 
   useEffect(() => {
     if ((session?.status === "completed" || stage === "completed") && successUrlRef.current) {
@@ -454,6 +455,7 @@ export default function Checkout() {
       return data;
     },
     onSuccess: (data) => {
+      setRetryRequested(false);
       if (data.requiresOTP) {
         setOtpInstructions(data.otpInstructions || "");
         setOtpUssdCode(data.otpUssdCode || "");
@@ -523,6 +525,7 @@ export default function Checkout() {
     setOtpInstructions("");
     setTransactionId(null);
     setPaymentActive(false);
+    setRetryRequested(true);
     paymentCountdown.resetCountdown();
     if (pollRef.current) clearInterval(pollRef.current);
   };
@@ -563,7 +566,7 @@ export default function Checkout() {
     );
   }
 
-  if (session?.status === "processing" && stage === "form") {
+  if (session?.status === "processing" && stage === "form" && !retryRequested) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-accent/5 p-4">
         <Card className="w-full max-w-md">
