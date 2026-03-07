@@ -2903,6 +2903,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success_url: session.successUrl,
         cancel_url: session.cancelUrl,
         expires_at: session.expiresAt.toISOString(),
+        api_key_id: session.apiKeyId,
+        customerPaysCryptoFee: (apiKey as any)?.customerPaysCryptoFee || false,
       });
     } catch (error: any) {
       console.error("[Payment Session Get] Error:", error);

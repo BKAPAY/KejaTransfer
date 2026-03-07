@@ -182,6 +182,12 @@ export default function ApiPay() {
   const [country, setCountry] = useState("");
   const [operator, setOperator] = useState("");
   const [copiedUssd, setCopiedUssd] = useState(false);
+  const [cryptoStep, setCryptoStep] = useState<"info" | "payment">("info");
+  const [cryptoCustomerInfo, setCryptoCustomerInfo] = useState<{
+    customerName: string;
+    customerEmail: string;
+    customerPhone: string;
+  } | null>(null);
   const [conversionData, setConversionData] = useState<ConversionData | null>(null);
   const [selectedCurrency, setSelectedCurrency] = useState<string>("XOF");
   const [dynamicFee, setDynamicFee] = useState<{ feePercentage: number; feeAmount: number } | null>(null);
@@ -1561,7 +1567,13 @@ export default function ApiPay() {
                   const data = JSON.parse(saved);
                   if (data.paymentDetails && data.createdAt) {
                     const elapsed = Math.floor((Date.now() - data.createdAt) / 1000);
-                    if ((data.expiresIn || 1800) - elapsed > 0) return "crypto";
+                    if ((data.expiresIn || 1800) - elapsed > 0) {
+                      if (cryptoStep === "info" && data.cryptoCustomerInfo) {
+                        setCryptoStep("payment");
+                        setCryptoCustomerInfo(data.cryptoCustomerInfo);
+                      }
+                      return "crypto";
+                    }
                   }
                 }
               } catch {}
@@ -1570,38 +1582,132 @@ export default function ApiPay() {
             mobileMoneyContent={mobileMoneyForm}
             cryptoContent={
               amount && amount >= 500 ? (
-                <CryptoPaymentFlow
-                  amount={amount}
-                  currency={ownerCurrency}
-                  apiKeyId={key}
-                  customerPaysFee={(apiKeyInfo as any)?.customerPaysCryptoFee || false}
-                  orderDescription={description || `Paiement à ${apiKeyInfo?.siteName}`}
-                  customerName={customerName}
-                  customerEmail={customerEmail}
-                  customerPhone={customerPhone}
-                  onSuccess={() => {
-                    setPaymentStage("completed");
-                    if (key) clearPaymentState(key);
-                    toast({
-                      title: "Paiement reussi",
-                      description: "Votre transaction crypto a ete confirmee",
-                    });
-                    if (isInlineMode && window.parent !== window) {
-                      setTimeout(() => {
-                        window.parent.postMessage({
-                          type: "bkapay_payment_success",
-                          transactionId,
-                          amount,
-                          status: "completed",
-                        }, "*");
-                      }, 3000);
-                    } else if (callbackUrl) {
-                      setTimeout(() => {
-                        window.location.href = `${callbackUrl}${callbackUrl.includes('?') ? '&' : '?'}status=success&amount=${amount}`;
-                      }, 2000);
-                    }
-                  }}
-                />
+                cryptoStep === "payment" && cryptoCustomerInfo ? (
+                  <div className="space-y-4">
+                    <div className="bg-muted p-3 rounded-md">
+                      <p className="text-sm text-muted-foreground">Montant a payer</p>
+                      <p className="text-xl font-bold">{displayAmount.toLocaleString()} {ownerCurrency}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {cryptoCustomerInfo.customerName} - {cryptoCustomerInfo.customerEmail}
+                      </p>
+                    </div>
+                    <CryptoPaymentFlow
+                      amount={amount}
+                      currency={ownerCurrency}
+                      apiKeyId={key}
+                      customerPaysFee={(apiKeyInfo as any)?.customerPaysCryptoFee || false}
+                      orderDescription={description || `Paiement a ${apiKeyInfo?.siteName}`}
+                      customerName={cryptoCustomerInfo.customerName}
+                      customerEmail={cryptoCustomerInfo.customerEmail}
+                      customerPhone={cryptoCustomerInfo.customerPhone}
+                      onSuccess={() => {
+                        setPaymentStage("completed");
+                        if (key) clearPaymentState(key);
+                        toast({
+                          title: "Paiement reussi",
+                          description: "Votre transaction crypto a ete confirmee",
+                        });
+                        if (isInlineMode && window.parent !== window) {
+                          setTimeout(() => {
+                            window.parent.postMessage({
+                              type: "bkapay_payment_success",
+                              transactionId,
+                              amount,
+                              status: "completed",
+                            }, "*");
+                          }, 3000);
+                        } else if (callbackUrl) {
+                          setTimeout(() => {
+                            window.location.href = `${callbackUrl}${callbackUrl.includes('?') ? '&' : '?'}status=success&amount=${amount}`;
+                          }, 2000);
+                        }
+                      }}
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setCryptoStep("info");
+                        setCryptoCustomerInfo(null);
+                      }}
+                      className="w-full"
+                      data-testid="button-back-crypto-info"
+                    >
+                      Modifier les informations
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <p className="text-sm text-muted-foreground text-center mb-4">
+                      Renseignez vos informations pour payer en cryptomonnaie
+                    </p>
+                    <div className="space-y-3">
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-2">
+                          <User className="w-4 h-4" />
+                          Nom complet
+                        </Label>
+                        <Input
+                          placeholder="Jean Dupont"
+                          data-testid="input-crypto-name"
+                          value={cryptoCustomerInfo?.customerName || ""}
+                          onChange={(e) => setCryptoCustomerInfo(prev => ({
+                            customerName: e.target.value,
+                            customerEmail: prev?.customerEmail || "",
+                            customerPhone: prev?.customerPhone || "",
+                          }))}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-2">
+                          <Mail className="w-4 h-4" />
+                          Email
+                        </Label>
+                        <Input
+                          type="email"
+                          placeholder="jean@exemple.com"
+                          data-testid="input-crypto-email"
+                          value={cryptoCustomerInfo?.customerEmail || ""}
+                          onChange={(e) => setCryptoCustomerInfo(prev => ({
+                            customerName: prev?.customerName || "",
+                            customerEmail: e.target.value,
+                            customerPhone: prev?.customerPhone || "",
+                          }))}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-2">
+                          <Phone className="w-4 h-4" />
+                          Telephone
+                        </Label>
+                        <Input
+                          type="tel"
+                          inputMode="numeric"
+                          placeholder="00 00 00 00"
+                          data-testid="input-crypto-phone"
+                          value={cryptoCustomerInfo?.customerPhone || ""}
+                          onChange={(e) => setCryptoCustomerInfo(prev => ({
+                            customerName: prev?.customerName || "",
+                            customerEmail: prev?.customerEmail || "",
+                            customerPhone: e.target.value.replace(/\D/g, ""),
+                          }))}
+                        />
+                      </div>
+                    </div>
+                    <Button
+                      className="w-full"
+                      disabled={
+                        !cryptoCustomerInfo?.customerName?.trim() ||
+                        !cryptoCustomerInfo?.customerEmail?.trim() ||
+                        !cryptoCustomerInfo?.customerPhone?.trim()
+                      }
+                      onClick={() => setCryptoStep("payment")}
+                      data-testid="button-continue-crypto"
+                    >
+                      Continuer vers le paiement crypto
+                    </Button>
+                  </div>
+                )
               ) : (
                 <div className="p-4 text-center text-muted-foreground">
                   Le montant minimum pour payer en crypto est de 500 {ownerCurrency}
