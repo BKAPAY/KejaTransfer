@@ -13,6 +13,7 @@ import { OperatorSelector } from "@/components/operator-selector";
 import { CountryFlag } from "@/components/country-flag";
 import logoImage from "@assets/bkapay-logo.png";
 import { getCurrencyDecimals } from "@/lib/currency";
+import { usePaymentCountdown } from "@/hooks/use-payment-countdown";
 import { COUNTRIES, OPERATORS } from "@shared/schema";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PaymentMethodSelector } from "@/components/payment-method-selector";
@@ -67,10 +68,35 @@ export default function Checkout() {
   const [sessionExpiresAt, setSessionExpiresAt] = useState<Date | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [copiedUssd, setCopiedUssd] = useState(false);
+  const [paymentActive, setPaymentActive] = useState(false);
   const pollRef = useRef<NodeJS.Timeout | null>(null);
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
   const successUrlRef = useRef<string | null>(null);
   const cancelUrlRef = useRef<string | null>(null);
+
+  const paymentCountdown = usePaymentCountdown({
+    invoiceToken: null,
+    transactionId,
+    enabled: paymentActive && stage === "polling",
+    onCompleted: () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+      setStage("completed");
+      setPaymentActive(false);
+      setTimeout(() => {
+        if (successUrlRef.current) window.location.href = successUrlRef.current;
+      }, 2500);
+    },
+    onFailed: () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+      setStage("failed");
+      setPaymentActive(false);
+    },
+    onExpired: () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+      setStage("failed");
+      setPaymentActive(false);
+    },
+  });
 
   const { data: session, isLoading: sessionLoading, error: sessionError } = useQuery<SessionInfo>({
     queryKey: ["/api/v1/payment-sessions", sessionId],
@@ -158,7 +184,12 @@ export default function Checkout() {
       const remaining = sessionExpiresAt.getTime() - Date.now();
       if (remaining <= 0) {
         setCountdown(0);
-        if (stage === "form") setStage("expired");
+        if (stage === "form" || stage === "polling") {
+          if (pollRef.current) clearInterval(pollRef.current);
+          setPaymentActive(false);
+          paymentCountdown.resetCountdown();
+          setStage("expired");
+        }
         clearInterval(countdownRef.current!);
       } else {
         setCountdown(remaining);
@@ -174,33 +205,37 @@ export default function Checkout() {
     if (session?.cancel_url) cancelUrlRef.current = session.cancel_url;
   }, [session]);
 
-  const startPolling = (txId: string) => {
+  const startSessionPolling = () => {
     if (pollRef.current) clearInterval(pollRef.current);
     const poll = async () => {
       try {
-        const [sessionRes, txRes] = await Promise.all([
-          fetch(`/api/v1/payment-sessions/${sessionId}/status`).then(r => r.json()),
-          txId ? fetch("/api/softpay/verify-payment", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ transactionId: txId }) }).then(r => r.json()) : Promise.resolve(null),
-        ]);
-
+        const sessionRes = await fetch(`/api/v1/payment-sessions/${sessionId}/status`).then(r => r.json());
         const sessionStatus = sessionRes?.status;
-        const txStatus = txRes?.status;
-
-        if (sessionStatus === "completed" || txStatus === "completed" || txRes?.response_code === "00") {
+        if (sessionStatus === "completed") {
           clearInterval(pollRef.current!);
+          setPaymentActive(false);
+          paymentCountdown.resetCountdown();
           setStage("completed");
           setTimeout(() => {
             if (successUrlRef.current) window.location.href = successUrlRef.current;
           }, 2500);
-        } else if (sessionStatus === "failed" || txStatus === "failed") {
+        } else if (sessionStatus === "failed") {
           clearInterval(pollRef.current!);
+          setPaymentActive(false);
+          paymentCountdown.resetCountdown();
           setStage("failed");
         }
       } catch {}
     };
     poll();
-    pollRef.current = setInterval(poll, 2000);
+    pollRef.current = setInterval(poll, 3000);
   };
+
+  useEffect(() => {
+    if (stage !== "polling" && stage !== "form") {
+      setPaymentActive(false);
+    }
+  }, [stage]);
 
   useEffect(() => () => {
     if (pollRef.current) clearInterval(pollRef.current);
@@ -235,10 +270,14 @@ export default function Checkout() {
       }
       setPaymentMessage(data.message || "Validez le paiement sur votre téléphone.");
       setStage("polling");
-      if (data.transactionId) startPolling(data.transactionId);
+      setPaymentActive(true);
+      paymentCountdown.startCountdown();
+      startSessionPolling();
     },
     onError: (error: any) => {
       setStage("form");
+      setPaymentActive(false);
+      paymentCountdown.resetCountdown();
       toast({ title: "Erreur", description: error.message, variant: "destructive" });
     },
   });
@@ -267,6 +306,8 @@ export default function Checkout() {
     setOtpCode("");
     setOtpInstructions("");
     setTransactionId(null);
+    setPaymentActive(false);
+    paymentCountdown.resetCountdown();
     if (pollRef.current) clearInterval(pollRef.current);
   };
 
@@ -348,7 +389,9 @@ export default function Checkout() {
             <img src={logoImage} alt="BKApay" className="h-10 w-auto mx-auto mb-6" />
             <XCircle className="w-12 h-12 text-destructive mx-auto mb-3" />
             <p className="font-semibold text-foreground mb-1">Paiement échoué</p>
-            <p className="text-sm text-muted-foreground mb-4">Le paiement n'a pas pu être complété.</p>
+            <p className="text-sm text-muted-foreground mb-4">
+              {paymentCountdown.isExpired ? "Le delai de validation a expire" : "Le paiement n'a pas pu être complété."}
+            </p>
             <div className="flex gap-2 justify-center">
               <Button variant="outline" onClick={handleRetry} data-testid="button-retry">
                 <RefreshCw className="w-4 h-4 mr-2" /> Réessayer
@@ -386,14 +429,42 @@ export default function Checkout() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-accent/5 p-4">
         <Card className="w-full max-w-md">
-          <CardContent className="pt-8 pb-6 text-center">
-            <img src={logoImage} alt="BKApay" className="h-10 w-auto mx-auto mb-6" />
-            <Loader2 className="w-14 h-14 text-primary animate-spin mx-auto mb-4" data-testid="icon-polling" />
-            <p className="font-semibold text-foreground mb-2">En attente de confirmation</p>
-            <p className="text-sm text-muted-foreground mb-4">{paymentMessage}</p>
+          <CardContent className="pt-8 pb-6 text-center space-y-4">
+            <img src={logoImage} alt="BKApay" className="h-10 w-auto mx-auto mb-2" />
+            <Loader2 className="w-16 h-16 text-primary animate-spin mx-auto" data-testid="icon-polling" />
+
+            <div className="space-y-2">
+              <h2 className="text-xl font-bold text-foreground">Paiement en cours</h2>
+              <p className="text-sm text-muted-foreground">
+                Veuillez valider le paiement sur votre telephone
+              </p>
+            </div>
+
+            <div className="bg-primary/10 rounded-lg p-4">
+              <p className="text-sm text-muted-foreground mb-1">Temps restant</p>
+              <p className="text-3xl font-mono font-bold text-primary" data-testid="text-payment-countdown">
+                {paymentCountdown.formattedTime}
+              </p>
+            </div>
+
+            {paymentMessage && (
+              <div className="text-left bg-muted rounded-lg p-3">
+                <p className="text-xs text-muted-foreground mb-1">Instructions:</p>
+                <p className="text-sm text-foreground whitespace-pre-line">{paymentMessage}</p>
+              </div>
+            )}
+
             {session.amount && session.currency && (
               <p className="text-2xl font-bold text-foreground">{formatAmount(session.amount, session.currency)}</p>
             )}
+
+            <p className="text-xs text-muted-foreground">
+              Ne fermez pas cette page
+            </p>
+
+            <Button variant="outline" onClick={handleRetry} data-testid="button-cancel-polling">
+              Annuler
+            </Button>
           </CardContent>
         </Card>
       </div>
