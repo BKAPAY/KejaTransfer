@@ -69,6 +69,19 @@ export default function AdminUserHistory() {
     return types[type] || type;
   };
 
+  const getTransactionLabel = (tx: any) => {
+    try {
+      const meta = tx.metadata ? JSON.parse(tx.metadata as string) : null;
+      const isApiPayout = tx.type === "withdrawal" && (
+        meta?.netMode === true || String(meta?.orderId || "").startsWith("BKAPAY-API-")
+      );
+      if (isApiPayout) {
+        return `Payout API ${Number(tx.amount).toLocaleString("fr-FR")} ${tx.currency}`;
+      }
+    } catch {}
+    return tx.description || getTypeText(tx.type);
+  };
+
   // Get user's currency based on their country
   const userCurrency = user?.country 
     ? COUNTRIES.find(c => c.code === user.country)?.currency || "XOF"
@@ -186,7 +199,7 @@ export default function AdminUserHistory() {
                   >
                     <div className="min-w-0 space-y-1">
                       <p className="font-medium text-sm truncate">
-                        {tx.description || getTypeText(tx.type)}
+                        {getTransactionLabel(tx)}
                       </p>
                       <div className="flex items-center gap-2 flex-wrap">
                         <Badge variant={getStatusBadge(tx.status)} className="text-xs shrink-0">
@@ -224,7 +237,7 @@ export default function AdminUserHistory() {
                       {(() => {
                         try {
                           const meta = tx.metadata ? JSON.parse(tx.metadata as string) : null;
-                          const refId = tx.paydunyaToken || meta?.fedapayTransactionId || meta?.mbiyopayTransactionId || meta?.afribaPayTransactionId || meta?.nowpaymentsId || meta?.orderId;
+                          const refId = tx.paydunyaToken || meta?.fedapayTransactionId || meta?.mbiyopayTransactionId || meta?.afribaPayTransactionId || meta?.pawaPayDepositId || meta?.pawaPayPayoutId || meta?.nowpaymentsId || meta?.orderId;
                           if (refId) {
                             return (
                               <p className="text-xs text-muted-foreground mt-1">

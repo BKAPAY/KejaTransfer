@@ -173,6 +173,8 @@ export function TransactionDetailsDialog({
     || (metadata?.fedapayTransactionId ? String(metadata.fedapayTransactionId) : null)
     || metadata?.mbiyopayTransactionId
     || metadata?.afribaPayTransactionId
+    || metadata?.pawaPayDepositId
+    || metadata?.pawaPayPayoutId
     || (metadata?.nowpaymentsId ? String(metadata.nowpaymentsId) : null)
     || (metadata?.orderId ? String(metadata.orderId) : null)
     || transaction.id;
@@ -216,7 +218,11 @@ export function TransactionDetailsDialog({
               </div>
               <div className="space-y-1">
                 <p className="text-xs text-muted-foreground">Type</p>
-                <p className="text-sm font-medium">{getTypeText(transaction.type)}</p>
+                <p className="text-sm font-medium">
+                  {transaction.type === "withdrawal" && (metadata?.netMode === true || String(metadata?.orderId || "").startsWith("BKAPAY-API-"))
+                    ? "Payout API"
+                    : getTypeText(transaction.type)}
+                </p>
               </div>
               <div className="space-y-1">
                 <p className="text-xs text-muted-foreground">Date</p>
