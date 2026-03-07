@@ -3478,12 +3478,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             "BJ": { "moov": "moov-benin", "mtn": "mtn-benin" },
             "TG": { "tmoney": "t-money-togo", "moov": "moov-togo" },
             "ML": { "orange": "orange-money-mali", "moov": "moov-mali" },
+            "CM": { "mtn": "mtn-cameroun" },
           };
           const withdrawMode = countryWithdrawModes[countryCode]?.[normalizedOperator];
           if (!withdrawMode) {
             return { success: false, error: "Opérateur non supporté via ce fournisseur" };
           }
-          const providerCurrency = "XOF";
+          const payduynaCountryCurrencies3486: Record<string, string> = { "CM": "XAF" };
+          const providerCurrency = payduynaCountryCurrencies3486[countryCode] || "XOF";
           // netMode: send the exact requested amount to the provider
           // crossCurrencyOverride: use original requested amount to avoid double-conversion
           let amountForProvider = crossCurrencyOverride ?? amountInUserCurrency;
@@ -4306,10 +4308,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const paydunyaData = {
         invoice: {
           total_amount: Math.floor(amount),
-          description: description || `Dépôt de ${amount} XOF`,
+          description: description || `Dépôt de ${amount} ${({ "CM": "XAF" } as Record<string,string>)[country?.toUpperCase()] || "XOF"}`,
           customer: {
             name: effectiveCustomerName,
-            email: "noreply@bkapay.com", // Privacy: never send real customer emails to providers
+            email: "noreply@bkapay.com",
             phone: phone,
           },
         },
@@ -4346,11 +4348,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           amount: feeInfo.grossAmount,
           fee: feeInfo.feeAmount,
           feePercentage: feeInfo.feePercentage,
-          currency: "XOF",
+          currency: ({ "CM": "XAF" } as Record<string,string>)[country?.toUpperCase()] || "XOF",
           status: "pending",
           country,
           operator,
-          description: description || `Dépôt de ${grossAmount} XOF`,
+          description: description || `Dépôt de ${grossAmount} ${({ "CM": "XAF" } as Record<string,string>)[country?.toUpperCase()] || "XOF"}`,
           paydunyaToken: paydunyaResponse.token,
           metadata: JSON.stringify({
             phone,
@@ -4616,7 +4618,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           amount: feeInfo.grossAmount,
           fee: feeInfo.feeAmount,
           feePercentage: feeInfo.feePercentage,
-          currency: "XOF",
+          currency: ({ "CM": "XAF" } as Record<string,string>)[country?.toUpperCase()] || "XOF",
           status: "pending",
           country,
           operator,
@@ -5580,10 +5582,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         const effectiveCustomerName = `${user.firstName} ${user.lastName}`;
         
+        const payduynaDepositCurrencies: Record<string, string> = { "CM": "XAF" };
+        const depositProviderCurrency = payduynaDepositCurrencies[country.toUpperCase()] || "XOF";
+        
         const paydunyaData = {
           invoice: {
             total_amount: Math.floor(amount),
-            description: `Depot de ${amount} XOF`,
+            description: `Depot de ${amount} ${depositProviderCurrency}`,
             customer: {
               name: effectiveCustomerName,
               email: "noreply@bkapay.com",
@@ -5610,7 +5615,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const paydunyaResponse = await callPaydunyaAPI("/checkout-invoice/create", paydunyaData);
 
         if (paydunyaResponse.response_code === "00" && paydunyaResponse.token) {
-          // Calculate fees for INCOMING payment with dynamic fee from database (auto-detect active provider)
           const grossAmount = Math.floor(amount);
           const depositPaydunyaFeeConfig = await getDynamicFees(storage, country, operator);
           const feeInfo = calculateIncomingFee(grossAmount, depositPaydunyaFeeConfig.incoming);
@@ -5622,11 +5626,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             amount: feeInfo.grossAmount,
             fee: feeInfo.feeAmount,
             feePercentage: feeInfo.feePercentage,
-            currency: "XOF",
+            currency: depositProviderCurrency,
             status: "pending",
             country,
             operator,
-            description: `Depot de ${grossAmount} XOF`,
+            description: `Depot de ${grossAmount} ${depositProviderCurrency}`,
             paydunyaToken: paydunyaResponse.token,
             metadata: JSON.stringify({
               phone,
@@ -6631,12 +6635,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`[MERCHANT_LINK] Using Paydunya SOFTPAY for ${country}/${operator}`);
         
         const effectiveCustomerName = customerName || "Client";
-        const providerCurrency = "XOF";
+        const payduynaMLCurrencies: Record<string, string> = { "CM": "XAF" };
+        const providerCurrency = payduynaMLCurrencies[country?.toUpperCase()] || "XOF";
         
         // CRITICAL: Calculate base amount in owner's currency for balance credit
         const baseAmountInOwnerCurrency = originalAmount ? Math.floor(originalAmount) : Math.floor(amount);
         
-        // Convert amount to provider currency (XOF) if needed
+        // Convert amount to provider currency if needed
         let convertedAmountForProvider = Math.floor(amount);
         if (ownerCurrency !== providerCurrency && !originalAmount) {
           const { convertCurrency: convertCurrencyFn } = await import("./currency-converter");
@@ -6959,7 +6964,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const paydunyaData = {
           invoice: {
             total_amount: Math.floor(transaction.amount),
-            description: transaction.description || `Paiement API de ${transaction.amount} XOF`,
+            description: transaction.description || `Paiement API de ${transaction.amount} ${transaction.currency || "XOF"}`,
             customer: {
               name: effectiveCustomerName,
               email: "noreply@bkapay.com",
@@ -7432,12 +7437,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           amount: Math.floor(amount),
           fee: feeInfo.feeAmount,
           feePercentage: feeInfo.feePercentage,
-          currency: "XOF",
+          currency: ({ "CM": "XAF" } as Record<string,string>)[country?.toUpperCase()] || "XOF",
           status: "completed",
           country,
           operator,
           customerPhone: cleanPhone,
-          description: `Retrait de ${amount} XOF vers ${cleanPhone}`,
+          description: `Retrait de ${amount} ${({ "CM": "XAF" } as Record<string,string>)[country?.toUpperCase()] || "XOF"} vers ${cleanPhone}`,
           paydunyaToken: disburseToken,
           metadata: JSON.stringify({
             paydunyaTransactionId: submitResponse.transaction_id,
@@ -7574,10 +7579,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.createTransaction({
           userId: apiKey.userId,
           type: "api_payment",
-          amount: feeInfo.grossAmount, // Store GROSS amount
+          amount: feeInfo.grossAmount,
           fee: feeInfo.feeAmount,
           feePercentage: feeInfo.feePercentage,
-          currency: "XOF",
+          currency: ({ "CM": "XAF" } as Record<string,string>)[paymentCountry?.toUpperCase()] || "XOF",
           status: "pending",
           country: paymentCountry,
           operator: operator || "wave",
@@ -9998,11 +10003,13 @@ SUPPORT ET CONTACT:
                   }
                 }
 
+                const chatbotWCurrencies: Record<string, string> = { "CM": "XAF" };
+                const chatbotWProviderCurrency = chatbotWCurrencies[country.toUpperCase()] || "XOF";
                 const amountForProviderW = feeInfoW.amountReceived;
                 let providerAmountW = amountForProviderW;
-                if (userCurrencyW !== "XOF") {
+                if (userCurrencyW !== chatbotWProviderCurrency) {
                   const { convertCurrency } = await import("./currency-converter");
-                  const convW = await convertCurrency(amountForProviderW, userCurrencyW, "XOF");
+                  const convW = await convertCurrency(amountForProviderW, userCurrencyW, chatbotWProviderCurrency);
                   if (convW.success) providerAmountW = Math.floor(convW.convertedAmount);
                   else return JSON.stringify({ success: false, error: "Erreur de conversion de devise" });
                 }
@@ -10014,7 +10021,7 @@ SUPPORT ET CONTACT:
                 const submitW = await callPaydunyaAPIv2("/disburse/submit-invoice", { disburse_invoice: getInvoiceW.disburse_token, disburse_id: `withdrawal-${user.id.substring(0, 8)}-${Date.now()}` });
                 if (submitW.response_code === "00") {
                   await storage.updateUserBalance(userId, -feeInfoW.totalDeductedFromBalance);
-                  const txW = await storage.createTransaction({ userId, type: "withdrawal", amount: Math.floor(amount), fee: feeInfoW.feeAmount, feePercentage: feeInfoW.feePercentage, currency: userCurrencyW, status: "completed", country, operator, customerPhone: cleanPhoneW, description: `Retrait de ${Math.floor(amount)} ${userCurrencyW}`, paydunyaToken: getInvoiceW.disburse_token, metadata: JSON.stringify({ provider: "paydunya", providerAmount: providerAmountW, providerCurrency: "XOF" }) });
+                  const txW = await storage.createTransaction({ userId, type: "withdrawal", amount: Math.floor(amount), fee: feeInfoW.feeAmount, feePercentage: feeInfoW.feePercentage, currency: userCurrencyW, status: "completed", country, operator, customerPhone: cleanPhoneW, description: `Retrait de ${Math.floor(amount)} ${userCurrencyW}`, paydunyaToken: getInvoiceW.disburse_token, metadata: JSON.stringify({ provider: "paydunya", providerAmount: providerAmountW, providerCurrency: chatbotWProviderCurrency }) });
                   return JSON.stringify({ success: true, message: `Retrait de ${feeInfoW.amountReceived.toLocaleString("fr-FR")} ${userCurrencyW} envoyé avec succès. Frais: ${feeInfoW.feeAmount.toLocaleString("fr-FR")} ${userCurrencyW}. Transaction ID: ${txW.id}` });
                 }
                 return JSON.stringify({ success: false, error: "Retrait échoué" });
@@ -10113,10 +10120,12 @@ SUPPORT ET CONTACT:
                   }
                 }
 
+                const chatbotTCurrencies: Record<string, string> = { "CM": "XAF" };
+                const chatbotTProviderCurrency = chatbotTCurrencies[country.toUpperCase()] || "XOF";
                 let providerAmountT = Math.floor(amount);
-                if (userCurrencyT !== "XOF") {
+                if (userCurrencyT !== chatbotTProviderCurrency) {
                   const { convertCurrency } = await import("./currency-converter");
-                  const convT = await convertCurrency(Math.floor(amount), userCurrencyT, "XOF");
+                  const convT = await convertCurrency(Math.floor(amount), userCurrencyT, chatbotTProviderCurrency);
                   if (convT.success) providerAmountT = Math.floor(convT.convertedAmount);
                   else return JSON.stringify({ success: false, error: "Erreur de conversion de devise" });
                 }
@@ -10128,7 +10137,7 @@ SUPPORT ET CONTACT:
                 const submitT = await callPaydunyaAPIv2("/disburse/submit-invoice", { disburse_invoice: getInvoiceT.disburse_token, disburse_id: `transfer-${user.id.substring(0, 8)}-${Date.now()}` });
                 if (submitT.response_code === "00") {
                   await storage.updateUserBalance(userId, -requiredBalanceT);
-                  const txT = await storage.createTransaction({ userId, type: "transfer", amount: Math.floor(amount), fee: feeInfoT.feeAmount, feePercentage: feeInfoT.feePercentage, currency: userCurrencyT, status: "completed", country, operator, customerPhone: cleanPhoneT, description: `Transfert de ${Math.floor(amount)} ${userCurrencyT}`, paydunyaToken: getInvoiceT.disburse_token, metadata: JSON.stringify({ provider: "paydunya", providerAmount: providerAmountT, providerCurrency: "XOF" }) });
+                  const txT = await storage.createTransaction({ userId, type: "transfer", amount: Math.floor(amount), fee: feeInfoT.feeAmount, feePercentage: feeInfoT.feePercentage, currency: userCurrencyT, status: "completed", country, operator, customerPhone: cleanPhoneT, description: `Transfert de ${Math.floor(amount)} ${userCurrencyT}`, paydunyaToken: getInvoiceT.disburse_token, metadata: JSON.stringify({ provider: "paydunya", providerAmount: providerAmountT, providerCurrency: chatbotTProviderCurrency }) });
                   return JSON.stringify({ success: true, message: `Transfert de ${Math.floor(amount).toLocaleString("fr-FR")} ${userCurrencyT} envoyé avec succès. Frais: ${feeInfoT.feeAmount.toLocaleString("fr-FR")} ${userCurrencyT}. Total débité: ${requiredBalanceT.toLocaleString("fr-FR")} ${userCurrencyT}. Transaction ID: ${txT.id}` });
                 }
                 return JSON.stringify({ success: false, error: "Transfert échoué" });
