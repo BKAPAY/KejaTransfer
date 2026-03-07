@@ -663,13 +663,18 @@ export default function Checkout() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-accent/5 p-4">
         <Card className="w-full max-w-md">
-          <CardContent className="pt-8 pb-6 text-center">
-            <img src={logoImage} alt="BKApay" className="h-10 w-auto mx-auto mb-6" />
-            <Loader2 className="w-12 h-12 text-primary animate-spin mx-auto mb-3" />
-            <p className="font-semibold text-foreground mb-3">Redirection vers le paiement...</p>
+          <CardContent className="pt-8 pb-6 text-center space-y-3">
+            <img src={logoImage} alt="BKApay" className="h-10 w-auto mx-auto mb-2" />
+            <Loader2 className="w-12 h-12 text-primary animate-spin mx-auto" />
+            <p className="font-semibold text-foreground">Redirection vers le paiement...</p>
             <Button onClick={() => window.location.href = redirectUrl} data-testid="button-redirect">
               Accéder au paiement
             </Button>
+            <div>
+              <Button variant="ghost" onClick={handleRetry} data-testid="button-cancel-redirect">
+                Annuler
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
