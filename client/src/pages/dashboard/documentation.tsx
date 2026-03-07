@@ -774,7 +774,7 @@ data = response.json()
           <div className="space-y-3">
             <h3 className="font-semibold">Flux de paiement</h3>
             <ol className="list-decimal pl-5 space-y-1 text-muted-foreground">
-              <li>Votre serveur appelle <code className="font-mono text-xs bg-muted px-1 rounded">POST /api/v1/payment-sessions</code> avec votre cle secrete <code className="font-mono text-xs bg-muted px-1 rounded">sk_live_...</code></li>
+              <li>Votre serveur appelle <code className="font-mono text-xs bg-muted px-1 rounded">POST /api/v1/payment-sessions</code> avec votre cle privee payin <code className="font-mono text-xs bg-muted px-1 rounded">sk_payin_live_...</code></li>
               <li>BKApay retourne une <code className="font-mono text-xs bg-muted px-1 rounded">payment_url</code> unique avec un ID de session</li>
               <li>Vous redirigez votre client vers cette URL</li>
               <li>Le client choisit son pays/operateur et paie — le montant est fixe et securise</li>
@@ -826,7 +826,7 @@ data = response.json()
   method: "POST",
   headers: {
     "Content-Type": "application/json",
-    "Authorization": "Bearer sk_live_VOTRE_CLE_SECRETE"
+    "Authorization": "Bearer sk_payin_live_VOTRE_CLE_PAYIN"
   },
   body: JSON.stringify({
     amount: 5000,
@@ -847,7 +847,7 @@ window.location.href = data.payment_url;`)} data-testid="button-copy-sessions-js
   method: "POST",
   headers: {
     "Content-Type": "application/json",
-    "Authorization": "Bearer sk_live_VOTRE_CLE_SECRETE"
+    "Authorization": "Bearer sk_payin_live_VOTRE_CLE_PAYIN"
   },
   body: JSON.stringify({
     amount: 5000,
@@ -878,7 +878,7 @@ window.location.href = data.payment_url;`}</pre>
           <Alert className="border-green-200 bg-green-50 dark:bg-green-950 dark:border-green-800">
             <ShieldCheck className="h-4 w-4 text-green-600" />
             <AlertDescription className="text-green-800 dark:text-green-200 text-sm">
-              <strong>Securite:</strong> Utilisez toujours votre cle secrete (<code className="font-mono text-xs">sk_live_</code>) uniquement cote serveur.
+              <strong>Securite:</strong> Utilisez toujours votre cle privee payin (<code className="font-mono text-xs">sk_payin_live_</code>) uniquement cote serveur.
               Ne l'exposez jamais dans votre code frontend ou dans une URL.
             </AlertDescription>
           </Alert>
