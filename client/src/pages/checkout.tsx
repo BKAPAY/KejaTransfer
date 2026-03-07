@@ -245,6 +245,33 @@ export default function Checkout() {
     if (countdownRef.current) clearInterval(countdownRef.current);
   }, []);
 
+  useEffect(() => {
+    if ((session?.status === "completed" || stage === "completed") && successUrlRef.current) {
+      const timer = setTimeout(() => {
+        window.location.href = successUrlRef.current!;
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [session?.status, stage]);
+
+  useEffect(() => {
+    if (stage === "failed" && cancelUrlRef.current) {
+      const timer = setTimeout(() => {
+        window.location.href = cancelUrlRef.current!;
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [stage]);
+
+  useEffect(() => {
+    if (stage === "expired" && cancelUrlRef.current) {
+      const timer = setTimeout(() => {
+        window.location.href = cancelUrlRef.current!;
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [stage]);
+
   const payMutation = useMutation({
     mutationFn: async (body: any) => {
       const res = await fetch(`/api/v1/payment-sessions/${sessionId}/pay`, {
@@ -349,33 +376,6 @@ export default function Checkout() {
       </div>
     );
   }
-
-  useEffect(() => {
-    if ((session?.status === "completed" || stage === "completed") && successUrlRef.current) {
-      const timer = setTimeout(() => {
-        window.location.href = successUrlRef.current!;
-      }, 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [session?.status, stage]);
-
-  useEffect(() => {
-    if (stage === "failed" && cancelUrlRef.current) {
-      const timer = setTimeout(() => {
-        window.location.href = cancelUrlRef.current!;
-      }, 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [stage]);
-
-  useEffect(() => {
-    if (stage === "expired" && cancelUrlRef.current) {
-      const timer = setTimeout(() => {
-        window.location.href = cancelUrlRef.current!;
-      }, 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [stage]);
 
   if (session?.status === "completed" || stage === "completed") {
     return (
