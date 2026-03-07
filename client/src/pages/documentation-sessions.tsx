@@ -72,7 +72,7 @@ const response = await fetch("${baseUrl}/api/v1/payment-sessions", {
   method: "POST",
   headers: {
     "Content-Type": "application/json",
-    "Authorization": "Bearer sk_live_VOTRE_CLE_SECRETE"
+    "Authorization": "Bearer sk_payin_live_VOTRE_CLE_PAYIN"
   },
   body: JSON.stringify({
     amount: 5000,                                    // Montant (verrouille)
@@ -99,7 +99,7 @@ curl_setopt_array($ch, [
   CURLOPT_POST => true,
   CURLOPT_HTTPHEADER => [
     "Content-Type: application/json",
-    "Authorization: Bearer sk_live_VOTRE_CLE_SECRETE"
+    "Authorization: Bearer sk_payin_live_VOTRE_CLE_PAYIN"
   ],
   CURLOPT_POSTFIELDS => json_encode([
     "amount" => 5000,
@@ -125,7 +125,7 @@ response = requests.post(
     "${baseUrl}/api/v1/payment-sessions",
     headers={
         "Content-Type": "application/json",
-        "Authorization": "Bearer sk_live_VOTRE_CLE_SECRETE"
+        "Authorization": "Bearer sk_payin_live_VOTRE_CLE_PAYIN"
     },
     json={
         "amount": 5000,
@@ -148,7 +148,7 @@ const response = await fetch(
   "${baseUrl}/api/v1/payment-sessions/VOTRE_SESSION_ID/status",
   {
     headers: {
-      "Authorization": "Bearer sk_live_VOTRE_CLE_SECRETE"
+      "Authorization": "Bearer sk_payin_live_VOTRE_CLE_PAYIN"
     }
   }
 );
@@ -274,9 +274,9 @@ app.post("/webhook/bkapay", express.raw({ type: "application/json" }), (req, res
           </div>
           <div className="bg-muted/50 rounded-md p-3 space-y-1">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Authentification</p>
-            <p className="text-sm font-mono">Authorization: Bearer sk_live_VOTRE_CLE_SECRETE</p>
+            <p className="text-sm font-mono">Authorization: Bearer sk_payin_live_VOTRE_CLE_PAYIN</p>
             <p className="text-xs text-muted-foreground mt-1">
-              Recuperez votre cle secrete dans le tableau de bord sous "Cles API".
+              Recuperez votre cle privee payin dans le tableau de bord sous "API Payin".
               Ne partagez jamais cette cle — elle est reservee a votre serveur.
             </p>
           </div>
@@ -433,7 +433,7 @@ app.post("/webhook/bkapay", express.raw({ type: "application/json" }), (req, res
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            Vous pouvez interroger le statut d'une session a tout moment depuis votre serveur, avec votre cle secrete.
+            Vous pouvez interroger le statut d'une session a tout moment depuis votre serveur, avec votre cle privee payin.
           </p>
           <div className="relative">
             <pre className="bg-muted rounded-md p-4 text-xs overflow-x-auto whitespace-pre-wrap break-words">
