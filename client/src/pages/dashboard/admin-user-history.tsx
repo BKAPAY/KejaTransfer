@@ -73,7 +73,9 @@ export default function AdminUserHistory() {
     try {
       const meta = tx.metadata ? JSON.parse(tx.metadata as string) : null;
       const isApiPayout = tx.type === "withdrawal" && (
-        meta?.netMode === true || String(meta?.orderId || "").startsWith("BKAPAY-API-")
+        meta?.netMode === true ||
+        String(meta?.orderId || "").startsWith("BKAPAY-API-") ||
+        !!meta?.apiKeyId
       );
       if (isApiPayout) {
         return `Payout API ${Number(tx.amount).toLocaleString("fr-FR")} ${tx.currency}`;

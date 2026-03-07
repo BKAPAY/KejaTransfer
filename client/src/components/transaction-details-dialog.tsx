@@ -219,8 +219,11 @@ export function TransactionDetailsDialog({
               <div className="space-y-1">
                 <p className="text-xs text-muted-foreground">Type</p>
                 <p className="text-sm font-medium">
-                  {transaction.type === "withdrawal" && (metadata?.netMode === true || String(metadata?.orderId || "").startsWith("BKAPAY-API-"))
-                    ? "Payout API"
+                  {transaction.type === "withdrawal" && (
+                    metadata?.netMode === true ||
+                    String(metadata?.orderId || "").startsWith("BKAPAY-API-") ||
+                    !!metadata?.apiKeyId
+                  ) ? "Payout API"
                     : getTypeText(transaction.type)}
                 </p>
               </div>

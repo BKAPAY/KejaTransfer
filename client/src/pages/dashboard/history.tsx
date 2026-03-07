@@ -140,7 +140,9 @@ export default function History() {
     try {
       const meta = transaction.metadata ? JSON.parse(transaction.metadata as string) : null;
       const isApiPayout = transaction.type === "withdrawal" && (
-        meta?.netMode === true || String(meta?.orderId || "").startsWith("BKAPAY-API-")
+        meta?.netMode === true ||
+        String(meta?.orderId || "").startsWith("BKAPAY-API-") ||
+        !!meta?.apiKeyId
       );
       if (isApiPayout) {
         return `Payout API ${Number(transaction.amount).toLocaleString("fr-FR")} ${transaction.currency}`;

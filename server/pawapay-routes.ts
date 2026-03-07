@@ -280,6 +280,7 @@ export async function handlePawaPayWithdrawal(
       paymentProvider: "pawapay",
       orderId,
       startTime,
+      netMode: netMode || false,
     });
     await storage.updateTransactionMetadata(tx.id, updatedMetadata);
 
