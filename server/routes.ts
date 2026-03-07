@@ -3468,14 +3468,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      if (!result.success) {
-        return res.status(400).json({
-          success: false,
-          error: { code: "TRANSACTION_FAILED", message: "La transaction a échoué. Vérifiez le numéro, l'opérateur et réessayez." }
-        });
-      }
-
-      // 13. Update transaction metadata with API key reference
+      // 13. Update transaction metadata with API key reference (always, even on failure)
       if (result.transactionId) {
         try {
           const tx = await storage.getTransaction(result.transactionId);
@@ -3487,6 +3480,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             await storage.updateTransactionMetadata(result.transactionId, JSON.stringify(meta));
           }
         } catch (e) {}
+      }
+
+      if (!result.success) {
+        return res.status(400).json({
+          success: false,
+          error: { code: "TRANSACTION_FAILED", message: "La transaction a échoué. Vérifiez le numéro, l'opérateur et réessayez." }
+        });
       }
 
       // 14. Send async callback webhook if configured (using payout-specific callback fields)
