@@ -567,15 +567,18 @@ export default function Checkout() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-accent/5 p-4">
         <Card className="w-full max-w-md">
-          <CardContent className="pt-8 pb-6 text-center">
-            <img src={logoImage} alt="BKApay" className="h-10 w-auto mx-auto mb-6" />
-            <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto mb-3" />
-            <p className="font-semibold text-xl text-foreground mb-1" data-testid="text-processing-title">Paiement en cours</p>
+          <CardContent className="pt-8 pb-6 text-center space-y-4">
+            <img src={logoImage} alt="BKApay" className="h-10 w-auto mx-auto mb-2" />
+            <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto" />
+            <p className="font-semibold text-xl text-foreground" data-testid="text-processing-title">Paiement en cours</p>
             <p className="text-muted-foreground text-sm" data-testid="text-processing-amount">
               {session?.amount && session?.currency ? formatAmount(session.amount, session.currency) : ""}
               {session?.description ? ` — ${session.description}` : ""}
             </p>
-            <p className="text-xs text-muted-foreground mt-4">Veuillez patienter, votre paiement est en cours de traitement...</p>
+            <p className="text-xs text-muted-foreground">Veuillez patienter, votre paiement est en cours de traitement...</p>
+            <Button variant="outline" onClick={handleRetry} data-testid="button-cancel-processing">
+              <RefreshCw className="w-4 h-4 mr-2" /> Annuler et réessayer
+            </Button>
           </CardContent>
         </Card>
       </div>
