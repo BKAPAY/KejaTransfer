@@ -2835,7 +2835,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const sessionCurrency = currency || "XOF";
-      const expiresInSeconds = Math.min(Number(expires_in) || 3600, 86400);
+      const expiresInSeconds = Math.max(1800, Math.min(Number(expires_in) || 3600, 86400));
       const expiresAt = new Date(Date.now() + expiresInSeconds * 1000);
 
       const session = await storage.createPaymentSession({
