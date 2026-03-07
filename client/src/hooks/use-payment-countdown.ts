@@ -102,6 +102,25 @@ export function usePaymentCountdown({
     }
   }, []);
 
+  // Auto-resume: when enabled becomes true and a saved startTime exists in localStorage, restart the countdown
+  useEffect(() => {
+    if (!enabled) return;
+    const key = storageKeyRef.current;
+    if (!key) return;
+    const existing = getStartTime(key);
+    if (existing && !active) {
+      startTimeRef.current = existing;
+      const elapsed = Math.floor((Date.now() - existing) / 1000);
+      const remaining = Math.max(0, durationRef.current - elapsed);
+      if (remaining > 0) {
+        setRemainingTime(remaining);
+        setStatus("pending");
+        setActive(true);
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled, storageKey]);
+
   const startCountdown = useCallback(() => {
     const key = storageKeyRef.current;
     const duration = durationRef.current;

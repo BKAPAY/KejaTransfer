@@ -986,16 +986,6 @@ export default function ApiPay() {
               <p className="text-2xl font-bold text-primary">
                 {displayAmount.toLocaleString()} {ownerCurrency}
               </p>
-              {apiKeyInfo?.customerPaysFee && hasOperatorSelected && dynamicFee && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  (Frais de {(dynamicFee.feePercentage / 10).toFixed(1)}% inclus: {dynamicFee.feeAmount.toLocaleString()} {ownerCurrency})
-                </p>
-              )}
-              {apiKeyInfo?.customerPaysFee && !hasOperatorSelected && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  (Selectionnez un pays et operateur pour voir les frais)
-                </p>
-              )}
             </div>
             
             {mbiyoInstructions && (
@@ -1539,16 +1529,6 @@ export default function ApiPay() {
               <p className="text-3xl font-bold text-primary">
                 {displayAmount.toLocaleString()} <span className="text-lg">{ownerCurrency}</span>
               </p>
-              {apiKeyInfo?.customerPaysFee && hasOperatorSelected && dynamicFee && (
-                <p className="text-xs text-muted-foreground">
-                  (Frais de {(dynamicFee.feePercentage / 10).toFixed(1)}% inclus: {dynamicFee.feeAmount.toLocaleString()} {ownerCurrency})
-                </p>
-              )}
-              {apiKeyInfo?.customerPaysFee && !hasOperatorSelected && (
-                <p className="text-xs text-muted-foreground">
-                  (Selectionnez un pays et operateur pour voir les frais)
-                </p>
-              )}
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Completez votre paiement en remplissant les informations</p>
