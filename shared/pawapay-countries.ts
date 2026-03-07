@@ -321,6 +321,20 @@ export function getCurrencyForOperator(countryCode: string, operatorCode: string
   return op?.currency || country.currency;
 }
 
+export function operatorSupportsCurrency(countryCode: string, operatorCode: string, currency: string): boolean {
+  const country = PAWAPAY_COUNTRIES.find(
+    c => c.code.toUpperCase() === countryCode.toUpperCase() || c.iso3.toUpperCase() === countryCode.toUpperCase()
+  );
+  if (!country) return false;
+  const op = country.operators.find(o => o.code.toLowerCase() === operatorCode.toLowerCase());
+  if (!op) return false;
+  const opCurrencies = (op as any).currencies as string[] | undefined;
+  if (opCurrencies && opCurrencies.length > 0) {
+    return opCurrencies.map(c => c.toUpperCase()).includes(currency.toUpperCase());
+  }
+  return (op.currency || country.currency).toUpperCase() === currency.toUpperCase();
+}
+
 export function getCorrespondent(countryCode: string, operatorCode: string): string | null {
   const country = PAWAPAY_COUNTRIES.find(
     c => c.code.toUpperCase() === countryCode.toUpperCase() || c.iso3.toUpperCase() === countryCode.toUpperCase()

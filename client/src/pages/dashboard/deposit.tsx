@@ -22,7 +22,7 @@ import { CryptoPaymentFlow } from "@/components/crypto-payment-flow";
 import { CurrencySelector, getCurrencyLabel } from "@/components/currency-selector";
 import { OperatorSelector } from "@/components/operator-selector";
 import { hasMultipleCurrencies, getMbiyoPayCurrencyForCountry, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
-import { hasMultiplePawaPayCurrencies, getCurrenciesForCountry as getPawaPayCurrenciesForCountry, getCurrencyForOperator } from "@shared/pawapay-countries";
+import { hasMultiplePawaPayCurrencies, getCurrenciesForCountry as getPawaPayCurrenciesForCountry, operatorSupportsCurrency } from "@shared/pawapay-countries";
 import { useConvertedMinimums } from "@/hooks/use-converted-minimums";
 import { getCurrencyDecimals } from "@/lib/currency";
 import { usePaymentCountdown, DEFAULT_COUNTDOWN_DURATION } from "@/hooks/use-payment-countdown";
@@ -209,8 +209,7 @@ export default function Deposit() {
     : allCountryOperators
   ).filter(op => {
     if (!hasMultiplePawaPayCurrencies(selectedCountry || "")) return true;
-    const opCurrency = getCurrencyForOperator(selectedCountry || "", op.code);
-    return opCurrency === selectedCurrency;
+    return operatorSupportsCurrency(selectedCountry || "", op.code, selectedCurrency);
   });
 
   // Fetch dynamic fee from database when country/operator changes

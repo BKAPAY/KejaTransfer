@@ -2563,8 +2563,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
 
-        // Use operator-specific currency (e.g. USD for Vodacom/Orange in DRC)
-        const providerCurrency = getPawaPayCurrencyForOp(country.toUpperCase(), operator);
+        // Use client-selected currency if provided, otherwise fallback to operator default
+        const providerCurrency = requestCurrency || getPawaPayCurrencyForOp(country.toUpperCase(), operator);
 
         let convertedAmountForProvider = amountForProvider;
         if (ownerCurrency !== providerCurrency) {
@@ -3010,7 +3010,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
 
-        const providerCurrency = getPawaPayCurrencyForOp(country.toUpperCase(), operator);
+        const providerCurrency = requestCurrency || getPawaPayCurrencyForOp(country.toUpperCase(), operator);
         let convertedAmount = amountForProvider;
         if (ownerCurrency !== providerCurrency) {
           const { convertCurrency } = await import("./currency-converter");
@@ -7154,7 +7154,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
 
-        const providerCurrency = getPawaPayCurrencyForOp(country.toUpperCase(), operator);
+        const providerCurrency = currency || getPawaPayCurrencyForOp(country.toUpperCase(), operator);
         const pawaResult = await createPawaPayDeposit({
           amount: transaction.amount,
           currency: providerCurrency,
