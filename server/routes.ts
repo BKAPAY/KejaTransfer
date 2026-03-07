@@ -1843,6 +1843,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Regenerate payin private key
+  app.post("/api/api-keys/:id/regenerate-payin-key", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const keyId = req.params.id;
+      const userId = req.session.userId!;
+      const updatedKey = await storage.regenerateApiKeyPayinKey(keyId, userId);
+      if (!updatedKey) return res.status(404).json({ error: "Clé API non trouvée" });
+      res.json({
+        success: true,
+        payinPrivateKey: (updatedKey as any).payinPrivateKey,
+        message: "Clé privée payin régénérée avec succès. Mettez à jour votre serveur."
+      });
+    } catch (error: any) {
+      console.error("Error regenerating payin key:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
   // Update API key settings (allowed countries and customer pays fee)
   app.patch("/api/api-keys/:id/settings", requireAuth, async (req: Request, res: Response) => {
     try {
@@ -2777,17 +2795,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST /api/v1/payment-sessions — Create a payment session (requires secret key)
   app.post("/api/v1/payment-sessions", async (req: Request, res: Response) => {
     try {
-      let privateKey = req.headers.authorization?.replace(/^Bearer\s+/i, "").trim();
-      if (!privateKey) privateKey = req.body.private_key;
+      let secretKey = req.headers.authorization?.replace(/^Bearer\s+/i, "").trim();
+      if (!secretKey) secretKey = req.body.private_key;
 
-      if (!privateKey || !privateKey.startsWith("sk_")) {
+      if (!secretKey || !secretKey.startsWith("sk_")) {
         return res.status(401).json({
           success: false,
-          error: { code: "INVALID_API_KEY", message: "Clé API secrète invalide. Utilisez: Authorization: Bearer sk_live_..." }
+          error: { code: "INVALID_API_KEY", message: "Clé API secrète invalide. Utilisez: Authorization: Bearer sk_payin_live_..." }
         });
       }
 
-      const apiKey = await storage.getApiKeyByPrivateKey(privateKey);
+      // Try payin private key first (sk_payin_live_...), then fallback to legacy payout key (sk_live_...)
+      let apiKey = await storage.getApiKeyByPayinPrivateKey(secretKey);
+      if (!apiKey) {
+        apiKey = await storage.getApiKeyByPrivateKey(secretKey);
+      }
       if (!apiKey || !apiKey.isActive) {
         return res.status(401).json({
           success: false,

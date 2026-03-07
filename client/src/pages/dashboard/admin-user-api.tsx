@@ -105,7 +105,24 @@ export default function AdminUserApi() {
                     </div>
 
                     <div>
-                      <p className="text-xs text-muted-foreground mb-1">Clé privée</p>
+                      <p className="text-xs text-muted-foreground mb-1">Clé privée payin (sessions)</p>
+                      <div className="flex items-center gap-2">
+                        <code className="text-xs bg-muted px-2 py-1 rounded flex-1 truncate">
+                          {(apiKey as any).payinPrivateKey
+                            ? (visibleKeys[apiKey.id + '-payin'] ? (apiKey as any).payinPrivateKey : maskKey((apiKey as any).payinPrivateKey))
+                            : "—"}
+                        </code>
+                        <Button size="sm" variant="outline" onClick={() => toggleKeyVisibility(apiKey.id + '-payin')}>
+                          {visibleKeys[apiKey.id + '-payin'] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => copyToClipboard((apiKey as any).payinPrivateKey || "", "Clé privée payin")}>
+                          <Copy className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Clé privée payout</p>
                       <div className="flex items-center gap-2">
                         <code className="text-xs bg-muted px-2 py-1 rounded flex-1 truncate">
                           {visibleKeys[apiKey.id] ? apiKey.privateKey : maskKey(apiKey.privateKey)}
@@ -120,7 +137,7 @@ export default function AdminUserApi() {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => copyToClipboard(apiKey.privateKey, "Clé privée")}
+                          onClick={() => copyToClipboard(apiKey.privateKey, "Clé privée payout")}
                         >
                           <Copy className="w-4 h-4" />
                         </Button>

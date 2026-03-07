@@ -254,6 +254,25 @@ async function bootstrapDatabase() {
     }
     await payoutCbClient.end();
 
+    // Step 6f: Ensure payin_private_key column exists in api_keys and generate for existing keys
+    const payinKeyClient = postgres(DATABASE_URL);
+    try {
+      await payinKeyClient`ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS payin_private_key TEXT UNIQUE`;
+      console.log("✅ api_keys payin_private_key column ready");
+      // Auto-generate payin_private_key for existing keys that don't have one
+      const keysNeedingPayin = await payinKeyClient`SELECT id FROM api_keys WHERE payin_private_key IS NULL`;
+      for (const row of keysNeedingPayin) {
+        const { randomUUID } = await import("crypto");
+        await payinKeyClient`UPDATE api_keys SET payin_private_key = ${`sk_payin_live_${randomUUID()}`} WHERE id = ${row.id}`;
+      }
+      if (keysNeedingPayin.length > 0) {
+        console.log(`✅ Generated payin_private_key for ${keysNeedingPayin.length} existing API key(s)`);
+      }
+    } catch (e) {
+      console.error("⚠️ payin_private_key column setup error:", e);
+    }
+    await payinKeyClient.end();
+
     // Step 7: Ensure primary admin exists
     console.log("👤 Ensuring primary admin exists...");
     const seedClient = postgres(DATABASE_URL);

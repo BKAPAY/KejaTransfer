@@ -77,7 +77,9 @@ export interface IStorage {
   getApiKeyById(id: string): Promise<ApiKey | undefined>;
   getApiKeyByPublicKey(publicKey: string): Promise<ApiKey | undefined>;
   getApiKeyByPrivateKey(privateKey: string): Promise<ApiKey | undefined>;
+  getApiKeyByPayinPrivateKey(payinPrivateKey: string): Promise<ApiKey | undefined>;
   createApiKey(key: InsertApiKey & { userId: string }): Promise<ApiKey>;
+  regenerateApiKeyPayinKey(id: string, userId: string): Promise<ApiKey | undefined>;
   deleteApiKey(id: string, userId: string): Promise<boolean>;
   updateApiKeyCallback(id: string, userId: string, callbackUrl: string | null): Promise<ApiKey | undefined>;
   regenerateApiKeyCallbackSecret(id: string, userId: string): Promise<ApiKey | undefined>;
@@ -481,10 +483,24 @@ export class DbStorage implements IStorage {
     return results[0];
   }
 
+  async getApiKeyByPayinPrivateKey(payinPrivateKey: string): Promise<ApiKey | undefined> {
+    const results = await db.select().from(schema.apiKeys).where(eq(schema.apiKeys.payinPrivateKey, payinPrivateKey)).limit(1);
+    return results[0];
+  }
+
   async createApiKey(key: InsertApiKey & { userId: string }): Promise<ApiKey> {
     const publicKey = `pk_live_${randomUUID()}`;
     const privateKey = `sk_live_${randomUUID()}`;
-    const results = await db.insert(schema.apiKeys).values({ ...key, publicKey, privateKey }).returning();
+    const payinPrivateKey = `sk_payin_live_${randomUUID()}`;
+    const results = await db.insert(schema.apiKeys).values({ ...key, publicKey, privateKey, payinPrivateKey }).returning();
+    return results[0];
+  }
+
+  async regenerateApiKeyPayinKey(id: string, userId: string): Promise<ApiKey | undefined> {
+    const existing = await db.select().from(schema.apiKeys).where(eq(schema.apiKeys.id, id)).limit(1);
+    if (!existing[0] || existing[0].userId !== userId) return undefined;
+    const newPayinKey = `sk_payin_live_${randomUUID()}`;
+    const results = await db.update(schema.apiKeys).set({ payinPrivateKey: newPayinKey }).where(eq(schema.apiKeys.id, id)).returning();
     return results[0];
   }
 

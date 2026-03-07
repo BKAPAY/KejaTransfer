@@ -158,6 +158,27 @@ export default function ApiPage() {
     },
   });
 
+  const regeneratePayinKeyMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("POST", `/api/api-keys/${id}/regenerate-payin-key`, {});
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/api-keys"] });
+      toast({
+        title: "Cle payin regeneree",
+        description: "La cle privee payin a ete regeneree. Mettez a jour votre serveur.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erreur",
+        description: error.message || "Erreur lors de la regeneration",
+        variant: "destructive",
+      });
+    },
+  });
+
   const settingsMutation = useMutation({
     mutationFn: async ({ id, allowedCountries, customerPaysFee, customerPaysCryptoFee }: { id: string; allowedCountries: string[]; customerPaysFee: boolean; customerPaysCryptoFee: boolean }) => {
       const res = await apiRequest("PATCH", `/api/api-keys/${id}/settings`, { allowedCountries, customerPaysFee, customerPaysCryptoFee });
@@ -371,6 +392,60 @@ export default function ApiPage() {
                       <Copy className="w-4 h-4" />
                     </Button>
                   </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <label className="text-sm font-medium">Cle privee payin</label>
+                    <Badge variant="outline" className="text-xs">Sessions de paiement API</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Utilisez cette cle dans votre serveur pour creer des sessions de paiement via <code className="bg-muted px-1 rounded">POST /api/v1/payment-sessions</code>.
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 bg-muted rounded-md px-3 py-2 font-mono text-xs break-all">
+                      {(apiKey as any).payinPrivateKey
+                        ? (visibleKeys[apiKey.id + '-payin']
+                          ? (apiKey as any).payinPrivateKey
+                          : maskKey((apiKey as any).payinPrivateKey))
+                        : "—"}
+                    </div>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => toggleKeyVisibility(apiKey.id + '-payin')}
+                      data-testid={`button-toggle-payin-${apiKey.id}`}
+                    >
+                      {visibleKeys[apiKey.id + '-payin'] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => copyToClipboard((apiKey as any).payinPrivateKey || "", "Cle privee payin")}
+                      data-testid={`button-copy-payin-${apiKey.id}`}
+                    >
+                      <Copy className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => {
+                        if (confirm("Regenerer la cle privee payin ? L'ancienne cle sera invalidee.")) {
+                          regeneratePayinKeyMutation.mutate(apiKey.id);
+                        }
+                      }}
+                      disabled={regeneratePayinKeyMutation.isPending}
+                      title="Regenerer la cle privee payin"
+                      data-testid={`button-regenerate-payin-${apiKey.id}`}
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  <Alert className="mt-2 border-destructive/30 bg-destructive/5 py-2">
+                    <AlertDescription className="text-destructive text-xs">
+                      Ne partagez jamais cette cle. Ne la mettez pas dans votre code frontend (JavaScript navigateur).
+                    </AlertDescription>
+                  </Alert>
                 </div>
 
                 <Separator className="my-4" />

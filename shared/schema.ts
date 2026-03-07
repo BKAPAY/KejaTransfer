@@ -79,6 +79,7 @@ export const apiKeys = pgTable("api_keys", {
   siteName: text("site_name").notNull().default("Mon Site"), // Nom du site qui sera affiché "Payer à [siteName]"
   publicKey: text("public_key").notNull().unique(),
   privateKey: text("private_key").notNull().unique(),
+  payinPrivateKey: text("payin_private_key").unique(), // Secret key for payin (payment sessions) - sk_payin_live_...
   callbackUrl: text("callback_url"), // URL to receive payin payment notifications
   callbackSecret: text("callback_secret"), // (legacy - unused for payin, kept for compat)
   payoutCallbackUrl: text("payout_callback_url"), // URL to receive payout status notifications
