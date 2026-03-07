@@ -3149,7 +3149,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             phoneNumber: customerPhone, invoiceToken: paydunyaResp.token,
           } as SoftpayPaymentData);
           if (softpayResult.success) {
-            return res.json({ success: true, transactionId: tx.id, token: paydunyaResp.token, message: softpayResult.message, provider: "paydunya" });
+            return res.json({ success: true, transactionId: tx.id, token: paydunyaResp.token, message: softpayResult.message, redirectUrl: softpayResult.url || null, provider: "paydunya" });
           }
           return res.status(400).json({ success: false, error: softpayResult.message || "Erreur de paiement" });
         }
