@@ -410,6 +410,12 @@ export default function Checkout() {
   }, []);
 
   useEffect(() => {
+    if (session?.status === "processing" && stage === "form" && !pollRef.current) {
+      startSessionPolling();
+    }
+  }, [session?.status, stage]);
+
+  useEffect(() => {
     if ((session?.status === "completed" || stage === "completed") && successUrlRef.current) {
       const timer = setTimeout(() => {
         window.location.href = successUrlRef.current!;
@@ -551,6 +557,25 @@ export default function Checkout() {
             <p className="text-sm text-muted-foreground">
               {session?.error || "Ce lien de paiement n'est plus valide."}
             </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (session?.status === "processing" && stage === "form") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-accent/5 p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-8 pb-6 text-center">
+            <img src={logoImage} alt="BKApay" className="h-10 w-auto mx-auto mb-6" />
+            <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto mb-3" />
+            <p className="font-semibold text-xl text-foreground mb-1" data-testid="text-processing-title">Paiement en cours</p>
+            <p className="text-muted-foreground text-sm" data-testid="text-processing-amount">
+              {session?.amount && session?.currency ? formatAmount(session.amount, session.currency) : ""}
+              {session?.description ? ` — ${session.description}` : ""}
+            </p>
+            <p className="text-xs text-muted-foreground mt-4">Veuillez patienter, votre paiement est en cours de traitement...</p>
           </CardContent>
         </Card>
       </div>
