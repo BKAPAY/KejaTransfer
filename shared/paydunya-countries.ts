@@ -102,6 +102,18 @@ export const PAYDUNYA_COUNTRIES: PaydunyaCountry[] = [
       { code: "wave", name: "Wave", requiresOtp: false, payin: true, payout: true },
     ],
   },
+  {
+    code: "CM",
+    name: "Cameroun",
+    flag: "🇨🇲",
+    phoneCode: "+237",
+    phoneDigits: 9,
+    phoneFormat: "6XXXXXXXX",
+    currency: "XAF",
+    operators: [
+      { code: "mtn", name: "MTN Mobile Money", requiresOtp: false, payin: true, payout: false },
+    ],
+  },
 ];
 
 export const getPaydunyaCountryByCode = (code: string): PaydunyaCountry | undefined => {

@@ -13,11 +13,12 @@ const BKAPAY_GENERIC_EMAIL = "noreply@bkapay.com";
 // Operator codes mapping
 export type OperatorCode = 
   | "orange_sn" | "free_sn" | "expresso_sn" | "wave_sn" | "wizall_sn"
-  | "orange_ml" | "moov_ml" // Mali - pas de MTN selon Paydunya
+  | "orange_ml" | "moov_ml"
   | "mtn_bj" | "moov_bj"
   | "tmoney_tg" | "moov_tg"
   | "orange_ci" | "mtn_ci" | "moov_ci" | "wave_ci"
   | "orange_bf" | "moov_bf"
+  | "mtn_cm"
   | "paydunya";
 
 export interface SoftpayOperatorConfig {
@@ -310,6 +311,23 @@ export const SOFTPAY_OPERATORS: Record<string, SoftpayOperatorConfig> = {
     })
   },
 
+  // CAMEROUN OPERATORS
+  // MTN Cameroun - Push notification + SMS de validation
+  "mtn_cm": {
+    endpoint: "/softpay/mtn-cameroun",
+    requiresOTP: false,
+    requiresTwoStep: false,
+    requiresRedirect: false,
+    ussdInstruction: "Vous recevrez un SMS de validation. Confirmez le paiement sur votre telephone.",
+    parameterMapping: (data) => ({
+      mtn_cameroun_customer_fullname: data.customerName,
+      mtn_cameroun_email: BKAPAY_GENERIC_EMAIL,
+      mtn_cameroun_phone_number: data.phoneNumber,
+      mtn_cameroun_wallet_provider: "MTNCAMEROUN",
+      payment_token: data.invoiceToken
+    })
+  },
+
   // PAYDUNYA WALLET
   "paydunya": {
     endpoint: "/softpay/paydunya",
@@ -361,6 +379,9 @@ export function getOperatorKey(operator: string, country: string): string | null
     "orange-bf": "orange_bf",
     "moov-bf": "moov_bf",
     
+    // Cameroun
+    "mtn-cm": "mtn_cm",
+    
     // Paydunya wallet (country-independent, works everywhere)
     "paydunya-sn": "paydunya",
     "paydunya-ml": "paydunya",
@@ -368,6 +389,7 @@ export function getOperatorKey(operator: string, country: string): string | null
     "paydunya-tg": "paydunya",
     "paydunya-ci": "paydunya",
     "paydunya-bf": "paydunya",
+    "paydunya-cm": "paydunya",
   };
 
   const key = `${operator.toLowerCase()}-${country.toLowerCase()}`;
