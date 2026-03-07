@@ -3135,8 +3135,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         await storage.updatePaymentSession(session.id, { transactionId: tx.id });
 
-        const { getOperatorKey, requiresOTP, requiresTwoStep } = await import("@shared/paydunya-countries");
-        const { callPaydunyaSoftpay, SoftpayPaymentData } = await import("./paydunya");
+        
         const opKey = getOperatorKey(operator, country);
         if (opKey && !requiresOTP(opKey) && !requiresTwoStep(opKey)) {
           const softpayResult = await callPaydunyaSoftpay(operator, country, {
