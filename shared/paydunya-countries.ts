@@ -111,7 +111,7 @@ export const PAYDUNYA_COUNTRIES: PaydunyaCountry[] = [
     phoneFormat: "6XXXXXXXX",
     currency: "XAF",
     operators: [
-      { code: "mtn", name: "MTN Mobile Money", requiresOtp: false, payin: true, payout: false },
+      { code: "mtn", name: "MTN Mobile Money", requiresOtp: false, payin: true, payout: true },
     ],
   },
 ];

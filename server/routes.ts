@@ -2284,9 +2284,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       } else if (activeProvider === "paydunya") {
         // Use Paydunya
-        const providerCurrency = "XOF"; // Paydunya only accepts XOF
+        const payduynaCountryCurrencies: Record<string, string> = { "CM": "XAF" };
+        const providerCurrency = payduynaCountryCurrencies[country.toUpperCase()] || "XOF";
         
-        // CRITICAL: Convert amount from owner's currency to XOF if different
+        // CRITICAL: Convert amount from owner's currency to provider currency if different
         let convertedAmountForProvider = amountForProvider;
         if (ownerCurrency !== providerCurrency) {
           const { convertCurrency } = await import("./currency-converter");
@@ -3998,7 +3999,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get owner's currency and payer's currency
       const ownerCurrency = owner?.country ? getCurrencyForCountry(owner.country) : "XOF";
       const payerCurrency = getCurrencyForCountry(country) || "XOF";
-      const providerCurrency = "XOF"; // Paydunya only accepts XOF
+      const payduynaCountryCurrencies4002: Record<string, string> = { "CM": "XAF" };
+      const providerCurrency = payduynaCountryCurrencies4002[country.toUpperCase()] || "XOF";
 
       // Calculate amount to send to provider based on customerPaysFee setting
       let amountForProvider: number;
@@ -4162,7 +4164,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Get owner's currency and provider currency
       const ownerCurrency = owner?.country ? getCurrencyForCountry(owner.country) : "XOF";
-      const providerCurrency = "XOF"; // Paydunya only accepts XOF
+      const payduynaCountryCurrencies4166: Record<string, string> = { "CM": "XAF" };
+      const providerCurrency = payduynaCountryCurrencies4166[country?.toUpperCase()] || "XOF";
       const baseAmountInOwnerCurrency = Math.floor(amount);
 
       // CRITICAL: Convert amount to provider currency (XOF) if owner's currency is different
@@ -5975,6 +5978,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           "moov-bj": "moov-benin", "mtn-bj": "mtn-benin",
           "tmoney-tg": "t-money-togo", "moov-tg": "moov-togo",
           "orange-ml": "orange-money-mali", "moov-ml": "moov-mali",
+          "mtn-cm": "mtn-cameroun",
         };
 
         const withdrawMode = withdrawModeMap[`${operator}-${country.toLowerCase()}`];
@@ -5992,6 +5996,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           "SN": { code: "221", localLength: [9] }, "CI": { code: "225", localLength: [10] },
           "BF": { code: "226", localLength: [8] }, "BJ": { code: "229", localLength: [8, 10] },
           "TG": { code: "228", localLength: [8] }, "ML": { code: "223", localLength: [8] },
+          "CM": { code: "237", localLength: [9] },
         };
 
         const phoneInfo = countryPhoneInfo[country.toUpperCase()];
@@ -6016,7 +6021,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Logique différente pour transfert vs retrait
         // TRANSFERT: L'utilisateur écrit 1000 → débité 1060 → fournisseur reçoit 1000 → destinataire reçoit 1000
         // RETRAIT: L'utilisateur écrit 1000 → débité 1000 → fournisseur reçoit 940 → utilisateur reçoit 940
-        const providerCurrency = "XOF"; // Paydunya only uses XOF
+        const payduynaCountryCurrencies6021: Record<string, string> = { "CM": "XAF" };
+        const providerCurrency = payduynaCountryCurrencies6021[country.toUpperCase()] || "XOF";
         const amountInUserCurrency = isTransfer ? Math.floor(amount) : feeInfo.amountReceived;
         const amountToDebit = isTransfer ? (Math.floor(amount) + feeInfo.feeAmount) : feeInfo.totalDeductedFromBalance;
 
@@ -7296,6 +7302,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Mali
         "orange-ml": "orange-money-mali",
         "moov-ml": "moov-mali",
+        // Cameroun
+        "mtn-cm": "mtn-cameroun",
       };
 
       const withdrawMode = withdrawModeMap[`${operator}-${country.toLowerCase()}`];
@@ -7323,6 +7331,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "BJ": { code: "229", localLength: [8, 10] },  // Benin: 8 or 10 digits (with leading 0)
         "TG": { code: "228", localLength: [8] },      // Togo: 8 digits
         "ML": { code: "223", localLength: [8] },      // Mali: 8 digits
+        "CM": { code: "237", localLength: [9] },      // Cameroun: 9 digits (6XXXXXXXX)
       };
       
       const phoneInfo = countryPhoneInfo[country.toUpperCase()];
@@ -9967,6 +9976,7 @@ SUPPORT ET CONTACT:
                   "moov-bj": "moov-benin", "mtn-bj": "mtn-benin",
                   "tmoney-tg": "t-money-togo", "moov-tg": "moov-togo",
                   "orange-ml": "orange-money-mali", "moov-ml": "moov-mali",
+                  "mtn-cm": "mtn-cameroun",
                 };
                 const withdrawModeW = withdrawModeMapW[`${operator}-${country.toLowerCase()}`];
                 if (!withdrawModeW) return JSON.stringify({ success: false, error: "Cet opérateur n'est pas disponible pour les retraits dans ce pays." });
@@ -9976,6 +9986,7 @@ SUPPORT ET CONTACT:
                   "SN": { code: "221", localLength: [9] }, "CI": { code: "225", localLength: [10] },
                   "BF": { code: "226", localLength: [8] }, "BJ": { code: "229", localLength: [8, 10] },
                   "TG": { code: "228", localLength: [8] }, "ML": { code: "223", localLength: [8] },
+                  "CM": { code: "237", localLength: [9] },
                 };
                 const phoneInfoW = countryPhoneInfoW[country.toUpperCase()];
                 if (phoneInfoW) {
@@ -10080,6 +10091,7 @@ SUPPORT ET CONTACT:
                   "moov-bj": "moov-benin", "mtn-bj": "mtn-benin",
                   "tmoney-tg": "t-money-togo", "moov-tg": "moov-togo",
                   "orange-ml": "orange-money-mali", "moov-ml": "moov-mali",
+                  "mtn-cm": "mtn-cameroun",
                 };
                 const withdrawModeT = withdrawModeMapT[`${operator}-${country.toLowerCase()}`];
                 if (!withdrawModeT) return JSON.stringify({ success: false, error: "Cet opérateur n'est pas disponible pour les transferts dans ce pays." });
@@ -10089,6 +10101,7 @@ SUPPORT ET CONTACT:
                   "SN": { code: "221", localLength: [9] }, "CI": { code: "225", localLength: [10] },
                   "BF": { code: "226", localLength: [8] }, "BJ": { code: "229", localLength: [8, 10] },
                   "TG": { code: "228", localLength: [8] }, "ML": { code: "223", localLength: [8] },
+                  "CM": { code: "237", localLength: [9] },
                 };
                 const phoneInfoT = countryPhoneInfoT[country.toUpperCase()];
                 if (phoneInfoT) {
