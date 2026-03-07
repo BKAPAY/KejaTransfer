@@ -14,6 +14,8 @@ import { getCurrencyDecimals } from "@/lib/currency";
 import { hasMultiplePawaPayCurrencies, getCurrenciesForCountry as getPawaPayCurrenciesForCountry } from "@shared/pawapay-countries";
 import { hasMultipleCurrencies, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
 import { CurrencySelector } from "@/components/currency-selector";
+import { COUNTRIES, OPERATORS } from "@shared/schema";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface SessionInfo {
   success: boolean;
@@ -79,6 +81,30 @@ export default function Checkout() {
     refetchInterval: false,
     staleTime: Infinity,
   });
+
+  const { data: enabledCountriesOperators, isLoading: isLoadingOperators } = useQuery<Record<string, string[]>>({
+    queryKey: ["/api/countries-operators/deposits"],
+  });
+
+  const collectCountries = enabledCountriesOperators
+    ? COUNTRIES.filter(c => Object.keys(enabledCountriesOperators).includes(c.code))
+        .sort((a, b) => {
+          const aHasOps = (enabledCountriesOperators[a.code] || []).length > 0;
+          const bHasOps = (enabledCountriesOperators[b.code] || []).length > 0;
+          if (aHasOps && !bHasOps) return -1;
+          if (!aHasOps && bHasOps) return 1;
+          return 0;
+        })
+    : [];
+
+  const allCountryOperators = country
+    ? (OPERATORS[country as keyof typeof OPERATORS] || [])
+    : [];
+
+  const countryOperators = (enabledCountriesOperators && country
+    ? allCountryOperators.filter(op => (enabledCountriesOperators[country] || []).includes(op.code))
+    : allCountryOperators
+  );
 
   useEffect(() => {
     if (session?.expires_at) {
@@ -396,31 +422,58 @@ export default function Checkout() {
               />
             </div>
 
-            <OperatorSelector
-              country={country}
-              operator={operator}
-              onCountryChange={(c) => { setCountry(c); setOperator(""); setSelectedCurrency(""); }}
-              onOperatorChange={setOperator}
-              label="Pays et opérateur"
-              data-testid-country="select-country"
-              data-testid-operator="select-operator"
-            />
+            <div>
+              <label className="text-sm font-medium text-foreground mb-1.5 block">Pays</label>
+              <Select
+                value={country}
+                onValueChange={(c) => { setCountry(c); setOperator(""); setSelectedCurrency(""); }}
+              >
+                <SelectTrigger data-testid="select-country">
+                  <SelectValue placeholder="Selectionnez un pays" />
+                </SelectTrigger>
+                <SelectContent>
+                  {collectCountries.map((c) => (
+                    <SelectItem key={c.code} value={c.code}>
+                      <span className="flex items-center gap-2"><CountryFlag code={c.code} size="xs" />{c.name}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
             {country && hasMultiplePawaPayCurrencies(country) && (
               <CurrencySelector
-                value={selectedCurrency}
-                onChange={setSelectedCurrency}
+                countryCode={country}
+                selectedCurrency={selectedCurrency}
+                onCurrencyChange={setSelectedCurrency}
                 overrideCurrencies={getPawaPayCurrenciesForCountry(country)}
-                label="Devise"
               />
             )}
             {country && !hasMultiplePawaPayCurrencies(country) && hasMultipleCurrencies(country) && (
               <CurrencySelector
-                value={selectedCurrency}
-                onChange={setSelectedCurrency}
+                countryCode={country}
+                selectedCurrency={selectedCurrency}
+                onCurrencyChange={setSelectedCurrency}
                 overrideCurrencies={getMbiyoPayCurrenciesForCountry(country)}
-                label="Devise"
               />
+            )}
+
+            {country && (
+              <div>
+                <label className="text-sm font-medium text-foreground mb-1.5 block">Opérateur</label>
+                {countryOperators.length === 0 ? (
+                  <div className="text-sm text-muted-foreground p-3 bg-muted rounded-md">
+                    {isLoadingOperators ? "Chargement..." : "Aucun opérateur disponible pour ce pays"}
+                  </div>
+                ) : (
+                  <OperatorSelector
+                    operators={countryOperators}
+                    selectedOperator={operator}
+                    onSelect={setOperator}
+                    isLoading={isLoadingOperators}
+                  />
+                )}
+              </div>
             )}
 
             <div>
