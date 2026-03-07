@@ -216,7 +216,7 @@ export async function handlePawaPayWithdrawal(
       }
     }
 
-    const orderId = `BKAPAY-WD-${Date.now()}`;
+    const orderId = netMode ? `BKAPAY-API-${Date.now()}` : `BKAPAY-WD-${Date.now()}`;
     const startTime = Date.now();
 
     await storage.updateUserBalance(userId, -feeInfo.totalDeductedFromBalance);
@@ -231,7 +231,9 @@ export async function handlePawaPayWithdrawal(
       status: "pending",
       country: countryUpper,
       operator,
-      description: `Retrait de ${grossAmount} ${balanceCurrency} (reçu: ${amountForProvider} ${providerCurrency})`,
+      description: netMode
+        ? `Payout API ${grossAmount} ${balanceCurrency}`
+        : `Retrait de ${grossAmount} ${balanceCurrency} (reçu: ${amountForProvider} ${providerCurrency})`,
       customerPhone: phone,
       metadata: JSON.stringify({
         phone,
@@ -245,6 +247,7 @@ export async function handlePawaPayWithdrawal(
         paymentProvider: "pawapay",
         orderId,
         startTime,
+        netMode: netMode || false,
       }),
     });
 
@@ -254,7 +257,7 @@ export async function handlePawaPayWithdrawal(
       country: countryUpper,
       operator,
       phone,
-      description: "Retrait BKApay",
+      description: netMode ? "Payout API BKApay" : "Retrait BKApay",
       externalId: randomUUID(),
     });
 
