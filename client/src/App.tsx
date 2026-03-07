@@ -112,11 +112,7 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
     }
   }, [isLoading, isUnauthenticated, location, setLocation]);
 
-  useEffect(() => {
-    if (verifyStatus && verifyStatus.verified === false && location.startsWith("/dashboard")) {
-      setLocation("/login-verify");
-    }
-  }, [verifyStatus, location, setLocation]);
+  
 
   // En attente de vérification d'auth
   if (isLoading) {

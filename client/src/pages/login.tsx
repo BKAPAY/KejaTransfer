@@ -130,10 +130,9 @@ export default function Login() {
       console.log("[Login] Response received:", JSON.stringify(response));
       
       if (response.requiresCode === false || !response.requiresCode) {
-        console.log("[Login] Direct login - redirecting to verification");
+        console.log("[Login] Direct login - redirecting to dashboard");
         await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
-        await queryClient.invalidateQueries({ queryKey: ["/api/auth/login-verify-status"] });
-        setLocation("/login-verify");
+        setLocation("/dashboard");
         return;
       }
       
@@ -169,8 +168,7 @@ export default function Login() {
         clearStorage(credentials.email);
       }
       await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
-      await queryClient.invalidateQueries({ queryKey: ["/api/auth/login-verify-status"] });
-      setLocation("/login-verify");
+      setLocation("/dashboard");
     },
     onError: (error: any) => {
       toast({
