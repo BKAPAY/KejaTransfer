@@ -767,7 +767,7 @@ data = response.json()
         </CardHeader>
         <CardContent className="space-y-5 text-sm">
           <p className="text-muted-foreground">
-            Avec les sessions de paiement, le montant est verrouille cote serveur grace a votre cle secrete.
+            Avec les sessions de paiement, le montant est verrouille cote serveur grace a votre cle privee payin (<code className="font-mono text-xs bg-muted px-1 rounded">sk_payin_live_...</code>).
             Vos clients recoivent une URL propre <code className="font-mono text-xs bg-muted px-1 rounded">/checkout/SESSION_ID</code> — le montant n'apparait jamais dans l'URL.
           </p>
 
