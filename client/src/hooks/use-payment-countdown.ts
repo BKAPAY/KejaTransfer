@@ -78,6 +78,8 @@ export function usePaymentCountdown({
   statusRef.current = status;
 
   const storageKey = getStorageKey(invoiceToken, transactionId);
+  const storageKeyRef = useRef(storageKey);
+  storageKeyRef.current = storageKey;
 
   const onCompletedRef = useRef(onCompleted);
   const onFailedRef = useRef(onFailed);
@@ -85,6 +87,9 @@ export function usePaymentCountdown({
   onCompletedRef.current = onCompleted;
   onFailedRef.current = onFailed;
   onExpiredRef.current = onExpired;
+
+  const durationRef = useRef(durationSeconds);
+  durationRef.current = durationSeconds;
 
   const cleanup = useCallback(() => {
     if (timerRef.current) {
@@ -98,15 +103,17 @@ export function usePaymentCountdown({
   }, []);
 
   const startCountdown = useCallback(() => {
+    const key = storageKeyRef.current;
+    const duration = durationRef.current;
     let startTime: number;
 
-    if (storageKey) {
-      const existing = getStartTime(storageKey);
+    if (key) {
+      const existing = getStartTime(key);
       if (existing) {
         startTime = existing;
       } else {
         startTime = Date.now();
-        setStartTime(storageKey, startTime);
+        setStartTime(key, startTime);
       }
     } else {
       startTime = Date.now();
@@ -115,22 +122,23 @@ export function usePaymentCountdown({
     startTimeRef.current = startTime;
 
     const elapsed = Math.floor((Date.now() - startTime) / 1000);
-    const remaining = Math.max(0, durationSeconds - elapsed);
+    const remaining = Math.max(0, duration - elapsed);
     setRemainingTime(remaining);
     setStatus("pending");
     setActive(true);
-  }, [storageKey, durationSeconds]);
+  }, []);
 
   const resetCountdown = useCallback(() => {
     cleanup();
-    if (storageKey) {
-      clearStartTime(storageKey);
+    const key = storageKeyRef.current;
+    if (key) {
+      clearStartTime(key);
     }
     startTimeRef.current = null;
-    setRemainingTime(durationSeconds);
+    setRemainingTime(durationRef.current);
     setStatus("pending");
     setActive(false);
-  }, [storageKey, durationSeconds, cleanup]);
+  }, [cleanup]);
 
   useEffect(() => {
     if (!active && !enabled) return;
@@ -143,7 +151,7 @@ export function usePaymentCountdown({
       if (!startTime) return;
 
       const elapsed = Math.floor((Date.now() - startTime) / 1000);
-      const remaining = Math.max(0, durationSeconds - elapsed);
+      const remaining = Math.max(0, durationRef.current - elapsed);
       setRemainingTime(remaining);
 
       if (remaining <= 0 && statusRef.current === "pending") {
@@ -163,7 +171,7 @@ export function usePaymentCountdown({
         timerRef.current = null;
       }
     };
-  }, [active, enabled, durationSeconds, cleanup]);
+  }, [active, enabled, cleanup]);
 
   useEffect(() => {
     if (!enabled || !active || (!invoiceToken && !transactionId) || statusRef.current !== "pending") {
