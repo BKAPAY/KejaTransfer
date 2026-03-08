@@ -177,6 +177,7 @@ export interface IStorage {
   createOrUpdateFeeConfig(config: InsertFeeConfig): Promise<FeeConfig>;
   updateFeeConfig(provider: string, country: string, operator: string, updates: { incomingFeePercentage?: number; outgoingFeePercentage?: number }): Promise<FeeConfig | undefined>;
   initializeFeeConfigs(): Promise<void>;
+  ensurePaydunyaFeeConfigs(): Promise<void>;
   ensurePawaPayFeeConfigs(): Promise<void>;
 
   // Support Settings
@@ -2117,6 +2118,33 @@ export class DbStorage implements IStorage {
     if (configs.length > 0) {
       await db.insert(schema.feeConfigs).values(configs);
       console.log(`[FeeConfigs] Initialized ${configs.length} fee configurations with default 6%`);
+    }
+  }
+
+  async ensurePaydunyaFeeConfigs(): Promise<void> {
+    const existing = await this.getFeeConfigsByProvider("paydunya");
+    const existingSet = new Set(existing.map(c => `${c.country}-${c.operator}`));
+
+    const toInsert: InsertFeeConfig[] = [];
+    for (const country of PAYDUNYA_COUNTRIES) {
+      for (const op of country.operators) {
+        const key = `${country.code}-${op.code}`;
+        if (existingSet.has(key)) continue;
+        toInsert.push({
+          provider: "paydunya",
+          country: country.code,
+          operator: op.code,
+          incomingFeePercentage: 60,
+          outgoingFeePercentage: 60,
+        });
+      }
+    }
+
+    if (toInsert.length > 0) {
+      await db.insert(schema.feeConfigs).values(toInsert);
+      console.log(`[FeeConfigs] Added ${toInsert.length} Paydunya fee configurations (default 6%)`);
+    } else {
+      console.log(`[FeeConfigs] Paydunya fee configs already initialized`);
     }
   }
 

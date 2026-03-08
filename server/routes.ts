@@ -9359,6 +9359,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Initialize fee configs
   await storage.initializeFeeConfigs();
+  await storage.ensurePaydunyaFeeConfigs();
   await storage.ensurePawaPayFeeConfigs();
 
   // ===== Provider Config Routes (API Keys Management) =====
