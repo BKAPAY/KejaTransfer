@@ -1,11 +1,5 @@
-const EXCHANGERATE_API_KEY = process.env.EXCHANGERATE_API_KEY;
 const EXCHANGERATE_API_URL = "https://v6.exchangerate-api.com/v6";
 
-if (!EXCHANGERATE_API_KEY) {
-  console.warn("[CurrencyConverter] EXCHANGERATE_API_KEY not configured");
-}
-
-// Currencies that don't use decimal places (African francs, etc.)
 const NO_DECIMAL_CURRENCIES = ["XOF", "XAF", "CDF", "GNF", "GMD", "RWF"];
 
 function getCurrencyDecimals(currency: string): number {
@@ -32,22 +26,51 @@ export interface ConversionResult {
 }
 
 const rateCache: Map<string, { rate: number; timestamp: number }> = new Map();
-const CACHE_DURATION_MS = 60 * 60 * 1000; // 1 hour cache
+const CACHE_DURATION_MS = 60 * 60 * 1000;
+
+let cachedApiKey: string | null = null;
+let apiKeyFetchedAt = 0;
+const API_KEY_CACHE_MS = 5 * 60 * 1000;
+
+async function getExchangeRateApiKey(): Promise<string | null> {
+  if (cachedApiKey && Date.now() - apiKeyFetchedAt < API_KEY_CACHE_MS) {
+    return cachedApiKey;
+  }
+
+  try {
+    const { storage } = await import("./storage");
+    const config = await storage.getProviderConfig("exchangerate");
+    if (config?.apiKey) {
+      cachedApiKey = config.apiKey;
+      apiKeyFetchedAt = Date.now();
+      return cachedApiKey;
+    }
+  } catch (e) {
+    console.error("[CurrencyConverter] Error fetching API key from database:", e);
+  }
+
+  if (process.env.EXCHANGERATE_API_KEY) {
+    cachedApiKey = process.env.EXCHANGERATE_API_KEY;
+    apiKeyFetchedAt = Date.now();
+    return cachedApiKey;
+  }
+
+  return null;
+}
 
 export async function convertCurrency(
   amount: number,
   fromCurrency: string,
   toCurrency: string
 ): Promise<ConversionResult> {
-  if (!EXCHANGERATE_API_KEY) {
+  if (fromCurrency === toCurrency) {
     return {
-      success: false,
+      success: true,
       originalAmount: amount,
       originalCurrency: fromCurrency,
       convertedAmount: amount,
       targetCurrency: toCurrency,
       conversionRate: 1,
-      error: "API de conversion non configurée",
     };
   }
 
@@ -67,9 +90,23 @@ export async function convertCurrency(
     };
   }
 
+  const apiKey = await getExchangeRateApiKey();
+  if (!apiKey) {
+    console.warn("[CurrencyConverter] ExchangeRate API key not configured (neither in admin panel nor in environment)");
+    return {
+      success: false,
+      originalAmount: amount,
+      originalCurrency: fromCurrency,
+      convertedAmount: amount,
+      targetCurrency: toCurrency,
+      conversionRate: 1,
+      error: "API de conversion non configurée. Configurez la clé ExchangeRate API dans l'interface admin (Fournisseurs).",
+    };
+  }
+
   try {
-    const url = `${EXCHANGERATE_API_URL}/${EXCHANGERATE_API_KEY}/pair/${fromCurrency}/${toCurrency}/${amount}`;
-    console.log(`[CurrencyConverter] Fetching rate: ${fromCurrency} -> ${toCurrency}`);
+    const url = `${EXCHANGERATE_API_URL}/${apiKey}/pair/${fromCurrency}/${toCurrency}/${amount}`;
+    console.log(`[CurrencyConverter] Fetching rate from ExchangeRate API: ${fromCurrency} -> ${toCurrency}`);
     
     const response = await fetch(url);
     const data = await response.json();
@@ -92,7 +129,12 @@ export async function convertCurrency(
         conversionRate: data.conversion_rate,
       };
     } else {
-      console.error("[CurrencyConverter] API error:", data["error-type"]);
+      console.error("[CurrencyConverter] ExchangeRate API error:", data["error-type"]);
+      if (data["error-type"] === "invalid-key") {
+        cachedApiKey = null;
+        apiKeyFetchedAt = 0;
+        rateCache.clear();
+      }
       return {
         success: false,
         originalAmount: amount,
