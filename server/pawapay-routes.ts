@@ -12,6 +12,7 @@ import {
   mapPawaPayStatus,
   PAWAPAY_SUPPORTED_COUNTRIES,
   getPawaPayConfig,
+  roundForCurrency,
 } from "./pawapay";
 import {
   PAWAPAY_COUNTRIES,
@@ -77,10 +78,10 @@ export async function handlePawaPayDeposit(
       };
     }
 
-    const providerAmount = Math.floor(amount);
     const providerCurrency = currency || getCurrencyForOperator(countryUpper, operator);
-    const balanceAmount = originalAmount ? Math.floor(originalAmount) : providerAmount;
+    const providerAmount = roundForCurrency(amount, providerCurrency);
     const userCurrency = originalCurrency || providerCurrency;
+    const balanceAmount = originalAmount ? roundForCurrency(originalAmount, userCurrency) : providerAmount;
 
     const feeConfig = await getFeeFromDatabase(storage, "pawapay", country, operator);
     const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming);
@@ -185,11 +186,10 @@ export async function handlePawaPayWithdrawal(
       return { success: false, error: "Vérification KYC requise" };
     }
 
-    const grossAmount = Math.floor(amount);
-    // Use operator-specific currency as default (e.g. USD for Vodacom/Orange COD)
     const defaultCurrency = getCurrencyForOperator(countryUpper, operator);
     const providerCurrency = targetCurrency || defaultCurrency;
     const balanceCurrency = userCurrency || providerCurrency;
+    const grossAmount = roundForCurrency(amount, balanceCurrency);
 
     const feeConfig = await getFeeFromDatabase(storage, "pawapay", country, operator);
     const feeInfo = netMode
@@ -207,9 +207,10 @@ export async function handlePawaPayWithdrawal(
       amountForProvider = feeInfo.amountReceived;
       if (balanceCurrency !== providerCurrency) {
         const { convertCurrency } = await import("./currency-converter");
+        const { roundForCurrency } = await import("./pawapay");
         const conversionResult = await convertCurrency(feeInfo.amountReceived, balanceCurrency, providerCurrency);
         if (conversionResult.success) {
-          amountForProvider = Math.floor(conversionResult.convertedAmount);
+          amountForProvider = roundForCurrency(conversionResult.convertedAmount, providerCurrency);
         } else {
           return { success: false, error: "Erreur de conversion de devise" };
         }
@@ -315,10 +316,10 @@ export async function handlePawaPayTransfer(
       return { success: false, error: "Vérification KYC requise" };
     }
 
-    const netAmount = Math.floor(amount);
     const defaultCurrency = getCurrencyForOperator(countryUpper, operator);
     const providerCurrency = targetCurrency || defaultCurrency;
     const balanceCurrency = userCurrency || providerCurrency;
+    const netAmount = roundForCurrency(amount, balanceCurrency);
 
     const feeConfig = await getFeeFromDatabase(storage, "pawapay", country, operator);
     // Transfer: recipient gets full amount, fee is added ON TOP of balance deduction
@@ -331,9 +332,10 @@ export async function handlePawaPayTransfer(
     let amountForProvider = netAmount;
     if (balanceCurrency !== providerCurrency) {
       const { convertCurrency } = await import("./currency-converter");
+      const { roundForCurrency } = await import("./pawapay");
       const conversionResult = await convertCurrency(netAmount, balanceCurrency, providerCurrency);
       if (conversionResult.success) {
-        amountForProvider = Math.floor(conversionResult.convertedAmount);
+        amountForProvider = roundForCurrency(conversionResult.convertedAmount, providerCurrency);
       } else {
         return { success: false, error: "Erreur de conversion de devise" };
       }

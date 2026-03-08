@@ -5,6 +5,26 @@ import { randomUUID } from "crypto";
 const PAWAPAY_SANDBOX_URL = "https://api.sandbox.pawapay.io";
 const PAWAPAY_PRODUCTION_URL = "https://api.pawapay.io";
 
+export const ZERO_DECIMAL_CURRENCIES = new Set([
+  "XOF", "XAF", "CDF", "RWF", "UGX", "TZS", "MWK", "SLE", "NGN",
+  "KES", "GNF", "MGA",
+]);
+
+export function roundForCurrency(amount: number, currency: string): number {
+  if (ZERO_DECIMAL_CURRENCIES.has(currency.toUpperCase())) {
+    return Math.floor(amount);
+  }
+  return Math.round(amount * 100) / 100;
+}
+
+function formatPawaPayAmount(amount: number, currency: string): string {
+  const rounded = roundForCurrency(amount, currency);
+  if (ZERO_DECIMAL_CURRENCIES.has(currency.toUpperCase())) {
+    return rounded.toString();
+  }
+  return rounded.toFixed(2);
+}
+
 // Mapping of PawaPay country codes to international dial codes
 const COUNTRY_DIAL_CODES: Record<string, string> = {
   // PawaPay supported countries
@@ -149,15 +169,13 @@ export async function createPawaPayDeposit(params: PawaPayDepositParams): Promis
   }
 
   const depositId = params.externalId || randomUUID();
-  const amountStr = Math.floor(params.amount).toString();
+  const amountStr = formatPawaPayAmount(params.amount, params.currency);
 
   const sanitizedPhone = sanitizePhoneForPawaPay(params.phone, params.country);
 
-  // v2 API: customerMessage must be 4–22 chars, alphanumeric and spaces ONLY
   const rawMsg = (params.description || "Recharge portefeuille").replace(/[^a-zA-Z0-9 ]/g, "").trim();
   const customerMessage = rawMsg.substring(0, 22).padEnd(4, " ").substring(0, 22);
 
-  // PawaPay v2 deposit body — exact format from official documentation
   const body: any = {
     depositId,
     amount: amountStr,
@@ -239,15 +257,13 @@ export async function createPawaPayPayout(params: PawaPayPayoutParams): Promise<
   }
 
   const payoutId = params.externalId || randomUUID();
-  const amountStr = Math.floor(params.amount).toString();
+  const amountStr = formatPawaPayAmount(params.amount, params.currency);
 
   const sanitizedPhone = sanitizePhoneForPawaPay(params.phone, params.country);
 
-  // v2 API: customerMessage must be 4–22 chars, alphanumeric and spaces ONLY
   const rawPayoutMsg = (params.description || "Retrait BKApay").replace(/[^a-zA-Z0-9 ]/g, "").trim();
   const customerMessage = rawPayoutMsg.substring(0, 22).padEnd(4, " ").substring(0, 22);
 
-  // PawaPay v2 payout body — exact format from official documentation
   const body: any = {
     payoutId,
     amount: amountStr,

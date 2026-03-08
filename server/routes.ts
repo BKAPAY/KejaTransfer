@@ -2572,7 +2572,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const { convertCurrency } = await import("./currency-converter");
           const conv = await convertCurrency(amountForProvider, ownerCurrency, providerCurrency);
           if (conv.success) {
-            convertedAmountForProvider = Math.floor(conv.convertedAmount);
+            const { roundForCurrency } = await import("./pawapay");
+            convertedAmountForProvider = roundForCurrency(conv.convertedAmount, providerCurrency);
           } else {
             return res.status(500).json({ error: "Erreur de conversion de devise" });
           }
@@ -3017,7 +3018,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const { convertCurrency } = await import("./currency-converter");
           const conv = await convertCurrency(amountForProvider, ownerCurrency, providerCurrency);
           if (conv.success) {
-            convertedAmount = Math.floor(conv.convertedAmount);
+            const { roundForCurrency } = await import("./pawapay");
+            convertedAmount = roundForCurrency(conv.convertedAmount, providerCurrency);
           } else {
             await storage.updatePaymentSession(session.id, { status: "pending" });
             return res.status(500).json({ success: false, error: "Erreur de conversion de devise" });

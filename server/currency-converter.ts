@@ -1,6 +1,9 @@
 const EXCHANGERATE_API_URL = "https://v6.exchangerate-api.com/v6";
 
-const NO_DECIMAL_CURRENCIES = ["XOF", "XAF", "CDF", "GNF", "GMD", "RWF"];
+const NO_DECIMAL_CURRENCIES = [
+  "XOF", "XAF", "CDF", "GNF", "GMD", "RWF",
+  "UGX", "TZS", "MWK", "SLE", "NGN", "KES", "MGA",
+];
 
 function getCurrencyDecimals(currency: string): number {
   return NO_DECIMAL_CURRENCIES.includes(currency) ? 0 : 2;
@@ -9,7 +12,7 @@ function getCurrencyDecimals(currency: string): number {
 function roundToDecimals(amount: number, currency: string): number {
   const decimals = getCurrencyDecimals(currency);
   if (decimals === 0) {
-    return Math.round(amount);
+    return Math.floor(amount);
   }
   const factor = Math.pow(10, decimals);
   return Math.round(amount * factor) / factor;
