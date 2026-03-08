@@ -15,6 +15,7 @@ import { MBIYOPAY_COUNTRIES } from "@shared/mbiyopay-countries";
 import { FEDAPAY_COUNTRIES } from "@shared/fedapay-countries";
 import { MONEYFUSION_COUNTRIES } from "@shared/moneyfusion-countries";
 import { PAWAPAY_COUNTRIES } from "@shared/pawapay-countries";
+import { PAYDUNYA_COUNTRIES } from "@shared/paydunya-countries";
 
 interface ProviderCountry {
   code: string;
@@ -164,34 +165,11 @@ const PROVIDERS: ProviderInfo[] = [
     id: "paydunya",
     name: "Paydunya",
     color: "bg-blue-500",
-    countries: [
-      { code: "BJ", name: "Benin", operators: [
-        { code: "mtn", name: "MTN Mobile Money" },
-        { code: "moov", name: "Moov Money" },
-      ]},
-      { code: "TG", name: "Togo", operators: [
-        { code: "moov", name: "Moov Money" },
-        { code: "togocom", name: "TogoCom" },
-      ]},
-      { code: "CI", name: "Cote d'Ivoire", operators: [
-        { code: "mtn", name: "MTN Mobile Money" },
-        { code: "orange", name: "Orange Money" },
-        { code: "moov", name: "Moov Money" },
-      ]},
-      { code: "SN", name: "Senegal", operators: [
-        { code: "orange", name: "Orange Money" },
-        { code: "free", name: "Free Money" },
-        { code: "wave", name: "Wave" },
-      ]},
-      { code: "BF", name: "Burkina Faso", operators: [
-        { code: "orange", name: "Orange Money" },
-        { code: "moov", name: "Moov Money" },
-      ]},
-      { code: "ML", name: "Mali", operators: [
-        { code: "orange", name: "Orange Money" },
-        { code: "moov", name: "Moov Money" },
-      ]},
-    ],
+    countries: PAYDUNYA_COUNTRIES.map(c => ({
+      code: c.code,
+      name: c.name,
+      operators: c.operators.map(op => ({ code: op.code, name: op.name })),
+    })),
   },
 ];
 
