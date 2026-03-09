@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { User, Building2, Mail, Shield, CheckCircle, Clock, XCircle, Phone, Hash, Pencil, Check, X } from "lucide-react";
+import { Building2, Mail, Shield, CheckCircle, Clock, XCircle, Phone, Hash, Pencil, Check, X, Lock } from "lucide-react";
 import type { User as UserType } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -43,6 +43,12 @@ export default function BusinessProfile() {
     businessPhone: "",
     businessEmail: "",
   });
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
 
   const { data: user, isLoading } = useQuery<UserType>({
     queryKey: ["/api/auth/me"],
@@ -59,6 +65,20 @@ export default function BusinessProfile() {
     },
     onError: (error: any) => {
       toast({ title: "Erreur", description: error.message || "Erreur lors de la mise à jour", variant: "destructive" });
+    },
+  });
+
+  const passwordMutation = useMutation({
+    mutationFn: async (data: typeof passwordData) => {
+      return await apiRequest("POST", "/api/auth/change-password", data);
+    },
+    onSuccess: () => {
+      toast({ title: "Mot de passe modifié", description: "Votre mot de passe a été changé avec succès." });
+      setIsChangingPassword(false);
+      setPasswordData({ currentPassword: "", newPassword: "", confirmPassword: "" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Erreur", description: error.message || "Mot de passe actuel incorrect ou erreur serveur.", variant: "destructive" });
     },
   });
 
@@ -233,6 +253,91 @@ export default function BusinessProfile() {
             </div>
           )}
         </CardContent>
+      </Card>
+
+      {/* Changement de mot de passe */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <CardTitle className="flex items-center gap-2">
+              <Lock className="h-5 w-5" />
+              Mot de passe
+            </CardTitle>
+            {!isChangingPassword ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsChangingPassword(true)}
+                data-testid="button-change-password"
+              >
+                <Pencil className="w-4 h-4 mr-2" />
+                Modifier
+              </Button>
+            ) : (
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  onClick={() => passwordMutation.mutate(passwordData)}
+                  disabled={passwordMutation.isPending}
+                  data-testid="button-save-password"
+                >
+                  <Check className="w-4 h-4 mr-1" />
+                  {passwordMutation.isPending ? "Enregistrement..." : "Enregistrer"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setIsChangingPassword(false);
+                    setPasswordData({ currentPassword: "", newPassword: "", confirmPassword: "" });
+                  }}
+                  disabled={passwordMutation.isPending}
+                  data-testid="button-cancel-password"
+                >
+                  <X className="w-4 h-4 mr-1" />
+                  Annuler
+                </Button>
+              </div>
+            )}
+          </div>
+        </CardHeader>
+        {isChangingPassword && (
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="current-password">Mot de passe actuel</Label>
+              <Input
+                id="current-password"
+                type="password"
+                placeholder="Votre mot de passe actuel"
+                value={passwordData.currentPassword}
+                onChange={(e) => setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))}
+                data-testid="input-current-password"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="new-password">Nouveau mot de passe</Label>
+              <Input
+                id="new-password"
+                type="password"
+                placeholder="Au moins 8 caractères"
+                value={passwordData.newPassword}
+                onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
+                data-testid="input-new-password"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirm-password">Confirmer le mot de passe</Label>
+              <Input
+                id="confirm-password"
+                type="password"
+                placeholder="Répétez le nouveau mot de passe"
+                value={passwordData.confirmPassword}
+                onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                data-testid="input-confirm-password"
+              />
+            </div>
+          </CardContent>
+        )}
       </Card>
 
       {/* Vérification KYC */}
