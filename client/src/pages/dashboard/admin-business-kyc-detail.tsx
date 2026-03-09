@@ -96,37 +96,161 @@ export default function AdminBusinessKycDetail() {
     if (!user) return;
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 20;
+    const contentWidth = pageWidth - margin * 2;
     let y = 20;
 
-    doc.setFontSize(20);
+    const checkPage = (needed: number) => {
+      if (y + needed > pageHeight - 20) {
+        doc.addPage();
+        y = 20;
+      }
+    };
+
+    const sectionTitle = (title: string) => {
+      checkPage(18);
+      doc.setFontSize(13);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(30, 80, 180);
+      doc.text(title, margin, y);
+      doc.setDrawColor(30, 80, 180);
+      doc.setLineWidth(0.4);
+      doc.line(margin, y + 2, pageWidth - margin, y + 2);
+      y += 10;
+      doc.setTextColor(0, 0, 0);
+    };
+
+    const field = (label: string, value?: string | null) => {
+      const val = value || "—";
+      checkPage(12);
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "bold");
+      doc.text(`${label} :`, margin + 4, y);
+      doc.setFont("helvetica", "normal");
+      const labelWidth = doc.getTextWidth(`${label} : `);
+      const wrapped = doc.splitTextToSize(val, contentWidth - labelWidth - 6);
+      doc.text(wrapped, margin + 4 + labelWidth, y);
+      y += wrapped.length > 1 ? wrapped.length * 5 + 3 : 7;
+    };
+
+    const addImage = (label: string, src?: string | null) => {
+      if (!src || !src.startsWith("data:image")) {
+        checkPage(10);
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "italic");
+        doc.setTextColor(150, 150, 150);
+        doc.text(`${label} : Non fourni`, margin + 4, y);
+        doc.setTextColor(0, 0, 0);
+        y += 7;
+        return;
+      }
+      const imgMaxW = contentWidth;
+      const imgMaxH = 70;
+      checkPage(imgMaxH + 16);
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "bold");
+      doc.text(`${label} :`, margin + 4, y);
+      y += 5;
+      try {
+        const format = src.startsWith("data:image/png") ? "PNG" : "JPEG";
+        doc.addImage(src, format, margin + 4, y, imgMaxW - 8, imgMaxH);
+        y += imgMaxH + 6;
+      } catch {
+        doc.setFont("helvetica", "italic");
+        doc.setFontSize(8);
+        doc.setTextColor(180, 0, 0);
+        doc.text("Impossible d'intégrer l'image", margin + 4, y + 4);
+        doc.setTextColor(0, 0, 0);
+        y += 10;
+      }
+    };
+
+    // ─── HEADER ───
+    doc.setFillColor(30, 80, 180);
+    doc.rect(0, 0, pageWidth, 18, "F");
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(255, 255, 255);
+    doc.text("RAPPORT KYC ENTREPRISE", pageWidth / 2, 12, { align: "center" });
     doc.setTextColor(0, 0, 0);
-    doc.text("RAPPORT KYC ENTREPRISE", pageWidth / 2, y, { align: "center" });
-    y += 15;
+    y = 26;
 
-    doc.setFontSize(12);
-    doc.text(`Entreprise: ${user.businessName}`, 20, y);
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Généré le : ${new Date().toLocaleString("fr-FR")}`, margin, y);
+    doc.text(`Statut : ${user.kycStatus === "verified" ? "Vérifié" : user.kycStatus === "submitted" ? "En examen" : user.kycStatus === "rejected" ? "Rejeté" : "En attente"}`, pageWidth - margin, y, { align: "right" });
     y += 10;
-    doc.text(`Dirigeant: ${user.firstName} ${user.lastName}`, 20, y);
-    y += 10;
-    doc.text(`Email: ${user.email}`, 20, y);
-    y += 15;
 
-    doc.setFontSize(14);
-    doc.text("Informations Légales", 20, y);
-    y += 10;
-    doc.setFontSize(10);
-    doc.text(`RCCM: ${user.businessRegistrationNumber || "N/A"}`, 25, y); y += 7;
-    doc.text(`NIF: ${user.kycTaxId || "N/A"}`, 25, y); y += 7;
-    doc.text(`Adresse: ${user.kycBusinessAddress || "N/A"}`, 25, y); y += 7;
-    doc.text(`Ville: ${user.kycBusinessCity || "N/A"}`, 25, y); y += 15;
+    // ─── SECTION 1 : Dirigeant ───
+    sectionTitle("1. Informations du dirigeant");
+    field("Prénom", user.firstName);
+    field("Nom de famille", user.lastName);
+    field("Email de connexion", user.email);
+    field("Téléphone dirigeant", u?.businessPhone ? (() => {
+      const c = COUNTRIES.find(c => c.code === u?.businessCountry);
+      return c ? `${c.phoneCode} ${u.businessPhone}` : u.businessPhone;
+    })() : null);
+    field("Date de naissance", u?.kycDirectorDob);
+    field("Pays de résidence", getCountryName(u?.kycDirectorCountry));
+    field("N° pièce d'identité", u?.kycDirectorIdNumber);
+    field("Date d'expiration pièce", u?.kycIdExpiryDate);
+    y += 4;
 
-    doc.setFontSize(14);
-    doc.text("Description de l'activité", 20, y);
-    y += 10;
-    doc.setFontSize(10);
-    const splitDescription = doc.splitTextToSize(user.kycActivityDescription || "Non fournie", pageWidth - 40);
-    doc.text(splitDescription, 20, y);
-    
+    // ─── SECTION 2 : Entreprise ───
+    sectionTitle("2. Informations de l'entreprise");
+    field("Dénomination sociale", user.businessName);
+    field("RCCM / N° Enregistrement", user.businessRegistrationNumber);
+    field("NIF / Identifiant fiscal", u?.kycTaxId);
+    field("N° compte entreprise", u?.kycBusinessAccountNumber);
+    field("Pays du siège", getCountryName(u?.businessCountry));
+    field("Téléphone entreprise", u?.businessEnterprisePhone);
+    field("Email professionnel", u?.businessEmail);
+    y += 4;
+
+    // ─── SECTION 3 : Localisation ───
+    sectionTitle("3. Localisation & Adresse");
+    field("Adresse complète", u?.kycBusinessAddress);
+    field("Ville", u?.kycBusinessCity);
+    field("Département / État", u?.kycBusinessDepartment);
+    y += 4;
+
+    // ─── SECTION 4 : Activité ───
+    sectionTitle("4. Description de l'activité");
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    const splitDesc = doc.splitTextToSize(user.kycActivityDescription || "Non fournie", contentWidth - 8);
+    checkPage(splitDesc.length * 5 + 10);
+    doc.text(splitDesc, margin + 4, y);
+    y += splitDesc.length * 5 + 8;
+
+    // ─── SECTION 5 : Pièce d'identité ───
+    sectionTitle("5. Pièce d'identité du dirigeant");
+    addImage("Recto", user.kycIdFront);
+    addImage("Verso", user.kycIdBack);
+
+    // ─── SECTION 6 : Documents entreprise ───
+    sectionTitle("6. Documents de l'entreprise");
+    addImage("Identification fiscale", u?.kycTaxDocument);
+    addImage("Justificatif d'adresse", u?.kycAddressDocument);
+
+    if (businessDocs.length > 0) {
+      businessDocs.forEach((doc2, i) => {
+        addImage(`Document additionnel ${i + 1}`, doc2);
+      });
+    }
+
+    // ─── FOOTER ───
+    const totalPages = (doc as any).internal.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(150, 150, 150);
+      doc.text(`Page ${i} / ${totalPages}`, pageWidth / 2, pageHeight - 8, { align: "center" });
+      doc.text("BKApay — Document confidentiel", margin, pageHeight - 8);
+    }
+
     doc.save(`KYC_Business_${user.businessName}_${userId.substring(0, 8)}.pdf`);
   };
 
