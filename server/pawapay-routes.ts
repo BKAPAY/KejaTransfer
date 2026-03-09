@@ -40,6 +40,7 @@ export async function handlePawaPayDeposit(
     transactionDescription?: string;
     customerName?: string;
     customerEmail?: string;
+    customerPaysFee?: boolean;
     extraMetadata?: Record<string, any>;
   }
 ): Promise<{
@@ -84,7 +85,13 @@ export async function handlePawaPayDeposit(
     const balanceAmount = originalAmount ? roundForCurrency(originalAmount, userCurrency) : providerAmount;
 
     const feeConfig = await getFeeFromDatabase(storage, "pawapay", country, operator);
+    const customerPaysFee = options?.customerPaysFee ?? false;
     const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming);
+    // If customer pays fee: owner receives full balanceAmount (no deduction)
+    // If owner pays fee: owner receives balanceAmount - fee
+    const netAmountForUser = customerPaysFee ? balanceAmount : feeInfo.netAmount;
+    const txFeeAmount = customerPaysFee ? 0 : feeInfo.feeAmount;
+    const txFeePercentage = customerPaysFee ? 0 : feeInfo.feePercentage;
 
     const txType = options?.transactionType || "deposit";
     const txDescription = options?.transactionDescription || `Dépôt de ${providerAmount} ${providerCurrency}`;
@@ -94,9 +101,9 @@ export async function handlePawaPayDeposit(
     const tx = await storage.createTransaction({
       userId,
       type: txType,
-      amount: feeInfo.grossAmount,
-      fee: feeInfo.feeAmount,
-      feePercentage: feeInfo.feePercentage,
+      amount: balanceAmount,
+      fee: txFeeAmount,
+      feePercentage: txFeePercentage,
       currency: userCurrency,
       status: "pending",
       country: countryUpper,
@@ -111,9 +118,10 @@ export async function handlePawaPayDeposit(
         paymentProvider: "pawapay",
         providerAmount,
         providerCurrency,
-        netAmountForUser: feeInfo.netAmount,
-        balanceAmount: feeInfo.netAmount,
+        netAmountForUser,
+        balanceAmount: netAmountForUser,
         balanceCurrency: userCurrency,
+        customerPaysFee,
         orderId,
         startTime,
         ...(options?.extraMetadata || {}),
