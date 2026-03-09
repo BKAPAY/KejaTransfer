@@ -1,6 +1,6 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { eq, desc, or, and, sql, gte, inArray } from "drizzle-orm";
+import { eq, desc, or, and, sql, gte, inArray, ne, isNull } from "drizzle-orm";
 import * as schema from "@shared/schema";
 import type {
   User,
@@ -334,10 +334,13 @@ export class DbStorage implements IStorage {
       })
       .from(schema.users)
       .where(
-        or(
-          eq(schema.users.kycStatus, "submitted"),
-          eq(schema.users.kycStatus, "verified"),
-          eq(schema.users.kycStatus, "rejected")
+        and(
+          or(isNull(schema.users.accountType), ne(schema.users.accountType, "business")),
+          or(
+            eq(schema.users.kycStatus, "submitted"),
+            eq(schema.users.kycStatus, "verified"),
+            eq(schema.users.kycStatus, "rejected")
+          )
         )
       )
       .orderBy(desc(schema.users.createdAt));
@@ -1248,11 +1251,15 @@ export class DbStorage implements IStorage {
       kycLongitude: sql<string | null>`NULL`.as('kycLongitude'),
       kycAddress: sql<string | null>`NULL`.as('kycAddress'),
       kycAcceptedTerms: sql<string | null>`NULL`.as('kycAcceptedTerms'),
-    }).from(schema.users).orderBy(desc(schema.users.balance));
+    }).from(schema.users)
+      .where(or(isNull(schema.users.accountType), ne(schema.users.accountType, "business")))
+      .orderBy(desc(schema.users.balance));
   }
 
   async getAllUsersWithKyc(): Promise<User[]> {
-    return db.select().from(schema.users).orderBy(desc(schema.users.balance));
+    return db.select().from(schema.users)
+      .where(or(isNull(schema.users.accountType), ne(schema.users.accountType, "business")))
+      .orderBy(desc(schema.users.balance));
   }
 
   async searchUsers(query: string): Promise<User[]> {
