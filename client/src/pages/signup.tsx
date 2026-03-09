@@ -422,11 +422,11 @@ export default function Signup() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email professionnel</FormLabel>
+                    <FormLabel>Email</FormLabel>
                     <FormControl>
                       <Input
                         type="email"
-                        placeholder="jean@entreprise.com"
+                        placeholder="votre@email.com"
                         data-testid="input-email"
                         {...field}
                       />
