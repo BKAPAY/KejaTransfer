@@ -557,7 +557,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const schema = z.object({
         businessRegistrationNumber: z.string().optional(),
+        businessCountry: z.string().optional(),
         businessPhone: z.string().optional(),
+        businessEnterprisePhone: z.string().optional(),
         businessEmail: z.string().email("Email invalide").optional().or(z.literal("")),
       });
       const data = schema.parse(req.body);

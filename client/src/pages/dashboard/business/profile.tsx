@@ -5,8 +5,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Building2, Mail, Shield, CheckCircle, Clock, XCircle, Phone, Hash, Pencil, Check, X, Lock } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Building2, Mail, Shield, CheckCircle, Clock, XCircle, Phone, Hash, Pencil, Check, X, Lock, MapPin } from "lucide-react";
 import type { User as UserType } from "@shared/schema";
+import { COUNTRIES } from "@shared/schema";
+import { PhoneInputWithPrefix } from "@/components/phone-input-with-prefix";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
@@ -40,7 +43,9 @@ export default function BusinessProfile() {
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
     businessRegistrationNumber: "",
+    businessCountry: "",
     businessPhone: "",
+    businessEnterprisePhone: "",
     businessEmail: "",
   });
   const [isChangingPassword, setIsChangingPassword] = useState(false);
@@ -50,7 +55,7 @@ export default function BusinessProfile() {
     confirmPassword: "",
   });
 
-  const { data: user, isLoading } = useQuery<UserType>({
+  const { data: user } = useQuery<UserType>({
     queryKey: ["/api/auth/me"],
   });
 
@@ -82,11 +87,15 @@ export default function BusinessProfile() {
     },
   });
 
+  const u = user as any;
+
   const startEditing = () => {
     setFormData({
-      businessRegistrationNumber: (user as any)?.businessRegistrationNumber || "",
-      businessPhone: (user as any)?.businessPhone || "",
-      businessEmail: (user as any)?.businessEmail || "",
+      businessRegistrationNumber: u?.businessRegistrationNumber || "",
+      businessCountry: u?.businessCountry || "",
+      businessPhone: u?.businessPhone || "",
+      businessEnterprisePhone: u?.businessEnterprisePhone || "",
+      businessEmail: u?.businessEmail || "",
     });
     setIsEditing(true);
   };
@@ -97,6 +106,18 @@ export default function BusinessProfile() {
 
   const handleCancel = () => {
     setIsEditing(false);
+  };
+
+  const getCountryDisplay = (code: string) => {
+    const c = COUNTRIES.find(c => c.code === code);
+    return c ? `${c.flag} ${c.name}` : code;
+  };
+
+  const getPhoneDisplay = (countryCode: string, digits: string) => {
+    if (!digits) return null;
+    const c = COUNTRIES.find(c => c.code === countryCode);
+    if (c && c.phoneCode) return `${c.phoneCode} ${digits}`;
+    return digits;
   };
 
   return (
@@ -169,6 +190,30 @@ export default function BusinessProfile() {
         <CardContent className="space-y-4">
           {isEditing ? (
             <>
+              {/* Pays de l'entreprise */}
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <MapPin className="w-4 h-4 text-muted-foreground" />
+                  Pays de l'entreprise
+                </Label>
+                <Select
+                  value={formData.businessCountry}
+                  onValueChange={(v) => setFormData(prev => ({ ...prev, businessCountry: v, businessPhone: "", businessEnterprisePhone: "" }))}
+                >
+                  <SelectTrigger data-testid="select-business-country">
+                    <SelectValue placeholder="Sélectionnez un pays" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {COUNTRIES.map(c => (
+                      <SelectItem key={c.code} value={c.code}>
+                        {c.flag} {c.name} ({c.phoneCode})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Numéro d'entreprise */}
               <div className="space-y-2">
                 <Label htmlFor="reg-number" className="flex items-center gap-2">
                   <Hash className="w-4 h-4 text-muted-foreground" />
@@ -183,21 +228,37 @@ export default function BusinessProfile() {
                 />
               </div>
 
+              {/* Téléphone personnel du dirigeant */}
               <div className="space-y-2">
-                <Label htmlFor="business-phone" className="flex items-center gap-2">
+                <Label className="flex items-center gap-2">
                   <Phone className="w-4 h-4 text-muted-foreground" />
-                  Numéro de téléphone personnel
+                  Téléphone personnel (dirigeant)
                 </Label>
-                <Input
-                  id="business-phone"
-                  type="tel"
-                  placeholder="Ex: +229 97 00 00 00"
+                <PhoneInputWithPrefix
+                  country={formData.businessCountry}
                   value={formData.businessPhone}
-                  onChange={(e) => setFormData(prev => ({ ...prev, businessPhone: e.target.value }))}
+                  onChange={(v) => setFormData(prev => ({ ...prev, businessPhone: v }))}
+                  placeholder={formData.businessCountry ? undefined : "Sélectionnez un pays d'abord"}
                   data-testid="input-business-phone"
                 />
               </div>
 
+              {/* Téléphone de l'entreprise */}
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Phone className="w-4 h-4 text-muted-foreground" />
+                  Téléphone de l'entreprise
+                </Label>
+                <PhoneInputWithPrefix
+                  country={formData.businessCountry}
+                  value={formData.businessEnterprisePhone}
+                  onChange={(v) => setFormData(prev => ({ ...prev, businessEnterprisePhone: v }))}
+                  placeholder={formData.businessCountry ? undefined : "Sélectionnez un pays d'abord"}
+                  data-testid="input-business-enterprise-phone"
+                />
+              </div>
+
+              {/* Email de l'entreprise */}
               <div className="space-y-2">
                 <Label htmlFor="business-email" className="flex items-center gap-2">
                   <Mail className="w-4 h-4 text-muted-foreground" />
@@ -216,11 +277,23 @@ export default function BusinessProfile() {
           ) : (
             <div className="space-y-3">
               <div className="flex items-start gap-3 py-2">
+                <MapPin className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-sm text-muted-foreground">Pays de l'entreprise</p>
+                  <p className="font-medium">
+                    {u?.businessCountry ? getCountryDisplay(u.businessCountry) : (
+                      <span className="text-muted-foreground italic">Non renseigné</span>
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 py-2">
                 <Hash className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
                 <div className="min-w-0">
                   <p className="text-sm text-muted-foreground">Numéro d'entreprise (RCCM)</p>
                   <p className="font-medium">
-                    {(user as any)?.businessRegistrationNumber || (
+                    {u?.businessRegistrationNumber || (
                       <span className="text-muted-foreground italic">Non renseigné</span>
                     )}
                   </p>
@@ -230,9 +303,21 @@ export default function BusinessProfile() {
               <div className="flex items-start gap-3 py-2">
                 <Phone className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
                 <div className="min-w-0">
-                  <p className="text-sm text-muted-foreground">Numéro de téléphone personnel</p>
+                  <p className="text-sm text-muted-foreground">Téléphone personnel (dirigeant)</p>
                   <p className="font-medium">
-                    {(user as any)?.businessPhone || (
+                    {getPhoneDisplay(u?.businessCountry, u?.businessPhone) || (
+                      <span className="text-muted-foreground italic">Non renseigné</span>
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 py-2">
+                <Phone className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-sm text-muted-foreground">Téléphone de l'entreprise</p>
+                  <p className="font-medium">
+                    {getPhoneDisplay(u?.businessCountry, u?.businessEnterprisePhone) || (
                       <span className="text-muted-foreground italic">Non renseigné</span>
                     )}
                   </p>
@@ -244,7 +329,7 @@ export default function BusinessProfile() {
                 <div className="min-w-0">
                   <p className="text-sm text-muted-foreground">Email professionnel</p>
                   <p className="font-medium">
-                    {(user as any)?.businessEmail || (
+                    {u?.businessEmail || (
                       <span className="text-muted-foreground italic">Non renseigné</span>
                     )}
                   </p>

@@ -20,7 +20,9 @@ export const users = pgTable("users", {
   accountType: text("account_type").notNull().default("personal"), // "personal" | "business"
   businessName: text("business_name"), // Only for business accounts
   businessRegistrationNumber: text("business_registration_number"), // RCCM / numéro entreprise
-  businessPhone: text("business_phone"), // Numéro personnel du dirigeant
+  businessCountry: text("business_country"), // Pays de l'entreprise
+  businessPhone: text("business_phone"), // Numéro personnel du dirigeant (chiffres seulement)
+  businessEnterprisePhone: text("business_enterprise_phone"), // Numéro de téléphone de l'entreprise
   businessEmail: text("business_email"), // Email professionnel de l'entreprise
   country: text("country"), // User's country: BJ, TG, CI, BF, SN
   balance: integer("balance").notNull().default(0), // Balance in XOF (personal only)

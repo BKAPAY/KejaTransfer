@@ -55,7 +55,7 @@ export interface IStorage {
   updateUserCountry(id: string, country: string): Promise<User | undefined>;
   updateUserWithdrawalPhones(id: string, withdrawalPhones: string[]): Promise<User | undefined>;
   updateUserSecurityCode(id: string, securityCode: string): Promise<User | undefined>;
-  updateBusinessProfile(id: string, data: { businessRegistrationNumber?: string; businessPhone?: string; businessEmail?: string }): Promise<User | undefined>;
+  updateBusinessProfile(id: string, data: { businessRegistrationNumber?: string; businessCountry?: string; businessPhone?: string; businessEnterprisePhone?: string; businessEmail?: string }): Promise<User | undefined>;
 
   // Payment Links
   getPaymentLinks(userId: string): Promise<PaymentLink[]>;
@@ -380,7 +380,7 @@ export class DbStorage implements IStorage {
     return results[0];
   }
 
-  async updateBusinessProfile(id: string, data: { businessRegistrationNumber?: string; businessPhone?: string; businessEmail?: string }): Promise<User | undefined> {
+  async updateBusinessProfile(id: string, data: { businessRegistrationNumber?: string; businessCountry?: string; businessPhone?: string; businessEnterprisePhone?: string; businessEmail?: string }): Promise<User | undefined> {
     const results = await db
       .update(schema.users)
       .set(data)
