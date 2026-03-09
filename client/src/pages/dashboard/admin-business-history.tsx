@@ -34,7 +34,7 @@ export default function AdminBusinessHistory() {
   });
 
   const { data: transactions = [], isLoading } = useQuery<Transaction[]>({
-    queryKey: [`/api/admin/user/${userId}/transactions`],
+    queryKey: [`/api/admin/business/users/${userId}/transactions`],
     enabled: !!userId,
   });
 
@@ -340,7 +340,7 @@ export default function AdminBusinessHistory() {
         onOpenChange={setDialogOpen}
         isAdmin={true}
         onStatusChanged={() => {
-          queryClient.invalidateQueries({ queryKey: [`/api/admin/user/${userId}/transactions`] });
+          queryClient.invalidateQueries({ queryKey: [`/api/admin/business/users/${userId}/transactions`] });
         }}
       />
     </div>

@@ -51,7 +51,7 @@ export default function AdminBusiness() {
       title: "Gestion utilisateurs",
       icon: Users,
       path: "/dashboard/admin/business/management",
-      description: "Gérer les comptes entreprise et leurs portefeuilles",
+      description: "Gérer les comptes entreprise, portefeuilles et historique des transactions",
       protected: true,
     },
     {

@@ -6835,7 +6835,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           operator,
           customerPhone,
           payerCurrency,
-          undefined,
+          ownerCurrency !== payerCurrency ? paymentLink.amount : undefined,
           ownerCurrency !== payerCurrency ? ownerCurrency : undefined,
           otpCode,
           {
@@ -7158,7 +7158,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           operator,
           customerPhone,
           payerCurrency,
-          undefined,
+          ownerCurrency !== payerCurrency ? (originalAmount || undefined) : undefined,
           ownerCurrency !== payerCurrency ? ownerCurrency : undefined,
           otpCode,
           {
