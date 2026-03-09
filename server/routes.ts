@@ -553,6 +553,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.put("/api/business/profile", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const schema = z.object({
+        businessRegistrationNumber: z.string().optional(),
+        businessPhone: z.string().optional(),
+        businessEmail: z.string().email("Email invalide").optional().or(z.literal("")),
+      });
+      const data = schema.parse(req.body);
+      const updated = await storage.updateBusinessProfile(req.session.userId!, data);
+      if (!updated) return res.status(404).json({ error: "Utilisateur non trouvé" });
+      res.json({ success: true, user: updated });
+    } catch (error: any) {
+      console.error("Update business profile error:", error);
+      res.status(400).json({ error: error.message || "Erreur lors de la mise à jour du profil" });
+    }
+  });
+
   // ===== Admin Business Routes =====
   app.get("/api/admin/business/users", requireAdmin, async (req: Request, res: Response) => {
     try {

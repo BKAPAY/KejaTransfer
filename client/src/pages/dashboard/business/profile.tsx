@@ -1,8 +1,11 @@
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { User, Building2, Mail, Shield, CheckCircle, Clock, XCircle } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { User, Building2, Mail, Shield, CheckCircle, Clock, XCircle, Phone, Hash, Pencil, Check, X } from "lucide-react";
 import type { User as UserType } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -34,37 +37,76 @@ function KycStatusBadge({ status }: { status: string }) {
 export default function BusinessProfile() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const { data: user } = useQuery<UserType>({
+  const [isEditing, setIsEditing] = useState(false);
+  const [formData, setFormData] = useState({
+    businessRegistrationNumber: "",
+    businessPhone: "",
+    businessEmail: "",
+  });
+
+  const { data: user, isLoading } = useQuery<UserType>({
     queryKey: ["/api/auth/me"],
   });
+
+  const updateMutation = useMutation({
+    mutationFn: async (data: typeof formData) => {
+      return await apiRequest("PUT", "/api/business/profile", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      toast({ title: "Profil mis à jour", description: "Les informations de l'entreprise ont été enregistrées." });
+      setIsEditing(false);
+    },
+    onError: (error: any) => {
+      toast({ title: "Erreur", description: error.message || "Erreur lors de la mise à jour", variant: "destructive" });
+    },
+  });
+
+  const startEditing = () => {
+    setFormData({
+      businessRegistrationNumber: (user as any)?.businessRegistrationNumber || "",
+      businessPhone: (user as any)?.businessPhone || "",
+      businessEmail: (user as any)?.businessEmail || "",
+    });
+    setIsEditing(true);
+  };
+
+  const handleSave = () => {
+    updateMutation.mutate(formData);
+  };
+
+  const handleCancel = () => {
+    setIsEditing(false);
+  };
 
   return (
     <div className="space-y-6 max-w-2xl">
       <h1 className="text-2xl font-bold tracking-tight">Profil Entreprise</h1>
 
+      {/* Informations de base (non modifiables) */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Building2 className="h-5 w-5" />
-            Informations de l'entreprise
+            Informations du compte
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <p className="text-sm text-muted-foreground">Nom</p>
-              <p className="font-medium">{user?.lastName}</p>
-            </div>
-            <div>
               <p className="text-sm text-muted-foreground">Prénom</p>
               <p className="font-medium">{user?.firstName}</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Nom</p>
+              <p className="font-medium">{user?.lastName}</p>
             </div>
             <div className="col-span-2">
               <p className="text-sm text-muted-foreground">Nom de l'entreprise</p>
               <p className="font-medium">{user?.businessName || "—"}</p>
             </div>
             <div className="col-span-2">
-              <p className="text-sm text-muted-foreground">Email</p>
+              <p className="text-sm text-muted-foreground">Email d'inscription</p>
               <p className="font-medium flex items-center gap-2">
                 <Mail className="w-4 h-4 text-muted-foreground" />
                 {user?.email}
@@ -74,6 +116,126 @@ export default function BusinessProfile() {
         </CardContent>
       </Card>
 
+      {/* Informations de l'entreprise (modifiables) */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <CardTitle className="flex items-center gap-2">
+              <Hash className="h-5 w-5" />
+              Informations de l'entreprise
+            </CardTitle>
+            {!isEditing ? (
+              <Button variant="outline" size="sm" onClick={startEditing} data-testid="button-edit-business-info">
+                <Pencil className="w-4 h-4 mr-2" />
+                Modifier
+              </Button>
+            ) : (
+              <div className="flex gap-2">
+                <Button size="sm" onClick={handleSave} disabled={updateMutation.isPending} data-testid="button-save-business-info">
+                  <Check className="w-4 h-4 mr-1" />
+                  {updateMutation.isPending ? "Enregistrement..." : "Enregistrer"}
+                </Button>
+                <Button size="sm" variant="ghost" onClick={handleCancel} disabled={updateMutation.isPending} data-testid="button-cancel-business-info">
+                  <X className="w-4 h-4 mr-1" />
+                  Annuler
+                </Button>
+              </div>
+            )}
+          </div>
+          <CardDescription>
+            Complétez les informations de votre entreprise pour faciliter les vérifications.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {isEditing ? (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="reg-number" className="flex items-center gap-2">
+                  <Hash className="w-4 h-4 text-muted-foreground" />
+                  Numéro d'entreprise (RCCM / Registre de commerce)
+                </Label>
+                <Input
+                  id="reg-number"
+                  placeholder="Ex: RB/COT/BJ/01/2024/B12345"
+                  value={formData.businessRegistrationNumber}
+                  onChange={(e) => setFormData(prev => ({ ...prev, businessRegistrationNumber: e.target.value }))}
+                  data-testid="input-business-registration"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="business-phone" className="flex items-center gap-2">
+                  <Phone className="w-4 h-4 text-muted-foreground" />
+                  Numéro de téléphone personnel
+                </Label>
+                <Input
+                  id="business-phone"
+                  type="tel"
+                  placeholder="Ex: +229 97 00 00 00"
+                  value={formData.businessPhone}
+                  onChange={(e) => setFormData(prev => ({ ...prev, businessPhone: e.target.value }))}
+                  data-testid="input-business-phone"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="business-email" className="flex items-center gap-2">
+                  <Mail className="w-4 h-4 text-muted-foreground" />
+                  Email professionnel de l'entreprise
+                </Label>
+                <Input
+                  id="business-email"
+                  type="email"
+                  placeholder="contact@monentreprise.com"
+                  value={formData.businessEmail}
+                  onChange={(e) => setFormData(prev => ({ ...prev, businessEmail: e.target.value }))}
+                  data-testid="input-business-email"
+                />
+              </div>
+            </>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex items-start gap-3 py-2">
+                <Hash className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-sm text-muted-foreground">Numéro d'entreprise (RCCM)</p>
+                  <p className="font-medium">
+                    {(user as any)?.businessRegistrationNumber || (
+                      <span className="text-muted-foreground italic">Non renseigné</span>
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 py-2">
+                <Phone className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-sm text-muted-foreground">Numéro de téléphone personnel</p>
+                  <p className="font-medium">
+                    {(user as any)?.businessPhone || (
+                      <span className="text-muted-foreground italic">Non renseigné</span>
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 py-2">
+                <Mail className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-sm text-muted-foreground">Email professionnel</p>
+                  <p className="font-medium">
+                    {(user as any)?.businessEmail || (
+                      <span className="text-muted-foreground italic">Non renseigné</span>
+                    )}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Vérification KYC */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -99,9 +261,7 @@ export default function BusinessProfile() {
 
           {(user?.kycStatus === "pending" || user?.kycStatus === "rejected") && (
             <div className="pt-2">
-              <p className="text-sm text-muted-foreground mb-3">
-                Documents requis :
-              </p>
+              <p className="text-sm text-muted-foreground mb-3">Documents requis :</p>
               <ul className="text-sm space-y-1 mb-4">
                 <li className="flex items-center gap-2">
                   <CheckCircle className="w-4 h-4 text-muted-foreground" />
@@ -112,10 +272,7 @@ export default function BusinessProfile() {
                   Document d'entreprise (registre de commerce, etc.)
                 </li>
               </ul>
-              <Button
-                onClick={() => setLocation("/dashboard/kyc")}
-                data-testid="button-kyc-verify"
-              >
+              <Button onClick={() => setLocation("/dashboard/kyc")} data-testid="button-kyc-verify">
                 Soumettre les documents
               </Button>
             </div>
