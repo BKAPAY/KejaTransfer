@@ -330,9 +330,33 @@ export default function Admin() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground mb-1">Panneau Administrateur</h1>
-        <p className="text-sm text-muted-foreground mb-3">Gestion et surveillance de la plateforme</p>
+      <div className="flex flex-col gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground mb-1">Panneau Administrateur</h1>
+          <p className="text-sm text-muted-foreground">Gestion et surveillance de la plateforme</p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Button
+            variant="default"
+            className="h-24 text-lg font-bold flex flex-col gap-2"
+            onClick={() => {}}
+            data-testid="button-admin-personal"
+          >
+            <Users className="w-8 h-8" />
+            COMPTES PERSONNELS
+          </Button>
+          <Button
+            variant="outline"
+            className="h-24 text-lg font-bold flex flex-col gap-2 border-primary text-primary hover:bg-primary/5"
+            onClick={() => setLocation("/dashboard/admin/business")}
+            data-testid="button-admin-business"
+          >
+            <Bot className="w-8 h-8" />
+            COMPTES ENTREPRISE
+          </Button>
+        </div>
+
         <div className="flex gap-2 flex-wrap">
           <Button
             onClick={() => handleProtectedNavigation("/dashboard/fournisseurs")}

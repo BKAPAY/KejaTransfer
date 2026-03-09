@@ -122,25 +122,33 @@ export interface IStorage {
   }>;
 
   // Country/Operator Config (Multi-Provider)
-  getCountryOperatorConfigs(): Promise<CountryOperatorConfig[]>;
-  getCountryOperatorConfigsByProvider(provider: string): Promise<CountryOperatorConfig[]>;
-  getCountryOperatorConfig(provider: string, country: string, operator: string): Promise<CountryOperatorConfig | undefined>;
-  updateCountryOperatorConfig(provider: string, country: string, operator: string, config: UpdateCountryOperatorConfig): Promise<CountryOperatorConfig | undefined>;
-  disableOperatorForOtherProviders(provider: string, country: string, operator: string, type: "incoming" | "outgoing"): Promise<void>;
-  disableCountryForOtherProviders(provider: string, country: string, type: "incoming" | "outgoing"): Promise<void>;
+  getCountryOperatorConfigs(scope?: string): Promise<CountryOperatorConfig[]>;
+  getCountryOperatorConfigsByProvider(provider: string, scope?: string): Promise<CountryOperatorConfig[]>;
+  getCountryOperatorConfig(provider: string, country: string, operator: string, scope?: string): Promise<CountryOperatorConfig | undefined>;
+  updateCountryOperatorConfig(provider: string, country: string, operator: string, config: UpdateCountryOperatorConfig, scope?: string): Promise<CountryOperatorConfig | undefined>;
+  disableOperatorForOtherProviders(provider: string, country: string, operator: string, type: "incoming" | "outgoing", scope?: string): Promise<void>;
+  disableCountryForOtherProviders(provider: string, country: string, type: "incoming" | "outgoing", scope?: string): Promise<void>;
   initializeCountryOperatorConfigs(): Promise<void>;
   
   // Country Status (Multi-Provider)
-  getCountryStatuses(): Promise<schema.CountryStatus[]>;
-  getCountryStatusesByProvider(provider: string): Promise<schema.CountryStatus[]>;
-  getCountryStatus(provider: string, country: string): Promise<schema.CountryStatus | undefined>;
-  updateCountryStatus(provider: string, country: string, updates: { payinEnabled?: boolean; payoutEnabled?: boolean }): Promise<schema.CountryStatus | undefined>;
+  getCountryStatuses(scope?: string): Promise<schema.CountryStatus[]>;
+  getCountryStatusesByProvider(provider: string, scope?: string): Promise<schema.CountryStatus[]>;
+  getCountryStatus(provider: string, country: string, scope?: string): Promise<schema.CountryStatus | undefined>;
+  updateCountryStatus(provider: string, country: string, updates: { payinEnabled?: boolean; payoutEnabled?: boolean }, scope?: string): Promise<schema.CountryStatus | undefined>;
   initializeCountryStatuses(): Promise<void>;
   
+  // Business Wallets
+  getBusinessWallet(userId: string, country: string, currency: string): Promise<BusinessWallet | undefined>;
+  getBusinessWallets(userId: string): Promise<BusinessWallet[]>;
+  creditBusinessWallet(userId: string, country: string, currency: string, amount: number): Promise<BusinessWallet>;
+  debitBusinessWallet(userId: string, country: string, currency: string, amount: number): Promise<BusinessWallet>;
+  getAllBusinessWalletsForAdmin(): Promise<(BusinessWallet & { user: User })[]>;
+  adminAdjustBusinessWallet(userId: string, country: string, currency: string, amount: number): Promise<BusinessWallet>;
+
   // Provider Configs
-  getProviderConfigs(): Promise<schema.ProviderConfig[]>;
-  getProviderConfig(provider: string): Promise<schema.ProviderConfig | undefined>;
-  updateProviderConfig(provider: string, updates: Partial<Omit<schema.ProviderConfig, 'id' | 'provider' | 'createdAt'>>): Promise<schema.ProviderConfig | undefined>;
+  getProviderConfigs(scope?: string): Promise<schema.ProviderConfig[]>;
+  getProviderConfig(provider: string, scope?: string): Promise<schema.ProviderConfig | undefined>;
+  updateProviderConfig(provider: string, updates: Partial<Omit<schema.ProviderConfig, 'id' | 'provider' | 'createdAt'>>, scope?: string): Promise<schema.ProviderConfig | undefined>;
   initializeProviderConfigs(): Promise<void>;
   
   // Diagnostic
@@ -171,11 +179,11 @@ export interface IStorage {
 
   // Fee Configuration
   getAllFeeConfigs(): Promise<FeeConfig[]>;
-  getFeeConfigsByProvider(provider: string): Promise<FeeConfig[]>;
-  getFeeConfig(provider: string, country: string, operator: string): Promise<FeeConfig | undefined>;
-  getFeeConfigsByCountry(country: string): Promise<FeeConfig[]>;
+  getFeeConfigsByProvider(provider: string, scope?: string): Promise<FeeConfig[]>;
+  getFeeConfig(provider: string, country: string, operator: string, scope?: string): Promise<FeeConfig | undefined>;
+  getFeeConfigsByCountry(country: string, scope?: string): Promise<FeeConfig[]>;
   createOrUpdateFeeConfig(config: InsertFeeConfig): Promise<FeeConfig>;
-  updateFeeConfig(provider: string, country: string, operator: string, updates: { incomingFeePercentage?: number; outgoingFeePercentage?: number }): Promise<FeeConfig | undefined>;
+  updateFeeConfig(provider: string, country: string, operator: string, updates: { incomingFeePercentage?: number; outgoingFeePercentage?: number }, scope?: string): Promise<FeeConfig | undefined>;
   initializeFeeConfigs(): Promise<void>;
   ensurePaydunyaFeeConfigs(): Promise<void>;
   ensurePawaPayFeeConfigs(): Promise<void>;
@@ -190,6 +198,8 @@ export interface IStorage {
   getLoginLogsByUserId(userId: string, limit?: number): Promise<schema.LoginLog[]>;
   purgeOldLoginLogs(userId: string, keepCount: number): Promise<number>;
 
+  // Business Users
+  getBusinessUsers(): Promise<User[]>;
 }
 
 export class DbStorage implements IStorage {
@@ -1409,16 +1419,21 @@ export class DbStorage implements IStorage {
   }
 
   // ===== Country/Operator Config (Multi-Provider) =====
-  async getCountryOperatorConfigs(): Promise<CountryOperatorConfig[]> {
-    return db.select().from(schema.countryOperatorConfig);
+  async getCountryOperatorConfigs(scope: string = "personal"): Promise<CountryOperatorConfig[]> {
+    return db.select().from(schema.countryOperatorConfig).where(eq(schema.countryOperatorConfig.scope, scope));
   }
 
-  async getCountryOperatorConfigsByProvider(provider: string): Promise<CountryOperatorConfig[]> {
+  async getCountryOperatorConfigsByProvider(provider: string, scope: string = "personal"): Promise<CountryOperatorConfig[]> {
     return db.select().from(schema.countryOperatorConfig)
-      .where(eq(schema.countryOperatorConfig.provider, provider));
+      .where(
+        and(
+          eq(schema.countryOperatorConfig.provider, provider),
+          eq(schema.countryOperatorConfig.scope, scope)
+        )
+      );
   }
 
-  async getCountryOperatorConfig(provider: string, country: string, operator: string): Promise<CountryOperatorConfig | undefined> {
+  async getCountryOperatorConfig(provider: string, country: string, operator: string, scope: string = "personal"): Promise<CountryOperatorConfig | undefined> {
     const results = await db
       .select()
       .from(schema.countryOperatorConfig)
@@ -1426,7 +1441,8 @@ export class DbStorage implements IStorage {
         and(
           eq(schema.countryOperatorConfig.provider, provider),
           eq(schema.countryOperatorConfig.country, country),
-          eq(schema.countryOperatorConfig.operator, operator)
+          eq(schema.countryOperatorConfig.operator, operator),
+          eq(schema.countryOperatorConfig.scope, scope)
         )
       )
       .limit(1);
@@ -1437,7 +1453,8 @@ export class DbStorage implements IStorage {
     provider: string,
     country: string,
     operator: string,
-    config: UpdateCountryOperatorConfig
+    config: UpdateCountryOperatorConfig,
+    scope: string = "personal"
   ): Promise<CountryOperatorConfig | undefined> {
     const results = await db
       .update(schema.countryOperatorConfig)
@@ -1449,7 +1466,8 @@ export class DbStorage implements IStorage {
         and(
           eq(schema.countryOperatorConfig.provider, provider),
           eq(schema.countryOperatorConfig.country, country),
-          eq(schema.countryOperatorConfig.operator, operator)
+          eq(schema.countryOperatorConfig.operator, operator),
+          eq(schema.countryOperatorConfig.scope, scope)
         )
       )
       .returning();
@@ -1462,7 +1480,8 @@ export class DbStorage implements IStorage {
     provider: string,
     country: string,
     operator: string,
-    type: "incoming" | "outgoing"
+    type: "incoming" | "outgoing",
+    scope: string = "personal"
   ): Promise<void> {
     const updateField = type === "incoming" ? { incomingEnabled: false } : { outgoingEnabled: false };
     
@@ -1477,18 +1496,20 @@ export class DbStorage implements IStorage {
         and(
           eq(schema.countryOperatorConfig.country, country),
           eq(schema.countryOperatorConfig.operator, operator),
+          eq(schema.countryOperatorConfig.scope, scope),
           sql`${schema.countryOperatorConfig.provider} != ${provider}`
         )
       );
     
-    console.log(`[MutualExclusivity] Disabled ${operator} in ${country} for ${type} on all providers except ${provider}`);
+    console.log(`[MutualExclusivity] Disabled ${operator} in ${country} for ${type} on all providers except ${provider} (scope: ${scope})`);
   }
   
   // Legacy function - disable entire country for other providers
   async disableCountryForOtherProviders(
     provider: string,
     country: string,
-    type: "incoming" | "outgoing"
+    type: "incoming" | "outgoing",
+    scope: string = "personal"
   ): Promise<void> {
     const updateField = type === "incoming" ? { incomingEnabled: false } : { outgoingEnabled: false };
     
@@ -1501,6 +1522,7 @@ export class DbStorage implements IStorage {
       .where(
         and(
           eq(schema.countryOperatorConfig.country, country),
+          eq(schema.countryOperatorConfig.scope, scope),
           sql`${schema.countryOperatorConfig.provider} != ${provider}`
         )
       );
@@ -1513,144 +1535,100 @@ export class DbStorage implements IStorage {
     const { FEDAPAY_COUNTRIES } = await import("@shared/fedapay-countries");
     const { MBIYOPAY_COUNTRIES } = await import("@shared/mbiyopay-countries");
 
-    // Get existing configs to check which ones are already present
-    const existing = await this.getCountryOperatorConfigs();
-    const existingSet = new Set(existing.map(c => `${c.provider}-${c.country}-${c.operator}`));
-    
-    // Initialize AfribaPay
-    for (const country of AFRIBAPAY_COUNTRIES) {
-      for (const operator of country.operators) {
-        const key = `afribapay-${country.code}-${operator.code}`;
-        if (existingSet.has(key)) continue;
+    const scopes = ["personal", "business"];
+
+    for (const scope of scopes) {
+      // Get existing configs to check which ones are already present
+      const existing = await this.getCountryOperatorConfigs(scope);
+      const existingSet = new Set(existing.map(c => `${c.provider}-${c.country}-${c.operator}`));
+      
+      const insertIfNotExists = async (provider: string, country: string, operator: string) => {
+        const key = `${provider}-${country}-${operator}`;
+        if (existingSet.has(key)) return;
         
         await db
           .insert(schema.countryOperatorConfig)
           .values({
-            provider: "afribapay",
-            country: country.code,
-            operator: operator.code,
+            provider,
+            country,
+            operator,
+            scope,
             incomingEnabled: false,
             outgoingEnabled: false,
           })
           .catch(() => {});
+      };
+
+      // Initialize AfribaPay
+      for (const country of AFRIBAPAY_COUNTRIES) {
+        for (const operator of country.operators) {
+          await insertIfNotExists("afribapay", country.code, operator.code);
+        }
       }
-    }
 
-    // Initialize Paydunya
-    for (const country of PAYDUNYA_COUNTRIES) {
-      for (const operator of country.operators) {
-        const key = `paydunya-${country.code}-${operator.code}`;
-        if (existingSet.has(key)) continue;
-        
-        await db
-          .insert(schema.countryOperatorConfig)
-          .values({
-            provider: "paydunya",
-            country: country.code,
-            operator: operator.code,
-            incomingEnabled: false,
-            outgoingEnabled: false,
-          })
-          .catch(() => {});
+      // Initialize Paydunya
+      for (const country of PAYDUNYA_COUNTRIES) {
+        for (const operator of country.operators) {
+          await insertIfNotExists("paydunya", country.code, operator.code);
+        }
       }
-    }
 
-    // Initialize FedaPay
-    for (const country of FEDAPAY_COUNTRIES) {
-      for (const operator of country.operators) {
-        const key = `fedapay-${country.code}-${operator.code}`;
-        if (existingSet.has(key)) continue;
-        
-        await db
-          .insert(schema.countryOperatorConfig)
-          .values({
-            provider: "fedapay",
-            country: country.code,
-            operator: operator.code,
-            incomingEnabled: false,
-            outgoingEnabled: false,
-          })
-          .catch(() => {});
+      // Initialize FedaPay
+      for (const country of FEDAPAY_COUNTRIES) {
+        for (const operator of country.operators) {
+          await insertIfNotExists("fedapay", country.code, operator.code);
+        }
       }
-    }
 
-    // Initialize MbiyoPay
-    for (const country of MBIYOPAY_COUNTRIES) {
-      for (const operator of country.operators) {
-        const key = `mbiyopay-${country.code}-${operator.code}`;
-        if (existingSet.has(key)) continue;
-        
-        await db
-          .insert(schema.countryOperatorConfig)
-          .values({
-            provider: "mbiyopay",
-            country: country.code,
-            operator: operator.code,
-            incomingEnabled: false,
-            outgoingEnabled: false,
-          })
-          .catch(() => {});
+      // Initialize MbiyoPay
+      for (const country of MBIYOPAY_COUNTRIES) {
+        for (const operator of country.operators) {
+          await insertIfNotExists("mbiyopay", country.code, operator.code);
+        }
       }
-    }
 
-    // Initialize MoneyFusion (payout-only)
-    const { MONEYFUSION_COUNTRIES } = await import("@shared/moneyfusion-countries");
-    for (const country of MONEYFUSION_COUNTRIES) {
-      for (const operator of country.operators) {
-        const key = `moneyfusion-${country.code}-${operator.code}`;
-        if (existingSet.has(key)) continue;
-        
-        await db
-          .insert(schema.countryOperatorConfig)
-          .values({
-            provider: "moneyfusion",
-            country: country.code,
-            operator: operator.code,
-            incomingEnabled: false,
-            outgoingEnabled: false,
-          })
-          .catch(() => {});
+      // Initialize MoneyFusion (payout-only)
+      const { MONEYFUSION_COUNTRIES } = await import("@shared/moneyfusion-countries");
+      for (const country of MONEYFUSION_COUNTRIES) {
+        for (const operator of country.operators) {
+          await insertIfNotExists("moneyfusion", country.code, operator.code);
+        }
       }
-    }
 
-    // Initialize PawaPay
-    for (const country of PAWAPAY_COUNTRIES) {
-      for (const operator of country.operators) {
-        const key = `pawapay-${country.code}-${operator.code}`;
-        if (existingSet.has(key)) continue;
-
-        await db
-          .insert(schema.countryOperatorConfig)
-          .values({
-            provider: "pawapay",
-            country: country.code,
-            operator: operator.code,
-            incomingEnabled: false,
-            outgoingEnabled: false,
-          })
-          .catch(() => {});
+      // Initialize PawaPay
+      const { PAWAPAY_COUNTRIES } = await import("@shared/pawapay-countries");
+      for (const country of PAWAPAY_COUNTRIES) {
+        for (const operator of country.operators) {
+          await insertIfNotExists("pawapay", country.code, operator.code);
+        }
       }
     }
   }
 
   // Country Status Methods (for country-level payin/payout control per provider)
-  async getCountryStatuses(): Promise<schema.CountryStatus[]> {
-    return db.select().from(schema.countryStatus);
+  async getCountryStatuses(scope: string = "personal"): Promise<schema.CountryStatus[]> {
+    return db.select().from(schema.countryStatus).where(eq(schema.countryStatus.scope, scope));
   }
 
-  async getCountryStatusesByProvider(provider: string): Promise<schema.CountryStatus[]> {
+  async getCountryStatusesByProvider(provider: string, scope: string = "personal"): Promise<schema.CountryStatus[]> {
     return db.select().from(schema.countryStatus)
-      .where(eq(schema.countryStatus.provider, provider));
+      .where(
+        and(
+          eq(schema.countryStatus.provider, provider),
+          eq(schema.countryStatus.scope, scope)
+        )
+      );
   }
 
-  async getCountryStatus(provider: string, country: string): Promise<schema.CountryStatus | undefined> {
+  async getCountryStatus(provider: string, country: string, scope: string = "personal"): Promise<schema.CountryStatus | undefined> {
     const results = await db
       .select()
       .from(schema.countryStatus)
       .where(
         and(
           eq(schema.countryStatus.provider, provider),
-          eq(schema.countryStatus.country, country)
+          eq(schema.countryStatus.country, country),
+          eq(schema.countryStatus.scope, scope)
         )
       );
     return results[0];
@@ -1659,7 +1637,8 @@ export class DbStorage implements IStorage {
   async updateCountryStatus(
     provider: string,
     country: string,
-    updates: { payinEnabled?: boolean; payoutEnabled?: boolean }
+    updates: { payinEnabled?: boolean; payoutEnabled?: boolean },
+    scope: string = "personal"
   ): Promise<schema.CountryStatus | undefined> {
     const results = await db
       .update(schema.countryStatus)
@@ -1670,7 +1649,8 @@ export class DbStorage implements IStorage {
       .where(
         and(
           eq(schema.countryStatus.provider, provider),
-          eq(schema.countryStatus.country, country)
+          eq(schema.countryStatus.country, country),
+          eq(schema.countryStatus.scope, scope)
         )
       )
       .returning();
@@ -1685,139 +1665,176 @@ export class DbStorage implements IStorage {
     const { MBIYOPAY_COUNTRIES } = await import("@shared/mbiyopay-countries");
     const { NOWPAYMENTS_COUNTRIES } = await import("@shared/nowpayments-countries");
     
-    const existing = await this.getCountryStatuses();
-    const existingSet = new Set(existing.map(c => `${c.provider}-${c.country}`));
+    const scopes = ["personal", "business"];
 
-    // Initialize AfribaPay countries
-    for (const country of AFRIBAPAY_COUNTRIES) {
-      const key = `afribapay-${country.code}`;
-      if (existingSet.has(key)) continue;
-      
-      await db
-        .insert(schema.countryStatus)
-        .values({
-          provider: "afribapay",
-          country: country.code,
-          payinEnabled: false,
-          payoutEnabled: false,
-        })
-        .catch(() => {});
+    for (const scope of scopes) {
+      const existing = await this.getCountryStatuses(scope);
+      const existingSet = new Set(existing.map(c => `${c.provider}-${c.country}`));
+
+      const insertIfNotExists = async (provider: string, countryCode: string) => {
+        const key = `${provider}-${countryCode}`;
+        if (existingSet.has(key)) return;
+        
+        await db
+          .insert(schema.countryStatus)
+          .values({
+            provider,
+            country: countryCode,
+            scope,
+            payinEnabled: false,
+            payoutEnabled: false,
+          })
+          .catch(() => {});
+      };
+
+      // Initialize AfribaPay countries
+      for (const country of AFRIBAPAY_COUNTRIES) {
+        await insertIfNotExists("afribapay", country.code);
+      }
+
+      // Initialize Paydunya countries
+      for (const country of PAYDUNYA_COUNTRIES) {
+        await insertIfNotExists("paydunya", country.code);
+      }
+
+      // Initialize FedaPay countries
+      for (const country of FEDAPAY_COUNTRIES) {
+        await insertIfNotExists("fedapay", country.code);
+      }
+
+      // Initialize MbiyoPay countries
+      for (const country of MBIYOPAY_COUNTRIES) {
+        await insertIfNotExists("mbiyopay", country.code);
+      }
+
+      // Initialize NOWPayments countries (crypto)
+      for (const country of NOWPAYMENTS_COUNTRIES) {
+        await insertIfNotExists("nowpayments", country.code);
+      }
+
+      // Initialize MoneyFusion countries (payout-only)
+      const { MONEYFUSION_COUNTRIES } = await import("@shared/moneyfusion-countries");
+      for (const country of MONEYFUSION_COUNTRIES) {
+        await insertIfNotExists("moneyfusion", country.code);
+      }
+
+      // Initialize PawaPay countries
+      const { PAWAPAY_COUNTRIES } = await import("@shared/pawapay-countries");
+      for (const country of PAWAPAY_COUNTRIES) {
+        await insertIfNotExists("pawapay", country.code);
+      }
     }
+  }
 
-    // Initialize Paydunya countries
-    for (const country of PAYDUNYA_COUNTRIES) {
-      const key = `paydunya-${country.code}`;
-      if (existingSet.has(key)) continue;
-      
-      await db
-        .insert(schema.countryStatus)
-        .values({
-          provider: "paydunya",
-          country: country.code,
-          payinEnabled: false,
-          payoutEnabled: false,
-        })
-        .catch(() => {});
+  // ===== Business Wallets =====
+  async getBusinessWallet(userId: string, country: string, currency: string): Promise<BusinessWallet | undefined> {
+    const results = await db
+      .select()
+      .from(schema.businessWallets)
+      .where(
+        and(
+          eq(schema.businessWallets.userId, userId),
+          eq(schema.businessWallets.country, country),
+          eq(schema.businessWallets.currency, currency)
+        )
+      )
+      .limit(1);
+    return results[0];
+  }
+
+  async getBusinessWallets(userId: string): Promise<BusinessWallet[]> {
+    return db
+      .select()
+      .from(schema.businessWallets)
+      .where(eq(schema.businessWallets.userId, userId))
+      .orderBy(desc(schema.businessWallets.createdAt));
+  }
+
+  async creditBusinessWallet(userId: string, country: string, currency: string, amount: number): Promise<BusinessWallet> {
+    const existing = await this.getBusinessWallet(userId, country, currency);
+    if (existing) {
+      const results = await db
+        .update(schema.businessWallets)
+        .set({ balance: existing.balance + amount })
+        .where(eq(schema.businessWallets.id, existing.id))
+        .returning();
+      return results[0];
+    } else {
+      const results = await db
+        .insert(schema.businessWallets)
+        .values({ userId, country, currency, balance: amount })
+        .returning();
+      return results[0];
     }
+  }
 
-    // Initialize FedaPay countries
-    for (const country of FEDAPAY_COUNTRIES) {
-      const key = `fedapay-${country.code}`;
-      if (existingSet.has(key)) continue;
-      
-      await db
-        .insert(schema.countryStatus)
-        .values({
-          provider: "fedapay",
-          country: country.code,
-          payinEnabled: false,
-          payoutEnabled: false,
-        })
-        .catch(() => {});
-    }
+  async debitBusinessWallet(userId: string, country: string, currency: string, amount: number): Promise<BusinessWallet> {
+    const existing = await this.getBusinessWallet(userId, country, currency);
+    if (!existing) throw new Error("Wallet non trouvé");
+    if (existing.balance < amount) throw new Error("Solde insuffisant");
+    
+    const results = await db
+      .update(schema.businessWallets)
+      .set({ balance: existing.balance - amount })
+      .where(eq(schema.businessWallets.id, existing.id))
+      .returning();
+    return results[0];
+  }
 
-    // Initialize MbiyoPay countries
-    for (const country of MBIYOPAY_COUNTRIES) {
-      const key = `mbiyopay-${country.code}`;
-      if (existingSet.has(key)) continue;
-      
-      await db
-        .insert(schema.countryStatus)
-        .values({
-          provider: "mbiyopay",
-          country: country.code,
-          payinEnabled: false,
-          payoutEnabled: false,
-        })
-        .catch(() => {});
-    }
+  async getAllBusinessWalletsForAdmin(): Promise<(BusinessWallet & { user: User })[]> {
+    const results = await db
+      .select({
+        wallet: schema.businessWallets,
+        user: schema.users,
+      })
+      .from(schema.businessWallets)
+      .innerJoin(schema.users, eq(schema.businessWallets.userId, schema.users.id))
+      .orderBy(desc(schema.businessWallets.createdAt));
+    
+    return results.map(r => ({ ...r.wallet, user: r.user }));
+  }
 
-    // Initialize NOWPayments countries (crypto)
-    for (const country of NOWPAYMENTS_COUNTRIES) {
-      const key = `nowpayments-${country.code}`;
-      if (existingSet.has(key)) continue;
-      
-      await db
-        .insert(schema.countryStatus)
-        .values({
-          provider: "nowpayments",
-          country: country.code,
-          payinEnabled: false,
-          payoutEnabled: false,
-        })
-        .catch(() => {});
-    }
-
-    // Initialize MoneyFusion countries (payout-only)
-    const { MONEYFUSION_COUNTRIES } = await import("@shared/moneyfusion-countries");
-    for (const country of MONEYFUSION_COUNTRIES) {
-      const key = `moneyfusion-${country.code}`;
-      if (existingSet.has(key)) continue;
-      
-      await db
-        .insert(schema.countryStatus)
-        .values({
-          provider: "moneyfusion",
-          country: country.code,
-          payinEnabled: false,
-          payoutEnabled: false,
-        })
-        .catch(() => {});
-    }
-
-    // Initialize PawaPay countries
-    for (const country of PAWAPAY_COUNTRIES) {
-      const key = `pawapay-${country.code}`;
-      if (existingSet.has(key)) continue;
-
-      await db
-        .insert(schema.countryStatus)
-        .values({
-          provider: "pawapay",
-          country: country.code,
-          payinEnabled: false,
-          payoutEnabled: false,
-        })
-        .catch(() => {});
+  async adminAdjustBusinessWallet(userId: string, country: string, currency: string, amount: number): Promise<BusinessWallet> {
+    // amount can be negative for deduction
+    const existing = await this.getBusinessWallet(userId, country, currency);
+    if (existing) {
+      const results = await db
+        .update(schema.businessWallets)
+        .set({ balance: Math.max(0, existing.balance + amount) })
+        .where(eq(schema.businessWallets.id, existing.id))
+        .returning();
+      return results[0];
+    } else {
+      const results = await db
+        .insert(schema.businessWallets)
+        .values({ userId, country, currency, balance: Math.max(0, amount) })
+        .returning();
+      return results[0];
     }
   }
 
   // ===== Provider Configs =====
-  async getProviderConfigs(): Promise<schema.ProviderConfig[]> {
-    return db.select().from(schema.providerConfigs);
+  async getProviderConfigs(scope: string = "personal"): Promise<schema.ProviderConfig[]> {
+    return db.select().from(schema.providerConfigs).where(eq(schema.providerConfigs.scope, scope));
   }
 
-  async getProviderConfig(provider: string): Promise<schema.ProviderConfig | undefined> {
+  async getProviderConfig(provider: string, scope: string = "personal"): Promise<schema.ProviderConfig | undefined> {
     const results = await db
       .select()
       .from(schema.providerConfigs)
-      .where(eq(schema.providerConfigs.provider, provider));
+      .where(
+        and(
+          eq(schema.providerConfigs.provider, provider),
+          eq(schema.providerConfigs.scope, scope)
+        )
+      );
     return results[0];
   }
 
   async updateProviderConfig(
     provider: string,
-    updates: Partial<Omit<schema.ProviderConfig, 'id' | 'provider' | 'createdAt'>>
+    updates: Partial<Omit<schema.ProviderConfig, 'id' | 'provider' | 'createdAt'>>,
+    scope: string = "personal"
   ): Promise<schema.ProviderConfig | undefined> {
     const results = await db
       .update(schema.providerConfigs)
@@ -1825,26 +1842,36 @@ export class DbStorage implements IStorage {
         ...updates,
         updatedAt: new Date(),
       })
-      .where(eq(schema.providerConfigs.provider, provider))
+      .where(
+        and(
+          eq(schema.providerConfigs.provider, provider),
+          eq(schema.providerConfigs.scope, scope)
+        )
+      )
       .returning();
     return results[0];
   }
 
   async initializeProviderConfigs(): Promise<void> {
     const providers = ["afribapay", "paydunya", "fedapay", "mbiyopay", "moneyfusion", "nowpayments", "pawapay", "exchangerate", "mailtrap"];
-    const existing = await this.getProviderConfigs();
-    const existingSet = new Set(existing.map(p => p.provider));
+    const scopes = ["personal", "business"];
 
-    for (const provider of providers) {
-      if (existingSet.has(provider)) continue;
-      
-      await db
-        .insert(schema.providerConfigs)
-        .values({
-          provider,
-          isActive: false,
-        })
-        .catch(() => {});
+    for (const scope of scopes) {
+      const existing = await this.getProviderConfigs(scope);
+      const existingSet = new Set(existing.map(p => p.provider));
+
+      for (const provider of providers) {
+        if (existingSet.has(provider)) continue;
+        
+        await db
+          .insert(schema.providerConfigs)
+          .values({
+            provider,
+            scope,
+            isActive: false,
+          })
+          .catch(() => {});
+      }
     }
   }
 
@@ -1991,36 +2018,48 @@ export class DbStorage implements IStorage {
     return db.select().from(schema.feeConfigs);
   }
 
-  async getFeeConfigsByProvider(provider: string): Promise<FeeConfig[]> {
+  async getFeeConfigsByProvider(provider: string, scope: string = "personal"): Promise<FeeConfig[]> {
     return db
       .select()
       .from(schema.feeConfigs)
-      .where(eq(schema.feeConfigs.provider, provider));
+      .where(
+        and(
+          eq(schema.feeConfigs.provider, provider),
+          eq(schema.feeConfigs.scope, scope)
+        )
+      );
   }
 
-  async getFeeConfig(provider: string, country: string, operator: string): Promise<FeeConfig | undefined> {
+  async getFeeConfig(provider: string, country: string, operator: string, scope: string = "personal"): Promise<FeeConfig | undefined> {
     const results = await db
       .select()
       .from(schema.feeConfigs)
       .where(and(
         eq(schema.feeConfigs.provider, provider),
         eq(schema.feeConfigs.country, country),
-        eq(schema.feeConfigs.operator, operator)
+        eq(schema.feeConfigs.operator, operator),
+        eq(schema.feeConfigs.scope, scope)
       ))
       .limit(1);
     return results[0];
   }
 
-  async getFeeConfigsByCountry(country: string): Promise<FeeConfig[]> {
+  async getFeeConfigsByCountry(country: string, scope: string = "personal"): Promise<FeeConfig[]> {
     return db
       .select()
       .from(schema.feeConfigs)
-      .where(eq(schema.feeConfigs.country, country));
+      .where(
+        and(
+          eq(schema.feeConfigs.country, country),
+          eq(schema.feeConfigs.scope, scope)
+        )
+      );
   }
 
   async createOrUpdateFeeConfig(config: InsertFeeConfig): Promise<FeeConfig> {
     const provider = config.provider || "default";
-    const existing = await this.getFeeConfig(provider, config.country, config.operator);
+    const scope = config.scope || "personal";
+    const existing = await this.getFeeConfig(provider, config.country, config.operator, scope);
     if (existing) {
       const results = await db
         .update(schema.feeConfigs)
@@ -2032,23 +2071,25 @@ export class DbStorage implements IStorage {
         .where(and(
           eq(schema.feeConfigs.provider, provider),
           eq(schema.feeConfigs.country, config.country),
-          eq(schema.feeConfigs.operator, config.operator)
+          eq(schema.feeConfigs.operator, config.operator),
+          eq(schema.feeConfigs.scope, scope)
         ))
         .returning();
       return results[0];
     }
-    const results = await db.insert(schema.feeConfigs).values({ ...config, provider }).returning();
+    const results = await db.insert(schema.feeConfigs).values({ ...config, provider, scope }).returning();
     return results[0];
   }
 
-  async updateFeeConfig(provider: string, country: string, operator: string, updates: { incomingFeePercentage?: number; outgoingFeePercentage?: number }): Promise<FeeConfig | undefined> {
+  async updateFeeConfig(provider: string, country: string, operator: string, updates: { incomingFeePercentage?: number; outgoingFeePercentage?: number }, scope: string = "personal"): Promise<FeeConfig | undefined> {
     const results = await db
       .update(schema.feeConfigs)
       .set({ ...updates, updatedAt: new Date() })
       .where(and(
         eq(schema.feeConfigs.provider, provider),
         eq(schema.feeConfigs.country, country),
-        eq(schema.feeConfigs.operator, operator)
+        eq(schema.feeConfigs.operator, operator),
+        eq(schema.feeConfigs.scope, scope)
       ))
       .returning();
     return results[0];
@@ -2058,60 +2099,72 @@ export class DbStorage implements IStorage {
     const existingConfigs = await this.getAllFeeConfigs();
     if (existingConfigs.length > 0) {
       console.log(`[FeeConfigs] Already initialized with ${existingConfigs.length} configs`);
-      return;
+      // We still want to ensure business configs exist if only personal were initialized
+      const hasBusiness = existingConfigs.some(c => c.scope === "business");
+      if (hasBusiness) return;
     }
 
     const configs: InsertFeeConfig[] = [];
+    const scopes = ["personal", "business"];
 
-    // MbiyoPay countries
-    for (const country of MBIYOPAY_COUNTRIES) {
-      for (const op of country.operators) {
-        configs.push({
-          provider: "mbiyopay",
-          country: country.code,
-          operator: op.code,
-          incomingFeePercentage: 60,
-          outgoingFeePercentage: 60,
-        });
+    for (const scope of scopes) {
+      // Skip if this scope already has configs
+      if (existingConfigs.some(c => c.scope === scope)) continue;
+
+      // MbiyoPay countries
+      for (const country of MBIYOPAY_COUNTRIES) {
+        for (const op of country.operators) {
+          configs.push({
+            provider: "mbiyopay",
+            country: country.code,
+            operator: op.code,
+            incomingFeePercentage: 60,
+            outgoingFeePercentage: 60,
+            scope,
+          });
+        }
       }
-    }
 
-    // FedaPay countries
-    for (const country of FEDAPAY_COUNTRIES) {
-      for (const op of country.operators) {
-        configs.push({
-          provider: "fedapay",
-          country: country.code,
-          operator: op.code,
-          incomingFeePercentage: 60,
-          outgoingFeePercentage: 60,
-        });
+      // FedaPay countries
+      for (const country of FEDAPAY_COUNTRIES) {
+        for (const op of country.operators) {
+          configs.push({
+            provider: "fedapay",
+            country: country.code,
+            operator: op.code,
+            incomingFeePercentage: 60,
+            outgoingFeePercentage: 60,
+            scope,
+          });
+        }
       }
-    }
 
-    // AfribaPay countries
-    for (const country of AFRIBAPAY_COUNTRIES) {
-      for (const op of country.operators) {
-        configs.push({
-          provider: "afribapay",
-          country: country.code,
-          operator: op.code,
-          incomingFeePercentage: 60,
-          outgoingFeePercentage: 60,
-        });
+      // AfribaPay countries
+      for (const country of AFRIBAPAY_COUNTRIES) {
+        for (const op of country.operators) {
+          configs.push({
+            provider: "afribapay",
+            country: country.code,
+            operator: op.code,
+            incomingFeePercentage: 60,
+            outgoingFeePercentage: 60,
+            scope,
+          });
+        }
       }
-    }
 
-    // Paydunya countries
-    for (const country of PAYDUNYA_COUNTRIES) {
-      for (const op of country.operators) {
-        configs.push({
-          provider: "paydunya",
-          country: country.code,
-          operator: op.code,
-          incomingFeePercentage: 60,
-          outgoingFeePercentage: 60,
-        });
+      // Paydunya countries
+      for (const country of PAYDUNYA_COUNTRIES) {
+        for (const op of country.operators) {
+          configs.push({
+            provider: "paydunya",
+            country: country.code,
+            operator: op.code,
+            incomingFeePercentage: 60,
+            outgoingFeePercentage: 60,
+            scope,
+          });
+        }
       }
     }
 
@@ -2122,56 +2175,60 @@ export class DbStorage implements IStorage {
   }
 
   async ensurePaydunyaFeeConfigs(): Promise<void> {
-    const existing = await this.getFeeConfigsByProvider("paydunya");
-    const existingSet = new Set(existing.map(c => `${c.country}-${c.operator}`));
+    const scopes = ["personal", "business"];
+    for (const scope of scopes) {
+      const existing = await this.getFeeConfigsByProvider("paydunya", scope);
+      const existingSet = new Set(existing.map(c => `${c.country}-${c.operator}`));
 
-    const toInsert: InsertFeeConfig[] = [];
-    for (const country of PAYDUNYA_COUNTRIES) {
-      for (const op of country.operators) {
-        const key = `${country.code}-${op.code}`;
-        if (existingSet.has(key)) continue;
-        toInsert.push({
-          provider: "paydunya",
-          country: country.code,
-          operator: op.code,
-          incomingFeePercentage: 60,
-          outgoingFeePercentage: 60,
-        });
+      const toInsert: InsertFeeConfig[] = [];
+      for (const country of PAYDUNYA_COUNTRIES) {
+        for (const op of country.operators) {
+          const key = `${country.code}-${op.code}`;
+          if (existingSet.has(key)) continue;
+          toInsert.push({
+            provider: "paydunya",
+            country: country.code,
+            operator: op.code,
+            incomingFeePercentage: 60,
+            outgoingFeePercentage: 60,
+            scope,
+          });
+        }
       }
-    }
 
-    if (toInsert.length > 0) {
-      await db.insert(schema.feeConfigs).values(toInsert);
-      console.log(`[FeeConfigs] Added ${toInsert.length} Paydunya fee configurations (default 6%)`);
-    } else {
-      console.log(`[FeeConfigs] Paydunya fee configs already initialized`);
+      if (toInsert.length > 0) {
+        await db.insert(schema.feeConfigs).values(toInsert);
+        console.log(`[FeeConfigs] Added ${toInsert.length} Paydunya fee configurations for scope ${scope} (default 6%)`);
+      }
     }
   }
 
   async ensurePawaPayFeeConfigs(): Promise<void> {
-    const existing = await this.getFeeConfigsByProvider("pawapay");
-    const existingSet = new Set(existing.map(c => `${c.country}-${c.operator}`));
+    const scopes = ["personal", "business"];
+    for (const scope of scopes) {
+      const existing = await this.getFeeConfigsByProvider("pawapay", scope);
+      const existingSet = new Set(existing.map(c => `${c.country}-${c.operator}`));
 
-    const toInsert: InsertFeeConfig[] = [];
-    for (const country of PAWAPAY_COUNTRIES) {
-      for (const op of country.operators) {
-        const key = `${country.code}-${op.code}`;
-        if (existingSet.has(key)) continue;
-        toInsert.push({
-          provider: "pawapay",
-          country: country.code,
-          operator: op.code,
-          incomingFeePercentage: 60,
-          outgoingFeePercentage: 60,
-        });
+      const toInsert: InsertFeeConfig[] = [];
+      for (const country of PAWAPAY_COUNTRIES) {
+        for (const op of country.operators) {
+          const key = `${country.code}-${op.code}`;
+          if (existingSet.has(key)) continue;
+          toInsert.push({
+            provider: "pawapay",
+            country: country.code,
+            operator: op.code,
+            incomingFeePercentage: 60,
+            outgoingFeePercentage: 60,
+            scope,
+          });
+        }
       }
-    }
 
-    if (toInsert.length > 0) {
-      await db.insert(schema.feeConfigs).values(toInsert);
-      console.log(`[FeeConfigs] Added ${toInsert.length} PawaPay fee configurations (default 6%)`);
-    } else {
-      console.log(`[FeeConfigs] PawaPay fee configs already initialized`);
+      if (toInsert.length > 0) {
+        await db.insert(schema.feeConfigs).values(toInsert);
+        console.log(`[FeeConfigs] Added ${toInsert.length} PawaPay fee configurations for scope ${scope} (default 6%)`);
+      }
     }
   }
 
@@ -2268,6 +2325,10 @@ export class DbStorage implements IStorage {
 
     console.log(`[LoginLogs] Purged ${toDelete.length} old login logs for user ${userId}`);
     return toDelete.length;
+  }
+
+  async getBusinessUsers(): Promise<User[]> {
+    return db.select().from(schema.users).where(eq(schema.users.accountType, "business"));
   }
 }
 

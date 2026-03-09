@@ -28,5 +28,6 @@ export function useAuth() {
     isServerError,
     error,
     failureCount,
+    accountType: user?.accountType,
   };
 }

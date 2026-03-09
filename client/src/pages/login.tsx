@@ -132,7 +132,11 @@ export default function Login() {
       if (response.requiresCode === false || !response.requiresCode) {
         console.log("[Login] Direct login - redirecting to dashboard");
         await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
-        setLocation("/dashboard");
+        if (response.user?.accountType === "business") {
+          setLocation("/dashboard/business");
+        } else {
+          setLocation("/dashboard");
+        }
         return;
       }
       
@@ -161,14 +165,18 @@ export default function Login() {
   const loginMutation = useMutation({
     mutationFn: async (data: { email: string; password: string; verificationCode: string }) => {
       const response = await apiRequest("POST", "/api/auth/login", data);
-      return response;
+      return await response.json();
     },
-    onSuccess: async () => {
+    onSuccess: async (data) => {
       if (credentials?.email) {
         clearStorage(credentials.email);
       }
       await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
-      setLocation("/dashboard");
+      if (data.user?.accountType === "business") {
+        setLocation("/dashboard/business");
+      } else {
+        setLocation("/dashboard");
+      }
     },
     onError: (error: any) => {
       toast({

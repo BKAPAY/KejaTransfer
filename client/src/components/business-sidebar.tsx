@@ -1,0 +1,205 @@
+import { useState } from "react";
+import { Link, useLocation } from "wouter";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarHeader,
+  SidebarFooter,
+  useSidebar,
+} from "@/components/ui/sidebar";
+import {
+  LayoutDashboard,
+  User,
+  Code,
+  History,
+  Settings,
+  LogOut,
+  ChevronDown,
+  ChevronRight,
+  ArrowDownCircle,
+  ArrowUpCircle,
+} from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import type { User as UserType } from "@shared/schema";
+import logoImage from "@assets/bkapay-logo.png";
+import { Button } from "@/components/ui/button";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+
+export function BusinessSidebar() {
+  const [location, setLocation] = useLocation();
+  const { toast } = useToast();
+  const { setOpenMobile, isMobile } = useSidebar();
+  const [historyOpen, setHistoryOpen] = useState(
+    location.startsWith("/dashboard/business/history")
+  );
+
+  const { data: user } = useQuery<UserType>({
+    queryKey: ["/api/auth/me"],
+  });
+
+  const handleMenuClick = () => {
+    if (isMobile) {
+      setOpenMobile(false);
+    }
+  };
+
+  const logoutMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("POST", "/api/auth/logout", {});
+    },
+    onSuccess: () => {
+      toast({
+        title: "Déconnexion réussie",
+        description: "À bientôt sur BKApay",
+      });
+      setLocation("/");
+    },
+    onError: () => {
+      toast({
+        title: "Erreur",
+        description: "Erreur lors de la déconnexion",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const isActive = (path: string) => location === path;
+
+  return (
+    <Sidebar>
+      <SidebarHeader className="p-6">
+        <div className="flex items-center gap-3">
+          <img src={logoImage} alt="BKApay" className="h-10 w-auto" />
+        </div>
+        {user?.businessName && (
+          <p className="text-xs text-muted-foreground mt-1 font-medium truncate">
+            {user.businessName}
+          </p>
+        )}
+      </SidebarHeader>
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel>Menu</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={isActive("/dashboard/business")}
+                  data-testid="nav-business-dashboard"
+                >
+                  <Link href="/dashboard/business" onClick={handleMenuClick}>
+                    <LayoutDashboard className="w-4 h-4" />
+                    <span>Tableau de bord</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={isActive("/dashboard/business/profile")}
+                  data-testid="nav-business-profile"
+                >
+                  <Link href="/dashboard/business/profile" onClick={handleMenuClick}>
+                    <User className="w-4 h-4" />
+                    <span>Profil</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={isActive("/dashboard/business/api")}
+                  data-testid="nav-business-api"
+                >
+                  <Link href="/dashboard/business/api" onClick={handleMenuClick}>
+                    <Code className="w-4 h-4" />
+                    <span>API</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={location.startsWith("/dashboard/business/history")}
+                  onClick={() => setHistoryOpen(!historyOpen)}
+                  data-testid="nav-business-history"
+                >
+                  <History className="w-4 h-4" />
+                  <span>Historique</span>
+                  {historyOpen
+                    ? <ChevronDown className="w-4 h-4 ml-auto" />
+                    : <ChevronRight className="w-4 h-4 ml-auto" />
+                  }
+                </SidebarMenuButton>
+                {historyOpen && (
+                  <SidebarMenu className="pl-6 mt-1">
+                    <SidebarMenuItem>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={isActive("/dashboard/business/history/incoming")}
+                        data-testid="nav-business-history-incoming"
+                      >
+                        <Link href="/dashboard/business/history/incoming" onClick={handleMenuClick}>
+                          <ArrowDownCircle className="w-4 h-4 text-green-600" />
+                          <span>Paiements entrants</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={isActive("/dashboard/business/history/outgoing")}
+                        data-testid="nav-business-history-outgoing"
+                      >
+                        <Link href="/dashboard/business/history/outgoing" onClick={handleMenuClick}>
+                          <ArrowUpCircle className="w-4 h-4 text-red-500" />
+                          <span>Paiements sortants</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  </SidebarMenu>
+                )}
+              </SidebarMenuItem>
+
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={isActive("/dashboard/business/settings")}
+                  data-testid="nav-business-settings"
+                >
+                  <Link href="/dashboard/business/settings" onClick={handleMenuClick}>
+                    <Settings className="w-4 h-4" />
+                    <span>Paramètres</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+      <SidebarFooter className="p-4">
+        <Button
+          variant="ghost"
+          className="w-full justify-start"
+          onClick={() => { handleMenuClick(); logoutMutation.mutate(); }}
+          disabled={logoutMutation.isPending}
+          data-testid="button-business-logout"
+        >
+          <LogOut className="w-4 h-4 mr-2" />
+          {logoutMutation.isPending ? "Déconnexion..." : "Déconnexion"}
+        </Button>
+      </SidebarFooter>
+    </Sidebar>
+  );
+}

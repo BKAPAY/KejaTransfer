@@ -542,6 +542,217 @@ export async function registerRoutes(app: Express): Promise<Server> {
     })
   );
 
+  // ===== Business Routes =====
+  app.get("/api/business/wallets", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const wallets = await storage.getBusinessWallets(req.session.userId!);
+      res.json(wallets);
+    } catch (error: any) {
+      console.error("Get business wallets error:", error);
+      res.status(500).json({ error: "Une erreur est survenue lors de la récupération des portefeuilles" });
+    }
+  });
+
+  // ===== Admin Business Routes =====
+  app.get("/api/admin/business/users", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const users = await storage.getBusinessUsers();
+      res.json(users);
+    } catch (error: any) {
+      console.error("Get business users error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
+  app.get("/api/admin/business/users/:id/transactions", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const transactions = await storage.getTransactions(req.params.id);
+      res.json(transactions);
+    } catch (error: any) {
+      console.error("Get business user transactions error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
+  app.post("/api/admin/business/users/:id/wallet/deposit", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { country, currency, amount } = req.body;
+      if (!country || !currency || typeof amount !== "number" || amount <= 0) {
+        return res.status(400).json({ error: "Données invalides" });
+      }
+      const wallet = await storage.creditBusinessWallet(req.params.id, country, currency, amount);
+      res.json(wallet);
+    } catch (error: any) {
+      console.error("Deposit business wallet error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
+  app.post("/api/admin/business/users/:id/wallet/withdraw", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { country, currency, amount } = req.body;
+      if (!country || !currency || typeof amount !== "number" || amount <= 0) {
+        return res.status(400).json({ error: "Données invalides" });
+      }
+      const wallet = await storage.debitBusinessWallet(req.params.id, country, currency, amount);
+      res.json(wallet);
+    } catch (error: any) {
+      console.error("Withdraw business wallet error:", error);
+      res.status(500).json({ error: error.message || "Une erreur est survenue" });
+    }
+  });
+
+  app.delete("/api/admin/business/users/:id", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const user = await storage.getUser(req.params.id);
+      if (!user) return res.status(404).json({ error: "Utilisateur non trouvé" });
+      if (user.isPrimaryAdmin) return res.status(403).json({ error: "Impossible de supprimer l'administrateur principal" });
+      
+      // Just suspend instead of hard delete for history
+      await storage.suspendUser(req.params.id);
+      res.json({ success: true, message: "Utilisateur suspendu avec succès" });
+    } catch (error: any) {
+      console.error("Delete business user error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
+  app.post("/api/admin/business/users/:id/payout-toggle", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { enabled } = req.body;
+      const results = await db
+        .update(schema.users)
+        .set({ payoutApiEnabled: enabled })
+        .where(eq(schema.users.id, req.params.id))
+        .returning();
+      
+      if (results.length === 0) return res.status(404).json({ error: "Utilisateur non trouvé" });
+      res.json(results[0]);
+    } catch (error: any) {
+      console.error("Toggle payout error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
+  app.get("/api/admin/business/provider-configs", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const configs = await storage.getProviderConfigs("business");
+      const masked = configs.map(c => ({
+        ...c,
+        apiKey: c.apiKey ? `${c.apiKey.slice(0, 8)}...${c.apiKey.slice(-4)}` : null,
+        secretKey: c.secretKey ? `${c.secretKey.slice(0, 8)}...${c.secretKey.slice(-4)}` : null,
+        publicKey: c.publicKey ? `${c.publicKey.slice(0, 8)}...${c.publicKey.slice(-4)}` : null,
+        masterKey: c.masterKey ? `${c.masterKey.slice(0, 8)}...${c.masterKey.slice(-4)}` : null,
+        token: c.token ? `${c.token.slice(0, 8)}...${c.token.slice(-4)}` : null,
+        ipnSecret: c.ipnSecret ? `${c.ipnSecret.slice(0, 8)}...${c.ipnSecret.slice(-4)}` : null,
+      }));
+      res.json(masked);
+    } catch (error: any) {
+      console.error("Get business provider configs error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
+  app.put("/api/admin/business/provider-configs/:provider", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { provider } = req.params;
+      const { isActive, apiKey, secretKey, publicKey, masterKey, token, ipnSecret } = req.body;
+      const updates: any = { updatedAt: new Date() };
+      if (typeof isActive === "boolean") updates.isActive = isActive;
+      if (apiKey !== undefined) updates.apiKey = apiKey || null;
+      if (secretKey !== undefined) updates.secretKey = secretKey || null;
+      if (publicKey !== undefined) updates.publicKey = publicKey || null;
+      if (masterKey !== undefined) updates.masterKey = masterKey || null;
+      if (token !== undefined) updates.token = token || null;
+      if (ipnSecret !== undefined) updates.ipnSecret = ipnSecret || null;
+
+      const config = await storage.updateProviderConfig(provider, updates, "business");
+      if (!config) return res.status(404).json({ error: "Fournisseur non trouvé" });
+      res.json(config);
+    } catch (error: any) {
+      console.error("Update business provider config error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
+  app.get("/api/admin/business/fee-configs", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const configs = await storage.getAllFeeConfigs();
+      res.json(configs.filter(c => c.scope === "business"));
+    } catch (error: any) {
+      console.error("Get business fee configs error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
+  app.put("/api/admin/business/fee-configs/:provider/:country/:operator", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { provider, country, operator } = req.params;
+      const { incomingFeePercentage, outgoingFeePercentage } = req.body;
+      const config = await storage.updateFeeConfig(provider, country, operator, {
+        incomingFeePercentage,
+        outgoingFeePercentage
+      }, "business");
+      if (!config) return res.status(404).json({ error: "Config non trouvée" });
+      res.json(config);
+    } catch (error: any) {
+      console.error("Update business fee config error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
+  app.get("/api/admin/business/country-operator", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const configs = await storage.getCountryOperatorConfigs("business");
+      res.json(configs);
+    } catch (error: any) {
+      console.error("Get business country operator configs error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
+  app.put("/api/admin/business/country-operator/:provider/:country/:operator", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { provider, country, operator } = req.params;
+      const { incomingEnabled, outgoingEnabled } = req.body;
+      const config = await storage.updateCountryOperatorConfig(provider, country, operator, {
+        incomingEnabled,
+        outgoingEnabled
+      }, "business");
+      if (!config) return res.status(404).json({ error: "Config non trouvée" });
+      res.json(config);
+    } catch (error: any) {
+      console.error("Update business country operator config error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
+  app.get("/api/admin/business/country-status", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const statuses = await storage.getCountryStatuses("business");
+      res.json(statuses);
+    } catch (error: any) {
+      console.error("Get business country statuses error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
+  app.put("/api/admin/business/country-status/:provider/:country", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { provider, country } = req.params;
+      const { payinEnabled, payoutEnabled } = req.body;
+      const status = await storage.updateCountryStatus(provider, country, {
+        payinEnabled,
+        payoutEnabled,
+      }, "business");
+      if (!status) return res.status(404).json({ error: "Pays non trouvé" });
+      res.json(status);
+    } catch (error: any) {
+      console.error("Update business country status error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
   // ===== Simple Rate Limiting for Auth Endpoints =====
   const loginAttempts = new Map<string, { count: number; lastAttempt: number }>();
   const temporarySuspensions = new Map<string, number>(); // email -> suspension end timestamp
@@ -735,7 +946,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/signup", async (req: Request, res: Response) => {
     try {
       const { verificationCode, ...userData } = req.body;
-      const validatedData = insertUserSchema.parse(userData);
+      
+      // Allow accountType and businessName in signup
+      const signupSchema = insertUserSchema.extend({
+        accountType: z.enum(["personal", "business"]).default("personal"),
+        businessName: z.string().optional(),
+      }).refine(data => {
+        if (data.accountType === "business" && !data.businessName) {
+          return false;
+        }
+        return true;
+      }, {
+        message: "Le nom de l'entreprise est requis pour un compte business",
+        path: ["businessName"]
+      });
+
+      const validatedData = signupSchema.parse(userData);
       
       // Check if email sending is enabled - if not, skip verification
       const skipVerification = !(await isEmailSendingEnabled("signup"));
@@ -963,6 +1189,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             fullName: `${user.firstName} ${user.lastName}`,
             isAdmin: user.isAdmin,
             balance: user.balance,
+            accountType: user.accountType,
           }
         });
       }
@@ -1048,7 +1275,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       req.session.loginVerified = true; // GPS verification disabled
       const logId = await recordLoginLog(req, user.id);
       if (logId) req.session.loginLogId = logId;
-      res.json({ success: true, loginLogId: logId, user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName } });
+      res.json({ success: true, loginLogId: logId, user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, accountType: user.accountType } });
     } catch (error: any) {
       console.error("[Login] Error:", error);
       res.status(500).json({ error: "Erreur lors de la connexion" });

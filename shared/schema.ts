@@ -17,8 +17,10 @@ export const users = pgTable("users", {
   lastName: text("last_name").notNull(),
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
+  accountType: text("account_type").notNull().default("personal"), // "personal" | "business"
+  businessName: text("business_name"), // Only for business accounts
   country: text("country"), // User's country: BJ, TG, CI, BF, SN
-  balance: integer("balance").notNull().default(0), // Balance in XOF
+  balance: integer("balance").notNull().default(0), // Balance in XOF (personal only)
   kycStatus: text("kyc_status").notNull().default("pending"), // "pending", "submitted", "verified", "rejected"
   kycIdFront: text("kyc_id_front"), // Base64 encoded or URL
   kycIdBack: text("kyc_id_back"), // Base64 encoded or URL
@@ -121,6 +123,7 @@ export const countryOperatorConfig = pgTable("country_operator_config", {
   operator: text("operator").notNull(), // "orange", "mtn", "moov", "wave", "free", "tmoney", "wizall", "expresso"
   incomingEnabled: boolean("incoming_enabled").notNull().default(false), // For deposits
   outgoingEnabled: boolean("outgoing_enabled").notNull().default(false), // For withdrawals
+  scope: text("scope").notNull().default("personal"), // "personal" | "business"
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -146,6 +149,7 @@ export const countryStatus = pgTable("country_status", {
   country: text("country").notNull(), // "BJ", "CI", etc.
   payinEnabled: boolean("payin_enabled").notNull().default(false),
   payoutEnabled: boolean("payout_enabled").notNull().default(false),
+  scope: text("scope").notNull().default("personal"), // "personal" | "business"
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -153,7 +157,8 @@ export const countryStatus = pgTable("country_status", {
 // Payment provider configurations (API keys)
 export const providerConfigs = pgTable("provider_configs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  provider: text("provider").notNull().unique(), // "afribapay", "paydunya", "fedapay", "nowpayments"
+  provider: text("provider").notNull(), // "afribapay", "paydunya", "fedapay", "nowpayments"
+  scope: text("scope").notNull().default("personal"), // "personal" | "business"
   isActive: boolean("is_active").notNull().default(false),
   apiKey: text("api_key"), // Main API key
   secretKey: text("secret_key"), // Secret key if needed
@@ -201,9 +206,27 @@ export const feeConfigs = pgTable("fee_configs", {
   operator: text("operator").notNull(), // "orange", "mtn", "moov", "wave", etc.
   incomingFeePercentage: integer("incoming_fee_percentage").notNull().default(60), // 60 = 6%, 40 = 4%, etc.
   outgoingFeePercentage: integer("outgoing_fee_percentage").notNull().default(60), // 60 = 6%, 40 = 4%, etc.
+  scope: text("scope").notNull().default("personal"), // "personal" | "business"
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
+
+// Business wallets - per-country balances for business accounts
+export const businessWallets = pgTable("business_wallets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  country: text("country").notNull(), // "BJ", "TG", "CI", "CD", etc.
+  currency: text("currency").notNull(), // "XOF", "XAF", "CDF", "USD", etc.
+  balance: integer("balance").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type BusinessWallet = typeof businessWallets.$inferSelect;
+export const insertBusinessWalletSchema = createInsertSchema(businessWallets).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertBusinessWallet = z.infer<typeof insertBusinessWalletSchema>;
 
 export type FeeConfig = typeof feeConfigs.$inferSelect;
 export const insertFeeConfigSchema = createInsertSchema(feeConfigs).omit({

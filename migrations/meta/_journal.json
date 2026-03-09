@@ -15,6 +15,13 @@
       "when": 1770761069165,
       "tag": "0001_add_primary_admin",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1773000000000,
+      "tag": "0002_add_business_accounts",
+      "breakpoints": true
     }
   ]
 }

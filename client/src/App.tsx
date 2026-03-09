@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
+import { BusinessSidebar } from "@/components/business-sidebar";
 import { useEffect, useRef } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Wallet } from "lucide-react";
@@ -27,6 +28,12 @@ import Deposit from "@/pages/dashboard/deposit";
 import Transfer from "@/pages/dashboard/transfer";
 import Withdrawal from "@/pages/dashboard/withdrawal";
 import Admin from "@/pages/dashboard/admin";
+import AdminBusiness from "@/pages/dashboard/admin-business";
+import AdminBusinessManagement from "@/pages/dashboard/admin-business-management";
+import AdminBusinessKyc from "@/pages/dashboard/admin-business-kyc";
+import AdminBusinessProviders from "@/pages/dashboard/admin-business-providers";
+import AdminBusinessCountryOperator from "@/pages/dashboard/admin-business-country-operator";
+import AdminBusinessFees from "@/pages/dashboard/admin-business-fees";
 import ManagementWrapper from "@/pages/dashboard/management-wrapper";
 import AdminAccessCode from "@/pages/dashboard/admin-access-code";
 import KycVerification from "@/pages/dashboard/kyc-verification";
@@ -63,14 +70,29 @@ import DocumentationPayout from "@/pages/documentation-payout";
 import DocumentationSessions from "@/pages/documentation-sessions";
 import ForgotPassword from "@/pages/forgot-password";
 import LoginVerify from "@/pages/login-verify";
+import BusinessDashboard from "@/pages/dashboard/business/index";
+import BusinessProfile from "@/pages/dashboard/business/profile";
+import BusinessApi from "@/pages/dashboard/business/api";
+import BusinessHistory from "@/pages/dashboard/business/history";
+import BusinessSettings from "@/pages/dashboard/business/settings";
 import { CURRENT_VERSION } from "@/lib/doc-versions";
 import { COUNTRIES } from "@shared/schema";
 import type { User } from "@shared/schema";
 
-function DashboardLayout({ children }: { children: React.ReactNode }) {
+function DashboardLayout({ children, type = "personal" }: { children: React.ReactNode, type?: "personal" | "business" }) {
   const [location, setLocation] = useLocation();
   const { user, isLoading, isAuthenticated, isUnauthenticated, isServerError } = useAuth();
   const redirectedRef = useRef(false);
+
+  useEffect(() => {
+    if (!isLoading && isAuthenticated && user?.accountType !== type) {
+      if (user?.accountType === "business" && type === "personal") {
+        setLocation("/dashboard/business");
+      } else if (user?.accountType === "personal" && type === "business") {
+        setLocation("/dashboard");
+      }
+    }
+  }, [isLoading, isAuthenticated, user?.accountType, type, setLocation]);
 
   const { data: stats } = useQuery<{
     totalBalance: number;
@@ -133,21 +155,25 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <SidebarProvider style={style as React.CSSProperties}>
       <div className="flex h-screen w-full">
-        <AppSidebar />
+        {type === "business" ? <BusinessSidebar /> : <AppSidebar />}
         <div className="flex flex-col flex-1 min-w-0">
           <header className="flex items-center justify-between gap-4 p-4 border-b bg-card sticky top-0 z-20">
             <div className="flex items-center gap-4">
               <SidebarTrigger size="lg" data-testid="button-sidebar-toggle" />
-              <div className="relative">
-                <EmaliChatButton />
+              {type === "personal" && (
+                <div className="relative">
+                  <EmaliChatButton />
+                </div>
+              )}
+            </div>
+            {type === "personal" && (
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 rounded-lg" data-testid="header-balance">
+                <Wallet className="h-4 w-4 text-primary" />
+                <span className="text-sm font-semibold text-primary">
+                  {formatAmount(stats?.totalBalance || 0)}
+                </span>
               </div>
-            </div>
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 rounded-lg" data-testid="header-balance">
-              <Wallet className="h-4 w-4 text-primary" />
-              <span className="text-sm font-semibold text-primary">
-                {formatAmount(stats?.totalBalance || 0)}
-              </span>
-            </div>
+            )}
           </header>
           <main className="flex-1 overflow-auto">
             <div className="container max-w-7xl mx-auto px-4 md:px-8 py-8">
@@ -163,6 +189,24 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
 function Router() {
   const [location] = useLocation();
   const isDashboard = location.startsWith("/dashboard");
+  const isBusiness = location.startsWith("/dashboard/business");
+
+  if (isBusiness) {
+    return (
+      <DashboardLayout type="business">
+        <Switch>
+          <Route path="/dashboard/business" component={BusinessDashboard} />
+          <Route path="/dashboard/business/profile" component={BusinessProfile} />
+          <Route path="/dashboard/business/api" component={BusinessApi} />
+          <Route path="/dashboard/business/history" component={BusinessHistory} />
+          <Route path="/dashboard/business/history/incoming" component={BusinessHistory} />
+          <Route path="/dashboard/business/history/outgoing" component={BusinessHistory} />
+          <Route path="/dashboard/business/settings" component={BusinessSettings} />
+          <Route component={NotFound} />
+        </Switch>
+      </DashboardLayout>
+    );
+  }
 
   if (isDashboard) {
     return (
@@ -203,6 +247,12 @@ function Router() {
           <Route path="/dashboard/transfer" component={Transfer} />
           <Route path="/dashboard/withdrawal" component={Withdrawal} />
           <Route path="/dashboard/admin" component={Admin} />
+          <Route path="/dashboard/admin/business" component={AdminBusiness} />
+          <Route path="/dashboard/admin/business/management" component={AdminBusinessManagement} />
+          <Route path="/dashboard/admin/business/kyc" component={AdminBusinessKyc} />
+          <Route path="/dashboard/admin/business/providers" component={AdminBusinessProviders} />
+          <Route path="/dashboard/admin/business/country-operator" component={AdminBusinessCountryOperator} />
+          <Route path="/dashboard/admin/business/fees" component={AdminBusinessFees} />
           <Route path="/dashboard/admin-access-code" component={AdminAccessCode} />
           <Route path="/dashboard/management" component={ManagementWrapper} />
           <Route path="/dashboard/kyc" component={KYC} />
