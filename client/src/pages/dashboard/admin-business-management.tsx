@@ -1,11 +1,11 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { User, Transaction, BusinessWallet } from "@shared/schema";
+import { User, Transaction, BusinessWallet, COUNTRIES } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Search, Wallet, History, Trash2, Power, ArrowUpCircle, ArrowDownCircle, ChevronLeft } from "lucide-react";
+import { Search, Wallet, History, Trash2, Power, ArrowUpCircle, ArrowDownCircle, ChevronLeft, User as UserIcon } from "lucide-react";
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
@@ -36,14 +36,15 @@ export default function AdminBusinessManagement() {
   });
 
   const depositMutation = useMutation({
-    mutationFn: async ({ userId, amount, country }: { userId: string, amount: number, country: string }) => {
-      const res = await apiRequest("POST", `/api/admin/business/users/${userId}/wallet/deposit`, { amount, country });
+    mutationFn: async ({ userId, amount, country, currency }: { userId: string, amount: number, country: string, currency: string }) => {
+      const res = await apiRequest("POST", `/api/admin/business/users/${userId}/wallet/deposit`, { amount, country, currency });
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/business/users"] });
       setDepositDialogOpen(false);
       setAmount("");
+      setSelectedCountry("");
       toast({ title: "Succès", description: "Dépôt effectué avec succès" });
     },
     onError: (error: Error) => {
@@ -52,14 +53,15 @@ export default function AdminBusinessManagement() {
   });
 
   const withdrawMutation = useMutation({
-    mutationFn: async ({ userId, amount, country }: { userId: string, amount: number, country: string }) => {
-      const res = await apiRequest("POST", `/api/admin/business/users/${userId}/wallet/withdraw`, { amount, country });
+    mutationFn: async ({ userId, amount, country, currency }: { userId: string, amount: number, country: string, currency: string }) => {
+      const res = await apiRequest("POST", `/api/admin/business/users/${userId}/wallet/withdraw`, { amount, country, currency });
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/business/users"] });
       setWithdrawDialogOpen(false);
       setAmount("");
+      setSelectedCountry("");
       toast({ title: "Succès", description: "Retrait effectué avec succès" });
     },
     onError: (error: Error) => {
@@ -143,7 +145,10 @@ export default function AdminBusinessManagement() {
                   <TableCell>{user.email}</TableCell>
                   <TableCell>
                     <Badge variant={user.kycStatus === 'verified' ? 'default' : user.kycStatus === 'rejected' ? 'destructive' : 'secondary'}>
-                      {user.kycStatus}
+                      {user.kycStatus === 'verified' ? 'Vérifié' : 
+                       user.kycStatus === 'pending' ? 'En attente' : 
+                       user.kycStatus === 'submitted' ? 'En examen' : 
+                       user.kycStatus === 'rejected' ? 'Rejeté' : user.kycStatus}
                     </Badge>
                   </TableCell>
                   <TableCell>
@@ -152,6 +157,14 @@ export default function AdminBusinessManagement() {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right flex items-center justify-end gap-2">
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => setLocation(`/dashboard/admin/user/${user.id}/profile`)}
+                      title="Voir Profil"
+                    >
+                      <UserIcon className="h-4 w-4" />
+                    </Button>
                     <Button 
                       size="sm" 
                       variant="outline"
@@ -185,23 +198,35 @@ export default function AdminBusinessManagement() {
                     <Button 
                       size="sm" 
                       variant="outline"
-                      onClick={() => setLocation(`/dashboard/admin/user/${user.id}/history`)}
-                      title="Transactions"
+                      onClick={() => setLocation(`/dashboard/admin/business/users/${user.id}/history`)}
+                      title="Historique Entreprise"
                     >
                       <History className="h-4 w-4" />
                     </Button>
                     <Button 
                       size="sm" 
-                      variant="destructive"
-                      onClick={() => {
-                        if (confirm("Supprimer ce compte entreprise ?")) {
-                          deleteUserMutation.mutate(user.id);
-                        }
-                      }}
-                      title="Supprimer"
+                      variant="outline"
+                      onClick={() => setLocation(`/dashboard/admin/user/${user.id}/history`)}
+                      title="Transactions (Toutes)"
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Wallet className="h-4 w-4" />
                     </Button>
+                    {user.suspended ? (
+                      <Badge variant="destructive" className="ml-2">Suspendu</Badge>
+                    ) : (
+                      <Button 
+                        size="sm" 
+                        variant="destructive"
+                        onClick={() => {
+                          if (confirm("Supprimer ce compte entreprise ?")) {
+                            deleteUserMutation.mutate(user.id);
+                          }
+                        }}
+                        title="Supprimer"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))
@@ -211,7 +236,10 @@ export default function AdminBusinessManagement() {
       </Card>
 
       {/* Deposit Dialog */}
-      <Dialog open={depositDialogOpen} onOpenChange={setDepositDialogOpen}>
+      <Dialog open={depositDialogOpen} onOpenChange={(open) => {
+        setDepositDialogOpen(open);
+        if (!open) setSelectedCountry("");
+      }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Dépôt Manuel - {selectedUser?.businessName}</DialogTitle>
@@ -220,17 +248,16 @@ export default function AdminBusinessManagement() {
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Pays</label>
-              <Select onValueChange={setSelectedCountry}>
+              <Select onValueChange={setSelectedCountry} value={selectedCountry}>
                 <SelectTrigger>
                   <SelectValue placeholder="Choisir un pays" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="BJ">Bénin (XOF)</SelectItem>
-                  <SelectItem value="TG">Togo (XOF)</SelectItem>
-                  <SelectItem value="CI">Côte d'Ivoire (XOF)</SelectItem>
-                  <SelectItem value="SN">Sénégal (XOF)</SelectItem>
-                  <SelectItem value="CD-CDF">RD Congo (CDF)</SelectItem>
-                  <SelectItem value="CD-USD">RD Congo (USD)</SelectItem>
+                  {COUNTRIES.filter(c => ["BJ", "TG", "CI", "BF", "SN", "CM", "CD", "GA", "CG", "ZM", "UG"].includes(c.code)).map((c) => (
+                    <SelectItem key={c.code} value={c.code}>
+                      {c.flag} {c.name} ({c.currency})
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -247,11 +274,15 @@ export default function AdminBusinessManagement() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setDepositDialogOpen(false)}>Annuler</Button>
             <Button 
-              onClick={() => depositMutation.mutate({ 
-                userId: selectedUser!.id, 
-                amount: parseInt(amount), 
-                country: selectedCountry 
-              })}
+              onClick={() => {
+                const countryData = COUNTRIES.find(c => c.code === selectedCountry);
+                depositMutation.mutate({ 
+                  userId: selectedUser!.id, 
+                  amount: parseInt(amount), 
+                  country: selectedCountry,
+                  currency: countryData?.currency || "XOF"
+                });
+              }}
               disabled={!amount || !selectedCountry || depositMutation.isPending}
             >
               Confirmer le dépôt
@@ -261,7 +292,10 @@ export default function AdminBusinessManagement() {
       </Dialog>
 
       {/* Withdraw Dialog */}
-      <Dialog open={withdrawDialogOpen} onOpenChange={setWithdrawDialogOpen}>
+      <Dialog open={withdrawDialogOpen} onOpenChange={(open) => {
+        setWithdrawDialogOpen(open);
+        if (!open) setSelectedCountry("");
+      }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Retrait Manuel - {selectedUser?.businessName}</DialogTitle>
@@ -270,15 +304,16 @@ export default function AdminBusinessManagement() {
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Pays</label>
-              <Select onValueChange={setSelectedCountry}>
+              <Select onValueChange={setSelectedCountry} value={selectedCountry}>
                 <SelectTrigger>
                   <SelectValue placeholder="Choisir un pays" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="BJ">Bénin (XOF)</SelectItem>
-                  <SelectItem value="TG">Togo (XOF)</SelectItem>
-                  <SelectItem value="CI">Côte d'Ivoire (XOF)</SelectItem>
-                  <SelectItem value="SN">Sénégal (XOF)</SelectItem>
+                  {COUNTRIES.filter(c => ["BJ", "TG", "CI", "BF", "SN", "CM", "CD", "GA", "CG", "ZM", "UG"].includes(c.code)).map((c) => (
+                    <SelectItem key={c.code} value={c.code}>
+                      {c.flag} {c.name} ({c.currency})
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -296,11 +331,15 @@ export default function AdminBusinessManagement() {
             <Button variant="outline" onClick={() => setWithdrawDialogOpen(false)}>Annuler</Button>
             <Button 
               variant="destructive"
-              onClick={() => withdrawMutation.mutate({ 
-                userId: selectedUser!.id, 
-                amount: parseInt(amount), 
-                country: selectedCountry 
-              })}
+              onClick={() => {
+                const countryData = COUNTRIES.find(c => c.code === selectedCountry);
+                withdrawMutation.mutate({ 
+                  userId: selectedUser!.id, 
+                  amount: parseInt(amount), 
+                  country: selectedCountry,
+                  currency: countryData?.currency || "XOF"
+                });
+              }}
               disabled={!amount || !selectedCountry || withdrawMutation.isPending}
             >
               Confirmer le retrait

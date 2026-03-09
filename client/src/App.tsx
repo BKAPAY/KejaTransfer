@@ -31,9 +31,11 @@ import Admin from "@/pages/dashboard/admin";
 import AdminBusiness from "@/pages/dashboard/admin-business";
 import AdminBusinessManagement from "@/pages/dashboard/admin-business-management";
 import AdminBusinessKyc from "@/pages/dashboard/admin-business-kyc";
+import AdminBusinessKycDetail from "@/pages/dashboard/admin-business-kyc-detail";
 import AdminBusinessProviders from "@/pages/dashboard/admin-business-providers";
 import AdminBusinessCountryOperator from "@/pages/dashboard/admin-business-country-operator";
 import AdminBusinessFees from "@/pages/dashboard/admin-business-fees";
+import AdminBusinessHistory from "@/pages/dashboard/admin-business-history";
 import ManagementWrapper from "@/pages/dashboard/management-wrapper";
 import AdminAccessCode from "@/pages/dashboard/admin-access-code";
 import KycVerification from "@/pages/dashboard/kyc-verification";
@@ -251,7 +253,9 @@ function Router() {
           <Route path="/dashboard/admin" component={Admin} />
           <Route path="/dashboard/admin/business" component={AdminBusiness} />
           <Route path="/dashboard/admin/business/management" component={AdminBusinessManagement} />
+          <Route path="/dashboard/admin/business/users/:userId/history" component={AdminBusinessHistory} />
           <Route path="/dashboard/admin/business/kyc" component={AdminBusinessKyc} />
+          <Route path="/dashboard/admin/business/kyc/:userId" component={AdminBusinessKycDetail} />
           <Route path="/dashboard/admin/business/providers" component={AdminBusinessProviders} />
           <Route path="/dashboard/admin/business/country-operator" component={AdminBusinessCountryOperator} />
           <Route path="/dashboard/admin/business/fees" component={AdminBusinessFees} />

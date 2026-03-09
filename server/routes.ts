@@ -639,14 +639,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/admin/business/users/:id/payout-toggle", requireAdmin, async (req: Request, res: Response) => {
     try {
       const { enabled } = req.body;
-      const results = await db
-        .update(schema.users)
-        .set({ payoutApiEnabled: enabled })
-        .where(eq(schema.users.id, req.params.id))
-        .returning();
+      const updatedUser = await storage.updatePayoutApiStatus(req.params.id, enabled);
       
-      if (results.length === 0) return res.status(404).json({ error: "Utilisateur non trouvé" });
-      res.json(results[0]);
+      if (!updatedUser) return res.status(404).json({ error: "Utilisateur non trouvé" });
+      res.json(updatedUser);
     } catch (error: any) {
       console.error("Toggle payout error:", error);
       res.status(500).json({ error: "Une erreur est survenue" });

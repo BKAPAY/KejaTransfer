@@ -94,6 +94,7 @@ export interface IStorage {
   updateApiKeyPayoutCallback(id: string, userId: string, payoutCallbackUrl: string | null): Promise<ApiKey | undefined>;
   regenerateApiKeyPayoutSecret(id: string, userId: string): Promise<ApiKey | undefined>;
   updateApiKeySettings(id: string, userId: string, settings: { allowedCountries?: string[]; customerPaysFee?: boolean; customerPaysCryptoFee?: boolean }): Promise<ApiKey | undefined>;
+  updatePayoutApiStatus(userId: string, enabled: boolean): Promise<User | undefined>;
 
   // Payment Sessions
   createPaymentSession(session: InsertPaymentSession): Promise<PaymentSession>;
@@ -709,6 +710,15 @@ export class DbStorage implements IStorage {
       .update(schema.apiKeys)
       .set(updateData)
       .where(eq(schema.apiKeys.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async updatePayoutApiStatus(userId: string, enabled: boolean): Promise<User | undefined> {
+    const results = await db
+      .update(schema.users)
+      .set({ payoutApiEnabled: enabled })
+      .where(eq(schema.users.id, userId))
       .returning();
     return results[0];
   }
