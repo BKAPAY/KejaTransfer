@@ -21,6 +21,8 @@ import type {
   SupportSettings,
   PaymentSession,
   InsertPaymentSession,
+  BusinessWallet,
+  InsertBusinessWallet,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { MBIYOPAY_COUNTRIES } from "@shared/mbiyopay-countries";
@@ -185,6 +187,7 @@ export interface IStorage {
   // Transactions by metadata
   getTransactionsByMetadataPaymentId(paymentId: string): Promise<Transaction[]>;
   getTransactionsByMetadataPayoutId(payoutId: string): Promise<Transaction[]>;
+  getTransactionsByMetadata(key: string, value: string): Promise<Transaction[]>;
 
   // Fee Configuration
   getAllFeeConfigs(): Promise<FeeConfig[]>;
@@ -2092,6 +2095,19 @@ export class DbStorage implements IStorage {
       try {
         const meta = JSON.parse(t.metadata);
         return meta.payoutId?.toString() === payoutId || meta.payoutWithdrawalId?.toString() === payoutId;
+      } catch {
+        return false;
+      }
+    });
+  }
+
+  async getTransactionsByMetadata(key: string, value: string): Promise<Transaction[]> {
+    const allTransactions = await db.select().from(schema.transactions);
+    return allTransactions.filter((t) => {
+      if (!t.metadata) return false;
+      try {
+        const meta = JSON.parse(t.metadata);
+        return meta[key]?.toString() === value;
       } catch {
         return false;
       }

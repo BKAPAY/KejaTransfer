@@ -7205,7 +7205,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // API Payment Route - Multi-Provider
   app.post("/api/fedapay/api-payment", requireApiKey, async (req: Request, res: Response) => {
     try {
-      const { transactionId, country, operator, customerPhone, customerName } = req.body;
+      const { transactionId, country, operator, customerPhone, customerName, currency } = req.body;
 
       if (!transactionId) {
         return res.status(400).json({ success: false, error: "Transaction ID requis" });
@@ -7492,11 +7492,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.updateTransaction(transaction.id, {
           country,
           operator,
-          customerPhone: effectivePhone,
           metadata: JSON.stringify({
             ...existingMeta,
             pawaPayDepositId: pawaResult.depositId,
             provider: "pawapay",
+            customerPhone: effectivePhone,
           }),
         });
 
