@@ -1024,7 +1024,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           email: user.email,
           fullName: `${user.firstName} ${user.lastName}`,
           isAdmin: user.isAdmin,
-          balance: user.balance,
+          balance: Math.max(0, user.balance),
         }
       });
     } catch (error: any) {
@@ -1203,7 +1203,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             email: user.email,
             fullName: `${user.firstName} ${user.lastName}`,
             isAdmin: user.isAdmin,
-            balance: user.balance,
+            balance: Math.max(0, user.balance),
             accountType: user.accountType,
           }
         });
@@ -1426,7 +1426,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Don't send password
       const { password, ...userWithoutPassword } = user;
       res.set("Cache-Control", "no-store");
-      res.json(userWithoutPassword);
+      res.json({
+        ...userWithoutPassword,
+        balance: Math.max(0, userWithoutPassword.balance),
+      });
     } catch (error: any) {
       res.status(500).json({ error: "Erreur lors de la récupération du profil" });
     }

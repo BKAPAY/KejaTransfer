@@ -1146,7 +1146,7 @@ export class DbStorage implements IStorage {
     ]);
 
     return {
-      totalBalance: user?.balance || 0,
+      totalBalance: Math.max(0, user?.balance || 0),
       totalDeposits: Number(depositsResult[0]?.total || 0),
       totalTransfers: Number(transfersResult[0]?.total || 0),
       totalWithdrawals: Number(withdrawalsResult[0]?.total || 0),
