@@ -267,8 +267,9 @@ export default function BusinessKyc() {
 
   const submitMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/kyc/business/submit", { description }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      await queryClient.refetchQueries({ queryKey: ["/api/auth/me"] });
       toast({ title: "Dossier soumis", description: "Votre dossier KYC est en cours d'examen." });
       setLocation("/dashboard/business/profile");
     },

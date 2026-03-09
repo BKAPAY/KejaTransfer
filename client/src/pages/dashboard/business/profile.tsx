@@ -449,6 +449,22 @@ export default function BusinessProfile() {
             </div>
           )}
 
+          {user?.kycStatus === "submitted" && (
+            <div className="pt-2 p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-md">
+              <p className="text-sm text-blue-800 dark:text-blue-200">
+                Votre dossier est en cours d'examen par notre équipe. Vous serez notifié une fois la vérification terminée.
+              </p>
+            </div>
+          )}
+
+          {user?.kycStatus === "verified" && (
+            <div className="pt-2 p-3 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-md">
+              <p className="text-sm text-green-800 dark:text-green-200">
+                Votre compte est vérifié. Vous avez accès à toutes les fonctionnalités de la plateforme.
+              </p>
+            </div>
+          )}
+
           {(user?.kycStatus === "pending" || user?.kycStatus === "rejected") && (
             <div className="pt-2">
               <p className="text-sm text-muted-foreground mb-3">Documents requis :</p>

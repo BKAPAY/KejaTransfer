@@ -1429,6 +1429,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Don't send password
       const { password, ...userWithoutPassword } = user;
+      res.set("Cache-Control", "no-store");
       res.json(userWithoutPassword);
     } catch (error: any) {
       res.status(500).json({ error: "Erreur lors de la récupération du profil" });
