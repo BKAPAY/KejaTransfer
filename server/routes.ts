@@ -6843,6 +6843,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             transactionDescription: `Paiement - ${paymentLink.productName}`,
             customerName: customerName || undefined,
             customerEmail: customerEmail || undefined,
+            customerPaysFee: paymentLink.customerPaysFee ?? false,
             extraMetadata: { paymentLinkId: paymentLink.id },
           }
         );
