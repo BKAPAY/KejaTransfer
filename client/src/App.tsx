@@ -72,6 +72,7 @@ import ForgotPassword from "@/pages/forgot-password";
 import LoginVerify from "@/pages/login-verify";
 import BusinessDashboard from "@/pages/dashboard/business/index";
 import BusinessProfile from "@/pages/dashboard/business/profile";
+import BusinessKyc from "@/pages/dashboard/business/kyc";
 import BusinessApi from "@/pages/dashboard/business/api";
 import BusinessHistory from "@/pages/dashboard/business/history";
 import BusinessSettings from "@/pages/dashboard/business/settings";
@@ -197,6 +198,7 @@ function Router() {
         <Switch>
           <Route path="/dashboard/business" component={BusinessDashboard} />
           <Route path="/dashboard/business/profile" component={BusinessProfile} />
+          <Route path="/dashboard/business/kyc" component={BusinessKyc} />
           <Route path="/dashboard/business/api" component={BusinessApi} />
           <Route path="/dashboard/business/history" component={BusinessHistory} />
           <Route path="/dashboard/business/history/incoming" component={BusinessHistory} />

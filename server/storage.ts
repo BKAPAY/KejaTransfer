@@ -56,6 +56,13 @@ export interface IStorage {
   updateUserWithdrawalPhones(id: string, withdrawalPhones: string[]): Promise<User | undefined>;
   updateUserSecurityCode(id: string, securityCode: string): Promise<User | undefined>;
   updateBusinessProfile(id: string, data: { businessRegistrationNumber?: string; businessCountry?: string; businessPhone?: string; businessEnterprisePhone?: string; businessEmail?: string }): Promise<User | undefined>;
+  saveBusinessKycStep2(userId: string, data: {
+    kycBusinessAccountNumber?: string; kycTaxId?: string; kycBusinessAddress?: string;
+    kycBusinessCity?: string; kycBusinessDepartment?: string; kycDirectorIdNumber?: string;
+    kycDirectorCountry?: string; kycDirectorDob?: string; kycIdIssueDate?: string; kycIdExpiryDate?: string;
+  }): Promise<User | undefined>;
+  uploadBusinessKycDocument(userId: string, type: string, data: string): Promise<void>;
+  submitBusinessKyc(userId: string, description: string): Promise<User | undefined>;
 
   // Payment Links
   getPaymentLinks(userId: string): Promise<PaymentLink[]>;
@@ -385,6 +392,57 @@ export class DbStorage implements IStorage {
       .update(schema.users)
       .set(data)
       .where(eq(schema.users.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async saveBusinessKycStep2(userId: string, data: {
+    kycBusinessAccountNumber?: string; kycTaxId?: string; kycBusinessAddress?: string;
+    kycBusinessCity?: string; kycBusinessDepartment?: string; kycDirectorIdNumber?: string;
+    kycDirectorCountry?: string; kycDirectorDob?: string; kycIdIssueDate?: string; kycIdExpiryDate?: string;
+  }): Promise<User | undefined> {
+    const results = await db
+      .update(schema.users)
+      .set(data)
+      .where(eq(schema.users.id, userId))
+      .returning();
+    return results[0];
+  }
+
+  async uploadBusinessKycDocument(userId: string, type: string, data: string): Promise<void> {
+    if (type === "__replace_business__") {
+      await db.update(schema.users).set({ kycBusinessDocuments: data }).where(eq(schema.users.id, userId));
+      return;
+    }
+    const fieldMap: Record<string, string> = {
+      businessDocuments: "kycBusinessDocuments",
+      taxDocument: "kycTaxDocument",
+      addressDocument: "kycAddressDocument",
+      idFront: "kycIdFront",
+      idBack: "kycIdBack",
+    };
+    const field = fieldMap[type];
+    if (!field) throw new Error("Type de document invalide");
+
+    if (type === "businessDocuments") {
+      // Append to JSON array
+      const user = await this.getUser(userId);
+      const existing: string[] = user?.kycBusinessDocuments ? JSON.parse(user.kycBusinessDocuments) : [];
+      existing.push(data);
+      await db.update(schema.users).set({ kycBusinessDocuments: JSON.stringify(existing) }).where(eq(schema.users.id, userId));
+    } else if (type === "__replace_business__") {
+      // Replace the entire business documents array (used for deletions)
+      await db.update(schema.users).set({ kycBusinessDocuments: data }).where(eq(schema.users.id, userId));
+    } else {
+      await db.update(schema.users).set({ [field]: data || null } as any).where(eq(schema.users.id, userId));
+    }
+  }
+
+  async submitBusinessKyc(userId: string, description: string): Promise<User | undefined> {
+    const results = await db
+      .update(schema.users)
+      .set({ kycStatus: "submitted", kycActivityDescription: description })
+      .where(eq(schema.users.id, userId))
       .returning();
     return results[0];
   }

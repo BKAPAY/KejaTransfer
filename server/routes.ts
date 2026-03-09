@@ -1601,8 +1601,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== Business KYC Routes =====
+
+  app.post("/api/kyc/business/save-step2", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const data = req.body;
+      const user = await storage.saveBusinessKycStep2(req.session.userId!, data);
+      res.json({ success: true, user });
+    } catch (error: any) {
+      console.error("Business KYC step2 error:", error);
+      res.status(400).json({ error: error.message || "Erreur lors de la sauvegarde" });
+    }
+  });
+
+  app.post("/api/kyc/business/upload", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { type, data } = req.body;
+      if (!type || !data) return res.status(400).json({ error: "Type et données requis" });
+      await storage.uploadBusinessKycDocument(req.session.userId!, type, data);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Business KYC upload error:", error);
+      res.status(400).json({ error: error.message || "Erreur lors de l'upload" });
+    }
+  });
+
+  app.delete("/api/kyc/business/document/:type/:index", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { type, index } = req.params;
+      if (type === "businessDocuments") {
+        const user = await storage.getUser(req.session.userId!);
+        const docs: string[] = user?.kycBusinessDocuments ? JSON.parse(user.kycBusinessDocuments) : [];
+        docs.splice(parseInt(index), 1);
+        await storage.uploadBusinessKycDocument(req.session.userId!, "__replace_business__", JSON.stringify(docs));
+        return res.json({ success: true });
+      }
+      // For single docs, just clear by uploading empty
+      await storage.uploadBusinessKycDocument(req.session.userId!, type, "");
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/kyc/business/submit", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { description } = req.body;
+      if (!description || description.trim().length < 20) {
+        return res.status(400).json({ error: "La description doit contenir au moins 20 caractères" });
+      }
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(404).json({ error: "Utilisateur non trouvé" });
+      if (!user.kycIdFront || !user.kycIdBack) {
+        return res.status(400).json({ error: "Les pièces d'identité (recto/verso) sont requises" });
+      }
+      const submitted = await storage.submitBusinessKyc(req.session.userId!, description);
+      res.json({ success: true, user: submitted });
+    } catch (error: any) {
+      console.error("Business KYC submit error:", error);
+      res.status(500).json({ error: error.message || "Erreur lors de la soumission" });
+    }
+  });
+
   // ===== User Country Update =====
-  
+
   app.patch("/api/user/country", requireAuth, async (req: Request, res: Response) => {
     try {
       const { country } = req.body;

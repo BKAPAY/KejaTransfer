@@ -38,6 +38,21 @@ export const users = pgTable("users", {
   kycAcceptedTerms: text("kyc_accepted_terms"), // JSON string of accepted legal terms per step
   kycRejectionReason: text("kyc_rejection_reason"), // Reason for KYC rejection
   kycRejectionCount: integer("kyc_rejection_count").notNull().default(0), // Number of KYC rejections
+  // Business KYC Step 2 - legal info
+  kycBusinessAccountNumber: text("kyc_business_account_number"),
+  kycTaxId: text("kyc_tax_id"),
+  kycBusinessAddress: text("kyc_business_address"),
+  kycBusinessCity: text("kyc_business_city"),
+  kycBusinessDepartment: text("kyc_business_department"),
+  kycDirectorIdNumber: text("kyc_director_id_number"),
+  kycDirectorCountry: text("kyc_director_country"),
+  kycDirectorDob: text("kyc_director_dob"),
+  kycIdIssueDate: text("kyc_id_issue_date"),
+  kycIdExpiryDate: text("kyc_id_expiry_date"),
+  // Business KYC Step 3 - documents
+  kycBusinessDocuments: text("kyc_business_documents"), // JSON array of base64 strings
+  kycTaxDocument: text("kyc_tax_document"),
+  kycAddressDocument: text("kyc_address_document"),
   withdrawalPhones: text("withdrawal_phones").array().default([]), // Up to 3 withdrawal phone numbers
   securityCode: text("security_code"), // 6-digit security code for transfers/withdrawals
   isAdmin: boolean("is_admin").notNull().default(false),

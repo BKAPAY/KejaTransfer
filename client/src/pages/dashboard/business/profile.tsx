@@ -462,7 +462,7 @@ export default function BusinessProfile() {
                   Document d'entreprise (registre de commerce, etc.)
                 </li>
               </ul>
-              <Button onClick={() => setLocation("/dashboard/kyc")} data-testid="button-kyc-verify">
+              <Button onClick={() => setLocation("/dashboard/business/kyc")} data-testid="button-kyc-verify">
                 Soumettre les documents
               </Button>
             </div>

@@ -24,6 +24,7 @@ import {
   ChevronRight,
   ArrowDownCircle,
   ArrowUpCircle,
+  Shield,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import type { User as UserType } from "@shared/schema";
@@ -112,6 +113,19 @@ export function BusinessSidebar() {
                   <Link href="/dashboard/business/profile" onClick={handleMenuClick}>
                     <User className="w-4 h-4" />
                     <span>Profil</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={location.startsWith("/dashboard/business/kyc")}
+                  data-testid="nav-business-kyc"
+                >
+                  <Link href="/dashboard/business/kyc" onClick={handleMenuClick}>
+                    <Shield className="w-4 h-4" />
+                    <span>Vérification KYC</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
