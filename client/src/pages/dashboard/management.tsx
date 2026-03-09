@@ -583,8 +583,13 @@ export default function Management() {
                           Créé le {new Date(user.createdAt).toLocaleDateString("fr-FR")}
                         </p>
                         <p className="font-semibold text-sm mt-2" data-testid={`balance-${user.id}`}>
-                          Solde: {formatAmount(user.balance, getCurrencyForUser(user))}
+                          Solde: {formatAmount(Math.max(0, user.balance), getCurrencyForUser(user))}
                         </p>
+                        {user.balance < 0 && (
+                          <p className="text-xs text-destructive font-medium" data-testid={`debt-${user.id}`}>
+                            Dette: {formatAmount(Math.abs(user.balance), getCurrencyForUser(user))}
+                          </p>
+                        )}
                       </div>
                     </div>
 
