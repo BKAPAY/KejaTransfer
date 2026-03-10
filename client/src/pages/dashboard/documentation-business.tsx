@@ -409,6 +409,66 @@ echo json_encode(['received' => true]);
         </CardContent>
       </Card>
 
+      <Card className="border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/30">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2">
+            <ShieldCheck className="w-5 h-5 text-amber-600" />
+            Wallets par pays et gestion des frais
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6 text-sm">
+          <div className="space-y-3">
+            <h4 className="font-semibold">Wallets par pays</h4>
+            <p className="text-muted-foreground">
+              Chaque paiement entrant est credite dans le wallet du pays correspondant.
+              Par exemple, un paiement depuis le Benin est credite dans votre wallet Benin (XOF),
+              un paiement depuis le Cameroun dans votre wallet Cameroun (XAF), etc.
+              Le Congo (CD) dispose de deux wallets : un en CDF et un en USD.
+            </p>
+            <p className="text-muted-foreground">
+              Les paiements sortants (payout) sont debites du wallet du pays concerne.
+              Vous devez avoir un solde suffisant dans le wallet du pays vers lequel vous envoyez.
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            <h4 className="font-semibold">Frais de transaction — toujours a votre charge</h4>
+            <p className="text-muted-foreground">
+              Les frais sont configures par l'administrateur de la plateforme et lus automatiquement a chaque appel API.
+              Ils sont toujours a la charge du proprietaire du compte entreprise, jamais du client final.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="border border-border rounded-md p-4 space-y-2">
+              <Badge variant="default" className="text-xs">Payin (collecte)</Badge>
+              <p className="text-muted-foreground text-xs">
+                Votre client paie le montant exact demande.
+                Les frais sont deduits du montant avant credit dans votre wallet.
+              </p>
+              <div className="bg-muted rounded p-2 text-xs font-mono space-y-1">
+                <p>Client paie : <span className="text-foreground font-semibold">1 000 XOF</span></p>
+                <p>Frais (ex: 10%) : <span className="text-destructive">-100 XOF</span></p>
+                <p>Credit wallet : <span className="text-green-600 dark:text-green-400 font-semibold">900 XOF</span></p>
+              </div>
+            </div>
+
+            <div className="border border-border rounded-md p-4 space-y-2">
+              <Badge variant="secondary" className="text-xs">Payout (envoi)</Badge>
+              <p className="text-muted-foreground text-xs">
+                Le destinataire recoit le montant exact demande.
+                Les frais sont ajoutes par-dessus et preleves de votre wallet.
+              </p>
+              <div className="bg-muted rounded p-2 text-xs font-mono space-y-1">
+                <p>Destinataire recoit : <span className="text-foreground font-semibold">1 000 XOF</span></p>
+                <p>Frais (ex: 10%) : <span className="text-destructive">+100 XOF</span></p>
+                <p>Debit wallet : <span className="text-destructive font-semibold">1 100 XOF</span></p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2">
@@ -469,7 +529,7 @@ echo json_encode(['received' => true]);
                     ["country", "string", "Oui", "Code ISO du pays (2 lettres). Ex: BJ, CI, CM, CD"],
                     ["operator", "string", "Oui", "Operateur mobile. Ex: mtn, orange, moov, airtel, tmoney"],
                     ["phone", "string", "Oui", "Numero avec indicatif international. Ex: +22961234567"],
-                    ["amount", "number", "Oui", "Montant a collecter (minimum selon le pays)"],
+                    ["amount", "number", "Oui", "Montant que le client paiera. Les frais seront deduits avant credit dans votre wallet"],
                     ["currency", "string", "Oui", "Devise: XOF, XAF, CDF, ZMW, UGX"],
                     ["description", "string", "Non", "Description du paiement"],
                     ["callbackUrl", "string", "Non", "URL de notification (remplace celle par defaut)"],
@@ -731,6 +791,10 @@ echo json_encode(['received' => true]);
           <div className="space-y-3">
             <h4 className="font-semibold">Payload Payin</h4>
             <pre className="bg-gray-950 dark:bg-gray-900 text-gray-100 p-4 rounded font-mono text-xs overflow-x-auto">{webhookPayinPayload}</pre>
+            <p className="text-xs text-muted-foreground">
+              <strong>amount</strong> = montant paye par le client. <strong>fee</strong> = frais deduits de votre wallet.
+              Votre wallet est credite de (amount - fee).
+            </p>
             <Button onClick={() => copyCode(webhookPayinPayload)} variant="outline" size="sm" className="w-full" data-testid="button-copy-biz-webhook-payin">
               <Copy className="w-4 h-4 mr-2" /> Copier
             </Button>
@@ -739,6 +803,10 @@ echo json_encode(['received' => true]);
           <div className="space-y-3">
             <h4 className="font-semibold">Payload Payout</h4>
             <pre className="bg-gray-950 dark:bg-gray-900 text-gray-100 p-4 rounded font-mono text-xs overflow-x-auto">{webhookPayoutPayload}</pre>
+            <p className="text-xs text-muted-foreground">
+              <strong>amount</strong> = montant recu par le destinataire. <strong>fee</strong> = frais supplementaires.
+              Votre wallet est debite de (amount + fee).
+            </p>
             <Button onClick={() => copyCode(webhookPayoutPayload)} variant="outline" size="sm" className="w-full" data-testid="button-copy-biz-webhook-payout">
               <Copy className="w-4 h-4 mr-2" /> Copier
             </Button>
