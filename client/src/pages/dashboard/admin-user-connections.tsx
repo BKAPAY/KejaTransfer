@@ -10,8 +10,10 @@ import { useState } from "react";
 
 export default function AdminUserConnections() {
   const params = useParams<{ userId: string }>();
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const userId = params.userId;
+  const isBusinessContext = location.includes("/admin/business/");
+  const backUrl = isBusinessContext ? "/dashboard/admin/business/management" : "/dashboard/management";
   const [lightboxImg, setLightboxImg] = useState<string | null>(null);
 
   const { data: user } = useQuery<User>({
@@ -48,7 +50,7 @@ export default function AdminUserConnections() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => setLocation("/dashboard/management")}
+          onClick={() => setLocation(backUrl)}
           data-testid="button-back"
         >
           <ArrowLeft className="w-4 h-4 mr-1" />

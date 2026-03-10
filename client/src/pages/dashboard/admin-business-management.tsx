@@ -348,7 +348,7 @@ export default function AdminBusinessManagement() {
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => setLocation(`/dashboard/admin/user/${user.id}/profile`)}
+                        onClick={() => setLocation(`/dashboard/admin/business/users/${user.id}/profile`)}
                         data-testid={`button-view-profile-${user.id}`}
                       >
                         <UserIcon className="w-4 h-4 mr-1" />
@@ -366,7 +366,7 @@ export default function AdminBusinessManagement() {
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => setLocation(`/dashboard/admin/user/${user.id}/history`)}
+                        onClick={() => setLocation(`/dashboard/admin/business/users/${user.id}/transactions`)}
                         data-testid={`button-view-all-transactions-${user.id}`}
                       >
                         <Wallet className="w-4 h-4 mr-1" />
@@ -375,7 +375,7 @@ export default function AdminBusinessManagement() {
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => setLocation(`/dashboard/admin/user/${user.id}/api`)}
+                        onClick={() => setLocation(`/dashboard/admin/business/users/${user.id}/api`)}
                         data-testid={`button-view-api-${user.id}`}
                       >
                         <Key className="w-4 h-4 mr-1" />

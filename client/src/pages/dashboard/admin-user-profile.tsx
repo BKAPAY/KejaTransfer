@@ -29,8 +29,10 @@ const COUNTRY_NAMES: Record<string, string> = {
 
 export default function AdminUserProfile() {
   const params = useParams<{ userId: string }>();
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const userId = params.userId;
+  const isBusinessContext = location.includes("/admin/business/");
+  const backUrl = isBusinessContext ? "/dashboard/admin/business/management" : "/dashboard/management";
 
   const { data: user, isLoading } = useQuery<UserType>({
     queryKey: [`/api/admin/user/${userId}/profile`],
@@ -67,7 +69,7 @@ export default function AdminUserProfile() {
   if (!user) {
     return (
       <div className="container mx-auto p-6 max-w-4xl">
-        <Button variant="ghost" onClick={() => setLocation("/dashboard/management")} className="mb-6">
+        <Button variant="ghost" onClick={() => setLocation(backUrl)} className="mb-6">
           <ArrowLeft className="w-4 h-4 mr-2" />
           Retour
         </Button>
@@ -78,7 +80,7 @@ export default function AdminUserProfile() {
 
   return (
     <div className="container mx-auto p-6 max-w-4xl">
-      <Button variant="ghost" onClick={() => setLocation("/dashboard/management")} className="mb-6" data-testid="button-back">
+      <Button variant="ghost" onClick={() => setLocation(backUrl)} className="mb-6" data-testid="button-back">
         <ArrowLeft className="w-4 h-4 mr-2" />
         Retour à la gestion
       </Button>

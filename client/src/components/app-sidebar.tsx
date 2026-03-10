@@ -129,8 +129,17 @@ export function AppSidebar() {
     }
   };
 
-  // Ajouter items Admin si l'utilisateur est admin
-  const sidebarMenuItems = [...menuItems];
+  const sidebarMenuItems = menuItems.map(item => {
+    if (item.testId === "nav-documentation" && user?.accountType === "business") {
+      return {
+        ...item,
+        title: "Documentation Entreprise",
+        url: "/dashboard/documentation-business",
+        testId: "nav-documentation-business",
+      };
+    }
+    return item;
+  });
   if (user?.isAdmin) {
     sidebarMenuItems.push({
       title: "Administration",

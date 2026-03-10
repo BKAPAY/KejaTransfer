@@ -11,8 +11,10 @@ import { useState } from "react";
 
 export default function AdminUserApi() {
   const params = useParams<{ userId: string }>();
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const userId = params.userId;
+  const isBusinessContext = location.includes("/admin/business/");
+  const backUrl = isBusinessContext ? "/dashboard/admin/business/management" : "/dashboard/management";
   const { toast } = useToast();
   const [visibleKeys, setVisibleKeys] = useState<Record<string, boolean>>({});
 
@@ -54,7 +56,7 @@ export default function AdminUserApi() {
 
   return (
     <div className="container mx-auto p-6 max-w-5xl">
-      <Button variant="ghost" onClick={() => setLocation("/dashboard/management")} className="mb-6" data-testid="button-back">
+      <Button variant="ghost" onClick={() => setLocation(backUrl)} className="mb-6" data-testid="button-back">
         <ArrowLeft className="w-4 h-4 mr-2" />
         Retour à la gestion
       </Button>
