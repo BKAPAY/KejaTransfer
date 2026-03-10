@@ -206,13 +206,11 @@ export default function Signup() {
             >
               <CardHeader className="p-4">
                 <CardTitle className="text-lg">Compte Personnel</CardTitle>
-                <CardDescription>Pour les particuliers. Nécessite une pièce d'identité valide.</CardDescription>
+                <CardDescription>Pour les particuliers.</CardDescription>
               </CardHeader>
               <CardContent className="p-4 pt-0">
                 <ul className="text-xs space-y-1 text-muted-foreground">
-                  <li>• Transferts d'argent</li>
-                  <li>• Dépôts et retraits</li>
-                  <li>• Portefeuille électronique</li>
+                  <li>• Nécessite une pièce d'identité valide uniquement</li>
                 </ul>
               </CardContent>
             </Card>
@@ -224,13 +222,14 @@ export default function Signup() {
             >
               <CardHeader className="p-4">
                 <CardTitle className="text-lg">Compte Entreprise</CardTitle>
-                <CardDescription>Pour les professionnels. Nécessite ID + documents d'entreprise.</CardDescription>
+                <CardDescription>Pour les entrepreneurs.</CardDescription>
               </CardHeader>
               <CardContent className="p-4 pt-0">
                 <ul className="text-xs space-y-1 text-muted-foreground">
-                  <li>• Paiements API</li>
-                  <li>• Wallets multi-pays</li>
-                  <li>• Gestion de trésorerie</li>
+                  <li>• Nécessite une pièce d'identité</li>
+                  <li>• Documents d'entreprise</li>
+                  <li>• Preuve de résidence</li>
+                  <li>• Compte bancaire</li>
                 </ul>
               </CardContent>
             </Card>
