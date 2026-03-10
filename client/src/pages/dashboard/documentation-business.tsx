@@ -277,9 +277,9 @@ const payoutData = await payoutStatus.json();`;
 
   const webhookVerificationExample = `const crypto = require('crypto');
 
-app.post('/api/webhook/bkapay-business', express.json(), (req, res) => {
+app.post('/api/webhook/bkapay', express.json(), (req, res) => {
   const signature = req.headers['x-bkapay-signature'];
-  const secret = process.env.BKAPAY_BUSINESS_CALLBACK_SECRET;
+  const secret = process.env.BKAPAY_WEBHOOK_SECRET;
   
   const expectedSignature = crypto
     .createHmac('sha256', secret)
@@ -311,9 +311,10 @@ app.post('/api/webhook/bkapay-business', express.json(), (req, res) => {
 });`;
 
   const webhookVerificationPhpExample = `<?php
+// Route: /api/webhook/bkapay
 $payload = file_get_contents('php://input');
 $signature = $_SERVER['HTTP_X_BKAPAY_SIGNATURE'] ?? '';
-$secret = getenv('BKAPAY_BUSINESS_CALLBACK_SECRET');
+$secret = getenv('BKAPAY_WEBHOOK_SECRET');
 
 $expectedSignature = hash_hmac('sha256', $payload, $secret);
 
@@ -402,7 +403,7 @@ echo json_encode(['received' => true]);
 
           <div className="space-y-2 text-sm">
             <p><span className="font-semibold">1.</span> Generez votre token API dans le tableau de bord entreprise</p>
-            <p><span className="font-semibold">2.</span> Configurez vos URL de callback (payin + payout)</p>
+            <p><span className="font-semibold">2.</span> Configurez votre URL de webhook</p>
             <p><span className="font-semibold">3.</span> Initiez des paiements ou envois via l'API</p>
             <p><span className="font-semibold">4.</span> Recevez les notifications de statut via webhook</p>
           </div>
@@ -532,7 +533,6 @@ echo json_encode(['received' => true]);
                     ["amount", "number", "Oui", "Montant que le client paiera. Les frais seront deduits avant credit dans votre wallet"],
                     ["currency", "string", "Oui", "Devise: XOF, XAF, CDF, ZMW, UGX"],
                     ["description", "string", "Non", "Description du paiement"],
-                    ["callbackUrl", "string", "Non", "URL de notification (remplace celle par defaut)"],
                     ["orderId", "string", "Non", "Votre reference interne"],
                   ].map(([param, type, req, desc]) => (
                     <tr key={param} className="border-b border-border">
@@ -572,7 +572,6 @@ echo json_encode(['received' => true]);
                 { code: "TOKEN_INACTIVE", http: "403", desc: "Token desactive" },
                 { code: "ACCOUNT_SUSPENDED", http: "403", desc: "Compte entreprise suspendu" },
                 { code: "ACCOUNT_NOT_VERIFIED", http: "403", desc: "KYC entreprise non verifie" },
-                { code: "COUNTRY_NOT_ALLOWED", http: "403", desc: "Pays non autorise pour ce token" },
                 { code: "COUNTRY_UNAVAILABLE", http: "400", desc: "Pays non disponible pour le payin" },
                 { code: "OPERATOR_UNAVAILABLE", http: "400", desc: "Operateur non supporte dans ce pays" },
                 { code: "INVALID_PHONE", http: "400", desc: "Numero de telephone invalide" },
@@ -669,7 +668,6 @@ echo json_encode(['received' => true]);
                 { code: "TOKEN_INACTIVE", http: "403", desc: "Token desactive" },
                 { code: "ACCOUNT_SUSPENDED", http: "403", desc: "Compte entreprise suspendu" },
                 { code: "ACCOUNT_NOT_VERIFIED", http: "403", desc: "KYC entreprise non verifie" },
-                { code: "COUNTRY_NOT_ALLOWED", http: "403", desc: "Pays non autorise pour ce token" },
                 { code: "INSUFFICIENT_FUNDS", http: "400", desc: "Solde insuffisant dans le wallet du pays" },
                 { code: "COUNTRY_UNAVAILABLE", http: "400", desc: "Pays non disponible pour le payout" },
                 { code: "OPERATOR_UNAVAILABLE", http: "400", desc: "Operateur non supporte dans ce pays" },
@@ -743,9 +741,9 @@ echo json_encode(['received' => true]);
         </CardHeader>
         <CardContent className="space-y-6">
           <p className="text-sm text-muted-foreground">
-            Configurez vos URL de callback dans le tableau de bord pour recevoir des notifications
+            Configurez votre URL de webhook dans le tableau de bord pour recevoir des notifications
             automatiques lorsque les transactions changent de statut.
-            Vous pouvez configurer des URL separees pour les payin et les payout.
+            Une seule URL recoit tous les evenements (payin et payout). Exemple : <code className="font-mono bg-muted px-1 rounded text-xs">https://votre-site.com/api/webhook/bkapay</code>
           </p>
 
           <div className="space-y-4">
