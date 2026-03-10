@@ -248,6 +248,29 @@ export const insertBusinessWalletSchema = createInsertSchema(businessWallets).om
 });
 export type InsertBusinessWallet = z.infer<typeof insertBusinessWalletSchema>;
 
+// Business API tokens - single token for direct payin/payout
+export const businessTokens = pgTable("business_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  token: text("token").notNull().unique(),
+  name: text("name").notNull().default("Token API"),
+  callbackUrl: text("callback_url"),
+  payoutCallbackUrl: text("payout_callback_url"),
+  callbackSecret: text("callback_secret"),
+  payoutCallbackSecret: text("payout_callback_secret"),
+  isActive: boolean("is_active").notNull().default(true),
+  allowedCountries: text("allowed_countries").array().default([]),
+  customerPaysFee: boolean("customer_pays_fee").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type BusinessToken = typeof businessTokens.$inferSelect;
+export const insertBusinessTokenSchema = createInsertSchema(businessTokens).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertBusinessToken = z.infer<typeof insertBusinessTokenSchema>;
+
 export type FeeConfig = typeof feeConfigs.$inferSelect;
 export const insertFeeConfigSchema = createInsertSchema(feeConfigs).omit({
   id: true,

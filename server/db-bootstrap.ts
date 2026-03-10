@@ -273,6 +273,32 @@ async function bootstrapDatabase() {
     }
     await payinKeyClient.end();
 
+    // Step 6g: Ensure business_tokens table exists
+    const btClient = postgres(DATABASE_URL);
+    try {
+      console.log("⚙️ Ensuring business_tokens table exists...");
+      await btClient`
+        CREATE TABLE IF NOT EXISTS business_tokens (
+          id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+          user_id VARCHAR NOT NULL REFERENCES users(id),
+          token TEXT NOT NULL UNIQUE,
+          name TEXT NOT NULL DEFAULT 'Token API',
+          callback_url TEXT,
+          payout_callback_url TEXT,
+          callback_secret TEXT,
+          payout_callback_secret TEXT,
+          is_active BOOLEAN NOT NULL DEFAULT TRUE,
+          allowed_countries TEXT[] DEFAULT '{}',
+          customer_pays_fee BOOLEAN NOT NULL DEFAULT FALSE,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `;
+      console.log("✅ Business tokens table ready");
+    } catch (e) {
+      console.error("⚠️ Business tokens table setup error:", e);
+    }
+    await btClient.end();
+
     // Step 7: Ensure primary admin exists
     console.log("👤 Ensuring primary admin exists...");
     const seedClient = postgres(DATABASE_URL);

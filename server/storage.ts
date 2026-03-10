@@ -162,6 +162,16 @@ export interface IStorage {
   updateProviderConfig(provider: string, updates: Partial<Omit<schema.ProviderConfig, 'id' | 'provider' | 'createdAt'>>, scope?: string): Promise<schema.ProviderConfig | undefined>;
   initializeProviderConfigs(): Promise<void>;
   
+  // Business Admin Stats
+  getBusinessAdminStats(): Promise<{
+    totalUsers: number;
+    verifiedUsers: number;
+    totalDeposits: number;
+    totalWithdrawals: number;
+    depositsByCurrency: Record<string, number>;
+    withdrawalsByCurrency: Record<string, number>;
+  }>;
+
   // Diagnostic
   getDiagnosticData(): Promise<{
     users: User[];
@@ -175,6 +185,14 @@ export interface IStorage {
   verifyCode(email: string, code: string, type: "signup" | "password_reset" | "login"): Promise<boolean>;
   markCodeAsUsed(email: string, code: string, type: "signup" | "password_reset" | "login"): Promise<void>;
   cleanupExpiredCodes(): Promise<void>;
+
+  // Business Tokens
+  createBusinessToken(data: { userId: string; token: string; name: string }): Promise<schema.BusinessToken>;
+  getBusinessTokenByToken(token: string): Promise<schema.BusinessToken | undefined>;
+  getBusinessTokensByUserId(userId: string): Promise<schema.BusinessToken[]>;
+  updateBusinessToken(id: string, userId: string, updates: Partial<Pick<schema.BusinessToken, 'name' | 'callbackUrl' | 'payoutCallbackUrl' | 'callbackSecret' | 'payoutCallbackSecret' | 'isActive' | 'allowedCountries' | 'customerPaysFee'>>): Promise<schema.BusinessToken | undefined>;
+  deleteBusinessToken(id: string, userId: string): Promise<boolean>;
+  regenerateBusinessToken(id: string, userId: string): Promise<schema.BusinessToken | undefined>;
 
   // Crypto Currencies
   getAllCryptoCurrencies(): Promise<schema.CryptoCurrency[]>;
@@ -1163,7 +1181,8 @@ export class DbStorage implements IStorage {
     depositsByCurrency: { XOF: number; XAF: number; CDF: number; GNF: number; GMD: number; RWF: number };
     withdrawalsByCurrency: { XOF: number; XAF: number; CDF: number; GNF: number; GMD: number; RWF: number };
   }> {
-    const allUsers = await db.select().from(schema.users);
+    const allUsersRaw = await db.select().from(schema.users);
+    const allUsers = allUsersRaw.filter((u) => !u.accountType || u.accountType === "personal");
     const verifiedUsers = allUsers.filter((u) => u.kycStatus === "verified").length;
 
     const userCurrencyMap = new Map<string, string>();
@@ -1176,17 +1195,20 @@ export class DbStorage implements IStorage {
       "GM": "GMD",
       "RW": "RWF",
     };
+    const personalUserIds = new Set<string>();
     allUsers.forEach(u => {
       userCurrencyMap.set(u.id, u.country ? COUNTRY_CURRENCIES[u.country] || "XOF" : "XOF");
+      personalUserIds.add(u.id);
     });
 
     const allTransactions = await db.select().from(schema.transactions);
-    const completedDeposits = allTransactions.filter(
+    const personalTransactions = allTransactions.filter(t => personalUserIds.has(t.userId));
+    const completedDeposits = personalTransactions.filter(
       (t) =>
         t.status === "completed" &&
         ["deposit", "payment_link", "merchant_link", "api_payment"].includes(t.type)
     );
-    const completedOutgoing = allTransactions.filter(
+    const completedOutgoing = personalTransactions.filter(
       (t) => t.status === "completed" && ["withdrawal", "transfer"].includes(t.type)
     );
 
@@ -1215,6 +1237,74 @@ export class DbStorage implements IStorage {
 
     return {
       totalUsers: allUsers.length,
+      verifiedUsers,
+      totalDeposits,
+      totalWithdrawals,
+      depositsByCurrency,
+      withdrawalsByCurrency,
+    };
+  }
+
+  async getBusinessAdminStats(): Promise<{
+    totalUsers: number;
+    verifiedUsers: number;
+    totalDeposits: number;
+    totalWithdrawals: number;
+    depositsByCurrency: Record<string, number>;
+    withdrawalsByCurrency: Record<string, number>;
+  }> {
+    const allUsersRaw = await db.select().from(schema.users);
+    const businessUsers = allUsersRaw.filter((u) => u.accountType === "business");
+    const verifiedUsers = businessUsers.filter((u) => u.kycStatus === "verified").length;
+
+    const businessUserIds = new Set<string>();
+    const userCurrencyMap = new Map<string, string>();
+    const COUNTRY_CURRENCIES: Record<string, string> = {
+      "BJ": "XOF", "TG": "XOF", "SN": "XOF", "CI": "XOF", "ML": "XOF",
+      "BF": "XOF", "NE": "XOF",
+      "CM": "XAF", "TD": "XAF", "CG": "XAF", "CF": "XAF", "GA": "XAF",
+      "CD": "CDF",
+      "GN": "GNF",
+      "GM": "GMD",
+      "RW": "RWF",
+      "ZM": "ZMW",
+      "UG": "UGX",
+    };
+    businessUsers.forEach(u => {
+      businessUserIds.add(u.id);
+      userCurrencyMap.set(u.id, u.country ? COUNTRY_CURRENCIES[u.country] || "XOF" : "XOF");
+    });
+
+    const allTransactions = await db.select().from(schema.transactions);
+    const businessTransactions = allTransactions.filter(t => businessUserIds.has(t.userId));
+    const completedDeposits = businessTransactions.filter(
+      (t) =>
+        t.status === "completed" &&
+        ["deposit", "payment_link", "merchant_link", "api_payment"].includes(t.type)
+    );
+    const completedOutgoing = businessTransactions.filter(
+      (t) => t.status === "completed" && ["withdrawal", "transfer", "payout"].includes(t.type)
+    );
+
+    const totalDeposits = completedDeposits.reduce((sum, t) => sum + t.amount, 0);
+    const totalWithdrawals = completedOutgoing.reduce((sum, t) => sum + t.amount, 0);
+
+    const depositsByCurrency: Record<string, number> = { XOF: 0, XAF: 0, CDF: 0, ZMW: 0, UGX: 0 };
+    completedDeposits.forEach(t => {
+      const currency = t.currency || userCurrencyMap.get(t.userId) || "XOF";
+      if (!(currency in depositsByCurrency)) depositsByCurrency[currency] = 0;
+      depositsByCurrency[currency] += t.amount;
+    });
+
+    const withdrawalsByCurrency: Record<string, number> = { XOF: 0, XAF: 0, CDF: 0, ZMW: 0, UGX: 0 };
+    completedOutgoing.forEach(t => {
+      const currency = t.currency || userCurrencyMap.get(t.userId) || "XOF";
+      if (!(currency in withdrawalsByCurrency)) withdrawalsByCurrency[currency] = 0;
+      withdrawalsByCurrency[currency] += t.amount;
+    });
+
+    return {
+      totalUsers: businessUsers.length,
       verifiedUsers,
       totalDeposits,
       totalWithdrawals,
@@ -2030,6 +2120,51 @@ export class DbStorage implements IStorage {
     await db
       .delete(schema.verificationCodes)
       .where(sql`${schema.verificationCodes.expiresAt} < NOW()`);
+  }
+
+  // Business Tokens
+  async createBusinessToken(data: { userId: string; token: string; name: string }): Promise<schema.BusinessToken> {
+    const [token] = await db.insert(schema.businessTokens).values({
+      userId: data.userId,
+      token: data.token,
+      name: data.name,
+      callbackSecret: `bks_${randomUUID().replace(/-/g, '')}`,
+      payoutCallbackSecret: `bkps_${randomUUID().replace(/-/g, '')}`,
+    }).returning();
+    return token;
+  }
+
+  async getBusinessTokenByToken(tokenStr: string): Promise<schema.BusinessToken | undefined> {
+    const [token] = await db.select().from(schema.businessTokens).where(eq(schema.businessTokens.token, tokenStr));
+    return token;
+  }
+
+  async getBusinessTokensByUserId(userId: string): Promise<schema.BusinessToken[]> {
+    return db.select().from(schema.businessTokens).where(eq(schema.businessTokens.userId, userId));
+  }
+
+  async updateBusinessToken(id: string, userId: string, updates: Partial<Pick<schema.BusinessToken, 'name' | 'callbackUrl' | 'payoutCallbackUrl' | 'callbackSecret' | 'payoutCallbackSecret' | 'isActive' | 'allowedCountries' | 'customerPaysFee'>>): Promise<schema.BusinessToken | undefined> {
+    const [token] = await db.update(schema.businessTokens)
+      .set(updates)
+      .where(and(eq(schema.businessTokens.id, id), eq(schema.businessTokens.userId, userId)))
+      .returning();
+    return token;
+  }
+
+  async deleteBusinessToken(id: string, userId: string): Promise<boolean> {
+    const result = await db.delete(schema.businessTokens)
+      .where(and(eq(schema.businessTokens.id, id), eq(schema.businessTokens.userId, userId)))
+      .returning();
+    return result.length > 0;
+  }
+
+  async regenerateBusinessToken(id: string, userId: string): Promise<schema.BusinessToken | undefined> {
+    const newToken = `bt_live_${randomUUID().replace(/-/g, '')}`;
+    const [token] = await db.update(schema.businessTokens)
+      .set({ token: newToken })
+      .where(and(eq(schema.businessTokens.id, id), eq(schema.businessTokens.userId, userId)))
+      .returning();
+    return token;
   }
 
   // Crypto Currencies

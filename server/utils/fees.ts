@@ -200,10 +200,11 @@ export async function getFeeFromDatabase(
   storage: any, 
   provider: string,
   country: string, 
-  operator: string
+  operator: string,
+  scope: string = "personal"
 ): Promise<{ incoming: number; outgoing: number }> {
   try {
-    const config = await storage.getFeeConfig(provider.toLowerCase(), country.toUpperCase(), operator.toLowerCase());
+    const config = await storage.getFeeConfig(provider.toLowerCase(), country.toUpperCase(), operator.toLowerCase(), scope);
     if (config) {
       return {
         incoming: config.incomingFeePercentage ?? DEFAULT_FEE_PERCENTAGE,

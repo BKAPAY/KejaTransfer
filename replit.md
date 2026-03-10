@@ -38,6 +38,18 @@ The frontend uses React 18 with TypeScript, Shadcn UI, and Tailwind CSS for a pr
   - **Legacy API Pay** (`/api-pay/:publicKey?amount=...`): Simple redirect flow, amount visible in URL. Still supported for backward compatibility.
   - **Secure Payment Sessions v1.6** (`POST /api/v1/payment-sessions`): Server-side session creation with secret key (`sk_live_`). Amount locked server-side, never in URL. Creates a `payment_url` pointing to `/checkout/:sessionId`. Table `payment_sessions` in DB. Routes: `GET /api/v1/payment-sessions/:id` (public session info), `POST /api/v1/payment-sessions/:id/pay` (initiate payment, all providers: PawaPay/FedaPay/Paydunya/MbiyoPay/AfribaPay), `GET /api/v1/payment-sessions/:id/status` (session status). Frontend checkout page at `client/src/pages/checkout.tsx`.
   - **API Payout v1.5** (`POST /api/v1/payout`): Send money to mobile money numbers via API key.
+  - **Business API v2.0** (Direct payin/payout for business accounts):
+    - Single `bt_live_...` token for authentication (table: `business_tokens`).
+    - `POST /api/v1/business/payin`: Direct mobile money collection (no redirect). Body: `{phone, operator, country, amount, currency}`.
+    - `POST /api/v1/business/payout`: Direct mobile money disbursement. Debits business wallet per country.
+    - `GET /api/v1/business/payin/:id/status` and `GET /api/v1/business/payout/:id/status`: Status check endpoints.
+    - Token management: `GET/POST/PUT/DELETE /api/business/tokens`, regenerate, callback secret management.
+    - Uses business-scope provider configs, fee configs, country-operator configs (scope="business").
+- **Account Separation**: Personal and business accounts are fully isolated:
+  - Admin stats (`/api/admin/stats`) filter personal-only users. Business stats at `/api/admin/business/stats`.
+  - Provider configs, fee configs, country-operator configs all use `scope` column ("personal"|"business").
+  - Business admin pages mirror personal admin quality (providers, country-operator, fees, management with stats).
+  - Documentation page has two tabs: "Integration Compte Personnel" and "Integration Compte Entreprise".
 - **Transaction Security**: Transactions are created as "pending" and only marked "completed" after strict FedaPay confirmation, using atomic functions to prevent race conditions.
 - **Customer Email Privacy**: Customer emails are never sent to payment providers; generic `noreply@bkapay.com` is used for provider API calls.
 - **Operator Filtering**: Country-specific operator filtering for collect and payout.

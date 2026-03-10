@@ -2,12 +2,12 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Copy, Eye, EyeOff, Trash2, Key, Webhook, RefreshCw, Check, X, Settings, Globe } from "lucide-react";
+import { Copy, Eye, EyeOff, Trash2, Key, Webhook, RefreshCw, Check, X, Settings, Globe, Shield, Plus } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import type { ApiKey, User } from "@shared/schema";
+import type { BusinessToken, User } from "@shared/schema";
 import { COUNTRIES } from "@shared/schema";
 import { CountryFlag } from "@/components/country-flag";
 import { useToast } from "@/hooks/use-toast";
@@ -27,18 +27,20 @@ import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
-const businessApiKeySchema = z.object({
-  name: z.string().min(1, "Le nom de la cle est requis"),
+const tokenNameSchema = z.object({
+  name: z.string().min(1, "Le nom du token est requis"),
 });
 
-type BusinessApiKeyFormData = z.infer<typeof businessApiKeySchema>;
+type TokenNameFormData = z.infer<typeof tokenNameSchema>;
 
 export default function BusinessApiPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [visibleKeys, setVisibleKeys] = useState<Record<string, boolean>>({});
-  const [editingCallback, setEditingCallback] = useState<string | null>(null);
+  const [visibleFields, setVisibleFields] = useState<Record<string, boolean>>({});
+  const [editingCallbackId, setEditingCallbackId] = useState<string | null>(null);
+  const [editingPayoutCallbackId, setEditingPayoutCallbackId] = useState<string | null>(null);
   const [callbackUrls, setCallbackUrls] = useState<Record<string, string>>({});
-  const [editingSettings, setEditingSettings] = useState<string | null>(null);
+  const [payoutCallbackUrls, setPayoutCallbackUrls] = useState<Record<string, string>>({});
+  const [editingSettingsId, setEditingSettingsId] = useState<string | null>(null);
   const [settingsData, setSettingsData] = useState<Record<string, { allowedCountries: string[]; customerPaysFee: boolean }>>({});
   const { toast } = useToast();
 
@@ -46,35 +48,25 @@ export default function BusinessApiPage() {
     queryKey: ["/api/auth/me"],
   });
 
-  const { data: apiKeys, isLoading } = useQuery<ApiKey[]>({
-    queryKey: ["/api/api-keys"],
+  const { data: tokens, isLoading } = useQuery<BusinessToken[]>({
+    queryKey: ["/api/business/tokens"],
   });
-
-  const { data: enabledCountriesOperators } = useQuery<Record<string, string[]>>({
-    queryKey: ["/api/countries-operators/deposits"],
-  });
-
-  const activeCountries = enabledCountriesOperators
-    ? COUNTRIES.filter(c => Object.keys(enabledCountriesOperators).includes(c.code))
-    : COUNTRIES;
 
   const isKycVerified = user?.kycStatus === "verified";
 
-  const form = useForm<BusinessApiKeyFormData>({
-    resolver: zodResolver(businessApiKeySchema),
-    defaultValues: { name: "" },
+  const form = useForm<TokenNameFormData>({
+    resolver: zodResolver(tokenNameSchema),
+    defaultValues: { name: "Token API" },
   });
 
   const createMutation = useMutation({
-    mutationFn: async (data: BusinessApiKeyFormData) => {
-      return await apiRequest("POST", "/api/api-keys", {
-        ...data,
-        siteName: user?.businessName || data.name,
-      });
+    mutationFn: async (data: TokenNameFormData) => {
+      const res = await apiRequest("POST", "/api/business/tokens", { name: data.name });
+      return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/api-keys"] });
-      toast({ title: "Cle API creee", description: "Votre cle API a ete creee avec succes" });
+      queryClient.invalidateQueries({ queryKey: ["/api/business/tokens"] });
+      toast({ title: "Token cree", description: "Votre token API a ete cree avec succes" });
       setDialogOpen(false);
       form.reset();
     },
@@ -85,68 +77,69 @@ export default function BusinessApiPage() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      return await apiRequest("DELETE", `/api/api-keys/${id}`, {});
+      return await apiRequest("DELETE", `/api/business/tokens/${id}`, {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/api-keys"] });
-      toast({ title: "Cle supprimee", description: "La cle API a ete supprimee" });
+      queryClient.invalidateQueries({ queryKey: ["/api/business/tokens"] });
+      toast({ title: "Token supprime", description: "Le token API a ete supprime" });
     },
     onError: (error: any) => {
       toast({ title: "Erreur", description: error.message || "Erreur lors de la suppression", variant: "destructive" });
     },
   });
 
-  const callbackMutation = useMutation({
-    mutationFn: async ({ id, callbackUrl }: { id: string; callbackUrl: string }) => {
-      const res = await apiRequest("PATCH", `/api/api-keys/${id}/callback`, { callbackUrl });
+  const regenerateMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("POST", `/api/business/tokens/${id}/regenerate`, {});
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/api-keys"] });
-      setEditingCallback(null);
-      toast({ title: "Callback configure", description: "L'URL de callback a ete configuree" });
+      queryClient.invalidateQueries({ queryKey: ["/api/business/tokens"] });
+      toast({ title: "Token regenere", description: "Le token a ete regenere. Mettez a jour votre serveur." });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Record<string, any> }) => {
+      const res = await apiRequest("PUT", `/api/business/tokens/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/business/tokens"] });
+      setEditingCallbackId(null);
+      setEditingPayoutCallbackId(null);
+      setEditingSettingsId(null);
+      toast({ title: "Enregistre", description: "Les parametres ont ete mis a jour" });
     },
     onError: (error: any) => {
       toast({ title: "Erreur", description: error.message || "Erreur", variant: "destructive" });
     },
   });
 
-  const regenerateSecretMutation = useMutation({
+  const regenerateCallbackSecretMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await apiRequest("POST", `/api/api-keys/${id}/regenerate-secret`, {});
+      const res = await apiRequest("POST", `/api/business/tokens/${id}/regenerate-callback-secret`, {});
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/api-keys"] });
-      toast({ title: "Secret regenere", description: "Le secret de signature a ete regenere. Mettez a jour votre serveur." });
+      queryClient.invalidateQueries({ queryKey: ["/api/business/tokens"] });
+      toast({ title: "Secret regenere", description: "Le secret de signature payin a ete regenere." });
     },
   });
 
-  const regeneratePayinKeyMutation = useMutation({
+  const regeneratePayoutSecretMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await apiRequest("POST", `/api/api-keys/${id}/regenerate-payin-key`, {});
+      const res = await apiRequest("POST", `/api/business/tokens/${id}/regenerate-payout-secret`, {});
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/api-keys"] });
-      toast({ title: "Cle regeneree", description: "La cle privee payin a ete regeneree. Mettez a jour votre serveur." });
+      queryClient.invalidateQueries({ queryKey: ["/api/business/tokens"] });
+      toast({ title: "Secret regenere", description: "Le secret de signature payout a ete regenere." });
     },
   });
 
-  const settingsMutation = useMutation({
-    mutationFn: async ({ id, allowedCountries, customerPaysFee }: { id: string; allowedCountries: string[]; customerPaysFee: boolean }) => {
-      const res = await apiRequest("PATCH", `/api/api-keys/${id}/settings`, { allowedCountries, customerPaysFee, customerPaysCryptoFee: false });
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/api-keys"] });
-      setEditingSettings(null);
-      toast({ title: "Parametres enregistres", description: "Les options de paiement ont ete mises a jour" });
-    },
-  });
-
-  const toggleKeyVisibility = (id: string) => {
-    setVisibleKeys(prev => ({ ...prev, [id]: !prev[id] }));
+  const toggleVisibility = (key: string) => {
+    setVisibleFields(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
   const copyToClipboard = (text: string, label: string) => {
@@ -154,15 +147,16 @@ export default function BusinessApiPage() {
     toast({ title: "Copie", description: `${label} copie dans le presse-papiers` });
   };
 
-  const maskKey = (key: string) => {
-    return key.substring(0, 12) + "..." + key.substring(key.length - 8);
+  const maskValue = (val: string) => {
+    if (val.length <= 16) return val.substring(0, 8) + "...";
+    return val.substring(0, 12) + "..." + val.substring(val.length - 8);
   };
 
-  const onSubmit = (data: BusinessApiKeyFormData) => {
+  const onSubmit = (data: TokenNameFormData) => {
     if (!isKycVerified) {
       toast({
         title: "Verification requise",
-        description: "Votre compte doit etre verifie avant de creer des cles API.",
+        description: "Votre compte doit etre verifie avant de creer des tokens API.",
         variant: "destructive",
       });
       setDialogOpen(false);
@@ -171,27 +165,31 @@ export default function BusinessApiPage() {
     createMutation.mutate(data);
   };
 
+  const BUSINESS_COUNTRIES = COUNTRIES.filter(c =>
+    ["BJ", "TG", "BF", "CI", "CM", "CD", "GA", "CG", "SN", "ZM", "UG"].includes(c.code)
+  );
+
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between gap-2 flex-wrap mb-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground mb-1">Cles API</h1>
+          <h1 className="text-2xl font-bold text-foreground mb-1" data-testid="text-page-title">Token API Entreprise</h1>
           <p className="text-sm text-muted-foreground">
-            Integrez les paiements Mobile Money directement dans votre application
+            Integrez les paiements Mobile Money directement via votre token unique
           </p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button data-testid="button-create-api-key">
+            <Button data-testid="button-create-token">
               <Plus className="w-4 h-4 mr-2" />
-              Nouvelle cle
+              Nouveau token
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Creer une cle API</DialogTitle>
+              <DialogTitle>Creer un token API</DialogTitle>
               <DialogDescription>
-                Creez une cle pour integrer les paiements dans votre application
+                Creez un token pour integrer les paiements payin/payout dans votre application
               </DialogDescription>
             </DialogHeader>
             <Form {...form}>
@@ -201,15 +199,15 @@ export default function BusinessApiPage() {
                   name="name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Nom de la cle</FormLabel>
+                      <FormLabel>Nom du token</FormLabel>
                       <FormControl>
                         <Input
                           placeholder="Ex: Production, Test..."
-                          data-testid="input-key-name"
+                          data-testid="input-token-name"
                           {...field}
                         />
                       </FormControl>
-                      <FormDescription>Un nom pour identifier cette cle</FormDescription>
+                      <FormDescription>Un nom pour identifier ce token</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -219,7 +217,7 @@ export default function BusinessApiPage() {
                     Annuler
                   </Button>
                   <Button type="submit" disabled={createMutation.isPending} data-testid="button-submit">
-                    {createMutation.isPending ? "Creation..." : "Creer la cle"}
+                    {createMutation.isPending ? "Creation..." : "Creer le token"}
                   </Button>
                 </div>
               </form>
@@ -233,23 +231,23 @@ export default function BusinessApiPage() {
           {isLoading ? (
             <Card>
               <CardContent className="py-12">
-                <p className="text-center text-muted-foreground">Chargement...</p>
+                <p className="text-center text-muted-foreground" data-testid="text-loading">Chargement...</p>
               </CardContent>
             </Card>
-          ) : apiKeys && apiKeys.length > 0 ? (
-            apiKeys.map((apiKey) => (
-              <Card key={apiKey.id} data-testid={`api-key-${apiKey.id}`}>
+          ) : tokens && tokens.length > 0 ? (
+            tokens.map((token) => (
+              <Card key={token.id} data-testid={`card-token-${token.id}`}>
                 <CardHeader>
                   <div className="flex items-start justify-between gap-4 flex-wrap">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <CardTitle className="text-lg">{apiKey.name}</CardTitle>
-                        <Badge variant={apiKey.isActive ? "default" : "secondary"}>
-                          {apiKey.isActive ? "Active" : "Inactive"}
+                        <CardTitle className="text-lg" data-testid={`text-token-name-${token.id}`}>{token.name}</CardTitle>
+                        <Badge variant={token.isActive ? "default" : "secondary"} data-testid={`badge-status-${token.id}`}>
+                          {token.isActive ? "Actif" : "Inactif"}
                         </Badge>
                       </div>
                       <CardDescription className="text-xs mt-1">
-                        Creee le {new Date(apiKey.createdAt).toLocaleDateString("fr-FR")}
+                        Cree le {new Date(token.createdAt).toLocaleDateString("fr-FR")}
                       </CardDescription>
                     </div>
                     <Key className="w-6 h-6 text-muted-foreground" />
@@ -257,149 +255,120 @@ export default function BusinessApiPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
 
-                  {/* Cle privee payin */}
                   <div>
                     <div className="flex items-center gap-2 mb-2">
-                      <label className="text-sm font-medium">Cle privee payin</label>
-                      <Badge variant="outline" className="text-xs">Collecte de paiements</Badge>
+                      <Shield className="w-4 h-4 text-muted-foreground" />
+                      <label className="text-sm font-medium">Token API</label>
+                      <Badge variant="outline" className="text-xs">bt_live_...</Badge>
                     </div>
                     <p className="text-xs text-muted-foreground mb-2">
-                      Utilisez cette cle dans votre serveur pour initier des paiements via <code className="bg-muted px-1 rounded">POST /api/v1/payment-sessions</code>.
+                      Utilisez ce token dans le header <code className="bg-muted px-1 rounded">Authorization: Bearer bt_live_...</code> pour les appels payin et payout.
                     </p>
                     <div className="flex items-center gap-2">
-                      <div className="flex-1 bg-muted rounded-md px-3 py-2 font-mono text-xs break-all">
-                        {(apiKey as any).payinPrivateKey
-                          ? (visibleKeys[apiKey.id + '-payin']
-                            ? (apiKey as any).payinPrivateKey
-                            : maskKey((apiKey as any).payinPrivateKey))
-                          : "—"}
+                      <div className="flex-1 bg-muted rounded-md px-3 py-2 font-mono text-xs break-all" data-testid={`text-token-value-${token.id}`}>
+                        {visibleFields[`token-${token.id}`] ? token.token : maskValue(token.token)}
                       </div>
-                      <Button size="icon" variant="ghost" onClick={() => toggleKeyVisibility(apiKey.id + '-payin')} data-testid={`button-toggle-payin-${apiKey.id}`}>
-                        {visibleKeys[apiKey.id + '-payin'] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      <Button size="icon" variant="ghost" onClick={() => toggleVisibility(`token-${token.id}`)} data-testid={`button-toggle-token-${token.id}`}>
+                        {visibleFields[`token-${token.id}`] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </Button>
-                      <Button size="icon" variant="ghost" onClick={() => copyToClipboard((apiKey as any).payinPrivateKey || "", "Cle privee payin")} data-testid={`button-copy-payin-${apiKey.id}`}>
+                      <Button size="icon" variant="ghost" onClick={() => copyToClipboard(token.token, "Token API")} data-testid={`button-copy-token-${token.id}`}>
                         <Copy className="w-4 h-4" />
                       </Button>
                       <Button
                         size="icon"
                         variant="ghost"
                         onClick={() => {
-                          if (confirm("Regenerer la cle privee payin ? L'ancienne cle sera invalidee.")) {
-                            regeneratePayinKeyMutation.mutate(apiKey.id);
+                          if (confirm("Regenerer le token ? L'ancien token sera invalide.")) {
+                            regenerateMutation.mutate(token.id);
                           }
                         }}
-                        disabled={regeneratePayinKeyMutation.isPending}
-                        title="Regenerer la cle privee payin"
-                        data-testid={`button-regenerate-payin-${apiKey.id}`}
+                        disabled={regenerateMutation.isPending}
+                        title="Regenerer le token"
+                        data-testid={`button-regenerate-token-${token.id}`}
                       >
                         <RefreshCw className="w-4 h-4" />
                       </Button>
                     </div>
                     <Alert className="mt-2 border-destructive/30 bg-destructive/5 py-2">
                       <AlertDescription className="text-destructive text-xs">
-                        Ne partagez jamais cette cle. Ne la mettez pas dans votre code frontend.
-                      </AlertDescription>
-                    </Alert>
-                  </div>
-
-                  {/* Cle payout */}
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <label className="text-sm font-medium">Cle privee payout</label>
-                      <Badge variant="outline" className="text-xs">Versements</Badge>
-                    </div>
-                    <p className="text-xs text-muted-foreground mb-2">
-                      Utilisez cette cle pour effectuer des versements vers des comptes Mobile Money via <code className="bg-muted px-1 rounded">POST /api/v1/payouts</code>.
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 bg-muted rounded-md px-3 py-2 font-mono text-xs break-all">
-                        {visibleKeys[apiKey.id + '-private']
-                          ? apiKey.privateKey
-                          : maskKey(apiKey.privateKey)}
-                      </div>
-                      <Button size="icon" variant="ghost" onClick={() => toggleKeyVisibility(apiKey.id + '-private')} data-testid={`button-toggle-private-${apiKey.id}`}>
-                        {visibleKeys[apiKey.id + '-private'] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </Button>
-                      <Button size="icon" variant="ghost" onClick={() => copyToClipboard(apiKey.privateKey, "Cle privee payout")} data-testid={`button-copy-private-${apiKey.id}`}>
-                        <Copy className="w-4 h-4" />
-                      </Button>
-                    </div>
-                    <Alert className="mt-2 border-destructive/30 bg-destructive/5 py-2">
-                      <AlertDescription className="text-destructive text-xs">
-                        Ne partagez jamais cette cle. Ne la mettez pas dans votre code frontend.
+                        Ne partagez jamais ce token. Ne le mettez pas dans votre code frontend.
                       </AlertDescription>
                     </Alert>
                   </div>
 
                   <Separator className="my-4" />
 
-                  {/* Webhook / Callback */}
                   <div>
                     <div className="flex items-center gap-2 mb-2">
                       <Webhook className="w-4 h-4 text-muted-foreground" />
-                      <label className="text-sm font-medium">URL de Callback (Webhook)</label>
+                      <label className="text-sm font-medium">Callback Payin (Webhook)</label>
                     </div>
                     <p className="text-xs text-muted-foreground mb-3">
-                      Recevez une notification automatique quand un paiement est complete.
+                      Recevez une notification quand un paiement entrant est complete.
                     </p>
 
-                    {editingCallback === apiKey.id ? (
+                    {editingCallbackId === token.id ? (
                       <div className="space-y-3">
                         <Input
-                          placeholder="https://votre-serveur.com/api/webhook/bkapay"
-                          value={callbackUrls[apiKey.id] ?? (apiKey as any).callbackUrl ?? ""}
-                          onChange={(e) => setCallbackUrls(prev => ({ ...prev, [apiKey.id]: e.target.value }))}
-                          data-testid={`input-callback-url-${apiKey.id}`}
+                          placeholder="https://votre-serveur.com/api/webhook/payin"
+                          value={callbackUrls[token.id] ?? token.callbackUrl ?? ""}
+                          onChange={(e) => setCallbackUrls(prev => ({ ...prev, [token.id]: e.target.value }))}
+                          data-testid={`input-callback-url-${token.id}`}
                         />
                         <p className="text-xs text-muted-foreground">L'URL doit utiliser HTTPS</p>
                         <div className="flex gap-2">
-                          <Button size="sm" onClick={() => callbackMutation.mutate({ id: apiKey.id, callbackUrl: callbackUrls[apiKey.id] ?? (apiKey as any).callbackUrl ?? "" })} disabled={callbackMutation.isPending} data-testid={`button-save-callback-${apiKey.id}`}>
+                          <Button
+                            size="sm"
+                            onClick={() => updateMutation.mutate({ id: token.id, data: { callbackUrl: callbackUrls[token.id] ?? token.callbackUrl ?? "" } })}
+                            disabled={updateMutation.isPending}
+                            data-testid={`button-save-callback-${token.id}`}
+                          >
                             <Check className="w-4 h-4 mr-1" />
-                            {callbackMutation.isPending ? "..." : "Enregistrer"}
+                            {updateMutation.isPending ? "..." : "Enregistrer"}
                           </Button>
-                          <Button size="sm" variant="ghost" onClick={() => { setEditingCallback(null); setCallbackUrls(prev => { const c = { ...prev }; delete c[apiKey.id]; return c; }); }} data-testid={`button-cancel-callback-${apiKey.id}`}>
+                          <Button size="sm" variant="ghost" onClick={() => { setEditingCallbackId(null); setCallbackUrls(prev => { const c = { ...prev }; delete c[token.id]; return c; }); }} data-testid={`button-cancel-callback-${token.id}`}>
                             <X className="w-4 h-4 mr-1" /> Annuler
                           </Button>
                         </div>
                       </div>
                     ) : (
                       <div className="space-y-3">
-                        {(apiKey as any).callbackUrl ? (
+                        {token.callbackUrl ? (
                           <>
                             <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-md">
-                              <code className="flex-1 text-xs font-mono truncate text-green-700 dark:text-green-300">{(apiKey as any).callbackUrl}</code>
-                              <Button variant="ghost" size="sm" onClick={() => copyToClipboard((apiKey as any).callbackUrl, "URL de callback")} data-testid={`button-copy-callback-${apiKey.id}`}>
+                              <code className="flex-1 text-xs font-mono truncate text-green-700 dark:text-green-300" data-testid={`text-callback-url-${token.id}`}>{token.callbackUrl}</code>
+                              <Button variant="ghost" size="sm" onClick={() => copyToClipboard(token.callbackUrl!, "URL callback payin")} data-testid={`button-copy-callback-${token.id}`}>
                                 <Copy className="w-4 h-4" />
                               </Button>
                             </div>
-                            {(apiKey as any).callbackSecret && (
+                            {token.callbackSecret && (
                               <div>
-                                <label className="text-xs font-medium text-muted-foreground">Secret HMAC-SHA256</label>
+                                <label className="text-xs font-medium text-muted-foreground">Secret HMAC-SHA256 (Payin)</label>
                                 <div className="flex items-center gap-2 p-2 bg-muted rounded-md mt-1">
-                                  <code className="flex-1 text-xs font-mono truncate">
-                                    {visibleKeys[apiKey.id + '-secret'] ? (apiKey as any).callbackSecret : maskKey((apiKey as any).callbackSecret)}
+                                  <code className="flex-1 text-xs font-mono truncate" data-testid={`text-callback-secret-${token.id}`}>
+                                    {visibleFields[`secret-${token.id}`] ? token.callbackSecret : maskValue(token.callbackSecret)}
                                   </code>
-                                  <Button variant="ghost" size="sm" onClick={() => toggleKeyVisibility(apiKey.id + '-secret')} data-testid={`button-toggle-secret-${apiKey.id}`}>
-                                    {visibleKeys[apiKey.id + '-secret'] ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                                  <Button variant="ghost" size="sm" onClick={() => toggleVisibility(`secret-${token.id}`)} data-testid={`button-toggle-secret-${token.id}`}>
+                                    {visibleFields[`secret-${token.id}`] ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
                                   </Button>
-                                  <Button variant="ghost" size="sm" onClick={() => copyToClipboard((apiKey as any).callbackSecret, "Secret")} data-testid={`button-copy-secret-${apiKey.id}`}>
+                                  <Button variant="ghost" size="sm" onClick={() => copyToClipboard(token.callbackSecret!, "Secret payin")} data-testid={`button-copy-secret-${token.id}`}>
                                     <Copy className="w-3 h-3" />
                                   </Button>
-                                  <Button variant="ghost" size="sm" onClick={() => regenerateSecretMutation.mutate(apiKey.id)} disabled={regenerateSecretMutation.isPending} data-testid={`button-regenerate-secret-${apiKey.id}`}>
+                                  <Button variant="ghost" size="sm" onClick={() => regenerateCallbackSecretMutation.mutate(token.id)} disabled={regenerateCallbackSecretMutation.isPending} data-testid={`button-regenerate-secret-${token.id}`}>
                                     <RefreshCw className="w-3 h-3" />
                                   </Button>
                                 </div>
                               </div>
                             )}
                             <div className="flex gap-2">
-                              <Button size="sm" variant="outline" onClick={() => { setCallbackUrls(prev => ({ ...prev, [apiKey.id]: (apiKey as any).callbackUrl || "" })); setEditingCallback(apiKey.id); }} data-testid={`button-edit-callback-${apiKey.id}`}>Modifier</Button>
-                              <Button size="sm" variant="ghost" onClick={() => { if (confirm("Supprimer ce callback ?")) callbackMutation.mutate({ id: apiKey.id, callbackUrl: "" }); }} disabled={callbackMutation.isPending} data-testid={`button-remove-callback-${apiKey.id}`}>Supprimer</Button>
+                              <Button size="sm" variant="outline" onClick={() => { setCallbackUrls(prev => ({ ...prev, [token.id]: token.callbackUrl || "" })); setEditingCallbackId(token.id); }} data-testid={`button-edit-callback-${token.id}`}>Modifier</Button>
+                              <Button size="sm" variant="ghost" onClick={() => { if (confirm("Supprimer ce callback payin ?")) updateMutation.mutate({ id: token.id, data: { callbackUrl: "" } }); }} disabled={updateMutation.isPending} data-testid={`button-remove-callback-${token.id}`}>Supprimer</Button>
                             </div>
                           </>
                         ) : (
-                          <Button size="sm" variant="outline" onClick={() => setEditingCallback(apiKey.id)} data-testid={`button-add-callback-${apiKey.id}`}>
+                          <Button size="sm" variant="outline" onClick={() => setEditingCallbackId(token.id)} data-testid={`button-add-callback-${token.id}`}>
                             <Webhook className="w-4 h-4 mr-2" />
-                            Configurer un callback
+                            Configurer le callback payin
                           </Button>
                         )}
                       </div>
@@ -408,14 +377,92 @@ export default function BusinessApiPage() {
 
                   <Separator className="my-4" />
 
-                  {/* Options */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Webhook className="w-4 h-4 text-muted-foreground" />
+                      <label className="text-sm font-medium">Callback Payout (Webhook)</label>
+                    </div>
+                    <p className="text-xs text-muted-foreground mb-3">
+                      Recevez une notification quand un versement est complete ou echoue.
+                    </p>
+
+                    {editingPayoutCallbackId === token.id ? (
+                      <div className="space-y-3">
+                        <Input
+                          placeholder="https://votre-serveur.com/api/webhook/payout"
+                          value={payoutCallbackUrls[token.id] ?? token.payoutCallbackUrl ?? ""}
+                          onChange={(e) => setPayoutCallbackUrls(prev => ({ ...prev, [token.id]: e.target.value }))}
+                          data-testid={`input-payout-callback-url-${token.id}`}
+                        />
+                        <p className="text-xs text-muted-foreground">L'URL doit utiliser HTTPS</p>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => updateMutation.mutate({ id: token.id, data: { payoutCallbackUrl: payoutCallbackUrls[token.id] ?? token.payoutCallbackUrl ?? "" } })}
+                            disabled={updateMutation.isPending}
+                            data-testid={`button-save-payout-callback-${token.id}`}
+                          >
+                            <Check className="w-4 h-4 mr-1" />
+                            {updateMutation.isPending ? "..." : "Enregistrer"}
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => { setEditingPayoutCallbackId(null); setPayoutCallbackUrls(prev => { const c = { ...prev }; delete c[token.id]; return c; }); }} data-testid={`button-cancel-payout-callback-${token.id}`}>
+                            <X className="w-4 h-4 mr-1" /> Annuler
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {token.payoutCallbackUrl ? (
+                          <>
+                            <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-md">
+                              <code className="flex-1 text-xs font-mono truncate text-green-700 dark:text-green-300" data-testid={`text-payout-callback-url-${token.id}`}>{token.payoutCallbackUrl}</code>
+                              <Button variant="ghost" size="sm" onClick={() => copyToClipboard(token.payoutCallbackUrl!, "URL callback payout")} data-testid={`button-copy-payout-callback-${token.id}`}>
+                                <Copy className="w-4 h-4" />
+                              </Button>
+                            </div>
+                            {token.payoutCallbackSecret && (
+                              <div>
+                                <label className="text-xs font-medium text-muted-foreground">Secret HMAC-SHA256 (Payout)</label>
+                                <div className="flex items-center gap-2 p-2 bg-muted rounded-md mt-1">
+                                  <code className="flex-1 text-xs font-mono truncate" data-testid={`text-payout-secret-${token.id}`}>
+                                    {visibleFields[`payout-secret-${token.id}`] ? token.payoutCallbackSecret : maskValue(token.payoutCallbackSecret)}
+                                  </code>
+                                  <Button variant="ghost" size="sm" onClick={() => toggleVisibility(`payout-secret-${token.id}`)} data-testid={`button-toggle-payout-secret-${token.id}`}>
+                                    {visibleFields[`payout-secret-${token.id}`] ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                                  </Button>
+                                  <Button variant="ghost" size="sm" onClick={() => copyToClipboard(token.payoutCallbackSecret!, "Secret payout")} data-testid={`button-copy-payout-secret-${token.id}`}>
+                                    <Copy className="w-3 h-3" />
+                                  </Button>
+                                  <Button variant="ghost" size="sm" onClick={() => regeneratePayoutSecretMutation.mutate(token.id)} disabled={regeneratePayoutSecretMutation.isPending} data-testid={`button-regenerate-payout-secret-${token.id}`}>
+                                    <RefreshCw className="w-3 h-3" />
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
+                            <div className="flex gap-2">
+                              <Button size="sm" variant="outline" onClick={() => { setPayoutCallbackUrls(prev => ({ ...prev, [token.id]: token.payoutCallbackUrl || "" })); setEditingPayoutCallbackId(token.id); }} data-testid={`button-edit-payout-callback-${token.id}`}>Modifier</Button>
+                              <Button size="sm" variant="ghost" onClick={() => { if (confirm("Supprimer ce callback payout ?")) updateMutation.mutate({ id: token.id, data: { payoutCallbackUrl: "" } }); }} disabled={updateMutation.isPending} data-testid={`button-remove-payout-callback-${token.id}`}>Supprimer</Button>
+                            </div>
+                          </>
+                        ) : (
+                          <Button size="sm" variant="outline" onClick={() => setEditingPayoutCallbackId(token.id)} data-testid={`button-add-payout-callback-${token.id}`}>
+                            <Webhook className="w-4 h-4 mr-2" />
+                            Configurer le callback payout
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <Separator className="my-4" />
+
                   <div>
                     <div className="flex items-center gap-2 mb-2">
                       <Settings className="w-4 h-4 text-muted-foreground" />
                       <label className="text-sm font-medium">Options de paiement</label>
                     </div>
 
-                    {editingSettings === apiKey.id ? (
+                    {editingSettingsId === token.id ? (
                       <div className="space-y-4">
                         <div>
                           <label className="text-sm font-medium mb-2 flex items-center gap-2">
@@ -423,25 +470,25 @@ export default function BusinessApiPage() {
                             Pays actives
                           </label>
                           <div className="grid grid-cols-2 gap-2 mt-2">
-                            {activeCountries.map((country) => {
-                              const isChecked = settingsData[apiKey.id]?.allowedCountries?.includes(country.code) || false;
+                            {BUSINESS_COUNTRIES.map((country) => {
+                              const isChecked = settingsData[token.id]?.allowedCountries?.includes(country.code) || false;
                               return (
                                 <div key={country.code} className="flex items-center gap-2">
                                   <Checkbox
-                                    id={`country-${apiKey.id}-${country.code}`}
+                                    id={`country-${token.id}-${country.code}`}
                                     checked={isChecked}
                                     onCheckedChange={(checked) => {
                                       setSettingsData(prev => {
-                                        const current = prev[apiKey.id] || { allowedCountries: [], customerPaysFee: false };
+                                        const current = prev[token.id] || { allowedCountries: [], customerPaysFee: false };
                                         const newAllowed = checked
                                           ? [...current.allowedCountries, country.code]
                                           : current.allowedCountries.filter(c => c !== country.code);
-                                        return { ...prev, [apiKey.id]: { ...current, allowedCountries: newAllowed } };
+                                        return { ...prev, [token.id]: { ...current, allowedCountries: newAllowed } };
                                       });
                                     }}
-                                    data-testid={`checkbox-country-${apiKey.id}-${country.code}`}
+                                    data-testid={`checkbox-country-${token.id}-${country.code}`}
                                   />
-                                  <label htmlFor={`country-${apiKey.id}-${country.code}`} className="text-sm cursor-pointer flex items-center gap-1">
+                                  <label htmlFor={`country-${token.id}-${country.code}`} className="text-sm cursor-pointer flex items-center gap-1">
                                     <CountryFlag code={country.code} size="xs" />
                                     <span>{country.name}</span>
                                   </label>
@@ -451,20 +498,20 @@ export default function BusinessApiPage() {
                           </div>
                         </div>
 
-                        <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                        <div className="flex items-center justify-between gap-4 p-3 bg-muted rounded-lg">
                           <div>
                             <label className="text-sm font-medium">Frais a la charge du client</label>
                             <p className="text-xs text-muted-foreground">Les frais Mobile Money seront ajoutes au montant client</p>
                           </div>
                           <Switch
-                            checked={settingsData[apiKey.id]?.customerPaysFee || false}
+                            checked={settingsData[token.id]?.customerPaysFee || false}
                             onCheckedChange={(checked) => {
                               setSettingsData(prev => {
-                                const current = prev[apiKey.id] || { allowedCountries: [], customerPaysFee: false };
-                                return { ...prev, [apiKey.id]: { ...current, customerPaysFee: checked } };
+                                const current = prev[token.id] || { allowedCountries: [], customerPaysFee: false };
+                                return { ...prev, [token.id]: { ...current, customerPaysFee: checked } };
                               });
                             }}
-                            data-testid={`switch-fee-${apiKey.id}`}
+                            data-testid={`switch-fee-${token.id}`}
                           />
                         </div>
 
@@ -472,16 +519,22 @@ export default function BusinessApiPage() {
                           <Button
                             size="sm"
                             onClick={() => {
-                              const data = settingsData[apiKey.id];
-                              settingsMutation.mutate({ id: apiKey.id, allowedCountries: data?.allowedCountries || [], customerPaysFee: data?.customerPaysFee || false });
+                              const data = settingsData[token.id];
+                              updateMutation.mutate({
+                                id: token.id,
+                                data: {
+                                  allowedCountries: data?.allowedCountries || [],
+                                  customerPaysFee: data?.customerPaysFee || false,
+                                },
+                              });
                             }}
-                            disabled={settingsMutation.isPending}
-                            data-testid={`button-save-settings-${apiKey.id}`}
+                            disabled={updateMutation.isPending}
+                            data-testid={`button-save-settings-${token.id}`}
                           >
                             <Check className="w-4 h-4 mr-1" />
-                            {settingsMutation.isPending ? "..." : "Enregistrer"}
+                            {updateMutation.isPending ? "..." : "Enregistrer"}
                           </Button>
-                          <Button size="sm" variant="ghost" onClick={() => { setEditingSettings(null); setSettingsData(prev => { const c = { ...prev }; delete c[apiKey.id]; return c; }); }} data-testid={`button-cancel-settings-${apiKey.id}`}>
+                          <Button size="sm" variant="ghost" onClick={() => { setEditingSettingsId(null); setSettingsData(prev => { const c = { ...prev }; delete c[token.id]; return c; }); }} data-testid={`button-cancel-settings-${token.id}`}>
                             <X className="w-4 h-4 mr-1" /> Annuler
                           </Button>
                         </div>
@@ -491,25 +544,25 @@ export default function BusinessApiPage() {
                         <div className="space-y-2 text-sm">
                           <div>
                             <span className="text-muted-foreground">Pays actives : </span>
-                            {(apiKey as any).allowedCountries?.length > 0 ? (
+                            {token.allowedCountries && token.allowedCountries.length > 0 ? (
                               <div className="flex flex-wrap gap-1 mt-1">
-                                {(apiKey as any).allowedCountries.map((code: string) => {
+                                {token.allowedCountries.map((code: string) => {
                                   const country = COUNTRIES.find(c => c.code === code);
                                   return (
-                                    <Badge key={code} variant="secondary" className="text-xs">
+                                    <Badge key={code} variant="secondary" className="text-xs" data-testid={`badge-country-${token.id}-${code}`}>
                                       <span className="flex items-center gap-1"><CountryFlag code={code} size="xs" />{country?.name || code}</span>
                                     </Badge>
                                   );
                                 })}
                               </div>
                             ) : (
-                              <span className="font-medium">Tous les pays</span>
+                              <span className="font-medium" data-testid={`text-all-countries-${token.id}`}>Tous les pays</span>
                             )}
                           </div>
                           <div>
                             <span className="text-muted-foreground">Frais : </span>
-                            <Badge variant={(apiKey as any).customerPaysFee ? "default" : "outline"} className="text-xs">
-                              {(apiKey as any).customerPaysFee ? "A la charge du client" : "A votre charge"}
+                            <Badge variant={token.customerPaysFee ? "default" : "outline"} className="text-xs" data-testid={`badge-fee-${token.id}`}>
+                              {token.customerPaysFee ? "A la charge du client" : "A votre charge"}
                             </Badge>
                           </div>
                         </div>
@@ -517,10 +570,10 @@ export default function BusinessApiPage() {
                           size="sm"
                           variant="outline"
                           onClick={() => {
-                            setSettingsData(prev => ({ ...prev, [apiKey.id]: { allowedCountries: (apiKey as any).allowedCountries || [], customerPaysFee: (apiKey as any).customerPaysFee || false } }));
-                            setEditingSettings(apiKey.id);
+                            setSettingsData(prev => ({ ...prev, [token.id]: { allowedCountries: token.allowedCountries || [], customerPaysFee: token.customerPaysFee || false } }));
+                            setEditingSettingsId(token.id);
                           }}
-                          data-testid={`button-edit-settings-${apiKey.id}`}
+                          data-testid={`button-edit-settings-${token.id}`}
                         >
                           <Settings className="w-4 h-4 mr-2" />
                           Configurer
@@ -533,9 +586,13 @@ export default function BusinessApiPage() {
                     <Button
                       variant="destructive"
                       size="sm"
-                      onClick={() => deleteMutation.mutate(apiKey.id)}
+                      onClick={() => {
+                        if (confirm("Supprimer ce token ? Cette action est irreversible.")) {
+                          deleteMutation.mutate(token.id);
+                        }
+                      }}
                       disabled={deleteMutation.isPending}
-                      data-testid={`button-delete-${apiKey.id}`}
+                      data-testid={`button-delete-${token.id}`}
                     >
                       <Trash2 className="w-4 h-4 mr-2" />
                       Supprimer
@@ -549,12 +606,12 @@ export default function BusinessApiPage() {
               <CardContent className="py-12">
                 <div className="text-center">
                   <Key className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-                  <p className="text-muted-foreground mb-4">
-                    Vous n'avez pas encore cree de cle API
+                  <p className="text-muted-foreground mb-4" data-testid="text-empty-state">
+                    Vous n'avez pas encore cree de token API
                   </p>
                   <Button onClick={() => setDialogOpen(true)} data-testid="button-create-first">
                     <Plus className="w-4 h-4 mr-2" />
-                    Creer votre premiere cle API
+                    Creer votre premier token API
                   </Button>
                 </div>
               </CardContent>

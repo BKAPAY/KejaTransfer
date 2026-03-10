@@ -730,6 +730,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { provider, country, operator } = req.params;
       const { incomingEnabled, outgoingEnabled } = req.body;
+      if (incomingEnabled) {
+        await storage.disableOperatorForOtherProviders(provider, country, operator, "incoming", "business");
+      }
+      if (outgoingEnabled) {
+        await storage.disableOperatorForOtherProviders(provider, country, operator, "outgoing", "business");
+      }
       const config = await storage.updateCountryOperatorConfig(provider, country, operator, {
         incomingEnabled,
         outgoingEnabled
@@ -756,6 +762,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { provider, country } = req.params;
       const { payinEnabled, payoutEnabled } = req.body;
+      if (payinEnabled) {
+        await storage.disableCountryForOtherProviders(provider, country, "incoming", "business");
+      }
+      if (payoutEnabled) {
+        await storage.disableCountryForOtherProviders(provider, country, "outgoing", "business");
+      }
       const status = await storage.updateCountryStatus(provider, country, {
         payinEnabled,
         payoutEnabled,
@@ -764,6 +776,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(status);
     } catch (error: any) {
       console.error("Update business country status error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
+  app.get("/api/admin/business/stats", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      res.set({
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      });
+      const stats = await storage.getBusinessAdminStats();
+      res.json(stats);
+    } catch (error: any) {
+      console.error("Business admin stats error:", error);
       res.status(500).json({ error: "Une erreur est survenue" });
     }
   });
@@ -5817,6 +5844,641 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return null;
   }
   
+  async function getBusinessActiveProviderForDeposit(country: string, operator: string): Promise<string | null> {
+    const [configs, countryStatuses, providerConfigs] = await Promise.all([
+      storage.getCountryOperatorConfigs("business"),
+      storage.getCountryStatuses("business"),
+      storage.getProviderConfigs("business"),
+    ]);
+    const activeProviders = new Set(providerConfigs.filter(p => p.isActive).map(p => p.provider));
+    const enabledConfigs = configs.filter(c =>
+      c.country.toUpperCase() === country.toUpperCase() &&
+      c.operator.toLowerCase() === operator.toLowerCase() &&
+      c.incomingEnabled &&
+      activeProviders.has(c.provider)
+    );
+    const enabledCountries = countryStatuses.filter(cs =>
+      cs.country.toUpperCase() === country.toUpperCase() &&
+      cs.payinEnabled &&
+      activeProviders.has(cs.provider)
+    );
+    for (const config of enabledConfigs) {
+      if (enabledCountries.some(c => c.provider === config.provider)) return config.provider;
+    }
+    if (enabledConfigs.length > 0) return enabledConfigs[0].provider;
+    return null;
+  }
+
+  async function getBusinessActiveProviderForWithdrawal(country: string, operator: string): Promise<string | null> {
+    const [configs, countryStatuses, providerConfigs] = await Promise.all([
+      storage.getCountryOperatorConfigs("business"),
+      storage.getCountryStatuses("business"),
+      storage.getProviderConfigs("business"),
+    ]);
+    const activeProviders = new Set(providerConfigs.filter(p => p.isActive).map(p => p.provider));
+    const enabledConfigs = configs.filter(c =>
+      c.country.toUpperCase() === country.toUpperCase() &&
+      c.operator.toLowerCase() === operator.toLowerCase() &&
+      c.outgoingEnabled &&
+      activeProviders.has(c.provider)
+    );
+    const enabledCountries = countryStatuses.filter(cs =>
+      cs.country.toUpperCase() === country.toUpperCase() &&
+      cs.payoutEnabled &&
+      activeProviders.has(cs.provider)
+    );
+    for (const config of enabledConfigs) {
+      if (enabledCountries.some(c => c.provider === config.provider)) return config.provider;
+    }
+    if (enabledConfigs.length > 0) return enabledConfigs[0].provider;
+    return null;
+  }
+
+  // ===== Business API Direct Payin =====
+  app.post("/api/v1/business/payin", async (req: Request, res: Response) => {
+    try {
+      let tokenStr = req.headers.authorization?.replace(/^Bearer\s+/i, "").trim();
+      if (!tokenStr || !tokenStr.startsWith("bt_")) {
+        return res.status(401).json({ success: false, error: { code: "INVALID_TOKEN", message: "Token API invalide. Utilisez: Authorization: Bearer bt_live_..." } });
+      }
+
+      const businessToken = await storage.getBusinessTokenByToken(tokenStr);
+      if (!businessToken || !businessToken.isActive) {
+        return res.status(401).json({ success: false, error: { code: "INVALID_TOKEN", message: "Token API invalide ou désactivé" } });
+      }
+
+      const user = await storage.getUser(businessToken.userId);
+      if (!user || user.accountType !== "business") {
+        return res.status(401).json({ success: false, error: { code: "INVALID_ACCOUNT", message: "Compte entreprise introuvable" } });
+      }
+      if (user.suspended) {
+        return res.status(403).json({ success: false, error: { code: "ACCOUNT_SUSPENDED", message: "Ce compte a été suspendu" } });
+      }
+      if (user.kycStatus !== "verified") {
+        return res.status(403).json({ success: false, error: { code: "ACCOUNT_NOT_VERIFIED", message: "KYC non vérifié" } });
+      }
+
+      const { phone, operator, country, amount, currency, description, orderId, callbackUrl } = req.body;
+      if (!phone || !operator || !country || !amount) {
+        return res.status(400).json({ success: false, error: { code: "INVALID_PARAMETERS", message: "Les champs phone, operator, country et amount sont obligatoires" } });
+      }
+
+      const parsedAmount = Number(amount);
+      if (isNaN(parsedAmount) || parsedAmount <= 0) {
+        return res.status(400).json({ success: false, error: { code: "INVALID_PARAMETERS", message: "Le montant doit être un nombre positif" } });
+      }
+
+      const countryCode = String(country).toUpperCase();
+      const requestedAmount = Math.floor(parsedAmount);
+      let normalizedOperator = String(operator).toLowerCase()
+        .replace(/\s+/g, "-").replace(/-[a-z]{2}$/i, "")
+        .replace(/[-_]money$/i, "").replace(/[-_]mobile$/i, "").replace(/[-_]cash$/i, "");
+
+      if (normalizedOperator === "t-money" || normalizedOperator === "tmoney") normalizedOperator = "tmoney";
+
+      const countryPhoneMap: Record<string, { code: string; digits: number[] }> = {
+        "SN": { code: "221", digits: [9] }, "CI": { code: "225", digits: [10] },
+        "BF": { code: "226", digits: [8] }, "BJ": { code: "229", digits: [8, 10] },
+        "TG": { code: "228", digits: [8] }, "CM": { code: "237", digits: [9] },
+        "CD": { code: "243", digits: [9] }, "CG": { code: "242", digits: [9] },
+        "GA": { code: "241", digits: [8] }, "ZM": { code: "260", digits: [9] },
+        "UG": { code: "256", digits: [9] },
+      };
+
+      let rawPhone = String(phone).replace(/[\s\-\.]+/g, "");
+      let localPhone = rawPhone;
+      const pInfo = countryPhoneMap[countryCode];
+      if (pInfo) {
+        if (localPhone.startsWith("+")) localPhone = localPhone.substring(1);
+        if (localPhone.startsWith("00")) localPhone = localPhone.substring(2);
+        if (localPhone.startsWith(pInfo.code)) {
+          const withoutCode = localPhone.substring(pInfo.code.length);
+          if (pInfo.digits.includes(withoutCode.length)) localPhone = withoutCode;
+        }
+      }
+
+      if (businessToken.allowedCountries && businessToken.allowedCountries.length > 0) {
+        if (!businessToken.allowedCountries.includes(countryCode)) {
+          return res.status(400).json({ success: false, error: { code: "COUNTRY_NOT_ALLOWED", message: `Ce pays n'est pas autorisé pour ce token` } });
+        }
+      }
+
+      const activeProvider = await getBusinessActiveProviderForDeposit(countryCode, normalizedOperator);
+      if (!activeProvider) {
+        return res.status(400).json({ success: false, error: { code: "OPERATOR_UNAVAILABLE", message: `Aucun fournisseur disponible pour ${countryCode}/${operator}` } });
+      }
+
+      const COUNTRY_CURRENCIES: Record<string, string> = {
+        "BJ": "XOF", "TG": "XOF", "SN": "XOF", "CI": "XOF", "BF": "XOF",
+        "CM": "XAF", "GA": "XAF", "CG": "XAF",
+        "CD": "CDF", "ZM": "ZMW", "UG": "UGX",
+      };
+      const requestedCurrency = currency ? String(currency).toUpperCase() : (COUNTRY_CURRENCIES[countryCode] || "XOF");
+
+      const feeConfig = await getFeeFromDatabase(storage, activeProvider, countryCode, normalizedOperator, "business");
+      const customerPaysFee = businessToken.customerPaysFee ?? false;
+      const feeInfo = calculateIncomingFee(requestedAmount, feeConfig.incoming);
+      const netAmountForUser = customerPaysFee ? requestedAmount : feeInfo.netAmount;
+      const txFeeAmount = customerPaysFee ? 0 : feeInfo.feeAmount;
+      const txFeePercentage = customerPaysFee ? 0 : feeInfo.feePercentage;
+
+      const txDescription = description || `Payin API ${requestedAmount} ${requestedCurrency}`;
+
+      let result: { success: boolean; transactionId?: string; error?: string; message?: string; requiresOTP?: boolean; otpInstructions?: string; otpUssdCode?: string; otpHint?: string };
+
+      if (activeProvider === "pawapay") {
+        const { otpCode } = req.body;
+        result = await handlePawaPayDeposit(
+          user.id, user, requestedAmount, countryCode, normalizedOperator, localPhone,
+          requestedCurrency, requestedAmount, requestedCurrency, otpCode,
+          { transactionType: "api_payment", transactionDescription: txDescription, customerPaysFee, extraMetadata: { businessTokenId: businessToken.id, orderId, scope: "business" } }
+        );
+      } else if (activeProvider === "afribapay") {
+        const { otpCode } = req.body;
+        const { handleAfribaPayDeposit } = await import("./afribapay-routes");
+        result = await handleAfribaPayDeposit(
+          user.id, user, requestedAmount, countryCode, normalizedOperator, localPhone, otpCode,
+          requestedCurrency, requestedAmount, requestedCurrency
+        );
+      } else if (activeProvider === "fedapay") {
+        const { handleFedaPayDeposit } = await import("./fedapay-routes");
+        result = await handleFedaPayDeposit(user.id, user, requestedAmount, countryCode, normalizedOperator, localPhone, requestedCurrency, requestedAmount, requestedCurrency);
+      } else if (activeProvider === "mbiyopay") {
+        const { handleMbiyoPayDeposit } = await import("./mbiyopay-routes");
+        result = await handleMbiyoPayDeposit(user.id, user, requestedAmount, countryCode, normalizedOperator, localPhone, requestedCurrency, requestedAmount, requestedCurrency);
+      } else if (activeProvider === "paydunya") {
+        result = { success: false, error: "Paydunya ne supporte pas le payin direct via API. Utilisez la redirection." };
+      } else {
+        result = { success: false, error: "Fournisseur de paiement non supporté" };
+      }
+
+      if (result.requiresOTP) {
+        return res.status(200).json({
+          success: false,
+          requiresOTP: true,
+          otpInstructions: result.otpInstructions,
+          otpUssdCode: result.otpUssdCode,
+          otpHint: result.otpHint,
+          error: result.error,
+        });
+      }
+
+      if (!result.success) {
+        return res.status(400).json({ success: false, error: { code: "TRANSACTION_FAILED", message: result.error || "La transaction a échoué" } });
+      }
+
+      if (result.transactionId) {
+        try {
+          const tx = await storage.getTransaction(result.transactionId);
+          if (tx && tx.metadata) {
+            const meta = JSON.parse(tx.metadata);
+            meta.businessTokenId = businessToken.id;
+            meta.scope = "business";
+            if (orderId) meta.orderId = orderId;
+            await storage.updateTransactionMetadata(result.transactionId, JSON.stringify(meta));
+          }
+        } catch (e) {}
+      }
+
+      const cbUrl = callbackUrl || businessToken.callbackUrl;
+      const cbSecret = businessToken.callbackSecret;
+      if (result.transactionId && cbUrl && cbSecret) {
+        setImmediate(async () => {
+          try {
+            const tx = await storage.getTransaction(result.transactionId!);
+            if (!tx) return;
+            const payinEvent = tx.status === "completed" ? "business.payin.completed" : tx.status === "failed" ? "business.payin.failed" : "business.payin.initiated";
+            const payload = {
+              event: payinEvent,
+              transactionId: tx.id,
+              orderId: orderId || undefined,
+              amount: requestedAmount,
+              currency: requestedCurrency,
+              status: tx.status,
+              country: countryCode,
+              operator: normalizedOperator,
+              phone: localPhone,
+              timestamp: new Date().toISOString(),
+            };
+            const payloadStr = JSON.stringify(payload);
+            const signature = require("crypto").createHmac("sha256", cbSecret).update(payloadStr).digest("hex");
+            const controller = new AbortController();
+            const tid = setTimeout(() => controller.abort(), 10000);
+            await fetch(cbUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "X-BKApay-Signature": signature, "X-BKApay-Event": payinEvent },
+              body: payloadStr,
+              signal: controller.signal,
+            }).finally(() => clearTimeout(tid));
+          } catch (e) { console.error("[Business Payin] Callback error:", e); }
+        });
+      }
+
+      return res.json({
+        success: true,
+        transactionId: result.transactionId,
+        status: "pending",
+        message: result.message || "Payin initié avec succès. Le client doit valider sur son téléphone.",
+        amount: requestedAmount,
+        currency: requestedCurrency,
+      });
+    } catch (error: any) {
+      console.error("[Business Payin] Error:", error);
+      res.status(500).json({ success: false, error: { code: "INTERNAL_ERROR", message: "Une erreur interne est survenue" } });
+    }
+  });
+
+  // ===== Business API Direct Payout =====
+  app.post("/api/v1/business/payout", async (req: Request, res: Response) => {
+    try {
+      let tokenStr = req.headers.authorization?.replace(/^Bearer\s+/i, "").trim();
+      if (!tokenStr || !tokenStr.startsWith("bt_")) {
+        return res.status(401).json({ success: false, error: { code: "INVALID_TOKEN", message: "Token API invalide. Utilisez: Authorization: Bearer bt_live_..." } });
+      }
+
+      const businessToken = await storage.getBusinessTokenByToken(tokenStr);
+      if (!businessToken || !businessToken.isActive) {
+        return res.status(401).json({ success: false, error: { code: "INVALID_TOKEN", message: "Token API invalide ou désactivé" } });
+      }
+
+      const user = await storage.getUser(businessToken.userId);
+      if (!user || user.accountType !== "business") {
+        return res.status(401).json({ success: false, error: { code: "INVALID_ACCOUNT", message: "Compte entreprise introuvable" } });
+      }
+      if (user.suspended) {
+        return res.status(403).json({ success: false, error: { code: "ACCOUNT_SUSPENDED", message: "Ce compte a été suspendu" } });
+      }
+      if (user.kycStatus !== "verified") {
+        return res.status(403).json({ success: false, error: { code: "ACCOUNT_NOT_VERIFIED", message: "KYC non vérifié" } });
+      }
+      if (!user.payoutApiEnabled) {
+        return res.status(403).json({ success: false, error: { code: "PAYOUT_NOT_ACTIVATED", message: "Le payout API n'est pas activé" } });
+      }
+
+      const { phone, operator, country, amount, currency, description, reference } = req.body;
+      if (!phone || !operator || !country || !amount) {
+        return res.status(400).json({ success: false, error: { code: "INVALID_PARAMETERS", message: "Les champs phone, operator, country et amount sont obligatoires" } });
+      }
+
+      const parsedAmount = Number(amount);
+      if (isNaN(parsedAmount) || parsedAmount <= 0) {
+        return res.status(400).json({ success: false, error: { code: "INVALID_PARAMETERS", message: "Le montant doit être un nombre positif" } });
+      }
+
+      const PAYOUT_MIN_AMOUNT = 500;
+      if (parsedAmount < PAYOUT_MIN_AMOUNT) {
+        return res.status(400).json({ success: false, error: { code: "AMOUNT_TOO_LOW", message: `Le montant minimum est de ${PAYOUT_MIN_AMOUNT}` } });
+      }
+
+      const requestedAmount = Math.floor(parsedAmount);
+      const countryCode = String(country).toUpperCase();
+      let normalizedOperator = String(operator).toLowerCase()
+        .replace(/\s+/g, "-").replace(/-[a-z]{2}$/i, "")
+        .replace(/[-_]money$/i, "").replace(/[-_]mobile$/i, "").replace(/[-_]cash$/i, "");
+      if (normalizedOperator === "t-money" || normalizedOperator === "tmoney") normalizedOperator = "tmoney";
+
+      const countryPhoneMap: Record<string, { code: string; digits: number[] }> = {
+        "SN": { code: "221", digits: [9] }, "CI": { code: "225", digits: [10] },
+        "BF": { code: "226", digits: [8] }, "BJ": { code: "229", digits: [8, 10] },
+        "TG": { code: "228", digits: [8] }, "CM": { code: "237", digits: [9] },
+        "CD": { code: "243", digits: [9] }, "CG": { code: "242", digits: [9] },
+        "GA": { code: "241", digits: [8] }, "ZM": { code: "260", digits: [9] },
+        "UG": { code: "256", digits: [9] },
+      };
+
+      let rawPhone = String(phone).replace(/[\s\-\.]+/g, "");
+      let localPhone = rawPhone;
+      const pInfo = countryPhoneMap[countryCode];
+      if (pInfo) {
+        if (localPhone.startsWith("+")) localPhone = localPhone.substring(1);
+        if (localPhone.startsWith("00")) localPhone = localPhone.substring(2);
+        if (localPhone.startsWith(pInfo.code)) {
+          const withoutCode = localPhone.substring(pInfo.code.length);
+          if (pInfo.digits.includes(withoutCode.length)) localPhone = withoutCode;
+        }
+      }
+
+      if (businessToken.allowedCountries && businessToken.allowedCountries.length > 0) {
+        if (!businessToken.allowedCountries.includes(countryCode)) {
+          return res.status(400).json({ success: false, error: { code: "COUNTRY_NOT_ALLOWED", message: `Ce pays n'est pas autorisé pour ce token` } });
+        }
+      }
+
+      const activeProvider = await getBusinessActiveProviderForWithdrawal(countryCode, normalizedOperator);
+      if (!activeProvider) {
+        return res.status(400).json({ success: false, error: { code: "OPERATOR_UNAVAILABLE", message: `Aucun fournisseur disponible pour le payout en ${countryCode}/${operator}` } });
+      }
+
+      const COUNTRY_CURRENCIES: Record<string, string> = {
+        "BJ": "XOF", "TG": "XOF", "SN": "XOF", "CI": "XOF", "BF": "XOF",
+        "CM": "XAF", "GA": "XAF", "CG": "XAF",
+        "CD": "CDF", "ZM": "ZMW", "UG": "UGX",
+      };
+      const requestedCurrency = currency ? String(currency).toUpperCase() : (COUNTRY_CURRENCIES[countryCode] || "XOF");
+
+      const wallet = await storage.getBusinessWallet(user.id, countryCode, requestedCurrency);
+      const walletBalance = wallet?.balance || 0;
+
+      const feeConfig = await getFeeFromDatabase(storage, activeProvider, countryCode, normalizedOperator, "business");
+      const feeInfo = calculateOutgoingFeeFromNet(requestedAmount, feeConfig.outgoing);
+
+      if (walletBalance < feeInfo.totalDeductedFromBalance) {
+        return res.status(400).json({ success: false, error: { code: "INSUFFICIENT_FUNDS", message: `Solde insuffisant dans le wallet ${countryCode} (${requestedCurrency})` } });
+      }
+
+      let result: { success: boolean; transactionId?: string; error?: string; message?: string };
+
+      if (activeProvider === "pawapay") {
+        result = await handlePawaPayWithdrawal(user.id, user, requestedAmount, countryCode, normalizedOperator, localPhone, requestedCurrency, requestedCurrency, true);
+      } else if (activeProvider === "fedapay") {
+        result = await handleFedaPayWithdrawal(user.id, user, requestedAmount, countryCode, normalizedOperator, localPhone, requestedCurrency, true);
+      } else if (activeProvider === "mbiyopay") {
+        result = await handleMbiyoPayWithdrawal(user.id, user, requestedAmount, countryCode, normalizedOperator, localPhone, requestedCurrency, requestedCurrency, true);
+      } else if (activeProvider === "moneyfusion") {
+        result = await handleMoneyFusionWithdrawal(user.id, user, requestedAmount, countryCode, normalizedOperator, localPhone, requestedCurrency, true);
+      } else if (activeProvider === "paydunya") {
+        const { callPaydunyaAPIv2 } = await import("./utils/paydunya");
+        const countryWithdrawModes: Record<string, Record<string, string>> = {
+          "SN": { "orange": "orange-money-senegal", "free": "free-money-senegal", "wave": "wave-senegal" },
+          "CI": { "orange": "orange-money-ci", "mtn": "mtn-ci", "moov": "moov-ci" },
+          "BF": { "orange": "orange-money-burkina", "moov": "moov-burkina-faso" },
+          "BJ": { "moov": "moov-benin", "mtn": "mtn-benin" },
+          "TG": { "tmoney": "t-money-togo", "moov": "moov-togo" },
+          "CM": { "mtn": "mtn-cameroun" },
+        };
+        const withdrawMode = countryWithdrawModes[countryCode]?.[normalizedOperator];
+        if (!withdrawMode) {
+          result = { success: false, error: "Opérateur non supporté via ce fournisseur" };
+        } else {
+          const callbackBaseUrl = process.env.BASE_URL || "https://bkapay.com";
+          const getInvoiceResp = await callPaydunyaAPIv2("/disburse/get-invoice", {
+            account_alias: localPhone, amount: requestedAmount,
+            withdraw_mode: withdrawMode, callback_url: `${callbackBaseUrl}/api/webhooks/paydunya-disburse`,
+          });
+          if (getInvoiceResp.response_code !== "00" || !getInvoiceResp.disburse_token) {
+            result = { success: false, error: "Échec de l'initialisation du payout" };
+          } else {
+            const submitResp = await callPaydunyaAPIv2("/disburse/submit-invoice", {
+              disburse_invoice: getInvoiceResp.disburse_token,
+              disburse_id: `biz-payout-${user.id.substring(0, 8)}-${Date.now()}`,
+            });
+            if (submitResp.response_code !== "00") {
+              result = { success: false, error: "Échec de l'envoi du payout" };
+            } else {
+              await storage.debitBusinessWallet(user.id, countryCode, requestedCurrency, feeInfo.totalDeductedFromBalance);
+              const tx = await storage.createTransaction({
+                userId: user.id, type: "withdrawal",
+                amount: requestedAmount, fee: feeInfo.feeAmount,
+                feePercentage: feeInfo.feePercentage, currency: requestedCurrency,
+                status: "completed", country: countryCode, operator: normalizedOperator,
+                customerPhone: localPhone,
+                description: description || `Business Payout ${requestedAmount} ${requestedCurrency}`,
+                metadata: JSON.stringify({ provider: "paydunya", businessTokenId: businessToken.id, reference, scope: "business", netMode: true }),
+              });
+              result = { success: true, transactionId: tx.id, message: "Payout effectué avec succès" };
+            }
+          }
+        }
+      } else {
+        result = { success: false, error: "Aucun fournisseur disponible" };
+      }
+
+      if (!result.success) {
+        return res.status(400).json({ success: false, error: { code: "TRANSACTION_FAILED", message: result.error || "La transaction a échoué" } });
+      }
+
+      if (result.transactionId) {
+        try {
+          const tx = await storage.getTransaction(result.transactionId);
+          if (tx && tx.metadata) {
+            const meta = JSON.parse(tx.metadata);
+            meta.businessTokenId = businessToken.id;
+            meta.scope = "business";
+            if (reference) meta.reference = reference;
+            await storage.updateTransactionMetadata(result.transactionId, JSON.stringify(meta));
+          }
+        } catch (e) {}
+      }
+
+      const payoutCbUrl = businessToken.payoutCallbackUrl;
+      const payoutCbSecret = businessToken.payoutCallbackSecret;
+      if (result.transactionId && payoutCbUrl && payoutCbSecret) {
+        setImmediate(async () => {
+          try {
+            const tx = await storage.getTransaction(result.transactionId!);
+            if (!tx) return;
+            const payoutEvent = tx.status === "completed" ? "business.payout.completed" : tx.status === "failed" ? "business.payout.failed" : "business.payout.pending";
+            const payload = {
+              event: payoutEvent,
+              transactionId: tx.id,
+              reference: reference || undefined,
+              amount: requestedAmount,
+              currency: requestedCurrency,
+              status: tx.status,
+              country: countryCode,
+              operator: normalizedOperator,
+              phone: localPhone,
+              timestamp: new Date().toISOString(),
+            };
+            const payloadStr = JSON.stringify(payload);
+            const signature = require("crypto").createHmac("sha256", payoutCbSecret).update(payloadStr).digest("hex");
+            const controller = new AbortController();
+            const tid = setTimeout(() => controller.abort(), 10000);
+            await fetch(payoutCbUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "X-BKApay-Signature": signature, "X-BKApay-Event": payoutEvent },
+              body: payloadStr,
+              signal: controller.signal,
+            }).finally(() => clearTimeout(tid));
+          } catch (e) { console.error("[Business Payout] Callback error:", e); }
+        });
+      }
+
+      return res.json({
+        success: true,
+        transactionId: result.transactionId,
+        status: "pending",
+        message: result.message || "Payout initié avec succès",
+        amount: requestedAmount,
+        currency: requestedCurrency,
+      });
+    } catch (error: any) {
+      console.error("[Business Payout] Error:", error);
+      res.status(500).json({ success: false, error: { code: "INTERNAL_ERROR", message: "Une erreur interne est survenue" } });
+    }
+  });
+
+  // ===== Business API Status Checks =====
+  app.get("/api/v1/business/payin/:id/status", async (req: Request, res: Response) => {
+    try {
+      let tokenStr = req.headers.authorization?.replace(/^Bearer\s+/i, "").trim();
+      if (!tokenStr || !tokenStr.startsWith("bt_")) {
+        return res.status(401).json({ success: false, error: "Token API invalide" });
+      }
+      const businessToken = await storage.getBusinessTokenByToken(tokenStr);
+      if (!businessToken || !businessToken.isActive) {
+        return res.status(401).json({ success: false, error: "Token invalide" });
+      }
+      const tx = await storage.getTransaction(req.params.id);
+      if (!tx || tx.userId !== businessToken.userId) {
+        return res.status(404).json({ success: false, error: "Transaction non trouvée" });
+      }
+      return res.json({
+        success: true,
+        transactionId: tx.id,
+        status: tx.status,
+        amount: tx.amount,
+        currency: tx.currency,
+        country: tx.country,
+        operator: tx.operator,
+        createdAt: tx.createdAt,
+      });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: "Erreur interne" });
+    }
+  });
+
+  app.get("/api/v1/business/payout/:id/status", async (req: Request, res: Response) => {
+    try {
+      let tokenStr = req.headers.authorization?.replace(/^Bearer\s+/i, "").trim();
+      if (!tokenStr || !tokenStr.startsWith("bt_")) {
+        return res.status(401).json({ success: false, error: "Token API invalide" });
+      }
+      const businessToken = await storage.getBusinessTokenByToken(tokenStr);
+      if (!businessToken || !businessToken.isActive) {
+        return res.status(401).json({ success: false, error: "Token invalide" });
+      }
+      const tx = await storage.getTransaction(req.params.id);
+      if (!tx || tx.userId !== businessToken.userId) {
+        return res.status(404).json({ success: false, error: "Transaction non trouvée" });
+      }
+      return res.json({
+        success: true,
+        transactionId: tx.id,
+        status: tx.status,
+        amount: tx.amount,
+        currency: tx.currency,
+        country: tx.country,
+        operator: tx.operator,
+        createdAt: tx.createdAt,
+      });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: "Erreur interne" });
+    }
+  });
+
+  // ===== Business Token Management Routes =====
+  app.get("/api/business/tokens", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || user.accountType !== "business") {
+        return res.status(403).json({ error: "Compte entreprise requis" });
+      }
+      const tokens = await storage.getBusinessTokensByUserId(user.id);
+      res.json(tokens);
+    } catch (error: any) {
+      res.status(500).json({ error: "Erreur interne" });
+    }
+  });
+
+  app.post("/api/business/tokens", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || user.accountType !== "business") {
+        return res.status(403).json({ error: "Compte entreprise requis" });
+      }
+      const existing = await storage.getBusinessTokensByUserId(user.id);
+      if (existing.length >= 3) {
+        return res.status(400).json({ error: "Maximum 3 tokens autorisés" });
+      }
+      const tokenStr = `bt_live_${require("crypto").randomUUID().replace(/-/g, '')}`;
+      const name = req.body.name || "Token API";
+      const token = await storage.createBusinessToken({ userId: user.id, token: tokenStr, name });
+      res.json(token);
+    } catch (error: any) {
+      res.status(500).json({ error: "Erreur interne" });
+    }
+  });
+
+  app.put("/api/business/tokens/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || user.accountType !== "business") {
+        return res.status(403).json({ error: "Compte entreprise requis" });
+      }
+      const { name, callbackUrl, payoutCallbackUrl, allowedCountries, customerPaysFee } = req.body;
+      const token = await storage.updateBusinessToken(req.params.id, user.id, {
+        ...(name !== undefined && { name }),
+        ...(callbackUrl !== undefined && { callbackUrl }),
+        ...(payoutCallbackUrl !== undefined && { payoutCallbackUrl }),
+        ...(allowedCountries !== undefined && { allowedCountries }),
+        ...(customerPaysFee !== undefined && { customerPaysFee }),
+      });
+      if (!token) return res.status(404).json({ error: "Token non trouvé" });
+      res.json(token);
+    } catch (error: any) {
+      res.status(500).json({ error: "Erreur interne" });
+    }
+  });
+
+  app.post("/api/business/tokens/:id/regenerate", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || user.accountType !== "business") {
+        return res.status(403).json({ error: "Compte entreprise requis" });
+      }
+      const token = await storage.regenerateBusinessToken(req.params.id, user.id);
+      if (!token) return res.status(404).json({ error: "Token non trouvé" });
+      res.json(token);
+    } catch (error: any) {
+      res.status(500).json({ error: "Erreur interne" });
+    }
+  });
+
+  app.delete("/api/business/tokens/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || user.accountType !== "business") {
+        return res.status(403).json({ error: "Compte entreprise requis" });
+      }
+      const deleted = await storage.deleteBusinessToken(req.params.id, user.id);
+      if (!deleted) return res.status(404).json({ error: "Token non trouvé" });
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: "Erreur interne" });
+    }
+  });
+
+  app.post("/api/business/tokens/:id/regenerate-callback-secret", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || user.accountType !== "business") {
+        return res.status(403).json({ error: "Compte entreprise requis" });
+      }
+      const newSecret = `bks_${require("crypto").randomUUID().replace(/-/g, '')}`;
+      const token = await storage.updateBusinessToken(req.params.id, user.id, { callbackSecret: newSecret });
+      if (!token) return res.status(404).json({ error: "Token non trouvé" });
+      res.json(token);
+    } catch (error: any) {
+      res.status(500).json({ error: "Erreur interne" });
+    }
+  });
+
+  app.post("/api/business/tokens/:id/regenerate-payout-secret", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || user.accountType !== "business") {
+        return res.status(403).json({ error: "Compte entreprise requis" });
+      }
+      const newSecret = `bkps_${require("crypto").randomUUID().replace(/-/g, '')}`;
+      const token = await storage.updateBusinessToken(req.params.id, user.id, { payoutCallbackSecret: newSecret });
+      if (!token) return res.status(404).json({ error: "Token non trouvé" });
+      res.json(token);
+    } catch (error: any) {
+      res.status(500).json({ error: "Erreur interne" });
+    }
+  });
+
   // Deposit Route - Multi-Provider
   app.post("/api/fedapay/deposit", requireAuth, async (req: Request, res: Response) => {
     try {
