@@ -6391,11 +6391,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (existing.length >= 3) {
         return res.status(400).json({ error: "Maximum 3 tokens autorisés" });
       }
-      const tokenStr = `bt_live_${require("crypto").randomUUID().replace(/-/g, '')}`;
+      const tokenStr = `bt_live_${randomUUID().replace(/-/g, '')}`;
       const name = req.body.name || "Token API";
       const token = await storage.createBusinessToken({ userId: user.id, token: tokenStr, name });
       res.json(token);
     } catch (error: any) {
+      console.error("[Business Token Create] Error:", error?.message || error);
       res.status(500).json({ error: "Erreur interne" });
     }
   });
@@ -6455,7 +6456,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!user || user.accountType !== "business") {
         return res.status(403).json({ error: "Compte entreprise requis" });
       }
-      const newSecret = `bks_${require("crypto").randomUUID().replace(/-/g, '')}`;
+      const newSecret = `bks_${randomUUID().replace(/-/g, '')}`;
       const token = await storage.updateBusinessToken(req.params.id, user.id, { callbackSecret: newSecret });
       if (!token) return res.status(404).json({ error: "Token non trouvé" });
       res.json(token);
@@ -6470,7 +6471,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!user || user.accountType !== "business") {
         return res.status(403).json({ error: "Compte entreprise requis" });
       }
-      const newSecret = `bkps_${require("crypto").randomUUID().replace(/-/g, '')}`;
+      const newSecret = `bkps_${randomUUID().replace(/-/g, '')}`;
       const token = await storage.updateBusinessToken(req.params.id, user.id, { payoutCallbackSecret: newSecret });
       if (!token) return res.status(404).json({ error: "Token non trouvé" });
       res.json(token);

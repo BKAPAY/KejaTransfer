@@ -112,29 +112,27 @@ export default function BusinessDashboard() {
                   data-testid={`wallet-card-${key.toLowerCase()}`}
                   className="transition-colors"
                 >
-                  <CardContent className="flex items-center justify-between gap-4 py-4 px-5">
-                    <div className="flex items-center gap-3 min-w-0">
+                  <CardContent className="py-4 px-5 space-y-2">
+                    <div className="flex items-center gap-3">
                       <span className="text-2xl flex-shrink-0">{info.flag}</span>
-                      <div className="min-w-0">
+                      <div>
                         <p className="font-medium leading-tight">{info.name}</p>
                         <p className="text-xs text-muted-foreground">{info.currency}</p>
                       </div>
-                    </div>
-                    <div className="text-right flex-shrink-0">
-                      <p
-                        className={`font-bold text-lg tabular-nums ${
-                          isPositive ? "text-foreground" : "text-muted-foreground"
-                        }`}
-                        data-testid={`wallet-balance-${key.toLowerCase()}`}
-                      >
-                        {formatCurrency(balance, info.currency)}
-                      </p>
                       {isPositive && (
-                        <Badge variant="secondary" className="text-xs mt-0.5">
+                        <Badge variant="secondary" className="text-xs ml-auto">
                           Actif
                         </Badge>
                       )}
                     </div>
+                    <p
+                      className={`font-bold text-xl tabular-nums ${
+                        isPositive ? "text-foreground" : "text-muted-foreground"
+                      }`}
+                      data-testid={`wallet-balance-${key.toLowerCase()}`}
+                    >
+                      {formatCurrency(balance, info.currency)}
+                    </p>
                   </CardContent>
                 </Card>
               );
