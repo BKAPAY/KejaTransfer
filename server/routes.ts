@@ -5965,7 +5965,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const activeProvider = await getBusinessActiveProviderForDeposit(countryCode, normalizedOperator);
       if (!activeProvider) {
-        return res.status(400).json({ success: false, error: { code: "OPERATOR_UNAVAILABLE", message: `Aucun fournisseur disponible pour ${countryCode}/${operator}` } });
+        return res.status(400).json({ success: false, error: { code: "OPERATOR_UNAVAILABLE", message: `L'opérateur ${operator} n'est pas disponible pour ce pays` } });
       }
 
       const COUNTRY_CURRENCIES: Record<string, string> = {
@@ -6007,10 +6007,113 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const { handleMbiyoPayDeposit } = await import("./mbiyopay-routes");
         result = await handleMbiyoPayDeposit(user.id, user, requestedAmount, countryCode, normalizedOperator, localPhone, requestedCurrency, requestedAmount, requestedCurrency);
       } else if (activeProvider === "paydunya") {
-        result = { success: false, error: "Paydunya ne supporte pas le payin direct via API. Utilisez la redirection." };
+        const paydunyaData = {
+          invoice: {
+            total_amount: requestedAmount,
+            description: txDescription,
+            customer: {
+              name: "Client",
+              email: "noreply@bkapay.com",
+              phone: localPhone,
+            },
+          },
+          store: { name: "BKApay" },
+          custom_data: {
+            type: "api_payment",
+            country: countryCode,
+            operator: normalizedOperator,
+            phone: localPhone,
+            scope: "business",
+            businessTokenId: businessToken.id,
+            orderId: orderId || null,
+          },
+          actions: {
+            callback_url: `${process.env.BASE_URL || 'https://bkapay.com'}/api/webhooks/paydunya`,
+          },
+        };
+
+        const paydunyaResponse = await callPaydunyaAPI("/checkout-invoice/create", paydunyaData);
+
+        if (paydunyaResponse.response_code !== "00" || !paydunyaResponse.token) {
+          result = { success: false, error: "Impossible d'initier le paiement" };
+        } else {
+          const tx = await storage.createTransaction({
+            userId: user.id,
+            type: "api_payment",
+            amount: requestedAmount,
+            fee: txFeeAmount,
+            feePercentage: txFeePercentage,
+            currency: requestedCurrency,
+            status: "pending",
+            country: countryCode,
+            operator: normalizedOperator,
+            description: txDescription,
+            customerPhone: localPhone,
+            paydunyaToken: paydunyaResponse.token,
+            metadata: JSON.stringify({
+              paydunyaToken: paydunyaResponse.token,
+              provider: "paydunya",
+              country: countryCode,
+              operator: normalizedOperator,
+              netAmountForUser,
+              businessTokenId: businessToken.id,
+              orderId: orderId || null,
+              scope: "business",
+              customerPaysFee,
+              feeAmount: txFeeAmount,
+            }),
+          });
+
+          const operatorKey = getOperatorKey(normalizedOperator, countryCode);
+          if (operatorKey) {
+            const paymentData: SoftpayPaymentData = {
+              customerName: "Client",
+              customerEmail: "noreply@bkapay.com",
+              phoneNumber: localPhone.replace(/\s+/g, "").replace(/[^0-9]/g, ""),
+              invoiceToken: paydunyaResponse.token,
+            };
+
+            const softpayResult = await callPaydunyaSoftpay(normalizedOperator, countryCode, paymentData);
+
+            if (softpayResult.success) {
+              const opConfig = SOFTPAY_OPERATORS[operatorKey];
+              const needsOTP = opConfig?.requiresOTP || false;
+
+              if (needsOTP) {
+                result = {
+                  success: true,
+                  transactionId: tx.id,
+                  requiresOTP: true,
+                  otpInstructions: opConfig?.ussdInstruction || undefined,
+                  message: "Veuillez valider le paiement sur votre téléphone.",
+                };
+              } else {
+                result = {
+                  success: true,
+                  transactionId: tx.id,
+                  message: softpayResult.message || "Paiement initié. Veuillez valider sur votre téléphone.",
+                };
+              }
+            } else {
+              result = { success: true, transactionId: tx.id, message: "Paiement initié. Veuillez valider sur votre téléphone." };
+            }
+          } else {
+            result = { success: true, transactionId: tx.id, message: "Paiement initié. Veuillez valider sur votre téléphone." };
+          }
+        }
       } else {
-        result = { success: false, error: "Fournisseur de paiement non supporté" };
+        result = { success: false, error: "Service de paiement temporairement indisponible" };
       }
+
+      const providerNames = ["pawapay", "paydunya", "fedapay", "mbiyopay", "moneyfusion", "afribapay", "PawaPay", "Paydunya", "FedaPay", "MbiyoPay", "MoneyFusion", "AfribaPay"];
+      const sanitizeBusinessError = (msg: string | undefined): string => {
+        if (!msg) return "La transaction a échoué";
+        let sanitized = msg;
+        for (const name of providerNames) {
+          sanitized = sanitized.replace(new RegExp(name, "gi"), "BKApay");
+        }
+        return sanitized;
+      };
 
       if (result.requiresOTP) {
         return res.status(200).json({
@@ -6019,12 +6122,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           otpInstructions: result.otpInstructions,
           otpUssdCode: result.otpUssdCode,
           otpHint: result.otpHint,
-          error: result.error,
+          error: sanitizeBusinessError(result.error),
         });
       }
 
       if (!result.success) {
-        return res.status(400).json({ success: false, error: { code: "TRANSACTION_FAILED", message: result.error || "La transaction a échoué" } });
+        return res.status(400).json({ success: false, error: { code: "TRANSACTION_FAILED", message: sanitizeBusinessError(result.error) } });
       }
 
       if (result.transactionId) {
@@ -6166,7 +6269,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const activeProvider = await getBusinessActiveProviderForWithdrawal(countryCode, normalizedOperator);
       if (!activeProvider) {
-        return res.status(400).json({ success: false, error: { code: "OPERATOR_UNAVAILABLE", message: `Aucun fournisseur disponible pour le payout en ${countryCode}/${operator}` } });
+        return res.status(400).json({ success: false, error: { code: "OPERATOR_UNAVAILABLE", message: `L'opérateur ${operator} n'est pas disponible pour le payout dans ce pays` } });
       }
 
       const COUNTRY_CURRENCIES: Record<string, string> = {
@@ -6197,7 +6300,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else if (activeProvider === "moneyfusion") {
         result = await handleMoneyFusionWithdrawal(user.id, user, requestedAmount, countryCode, normalizedOperator, localPhone, requestedCurrency, true);
       } else if (activeProvider === "paydunya") {
-        const { callPaydunyaAPIv2 } = await import("./utils/paydunya");
         const countryWithdrawModes: Record<string, Record<string, string>> = {
           "SN": { "orange": "orange-money-senegal", "free": "free-money-senegal", "wave": "wave-senegal" },
           "CI": { "orange": "orange-money-ci", "mtn": "mtn-ci", "moov": "moov-ci" },
@@ -6208,7 +6310,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
         const withdrawMode = countryWithdrawModes[countryCode]?.[normalizedOperator];
         if (!withdrawMode) {
-          result = { success: false, error: "Opérateur non supporté via ce fournisseur" };
+          result = { success: false, error: "Cet opérateur n'est pas disponible pour le payout dans ce pays" };
         } else {
           const callbackBaseUrl = process.env.BASE_URL || "https://bkapay.com";
           const getInvoiceResp = await callPaydunyaAPIv2("/disburse/get-invoice", {
@@ -6216,14 +6318,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             withdraw_mode: withdrawMode, callback_url: `${callbackBaseUrl}/api/webhooks/paydunya-disburse`,
           });
           if (getInvoiceResp.response_code !== "00" || !getInvoiceResp.disburse_token) {
-            result = { success: false, error: "Échec de l'initialisation du payout" };
+            result = { success: false, error: "Impossible d'initier le payout" };
           } else {
             const submitResp = await callPaydunyaAPIv2("/disburse/submit-invoice", {
               disburse_invoice: getInvoiceResp.disburse_token,
               disburse_id: `biz-payout-${user.id.substring(0, 8)}-${Date.now()}`,
             });
             if (submitResp.response_code !== "00") {
-              result = { success: false, error: "Échec de l'envoi du payout" };
+              result = { success: false, error: "Le payout n'a pas pu être traité" };
             } else {
               await storage.debitBusinessWallet(user.id, countryCode, requestedCurrency, feeInfo.totalDeductedFromBalance);
               const tx = await storage.createTransaction({
@@ -6240,11 +6342,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
       } else {
-        result = { success: false, error: "Aucun fournisseur disponible" };
+        result = { success: false, error: "Service de payout temporairement indisponible" };
       }
 
+      const providerNames = ["pawapay", "paydunya", "fedapay", "mbiyopay", "moneyfusion", "afribapay", "PawaPay", "Paydunya", "FedaPay", "MbiyoPay", "MoneyFusion", "AfribaPay"];
+      const sanitizePayoutError = (msg: string | undefined): string => {
+        if (!msg) return "La transaction a échoué";
+        let sanitized = msg;
+        for (const name of providerNames) {
+          sanitized = sanitized.replace(new RegExp(name, "gi"), "BKApay");
+        }
+        return sanitized;
+      };
+
       if (!result.success) {
-        return res.status(400).json({ success: false, error: { code: "TRANSACTION_FAILED", message: result.error || "La transaction a échoué" } });
+        return res.status(400).json({ success: false, error: { code: "TRANSACTION_FAILED", message: sanitizePayoutError(result.error) } });
       }
 
       if (result.transactionId) {

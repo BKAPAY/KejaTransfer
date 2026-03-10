@@ -40,8 +40,9 @@ The frontend uses React 18 with TypeScript, Shadcn UI, and Tailwind CSS for a pr
   - **API Payout v1.5** (`POST /api/v1/payout`): Send money to mobile money numbers via API key.
   - **Business API v2.0** (Direct payin/payout for business accounts):
     - Single `bt_live_...` token for authentication (table: `business_tokens`).
-    - `POST /api/v1/business/payin`: Direct mobile money collection (no redirect). Body: `{phone, operator, country, amount, currency}`.
+    - `POST /api/v1/business/payin`: Direct mobile money collection (no redirect). Body: `{phone, operator, country, amount, currency}`. Supports all providers including Paydunya (invoice + Softpay STK push).
     - `POST /api/v1/business/payout`: Direct mobile money disbursement. Debits business wallet per country.
+    - **Provider Transparency**: All business API responses are provider-agnostic. Error messages are sanitized to never expose internal provider names (PawaPay, Paydunya, FedaPay, etc.). Generic error codes: `OPERATOR_UNAVAILABLE`, `TRANSACTION_FAILED`, `INTERNAL_ERROR`.
     - `GET /api/v1/business/payin/:id/status` and `GET /api/v1/business/payout/:id/status`: Status check endpoints.
     - Token management: `GET/POST/PUT/DELETE /api/business/tokens`, regenerate, callback secret management.
     - Uses business-scope provider configs, fee configs, country-operator configs (scope="business").
