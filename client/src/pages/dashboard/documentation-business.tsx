@@ -38,7 +38,9 @@ function CodeBlock({ label, description, code, copyCode, testId }: {
 
 export default function DocumentationBusiness() {
   const { toast } = useToast();
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
+  const isDashboard = location.startsWith("/dashboard");
+  const backUrl = isDashboard ? "/dashboard/docs" : "/docs";
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "https://bkapay.com";
 
   const copyCode = (code: string) => {
@@ -362,7 +364,7 @@ echo json_encode(['received' => true]);
           variant="ghost"
           size="sm"
           className="mb-4"
-          onClick={() => setLocation("/dashboard/docs")}
+          onClick={() => setLocation(backUrl)}
           data-testid="button-back-doc-landing-biz"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />

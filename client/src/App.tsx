@@ -305,12 +305,9 @@ function Router() {
       <Route path="/documentation/:version">
         {(params) => <DocumentationVersion version={params.version} />}
       </Route>
-      <Route path="/documentation">
-        {() => {
-          window.location.replace(`/documentation/${CURRENT_VERSION}`);
-          return null;
-        }}
-      </Route>
+      <Route path="/documentation" component={DocumentationLanding} />
+      <Route path="/docs" component={DocumentationLanding} />
+      <Route path="/documentation-business" component={DocumentationBusiness} />
       <Route path="/signup" component={Signup} />
       <Route path="/login" component={Login} />
       <Route path="/login-verify" component={LoginVerify} />

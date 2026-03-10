@@ -241,7 +241,7 @@ export default function ApiPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Link href="/dashboard/documentation">
+          <Link href="/dashboard/docs">
             <Button variant="outline" data-testid="button-view-documentation">
               <ExternalLink className="w-4 h-4 mr-2" />
               Documentation

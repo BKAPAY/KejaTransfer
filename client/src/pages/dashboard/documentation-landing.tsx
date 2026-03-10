@@ -1,12 +1,18 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { User, Building2, ArrowRight } from "lucide-react";
 import { useLocation } from "wouter";
 import { CURRENT_VERSION } from "@/lib/doc-versions";
 
 export default function DocumentationLanding() {
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
+  const isDashboard = location.startsWith("/dashboard");
+  const personalUrl = isDashboard
+    ? `/dashboard/documentation/${CURRENT_VERSION}`
+    : `/documentation/${CURRENT_VERSION}`;
+  const businessUrl = isDashboard
+    ? "/dashboard/documentation-business"
+    : "/documentation-business";
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] p-6">
@@ -22,7 +28,7 @@ export default function DocumentationLanding() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl w-full">
         <Card
           className="cursor-pointer hover-elevate border-2 transition-colors"
-          onClick={() => setLocation(`/dashboard/documentation/${CURRENT_VERSION}`)}
+          onClick={() => setLocation(personalUrl)}
           data-testid="card-doc-personal"
         >
           <CardHeader className="text-center pb-2">
@@ -60,7 +66,7 @@ export default function DocumentationLanding() {
 
         <Card
           className="cursor-pointer hover-elevate border-2 transition-colors"
-          onClick={() => setLocation("/dashboard/documentation-business")}
+          onClick={() => setLocation(businessUrl)}
           data-testid="card-doc-business"
         >
           <CardHeader className="text-center pb-2">

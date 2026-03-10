@@ -197,7 +197,7 @@ export default function Home() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem asChild>
-                  <Link href="/documentation" data-testid="menu-documentation">
+                  <Link href="/docs" data-testid="menu-documentation">
                     Documentation
                   </Link>
                 </DropdownMenuItem>
