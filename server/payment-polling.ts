@@ -103,6 +103,80 @@ export async function sendApiPayoutCallback(transactionId: string, metadata: any
   attempt_send();
 }
 
+/**
+ * Sends the business webhook callback when a business transaction status changes via polling.
+ * Checks if the transaction metadata contains scope="business" and businessTokenId.
+ * Retries every 3 seconds for up to 15 minutes if the server doesn't respond with 2xx.
+ */
+async function sendBusinessWebhookCallback(
+  transactionId: string,
+  finalStatus: "completed" | "failed",
+  txType: "payin" | "payout"
+): Promise<void> {
+  try {
+    const tx = await storage.getTransaction(transactionId);
+    if (!tx) return;
+
+    let metadata: any = {};
+    try { metadata = JSON.parse(tx.metadata || "{}"); } catch {}
+
+    if (metadata.scope !== "business" || !metadata.businessTokenId) return;
+
+    const businessToken = await storage.getBusinessTokenById(metadata.businessTokenId);
+    if (!businessToken) return;
+
+    const isPayin = txType === "payin";
+    const cbUrl = isPayin ? businessToken.callbackUrl : (businessToken.payoutCallbackUrl || businessToken.callbackUrl);
+    const cbSecret = isPayin ? businessToken.callbackSecret : (businessToken.payoutCallbackSecret || businessToken.callbackSecret);
+
+    if (!cbUrl || !cbSecret) return;
+
+    const event = `business.${txType}.${finalStatus}`;
+    const timestamp = new Date().toISOString();
+    const payload: any = {
+      event,
+      transactionId: tx.id,
+      amount: tx.amount,
+      currency: tx.currency,
+      status: finalStatus,
+      country: tx.country,
+      operator: tx.operator,
+      timestamp,
+    };
+    if (metadata.orderId) payload.orderId = metadata.orderId;
+    if (metadata.reference) payload.reference = metadata.reference;
+    if (tx.customerPhone) payload.phone = tx.customerPhone;
+
+    const payloadStr = JSON.stringify(payload);
+
+    const MAX_ATTEMPTS = 300;
+    const RETRY_INTERVAL_MS = 3000;
+    let attempt = 0;
+
+    const attemptSend = async () => {
+      attempt++;
+      const success = await tryDeliverApiPayoutWebhook(cbUrl, cbSecret, payloadStr, event, timestamp);
+
+      if (success) {
+        console.log(`[BusinessWebhook] Webhook delivered to ${cbUrl} for tx ${transactionId} (${event}) — attempt ${attempt}`);
+        return;
+      }
+
+      console.warn(`[BusinessWebhook] Attempt ${attempt}/${MAX_ATTEMPTS} failed for tx ${transactionId} — retrying in ${RETRY_INTERVAL_MS / 1000}s`);
+
+      if (attempt < MAX_ATTEMPTS) {
+        setTimeout(attemptSend, RETRY_INTERVAL_MS);
+      } else {
+        console.error(`[BusinessWebhook] Gave up after ${MAX_ATTEMPTS} attempts for tx ${transactionId} (${event})`);
+      }
+    };
+
+    attemptSend();
+  } catch (error) {
+    console.error(`[BusinessWebhook] Error preparing webhook for tx ${transactionId}:`, error);
+  }
+}
+
 const PAYDUNYA_MASTER_KEY = process.env.PAYDUNYA_MASTER_KEY;
 const PAYDUNYA_PRIVATE_KEY = process.env.PAYDUNYA_PRIVATE_KEY;
 const PAYDUNYA_TOKEN = process.env.PAYDUNYA_TOKEN;
@@ -235,6 +309,7 @@ async function processFedaPayTransaction(transaction: Transaction & { user?: Use
         if (updatedFedaTx) {
           trySendPaymentCallback(updatedFedaTx, 'payment.completed', '[PaymentPolling/FedaPay]');
         }
+        setImmediate(() => sendBusinessWebhookCallback(transaction.id, "completed", "payin"));
       } else {
         console.log(`[PaymentPolling] FedaPay transaction ${transaction.id} already processed - skipping`);
       }
@@ -242,6 +317,7 @@ async function processFedaPayTransaction(transaction: Transaction & { user?: Use
     } else if (fedapayStatus.status === "declined" || fedapayStatus.status === "canceled" || fedapayStatus.status === "refunded") {
       console.log(`[PaymentPolling] ❌ FedaPay transaction ${transaction.id} failed/cancelled (status: ${fedapayStatus.status})`);
       await storage.updateTransactionStatus(transaction.id, "failed");
+      setImmediate(() => sendBusinessWebhookCallback(transaction.id, "failed", "payin"));
       return true;
     } else {
       // Still pending
@@ -249,6 +325,7 @@ async function processFedaPayTransaction(transaction: Transaction & { user?: Use
         const timeoutMinutes = Math.round(PAYMENT_TIMEOUT_MS / 60000);
         console.log(`[PaymentPolling] ⏱️ FedaPay transaction ${transaction.id} TIMEOUT (${timeoutMinutes}min) - marking as failed`);
         await storage.updateTransactionStatus(transaction.id, "failed");
+        setImmediate(() => sendBusinessWebhookCallback(transaction.id, "failed", "payin"));
         return true;
       }
       console.log(`[PaymentPolling] ⏳ FedaPay transaction ${transaction.id} still pending (${remainingSeconds}s remaining)`);
@@ -259,6 +336,7 @@ async function processFedaPayTransaction(transaction: Transaction & { user?: Use
     if (hasPaymentExpired(transaction)) {
       console.log(`[PaymentPolling] ⏱️ FedaPay transaction ${transaction.id} expired with error - marking as failed`);
       await storage.updateTransactionStatus(transaction.id, "failed");
+      setImmediate(() => sendBusinessWebhookCallback(transaction.id, "failed", "payin"));
       return true;
     }
     return false;
@@ -293,6 +371,7 @@ async function processNowPaymentsTransaction(transaction: Transaction & { user?:
       if (hasPaymentExpired(transaction)) {
         console.log(`[PaymentPolling] ⏱️ NOWPayments transaction ${transaction.id} TIMEOUT - marking as failed`);
         await storage.updateTransactionStatus(transaction.id, "failed");
+        setImmediate(() => sendBusinessWebhookCallback(transaction.id, "failed", "payin"));
         return true;
       }
       return false;
@@ -311,6 +390,7 @@ async function processNowPaymentsTransaction(transaction: Transaction & { user?:
         if (updatedNowTx) {
           trySendPaymentCallback(updatedNowTx, 'payment.completed', '[PaymentPolling/NOWPayments]');
         }
+        setImmediate(() => sendBusinessWebhookCallback(transaction.id, "completed", "payin"));
       } else {
         console.log(`[PaymentPolling] NOWPayments transaction ${transaction.id} already processed - skipping`);
       }
@@ -323,6 +403,7 @@ async function processNowPaymentsTransaction(transaction: Transaction & { user?:
       if (failedNowTx) {
         trySendPaymentCallback(failedNowTx, 'payment.failed', '[PaymentPolling/NOWPayments]');
       }
+      setImmediate(() => sendBusinessWebhookCallback(transaction.id, "failed", "payin"));
       return true;
     } else {
       // Still pending (waiting, confirming, sending, partially_paid)
@@ -330,6 +411,7 @@ async function processNowPaymentsTransaction(transaction: Transaction & { user?:
         const timeoutMinutes = Math.round(CRYPTO_TIMEOUT_MS / 60000);
         console.log(`[PaymentPolling] ⏱️ NOWPayments transaction ${transaction.id} TIMEOUT (${timeoutMinutes}min) - marking as failed`);
         await storage.updateTransactionStatus(transaction.id, "failed");
+        setImmediate(() => sendBusinessWebhookCallback(transaction.id, "failed", "payin"));
         return true;
       }
       console.log(`[PaymentPolling] ⏳ NOWPayments transaction ${transaction.id} still pending (status: ${status.payment_status}, ${remainingSeconds}s remaining)`);
@@ -340,6 +422,7 @@ async function processNowPaymentsTransaction(transaction: Transaction & { user?:
     if (hasPaymentExpired(transaction)) {
       console.log(`[PaymentPolling] ⏱️ NOWPayments transaction ${transaction.id} expired with error - marking as failed`);
       await storage.updateTransactionStatus(transaction.id, "failed");
+      setImmediate(() => sendBusinessWebhookCallback(transaction.id, "failed", "payin"));
       return true;
     }
     return false;
@@ -419,11 +502,13 @@ async function processMbiyoPayTransaction(transaction: Transaction & { user?: Us
     
     if (hasPaymentExpired(transaction)) {
       console.log(`[PaymentPolling] MbiyoPay transaction ${transaction.id} expired without receiving mbiyopayTransactionId - marking as failed`);
-      if (transaction.type === "withdrawal" || transaction.type === "transfer") {
+      const isOutgoingNoId = transaction.type === "withdrawal" || transaction.type === "transfer";
+      if (isOutgoingNoId) {
         await safeRefundOutgoingTransaction(transaction.id, transaction.userId, metadata, "polling-mbiyopay-expired-no-id");
       }
       await storage.updateTransactionStatus(transaction.id, "failed");
       setImmediate(() => sendApiPayoutCallback(transaction.id, metadata, "failed"));
+      setImmediate(() => sendBusinessWebhookCallback(transaction.id, "failed", isOutgoingNoId ? "payout" : "payin"));
       return true;
     }
     console.log(`[PaymentPolling] Waiting for MbiyoPay transaction ID for ${transaction.id} (${remainingSeconds}s remaining)`);
@@ -483,6 +568,7 @@ async function processMbiyoPayTransaction(transaction: Transaction & { user?: Us
             if (updatedMbiyoTx) {
               trySendPaymentCallback(updatedMbiyoTx, 'payment.completed', '[PaymentPolling/MbiyoPay]');
             }
+            setImmediate(() => sendBusinessWebhookCallback(transaction.id, "completed", "payin"));
           } else {
             console.log(`[PaymentPolling] MbiyoPay transaction ${transaction.id} already processed - skipping`);
           }
@@ -490,6 +576,7 @@ async function processMbiyoPayTransaction(transaction: Transaction & { user?: Us
           await storage.updateTransactionStatus(transaction.id, "completed");
           console.log(`[PaymentPolling] ✅ MbiyoPay ${transaction.type} ${transaction.id} COMPLETED (double-verified)`);
           setImmediate(() => sendApiPayoutCallback(transaction.id, metadata, "completed"));
+          setImmediate(() => sendBusinessWebhookCallback(transaction.id, "completed", "payout"));
         }
         return true;
       } 
@@ -507,11 +594,13 @@ async function processMbiyoPayTransaction(transaction: Transaction & { user?: Us
         // Grace period passed - getMbiyoPayTransactionStatus with the real mbiyopayTransactionId is the AUTHORITATIVE source
         // We trust the direct API status and do NOT override it with order_id search which can return wrong transactions
         console.log(`[PaymentPolling] ❌ MbiyoPay transaction ${transaction.id} confirmed ${status} after grace period (authoritative source: getMbiyoPayTransactionStatus with ID ${mbiyopayTransactionId})`);
-        if (transaction.type === "withdrawal" || transaction.type === "transfer") {
+        const isOutgoingMbiyo = transaction.type === "withdrawal" || transaction.type === "transfer";
+        if (isOutgoingMbiyo) {
           await safeRefundOutgoingTransaction(transaction.id, transaction.userId, metadata, "polling-mbiyopay-failed");
         }
         await storage.updateTransactionStatus(transaction.id, "failed");
         setImmediate(() => sendApiPayoutCallback(transaction.id, metadata, "failed"));
+        setImmediate(() => sendBusinessWebhookCallback(transaction.id, "failed", isOutgoingMbiyo ? "payout" : "payin"));
         return true;
       } 
       // Still pending
@@ -528,6 +617,7 @@ async function processMbiyoPayTransaction(transaction: Transaction & { user?: Us
           console.log(`[PaymentPolling] ⏱️ MbiyoPay transaction ${transaction.id} TIMEOUT (${timeoutMinutes}min) - marking as failed`);
           await storage.updateTransactionStatus(transaction.id, "failed");
           setImmediate(() => sendApiPayoutCallback(transaction.id, metadata, "failed"));
+          setImmediate(() => sendBusinessWebhookCallback(transaction.id, "failed", "payin"));
           return true;
         }
         console.log(`[PaymentPolling] ⏳ MbiyoPay transaction ${transaction.id} still pending (status: ${status}, ${remainingSeconds}s remaining)`);
@@ -544,6 +634,7 @@ async function processMbiyoPayTransaction(transaction: Transaction & { user?: Us
         }
         console.log(`[PaymentPolling] ⏱️ MbiyoPay transaction ${transaction.id} expired with API error - marking as failed`);
         await storage.updateTransactionStatus(transaction.id, "failed");
+        setImmediate(() => sendBusinessWebhookCallback(transaction.id, "failed", "payin"));
         return true;
       }
       console.log(`[PaymentPolling] MbiyoPay API error for ${transaction.id}: ${statusResult.error}, will retry (${remainingSeconds}s remaining)`);
@@ -561,6 +652,7 @@ async function processMbiyoPayTransaction(transaction: Transaction & { user?: Us
       }
       console.log(`[PaymentPolling] ⏱️ MbiyoPay transaction ${transaction.id} expired with error - marking as failed`);
       await storage.updateTransactionStatus(transaction.id, "failed");
+      setImmediate(() => sendBusinessWebhookCallback(transaction.id, "failed", "payin"));
       return true;
     }
     return false;
@@ -588,6 +680,7 @@ async function processAfribaPayIncoming(transaction: Transaction & { user?: User
       if (hasPaymentExpired(transaction)) {
         console.log(`[PaymentPolling] ⏱️ AfribaPay incoming ${transaction.id} TIMEOUT - API error - marking failed`);
         await storage.updateTransactionStatus(transaction.id, "failed");
+        setImmediate(() => sendBusinessWebhookCallback(transaction.id, "failed", "payin"));
         return true;
       }
       console.log(`[PaymentPolling] AfribaPay incoming ${transaction.id} API error: ${result.error}, will retry (${remainingSeconds}s remaining)`);
@@ -607,6 +700,7 @@ async function processAfribaPayIncoming(transaction: Transaction & { user?: User
       if (!fingerprint.valid) {
         console.error(`[PaymentPolling] 🚨 AfribaPay fingerprint INVALIDE pour ${transaction.id}: ${fingerprint.reason} - CREDIT BLOQUE`);
         await storage.updateTransactionStatus(transaction.id, "failed");
+        setImmediate(() => sendBusinessWebhookCallback(transaction.id, "failed", "payin"));
         return true;
       }
 
@@ -617,6 +711,7 @@ async function processAfribaPayIncoming(transaction: Transaction & { user?: User
         if (updatedTx) {
           trySendPaymentCallback(updatedTx, 'payment.completed', '[PaymentPolling/AfribaPay]');
         }
+        setImmediate(() => sendBusinessWebhookCallback(transaction.id, "completed", "payin"));
       } else {
         console.log(`[PaymentPolling] AfribaPay incoming ${transaction.id} already processed - skipping`);
       }
@@ -628,11 +723,13 @@ async function processAfribaPayIncoming(transaction: Transaction & { user?: User
       if (failedTx) {
         trySendPaymentCallback(failedTx, 'payment.failed', '[PaymentPolling/AfribaPay]');
       }
+      setImmediate(() => sendBusinessWebhookCallback(transaction.id, "failed", "payin"));
       return true;
     } else {
       if (hasPaymentExpired(transaction)) {
-        console.log(`[PaymentPolling] ⏱️ AfribaPay incoming ${transaction.id} TIMEOUT (10min) - marking failed`);
+        console.log(`[PaymentPolling] ⏱️ AfribaPay incoming ${transaction.id} TIMEOUT (15min) - marking failed`);
         await storage.updateTransactionStatus(transaction.id, "failed");
+        setImmediate(() => sendBusinessWebhookCallback(transaction.id, "failed", "payin"));
         return true;
       }
       console.log(`[PaymentPolling] ⏳ AfribaPay incoming ${transaction.id} still pending (raw: ${result.status}, ${remainingSeconds}s remaining)`);
@@ -643,6 +740,7 @@ async function processAfribaPayIncoming(transaction: Transaction & { user?: User
     if (hasPaymentExpired(transaction)) {
       console.log(`[PaymentPolling] ⏱️ AfribaPay incoming ${transaction.id} expired with error - marking failed`);
       await storage.updateTransactionStatus(transaction.id, "failed");
+      setImmediate(() => sendBusinessWebhookCallback(transaction.id, "failed", "payin"));
       return true;
     }
     return false;
@@ -684,12 +782,14 @@ async function processAfribaPayPayout(transaction: Transaction & { user?: User }
       await storage.updateTransactionStatus(transaction.id, "completed");
       console.log(`[PaymentPolling] ✅ AfribaPay payout ${transaction.id} COMPLETED`);
       setImmediate(() => sendApiPayoutCallback(transaction.id, metadata, "completed"));
+      setImmediate(() => sendBusinessWebhookCallback(transaction.id, "completed", "payout"));
       return true;
     } else if (mappedStatus === "failed") {
       console.log(`[PaymentPolling] ❌ AfribaPay payout ${transaction.id} FAILED (raw: ${result.status}) - refunding user`);
       await safeRefundOutgoingTransaction(transaction.id, transaction.userId, metadata, "polling-afribapay-payout-failed");
       await storage.updateTransactionStatus(transaction.id, "failed");
       setImmediate(() => sendApiPayoutCallback(transaction.id, metadata, "failed"));
+      setImmediate(() => sendBusinessWebhookCallback(transaction.id, "failed", "payout"));
       return true;
     } else {
       if (hasPaymentExpired(transaction)) {
@@ -757,20 +857,23 @@ async function processFedaPayPayout(transaction: Transaction & { user?: User }, 
       await storage.updateTransactionStatus(transaction.id, "completed");
       console.log(`[PaymentPolling] ✅ FedaPay payout ${transaction.id} COMPLETED`);
       setImmediate(() => sendApiPayoutCallback(transaction.id, metadata, "completed"));
+      setImmediate(() => sendBusinessWebhookCallback(transaction.id, "completed", "payout"));
       return true;
     } else if (payoutStatus.status === "declined" || payoutStatus.status === "canceled" || payoutStatus.status === "failed") {
       console.log(`[PaymentPolling] ❌ FedaPay payout ${transaction.id} failed (status: ${payoutStatus.status})`);
       await safeRefundOutgoingTransaction(transaction.id, transaction.userId, metadata, "polling-fedapay-failed");
       await storage.updateTransactionStatus(transaction.id, "failed");
       setImmediate(() => sendApiPayoutCallback(transaction.id, metadata, "failed"));
+      setImmediate(() => sendBusinessWebhookCallback(transaction.id, "failed", "payout"));
       return true;
     } else {
       // Still pending
       if (hasPaymentExpired(transaction)) {
-        console.log(`[PaymentPolling] ⏱️ FedaPay payout ${transaction.id} TIMEOUT (10min) - marking as failed`);
+        console.log(`[PaymentPolling] ⏱️ FedaPay payout ${transaction.id} TIMEOUT (15min) - marking as failed`);
         await safeRefundOutgoingTransaction(transaction.id, transaction.userId, metadata, "polling-fedapay-timeout");
         await storage.updateTransactionStatus(transaction.id, "failed");
         setImmediate(() => sendApiPayoutCallback(transaction.id, metadata, "failed"));
+        setImmediate(() => sendBusinessWebhookCallback(transaction.id, "failed", "payout"));
         return true;
       }
       console.log(`[PaymentPolling] ⏳ FedaPay payout ${transaction.id} still pending (${remainingSeconds}s remaining)`);
@@ -783,6 +886,7 @@ async function processFedaPayPayout(transaction: Transaction & { user?: User }, 
       await safeRefundOutgoingTransaction(transaction.id, transaction.userId, metadata, "polling-fedapay-error-timeout");
       await storage.updateTransactionStatus(transaction.id, "failed");
       setImmediate(() => sendApiPayoutCallback(transaction.id, metadata, "failed"));
+      setImmediate(() => sendBusinessWebhookCallback(transaction.id, "failed", "payout"));
       return true;
     }
     return false;
@@ -798,6 +902,7 @@ async function processPaydunyaTransaction(transaction: Transaction & { user?: Us
     if (hasPaymentExpired(transaction)) {
       console.log(`[PaymentPolling] Transaction ${transaction.id} expired without Paydunya token - marking as failed`);
       await storage.updateTransactionStatus(transaction.id, "failed");
+      setImmediate(() => sendBusinessWebhookCallback(transaction.id, "failed", "payin"));
     } else {
       console.log(`[PaymentPolling] Transaction ${transaction.id} waiting for Paydunya token (${remainingSeconds}s remaining)`);
     }
@@ -812,6 +917,7 @@ async function processPaydunyaTransaction(transaction: Transaction & { user?: Us
     if (hasPaymentExpired(transaction)) {
       console.log(`[PaymentPolling] Transaction ${transaction.id} expired with no Paydunya response - marking as failed`);
       await storage.updateTransactionStatus(transaction.id, "failed");
+      setImmediate(() => sendBusinessWebhookCallback(transaction.id, "failed", "payin"));
     } else {
       console.log(`[PaymentPolling] Transaction ${transaction.id} - Paydunya not responding, will retry (${remainingSeconds}s remaining)`);
     }
@@ -842,16 +948,19 @@ async function processPaydunyaTransaction(transaction: Transaction & { user?: Us
       if (updatedPaydTx) {
         trySendPaymentCallback(updatedPaydTx, 'payment.completed', '[PaymentPolling/Paydunya]');
       }
+      setImmediate(() => sendBusinessWebhookCallback(transaction.id, "completed", "payin"));
     } else {
       console.log(`[PaymentPolling] Paydunya transaction ${transaction.id} already processed - skipping`);
     }
   } else if (paymentStatus === "cancelled" || paymentStatus === "canceled" || paymentStatus === "failed" || paymentStatus === "fail") {
     console.log(`[PaymentPolling] ❌ Paydunya transaction ${transaction.id} failed/cancelled (status: ${paymentStatus})`);
     await storage.updateTransactionStatus(transaction.id, "failed");
+    setImmediate(() => sendBusinessWebhookCallback(transaction.id, "failed", "payin"));
   } else {
     if (hasPaymentExpired(transaction)) {
-      console.log(`[PaymentPolling] ⏱️ Paydunya transaction ${transaction.id} TIMEOUT (10min) with pending status "${paymentStatus}" - marking as failed`);
+      console.log(`[PaymentPolling] ⏱️ Paydunya transaction ${transaction.id} TIMEOUT (15min) with pending status "${paymentStatus}" - marking as failed`);
       await storage.updateTransactionStatus(transaction.id, "failed");
+      setImmediate(() => sendBusinessWebhookCallback(transaction.id, "failed", "payin"));
     } else {
       console.log(`[PaymentPolling] ⏳ Paydunya transaction ${transaction.id} still pending (status: ${paymentStatus}, ${remainingSeconds}s remaining)`);
     }
@@ -880,16 +989,19 @@ async function processPawaPayDeposit(transaction: Transaction & { user?: User },
         if (updatedTx) {
           trySendPaymentCallback(updatedTx, 'payment.completed', '[PaymentPolling/PawaPay]');
         }
+        setImmediate(() => sendBusinessWebhookCallback(transaction.id, "completed", "payin"));
       } else {
         console.log(`[PaymentPolling] PawaPay deposit ${transaction.id} already processed - skipping`);
       }
     } else if (mappedStatus === "failed") {
       console.log(`[PaymentPolling] ❌ PawaPay deposit ${transaction.id} failed (raw status: ${result.status})`);
       await storage.updateTransactionStatus(transaction.id, "failed");
+      setImmediate(() => sendBusinessWebhookCallback(transaction.id, "failed", "payin"));
     } else {
       if (hasPaymentExpired(transaction)) {
         console.log(`[PaymentPolling] ⏱️ PawaPay deposit ${transaction.id} TIMEOUT - marking as failed`);
         await storage.updateTransactionStatus(transaction.id, "failed");
+        setImmediate(() => sendBusinessWebhookCallback(transaction.id, "failed", "payin"));
       } else {
         console.log(`[PaymentPolling] ⏳ PawaPay deposit ${transaction.id} still pending (${remainingSeconds}s remaining)`);
       }
@@ -898,6 +1010,7 @@ async function processPawaPayDeposit(transaction: Transaction & { user?: User },
     console.error(`[PaymentPolling] Error checking PawaPay deposit ${transaction.id}:`, error);
     if (hasPaymentExpired(transaction)) {
       await storage.updateTransactionStatus(transaction.id, "failed");
+      setImmediate(() => sendBusinessWebhookCallback(transaction.id, "failed", "payin"));
     }
   }
 }
@@ -923,15 +1036,18 @@ async function processPawaPayPayout(transaction: Transaction & { user?: User }, 
       if (updatedTx) {
         trySendPaymentCallback(updatedTx, 'payment.completed', '[PaymentPolling/PawaPay/Payout]');
       }
+      setImmediate(() => sendBusinessWebhookCallback(transaction.id, "completed", "payout"));
     } else if (mappedStatus === "failed") {
       console.log(`[PaymentPolling] ❌ PawaPay payout ${transaction.id} failed (raw: ${result.status}) - refunding`);
       await safeRefundOutgoingTransaction(transaction.id, transaction.userId, metadata, "polling-pawapay-payout-failed");
       await storage.updateTransactionStatus(transaction.id, "failed");
+      setImmediate(() => sendBusinessWebhookCallback(transaction.id, "failed", "payout"));
     } else {
       if (hasPaymentExpired(transaction)) {
         console.log(`[PaymentPolling] ⏱️ PawaPay payout ${transaction.id} TIMEOUT - refunding`);
         await safeRefundOutgoingTransaction(transaction.id, transaction.userId, metadata, "polling-pawapay-payout-timeout");
         await storage.updateTransactionStatus(transaction.id, "failed");
+        setImmediate(() => sendBusinessWebhookCallback(transaction.id, "failed", "payout"));
       } else {
         console.log(`[PaymentPolling] ⏳ PawaPay payout ${transaction.id} still pending (${remainingSeconds}s remaining)`);
       }
@@ -941,6 +1057,7 @@ async function processPawaPayPayout(transaction: Transaction & { user?: User }, 
     if (hasPaymentExpired(transaction)) {
       await safeRefundOutgoingTransaction(transaction.id, transaction.userId, metadata, "polling-pawapay-payout-error");
       await storage.updateTransactionStatus(transaction.id, "failed");
+      setImmediate(() => sendBusinessWebhookCallback(transaction.id, "failed", "payout"));
     }
   }
 }

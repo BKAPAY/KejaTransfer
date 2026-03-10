@@ -189,6 +189,7 @@ export interface IStorage {
   // Business Tokens
   createBusinessToken(data: { userId: string; token: string; name: string }): Promise<schema.BusinessToken>;
   getBusinessTokenByToken(token: string): Promise<schema.BusinessToken | undefined>;
+  getBusinessTokenById(id: string): Promise<schema.BusinessToken | undefined>;
   getBusinessTokensByUserId(userId: string): Promise<schema.BusinessToken[]>;
   updateBusinessToken(id: string, userId: string, updates: Partial<Pick<schema.BusinessToken, 'name' | 'callbackUrl' | 'payoutCallbackUrl' | 'callbackSecret' | 'payoutCallbackSecret' | 'isActive' | 'allowedCountries' | 'customerPaysFee'>>): Promise<schema.BusinessToken | undefined>;
   deleteBusinessToken(id: string, userId: string): Promise<boolean>;
@@ -2136,6 +2137,11 @@ export class DbStorage implements IStorage {
 
   async getBusinessTokenByToken(tokenStr: string): Promise<schema.BusinessToken | undefined> {
     const [token] = await db.select().from(schema.businessTokens).where(eq(schema.businessTokens.token, tokenStr));
+    return token;
+  }
+
+  async getBusinessTokenById(id: string): Promise<schema.BusinessToken | undefined> {
+    const [token] = await db.select().from(schema.businessTokens).where(eq(schema.businessTokens.id, id));
     return token;
   }
 
