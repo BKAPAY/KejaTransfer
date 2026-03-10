@@ -182,7 +182,8 @@ export async function handlePawaPayWithdrawal(
   userCurrency?: string,
   targetCurrency?: string,
   netMode?: boolean,
-  providerAmountOverride?: number
+  providerAmountOverride?: number,
+  skipBalanceOps?: boolean
 ): Promise<{ success: boolean; transactionId?: string; message?: string; error?: string }> {
   try {
     const countryUpper = country.toUpperCase();
@@ -204,7 +205,7 @@ export async function handlePawaPayWithdrawal(
       ? calculateOutgoingFeeFromNet(grossAmount, feeConfig.outgoing)
       : calculateOutgoingFee(grossAmount, feeConfig.outgoing);
 
-    if (user.balance < feeInfo.totalDeductedFromBalance) {
+    if (!skipBalanceOps && user.balance < feeInfo.totalDeductedFromBalance) {
       return { success: false, error: "Solde insuffisant sur votre compte. Veuillez effectuer un dépôt avant de retirer." };
     }
 
@@ -228,7 +229,9 @@ export async function handlePawaPayWithdrawal(
     const orderId = netMode ? `BKAPAY-API-${Date.now()}` : `BKAPAY-WD-${Date.now()}`;
     const startTime = Date.now();
 
-    await storage.updateUserBalance(userId, -feeInfo.totalDeductedFromBalance);
+    if (!skipBalanceOps) {
+      await storage.updateUserBalance(userId, -feeInfo.totalDeductedFromBalance);
+    }
 
     const tx = await storage.createTransaction({
       userId,
@@ -271,7 +274,9 @@ export async function handlePawaPayWithdrawal(
     });
 
     if (!result.success) {
-      await storage.updateUserBalance(userId, feeInfo.totalDeductedFromBalance);
+      if (!skipBalanceOps) {
+        await storage.updateUserBalance(userId, feeInfo.totalDeductedFromBalance);
+      }
       await storage.updateTransactionStatus(tx.id, "failed");
       return { success: false, transactionId: tx.id, error: result.error || "Retrait échoué" };
     }
@@ -531,14 +536,29 @@ export async function handlePawaPayWebhook(req: Request, res: Response): Promise
             console.log(`[PawaPay Webhook] Payout ${tx.id} already processed by another process`);
           }
         } else if (mappedStatus === "failed") {
-          const refundAmount = meta.deductedFromBalance || tx.amount;
-          // ATOMIC: Fails and refunds in one DB transaction — prevents double-refund
-          const refunded = await storage.atomicFailAndRefundPayout(tx.id, tx.userId, refundAmount);
-          if (refunded) {
-            console.log(`[PawaPay Webhook] Payout ${tx.id} failed — refunded ${refundAmount} to user ${tx.userId}`);
+          if (meta.scope === "business") {
+            const refundAmount = meta.deductedFromBalance || tx.amount;
+            const country = tx.country || meta.country;
+            const currency = tx.currency || meta.balanceCurrency;
+            if (country && currency) {
+              try {
+                await storage.creditBusinessWallet(tx.userId, country, currency, refundAmount);
+                await storage.updateTransactionStatus(tx.id, "failed");
+                console.log(`[PawaPay Webhook] Business payout ${tx.id} failed — refunded ${refundAmount} ${currency} to business wallet ${country}`);
+              } catch (err) {
+                console.error(`[PawaPay Webhook] CRITICAL: Failed to refund business wallet for payout ${tx.id}:`, err);
+              }
+            }
             await sendApiPayoutCallback(tx.id, meta, "failed");
           } else {
-            console.log(`[PawaPay Webhook] Payout ${tx.id} already processed by another process`);
+            const refundAmount = meta.deductedFromBalance || tx.amount;
+            const refunded = await storage.atomicFailAndRefundPayout(tx.id, tx.userId, refundAmount);
+            if (refunded) {
+              console.log(`[PawaPay Webhook] Payout ${tx.id} failed — refunded ${refundAmount} to user ${tx.userId}`);
+              await sendApiPayoutCallback(tx.id, meta, "failed");
+            } else {
+              console.log(`[PawaPay Webhook] Payout ${tx.id} already processed by another process`);
+            }
           }
         }
       }
@@ -612,14 +632,29 @@ export async function pollPawaPayTransaction(txId: string): Promise<void> {
           console.log(`[PawaPay Poll] Payout ${txId} already processed by another process`);
         }
       } else if (mappedStatus === "failed") {
-        const refundAmount = meta.deductedFromBalance || tx.amount;
-        // ATOMIC: Fails and refunds in one DB transaction — prevents double-refund
-        const refunded = await storage.atomicFailAndRefundPayout(txId, tx.userId, refundAmount);
-        if (refunded) {
-          console.log(`[PawaPay Poll] Payout ${txId} failed — refunded ${refundAmount} to user ${tx.userId}`);
+        if (meta.scope === "business") {
+          const refundAmount = meta.deductedFromBalance || tx.amount;
+          const country = tx.country || meta.country;
+          const currency = tx.currency || meta.balanceCurrency;
+          if (country && currency) {
+            try {
+              await storage.creditBusinessWallet(tx.userId, country, currency, refundAmount);
+              await storage.updateTransactionStatus(txId, "failed");
+              console.log(`[PawaPay Poll] Business payout ${txId} failed — refunded ${refundAmount} ${currency} to business wallet ${country}`);
+            } catch (err) {
+              console.error(`[PawaPay Poll] CRITICAL: Failed to refund business wallet for payout ${txId}:`, err);
+            }
+          }
           await sendApiPayoutCallback(txId, meta, "failed");
         } else {
-          console.log(`[PawaPay Poll] Payout ${txId} already processed by another process`);
+          const refundAmount = meta.deductedFromBalance || tx.amount;
+          const refunded = await storage.atomicFailAndRefundPayout(txId, tx.userId, refundAmount);
+          if (refunded) {
+            console.log(`[PawaPay Poll] Payout ${txId} failed — refunded ${refundAmount} to user ${tx.userId}`);
+            await sendApiPayoutCallback(txId, meta, "failed");
+          } else {
+            console.log(`[PawaPay Poll] Payout ${txId} already processed by another process`);
+          }
         }
       }
     }

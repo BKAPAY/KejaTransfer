@@ -143,7 +143,8 @@ export async function handleMbiyoPayWithdrawal(
   userCurrency?: string,
   targetCurrency?: string,
   netMode?: boolean,
-  providerAmountOverride?: number
+  providerAmountOverride?: number,
+  skipBalanceOps?: boolean
 ): Promise<{ success: boolean; transactionId?: string; message?: string; error?: string }> {
   try {
     const countryLower = country.toLowerCase();
@@ -172,11 +173,10 @@ export async function handleMbiyoPayWithdrawal(
       ? calculateOutgoingFeeFromNet(grossAmount, feeConfig.outgoing)
       : calculateOutgoingFee(grossAmount, feeConfig.outgoing);
 
-    if (user.balance < feeInfo.totalDeductedFromBalance) {
+    if (!skipBalanceOps && user.balance < feeInfo.totalDeductedFromBalance) {
       return { success: false, error: "Solde insuffisant" };
     }
 
-    // Use providerAmountOverride when set (avoids double-conversion in cross-currency API payouts)
     let amountForProvider: number;
     if (providerAmountOverride !== undefined) {
       amountForProvider = providerAmountOverride;
@@ -203,8 +203,9 @@ export async function handleMbiyoPayWithdrawal(
     const orderId = `BKAPAY-WD-${Date.now()}`;
     const startTime = Date.now();
 
-    // Debit balance BEFORE API call
-    await storage.updateUserBalance(userId, -feeInfo.totalDeductedFromBalance);
+    if (!skipBalanceOps) {
+      await storage.updateUserBalance(userId, -feeInfo.totalDeductedFromBalance);
+    }
 
     // Create transaction BEFORE calling MbiyoPay API so it always appears in history
     const tx = await storage.createTransaction({
@@ -246,7 +247,9 @@ export async function handleMbiyoPayWithdrawal(
     });
 
     if (!result.success && !result.transactionId) {
-      await storage.updateUserBalance(userId, feeInfo.totalDeductedFromBalance);
+      if (!skipBalanceOps) {
+        await storage.updateUserBalance(userId, feeInfo.totalDeductedFromBalance);
+      }
       await storage.updateTransactionStatus(tx.id, "failed");
       return { success: false, transactionId: tx.id, error: result.error || "Retrait echoue" };
     }

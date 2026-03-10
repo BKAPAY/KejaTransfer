@@ -200,6 +200,22 @@ export async function safeRefundOutgoingTransaction(
     return false;
   }
 
+  if (latestMeta.scope === "business") {
+    const country = latestTx.country || latestMeta.country;
+    const currency = latestTx.currency || latestMeta.balanceCurrency || latestMeta.providerCurrency;
+    if (country && currency) {
+      try {
+        await storage.creditBusinessWallet(userId, country, currency, refundAmount);
+        await storage.updateTransactionStatus(transactionId, "failed");
+        console.log(`[SafeRefund] ✅ Refunded ${refundAmount} ${currency} to business wallet ${country} for transaction ${transactionId} (source: ${source})`);
+        return true;
+      } catch (err) {
+        console.error(`[SafeRefund] CRITICAL: Failed to refund business wallet for ${transactionId}:`, err);
+        return false;
+      }
+    }
+  }
+
   const success = await storage.atomicMarkRefundedAndCredit(transactionId, userId, refundAmount, source);
   if (!success) {
     console.log(`[SafeRefund] Transaction ${transactionId} not eligible for refund (already refunded or wrong status) - skipping (source: ${source})`);

@@ -111,7 +111,8 @@ export async function handleFedaPayWithdrawal(
   operator: string,
   phone: string,
   userCurrency?: string,
-  netMode?: boolean
+  netMode?: boolean,
+  skipBalanceOps?: boolean
 ): Promise<{ success: boolean; transactionId?: string; message?: string; error?: string }> {
   try {
     if (!FEDAPAY_SUPPORTED_COUNTRIES_PAYOUT.includes(country.toLowerCase())) {
@@ -139,11 +140,10 @@ export async function handleFedaPayWithdrawal(
       ? calculateOutgoingFeeFromNet(grossAmount, feeConfig.outgoing)
       : calculateOutgoingFee(grossAmount, feeConfig.outgoing);
 
-    if (user.balance < feeInfo.totalDeductedFromBalance) {
+    if (!skipBalanceOps && user.balance < feeInfo.totalDeductedFromBalance) {
       return { success: false, error: "Solde insuffisant" };
     }
 
-    // CRITICAL: Convert amount from user's currency to provider currency if different
     let amountForProvider = feeInfo.amountReceived;
     if (balanceCurrency !== providerCurrency) {
       const { convertCurrency } = await import("./currency-converter");
@@ -161,7 +161,6 @@ export async function handleFedaPayWithdrawal(
     const firstName = nameParts[0] || "Client";
     const lastName = nameParts.slice(1).join(" ") || "BKApay";
 
-    // ALWAYS send converted amount to provider
     const result = await createPayout({
       amount: amountForProvider,
       customerFirstName: firstName,
@@ -176,8 +175,9 @@ export async function handleFedaPayWithdrawal(
       return { success: false, error: "Retrait echoue" };
     }
 
-    // Debiter le montant brut (ce que l'utilisateur a saisi)
-    await storage.updateUserBalance(userId, -feeInfo.totalDeductedFromBalance);
+    if (!skipBalanceOps) {
+      await storage.updateUserBalance(userId, -feeInfo.totalDeductedFromBalance);
+    }
 
     const tx = await storage.createTransaction({
       userId: userId,

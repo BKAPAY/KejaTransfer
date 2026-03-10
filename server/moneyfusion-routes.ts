@@ -13,7 +13,8 @@ export async function handleMoneyFusionWithdrawal(
   phone: string,
   userCurrency?: string,
   netMode?: boolean,
-  providerAmountOverride?: number
+  providerAmountOverride?: number,
+  skipBalanceOps?: boolean
 ): Promise<{ success: boolean; transactionId?: string; message?: string; error?: string }> {
   try {
     const countryLower = country.toLowerCase();
@@ -35,11 +36,10 @@ export async function handleMoneyFusionWithdrawal(
       ? calculateOutgoingFeeFromNet(grossAmount, feeConfig.outgoing)
       : calculateOutgoingFee(grossAmount, feeConfig.outgoing);
 
-    if (user.balance < feeInfo.totalDeductedFromBalance) {
+    if (!skipBalanceOps && user.balance < feeInfo.totalDeductedFromBalance) {
       return { success: false, error: "L'operation ne peut pas etre effectuee pour le moment. Veuillez reessayer plus tard." };
     }
 
-    // Use providerAmountOverride when set (avoids double-conversion in cross-currency API payouts)
     let amountForProvider: number;
     if (providerAmountOverride !== undefined) {
       amountForProvider = providerAmountOverride;
@@ -62,7 +62,9 @@ export async function handleMoneyFusionWithdrawal(
     const orderId = `BKAPAY-MF-WD-${Date.now()}`;
     const startTime = Date.now();
 
-    await storage.updateUserBalance(userId, -feeInfo.totalDeductedFromBalance);
+    if (!skipBalanceOps) {
+      await storage.updateUserBalance(userId, -feeInfo.totalDeductedFromBalance);
+    }
 
     const tx = await storage.createTransaction({
       userId: userId,
@@ -99,7 +101,9 @@ export async function handleMoneyFusionWithdrawal(
     });
 
     if (!result.success) {
-      await storage.updateUserBalance(userId, feeInfo.totalDeductedFromBalance);
+      if (!skipBalanceOps) {
+        await storage.updateUserBalance(userId, feeInfo.totalDeductedFromBalance);
+      }
       await storage.updateTransactionStatus(tx.id, "failed");
       return { success: false, transactionId: tx.id, error: result.error || "L'operation a echoue." };
     }

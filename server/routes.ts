@@ -6289,16 +6289,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ success: false, error: { code: "INSUFFICIENT_FUNDS", message: `Solde insuffisant dans le wallet ${countryCode} (${requestedCurrency})` } });
       }
 
+      await storage.debitBusinessWallet(user.id, countryCode, requestedCurrency, feeInfo.totalDeductedFromBalance);
+
       let result: { success: boolean; transactionId?: string; error?: string; message?: string };
 
       if (activeProvider === "pawapay") {
-        result = await handlePawaPayWithdrawal(user.id, user, requestedAmount, countryCode, normalizedOperator, localPhone, requestedCurrency, requestedCurrency, true);
+        result = await handlePawaPayWithdrawal(user.id, user, requestedAmount, countryCode, normalizedOperator, localPhone, requestedCurrency, requestedCurrency, true, undefined, true);
       } else if (activeProvider === "fedapay") {
-        result = await handleFedaPayWithdrawal(user.id, user, requestedAmount, countryCode, normalizedOperator, localPhone, requestedCurrency, true);
+        result = await handleFedaPayWithdrawal(user.id, user, requestedAmount, countryCode, normalizedOperator, localPhone, requestedCurrency, true, true);
       } else if (activeProvider === "mbiyopay") {
-        result = await handleMbiyoPayWithdrawal(user.id, user, requestedAmount, countryCode, normalizedOperator, localPhone, requestedCurrency, requestedCurrency, true);
+        result = await handleMbiyoPayWithdrawal(user.id, user, requestedAmount, countryCode, normalizedOperator, localPhone, requestedCurrency, requestedCurrency, true, undefined, true);
       } else if (activeProvider === "moneyfusion") {
-        result = await handleMoneyFusionWithdrawal(user.id, user, requestedAmount, countryCode, normalizedOperator, localPhone, requestedCurrency, true);
+        result = await handleMoneyFusionWithdrawal(user.id, user, requestedAmount, countryCode, normalizedOperator, localPhone, requestedCurrency, true, undefined, true);
       } else if (activeProvider === "paydunya") {
         const countryWithdrawModes: Record<string, Record<string, string>> = {
           "SN": { "orange": "orange-money-senegal", "free": "free-money-senegal", "wave": "wave-senegal" },
@@ -6327,7 +6329,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (submitResp.response_code !== "00") {
               result = { success: false, error: "Le payout n'a pas pu être traité" };
             } else {
-              await storage.debitBusinessWallet(user.id, countryCode, requestedCurrency, feeInfo.totalDeductedFromBalance);
               const tx = await storage.createTransaction({
                 userId: user.id, type: "withdrawal",
                 amount: requestedAmount, fee: feeInfo.feeAmount,
@@ -6343,6 +6344,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       } else {
         result = { success: false, error: "Service de payout temporairement indisponible" };
+      }
+
+      if (!result.success) {
+        await storage.creditBusinessWallet(user.id, countryCode, requestedCurrency, feeInfo.totalDeductedFromBalance);
       }
 
       const providerNames = ["pawapay", "paydunya", "fedapay", "mbiyopay", "moneyfusion", "afribapay", "PawaPay", "Paydunya", "FedaPay", "MbiyoPay", "MoneyFusion", "AfribaPay"];
@@ -6416,6 +6421,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       console.error("[Business Payout] Error:", error);
+      try {
+        if (requestedAmount && countryCode && requestedCurrency && feeInfo) {
+          await storage.creditBusinessWallet(user.id, countryCode, requestedCurrency, feeInfo.totalDeductedFromBalance);
+          console.log(`[Business Payout] Refunded ${feeInfo.totalDeductedFromBalance} ${requestedCurrency} to business wallet after exception`);
+        }
+      } catch (refundErr) {
+        console.error("[Business Payout] CRITICAL: Failed to refund business wallet after exception:", refundErr);
+      }
       res.status(500).json({ success: false, error: { code: "INTERNAL_ERROR", message: "Une erreur interne est survenue" } });
     }
   });
