@@ -47,6 +47,7 @@ import Diagnostic from "@/pages/dashboard/diagnostic";
 import Fournisseurs from "@/pages/dashboard/fournisseurs";
 import SupportConfig from "@/pages/dashboard/support-config";
 import DocumentationBusiness from "@/pages/dashboard/documentation-business";
+import DocumentationLanding from "@/pages/dashboard/documentation-landing";
 import IpAddresses from "@/pages/dashboard/ip-addresses";
 import AdminUserProfile from "@/pages/dashboard/admin-user-profile";
 import AdminUserHistory from "@/pages/dashboard/admin-user-history";
@@ -241,12 +242,7 @@ function Router() {
           <Route path="/dashboard/documentation/:version">
             {(params) => <DocumentationVersion version={params.version} />}
           </Route>
-          <Route path="/dashboard/documentation">
-            {() => {
-              window.location.replace(`/dashboard/documentation/${CURRENT_VERSION}`);
-              return null;
-            }}
-          </Route>
+          <Route path="/dashboard/documentation" component={DocumentationLanding} />
           <Route path="/dashboard/support" component={Support} />
           <Route path="/dashboard/deposit" component={Deposit} />
           <Route path="/dashboard/transfer" component={Transfer} />

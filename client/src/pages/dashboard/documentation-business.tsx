@@ -1,9 +1,10 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Copy, Code, Globe, Webhook, Send, ShieldCheck } from "lucide-react";
+import { Copy, Code, Globe, Webhook, Send, ShieldCheck, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useLocation } from "wouter";
 
 function CodeBlock({ label, description, code, copyCode, testId }: {
   label: string;
@@ -37,6 +38,7 @@ function CodeBlock({ label, description, code, copyCode, testId }: {
 
 export default function DocumentationBusiness() {
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "https://bkapay.com";
 
   const copyCode = (code: string) => {
@@ -356,6 +358,16 @@ echo json_encode(['received' => true]);
   return (
     <div className="space-y-6 max-w-4xl">
       <div className="mb-8">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="mb-4"
+          onClick={() => setLocation("/dashboard/documentation")}
+          data-testid="button-back-doc-landing-biz"
+        >
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Retour
+        </Button>
         <div className="flex items-center gap-3 flex-wrap">
           <h1 className="text-3xl font-bold text-foreground" data-testid="text-doc-business-title">
             Documentation Compte Entreprise

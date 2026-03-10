@@ -129,17 +129,7 @@ export function AppSidebar() {
     }
   };
 
-  const sidebarMenuItems = menuItems.map(item => {
-    if (item.testId === "nav-documentation" && user?.accountType === "business") {
-      return {
-        ...item,
-        title: "Documentation Entreprise",
-        url: "/dashboard/documentation-business",
-        testId: "nav-documentation-business",
-      };
-    }
-    return item;
-  });
+  const sidebarMenuItems = [...menuItems];
   if (user?.isAdmin) {
     sidebarMenuItems.push({
       title: "Administration",
