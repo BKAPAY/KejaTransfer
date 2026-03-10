@@ -208,6 +208,8 @@ function Router() {
           <Route path="/dashboard/business/history/incoming" component={BusinessHistory} />
           <Route path="/dashboard/business/history/outgoing" component={BusinessHistory} />
           <Route path="/dashboard/business/settings" component={BusinessSettings} />
+          <Route path="/dashboard/docs" component={DocumentationLanding} />
+          <Route path="/dashboard/documentation-business" component={DocumentationBusiness} />
           <Route component={NotFound} />
         </Switch>
       </DashboardLayout>
@@ -242,7 +244,7 @@ function Router() {
           <Route path="/dashboard/documentation/:version">
             {(params) => <DocumentationVersion version={params.version} />}
           </Route>
-          <Route path="/dashboard/documentation" component={DocumentationLanding} />
+          <Route path="/dashboard/docs" component={DocumentationLanding} />
           <Route path="/dashboard/support" component={Support} />
           <Route path="/dashboard/deposit" component={Deposit} />
           <Route path="/dashboard/transfer" component={Transfer} />

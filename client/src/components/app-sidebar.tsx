@@ -101,7 +101,7 @@ const menuItems = [
   },
   {
     title: "Documentation",
-    url: "/dashboard/documentation",
+    url: "/dashboard/docs",
     icon: FileText,
     testId: "nav-documentation",
   },

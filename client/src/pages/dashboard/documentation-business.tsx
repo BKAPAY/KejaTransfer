@@ -362,7 +362,7 @@ echo json_encode(['received' => true]);
           variant="ghost"
           size="sm"
           className="mb-4"
-          onClick={() => setLocation("/dashboard/documentation")}
+          onClick={() => setLocation("/dashboard/docs")}
           data-testid="button-back-doc-landing-biz"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
