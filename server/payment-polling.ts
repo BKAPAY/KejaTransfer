@@ -136,9 +136,9 @@ export async function safeRefundOutgoingTransaction(
   return true;
 }
 
-// Polling every 5 seconds for active transactions
-const POLLING_INTERVAL = 5000;
-const PAYMENT_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes timeout (Mobile Money)
+// Polling every 3 seconds for active transactions
+const POLLING_INTERVAL = 3000;
+const PAYMENT_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes timeout (Mobile Money)
 const CRYPTO_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes timeout (Crypto)
 
 interface PaydunyaStatusResponse {
