@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -70,9 +71,14 @@ export function EmaliChatButton() {
   ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [portalTarget, setPortalTarget] = useState<Element | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const lastActivityRef = useRef<number>(Date.now());
+
+  useEffect(() => {
+    setPortalTarget(document.body);
+  }, []);
 
   const { data: emaliStatus } = useQuery<{ enabled: boolean }>({
     queryKey: ["/api/platform-settings/emali-enabled"],
@@ -253,7 +259,7 @@ export function EmaliChatButton() {
         />
       </Button>
 
-      {isOpen && isEmaliEnabled && (
+      {isOpen && isEmaliEnabled && portalTarget && createPortal(
         <>
           <div
             className="fixed inset-0 z-[10000]"
@@ -379,7 +385,8 @@ export function EmaliChatButton() {
               </div>
             </div>
           </div>
-        </>
+        </>,
+        portalTarget
       )}
     </>
   );
