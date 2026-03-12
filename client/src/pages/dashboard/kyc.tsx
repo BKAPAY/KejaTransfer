@@ -77,6 +77,7 @@ export default function KYC() {
   const [cameraMode, setCameraMode] = useState<CameraMode>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
+  const [cameraError, setCameraError] = useState("");
   const [captureCountdown, setCaptureCountdown] = useState<number | null>(null);
   const [uploadState, setUploadState] = useState<UploadState>({
     front: { status: "idle", progress: 0 },
@@ -143,6 +144,7 @@ export default function KYC() {
 
   const startCamera = async (mode: CameraMode) => {
     try {
+      setCameraError("");
       stopCamera();
       setCameraMode(mode);
 
@@ -153,14 +155,20 @@ export default function KYC() {
       });
 
       setStream(mediaStream);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Camera error:", error);
       setCameraMode(null);
-      toast({
-        title: "Erreur",
-        description: "Impossible d'acceder a la camera. Verifiez les permissions.",
-        variant: "destructive",
-      });
+      const isPermissionDenied =
+        error?.name === "NotAllowedError" || error?.name === "PermissionDeniedError";
+      if (isPermissionDenied) {
+        setCameraError("permission_denied");
+      } else {
+        toast({
+          title: "Erreur",
+          description: "Impossible d'acceder a la camera. Verifiez que votre appareil dispose d'une camera fonctionnelle.",
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -361,7 +369,7 @@ export default function KYC() {
       (error) => {
         let msg = "Impossible de recuperer votre position.";
         if (error.code === error.PERMISSION_DENIED) {
-          msg = "Veuillez activer la localisation dans les parametres de votre appareil puis reessayez.";
+          msg = "PERMISSION_DENIED";
         } else if (error.code === error.POSITION_UNAVAILABLE) {
           msg = "Votre position n'est pas disponible. Verifiez que le GPS est active.";
         } else if (error.code === error.TIMEOUT) {
@@ -776,6 +784,34 @@ export default function KYC() {
         <p className="text-sm text-muted-foreground">Prenez en photo vos pieces d'identite</p>
       </div>
 
+      {cameraError === "permission_denied" && (
+        <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-lg p-4">
+          <div className="flex gap-3">
+            <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+            <div className="space-y-2">
+              <p className="text-sm font-semibold text-red-700 dark:text-red-300">Acces a la camera refuse</p>
+              <p className="text-sm text-red-700 dark:text-red-300">Pour autoriser la camera, suivez ces etapes sur votre telephone :</p>
+              <ol className="text-sm text-red-700 dark:text-red-300 space-y-1 list-none">
+                <li>1. Allez dans les <strong>Parametres</strong> de votre telephone</li>
+                <li>2. Appuyez sur <strong>Applications</strong></li>
+                <li>3. Recherchez et ouvrez votre <strong>navigateur</strong> (Chrome, Firefox...)</li>
+                <li>4. Appuyez sur <strong>Autorisations</strong></li>
+                <li>5. Appuyez sur <strong>Camera</strong> puis choisissez <strong>Autoriser</strong></li>
+                <li>6. Revenez ici et reessayez</li>
+              </ol>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => { setCameraError(""); startCamera("front"); }}
+                data-testid="button-retry-camera"
+              >
+                Reessayer
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="space-y-4">
         <div>
           <label className="text-sm font-medium text-foreground mb-2 block">
@@ -974,7 +1010,22 @@ export default function KYC() {
           <div className="flex gap-3">
             <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
             <div className="space-y-2">
-              <p className="text-sm text-red-700 dark:text-red-300">{locationError}</p>
+              {locationError === "PERMISSION_DENIED" ? (
+                <>
+                  <p className="text-sm font-semibold text-red-700 dark:text-red-300">Acces a la localisation refuse</p>
+                  <p className="text-sm text-red-700 dark:text-red-300">Pour autoriser la localisation, suivez ces etapes sur votre telephone :</p>
+                  <ol className="text-sm text-red-700 dark:text-red-300 space-y-1 list-none">
+                    <li>1. Allez dans les <strong>Parametres</strong> de votre telephone</li>
+                    <li>2. Appuyez sur <strong>Applications</strong></li>
+                    <li>3. Recherchez et ouvrez votre <strong>navigateur</strong> (Chrome, Firefox...)</li>
+                    <li>4. Appuyez sur <strong>Autorisations</strong></li>
+                    <li>5. Appuyez sur <strong>Position</strong> puis choisissez <strong>Autoriser</strong></li>
+                    <li>6. Revenez ici et reessayez</li>
+                  </ol>
+                </>
+              ) : (
+                <p className="text-sm text-red-700 dark:text-red-300">{locationError}</p>
+              )}
               <Button
                 variant="outline"
                 size="sm"
