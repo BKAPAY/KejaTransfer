@@ -164,7 +164,10 @@ function DashboardLayout({ children, type = "personal" }: { children: React.Reac
         <div className="flex flex-col flex-1 min-w-0">
           <header className="flex items-center justify-between gap-4 p-4 border-b bg-card sticky top-0 z-20">
             <div className="flex items-center gap-4">
-              <SidebarTrigger size="lg" data-testid="button-sidebar-toggle" />
+              <div className="flex flex-col items-center gap-0.5">
+                <SidebarTrigger size="lg" data-testid="button-sidebar-toggle" />
+                <span className="text-[10px] font-medium text-muted-foreground leading-none">MENU</span>
+              </div>
               {type === "personal" && (
                 <div className="relative">
                   <EmaliChatButton />
