@@ -10627,53 +10627,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         currentUserId ? storage.getUserStats(currentUserId) : Promise.resolve(null),
       ]);
 
-      // Build country info with real-time per-operator availability
+      // Build unified country + operator + fees + availability info
       const countryInfoLines: string[] = [];
-      for (const country of COUNTRIES) {
-        const countryCode = country.code as keyof typeof OPERATORS;
-        const operators = OPERATORS[countryCode] || [];
-        const statuses = countryStatusData.filter((cs: any) => cs.country === country.code);
-        const countryFees = feeConfigsData.filter((fc: any) => fc.country === country.code);
-
-        const payinOperators: string[] = [];
-        const payoutOperators: string[] = [];
-
-        const opConfigs = countryOperatorConfigsData.filter((oc: any) => oc.country === country.code);
-
-        for (const op of operators) {
-          const opProviders = countryFees.filter((fc: any) => fc.operator === op.code);
-          const opProviderNames = opProviders.map((fc: any) => fc.provider);
-
-          const hasPayin = opProviderNames.some((prov: string) => {
-            const providerEnabled = statuses.some((cs: any) => cs.provider === prov && cs.payinEnabled);
-            if (!providerEnabled) return false;
-            const opConfig = opConfigs.find((oc: any) => oc.provider === prov && oc.operator === op.code);
-            return opConfig ? opConfig.incomingEnabled : false;
-          });
-          const hasPayout = opProviderNames.some((prov: string) => {
-            const providerEnabled = statuses.some((cs: any) => cs.provider === prov && cs.payoutEnabled);
-            if (!providerEnabled) return false;
-            const opConfig = opConfigs.find((oc: any) => oc.provider === prov && oc.operator === op.code);
-            return opConfig ? opConfig.outgoingEnabled : false;
-          });
-
-          if (hasPayin) payinOperators.push(op.name);
-          if (hasPayout) payoutOperators.push(op.name);
-        }
-
-        const payinText = payinOperators.length > 0
-          ? `Paiements entrants (dépôts): ${payinOperators.join(", ")}`
-          : "Paiements entrants (dépôts): Aucun opérateur actif pour le moment";
-        const payoutText = payoutOperators.length > 0
-          ? `Paiements sortants (retraits): ${payoutOperators.join(", ")}`
-          : "Paiements sortants (retraits): Aucun opérateur actif pour le moment";
-
-        countryInfoLines.push(`- ${country.name} (${country.code}): Devise ${country.currency}, Indicatif ${country.phoneCode}\n    ${payinText}\n    ${payoutText}`);
-      }
-
-      // Build transfer-eligible countries list (countries with at least one active payout operator)
       const transferCountryLines: string[] = [];
       const withdrawalCountryLines: string[] = [];
+      const countryFeeDetailLines: string[] = [];
+
       for (const country of COUNTRIES) {
         const countryCode = country.code as keyof typeof OPERATORS;
         const operators = OPERATORS[countryCode] || [];
@@ -10681,39 +10640,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const countryFees = feeConfigsData.filter((fc: any) => fc.country === country.code);
         const opConfigs = countryOperatorConfigsData.filter((oc: any) => oc.country === country.code);
 
-        const activePayoutOps: string[] = [];
+        const payinActiveOps: string[] = [];
+        const payoutActiveOps: string[] = [];
+
+        const payinLines: string[] = [];
+        const payoutLines: string[] = [];
+
         for (const op of operators) {
           const opProviders = countryFees.filter((fc: any) => fc.operator === op.code);
+          const feeEntry = opProviders[0];
+          const inPct = feeEntry ? (feeEntry.incomingFeePercentage / 10).toFixed(1) : "N/A";
+          const outPct = feeEntry ? (feeEntry.outgoingFeePercentage / 10).toFixed(1) : "N/A";
+
+          const hasPayin = opProviders.some((fc: any) => {
+            const providerEnabled = statuses.some((cs: any) => cs.provider === fc.provider && cs.payinEnabled);
+            if (!providerEnabled) return false;
+            const opConfig = opConfigs.find((oc: any) => oc.provider === fc.provider && oc.operator === op.code);
+            return opConfig ? opConfig.incomingEnabled : false;
+          });
           const hasPayout = opProviders.some((fc: any) => {
             const providerEnabled = statuses.some((cs: any) => cs.provider === fc.provider && cs.payoutEnabled);
             if (!providerEnabled) return false;
             const opConfig = opConfigs.find((oc: any) => oc.provider === fc.provider && oc.operator === op.code);
             return opConfig ? opConfig.outgoingEnabled : false;
           });
-          if (hasPayout) activePayoutOps.push(op.name);
+
+          if (hasPayin) payinActiveOps.push(op.name);
+          if (hasPayout) payoutActiveOps.push(op.name);
+
+          const payinStatus = hasPayin ? "DISPONIBLE" : "NON DISPONIBLE";
+          const payoutStatus = hasPayout ? "DISPONIBLE" : "NON DISPONIBLE";
+          payinLines.push(`    - ${op.name}: Frais ${inPct}% → ${payinStatus}`);
+          payoutLines.push(`    - ${op.name}: Frais ${outPct}% → ${payoutStatus}`);
         }
 
-        if (activePayoutOps.length > 0) {
-          transferCountryLines.push(`- ${country.name} (${country.code}): ${activePayoutOps.join(", ")}`);
+        // Simple availability line for transfer/withdrawal lists
+        if (payoutActiveOps.length > 0) {
+          transferCountryLines.push(`- ${country.name} (${country.code}): ${payoutActiveOps.join(", ")}`);
           if (currentUser && currentUser.country === country.code) {
-            withdrawalCountryLines.push(`- ${country.name} (${country.code}): ${activePayoutOps.join(", ")}`);
+            withdrawalCountryLines.push(`- ${country.name} (${country.code}): ${payoutActiveOps.join(", ")}`);
           }
         }
-      }
 
-      // Build fee info from DB
-      const feeInfoLines: string[] = [];
-      const feesByCountry: Record<string, any[]> = {};
-      for (const fc of feeConfigsData) {
-        if (!feesByCountry[fc.country]) feesByCountry[fc.country] = [];
-        feesByCountry[fc.country].push(fc);
-      }
-      for (const [countryCode, fees] of Object.entries(feesByCountry)) {
-        const countryName = COUNTRIES.find((c: any) => c.code === countryCode)?.name || countryCode;
-        for (const fee of fees as any[]) {
-          const inPct = (fee.incomingFeePercentage / 10).toFixed(1);
-          const outPct = (fee.outgoingFeePercentage / 10).toFixed(1);
-          feeInfoLines.push(`  ${countryName} - ${fee.operator}: Frais entrants ${inPct}%, Frais sortants ${outPct}%`);
+        // Simple country info line
+        const payinText = payinActiveOps.length > 0
+          ? `Paiements entrants (dépôts): ${payinActiveOps.join(", ")}`
+          : "Paiements entrants (dépôts): Aucun opérateur actif";
+        const payoutText = payoutActiveOps.length > 0
+          ? `Paiements sortants (retraits): ${payoutActiveOps.join(", ")}`
+          : "Paiements sortants (retraits): Aucun opérateur actif";
+        countryInfoLines.push(`- ${country.name} (${country.code}): Devise ${country.currency}, Indicatif ${country.phoneCode}\n    ${payinText}\n    ${payoutText}`);
+
+        // Detailed fee block per country
+        const opCount = operators.length;
+        if (opCount > 0) {
+          countryFeeDetailLines.push(`--- ${country.name} (${country.code}) - Devise: ${country.currency} ---`);
+          countryFeeDetailLines.push(`  PAIEMENTS ENTRANTS (dépôts) — frais déduits de ce que l'utilisateur reçoit:`);
+          countryFeeDetailLines.push(...payinLines);
+          countryFeeDetailLines.push(`  PAIEMENTS SORTANTS (retraits/transferts) — frais déduits du montant envoyé:`);
+          countryFeeDetailLines.push(...payoutLines);
         }
       }
 
@@ -10876,8 +10861,10 @@ ${transferCountryLines.length > 0 ? transferCountryLines.join("\n") : "Aucun pay
 === OPÉRATEURS ACTIFS POUR LES RETRAITS (pays de l'utilisateur) ===
 ${withdrawalCountryLines.length > 0 ? withdrawalCountryLines.join("\n") : "Aucun opérateur actif pour les retraits dans le pays de l'utilisateur."}
 
-FRAIS DE TRANSACTION MOBILE MONEY (données en temps réel):
-${feeInfoLines.length > 0 ? feeInfoLines.join("\n") : "Frais standard de 6% pour tous les pays et opérateurs."}
+=== FRAIS DE TRANSACTION PAR PAYS ET OPÉRATEUR (données en temps réel) ===
+INSTRUCTIONS: Pour répondre à une question sur les frais, lis TOUJOURS cette section complète. Affiche d'abord les PAIEMENTS ENTRANTS (dépôts) de tous les pays, puis les PAIEMENTS SORTANTS (retraits). Si un opérateur est NON DISPONIBLE, affiche quand même son pays et son nom mais indique "opération non disponible". Ne cache jamais un pays sous prétexte qu'un opérateur est inactif.
+
+${countryFeeDetailLines.length > 0 ? countryFeeDetailLines.join("\n") : "Frais standard de 6% pour tous les pays et opérateurs."}
 
 RÈGLES DES FRAIS:
 - Dépôts (paiements entrants): Le client paie le montant brut, l'utilisateur reçoit le net (brut - frais).
