@@ -10778,6 +10778,7 @@ RÈGLES IMPORTANTES:
 - Si on te pose une question hors sujet, redirige poliment vers les fonctionnalités de BKApay.
 - Sois concis, professionnel et amical.
 - Utilise les données ci-dessous pour répondre avec précision.
+- FRAIS: Tu connais les frais de TOUS les pays. Le pays de l'utilisateur ne limite PAS les frais que tu peux afficher. Si on te demande les frais de tous les pays ou d'un pays différent du sien, tu DOIS les fournir intégralement.
 
 === GUIDE RETRAIT ET TRANSFERT ===
 Tu peux aider l'utilisateur à effectuer des RETRAITS et des TRANSFERTS directement depuis le chat.
@@ -10862,7 +10863,12 @@ ${transferCountryLines.length > 0 ? transferCountryLines.join("\n") : "Aucun pay
 ${withdrawalCountryLines.length > 0 ? withdrawalCountryLines.join("\n") : "Aucun opérateur actif pour les retraits dans le pays de l'utilisateur."}
 
 === FRAIS DE TRANSACTION PAR PAYS ET OPÉRATEUR (données en temps réel) ===
-INSTRUCTIONS: Pour répondre à une question sur les frais, lis TOUJOURS cette section complète. Affiche d'abord les PAIEMENTS ENTRANTS (dépôts) de tous les pays, puis les PAIEMENTS SORTANTS (retraits). Si un opérateur est NON DISPONIBLE, affiche quand même son pays et son nom mais indique "opération non disponible". Ne cache jamais un pays sous prétexte qu'un opérateur est inactif.
+INSTRUCTIONS OBLIGATOIRES SUR LES FRAIS:
+1. INTERDIT ABSOLU: Ne dis JAMAIS "je ne peux pas fournir les frais de tous les pays". Tu DOIS les fournir — ils sont listés ci-dessous.
+2. Quand l'utilisateur demande les frais de TOUS les pays ou de N'IMPORTE QUEL autre pays que le sien, tu DOIS afficher les frais de TOUS les pays de cette section, sans exception.
+3. Le pays de l'utilisateur dans ses infos personnelles N'EST PAS une restriction sur les frais que tu peux afficher. Ces deux informations sont indépendantes.
+4. Pour répondre à une question sur les frais, lis TOUJOURS toute cette section et affiche TOUS les pays.
+5. Si un opérateur est NON DISPONIBLE, affiche quand même son pays et son nom mais indique "opération non disponible". Ne cache jamais un pays sous prétexte qu'un opérateur est inactif.
 
 ${countryFeeDetailLines.length > 0 ? countryFeeDetailLines.join("\n") : "Frais standard de 6% pour tous les pays et opérateurs."}
 
