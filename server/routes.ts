@@ -10863,12 +10863,8 @@ ${transferCountryLines.length > 0 ? transferCountryLines.join("\n") : "Aucun pay
 ${withdrawalCountryLines.length > 0 ? withdrawalCountryLines.join("\n") : "Aucun opérateur actif pour les retraits dans le pays de l'utilisateur."}
 
 === FRAIS DE TRANSACTION PAR PAYS ET OPÉRATEUR (données en temps réel) ===
-INSTRUCTIONS OBLIGATOIRES SUR LES FRAIS:
-1. INTERDIT ABSOLU: Ne dis JAMAIS "je ne peux pas fournir les frais de tous les pays". Tu DOIS les fournir — ils sont listés ci-dessous.
-2. Quand l'utilisateur demande les frais de TOUS les pays ou de N'IMPORTE QUEL autre pays que le sien, tu DOIS afficher les frais de TOUS les pays de cette section, sans exception.
-3. Le pays de l'utilisateur dans ses infos personnelles N'EST PAS une restriction sur les frais que tu peux afficher. Ces deux informations sont indépendantes.
-4. Pour répondre à une question sur les frais, lis TOUJOURS toute cette section et affiche TOUS les pays.
-5. Si un opérateur est NON DISPONIBLE, affiche quand même son pays et son nom mais indique "opération non disponible". Ne cache jamais un pays sous prétexte qu'un opérateur est inactif.
+RÈGLE ABSOLUE: Quand l'utilisateur pose une question sur les frais (peu importe comment il formule), tu DOIS copier et afficher TOUS les blocs pays ci-dessous, un par un. Tu n'as PAS le droit de dire que tu ne peux pas les fournir. Tu n'as PAS le droit de n'afficher que le pays de l'utilisateur. Tu DOIS tous les afficher. Le pays du compte de l'utilisateur n'a AUCUN lien avec les frais que tu peux afficher. Tous les frais de tous les pays sont publics et accessibles à tous.
+EXEMPLE DE COMPORTEMENT CORRECT: Si l'utilisateur dit "donne-moi les frais de tous les pays", tu réponds en listant CHAQUE pays ci-dessous avec ses opérateurs et ses frais. C'est tout. Pas d'excuse, pas de restriction.
 
 ${countryFeeDetailLines.length > 0 ? countryFeeDetailLines.join("\n") : "Frais standard de 6% pour tous les pays et opérateurs."}
 
