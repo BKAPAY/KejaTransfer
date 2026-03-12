@@ -246,10 +246,9 @@ export function EmaliChatButton() {
   return (
     <>
       <Button
-        size="icon"
         variant="ghost"
         onClick={isEmaliEnabled ? handleOpen : undefined}
-        className={`relative ${!isEmaliEnabled ? "pointer-events-none" : ""}`}
+        className={`relative flex flex-col items-center gap-0.5 h-auto px-2 py-1 ${!isEmaliEnabled ? "pointer-events-none" : ""}`}
         data-testid="button-emali-chat"
       >
         <img
@@ -257,6 +256,7 @@ export function EmaliChatButton() {
           alt="EMALI AI"
           className="w-7 h-7 rounded-full"
         />
+        <span className="text-[10px] font-medium text-muted-foreground leading-none">AIDE</span>
       </Button>
 
       {isOpen && isEmaliEnabled && portalTarget && createPortal(
