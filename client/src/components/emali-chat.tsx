@@ -256,11 +256,11 @@ export function EmaliChatButton() {
       {isOpen && isEmaliEnabled && (
         <>
           <div
-            className="fixed inset-0 z-40"
+            className="fixed inset-0 z-[10000]"
             onClick={handleClose}
           />
           <div
-            className="fixed z-50 flex flex-col bg-card border rounded-lg shadow-lg overflow-hidden"
+            className="fixed z-[10001] flex flex-col bg-card border rounded-lg shadow-lg overflow-hidden"
             style={{
               top: "60px",
               left: "70px",
