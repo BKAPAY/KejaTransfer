@@ -146,6 +146,8 @@ export default function Merchant() {
   const [ussdInstruction, setUssdInstruction] = useState<string | null>(null);
   const [wizallTransactionId, setWizallTransactionId] = useState<string | null>(null);
   const [redirectUrl, setRedirectUrl] = useState<string | null>(null);
+  const [omUrl, setOmUrl] = useState<string | null>(null);
+  const [maxitUrl, setMaxitUrl] = useState<string | null>(null);
   const [mbiyoInstructions, setMbiyoInstructions] = useState<string | null>(null);
   const [authCode, setAuthCode] = useState("");
   const [mbiyoOtpInstructions, setMbiyoOtpInstructions] = useState("");
@@ -508,13 +510,17 @@ export default function Merchant() {
           setMbiyoInstructions(data.instructions);
         }
         
-        if (data.redirectUrl) {
-          setRedirectUrl(data.redirectUrl);
+        if (data.redirectUrl || data.omUrl) {
+          setRedirectUrl(data.redirectUrl || null);
+          setOmUrl(data.omUrl || null);
+          setMaxitUrl(data.maxitUrl || null);
           setPaymentStage("redirect");
           
           toast({
-            title: "Redirection requise",
-            description: "Cliquez sur le bouton pour finaliser le paiement",
+            title: data.omUrl ? "Ouvrir Orange Money" : "Finaliser le paiement",
+            description: data.omUrl
+              ? "Ouvrez l'application Orange Money pour valider le paiement"
+              : "Cliquez sur le bouton pour finaliser le paiement",
           });
           
           if (token) {
@@ -682,9 +688,12 @@ export default function Merchant() {
             title: "Code OTP envoyé",
             description: "Veuillez entrer le code reçu par SMS",
           });
-        } else if (data.redirectUrl) {
+        } else if (data.redirectUrl || data.omUrl) {
+          setRedirectUrl(data.redirectUrl || null);
+          setOmUrl(data.omUrl || null);
+          setMaxitUrl(data.maxitUrl || null);
           if (token) clearMerchantPaymentState(token);
-          window.location.href = data.redirectUrl;
+          setPaymentStage("redirect");
         } else {
           countdown.startCountdown();
           setPaymentStage("polling");
@@ -911,22 +920,18 @@ export default function Merchant() {
   }
 
   // STAGE: Redirect - Bouton pour aller à Wave ou Orange Money
-  if (paymentStage === "redirect" && redirectUrl) {
+  if (paymentStage === "redirect" && (redirectUrl || omUrl)) {
     const isWave = savedOperator?.toLowerCase() === "wave";
     const isOrange = savedOperator?.toLowerCase() === "orange";
+    const hasOmDeepLink = !!omUrl;
     const redirectTitle = isWave ? "Paiement Wave" : isOrange ? "Paiement Orange Money" : "Finaliser le paiement";
     const redirectDesc = isWave 
       ? "Cliquez sur le bouton ci-dessous pour compléter votre paiement via Wave"
-      : isOrange
-        ? "Cliquez sur le bouton ci-dessous pour compléter votre paiement via Orange Money"
+      : hasOmDeepLink
+        ? "Choisissez comment vous souhaitez payer avec Orange Money"
         : "Cliquez sur le bouton ci-dessous pour finaliser votre paiement";
-    const redirectBtnText = isWave 
-      ? "Aller à Wave pour payer"
-      : isOrange
-        ? "Aller à Orange Money pour payer"
-        : "Finaliser le paiement";
     
-    const handleRedirectPayment = () => {
+    const handleRedirectPayment = (url: string) => {
       countdown.startCountdown();
       setPaymentStage("polling");
       
@@ -940,7 +945,7 @@ export default function Merchant() {
         }
       }
       
-      window.open(redirectUrl, "_blank");
+      window.open(url, "_blank");
     };
     
     return (
@@ -978,15 +983,46 @@ export default function Merchant() {
               </Alert>
             )}
             
-            <Button
-              onClick={handleRedirectPayment}
-              className="w-full bg-blue-600"
-              size="lg"
-              data-testid="button-wave-redirect"
-            >
-              <ExternalLink className="w-5 h-5 mr-2" />
-              {redirectBtnText}
-            </Button>
+            {omUrl && (
+              <Button
+                onClick={() => handleRedirectPayment(omUrl)}
+                className="w-full"
+                variant="default"
+                size="lg"
+                data-testid="button-om-deeplink"
+              >
+                <ExternalLink className="w-5 h-5 mr-2" />
+                Ouvrir l'application Orange Money
+              </Button>
+            )}
+            {maxitUrl && (
+              <Button
+                onClick={() => handleRedirectPayment(maxitUrl)}
+                className="w-full"
+                variant="outline"
+                size="lg"
+                data-testid="button-maxit-deeplink"
+              >
+                <ExternalLink className="w-5 h-5 mr-2" />
+                Ouvrir Maxit pour payer
+              </Button>
+            )}
+            {redirectUrl && (
+              <Button
+                onClick={() => handleRedirectPayment(redirectUrl)}
+                className={omUrl ? "w-full" : "w-full bg-blue-600"}
+                variant={omUrl ? "outline" : "default"}
+                size="lg"
+                data-testid="button-wave-redirect"
+              >
+                <ExternalLink className="w-5 h-5 mr-2" />
+                {isWave
+                  ? "Aller à Wave pour payer"
+                  : omUrl
+                    ? "Voir le QR Code (ordinateur)"
+                    : "Finaliser le paiement"}
+              </Button>
+            )}
             
             <p className="text-xs text-muted-foreground text-center">
               Après le paiement, revenez sur cette page pour confirmer

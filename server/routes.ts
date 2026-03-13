@@ -2747,10 +2747,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           provider: "paydunya",
         };
 
-        // Wave redirect URL
-        if (softpayResult.url) {
+        // Redirect URLs (Wave QR, Orange Money deep link, Maxit deep link)
+        if (softpayResult.url || softpayResult.omUrl) {
           response.redirectUrl = softpayResult.url;
-          console.log(`[API-PAY INIT] Wave redirect URL: ${softpayResult.url}`);
+          response.omUrl = softpayResult.omUrl;
+          response.maxitUrl = softpayResult.maxitUrl;
+          console.log(`[API-PAY INIT] redirect URLs: url=${softpayResult.url} omUrl=${softpayResult.omUrl}`);
         }
 
         // Orange Money and other OTP flows
@@ -3492,7 +3494,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             phoneNumber: customerPhone, invoiceToken: paydunyaResp.token,
           } as SoftpayPaymentData);
           if (softpayResult.success) {
-            return res.json({ success: true, transactionId: tx.id, token: paydunyaResp.token, message: softpayResult.message, redirectUrl: softpayResult.url || null, provider: "paydunya" });
+            return res.json({ success: true, transactionId: tx.id, token: paydunyaResp.token, message: softpayResult.message, redirectUrl: softpayResult.url || null, omUrl: softpayResult.omUrl, maxitUrl: softpayResult.maxitUrl, provider: "paydunya" });
           }
           return res.status(400).json({ success: false, error: softpayResult.message || "Erreur de paiement" });
         }
@@ -4876,7 +4878,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               transactionId: transaction.id,
               fees: softpayResult.fees,
               currency: softpayResult.currency,
-              redirectUrl: softpayResult.url, // For Wave operators
+              redirectUrl: softpayResult.url, // For Wave/Orange SN operators
+              omUrl: softpayResult.omUrl,
+              maxitUrl: softpayResult.maxitUrl,
             });
           }
         } else {
@@ -5090,6 +5094,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               fees: softpayResult.fees,
               currency: softpayResult.currency,
               redirectUrl: softpayResult.url,
+              omUrl: softpayResult.omUrl,
+              maxitUrl: softpayResult.maxitUrl,
             });
           }
         } else {
@@ -5203,6 +5209,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               fees: softpayResult.fees,
               currency: softpayResult.currency,
               redirectUrl: softpayResult.url,
+              omUrl: softpayResult.omUrl,
+              maxitUrl: softpayResult.maxitUrl,
             });
           }
         } else {
@@ -5316,6 +5324,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               fees: softpayResult.fees,
               currency: softpayResult.currency,
               redirectUrl: softpayResult.url,
+              omUrl: softpayResult.omUrl,
+              maxitUrl: softpayResult.maxitUrl,
             });
           }
         } else {
@@ -7519,6 +7529,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 token: paydunyaResponse.token,
                 message: softpayResult.message || "Validez le paiement sur votre telephone",
                 redirectUrl: softpayResult.url,
+                omUrl: softpayResult.omUrl,
+                maxitUrl: softpayResult.maxitUrl,
                 provider: "paydunya",
               });
             } else {
@@ -7842,6 +7854,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 token: paydunyaResponse.token,
                 message: softpayResult.message || "Validez le paiement sur votre telephone",
                 redirectUrl: softpayResult.url,
+                omUrl: softpayResult.omUrl,
+                maxitUrl: softpayResult.maxitUrl,
                 provider: "paydunya",
               });
             } else {
@@ -8126,6 +8140,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 token: paydunyaResponse.token,
                 message: softpayResult.message || "Validez le paiement sur votre telephone",
                 redirectUrl: softpayResult.url,
+                omUrl: softpayResult.omUrl,
+                maxitUrl: softpayResult.maxitUrl,
                 provider: "paydunya",
               });
             } else {
@@ -8839,6 +8855,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               fees: softpayResult.fees,
               currency: softpayResult.currency,
               redirectUrl: softpayResult.url,
+              omUrl: softpayResult.omUrl,
+              maxitUrl: softpayResult.maxitUrl,
             });
           }
         } else {
