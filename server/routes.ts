@@ -379,7 +379,7 @@ async function callPaydunyaSoftpay(
   operator: string,
   country: string,
   paymentData: SoftpayPaymentData
-): Promise<{ success: boolean; message: string; data?: any; fees?: number; currency?: string; url?: string; transactionId?: string }> {
+): Promise<{ success: boolean; message: string; data?: any; fees?: number; currency?: string; url?: string; omUrl?: string; maxitUrl?: string; transactionId?: string }> {
   const paydunyaConfig = await getPaydunyaConfig();
   if (!paydunyaConfig) {
     return { success: false, message: "Paydunya n'est pas configure. Veuillez configurer les cles API." };
@@ -460,6 +460,9 @@ async function callPaydunyaSoftpay(
 
     if (result.success === true) {
       // Already in correct format
+      // Orange Money SN returns other_url.om_url and other_url.maxit_url as deep links
+      const omUrl = result.other_url?.om_url || undefined;
+      const maxitUrl = result.other_url?.maxit_url || undefined;
       return {
         success: true,
         message: result.message || "Paiement initié avec succès",
@@ -467,6 +470,8 @@ async function callPaydunyaSoftpay(
         fees: result.fees,
         currency: result.currency,
         url: result.url,
+        omUrl,
+        maxitUrl,
         transactionId: extractTransactionId(result),
       };
     } else if (result.success === false) {
@@ -4721,8 +4726,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`[SOFTPAY INIT] SOFTPAY result for ${operatorKey}:`, softpayResult);
 
           if (softpayResult.success) {
-            // For Wave, return redirect URL
-            if (softpayResult.url) {
+            // For redirect-based operators (Wave, Orange SN, etc.), return redirect URL(s)
+            if (softpayResult.url || softpayResult.omUrl) {
               return res.json({
                 success: true,
                 transactionId,
@@ -4731,6 +4736,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 requiresOTP: false,
                 requiresTwoStep: false,
                 redirectUrl: softpayResult.url,
+                omUrl: softpayResult.omUrl,     // Orange Money SN deep link
+                maxitUrl: softpayResult.maxitUrl, // Maxit app deep link
               });
             }
 
@@ -6757,13 +6764,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.log(`[DEPOSIT PAYDUNYA] SOFTPAY result:`, softpayResult);
 
             if (softpayResult.success) {
-              if (softpayResult.url) {
+              if (softpayResult.url || softpayResult.omUrl) {
                 return res.json({
                   success: true,
                   transactionId,
                   token: paydunyaResponse.token,
                   message: softpayResult.message,
                   redirectUrl: softpayResult.url,
+                  omUrl: softpayResult.omUrl,       // Orange Money SN deep link
+                  maxitUrl: softpayResult.maxitUrl, // Maxit app deep link
                   provider: "paydunya",
                 });
               }

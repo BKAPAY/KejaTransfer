@@ -51,6 +51,8 @@ export default function Deposit() {
     fedapayTransactionId?: number;
     message?: string;
     redirectUrl?: string;
+    omUrl?: string;
+    maxitUrl?: string;
     ussdInstruction?: string;
     paydunyaToken?: string;
     requiresOTP?: boolean;
@@ -326,6 +328,8 @@ export default function Deposit() {
           fedapayTransactionId: response.fedapayTransactionId,
           message: response.message,
           redirectUrl: response.redirectUrl,
+          omUrl: response.omUrl,
+          maxitUrl: response.maxitUrl,
           ussdInstruction: response.ussdInstruction,
           paydunyaToken: response.token,
           requiresOTP: response.requiresOTP,
@@ -340,13 +344,15 @@ export default function Deposit() {
             title: "Code OTP requis",
             description: response.ussdInstruction || "Generez votre code de paiement",
           });
-        } else if (response.redirectUrl) {
+        } else if (response.redirectUrl || response.omUrl) {
           countdown.startCountdown();
           setPaymentStep("redirect");
           setOtpCode("");
           toast({
-            title: "Redirection requise",
-            description: "Cliquez sur le bouton pour finaliser le paiement",
+            title: "Finaliser le paiement",
+            description: response.omUrl
+              ? "Ouvrez l'application Orange Money pour valider"
+              : "Cliquez sur le bouton pour finaliser le paiement",
           });
         } else {
           countdown.startCountdown();
@@ -623,18 +629,24 @@ export default function Deposit() {
         </Card>
       )}
 
-      {paymentStep === "redirect" && paymentData.redirectUrl && (
+      {paymentStep === "redirect" && (paymentData.redirectUrl || paymentData.omUrl) && (
         <Card>
           <CardContent className="py-8 text-center space-y-4">
             <ExternalLink className="h-12 w-12 mx-auto text-blue-600" />
             <div>
               <p className="font-semibold text-lg">
-                {form.getValues("operator")?.toLowerCase() === "wave" ? "Paiement Wave" : "Finaliser le paiement"}
+                {form.getValues("operator")?.toLowerCase() === "wave"
+                  ? "Paiement Wave"
+                  : form.getValues("operator")?.toLowerCase() === "orange"
+                    ? "Paiement Orange Money"
+                    : "Finaliser le paiement"}
               </p>
               <p className="text-sm text-muted-foreground mt-2">
                 {form.getValues("operator")?.toLowerCase() === "wave"
                   ? "Cliquez sur le bouton ci-dessous pour completer votre paiement via Wave"
-                  : "Cliquez sur le bouton ci-dessous pour finaliser votre paiement"}
+                  : form.getValues("operator")?.toLowerCase() === "orange" && paymentData.omUrl
+                    ? "Choisissez comment vous souhaitez payer avec Orange Money"
+                    : "Cliquez sur le bouton ci-dessous pour finaliser votre paiement"}
               </p>
             </div>
             <div className="bg-primary/10 rounded-lg p-4">
@@ -649,22 +661,47 @@ export default function Deposit() {
                 {amount?.toLocaleString()} FCFA
               </p>
             </div>
-            <Button
-              onClick={() => {
-                if (paymentData.redirectUrl) {
-                  window.open(paymentData.redirectUrl, "_blank");
-                }
-              }}
-              className="w-full"
-              variant="default"
-              size="lg"
-              data-testid="button-redirect-payment"
-            >
-              <ExternalLink className="w-5 h-5 mr-2" />
-              {form.getValues("operator")?.toLowerCase() === "wave"
-                ? "Aller a Wave pour payer"
-                : "Finaliser le paiement"}
-            </Button>
+            {/* Orange Money SN: show deep link button (primary) + QR code page (secondary) */}
+            {paymentData.omUrl && (
+              <Button
+                onClick={() => window.open(paymentData.omUrl, "_blank")}
+                className="w-full"
+                variant="default"
+                size="lg"
+                data-testid="button-om-deeplink"
+              >
+                <ExternalLink className="w-5 h-5 mr-2" />
+                Ouvrir l'application Orange Money
+              </Button>
+            )}
+            {paymentData.maxitUrl && (
+              <Button
+                onClick={() => window.open(paymentData.maxitUrl, "_blank")}
+                className="w-full"
+                variant="outline"
+                size="lg"
+                data-testid="button-maxit-deeplink"
+              >
+                <ExternalLink className="w-5 h-5 mr-2" />
+                Ouvrir Maxit pour payer
+              </Button>
+            )}
+            {paymentData.redirectUrl && (
+              <Button
+                onClick={() => window.open(paymentData.redirectUrl, "_blank")}
+                className="w-full"
+                variant={paymentData.omUrl ? "outline" : "default"}
+                size="lg"
+                data-testid="button-redirect-payment"
+              >
+                <ExternalLink className="w-5 h-5 mr-2" />
+                {form.getValues("operator")?.toLowerCase() === "wave"
+                  ? "Aller a Wave pour payer"
+                  : paymentData.omUrl
+                    ? "Voir le QR Code (ordinateur)"
+                    : "Finaliser le paiement"}
+              </Button>
+            )}
             <Alert className="border-yellow-200 bg-yellow-50 dark:bg-yellow-950 dark:border-yellow-800">
               <Clock className="h-4 w-4 text-yellow-600" />
               <AlertDescription className="text-sm text-yellow-900 dark:text-yellow-100 ml-2">
