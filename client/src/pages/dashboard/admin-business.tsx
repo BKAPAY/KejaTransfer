@@ -11,6 +11,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { useToast } from "@/hooks/use-toast";
 
 const ADMIN_ACCESS_CODE = "19992025";
@@ -135,8 +136,7 @@ export default function AdminBusiness() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <Input
-              type="password"
+            <PasswordInput
               placeholder="Code d'accès"
               value={accessCode}
               onChange={(e) => setAccessCode(e.target.value)}

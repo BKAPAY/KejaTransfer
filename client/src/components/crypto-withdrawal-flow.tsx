@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -374,8 +375,7 @@ export function CryptoWithdrawalFlow({
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Input
-                type="password"
+              <PasswordInput
                 placeholder="******"
                 maxLength={6}
                 inputMode="numeric"

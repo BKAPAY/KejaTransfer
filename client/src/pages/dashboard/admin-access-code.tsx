@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { useToast } from "@/hooks/use-toast";
 import { Lock, ArrowLeft } from "lucide-react";
 
@@ -79,8 +80,7 @@ export default function AdminAccessCodePage() {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <Input
-                  type="password"
+                <PasswordInput
                   placeholder="Entrez le code d'accès"
                   value={code}
                   onChange={(e) => setCode(e.target.value)}

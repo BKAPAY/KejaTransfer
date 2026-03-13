@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Building2, Mail, Shield, CheckCircle, Clock, XCircle, Phone, Hash, Pencil, Check, X, Lock, MapPin } from "lucide-react";
@@ -390,9 +391,8 @@ export default function BusinessProfile() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="current-password">Mot de passe actuel</Label>
-              <Input
+              <PasswordInput
                 id="current-password"
-                type="password"
                 placeholder="Votre mot de passe actuel"
                 value={passwordData.currentPassword}
                 onChange={(e) => setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))}
@@ -401,9 +401,8 @@ export default function BusinessProfile() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="new-password">Nouveau mot de passe</Label>
-              <Input
+              <PasswordInput
                 id="new-password"
-                type="password"
                 placeholder="Au moins 8 caractères"
                 value={passwordData.newPassword}
                 onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
@@ -412,9 +411,8 @@ export default function BusinessProfile() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="confirm-password">Confirmer le mot de passe</Label>
-              <Input
+              <PasswordInput
                 id="confirm-password"
-                type="password"
                 placeholder="Répétez le nouveau mot de passe"
                 value={passwordData.confirmPassword}
                 onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}

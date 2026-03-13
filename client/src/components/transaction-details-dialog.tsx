@@ -11,6 +11,7 @@ import { CryptoIcon } from "@/components/crypto-icon";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { useMemo, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -487,8 +488,7 @@ export function TransactionDetailsDialog({
                     <Lock className="w-4 h-4 text-muted-foreground" />
                     <p className="text-sm font-medium">Entrez le code de sécurité pour continuer</p>
                   </div>
-                  <Input
-                    type="password"
+                  <PasswordInput
                     placeholder="Code de sécurité"
                     value={adminCode}
                     onChange={(e) => {

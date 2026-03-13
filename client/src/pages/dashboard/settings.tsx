@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -236,8 +237,7 @@ export default function Settings() {
               <div className="space-y-3">
                 <div>
                   <label className="text-sm font-medium mb-1 block">Code actuel</label>
-                  <Input
-                    type="password"
+                  <PasswordInput
                     placeholder="******"
                     value={currentSecurityCode}
                     onChange={(e) => setCurrentSecurityCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
@@ -247,8 +247,7 @@ export default function Settings() {
                 </div>
                 <div>
                   <label className="text-sm font-medium mb-1 block">Nouveau code</label>
-                  <Input
-                    type="password"
+                  <PasswordInput
                     placeholder="******"
                     value={securityCode}
                     onChange={(e) => setSecurityCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
@@ -258,8 +257,7 @@ export default function Settings() {
                 </div>
                 <div>
                   <label className="text-sm font-medium mb-1 block">Confirmer le nouveau code</label>
-                  <Input
-                    type="password"
+                  <PasswordInput
                     placeholder="******"
                     value={confirmSecurityCode}
                     onChange={(e) => setConfirmSecurityCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
@@ -278,8 +276,7 @@ export default function Settings() {
               
               <div>
                 <label className="text-sm font-medium mb-1 block">Nouveau code (6 chiffres)</label>
-                <Input
-                  type="password"
+                <PasswordInput
                   placeholder="******"
                   value={securityCode}
                   onChange={(e) => setSecurityCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
@@ -289,8 +286,7 @@ export default function Settings() {
               </div>
               <div>
                 <label className="text-sm font-medium mb-1 block">Confirmer le code</label>
-                <Input
-                  type="password"
+                <PasswordInput
                   placeholder="******"
                   value={confirmSecurityCode}
                   onChange={(e) => setConfirmSecurityCode(e.target.value.replace(/\D/g, "").slice(0, 6))}

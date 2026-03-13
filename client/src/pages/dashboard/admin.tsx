@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Button } from "@/components/ui/button";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -1174,8 +1175,7 @@ export default function Admin() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <Input
-              type="password"
+            <PasswordInput
               placeholder="Entrez le code d'accès"
               value={accessCode}
               onChange={(e) => setAccessCode(e.target.value)}

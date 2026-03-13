@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -97,9 +98,8 @@ export function ChangePasswordDialog({ open, onOpenChange }: { open: boolean; on
             <label htmlFor="current-password" className="text-sm font-medium">
               Mot de passe actuel
             </label>
-            <Input
+            <PasswordInput
               id="current-password"
-              type="password"
               placeholder="Entrez votre mot de passe actuel"
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
@@ -111,9 +111,8 @@ export function ChangePasswordDialog({ open, onOpenChange }: { open: boolean; on
             <label htmlFor="new-password" className="text-sm font-medium">
               Nouveau mot de passe
             </label>
-            <Input
+            <PasswordInput
               id="new-password"
-              type="password"
               placeholder="Entrez votre nouveau mot de passe"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
@@ -125,9 +124,8 @@ export function ChangePasswordDialog({ open, onOpenChange }: { open: boolean; on
             <label htmlFor="confirm-password" className="text-sm font-medium">
               Confirmer le nouveau mot de passe
             </label>
-            <Input
+            <PasswordInput
               id="confirm-password"
-              type="password"
               placeholder="Confirmez votre nouveau mot de passe"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
