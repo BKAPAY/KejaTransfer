@@ -1139,16 +1139,6 @@ export default function Pay() {
                 <p className="text-2xl font-bold text-primary">
                   {displayAmount.toLocaleString()} {ownerCurrency}
                 </p>
-                {paymentLink?.customerPaysFee && hasOperatorSelected && dynamicFee && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    (Frais de {(dynamicFee.feePercentage / 10).toFixed(1)}% inclus: {dynamicFee.feeAmount.toLocaleString()} {ownerCurrency})
-                  </p>
-                )}
-                {paymentLink?.customerPaysFee && !hasOperatorSelected && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    (Sélectionnez un pays et opérateur pour voir les frais)
-                  </p>
-                )}
               </div>
             )}
             
@@ -1714,11 +1704,6 @@ export default function Pay() {
                     <div className="bg-muted p-3 rounded-md">
                       <p className="text-sm text-muted-foreground">Montant à payer</p>
                       <p className="text-xl font-bold">{baseAmount.toLocaleString()} {ownerCurrency}</p>
-                      {paymentLink?.customerPaysFee && (
-                        <p className="text-xs text-muted-foreground">
-                          (Frais de transaction inclus)
-                        </p>
-                      )}
                       <p className="text-xs text-muted-foreground mt-1">
                         {cryptoCustomerInfo.customerName} - {cryptoCustomerInfo.customerEmail}
                       </p>
