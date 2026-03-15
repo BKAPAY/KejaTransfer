@@ -83,6 +83,14 @@ export const paymentLinks = pgTable("payment_links", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// Video files (persistent storage in DB instead of filesystem)
+export const videoFiles = pgTable("video_files", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  mimeType: text("mime_type").notNull(),
+  data: text("data").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 // Merchant links
 export const merchantLinks = pgTable("merchant_links", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

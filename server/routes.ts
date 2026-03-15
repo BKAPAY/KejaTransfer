@@ -1514,6 +1514,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     fs.mkdirSync(uploadsDir, { recursive: true });
   }
 
+  app.get("/api/videos/:id", async (req: Request, res: Response) => {
+    try {
+      const result = await pgPool.query("SELECT mime_type, data FROM video_files WHERE id = $1 LIMIT 1", [req.params.id]);
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: "Video non trouvee" });
+      }
+      const video = result.rows[0];
+      const buffer = Buffer.from(video.data, "base64");
+      res.setHeader("Content-Type", video.mime_type);
+      res.setHeader("Content-Length", buffer.length.toString());
+      res.setHeader("Cache-Control", "public, max-age=31536000");
+      res.setHeader("Accept-Ranges", "bytes");
+      res.send(buffer);
+    } catch (error: any) {
+      console.error("Video serve error:", error);
+      res.status(500).json({ error: "Erreur lors de la lecture de la video" });
+    }
+  });
+
   app.use("/uploads/videos", (req: Request, res: Response, next) => {
     const filePath = path.join(uploadsDir, path.basename(req.path));
     if (fs.existsSync(filePath)) {
@@ -1537,7 +1556,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const mimeType = matches[1];
-      const ext = matches[2] === "mpeg" ? "mp4" : matches[2];
       const base64Data = matches[3];
       const buffer = Buffer.from(base64Data, "base64");
 
@@ -1546,12 +1564,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "La video est trop volumineuse (max 50 Mo)" });
       }
 
-      const filename = `${randomUUID()}.${ext}`;
-      const filePath = path.join(uploadsDir, filename);
+      const videoId = randomUUID();
+      await pgPool.query(
+        "INSERT INTO video_files (id, mime_type, data, created_at) VALUES ($1, $2, $3, NOW())",
+        [videoId, mimeType, base64Data]
+      );
 
-      await fs.promises.writeFile(filePath, buffer);
-
-      const videoUrl = `/uploads/videos/${filename}`;
+      const videoUrl = `/api/videos/${videoId}`;
       res.json({ success: true, videoUrl });
     } catch (error: any) {
       console.error("Video upload error:", error);
@@ -1903,10 +1922,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (validatedData.videoUrl !== undefined) {
         const userLinks = await storage.getPaymentLinks(req.session.userId!);
         const existingLink = userLinks.find(l => l.id === req.params.id);
-        if (existingLink && existingLink.videoUrl && existingLink.videoUrl.startsWith("/uploads/videos/") && existingLink.videoUrl !== validatedData.videoUrl) {
-          const oldVideoFilename = path.basename(existingLink.videoUrl);
-          const oldVideoPath = path.join(uploadsDir, oldVideoFilename);
-          fs.promises.unlink(oldVideoPath).catch(() => {});
+        if (existingLink && existingLink.videoUrl && existingLink.videoUrl !== validatedData.videoUrl) {
+          if (existingLink.videoUrl.startsWith("/api/videos/")) {
+            const oldVideoId = existingLink.videoUrl.replace("/api/videos/", "");
+            pgPool.query("DELETE FROM video_files WHERE id = $1", [oldVideoId]).catch(() => {});
+          } else if (existingLink.videoUrl.startsWith("/uploads/videos/")) {
+            const oldVideoFilename = path.basename(existingLink.videoUrl);
+            const oldVideoPath = path.join(uploadsDir, oldVideoFilename);
+            fs.promises.unlink(oldVideoPath).catch(() => {});
+          }
         }
       }
 
@@ -1925,10 +1949,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const links = await storage.getPaymentLinks(req.session.userId!);
       const ownedLink = links.find(l => l.id === req.params.id);
 
-      if (ownedLink && ownedLink.videoUrl && ownedLink.videoUrl.startsWith("/uploads/videos/")) {
-        const videoFilename = path.basename(ownedLink.videoUrl);
-        const videoPath = path.join(uploadsDir, videoFilename);
-        fs.promises.unlink(videoPath).catch(() => {});
+      if (ownedLink && ownedLink.videoUrl) {
+        if (ownedLink.videoUrl.startsWith("/api/videos/")) {
+          const videoId = ownedLink.videoUrl.replace("/api/videos/", "");
+          pgPool.query("DELETE FROM video_files WHERE id = $1", [videoId]).catch(() => {});
+        } else if (ownedLink.videoUrl.startsWith("/uploads/videos/")) {
+          const videoFilename = path.basename(ownedLink.videoUrl);
+          const videoPath = path.join(uploadsDir, videoFilename);
+          fs.promises.unlink(videoPath).catch(() => {});
+        }
       }
 
       const success = await storage.deletePaymentLink(req.params.id, req.session.userId!);
