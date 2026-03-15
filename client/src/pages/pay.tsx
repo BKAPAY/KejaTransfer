@@ -125,6 +125,8 @@ function ProductVideo({ videoUrl }: { videoUrl: string }) {
         className="w-full h-auto object-contain"
         loop
         playsInline
+        autoPlay
+        muted
         data-testid="video-product"
       />
       <button
