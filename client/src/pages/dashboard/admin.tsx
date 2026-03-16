@@ -130,7 +130,7 @@ export default function Admin() {
       queryClient.invalidateQueries({ queryKey: ["/api/platform-settings/emali-enabled"] });
       toast({
         title: data.enabled ? "Assistant active" : "Assistant desactive",
-        description: data.enabled ? "EMALI IA est maintenant disponible pour les utilisateurs" : "EMALI IA est desormais desactive",
+        description: data.enabled ? "EMALI est maintenant disponible pour les utilisateurs" : "EMALI est desormais desactive",
       });
     },
     onError: () => {
@@ -422,7 +422,7 @@ export default function Admin() {
             variant={emaliStatus?.enabled !== false ? "default" : "secondary"}
           >
             <Bot className="w-4 h-4" />
-            {emaliStatus?.enabled !== false ? "EMALI IA : ON" : "EMALI IA : OFF"}
+            {emaliStatus?.enabled !== false ? "EMALI : ON" : "EMALI : OFF"}
           </Button>
           <Button
             onClick={() => handleProtectedNavigation("/dashboard/ip-addresses")}

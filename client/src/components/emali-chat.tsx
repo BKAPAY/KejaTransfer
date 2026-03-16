@@ -11,7 +11,7 @@ interface ChatMessage {
   content: string;
 }
 
-const WELCOME_MESSAGE = `Bonjour ! Je suis **EMALI IA**, votre assistant intelligent BKApay. Je suis là pour vous aider. Que souhaitez-vous faire ?
+const WELCOME_MESSAGE = `Bonjour ! Je suis **EMALI**, votre assistant intelligent BKApay. Je suis là pour vous aider. Que souhaitez-vous faire ?
 
 1. Faire un retrait
 2. Faire un transfert
@@ -253,7 +253,7 @@ export function EmaliChatButton() {
       >
         <img
           src={emaliLogo}
-          alt="EMALI IA"
+          alt="EMALI"
           className="w-7 h-7 rounded-full"
         />
         <span className="text-[10px] font-medium text-muted-foreground leading-none">AIDE</span>
@@ -279,11 +279,11 @@ export function EmaliChatButton() {
               <div className="flex items-center gap-2">
                 <img
                   src={emaliLogo}
-                  alt="EMALI IA"
+                  alt="EMALI"
                   className="w-8 h-8 rounded-full"
                 />
                 <div>
-                  <h3 className="font-semibold text-sm">EMALI IA</h3>
+                  <h3 className="font-semibold text-sm">EMALI</h3>
                   <p className="text-xs text-muted-foreground">Assistant BKApay</p>
                 </div>
               </div>

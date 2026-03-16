@@ -10653,7 +10653,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ==================== EMALI IA Chat Endpoint ====================
+  // ==================== EMALI Chat Endpoint ====================
   app.post("/api/emali-chat", requireAuth, async (req: Request, res: Response) => {
     try {
       const { messages: userMessages } = req.body;
@@ -10825,7 +10825,7 @@ ${recentTxLines.length > 0 ? recentTxLines.join("\n") : "  Aucune transaction r�
 `;
       }
 
-      const systemPrompt = `Tu es EMALI IA, l'assistant intelligent de BKApay, une plateforme de paiement mobile money en Afrique. Tu réponds UNIQUEMENT en français.
+      const systemPrompt = `Tu es EMALI, l'assistant intelligent de BKApay, une plateforme de paiement mobile money en Afrique. Tu réponds UNIQUEMENT en français.
 
 RÈGLES IMPORTANTES:
 - Tu peux donner à l'utilisateur actuel ses propres informations de compte (solde, transactions, statut KYC, etc.) car elles sont fournies ci-dessous.
@@ -11323,7 +11323,7 @@ SUPPORT ET CONTACT:
               return JSON.stringify({ error: "Fonction inconnue" });
           }
         } catch (err: any) {
-          console.error(`[EMALI IA] Tool error (${toolName}):`, err);
+          console.error(`[EMALI] Tool error (${toolName}):`, err);
           return JSON.stringify({ success: false, error: err.message || "Erreur interne" });
         }
       }
@@ -11365,14 +11365,14 @@ SUPPORT ET CONTACT:
             try {
               fnName = (toolCall as any).function.name;
               fnArgs = JSON.parse((toolCall as any).function.arguments);
-              console.log(`[EMALI IA] Tool call: ${fnName}(${JSON.stringify(fnArgs)})`);
+              console.log(`[EMALI] Tool call: ${fnName}(${JSON.stringify(fnArgs)})`);
               toolResult = await handleToolCall(fnName, fnArgs, currentUserId!);
             } catch (parseErr: any) {
-              console.error(`[EMALI IA] Tool parse/exec error:`, parseErr);
+              console.error(`[EMALI] Tool parse/exec error:`, parseErr);
               toolResult = JSON.stringify({ success: false, error: "Erreur interne lors du traitement de la demande" });
             }
 
-            console.log(`[EMALI IA] Tool result: ${toolResult}`);
+            console.log(`[EMALI] Tool result: ${toolResult}`);
             conversationMessages.push({
               role: "tool",
               tool_call_id: toolCall.id,
@@ -11397,12 +11397,12 @@ SUPPORT ET CONTACT:
       res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
       res.end();
     } catch (error: any) {
-      console.error("[EMALI IA] Error:", error);
+      console.error("[EMALI] Error:", error);
       if (res.headersSent) {
         res.write(`data: ${JSON.stringify({ error: "Une erreur est survenue" })}\n\n`);
         res.end();
       } else {
-        res.status(500).json({ error: "Une erreur est survenue avec l'assistant EMALI IA" });
+        res.status(500).json({ error: "Une erreur est survenue avec l'assistant EMALI" });
       }
     }
   });
