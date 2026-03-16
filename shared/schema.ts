@@ -720,5 +720,5 @@ export const insertPaymentSessionSchema = createInsertSchema(paymentSessions).om
 export type PaymentSession = typeof paymentSessions.$inferSelect;
 export type InsertPaymentSession = z.infer<typeof insertPaymentSessionSchema>;
 
-// Chat schema for EMALI AI
+// Chat schema for EMALI IA
 export * from "./models/chat";
