@@ -2,13 +2,7 @@ import { Link } from "wouter";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { CreditCard, Link as LinkIcon, Code, BarChart3, Shield, Zap, Menu } from "lucide-react";
+import { CreditCard, Link as LinkIcon, Code, BarChart3, Shield, Zap } from "lucide-react";
 import { CryptoIcon } from "@/components/crypto-icon";
 import { CardBrandIcon } from "@/components/card-brand-icon";
 import { COUNTRIES } from "@shared/schema";
@@ -189,30 +183,12 @@ export default function Home() {
             <div className="flex items-center gap-2 sm:gap-3">
               <img src={logoImage} alt="BKApay" className="h-8 sm:h-10 w-auto" />
             </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" data-testid="button-auth-menu">
-                  <Menu className="w-5 h-5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem asChild>
-                  <Link href="/docs" data-testid="menu-documentation">
-                    Documentation
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/login" data-testid="menu-login">
-                    Se connecter
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/signup" data-testid="menu-signup">
-                    S'inscrire
-                  </Link>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <Link href="/docs">
+              <Button variant="outline" size="sm" data-testid="button-documentation-api">
+                <Code className="w-4 h-4 mr-1" />
+                Documentation API
+              </Button>
+            </Link>
           </div>
         </div>
       </header>
