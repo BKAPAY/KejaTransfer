@@ -106,31 +106,39 @@ export default function KYC() {
       });
     }, 100);
 
-    try {
-      await apiRequest("POST", "/api/kyc/upload", { type, data });
+    const maxRetries = 3;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        await apiRequest("POST", "/api/kyc/upload", { type, data });
 
-      clearInterval(interval);
-      setUploadState(prev => ({
-        ...prev,
-        [type]: { status: "done", progress: 100 }
-      }));
+        clearInterval(interval);
+        setUploadState(prev => ({
+          ...prev,
+          [type]: { status: "done", progress: 100 }
+        }));
 
-      toast({
-        title: "Document telecharge",
-        description: "Le document a ete enregistre avec succes",
-      });
-    } catch (error) {
-      clearInterval(interval);
-      setUploadState(prev => ({
-        ...prev,
-        [type]: { status: "error", progress: 0 }
-      }));
+        toast({
+          title: "Document telecharge",
+          description: "Le document a ete enregistre avec succes",
+        });
+        return;
+      } catch (error) {
+        if (attempt < maxRetries) {
+          await new Promise(r => setTimeout(r, 2000 * attempt));
+          continue;
+        }
+        clearInterval(interval);
+        setUploadState(prev => ({
+          ...prev,
+          [type]: { status: "error", progress: 0 }
+        }));
 
-      toast({
-        title: "Erreur",
-        description: "Erreur lors du telechargement",
-        variant: "destructive",
-      });
+        toast({
+          title: "Erreur",
+          description: "Erreur lors du telechargement. Verifiez votre connexion internet et reessayez.",
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -202,11 +210,23 @@ export default function KYC() {
 
     if (!ctx) return;
 
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    ctx.drawImage(video, 0, 0);
+    const maxWidth = 1280;
+    const maxHeight = 960;
+    let targetWidth = video.videoWidth;
+    let targetHeight = video.videoHeight;
+    if (targetWidth > maxWidth) {
+      targetHeight = Math.round(targetHeight * (maxWidth / targetWidth));
+      targetWidth = maxWidth;
+    }
+    if (targetHeight > maxHeight) {
+      targetWidth = Math.round(targetWidth * (maxHeight / targetHeight));
+      targetHeight = maxHeight;
+    }
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+    ctx.drawImage(video, 0, 0, targetWidth, targetHeight);
 
-    const imageData = canvas.toDataURL("image/jpeg", 0.92);
+    const imageData = canvas.toDataURL("image/jpeg", 0.7);
     const currentMode = cameraMode;
 
     if (currentMode === "front") {
@@ -518,10 +538,22 @@ export default function KYC() {
     }
 
     if (state.status === "error") {
+      const retryData = type === "front" ? idFrontData : type === "back" ? idBackData : type === "selfie" ? selfieData : null;
       return (
-        <div className="mt-2 flex items-center gap-2 text-xs text-red-600 dark:text-red-400">
-          <AlertCircle className="w-3 h-3" />
-          <span>Erreur de telechargement</span>
+        <div className="mt-2 space-y-1">
+          <div className="flex items-center gap-2 text-xs text-red-600 dark:text-red-400">
+            <AlertCircle className="w-3 h-3" />
+            <span>Echec du telechargement</span>
+          </div>
+          {retryData && (
+            <button
+              onClick={() => uploadDocument(type, retryData)}
+              className="text-xs text-primary underline"
+              data-testid={`btn-retry-upload-${type}`}
+            >
+              Reessayer
+            </button>
+          )}
         </div>
       );
     }
