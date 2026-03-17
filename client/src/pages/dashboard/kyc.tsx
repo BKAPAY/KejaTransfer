@@ -365,41 +365,51 @@ export default function KYC() {
       return;
     }
 
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude, longitude } = position.coords;
-        setLocationData({ lat: latitude, lng: longitude });
+    const tryGetPosition = (attempt: number) => {
+      const maxAttempts = 10;
+      const useHighAccuracy = attempt <= 5;
+      const timeout = useHighAccuracy ? 10000 : 20000;
 
-        try {
-          const response = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&accept-language=fr`
-          );
-          const data = await response.json();
-          if (data.display_name) {
-            setLocationAddress(data.display_name);
-          } else {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const { latitude, longitude } = position.coords;
+          setLocationData({ lat: latitude, lng: longitude });
+
+          try {
+            const response = await fetch(
+              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&accept-language=fr`
+            );
+            const data = await response.json();
+            if (data.display_name) {
+              setLocationAddress(data.display_name);
+            } else {
+              setLocationAddress(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+            }
+          } catch {
             setLocationAddress(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
           }
-        } catch {
-          setLocationAddress(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
-        }
 
-        setLocationLoading(false);
-      },
-      (error) => {
-        let msg = "Impossible de recuperer votre position.";
-        if (error.code === error.PERMISSION_DENIED) {
-          msg = "PERMISSION_DENIED";
-        } else if (error.code === error.POSITION_UNAVAILABLE) {
-          msg = "Votre position n'est pas disponible. Verifiez que le GPS est active.";
-        } else if (error.code === error.TIMEOUT) {
-          msg = "Le delai de localisation a expire. Reessayez.";
-        }
-        setLocationError(msg);
-        setLocationLoading(false);
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-    );
+          setLocationLoading(false);
+        },
+        (error) => {
+          if (error.code === error.PERMISSION_DENIED) {
+            setLocationError("PERMISSION_DENIED");
+            setLocationLoading(false);
+            return;
+          }
+
+          if (attempt < maxAttempts) {
+            setTimeout(() => tryGetPosition(attempt + 1), 1500);
+          } else {
+            setLocationError("Impossible de recuperer votre position. Verifiez que le GPS est active et reessayez.");
+            setLocationLoading(false);
+          }
+        },
+        { enableHighAccuracy: useHighAccuracy, timeout, maximumAge: 0 }
+      );
+    };
+
+    tryGetPosition(1);
   };
 
   const allUploaded =
