@@ -337,6 +337,7 @@ function MaintenanceGuard({ children }: { children: React.ReactNode }) {
   const { user, isLoading: authLoading } = useAuth();
   const [maintenanceEnabled, setMaintenanceEnabled] = useState(false);
   const [checked, setChecked] = useState(false);
+  const [location] = useLocation();
 
   useEffect(() => {
     const checkMaintenance = async () => {
@@ -358,7 +359,11 @@ function MaintenanceGuard({ children }: { children: React.ReactNode }) {
   if (!checked || authLoading) return null;
 
   if (maintenanceEnabled && !(user?.isAdmin === true)) {
-    return <MaintenancePage />;
+    const blockedPaths = ["/login", "/signup", "/login-verify", "/forgot-password", "/dashboard"];
+    const isBlocked = blockedPaths.some(p => location === p || location.startsWith(p + "/"));
+    if (isBlocked) {
+      return <MaintenancePage />;
+    }
   }
 
   return <>{children}</>;
