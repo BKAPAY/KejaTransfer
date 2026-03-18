@@ -111,6 +111,7 @@ export default function Admin() {
   const [accessCodeDialogOpen, setAccessCodeDialogOpen] = useState(false);
   const [accessCode, setAccessCode] = useState("");
   const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
+  const [pendingMaintenanceToggle, setPendingMaintenanceToggle] = useState<boolean | null>(null);
   const [txCurrentPage, setTxCurrentPage] = useState(1);
   const [txItemsPerPage, setTxItemsPerPage] = useState(20);
   const [txSearchQuery, setTxSearchQuery] = useState("");
@@ -167,12 +168,23 @@ export default function Admin() {
     setAccessCodeDialogOpen(true);
   };
 
+  const handleMaintenanceToggle = () => {
+    const newValue = !(maintenanceStatus?.enabled ?? false);
+    setPendingMaintenanceToggle(newValue);
+    setAccessCode("");
+    setAccessCodeDialogOpen(true);
+  };
+
   const handleAccessCodeSubmit = () => {
     if (accessCode === ADMIN_ACCESS_CODE) {
       setAccessCodeDialogOpen(false);
       if (pendingNavigation) {
         setLocation(pendingNavigation);
         setPendingNavigation(null);
+      }
+      if (pendingMaintenanceToggle !== null) {
+        toggleMaintenanceMutation.mutate(pendingMaintenanceToggle);
+        setPendingMaintenanceToggle(null);
       }
       setAccessCode("");
     } else {
@@ -457,7 +469,7 @@ export default function Admin() {
             Adresses IP
           </Button>
           <Button
-            onClick={() => toggleMaintenanceMutation.mutate(!(maintenanceStatus?.enabled ?? false))}
+            onClick={handleMaintenanceToggle}
             disabled={toggleMaintenanceMutation.isPending}
             data-testid="button-toggle-maintenance"
             className="gap-2"
