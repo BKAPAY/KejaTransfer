@@ -15,11 +15,7 @@ export default function MaintenancePage() {
             Maintenance en cours
           </h1>
           <p className="text-muted-foreground text-base" data-testid="text-maintenance-message">
-            Notre plateforme est en cours de maintenance pour vous offrir une meilleure experience.
-            Nous serons bientot de retour.
-          </p>
-          <p className="text-sm text-muted-foreground">
-            Merci pour votre patience et votre comprehension.
+            Nous serons bientôt de retour.
           </p>
         </div>
       </div>
