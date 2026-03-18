@@ -6,8 +6,9 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { BusinessSidebar } from "@/components/business-sidebar";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
+import MaintenancePage from "@/pages/maintenance";
 import { Wallet } from "lucide-react";
 import { EmaliChatButton } from "@/components/emali-chat";
 import NotFound from "@/pages/not-found";
@@ -332,13 +333,43 @@ function Router() {
   );
 }
 
+function MaintenanceGuard({ children }: { children: React.ReactNode }) {
+  const { user, isLoading: authLoading } = useAuth();
+  const [maintenanceEnabled, setMaintenanceEnabled] = useState(false);
+  const [checked, setChecked] = useState(false);
+
+  useEffect(() => {
+    const checkMaintenance = async () => {
+      try {
+        const res = await fetch("/api/platform-settings/maintenance");
+        const data = await res.json();
+        setMaintenanceEnabled(data.enabled === true);
+      } catch {
+        setMaintenanceEnabled(false);
+      }
+      setChecked(true);
+    };
+
+    checkMaintenance();
+    const interval = setInterval(checkMaintenance, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  if (!checked || authLoading) return null;
+
+  if (maintenanceEnabled && !(user?.isAdmin === true)) {
+    return <MaintenancePage />;
+  }
+
+  return <>{children}</>;
+}
+
 function AppInitializer() {
   const { isLoading } = useAuth();
   const initRef = useRef(false);
 
   useEffect(() => {
     if (!initRef.current) {
-      // Prefetch auth data on app init to maintain session persistence
       queryClient.prefetchQuery({
         queryKey: ["/api/auth/me"],
       });
@@ -346,7 +377,11 @@ function AppInitializer() {
     }
   }, []);
 
-  return <Router />;
+  return (
+    <MaintenanceGuard>
+      <Router />
+    </MaintenanceGuard>
+  );
 }
 
 function App() {

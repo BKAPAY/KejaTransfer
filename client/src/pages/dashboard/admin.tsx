@@ -138,6 +138,29 @@ export default function Admin() {
     },
   });
 
+  const { data: maintenanceStatus } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/platform-settings/maintenance"],
+  });
+
+  const toggleMaintenanceMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const res = await apiRequest("POST", "/api/admin/toggle-maintenance", { enabled });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/platform-settings/maintenance"] });
+      toast({
+        title: data.enabled ? "Maintenance activee" : "Maintenance desactivee",
+        description: data.enabled 
+          ? "La plateforme est en maintenance. Tous les utilisateurs sont deconnectes." 
+          : "La plateforme est de nouveau accessible a tous les utilisateurs.",
+      });
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible de modifier le mode maintenance", variant: "destructive" });
+    },
+  });
+
   const handleProtectedNavigation = (path: string) => {
     setPendingNavigation(path);
     setAccessCode("");
@@ -432,6 +455,16 @@ export default function Admin() {
           >
             <Network className="w-4 h-4" />
             Adresses IP
+          </Button>
+          <Button
+            onClick={() => toggleMaintenanceMutation.mutate(!(maintenanceStatus?.enabled ?? false))}
+            disabled={toggleMaintenanceMutation.isPending}
+            data-testid="button-toggle-maintenance"
+            className="gap-2"
+            variant={maintenanceStatus?.enabled ? "destructive" : "outline"}
+          >
+            <Power className="w-4 h-4" />
+            {maintenanceStatus?.enabled ? "Maintenance : ON" : "Maintenance : OFF"}
           </Button>
         </div>
       </div>

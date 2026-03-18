@@ -9497,6 +9497,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Platform settings - maintenance mode (public)
+  app.get("/api/platform-settings/maintenance", async (req: Request, res: Response) => {
+    try {
+      const result = await pgPool.query(
+        "SELECT value FROM platform_settings WHERE key = 'maintenance_mode'"
+      );
+      const enabled = result.rows.length > 0 ? result.rows[0].value === 'true' : false;
+      res.json({ enabled });
+    } catch (error) {
+      res.json({ enabled: false });
+    }
+  });
+
+  // Platform settings - toggle maintenance mode (admin only)
+  app.post("/api/admin/toggle-maintenance", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { enabled } = req.body;
+      if (typeof enabled !== 'boolean') {
+        return res.status(400).json({ error: "Valeur invalide" });
+      }
+      await pgPool.query(
+        "INSERT INTO platform_settings (key, value, updated_at) VALUES ('maintenance_mode', $1, NOW()) ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = NOW()",
+        [enabled ? 'true' : 'false']
+      );
+
+      if (enabled) {
+        await pgPool.query(`
+          DELETE FROM session 
+          WHERE sid NOT IN (
+            SELECT s.sid FROM session s
+            JOIN users u ON u.id = (s.sess::json->>'userId')::text
+            WHERE u.is_admin = true
+          )
+        `);
+        console.log("[Maintenance] Mode maintenance active - toutes les sessions non-admin supprimees");
+      } else {
+        console.log("[Maintenance] Mode maintenance desactive");
+      }
+
+      res.json({ success: true, enabled });
+    } catch (error: any) {
+      console.error("Toggle maintenance error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
   // Platform settings - get emali status (public for authenticated users)
   app.get("/api/platform-settings/emali-enabled", async (req: Request, res: Response) => {
     try {
