@@ -359,9 +359,7 @@ function MaintenanceGuard({ children }: { children: React.ReactNode }) {
   if (!checked || authLoading) return null;
 
   if (maintenanceEnabled && !(user?.isAdmin === true)) {
-    const blockedPaths = ["/login", "/signup", "/login-verify", "/forgot-password", "/dashboard"];
-    const isBlocked = blockedPaths.some(p => location === p || location.startsWith(p + "/"));
-    if (isBlocked) {
+    if (location !== "/") {
       return <MaintenancePage />;
     }
   }
