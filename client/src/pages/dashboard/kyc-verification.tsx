@@ -235,49 +235,6 @@ export default function KycVerificationPage() {
       y += 2;
     }
 
-    if ((user as any).kycActivityDescription) {
-      addSectionTitle("2. Description de l'activite");
-      addField("Activite declaree", (user as any).kycActivityDescription);
-    }
-
-    if ((user as any).kycLatitude && (user as any).kycLongitude) {
-      addSectionTitle("3. Localisation geographique");
-      if ((user as any).kycAddress) {
-        addField("Adresse", (user as any).kycAddress);
-      }
-      addField("Latitude", (user as any).kycLatitude);
-      addField("Longitude", (user as any).kycLongitude);
-      addField("Coordonnees GPS", `${(user as any).kycLatitude}, ${(user as any).kycLongitude}`);
-    }
-
-    if ((user as any).kycAcceptedTerms) {
-      addSectionTitle("4. Engagements acceptes par l'utilisateur");
-      try {
-        const terms = JSON.parse((user as any).kycAcceptedTerms) as string[];
-        terms.forEach((term: string, i: number) => {
-          const stepLabel = KYC_STEP_LABELS[i] || `Etape ${i + 1}`;
-          checkPageBreak(20);
-          doc.setFontSize(9);
-          doc.setFont("helvetica", "bold");
-          doc.setTextColor(59, 130, 246);
-          doc.text(stepLabel, margin + 2, y);
-          doc.setTextColor(0, 0, 0);
-          y += 5;
-          doc.setFontSize(10);
-          doc.setFont("helvetica", "normal");
-          const splitLines = doc.splitTextToSize(`[Accepte] ${term}`, maxTextWidth - 10);
-          splitLines.forEach((line: string) => {
-            checkPageBreak(6);
-            doc.text(line, margin + 6, y);
-            y += 5;
-          });
-          y += 3;
-        });
-      } catch {}
-    }
-
-    addSectionTitle("5. Documents fournis");
-
     const addImageToPdf = async (imageUrl: string, label: string): Promise<void> => {
       return new Promise((resolve) => {
         if (!imageUrl) {
@@ -330,6 +287,61 @@ export default function KycVerificationPage() {
         img.src = imageUrl;
       });
     };
+
+    if ((user as any).kycActivityDescription) {
+      addSectionTitle("2. Description de l'activite");
+      addField("Activite declaree", (user as any).kycActivityDescription);
+    }
+
+    if ((user as any).kycLatitude && (user as any).kycLongitude) {
+      addSectionTitle("3. Localisation geographique");
+      if ((user as any).kycAddress) {
+        addField("Adresse", (user as any).kycAddress);
+      }
+      addField("Coordonnees GPS", `${(user as any).kycLatitude}, ${(user as any).kycLongitude}`);
+
+      const lat = parseFloat((user as any).kycLatitude);
+      const lng = parseFloat((user as any).kycLongitude);
+      if (!isNaN(lat) && !isNaN(lng)) {
+        const staticMapUrl = `https://staticmap.openstreetmap.de/staticmap.php?center=${lat},${lng}&zoom=15&size=600x300&maptype=mapnik&markers=${lat},${lng},lightblue`;
+        try {
+          await addImageToPdf(staticMapUrl, "Carte de localisation");
+        } catch {
+          doc.setFontSize(10);
+          doc.setFont("helvetica", "normal");
+          doc.text("Carte de localisation non disponible", margin, y);
+          y += 10;
+        }
+      }
+    }
+
+    if ((user as any).kycAcceptedTerms) {
+      addSectionTitle("4. Engagements acceptes par l'utilisateur");
+      try {
+        const terms = JSON.parse((user as any).kycAcceptedTerms) as string[];
+        terms.forEach((term: string, i: number) => {
+          const stepLabel = KYC_STEP_LABELS[i] || `Etape ${i + 1}`;
+          checkPageBreak(20);
+          doc.setFontSize(9);
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(59, 130, 246);
+          doc.text(stepLabel, margin + 2, y);
+          doc.setTextColor(0, 0, 0);
+          y += 5;
+          doc.setFontSize(10);
+          doc.setFont("helvetica", "normal");
+          const splitLines = doc.splitTextToSize(`[Accepte] ${term}`, maxTextWidth - 10);
+          splitLines.forEach((line: string) => {
+            checkPageBreak(6);
+            doc.text(line, margin + 6, y);
+            y += 5;
+          });
+          y += 3;
+        });
+      } catch {}
+    }
+
+    addSectionTitle("5. Documents fournis");
     
     try {
       if (user.kycIdFront) {
