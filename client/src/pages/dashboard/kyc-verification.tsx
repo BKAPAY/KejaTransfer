@@ -303,7 +303,7 @@ export default function KycVerificationPage() {
       const lat = parseFloat((user as any).kycLatitude);
       const lng = parseFloat((user as any).kycLongitude);
       if (!isNaN(lat) && !isNaN(lng)) {
-        const staticMapUrl = `https://staticmap.openstreetmap.de/staticmap.php?center=${lat},${lng}&zoom=15&size=600x300&maptype=mapnik&markers=${lat},${lng},lightblue`;
+        const staticMapUrl = `/api/static-map?lat=${lat}&lng=${lng}&zoom=15&width=600&height=300`;
         try {
           await addImageToPdf(staticMapUrl, "Carte de localisation");
         } catch {

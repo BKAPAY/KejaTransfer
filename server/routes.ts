@@ -9497,6 +9497,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/static-map", async (req: Request, res: Response) => {
+    try {
+      const { lat, lng, zoom = "15", width = "600", height = "300" } = req.query;
+      if (!lat || !lng) {
+        return res.status(400).json({ error: "Latitude et longitude requises" });
+      }
+      const mapUrl = `https://staticmap.openstreetmap.de/staticmap.php?center=${lat},${lng}&zoom=${zoom}&size=${width}x${height}&maptype=mapnik&markers=${lat},${lng},lightblue`;
+      const response = await fetch(mapUrl);
+      if (!response.ok) {
+        return res.status(502).json({ error: "Impossible de recuperer la carte" });
+      }
+      const buffer = await response.arrayBuffer();
+      res.set("Content-Type", response.headers.get("content-type") || "image/png");
+      res.set("Cache-Control", "public, max-age=86400");
+      res.send(Buffer.from(buffer));
+    } catch (error) {
+      console.error("Static map error:", error);
+      res.status(500).json({ error: "Erreur lors de la recuperation de la carte" });
+    }
+  });
+
   // Platform settings - maintenance mode (public)
   app.get("/api/platform-settings/maintenance", async (req: Request, res: Response) => {
     try {
