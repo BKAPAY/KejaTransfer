@@ -127,6 +127,78 @@ export default function KycVerificationPage() {
     },
   });
 
+  const generateMapImage = (lat: number, lng: number, zoom: number, width: number, height: number): Promise<string | null> => {
+    return new Promise((resolve) => {
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { resolve(null); return; }
+
+      const tileSize = 256;
+      const centerX = ((lng + 180) / 360) * Math.pow(2, zoom);
+      const centerY = (1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * Math.pow(2, zoom);
+
+      const tilesX = Math.ceil(width / tileSize) + 1;
+      const tilesY = Math.ceil(height / tileSize) + 1;
+
+      const offsetX = (width / 2) - (centerX - Math.floor(centerX)) * tileSize;
+      const offsetY = (height / 2) - (centerY - Math.floor(centerY)) * tileSize;
+
+      const startTileX = Math.floor(centerX) - Math.floor(tilesX / 2);
+      const startTileY = Math.floor(centerY) - Math.floor(tilesY / 2);
+
+      let loaded = 0;
+      const totalTiles = tilesX * tilesY;
+      let hasError = false;
+
+      const timeout = setTimeout(() => { if (loaded < totalTiles) resolve(null); }, 10000);
+
+      for (let tx = 0; tx < tilesX; tx++) {
+        for (let ty = 0; ty < tilesY; ty++) {
+          const tileX = startTileX + tx;
+          const tileY = startTileY + ty;
+          const maxTile = Math.pow(2, zoom);
+          if (tileY < 0 || tileY >= maxTile) { loaded++; continue; }
+          const wrappedTileX = ((tileX % maxTile) + maxTile) % maxTile;
+
+          const img = new Image();
+          img.crossOrigin = "anonymous";
+          img.onload = () => {
+            const drawX = offsetX + tx * tileSize - Math.floor(tilesX / 2) * tileSize + Math.floor(centerX - startTileX) * tileSize - (centerX - Math.floor(centerX)) * tileSize;
+            const drawY = offsetY + ty * tileSize - Math.floor(tilesY / 2) * tileSize + Math.floor(centerY - startTileY) * tileSize - (centerY - Math.floor(centerY)) * tileSize;
+            const px = (tileX - centerX) * tileSize + width / 2;
+            const py = (tileY - centerY) * tileSize + height / 2;
+            ctx.drawImage(img, px, py, tileSize, tileSize);
+            loaded++;
+            if (loaded >= totalTiles && !hasError) {
+              clearTimeout(timeout);
+              ctx.beginPath();
+              ctx.arc(width / 2, height / 2, 8, 0, 2 * Math.PI);
+              ctx.fillStyle = "#3b82f6";
+              ctx.fill();
+              ctx.strokeStyle = "#ffffff";
+              ctx.lineWidth = 3;
+              ctx.stroke();
+              resolve(canvas.toDataURL("image/png"));
+            }
+          };
+          img.onerror = () => {
+            loaded++;
+            if (loaded >= totalTiles) {
+              clearTimeout(timeout);
+              if (!hasError) resolve(null);
+              hasError = true;
+            }
+          };
+          const subdomains = ["a", "b", "c"];
+          const s = subdomains[(tileX + tileY) % 3];
+          img.src = `https://${s}.tile.openstreetmap.org/${zoom}/${wrappedTileX}/${tileY}.png`;
+        }
+      }
+    });
+  };
+
   const downloadPdf = async (user: User) => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -303,9 +375,19 @@ export default function KycVerificationPage() {
       const lat = parseFloat((user as any).kycLatitude);
       const lng = parseFloat((user as any).kycLongitude);
       if (!isNaN(lat) && !isNaN(lng)) {
-        const staticMapUrl = `/api/static-map?lat=${lat}&lng=${lng}&zoom=15&width=600&height=300`;
         try {
-          await addImageToPdf(staticMapUrl, "Carte de localisation");
+          const mapDataUrl = await generateMapImage(lat, lng, 15, 600, 300);
+          if (mapDataUrl) {
+            checkPageBreak(110);
+            doc.setFontSize(11);
+            doc.setFont("helvetica", "bold");
+            doc.text("Carte de localisation", margin, y);
+            y += 6;
+            const mapWidth = 160;
+            const mapHeight = 80;
+            doc.addImage(mapDataUrl, "PNG", margin, y, mapWidth, mapHeight);
+            y += mapHeight + 10;
+          }
         } catch {
           doc.setFontSize(10);
           doc.setFont("helvetica", "normal");
