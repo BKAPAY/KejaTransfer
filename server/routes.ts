@@ -4658,6 +4658,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Votre compte a été suspendu. Veuillez contacter le support." });
       }
 
+      // Check deposit enabled (global + per-user override)
+      const depositSetting = await pgPool.query("SELECT value FROM platform_settings WHERE key = 'deposit_enabled'");
+      const depositGlobalEnabled = depositSetting.rows.length === 0 || depositSetting.rows[0].value === 'true';
+      if (!depositGlobalEnabled && !user?.depositOverrideEnabled) {
+        return res.status(403).json({ error: "Les dépôts sont temporairement désactivés. Veuillez contacter le support." });
+      }
+
       const { amount, description, country, operator, phone, customerName, customerEmail } = req.body;
 
       if (!amount || amount <= 0) {
@@ -6669,6 +6676,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (user.suspended) {
         return res.status(403).json({ success: false, error: "Votre compte a ete suspendu" });
+      }
+
+      // Check deposit enabled (global + per-user override)
+      const depositSetting = await pgPool.query("SELECT value FROM platform_settings WHERE key = 'deposit_enabled'");
+      const depositGlobalEnabled = depositSetting.rows.length === 0 || depositSetting.rows[0].value === 'true';
+      if (!depositGlobalEnabled && !user.depositOverrideEnabled) {
+        return res.status(403).json({ success: false, error: "Les depots sont temporairement desactives. Veuillez contacter le support." });
       }
 
       if (!amount || amount <= 0) {
@@ -9493,6 +9507,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true, wavePayinEnabled: result.rows[0].wave_payin_enabled });
     } catch (error: any) {
       console.error("Toggle wave payin error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
+  // Platform settings - deposit enabled (public)
+  app.get("/api/platform-settings/deposit-enabled", async (req: Request, res: Response) => {
+    try {
+      const result = await pgPool.query(
+        "SELECT value FROM platform_settings WHERE key = 'deposit_enabled'"
+      );
+      const enabled = result.rows.length > 0 ? result.rows[0].value === 'true' : true;
+      res.json({ enabled });
+    } catch (error) {
+      res.json({ enabled: true });
+    }
+  });
+
+  // Platform settings - toggle deposit globally (admin only)
+  app.post("/api/admin/toggle-deposit", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { enabled } = req.body;
+      if (typeof enabled !== 'boolean') {
+        return res.status(400).json({ error: "Valeur invalide" });
+      }
+      await pgPool.query(
+        "INSERT INTO platform_settings (key, value, updated_at) VALUES ('deposit_enabled', $1, NOW()) ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = NOW()",
+        [enabled ? 'true' : 'false']
+      );
+      if (enabled) {
+        await pgPool.query("UPDATE users SET deposit_override_enabled = FALSE");
+      }
+      res.json({ success: true, enabled });
+    } catch (error: any) {
+      console.error("Toggle deposit error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
+  // Admin - toggle deposit override for a specific user
+  app.post("/api/admin/toggle-deposit-override", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { userId, enabled } = req.body;
+      if (!userId || typeof enabled !== "boolean") {
+        return res.status(400).json({ error: "Parametres invalides" });
+      }
+      const result = await pgPool.query(
+        "UPDATE users SET deposit_override_enabled = $1 WHERE id = $2 RETURNING deposit_override_enabled",
+        [enabled, userId]
+      );
+      if (result.rows.length === 0) return res.status(404).json({ error: "Utilisateur non trouve" });
+      res.json({ success: true, depositOverrideEnabled: result.rows[0].deposit_override_enabled });
+    } catch (error: any) {
+      console.error("Toggle deposit override error:", error);
       res.status(500).json({ error: "Une erreur est survenue" });
     }
   });

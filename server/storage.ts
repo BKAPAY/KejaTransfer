@@ -1332,6 +1332,7 @@ export class DbStorage implements IStorage {
       withdrawalsEnabled: schema.users.withdrawalsEnabled,
       payoutApiEnabled: schema.users.payoutApiEnabled,
       wavePayinEnabled: schema.users.wavePayinEnabled,
+      depositOverrideEnabled: schema.users.depositOverrideEnabled,
       createdAt: schema.users.createdAt,
       country: schema.users.country,
       withdrawalPhones: schema.users.withdrawalPhones,

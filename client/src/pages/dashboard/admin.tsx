@@ -4,7 +4,7 @@ import { PasswordInput } from "@/components/ui/password-input";
 import { Button } from "@/components/ui/button";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Users, UserCheck, TrendingDown, TrendingUp, Search, Settings, Globe, RefreshCw, Database, AlertCircle, CheckCircle2, Eye, History, MapPin, Mail, Phone, CreditCard, Percent, Lock, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Bot, Power, Network, ArrowDownWideNarrow, CalendarArrowDown } from "lucide-react";
+import { Users, UserCheck, TrendingDown, TrendingUp, Search, Settings, Globe, RefreshCw, Database, AlertCircle, CheckCircle2, Eye, History, MapPin, Mail, Phone, CreditCard, Percent, Lock, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Bot, Power, Network, ArrowDownWideNarrow, CalendarArrowDown, ArrowDownToLine } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -136,6 +136,30 @@ export default function Admin() {
     },
     onError: () => {
       toast({ title: "Erreur", description: "Impossible de modifier le statut", variant: "destructive" });
+    },
+  });
+
+  const { data: depositStatus } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/platform-settings/deposit-enabled"],
+  });
+
+  const toggleDepositMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const res = await apiRequest("POST", "/api/admin/toggle-deposit", { enabled });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/platform-settings/deposit-enabled"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({
+        title: data.enabled ? "Depot active" : "Depot desactive",
+        description: data.enabled
+          ? "Le depot est maintenant disponible pour tous les utilisateurs."
+          : "Le depot est desactive pour tous les utilisateurs. Vous pouvez activer individuellement.",
+      });
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible de modifier le statut du depot", variant: "destructive" });
     },
   });
 
@@ -467,6 +491,16 @@ export default function Admin() {
           >
             <Network className="w-4 h-4" />
             Adresses IP
+          </Button>
+          <Button
+            onClick={() => toggleDepositMutation.mutate(!(depositStatus?.enabled ?? true))}
+            disabled={toggleDepositMutation.isPending}
+            data-testid="button-toggle-deposit"
+            className="gap-2"
+            variant={(depositStatus?.enabled ?? true) ? "default" : "destructive"}
+          >
+            <ArrowDownToLine className="w-4 h-4" />
+            {(depositStatus?.enabled ?? true) ? "Depot : ON" : "Depot : OFF"}
           </Button>
           <Button
             onClick={handleMaintenanceToggle}

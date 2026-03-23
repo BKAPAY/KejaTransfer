@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Users, Shield, Trash2, Plus, Minus, History, Link as LinkIcon, Store, Key, User as UserIcon, Check, X, FileCheck, AlertCircle, Unlock, Lock, Clock, CheckCircle, XCircle, ArrowDownLeft, ArrowUpRight, Loader2, Monitor, RotateCcw, Waves } from "lucide-react";
+import { Users, Shield, Trash2, Plus, Minus, History, Link as LinkIcon, Store, Key, User as UserIcon, Check, X, FileCheck, AlertCircle, Unlock, Lock, Clock, CheckCircle, XCircle, ArrowDownLeft, ArrowUpRight, Loader2, Monitor, RotateCcw, Waves, ArrowDownToLine } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
@@ -418,6 +418,26 @@ export default function Management() {
     },
   });
 
+  const toggleDepositOverrideMutation = useMutation({
+    mutationFn: async ({ userId, enabled }: { userId: string; enabled: boolean }) => {
+      const res = await apiRequest("POST", "/api/admin/toggle-deposit-override", { userId, enabled });
+      return res.json();
+    },
+    onSuccess: (data, vars) => {
+      toast({ title: "Succès", description: vars.enabled ? "Dépôt activé pour cet utilisateur" : "Dépôt désactivé pour cet utilisateur" });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/search"] });
+      refetchUsers();
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible de modifier le dépôt", variant: "destructive" });
+    },
+  });
+
+  const { data: depositGlobalStatus } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/platform-settings/deposit-enabled"],
+  });
+
   // Helper function to get currency for a user's country
   const getCurrencyForUser = (user: User) => {
     return user?.country 
@@ -780,6 +800,21 @@ export default function Management() {
                         <Waves className="w-4 h-4 mr-1" />
                         {(user as any).wavePayinEnabled ? "Wave ON" : "Wave OFF"}
                       </Button>
+                      {!(depositGlobalStatus?.enabled ?? true) && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setToggleDialog({ open: true, userId: user.id, userName: `${user.firstName} ${user.lastName}`, type: "deposit_override", enabled: !(user as any).depositOverrideEnabled })}
+                          disabled={toggleDepositOverrideMutation.isPending}
+                          data-testid={`button-toggle-deposit-${user.id}`}
+                          className={(user as any).depositOverrideEnabled
+                            ? "border-green-500 text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/30"
+                            : "border-red-400 text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/30"}
+                        >
+                          <ArrowDownToLine className="w-4 h-4 mr-1" />
+                          {(user as any).depositOverrideEnabled ? "Depot ON" : "Depot OFF"}
+                        </Button>
+                      )}
                       {user.kycStatus === "submitted" ? (
                         <>
                           <Button
@@ -898,6 +933,10 @@ export default function Management() {
                 toggleDialog.enabled
                   ? <>Activer Wave (encaissement) pour <strong>{toggleDialog.userName}</strong> lui permettra de recevoir des paiements via Wave sur ses liens et son API. Le client a fait la demande.</>
                   : <>Désactiver Wave (encaissement) pour <strong>{toggleDialog.userName}</strong>. Il ne pourra plus recevoir de paiements entrants via Wave.</>
+              ) : toggleDialog.type === "deposit_override" ? (
+                toggleDialog.enabled
+                  ? <>Activer le dépôt pour <strong>{toggleDialog.userName}</strong> même si le dépôt global est désactivé. Cet utilisateur pourra effectuer des dépôts.</>
+                  : <>Désactiver le dépôt pour <strong>{toggleDialog.userName}</strong>. Cet utilisateur ne pourra plus effectuer de dépôts.</>
               ) : (
                 <>Êtes-vous sûr de vouloir {toggleDialog.enabled ? "activer" : "désactiver"} les {toggleDialog.type === "transfers" ? "transferts" : "retraits"} pour <strong>{toggleDialog.userName}</strong> ?
                 {!toggleDialog.enabled && " Cet utilisateur ne pourra plus effectuer cette opération."}</>
@@ -915,12 +954,14 @@ export default function Management() {
                     toggleWithdrawalsMutation.mutate({ userId: toggleDialog.userId, enabled: !!toggleDialog.enabled });
                   } else if (toggleDialog.type === "wave_payin") {
                     toggleWavePayinMutation.mutate({ userId: toggleDialog.userId, enabled: !!toggleDialog.enabled });
+                  } else if (toggleDialog.type === "deposit_override") {
+                    toggleDepositOverrideMutation.mutate({ userId: toggleDialog.userId, enabled: !!toggleDialog.enabled });
                   } else {
                     togglePayoutApiMutation.mutate({ userId: toggleDialog.userId, enabled: !!toggleDialog.enabled });
                   }
                 }
               }}
-              disabled={toggleTransfersMutation.isPending || toggleWithdrawalsMutation.isPending || togglePayoutApiMutation.isPending || toggleWavePayinMutation.isPending}
+              disabled={toggleTransfersMutation.isPending || toggleWithdrawalsMutation.isPending || togglePayoutApiMutation.isPending || toggleWavePayinMutation.isPending || toggleDepositOverrideMutation.isPending}
               data-testid="button-confirm-toggle"
             >
               {(toggleTransfersMutation.isPending || toggleWithdrawalsMutation.isPending || togglePayoutApiMutation.isPending || toggleWavePayinMutation.isPending) ? "En cours..." : "Confirmer"}

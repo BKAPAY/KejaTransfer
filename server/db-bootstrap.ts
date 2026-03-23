@@ -243,6 +243,18 @@ async function bootstrapDatabase() {
     }
     await waveColClient.end();
 
+    // Step 6d3: Ensure deposit_override_enabled column exists in users table
+    const depositColClient = postgres(DATABASE_URL);
+    try {
+      await depositColClient`
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS deposit_override_enabled BOOLEAN NOT NULL DEFAULT FALSE
+      `;
+      console.log("✅ users.deposit_override_enabled column ready");
+    } catch (e) {
+      console.error("⚠️ deposit_override_enabled column setup error:", e);
+    }
+    await depositColClient.end();
+
     // Step 6e: Ensure payout_callback_url and payout_callback_secret columns exist in api_keys
     const payoutCbClient = postgres(DATABASE_URL);
     try {

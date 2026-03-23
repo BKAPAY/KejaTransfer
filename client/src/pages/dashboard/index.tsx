@@ -292,6 +292,10 @@ export default function Dashboard() {
     return () => clearTimeout(timer);
   }, []);
 
+  const { data: depositGlobalStatus } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/platform-settings/deposit-enabled"],
+  });
+
   const { data: user, isLoading: userLoading } = useQuery<User>({
     queryKey: ["/api/auth/me"],
     staleTime: 30000,
@@ -386,14 +390,16 @@ export default function Dashboard() {
 
         {/* Action Buttons */}
         <div className="flex gap-2">
-          <Button 
-            data-testid="button-deposit"
-            className="flex-1 flex items-center justify-center gap-2"
-            onClick={() => setLocation("/dashboard/deposit")}
-          >
-            <ArrowDownToLine className="h-4 w-4" />
-            Dépôt
-          </Button>
+          {((depositGlobalStatus?.enabled ?? true) || (user as any)?.depositOverrideEnabled) && (
+            <Button 
+              data-testid="button-deposit"
+              className="flex-1 flex items-center justify-center gap-2"
+              onClick={() => setLocation("/dashboard/deposit")}
+            >
+              <ArrowDownToLine className="h-4 w-4" />
+              Dépôt
+            </Button>
+          )}
           <Button 
             data-testid="button-transfer"
             className="flex-1 flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white"
