@@ -273,11 +273,10 @@ export default function Admin() {
 
   const { data: pendingBroadcast } = useQuery<{ sent: number; failed: number; total: number; failedUserIds: string[]; subject: string; message: string } | null>({
     queryKey: ["/api/admin/pending-broadcast"],
-    enabled: mainTab === "messages",
   });
 
   useEffect(() => {
-    if (pendingBroadcast && pendingBroadcast.failedUserIds?.length > 0 && !lastBroadcastResult) {
+    if (pendingBroadcast && pendingBroadcast.failedUserIds?.length > 0) {
       setLastBroadcastResult(pendingBroadcast);
     }
   }, [pendingBroadcast]);
