@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { PhoneInputWithPrefix } from "@/components/phone-input-with-prefix";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -747,25 +747,23 @@ export default function KYC() {
         <CardContent className="pt-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="text-xs font-medium text-muted-foreground" htmlFor="kyc-phone">Numero de telephone</label>
-              <Input
-                id="kyc-phone"
-                data-testid="input-kyc-phone"
-                type="tel"
-                placeholder="Ex: +229 97 00 00 00"
+              <p className="text-xs font-medium text-muted-foreground">Numero de telephone</p>
+              <PhoneInputWithPrefix
+                country={user?.country || "BJ"}
                 value={kycPhone}
-                onChange={(e) => setKycPhone(e.target.value)}
+                onChange={setKycPhone}
+                placeholder="97 00 00 00"
+                data-testid="input-kyc-phone"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-xs font-medium text-muted-foreground" htmlFor="kyc-whatsapp">Numero WhatsApp</label>
-              <Input
-                id="kyc-whatsapp"
-                data-testid="input-kyc-whatsapp"
-                type="tel"
-                placeholder="Ex: +229 97 00 00 00"
+              <p className="text-xs font-medium text-muted-foreground">Numero WhatsApp</p>
+              <PhoneInputWithPrefix
+                country={user?.country || "BJ"}
                 value={kycWhatsapp}
-                onChange={(e) => setKycWhatsapp(e.target.value)}
+                onChange={setKycWhatsapp}
+                placeholder="97 00 00 00"
+                data-testid="input-kyc-whatsapp"
               />
             </div>
           </div>
