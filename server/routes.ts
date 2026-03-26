@@ -11572,6 +11572,35 @@ SUPPORT ET CONTACT:
     }
   });
 
+  app.get("/api/admin/active-users-7d", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const pool = new (await import("pg")).default.Pool({ connectionString: process.env.DATABASE_URL });
+      const result = await pool.query(`
+        SELECT DISTINCT u.* FROM users u
+        INNER JOIN login_logs ll ON u.id = ll.user_id
+        WHERE ll.created_at >= NOW() - INTERVAL '7 days'
+        AND u.is_admin = false
+        ORDER BY u.first_name ASC
+      `);
+      await pool.end();
+      res.json(result.rows.map((r: any) => ({
+        id: r.id,
+        email: r.email,
+        firstName: r.first_name,
+        lastName: r.last_name,
+        country: r.country,
+        balance: parseFloat(r.balance) || 0,
+        kycStatus: r.kyc_status,
+        isAdmin: r.is_admin,
+        accountType: r.account_type,
+        createdAt: r.created_at,
+      })));
+    } catch (error: any) {
+      console.error("[Admin] Active users 7d error:", error);
+      res.status(500).json({ error: "Erreur" });
+    }
+  });
+
   // ==================== Admin Messaging ====================
   app.post("/api/admin/polish-message", requireAdmin, async (req: Request, res: Response) => {
     try {

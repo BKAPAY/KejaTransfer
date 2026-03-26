@@ -98,7 +98,7 @@ interface TransactionWithUser extends Transaction {
 
 export default function Admin() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeTab, setActiveTab] = useState<"search" | "all">("all");
+  const [activeTab, setActiveTab] = useState<"search" | "all" | "active7d">("all");
   const [mainTab, setMainTab] = useState<"users" | "transactions" | "messages">("users");
   const [userSortBy, setUserSortBy] = useState<"balance" | "date">("balance");
   const [isSyncing, setIsSyncing] = useState(false);
@@ -381,6 +381,11 @@ export default function Admin() {
     enabled: searchQuery.length > 0,
   });
 
+  const { data: activeUsers7d = [], isLoading: activeUsersLoading } = useQuery<User[]>({
+    queryKey: ["/api/admin/active-users-7d"],
+    enabled: activeTab === "active7d",
+  });
+
   // Get all transactions for admin (recent 500 for display)
   const { data: allTransactions = [], isLoading: transactionsLoading } = useQuery<TransactionWithUser[]>({
     queryKey: ["/api/admin/all-transactions"],
@@ -411,14 +416,15 @@ export default function Admin() {
     ).slice(0, 50);
   }, [allUsers, msgUserSearch]);
 
-  const sortedUsers = [...(searchQuery.length > 0 ? searchResults : allUsers)].sort((a, b) => {
+  const baseUsers = activeTab === "active7d" ? activeUsers7d : (searchQuery.length > 0 ? searchResults : allUsers);
+  const sortedUsers = [...baseUsers].sort((a, b) => {
     if (userSortBy === "date") {
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     }
     return (b.balance || 0) - (a.balance || 0);
   });
   const displayedUsers = sortedUsers;
-  const isLoading = searchQuery.length > 0 ? searchLoading : usersLoading;
+  const isLoading = activeTab === "active7d" ? activeUsersLoading : (searchQuery.length > 0 ? searchLoading : usersLoading);
 
   // When searching: use server-side results. Otherwise: show the 500 recent transactions.
   const filteredTransactions: TransactionWithUser[] = txSearchQuery.trim().length >= 2
@@ -850,6 +856,18 @@ export default function Admin() {
                   data-testid="button-tab-all-users"
                 >
                   Tous ({allUsers.length})
+                </Button>
+                <Button
+                  variant={activeTab === "active7d" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => {
+                    setActiveTab("active7d");
+                    setSearchQuery("");
+                  }}
+                  data-testid="button-tab-active-7d"
+                >
+                  <Eye className="w-4 h-4 mr-2" />
+                  Actifs 7j {activeTab === "active7d" && activeUsers7d.length > 0 ? `(${activeUsers7d.length})` : ""}
                 </Button>
                 <Button
                   variant={activeTab === "search" ? "default" : "outline"}
