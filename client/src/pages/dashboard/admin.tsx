@@ -4,7 +4,7 @@ import { PasswordInput } from "@/components/ui/password-input";
 import { Button } from "@/components/ui/button";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Users, UserCheck, TrendingDown, TrendingUp, Search, Settings, Globe, RefreshCw, Database, AlertCircle, CheckCircle2, Eye, History, MapPin, Mail, Phone, CreditCard, Percent, Lock, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Bot, Power, Network, ArrowDownWideNarrow, CalendarArrowDown, ArrowDownToLine, Send, Sparkles, Check, X, MessageSquare, Loader2 } from "lucide-react";
+import { Users, UserCheck, TrendingDown, TrendingUp, Search, Settings, Globe, RefreshCw, Database, AlertCircle, AlertTriangle, CheckCircle2, Eye, History, MapPin, Mail, Phone, CreditCard, Percent, Lock, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Bot, Power, Network, ArrowDownWideNarrow, CalendarArrowDown, ArrowDownToLine, Send, Sparkles, Check, X, MessageSquare, Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -197,16 +197,39 @@ export default function Admin() {
     },
   });
 
+  const [pendingBroadcastMeta, setPendingBroadcastMeta] = useState<{ subject: string; message: string } | null>(null);
+
   const sendBroadcastMutation = useMutation({
     mutationFn: async (data: { subject: string; message: string; audienceType: string; accountType: string; kycFilter: string; userIds?: string[] }) => {
+      setPendingBroadcastMeta({ subject: data.subject, message: data.message });
       const res = await apiRequest("POST", "/api/admin/send-broadcast", data);
       return res.json();
     },
     onSuccess: (data) => {
-      toast({
-        title: "Messages envoyes",
-        description: `${data.sent} email(s) envoye(s) avec succes${data.failed > 0 ? `, ${data.failed} echec(s)` : ""}`,
-      });
+      const prevSent = lastBroadcastResult ? lastBroadcastResult.sent : 0;
+      const totalSent = (lastBroadcastResult && data.total < lastBroadcastResult.total) ? prevSent + data.sent : data.sent;
+
+      if (data.failed > 0 && data.failedUserIds?.length > 0) {
+        setLastBroadcastResult({
+          sent: totalSent,
+          failed: data.failed,
+          total: lastBroadcastResult ? lastBroadcastResult.total : data.total,
+          failedUserIds: data.failedUserIds,
+          subject: pendingBroadcastMeta?.subject || "",
+          message: pendingBroadcastMeta?.message || "",
+        });
+        toast({
+          title: "Envoi partiel",
+          description: `${totalSent} envoyé(s) au total, ${data.failed} en attente — limite atteinte.`,
+          variant: "destructive",
+        });
+      } else {
+        setLastBroadcastResult(null);
+        toast({
+          title: "Messages envoyés",
+          description: `${totalSent} email(s) envoyé(s) avec succès`,
+        });
+      }
       setMsgSubject("");
       setMsgBody("");
       setMsgSelectedUserIds([]);
@@ -233,6 +256,7 @@ export default function Admin() {
   };
 
   const [approvedPolishedMessage, setApprovedPolishedMessage] = useState<string | null>(null);
+  const [lastBroadcastResult, setLastBroadcastResult] = useState<{ sent: number; failed: number; total: number; failedUserIds: string[]; subject: string; message: string } | null>(null);
 
   const handleSendBroadcast = () => {
     const messageToSend = approvedPolishedMessage || msgBody;
@@ -1468,6 +1492,61 @@ export default function Admin() {
                 )}
                 {sendBroadcastMutation.isPending ? "Envoi en cours..." : "Envoyer le message"}
               </Button>
+
+              {lastBroadcastResult && lastBroadcastResult.failed > 0 && (
+                <Card className="border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-950/30">
+                  <CardContent className="p-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="w-5 h-5 text-orange-500" />
+                      <span className="font-semibold text-orange-700 dark:text-orange-400">Envoi partiel — limite atteinte</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="p-3 rounded-md bg-green-100 dark:bg-green-900/30 text-center">
+                        <p className="text-2xl font-bold text-green-700 dark:text-green-400" data-testid="text-broadcast-sent">{lastBroadcastResult.sent}</p>
+                        <p className="text-sm text-green-600 dark:text-green-500">Envoyé(s)</p>
+                      </div>
+                      <div className="p-3 rounded-md bg-red-100 dark:bg-red-900/30 text-center">
+                        <p className="text-2xl font-bold text-red-700 dark:text-red-400" data-testid="text-broadcast-failed">{lastBroadcastResult.failed}</p>
+                        <p className="text-sm text-red-600 dark:text-red-500">En attente</p>
+                      </div>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Sujet : <strong>{lastBroadcastResult.subject}</strong>
+                    </p>
+                    <Button
+                      onClick={() => {
+                        sendBroadcastMutation.mutate({
+                          subject: lastBroadcastResult.subject,
+                          message: lastBroadcastResult.message,
+                          audienceType: "selected",
+                          accountType: "all",
+                          kycFilter: "all",
+                          userIds: lastBroadcastResult.failedUserIds,
+                        });
+                      }}
+                      disabled={sendBroadcastMutation.isPending}
+                      className="w-full gap-2"
+                      data-testid="button-retry-broadcast"
+                    >
+                      {sendBroadcastMutation.isPending ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <RefreshCw className="w-4 h-4" />
+                      )}
+                      {sendBroadcastMutation.isPending ? "Renvoi en cours..." : `Renvoyer aux ${lastBroadcastResult.failed} restant(s)`}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setLastBroadcastResult(null)}
+                      className="w-full"
+                      data-testid="button-dismiss-broadcast-result"
+                    >
+                      Fermer
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
             </div>
           </CardContent>
         </Card>

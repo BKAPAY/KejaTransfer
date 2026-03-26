@@ -11698,6 +11698,7 @@ Ton role est de reformuler et ameliorer les messages que l'administrateur souhai
 
       let sent = 0;
       let failed = 0;
+      const failedUserIds: string[] = [];
 
       for (const user of targetUsers) {
         try {
@@ -11708,14 +11709,18 @@ Ton role est de reformuler et ameliorer les messages que l'administrateur souhai
             message
           );
           if (success) sent++;
-          else failed++;
+          else {
+            failed++;
+            failedUserIds.push(user.id);
+          }
         } catch (e) {
           failed++;
+          failedUserIds.push(user.id);
           console.error(`[Admin Messages] Failed to send to ${user.email}:`, e);
         }
       }
 
-      res.json({ sent, failed, total: targetUsers.length });
+      res.json({ sent, failed, total: targetUsers.length, failedUserIds });
     } catch (error: any) {
       console.error("[Admin Messages] Broadcast error:", error);
       res.status(500).json({ error: "Erreur lors de l'envoi des messages" });
