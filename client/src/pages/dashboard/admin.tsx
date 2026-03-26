@@ -4,10 +4,11 @@ import { PasswordInput } from "@/components/ui/password-input";
 import { Button } from "@/components/ui/button";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Users, UserCheck, TrendingDown, TrendingUp, Search, Settings, Globe, RefreshCw, Database, AlertCircle, CheckCircle2, Eye, History, MapPin, Mail, Phone, CreditCard, Percent, Lock, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Bot, Power, Network, ArrowDownWideNarrow, CalendarArrowDown, ArrowDownToLine } from "lucide-react";
+import { Users, UserCheck, TrendingDown, TrendingUp, Search, Settings, Globe, RefreshCw, Database, AlertCircle, CheckCircle2, Eye, History, MapPin, Mail, Phone, CreditCard, Percent, Lock, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Bot, Power, Network, ArrowDownWideNarrow, CalendarArrowDown, ArrowDownToLine, Send, Sparkles, Check, X, MessageSquare, Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
 import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
@@ -98,7 +99,7 @@ interface TransactionWithUser extends Transaction {
 export default function Admin() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"search" | "all">("all");
-  const [mainTab, setMainTab] = useState<"users" | "transactions">("users");
+  const [mainTab, setMainTab] = useState<"users" | "transactions" | "messages">("users");
   const [userSortBy, setUserSortBy] = useState<"balance" | "date">("balance");
   const [isSyncing, setIsSyncing] = useState(false);
   const [isDiagnosing, setIsDiagnosing] = useState(false);
@@ -117,6 +118,16 @@ export default function Admin() {
   const [txSearchQuery, setTxSearchQuery] = useState("");
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+
+  const [msgSubject, setMsgSubject] = useState("");
+  const [msgBody, setMsgBody] = useState("");
+  const [msgAudienceType, setMsgAudienceType] = useState<"filter" | "selected">("filter");
+  const [msgAccountType, setMsgAccountType] = useState<"all" | "personal" | "merchant">("all");
+  const [msgKycFilter, setMsgKycFilter] = useState<"all" | "verified" | "unverified">("all");
+  const [msgSelectedUserIds, setMsgSelectedUserIds] = useState<string[]>([]);
+  const [msgUserSearch, setMsgUserSearch] = useState("");
+  const [isPolishing, setIsPolishing] = useState(false);
+  const [polishedMessage, setPolishedMessage] = useState<string | null>(null);
 
   const { data: emaliStatus } = useQuery<{ enabled: boolean }>({
     queryKey: ["/api/platform-settings/emali-enabled"],
@@ -185,6 +196,57 @@ export default function Admin() {
       toast({ title: "Erreur", description: "Impossible de modifier le mode maintenance", variant: "destructive" });
     },
   });
+
+  const sendBroadcastMutation = useMutation({
+    mutationFn: async (data: { subject: string; message: string; audienceType: string; accountType: string; kycFilter: string; userIds?: string[] }) => {
+      const res = await apiRequest("POST", "/api/admin/send-broadcast", data);
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Messages envoyes",
+        description: `${data.sent} email(s) envoye(s) avec succes${data.failed > 0 ? `, ${data.failed} echec(s)` : ""}`,
+      });
+      setMsgSubject("");
+      setMsgBody("");
+      setMsgSelectedUserIds([]);
+      setPolishedMessage(null);
+      setApprovedPolishedMessage(null);
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible d'envoyer les messages", variant: "destructive" });
+    },
+  });
+
+  const handlePolishMessage = async () => {
+    if (!msgBody.trim()) return;
+    setIsPolishing(true);
+    try {
+      const res = await apiRequest("POST", "/api/admin/polish-message", { message: msgBody, subject: msgSubject });
+      const data = await res.json();
+      setPolishedMessage(data.polishedMessage);
+    } catch {
+      toast({ title: "Erreur", description: "Impossible d'ameliorer le message", variant: "destructive" });
+    } finally {
+      setIsPolishing(false);
+    }
+  };
+
+  const [approvedPolishedMessage, setApprovedPolishedMessage] = useState<string | null>(null);
+
+  const handleSendBroadcast = () => {
+    const messageToSend = approvedPolishedMessage || msgBody;
+    if (!msgSubject.trim() || !messageToSend.trim()) return;
+
+    sendBroadcastMutation.mutate({
+      subject: msgSubject,
+      message: messageToSend,
+      audienceType: msgAudienceType,
+      accountType: msgAccountType,
+      kycFilter: msgKycFilter,
+      userIds: msgAudienceType === "selected" ? msgSelectedUserIds : undefined,
+    });
+  };
 
   const handleProtectedNavigation = (path: string) => {
     setPendingNavigation(path);
@@ -337,6 +399,18 @@ export default function Admin() {
     enabled: txSearchQuery.trim().length >= 2 && mainTab === "transactions",
     staleTime: 10000,
   });
+
+  const msgFilteredUsers = useMemo(() => {
+    if (!allUsers.length) return [];
+    const nonAdmins = allUsers.filter(u => !u.isAdmin);
+    if (!msgUserSearch.trim()) return nonAdmins.slice(0, 50);
+    const q = msgUserSearch.toLowerCase();
+    return nonAdmins.filter(u =>
+      u.email.toLowerCase().includes(q) ||
+      (u.firstName && u.firstName.toLowerCase().includes(q)) ||
+      (u.lastName && u.lastName.toLowerCase().includes(q))
+    ).slice(0, 50);
+  }, [allUsers, msgUserSearch]);
 
   const sortedUsers = [...(searchQuery.length > 0 ? searchResults : allUsers)].sort((a, b) => {
     if (userSortBy === "date") {
@@ -745,6 +819,16 @@ export default function Admin() {
           <History className="w-5 h-5" />
           Transactions
         </Button>
+        <Button
+          variant={mainTab === "messages" ? "default" : "outline"}
+          size="lg"
+          onClick={() => setMainTab("messages")}
+          data-testid="button-main-tab-messages"
+          className="gap-2"
+        >
+          <MessageSquare className="w-5 h-5" />
+          Messages
+        </Button>
       </div>
 
       {/* Section Utilisateurs */}
@@ -1115,6 +1199,259 @@ export default function Admin() {
                 <p className="text-muted-foreground">Aucune transaction sur la plateforme</p>
               </div>
             )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Section Messages */}
+      {mainTab === "messages" && (
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <Mail className="w-5 h-5 text-primary" />
+              <CardTitle>Envoyer un message</CardTitle>
+            </div>
+            <CardDescription>Envoyez des emails aux utilisateurs de la plateforme</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Mode d'envoi</label>
+                <div className="flex gap-2 flex-wrap">
+                  <Button
+                    variant={msgAudienceType === "filter" ? "default" : "outline"}
+                    onClick={() => setMsgAudienceType("filter")}
+                    data-testid="button-audience-filter"
+                  >
+                    Par filtre
+                  </Button>
+                  <Button
+                    variant={msgAudienceType === "selected" ? "default" : "outline"}
+                    onClick={() => setMsgAudienceType("selected")}
+                    data-testid="button-audience-selected"
+                  >
+                    Choisir des utilisateurs
+                  </Button>
+                </div>
+              </div>
+
+              {msgAudienceType === "filter" && (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Type de compte</label>
+                    <div className="flex gap-2 flex-wrap">
+                      <Button
+                        variant={msgAccountType === "all" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setMsgAccountType("all")}
+                        data-testid="button-account-all"
+                      >
+                        Tous
+                      </Button>
+                      <Button
+                        variant={msgAccountType === "personal" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setMsgAccountType("personal")}
+                        data-testid="button-account-personal"
+                      >
+                        Personnel
+                      </Button>
+                      <Button
+                        variant={msgAccountType === "merchant" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setMsgAccountType("merchant")}
+                        data-testid="button-account-merchant"
+                      >
+                        Marchand
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Statut de verification</label>
+                    <div className="flex gap-2 flex-wrap">
+                      <Button
+                        variant={msgKycFilter === "all" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setMsgKycFilter("all")}
+                        data-testid="button-kyc-all"
+                      >
+                        Tous
+                      </Button>
+                      <Button
+                        variant={msgKycFilter === "verified" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setMsgKycFilter("verified")}
+                        data-testid="button-kyc-verified"
+                      >
+                        Verifies
+                      </Button>
+                      <Button
+                        variant={msgKycFilter === "unverified" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setMsgKycFilter("unverified")}
+                        data-testid="button-kyc-unverified"
+                      >
+                        Non verifies
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {msgAudienceType === "selected" && (
+                <div className="space-y-3">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Rechercher par nom ou email..."
+                      value={msgUserSearch}
+                      onChange={(e) => setMsgUserSearch(e.target.value)}
+                      className="pl-9"
+                      data-testid="input-msg-user-search"
+                    />
+                  </div>
+                  {msgSelectedUserIds.length > 0 && (
+                    <p className="text-sm text-primary font-medium">
+                      {msgSelectedUserIds.length} utilisateur(s) selectionne(s)
+                    </p>
+                  )}
+                  <ScrollArea className="h-[200px] border rounded-md">
+                    <div className="p-2 space-y-1">
+                      {msgFilteredUsers.map((user) => (
+                        <div
+                          key={user.id}
+                          className="flex items-center gap-3 p-2 rounded-md hover-elevate cursor-pointer"
+                          onClick={() => {
+                            setMsgSelectedUserIds(prev =>
+                              prev.includes(user.id)
+                                ? prev.filter(id => id !== user.id)
+                                : [...prev, user.id]
+                            );
+                          }}
+                          data-testid={`checkbox-user-${user.id}`}
+                        >
+                          <div className={`w-4 h-4 rounded-sm border flex items-center justify-center flex-shrink-0 ${msgSelectedUserIds.includes(user.id) ? "bg-primary border-primary text-primary-foreground" : "border-input"}`}>
+                            {msgSelectedUserIds.includes(user.id) && <Check className="w-3 h-3" />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">
+                              {user.firstName} {user.lastName}
+                            </p>
+                            <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                          </div>
+                          <Badge variant={user.kycStatus === "verified" ? "default" : "secondary"} className="text-[10px]">
+                            {user.kycStatus === "verified" ? "Verifie" : "Non verifie"}
+                          </Badge>
+                          <Badge variant="outline" className="text-[10px]">
+                            {user.accountType === "business" ? "Marchand" : "Personnel"}
+                          </Badge>
+                        </div>
+                      ))}
+                      {msgFilteredUsers.length === 0 && (
+                        <p className="text-sm text-muted-foreground text-center py-4">
+                          Aucun utilisateur trouve
+                        </p>
+                      )}
+                    </div>
+                  </ScrollArea>
+                </div>
+              )}
+            </div>
+
+            <div className="border-t pt-4 space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Sujet de l'email</label>
+                <Input
+                  value={msgSubject}
+                  onChange={(e) => setMsgSubject(e.target.value)}
+                  placeholder="Ex: Mise a jour importante de BKApay"
+                  data-testid="input-msg-subject"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Message</label>
+                <Textarea
+                  value={msgBody}
+                  onChange={(e) => { setMsgBody(e.target.value); setPolishedMessage(null); setApprovedPolishedMessage(null); }}
+                  placeholder="Ecrivez votre message ici..."
+                  className="min-h-[150px]"
+                  data-testid="input-msg-body"
+                />
+              </div>
+
+              <div className="flex gap-2 flex-wrap">
+                <Button
+                  variant="outline"
+                  onClick={handlePolishMessage}
+                  disabled={!msgBody.trim() || isPolishing}
+                  data-testid="button-polish-message"
+                  className="gap-2"
+                >
+                  {isPolishing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                  {isPolishing ? "Amelioration en cours..." : "Ameliorer avec l'IA"}
+                </Button>
+              </div>
+
+              {polishedMessage && (
+                <Card className="border-primary/30 bg-primary/5">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-primary" />
+                        Message ameliore par l'IA
+                      </CardTitle>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => { setApprovedPolishedMessage(polishedMessage); setMsgBody(polishedMessage); setPolishedMessage(null); }}
+                          data-testid="button-accept-polish"
+                          className="gap-1"
+                        >
+                          <Check className="w-3 h-3" />
+                          Accepter
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => { setPolishedMessage(null); setApprovedPolishedMessage(null); }}
+                          data-testid="button-reject-polish"
+                          className="gap-1"
+                        >
+                          <X className="w-3 h-3" />
+                          Rejeter
+                        </Button>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm whitespace-pre-wrap">{polishedMessage}</p>
+                  </CardContent>
+                </Card>
+              )}
+
+              <Button
+                onClick={handleSendBroadcast}
+                disabled={
+                  !msgSubject.trim() ||
+                  (!msgBody.trim() && !polishedMessage) ||
+                  sendBroadcastMutation.isPending ||
+                  (msgAudienceType === "selected" && msgSelectedUserIds.length === 0)
+                }
+                className="w-full gap-2"
+                size="lg"
+                data-testid="button-send-broadcast"
+              >
+                {sendBroadcastMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Send className="w-4 h-4" />
+                )}
+                {sendBroadcastMutation.isPending ? "Envoi en cours..." : "Envoyer le message"}
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}

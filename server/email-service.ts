@@ -754,3 +754,64 @@ function generateKycRejectedHtml(firstName: string, reason: string): string {
     </html>
   `;
 }
+
+function escapeHtml(str: string): string {
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+}
+
+export async function sendAdminBroadcastEmail(
+  to: string,
+  firstName: string,
+  subject: string,
+  messageBody: string
+): Promise<boolean> {
+  const logoHeader = getEmailLogoHeader();
+  const safeName = escapeHtml(firstName);
+  const htmlParagraphs = messageBody.split("\n").filter(l => l.trim()).map(l => `<p style="margin: 0 0 12px 0; color: #374151; font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6;">${escapeHtml(l)}</p>`).join("\n");
+
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+    <body style="margin: 0; padding: 0; background-color: #f3f4f6; font-family: Arial, sans-serif;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f3f4f6; padding: 20px 0;">
+        <tr>
+          <td align="center">
+            <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+              <tr>
+                <td style="background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); padding: 30px; text-align: center;">
+                  ${logoHeader}
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 30px;">
+                  <p style="margin: 0 0 16px 0; color: #374151; font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6;">
+                    Bonjour <strong>${safeName}</strong>,
+                  </p>
+                  ${htmlParagraphs}
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 20px 30px; background-color: #f9fafb; border-top: 1px solid #e5e7eb;">
+                  <p style="margin: 0 0 8px 0; color: #9ca3af; font-family: Arial, sans-serif; font-size: 12px; text-align: center;">
+                    Pour toute question, contactez notre support:<br>
+                    <a href="mailto:support@bkapay.com" style="color: #2563eb; text-decoration: none;">support@bkapay.com</a>
+                  </p>
+                  <p style="margin: 0; color: #9ca3af; font-family: Arial, sans-serif; font-size: 12px; text-align: center;">
+                    BKApay - Votre plateforme de paiement mobile money<br>
+                    <a href="https://bkapay.com" style="color: #2563eb; text-decoration: none;">bkapay.com</a>
+                  </p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+  `;
+
+  const textContent = `Bonjour ${safeName},\n\n${messageBody}\n\nBKApay - Votre plateforme de paiement mobile money\nhttps://bkapay.com`;
+
+  return sendMailtrapEmail(to, subject, textContent, htmlContent);
+}

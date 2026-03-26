@@ -11572,6 +11572,125 @@ SUPPORT ET CONTACT:
     }
   });
 
+  // ==================== Admin Messaging ====================
+  app.post("/api/admin/polish-message", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { message, subject } = req.body;
+      if (!message || typeof message !== "string" || !message.trim()) {
+        return res.status(400).json({ error: "Message requis" });
+      }
+      if (subject && typeof subject !== "string") {
+        return res.status(400).json({ error: "Sujet invalide" });
+      }
+
+      const OpenAI = (await import("openai")).default;
+      const openai = new OpenAI({
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+      });
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content: `Tu es un assistant de redaction pour BKApay, une plateforme de paiement mobile money en Afrique. 
+Ton role est de reformuler et ameliorer les messages que l'administrateur souhaite envoyer aux utilisateurs.
+- Garde le meme sens et intention du message original
+- Utilise un ton professionnel mais chaleureux et accessible
+- Corrige les fautes d'orthographe et de grammaire
+- Structure le message avec des paragraphes clairs
+- Le message doit etre en francais
+- Ne rajoute pas de formule de politesse au debut (pas de "Bonjour", c'est deja gere automatiquement)
+- Ne rajoute pas de signature a la fin (c'est deja gere automatiquement)
+- Retourne UNIQUEMENT le message ameliore, sans commentaire ni explication`
+          },
+          {
+            role: "user",
+            content: `Ameliore ce message${subject ? ` (sujet: "${subject}")` : ""}:\n\n${message}`
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 1000,
+      });
+
+      const polishedMessage = completion.choices[0]?.message?.content || message;
+      res.json({ polishedMessage });
+    } catch (error: any) {
+      console.error("[Admin Messages] AI polish error:", error);
+      res.status(500).json({ error: "Erreur lors de l'amelioration du message" });
+    }
+  });
+
+  app.post("/api/admin/send-broadcast", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { subject, message, audienceType, accountType, kycFilter, userIds } = req.body;
+      if (!subject || typeof subject !== "string" || !subject.trim()) {
+        return res.status(400).json({ error: "Sujet requis" });
+      }
+      if (!message || typeof message !== "string" || !message.trim()) {
+        return res.status(400).json({ error: "Message requis" });
+      }
+      if (subject.length > 200) {
+        return res.status(400).json({ error: "Sujet trop long (max 200 caracteres)" });
+      }
+      if (message.length > 5000) {
+        return res.status(400).json({ error: "Message trop long (max 5000 caracteres)" });
+      }
+
+      const { sendAdminBroadcastEmail } = await import("./email-service");
+      const allUsers = await storage.getAllUsers();
+
+      let targetUsers: typeof allUsers = [];
+
+      if (audienceType === "selected" && userIds && Array.isArray(userIds)) {
+        targetUsers = allUsers.filter(u => userIds.includes(u.id) && !u.isAdmin);
+      } else {
+        targetUsers = allUsers.filter(u => !u.isAdmin);
+
+        if (accountType === "personal") {
+          targetUsers = targetUsers.filter(u => u.accountType === "personal");
+        } else if (accountType === "merchant") {
+          targetUsers = targetUsers.filter(u => u.accountType === "business");
+        }
+
+        if (kycFilter === "verified") {
+          targetUsers = targetUsers.filter(u => u.kycStatus === "verified");
+        } else if (kycFilter === "unverified") {
+          targetUsers = targetUsers.filter(u => u.kycStatus !== "verified");
+        }
+      }
+
+      if (targetUsers.length === 0) {
+        return res.status(400).json({ error: "Aucun utilisateur correspondant aux criteres" });
+      }
+
+      let sent = 0;
+      let failed = 0;
+
+      for (const user of targetUsers) {
+        try {
+          const success = await sendAdminBroadcastEmail(
+            user.email,
+            user.firstName || user.email,
+            subject,
+            message
+          );
+          if (success) sent++;
+          else failed++;
+        } catch (e) {
+          failed++;
+          console.error(`[Admin Messages] Failed to send to ${user.email}:`, e);
+        }
+      }
+
+      res.json({ sent, failed, total: targetUsers.length });
+    } catch (error: any) {
+      console.error("[Admin Messages] Broadcast error:", error);
+      res.status(500).json({ error: "Erreur lors de l'envoi des messages" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
