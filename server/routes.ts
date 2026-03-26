@@ -11577,10 +11577,8 @@ SUPPORT ET CONTACT:
       const pool = new (await import("pg")).default.Pool({ connectionString: process.env.DATABASE_URL });
       const result = await pool.query(`
         SELECT DISTINCT u.* FROM users u
-        INNER JOIN transactions t ON u.id = t.user_id
-        WHERE t.created_at >= NOW() - INTERVAL '7 days'
-        AND t.status = 'completed'
-        AND t.type IN ('deposit', 'withdrawal', 'transfer')
+        INNER JOIN login_logs ll ON u.id = ll.user_id
+        WHERE ll.created_at >= NOW() - INTERVAL '7 days'
         AND u.is_admin = false
         ORDER BY u.first_name ASC
       `);
