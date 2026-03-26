@@ -365,6 +365,7 @@ export default function KycVerificationPage() {
     if ((user as any).kycActivityDescription) {
       addSectionTitle("2. Description de l'activite");
       addField("Activite declaree", (user as any).kycActivityDescription);
+      if ((user as any).kycActivityUrl) addField("Lien activite", (user as any).kycActivityUrl);
     }
 
     if ((user as any).kycLatitude && (user as any).kycLongitude) {
@@ -640,8 +641,22 @@ export default function KycVerificationPage() {
               <CardHeader>
                 <CardTitle className="text-base">Description de l'activite</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-3">
                 <p className="text-sm">{(selectedUserDetails as any).kycActivityDescription}</p>
+                {(selectedUserDetails as any).kycActivityUrl && (
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground mb-1">Lien de l'activite</p>
+                    <a
+                      href={(selectedUserDetails as any).kycActivityUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-primary underline break-all"
+                      data-testid="link-activity-url"
+                    >
+                      {(selectedUserDetails as any).kycActivityUrl}
+                    </a>
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}

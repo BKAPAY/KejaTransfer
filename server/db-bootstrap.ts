@@ -260,6 +260,7 @@ async function bootstrapDatabase() {
     try {
       await kycPhoneClient`ALTER TABLE users ADD COLUMN IF NOT EXISTS kyc_phone TEXT`;
       await kycPhoneClient`ALTER TABLE users ADD COLUMN IF NOT EXISTS kyc_whatsapp TEXT`;
+      await kycPhoneClient`ALTER TABLE users ADD COLUMN IF NOT EXISTS kyc_activity_url TEXT`;
       console.log("✅ users.kyc_phone and kyc_whatsapp columns ready");
     } catch (e) {
       console.error("⚠️ kyc_phone/kyc_whatsapp column setup error:", e);

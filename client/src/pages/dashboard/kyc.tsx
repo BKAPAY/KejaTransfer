@@ -75,6 +75,7 @@ export default function KYC() {
   const [selfieInstructionsAcknowledged, setSelfieInstructionsAcknowledged] = useState(false);
   const [kycPhone, setKycPhone] = useState("");
   const [kycWhatsapp, setKycWhatsapp] = useState("");
+  const [kycActivityUrl, setKycActivityUrl] = useState("");
   const [isResubmitting, setIsResubmitting] = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
   const [cameraMode, setCameraMode] = useState<CameraMode>(null);
@@ -456,6 +457,7 @@ export default function KYC() {
         kycAcceptedTerms: JSON.stringify(acceptedTerms),
         kycPhone: kycPhone,
         kycWhatsapp: kycWhatsapp,
+        kycActivityUrl: kycActivityUrl,
       });
     },
     onSuccess: () => {
@@ -808,13 +810,29 @@ export default function KYC() {
             <Textarea
               value={activityDescription}
               onChange={(e) => setActivityDescription(e.target.value)}
-              placeholder="Decrivez votre activite professionnelle, le type de produits ou services que vous proposez, et comment vous comptez utiliser BKApay..."
+              placeholder="Decrivez votre activite professionnelle, le type de produits ou services que vous proposez, et comment vous comptez utiliser BKApay... (minimum 100 caracteres)"
               className="min-h-[120px] resize-none"
               data-testid="input-activity-description"
             />
-            <p className="text-xs text-muted-foreground">
-              {activityDescription.length}/500 caracteres
+            <p className={`text-xs ${activityDescription.length < 100 ? "text-red-500" : "text-muted-foreground"}`}>
+              {activityDescription.length}/100 caracteres minimum
             </p>
+          </div>
+          <div className="space-y-3 mt-4">
+            <label className="text-sm font-medium text-foreground block">
+              Lien de votre activite en ligne
+            </label>
+            <p className="text-xs text-muted-foreground -mt-1">
+              Site web, page Facebook, compte Instagram, TikTok, chaine YouTube, groupe ou chaine WhatsApp, etc.
+            </p>
+            <input
+              type="url"
+              value={kycActivityUrl}
+              onChange={(e) => setKycActivityUrl(e.target.value)}
+              placeholder="https://..."
+              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              data-testid="input-activity-url"
+            />
           </div>
         </CardContent>
       </Card>
@@ -841,7 +859,7 @@ export default function KYC() {
         <Button
           className="flex-1"
           onClick={() => setCurrentStep(3)}
-          disabled={activityDescription.trim().length < 10}
+          disabled={activityDescription.trim().length < 100 || !kycActivityUrl.trim()}
           data-testid="button-next-step-2"
         >
           Etape suivante

@@ -275,7 +275,7 @@ export class DbStorage implements IStorage {
     return results[0];
   }
 
-  async submitKyc(userId: string, kycData: { kycIdFront: string; kycIdBack: string; kycSelfie: string; kycSignature: string; kycActivityDescription: string; kycLatitude: string; kycLongitude: string; kycAddress: string; kycAcceptedTerms: string; kycPhone?: string; kycWhatsapp?: string }): Promise<User | undefined> {
+  async submitKyc(userId: string, kycData: { kycIdFront: string; kycIdBack: string; kycSelfie: string; kycSignature: string; kycActivityDescription: string; kycLatitude: string; kycLongitude: string; kycAddress: string; kycAcceptedTerms: string; kycPhone?: string; kycWhatsapp?: string; kycActivityUrl?: string }): Promise<User | undefined> {
     const results = await db
       .update(schema.users)
       .set({
@@ -291,6 +291,7 @@ export class DbStorage implements IStorage {
         kycAcceptedTerms: kycData.kycAcceptedTerms,
         kycPhone: kycData.kycPhone || null,
         kycWhatsapp: kycData.kycWhatsapp || null,
+        kycActivityUrl: kycData.kycActivityUrl || null,
       })
       .where(eq(schema.users.id, userId))
       .returning();
