@@ -642,7 +642,7 @@ export default function KycVerificationPage() {
                 <CardTitle className="text-base">Description de l'activite</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <p className="text-sm">{(selectedUserDetails as any).kycActivityDescription}</p>
+                <p className="text-sm break-all whitespace-pre-wrap">{(selectedUserDetails as any).kycActivityDescription}</p>
                 {(selectedUserDetails as any).kycActivityUrl && (
                   <div>
                     <p className="text-xs font-medium text-muted-foreground mb-1">Lien de l'activite</p>
@@ -650,7 +650,7 @@ export default function KycVerificationPage() {
                       href={(selectedUserDetails as any).kycActivityUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-sm text-primary underline break-all"
+                      className="text-sm text-primary underline break-all whitespace-pre-wrap"
                       data-testid="link-activity-url"
                     >
                       {(selectedUserDetails as any).kycActivityUrl}
