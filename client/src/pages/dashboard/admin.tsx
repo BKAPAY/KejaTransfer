@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import type { User, Transaction } from "@shared/schema";
@@ -210,13 +210,20 @@ export default function Admin() {
       const totalSent = (lastBroadcastResult && data.total < lastBroadcastResult.total) ? prevSent + data.sent : data.sent;
 
       if (data.failed > 0 && data.failedUserIds?.length > 0) {
-        setLastBroadcastResult({
+        const newResult = {
           sent: totalSent,
           failed: data.failed,
           total: lastBroadcastResult ? lastBroadcastResult.total : data.total,
           failedUserIds: data.failedUserIds,
           subject: pendingBroadcastMeta?.subject || "",
           message: pendingBroadcastMeta?.message || "",
+        };
+        setLastBroadcastResult(newResult);
+        fetch("/api/admin/save-pending-broadcast", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ data: newResult }),
+          credentials: "include",
         });
         toast({
           title: "Envoi partiel",
@@ -225,6 +232,12 @@ export default function Admin() {
         });
       } else {
         setLastBroadcastResult(null);
+        fetch("/api/admin/save-pending-broadcast", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ data: null }),
+          credentials: "include",
+        });
         toast({
           title: "Messages envoyés",
           description: `${totalSent} email(s) envoyé(s) avec succès`,
@@ -257,6 +270,17 @@ export default function Admin() {
 
   const [approvedPolishedMessage, setApprovedPolishedMessage] = useState<string | null>(null);
   const [lastBroadcastResult, setLastBroadcastResult] = useState<{ sent: number; failed: number; total: number; failedUserIds: string[]; subject: string; message: string } | null>(null);
+
+  const { data: pendingBroadcast } = useQuery<{ sent: number; failed: number; total: number; failedUserIds: string[]; subject: string; message: string } | null>({
+    queryKey: ["/api/admin/pending-broadcast"],
+    enabled: mainTab === "messages",
+  });
+
+  useEffect(() => {
+    if (pendingBroadcast && pendingBroadcast.failedUserIds?.length > 0 && !lastBroadcastResult) {
+      setLastBroadcastResult(pendingBroadcast);
+    }
+  }, [pendingBroadcast]);
 
   const handleSendBroadcast = () => {
     const messageToSend = approvedPolishedMessage || msgBody;
@@ -1538,7 +1562,15 @@ export default function Admin() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setLastBroadcastResult(null)}
+                      onClick={() => {
+                        setLastBroadcastResult(null);
+                        fetch("/api/admin/save-pending-broadcast", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ data: null }),
+                          credentials: "include",
+                        });
+                      }}
                       className="w-full"
                       data-testid="button-dismiss-broadcast-result"
                     >

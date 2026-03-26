@@ -11603,6 +11603,33 @@ SUPPORT ET CONTACT:
     }
   });
 
+  app.get("/api/admin/pending-broadcast", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const setting = await storage.getPlatformSetting("pending_broadcast");
+      if (setting) {
+        res.json(JSON.parse(setting));
+      } else {
+        res.json(null);
+      }
+    } catch {
+      res.json(null);
+    }
+  });
+
+  app.post("/api/admin/save-pending-broadcast", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { data } = req.body;
+      if (data) {
+        await storage.setPlatformSetting("pending_broadcast", JSON.stringify(data));
+      } else {
+        await storage.setPlatformSetting("pending_broadcast", "");
+      }
+      res.json({ ok: true });
+    } catch {
+      res.status(500).json({ error: "Erreur" });
+    }
+  });
+
   // ==================== Admin Messaging ====================
   app.post("/api/admin/polish-message", requireAdmin, async (req: Request, res: Response) => {
     try {
