@@ -1279,6 +1279,70 @@ export default function Admin() {
             <CardDescription>Envoyez des emails aux utilisateurs de la plateforme</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
+
+            {lastBroadcastResult && lastBroadcastResult.failed > 0 && (
+              <Card className="border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-950/30">
+                <CardContent className="p-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-5 h-5 text-orange-500" />
+                    <span className="font-semibold text-orange-700 dark:text-orange-400">Envoi partiel — limite atteinte</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="p-3 rounded-md bg-green-100 dark:bg-green-900/30 text-center">
+                      <p className="text-2xl font-bold text-green-700 dark:text-green-400" data-testid="text-broadcast-sent-top">{lastBroadcastResult.sent}</p>
+                      <p className="text-sm text-green-600 dark:text-green-500">Envoyé(s)</p>
+                    </div>
+                    <div className="p-3 rounded-md bg-red-100 dark:bg-red-900/30 text-center">
+                      <p className="text-2xl font-bold text-red-700 dark:text-red-400" data-testid="text-broadcast-failed-top">{lastBroadcastResult.failed}</p>
+                      <p className="text-sm text-red-600 dark:text-red-500">En attente</p>
+                    </div>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Sujet : <strong>{lastBroadcastResult.subject}</strong>
+                  </p>
+                  <Button
+                    onClick={() => {
+                      sendBroadcastMutation.mutate({
+                        subject: lastBroadcastResult.subject,
+                        message: lastBroadcastResult.message,
+                        audienceType: "selected",
+                        accountType: "all",
+                        kycFilter: "all",
+                        userIds: lastBroadcastResult.failedUserIds,
+                      });
+                    }}
+                    disabled={sendBroadcastMutation.isPending}
+                    className="w-full gap-2"
+                    data-testid="button-retry-broadcast-top"
+                  >
+                    {sendBroadcastMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="w-4 h-4" />
+                    )}
+                    {sendBroadcastMutation.isPending ? "Renvoi en cours..." : `Renvoyer aux ${lastBroadcastResult.failed} restant(s)`}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setLastBroadcastResult(null);
+                      fetch("/api/admin/save-pending-broadcast", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ data: null }),
+                        credentials: "include",
+                      });
+                    }}
+                    className="w-full"
+                    data-testid="button-dismiss-broadcast-top"
+                  >
+                    Fermer
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
             <div className="space-y-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Mode d'envoi</label>
