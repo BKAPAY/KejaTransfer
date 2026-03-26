@@ -285,6 +285,8 @@ export default function KycVerificationPage() {
     addField("Prenom", user.firstName);
     addField("Nom", user.lastName);
     addField("Adresse email", user.email);
+    if ((user as any).kycPhone) addField("Telephone", (user as any).kycPhone);
+    if ((user as any).kycWhatsapp) addField("WhatsApp", (user as any).kycWhatsapp);
     addField("Pays", user.country || "Non defini");
     addField("Statut KYC", getStatusText(user.kycStatus));
     addField("Date d'inscription", new Date(user.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" }));
@@ -603,6 +605,18 @@ export default function KycVerificationPage() {
                   <p className="text-xs font-medium text-muted-foreground">Pays</p>
                   <p className="text-sm font-medium">{selectedUserDetails.country || "Non defini"}</p>
                 </div>
+                {(selectedUserDetails as any).kycPhone && (
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground">Telephone</p>
+                    <p className="text-sm font-medium">{(selectedUserDetails as any).kycPhone}</p>
+                  </div>
+                )}
+                {(selectedUserDetails as any).kycWhatsapp && (
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground">WhatsApp</p>
+                    <p className="text-sm font-medium">{(selectedUserDetails as any).kycWhatsapp}</p>
+                  </div>
+                )}
                 <div>
                   <p className="text-xs font-medium text-muted-foreground">Statut KYC</p>
                   <div className="mt-1">{getStatusBadge(selectedUserDetails.kycStatus)}</div>

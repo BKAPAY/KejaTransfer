@@ -36,6 +36,8 @@ export const users = pgTable("users", {
   kycLongitude: text("kyc_longitude"), // GPS longitude
   kycAddress: text("kyc_address"), // Reverse geocoded address
   kycAcceptedTerms: text("kyc_accepted_terms"), // JSON string of accepted legal terms per step
+  kycPhone: text("kyc_phone"), // Phone number for KYC verification
+  kycWhatsapp: text("kyc_whatsapp"), // WhatsApp number for KYC verification
   kycRejectionReason: text("kyc_rejection_reason"), // Reason for KYC rejection
   kycRejectionCount: integer("kyc_rejection_count").notNull().default(0), // Number of KYC rejections
   // Business KYC Step 2 - legal info

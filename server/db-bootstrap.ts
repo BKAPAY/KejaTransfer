@@ -255,6 +255,17 @@ async function bootstrapDatabase() {
     }
     await depositColClient.end();
 
+    // Step 6d4: Ensure kyc_phone and kyc_whatsapp columns exist in users table
+    const kycPhoneClient = postgres(DATABASE_URL);
+    try {
+      await kycPhoneClient`ALTER TABLE users ADD COLUMN IF NOT EXISTS kyc_phone TEXT`;
+      await kycPhoneClient`ALTER TABLE users ADD COLUMN IF NOT EXISTS kyc_whatsapp TEXT`;
+      console.log("✅ users.kyc_phone and kyc_whatsapp columns ready");
+    } catch (e) {
+      console.error("⚠️ kyc_phone/kyc_whatsapp column setup error:", e);
+    }
+    await kycPhoneClient.end();
+
     // Step 6e: Ensure payout_callback_url and payout_callback_secret columns exist in api_keys
     const payoutCbClient = postgres(DATABASE_URL);
     try {

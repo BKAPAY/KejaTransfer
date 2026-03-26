@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -72,6 +73,8 @@ export default function KYC() {
   const [locationError, setLocationError] = useState("");
   const [showSelfieInstructions, setShowSelfieInstructions] = useState(false);
   const [selfieInstructionsAcknowledged, setSelfieInstructionsAcknowledged] = useState(false);
+  const [kycPhone, setKycPhone] = useState("");
+  const [kycWhatsapp, setKycWhatsapp] = useState("");
   const [isResubmitting, setIsResubmitting] = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
   const [cameraMode, setCameraMode] = useState<CameraMode>(null);
@@ -451,6 +454,8 @@ export default function KYC() {
         kycLongitude: locationData?.lng.toString() || "",
         kycAddress: locationAddress,
         kycAcceptedTerms: JSON.stringify(acceptedTerms),
+        kycPhone: kycPhone,
+        kycWhatsapp: kycWhatsapp,
       });
     },
     onSuccess: () => {
@@ -738,6 +743,35 @@ export default function KYC() {
         </CardContent>
       </Card>
 
+      <Card className="border-2">
+        <CardContent className="pt-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-muted-foreground" htmlFor="kyc-phone">Numero de telephone</label>
+              <Input
+                id="kyc-phone"
+                data-testid="input-kyc-phone"
+                type="tel"
+                placeholder="Ex: +229 97 00 00 00"
+                value={kycPhone}
+                onChange={(e) => setKycPhone(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-muted-foreground" htmlFor="kyc-whatsapp">Numero WhatsApp</label>
+              <Input
+                id="kyc-whatsapp"
+                data-testid="input-kyc-whatsapp"
+                type="tel"
+                placeholder="Ex: +229 97 00 00 00"
+                value={kycWhatsapp}
+                onChange={(e) => setKycWhatsapp(e.target.value)}
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-lg p-3">
         <div className="flex gap-2">
           <Shield className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
@@ -751,6 +785,7 @@ export default function KYC() {
         className="w-full"
         onClick={() => setCurrentStep(2)}
         data-testid="button-next-step-1"
+        disabled={!kycPhone.trim() || !kycWhatsapp.trim()}
       >
         Etape suivante
         <ArrowRight className="w-4 h-4 ml-2" />
