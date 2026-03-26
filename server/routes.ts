@@ -9736,7 +9736,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error("Error sending KYC rejected email:", emailError);
       }
 
-      const autoSuspended = user.suspended && (user.kycRejectionCount || 0) >= 3;
+      const autoSuspended = user.suspended && (user.kycRejectionCount || 0) >= 10;
       if (autoSuspended) {
         console.log(`[KYC] Auto-suspension du compte ${userId} apres ${user.kycRejectionCount} rejets KYC`);
       }

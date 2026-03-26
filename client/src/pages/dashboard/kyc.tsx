@@ -1339,9 +1339,9 @@ export default function KYC() {
                   <div>
                     <p className="text-sm font-medium text-orange-700 dark:text-orange-300 mb-1">Attention</p>
                     <p className="text-sm text-orange-600 dark:text-orange-400">
-                      Veuillez utiliser vos vraies informations personnelles et des documents authentiques. Apres 3 rejets consecutifs, votre compte sera automatiquement suspendu.
+                      Veuillez utiliser vos vraies informations personnelles et des documents authentiques. Apres 10 rejets consecutifs, votre compte sera automatiquement suspendu.
                       {(user as any).kycRejectionCount > 0 && (
-                        <span className="font-semibold"> ({(user as any).kycRejectionCount}/3 rejet{(user as any).kycRejectionCount > 1 ? "s" : ""})</span>
+                        <span className="font-semibold"> ({(user as any).kycRejectionCount}/10 rejet{(user as any).kycRejectionCount > 1 ? "s" : ""})</span>
                       )}
                     </p>
                   </div>

@@ -316,7 +316,7 @@ export class DbStorage implements IStorage {
     if (!user) return undefined;
 
     const newRejectionCount = (user.kycRejectionCount || 0) + 1;
-    const shouldSuspend = newRejectionCount >= 3;
+    const shouldSuspend = newRejectionCount >= 10;
 
     const results = await db
       .update(schema.users)
