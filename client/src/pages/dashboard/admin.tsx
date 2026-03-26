@@ -402,10 +402,9 @@ export default function Admin() {
 
   const msgFilteredUsers = useMemo(() => {
     if (!allUsers.length) return [];
-    const nonAdmins = allUsers.filter(u => !u.isAdmin);
-    if (!msgUserSearch.trim()) return nonAdmins.slice(0, 50);
+    if (!msgUserSearch.trim()) return allUsers.slice(0, 50);
     const q = msgUserSearch.toLowerCase();
-    return nonAdmins.filter(u =>
+    return allUsers.filter(u =>
       u.email.toLowerCase().includes(q) ||
       (u.firstName && u.firstName.toLowerCase().includes(q)) ||
       (u.lastName && u.lastName.toLowerCase().includes(q))
