@@ -325,7 +325,6 @@ export class DbStorage implements IStorage {
     if (!user) return undefined;
 
     const newRejectionCount = (user.kycRejectionCount || 0) + 1;
-    const shouldSuspend = newRejectionCount >= 10;
 
     const results = await db
       .update(schema.users)
@@ -333,7 +332,6 @@ export class DbStorage implements IStorage {
         kycStatus: "rejected",
         kycRejectionReason: reason || null,
         kycRejectionCount: newRejectionCount,
-        ...(shouldSuspend ? { suspended: true } : {}),
       })
       .where(eq(schema.users.id, userId))
       .returning();

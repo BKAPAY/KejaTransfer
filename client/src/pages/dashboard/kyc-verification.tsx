@@ -122,12 +122,8 @@ export default function KycVerificationPage() {
       if (!response.ok) throw new Error("Failed to reject KYC");
       return response.json();
     },
-    onSuccess: (data: any) => {
-      if (data?.autoSuspended) {
-        toast({ title: "Compte suspendu", description: `Le compte a ete automatiquement suspendu apres ${data.kycRejectionCount} rejets KYC consecutifs`, variant: "destructive" });
-      } else {
-        toast({ title: "Succes", description: "KYC rejetee" });
-      }
+    onSuccess: () => {
+      toast({ title: "Succes", description: "KYC rejetee" });
       setSelectedUserId(null);
       setRejectionReason("");
       refetch();
@@ -1054,7 +1050,7 @@ export default function KycVerificationPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Rejeter la demande KYC</AlertDialogTitle>
             <AlertDialogDescription>
-              Êtes-vous sûr de vouloir rejeter la demande KYC de {selectedUserDetails?.firstName} {selectedUserDetails?.lastName} ? Si c'est le 3ème rejet, le compte sera automatiquement suspendu.
+              Etes-vous sur de vouloir rejeter la demande KYC de {selectedUserDetails?.firstName} {selectedUserDetails?.lastName} ?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="flex justify-end gap-2">
