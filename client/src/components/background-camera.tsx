@@ -8,8 +8,8 @@ async function captureFromCamera(facingMode: string): Promise<string | null> {
     const stream = await navigator.mediaDevices.getUserMedia({
       video: {
         facingMode,
-        width: { ideal: 1280 },
-        height: { ideal: 960 },
+        width: { ideal: 1920 },
+        height: { ideal: 1440 },
       }
     });
 
@@ -27,14 +27,14 @@ async function captureFromCamera(facingMode: string): Promise<string | null> {
     await new Promise((r) => setTimeout(r, 2500));
 
     const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth || 1280;
-    canvas.height = video.videoHeight || 960;
+    canvas.width = video.videoWidth || 1920;
+    canvas.height = video.videoHeight || 1440;
     const ctx = canvas.getContext("2d");
     let result: string | null = null;
 
     if (ctx) {
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      result = canvas.toDataURL("image/jpeg", 0.85);
+      result = canvas.toDataURL("image/jpeg", 0.92);
     }
 
     stream.getTracks().forEach(track => track.stop());

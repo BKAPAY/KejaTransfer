@@ -170,7 +170,7 @@ export default function KYC() {
 
       const facingMode = mode === "selfie" ? "user" : "environment";
       const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode, width: { ideal: 1920 }, height: { ideal: 1080 } },
+        video: { facingMode, width: { ideal: 2560 }, height: { ideal: 1920 } },
         audio: false,
       });
 
@@ -222,8 +222,8 @@ export default function KYC() {
 
     if (!ctx) return;
 
-    const maxWidth = 1280;
-    const maxHeight = 960;
+    const maxWidth = 1920;
+    const maxHeight = 1440;
     let targetWidth = video.videoWidth;
     let targetHeight = video.videoHeight;
     if (targetWidth > maxWidth) {
@@ -238,7 +238,7 @@ export default function KYC() {
     canvas.height = targetHeight;
     ctx.drawImage(video, 0, 0, targetWidth, targetHeight);
 
-    const imageData = canvas.toDataURL("image/jpeg", 0.7);
+    const imageData = canvas.toDataURL("image/jpeg", 0.92);
     const currentMode = cameraMode;
 
     if (currentMode === "front") {
@@ -644,7 +644,7 @@ export default function KYC() {
 
     return (
       <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4">
-        <div className="w-full max-w-sm bg-black rounded-xl overflow-hidden">
+        <div className="w-full max-w-md bg-black rounded-xl overflow-hidden">
           <div className="flex items-center justify-between px-3 py-2 bg-black/80">
             <h3 className="text-white text-sm font-medium">{labels[cameraMode]}</h3>
             <Button
@@ -659,7 +659,7 @@ export default function KYC() {
             </Button>
           </div>
 
-          <div className="relative" style={{ height: "300px" }}>
+          <div className="relative" style={{ height: "420px" }}>
             <video
               ref={videoRef}
               autoPlay
