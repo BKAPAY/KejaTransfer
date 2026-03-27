@@ -765,35 +765,41 @@ export async function sendAdminBroadcastEmail(
   subject: string,
   messageBody: string
 ): Promise<boolean> {
-  const logoHeader = getEmailLogoHeader();
   const safeName = escapeHtml(firstName);
-  const htmlParagraphs = messageBody.split("\n").filter(l => l.trim()).map(l => `<p style="margin: 0 0 12px 0; color: #374151; font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6;">${escapeHtml(l)}</p>`).join("\n");
+  const htmlParagraphs = messageBody.split("\n").filter(l => l.trim()).map(l => `<p style="margin: 0 0 15px 0; color: #4b5563; font-family: Arial, sans-serif; font-size: 16px; line-height: 1.5;">${escapeHtml(l)}</p>`).join("\n");
 
   const htmlContent = `
     <!DOCTYPE html>
-    <html>
-    <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
-    <body style="margin: 0; padding: 0; background-color: #f3f4f6; font-family: Arial, sans-serif;">
-      <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f3f4f6; padding: 20px 0;">
+    <html lang="fr">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>BKApay</title>
+    </head>
+    <body style="margin: 0; padding: 0; background-color: #f9fafb;">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f9fafb;">
         <tr>
-          <td align="center">
-            <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+          <td align="center" style="padding: 40px 20px;">
+            <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
               <tr>
-                <td style="background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); padding: 30px; text-align: center;">
-                  ${logoHeader}
+                <td style="padding: 40px 40px 20px; text-align: center;">
+                  ${getEmailLogoHeader()}
                 </td>
               </tr>
               <tr>
-                <td style="padding: 30px;">
-                  <p style="margin: 0 0 16px 0; color: #374151; font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6;">
-                    Bonjour <strong>${safeName}</strong>,
-                  </p>
+                <td style="padding: 0 40px;">
+                  <h2 style="margin: 0 0 20px; color: #1f2937; font-family: Arial, sans-serif; font-size: 20px; text-align: center;">${escapeHtml(subject)}</h2>
+                  <p style="margin: 0 0 15px; color: #4b5563; font-family: Arial, sans-serif; font-size: 16px; line-height: 1.5;">Bonjour <strong>${safeName}</strong>,</p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 0 40px 30px;">
                   ${htmlParagraphs}
                 </td>
               </tr>
               <tr>
-                <td style="padding: 20px 30px; background-color: #f9fafb; border-top: 1px solid #e5e7eb;">
-                  <p style="margin: 0 0 8px 0; color: #9ca3af; font-family: Arial, sans-serif; font-size: 12px; text-align: center;">
+                <td style="padding: 20px 40px; border-top: 1px solid #e5e7eb;">
+                  <p style="margin: 0 0 10px; color: #9ca3af; font-family: Arial, sans-serif; font-size: 12px; text-align: center;">
                     Pour toute question, contactez notre support:<br>
                     <a href="mailto:support@bkapay.com" style="color: #2563eb; text-decoration: none;">support@bkapay.com</a>
                   </p>
