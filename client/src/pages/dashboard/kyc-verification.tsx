@@ -5,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { CheckCircle2, X, Download, FileText, ArrowLeft, Search, BadgeCheck, Loader2, MapPin, Shield, Layers, ExternalLink, Globe, Satellite } from "lucide-react";
+import { CheckCircle2, X, Download, FileText, ArrowLeft, Search, BadgeCheck, Loader2, MapPin, Shield, Layers, ExternalLink, Globe, Satellite, Copy } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -365,7 +365,13 @@ export default function KycVerificationPage() {
     if ((user as any).kycActivityDescription) {
       addSectionTitle("2. Description de l'activite");
       addField("Activite declaree", (user as any).kycActivityDescription);
-      if ((user as any).kycActivityUrl) addField("Lien activite", (user as any).kycActivityUrl);
+      if ((user as any).kycActivityUrl) addField("Lien activite (ancien)", (user as any).kycActivityUrl);
+      if ((user as any).kycUrlWebsite) addField("Site web", (user as any).kycUrlWebsite);
+      if ((user as any).kycUrlInstagram) addField("Instagram", (user as any).kycUrlInstagram);
+      if ((user as any).kycUrlFacebook) addField("Facebook", (user as any).kycUrlFacebook);
+      if ((user as any).kycUrlTiktok) addField("TikTok", (user as any).kycUrlTiktok);
+      if ((user as any).kycUrlWhatsappGroup) addField("Groupe WhatsApp", (user as any).kycUrlWhatsappGroup);
+      if ((user as any).kycUrlWhatsappChannel) addField("Chaine WhatsApp", (user as any).kycUrlWhatsappChannel);
     }
 
     if ((user as any).kycLatitude && (user as any).kycLongitude) {
@@ -645,18 +651,49 @@ export default function KycVerificationPage() {
                 <p className="text-sm break-all whitespace-pre-wrap">{(selectedUserDetails as any).kycActivityDescription}</p>
                 {(selectedUserDetails as any).kycActivityUrl && (
                   <div>
-                    <p className="text-xs font-medium text-muted-foreground mb-1">Lien de l'activite</p>
-                    <a
-                      href={(selectedUserDetails as any).kycActivityUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm text-primary underline break-all whitespace-pre-wrap"
-                      data-testid="link-activity-url"
-                    >
-                      {(selectedUserDetails as any).kycActivityUrl}
-                    </a>
+                    <p className="text-xs font-medium text-muted-foreground mb-1">Lien activite (ancien)</p>
+                    <div className="flex items-center gap-2">
+                      <a
+                        href={(selectedUserDetails as any).kycActivityUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-primary underline break-all whitespace-pre-wrap flex-1"
+                        data-testid="link-activity-url"
+                      >
+                        {(selectedUserDetails as any).kycActivityUrl}
+                      </a>
+                      <Button size="icon" variant="ghost" onClick={() => { navigator.clipboard.writeText((selectedUserDetails as any).kycActivityUrl); toast({ title: "Copie !" }); }} data-testid="button-copy-activity-url"><Copy className="w-3 h-3" /></Button>
+                    </div>
                   </div>
                 )}
+                {[
+                  { key: "kycUrlWebsite", label: "Site web", testId: "url-website" },
+                  { key: "kycUrlInstagram", label: "Instagram", testId: "url-instagram" },
+                  { key: "kycUrlFacebook", label: "Facebook", testId: "url-facebook" },
+                  { key: "kycUrlTiktok", label: "TikTok", testId: "url-tiktok" },
+                  { key: "kycUrlWhatsappGroup", label: "Groupe WhatsApp", testId: "url-whatsapp-group" },
+                  { key: "kycUrlWhatsappChannel", label: "Chaine WhatsApp", testId: "url-whatsapp-channel" },
+                ].map(({ key, label, testId }) => (
+                  <div key={key}>
+                    <p className="text-xs font-medium text-muted-foreground mb-1">{label}</p>
+                    {(selectedUserDetails as any)[key] ? (
+                      <div className="flex items-center gap-2">
+                        <a
+                          href={(selectedUserDetails as any)[key]}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-primary underline break-all whitespace-pre-wrap flex-1"
+                          data-testid={`link-${testId}`}
+                        >
+                          {(selectedUserDetails as any)[key]}
+                        </a>
+                        <Button size="icon" variant="ghost" onClick={() => { navigator.clipboard.writeText((selectedUserDetails as any)[key]); toast({ title: "Copie !" }); }} data-testid={`button-copy-${testId}`}><Copy className="w-3 h-3" /></Button>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground italic">Non renseigne</p>
+                    )}
+                  </div>
+                ))}
               </CardContent>
             </Card>
           )}

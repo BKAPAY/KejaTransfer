@@ -46,7 +46,7 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   updateUserBalance(id: string, amount: number): Promise<User | undefined>;
   updateUserPassword(id: string, hashedPassword: string): Promise<User | undefined>;
-  submitKyc(userId: string, kycData: { kycIdFront: string; kycIdBack: string; kycSelfie: string; kycSignature: string; kycActivityDescription: string; kycLatitude: string; kycLongitude: string; kycAddress: string; kycAcceptedTerms: string }): Promise<User | undefined>;
+  submitKyc(userId: string, kycData: { kycIdFront: string; kycIdBack: string; kycSelfie: string; kycSignature: string; kycActivityDescription: string; kycLatitude: string; kycLongitude: string; kycAddress: string; kycAcceptedTerms: string; kycPhone?: string; kycWhatsapp?: string; kycActivityUrl?: string; kycUrlWebsite?: string; kycUrlInstagram?: string; kycUrlFacebook?: string; kycUrlTiktok?: string; kycUrlWhatsappGroup?: string; kycUrlWhatsappChannel?: string }): Promise<User | undefined>;
   updateKycDocument(userId: string, data: Partial<{ kycIdFront: string; kycIdBack: string; kycSelfie: string; kycSignature: string; kycActivityDescription: string; kycLatitude: string; kycLongitude: string; kycAddress: string; kycAcceptedTerms: string }>): Promise<void>;
   approveKyc(userId: string): Promise<User | undefined>;
   rejectKyc(userId: string, reason?: string): Promise<User | undefined>;
@@ -275,7 +275,7 @@ export class DbStorage implements IStorage {
     return results[0];
   }
 
-  async submitKyc(userId: string, kycData: { kycIdFront: string; kycIdBack: string; kycSelfie: string; kycSignature: string; kycActivityDescription: string; kycLatitude: string; kycLongitude: string; kycAddress: string; kycAcceptedTerms: string; kycPhone?: string; kycWhatsapp?: string; kycActivityUrl?: string }): Promise<User | undefined> {
+  async submitKyc(userId: string, kycData: { kycIdFront: string; kycIdBack: string; kycSelfie: string; kycSignature: string; kycActivityDescription: string; kycLatitude: string; kycLongitude: string; kycAddress: string; kycAcceptedTerms: string; kycPhone?: string; kycWhatsapp?: string; kycActivityUrl?: string; kycUrlWebsite?: string; kycUrlInstagram?: string; kycUrlFacebook?: string; kycUrlTiktok?: string; kycUrlWhatsappGroup?: string; kycUrlWhatsappChannel?: string }): Promise<User | undefined> {
     const results = await db
       .update(schema.users)
       .set({
@@ -292,6 +292,12 @@ export class DbStorage implements IStorage {
         kycPhone: kycData.kycPhone || null,
         kycWhatsapp: kycData.kycWhatsapp || null,
         kycActivityUrl: kycData.kycActivityUrl || null,
+        kycUrlWebsite: kycData.kycUrlWebsite || null,
+        kycUrlInstagram: kycData.kycUrlInstagram || null,
+        kycUrlFacebook: kycData.kycUrlFacebook || null,
+        kycUrlTiktok: kycData.kycUrlTiktok || null,
+        kycUrlWhatsappGroup: kycData.kycUrlWhatsappGroup || null,
+        kycUrlWhatsappChannel: kycData.kycUrlWhatsappChannel || null,
       })
       .where(eq(schema.users.id, userId))
       .returning();

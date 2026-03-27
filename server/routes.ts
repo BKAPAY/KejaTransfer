@@ -1614,10 +1614,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // KYC Final Submit - just changes status to submitted
   app.post("/api/kyc/submit", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { kycIdFront, kycIdBack, kycSelfie, kycSignature, kycActivityDescription, kycLatitude, kycLongitude, kycAddress, kycAcceptedTerms, kycPhone, kycWhatsapp, kycActivityUrl } = req.body;
+      const { kycIdFront, kycIdBack, kycSelfie, kycSignature, kycActivityDescription, kycLatitude, kycLongitude, kycAddress, kycAcceptedTerms, kycPhone, kycWhatsapp, kycActivityUrl, kycUrlWebsite, kycUrlInstagram, kycUrlFacebook, kycUrlTiktok, kycUrlWhatsappGroup, kycUrlWhatsappChannel } = req.body;
 
       if (!kycIdFront || !kycIdBack || !kycSelfie || !kycSignature) {
         return res.status(400).json({ error: "Tous les documents sont requis" });
+      }
+
+      const urlFields = [kycUrlWebsite, kycUrlInstagram, kycUrlFacebook, kycUrlTiktok, kycUrlWhatsappGroup, kycUrlWhatsappChannel].filter(u => u && typeof u === "string" && u.trim());
+      if (urlFields.length < 2) {
+        return res.status(400).json({ error: "Vous devez renseigner au moins 2 liens d'activite" });
+      }
+
+      const waPersonalPattern = /wa\.me\/(qr\/|[0-9])/i;
+      if (kycUrlWhatsappGroup && waPersonalPattern.test(kycUrlWhatsappGroup)) {
+        return res.status(400).json({ error: "Le lien WhatsApp groupe doit etre un lien de groupe, pas un lien personnel" });
+      }
+      if (kycUrlWhatsappChannel && waPersonalPattern.test(kycUrlWhatsappChannel)) {
+        return res.status(400).json({ error: "Le lien WhatsApp chaine doit etre un lien de chaine, pas un lien personnel" });
       }
 
       const user = await storage.submitKyc(req.session.userId!, {
@@ -1633,6 +1646,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         kycPhone: kycPhone || "",
         kycWhatsapp: kycWhatsapp || "",
         kycActivityUrl: kycActivityUrl || "",
+        kycUrlWebsite: kycUrlWebsite || "",
+        kycUrlInstagram: kycUrlInstagram || "",
+        kycUrlFacebook: kycUrlFacebook || "",
+        kycUrlTiktok: kycUrlTiktok || "",
+        kycUrlWhatsappGroup: kycUrlWhatsappGroup || "",
+        kycUrlWhatsappChannel: kycUrlWhatsappChannel || "",
       });
 
       if (!user) {
