@@ -813,7 +813,20 @@ export class DbStorage implements IStorage {
   }
 
   async getTransactionByFedapayId(fedapayId: number): Promise<Transaction | undefined> {
-    // Search in metadata for FedaPay transaction ID
+    const fedapayIdStr = String(fedapayId);
+    const results = await db
+      .select()
+      .from(schema.transactions)
+      .where(
+        and(
+          eq(schema.transactions.status, "pending"),
+          sql`(metadata::text LIKE ${'%"fedapayTransactionId":' + fedapayIdStr + '%'} OR metadata::text LIKE ${'%"fedapayPayoutId":' + fedapayIdStr + '%'})`
+        )
+      )
+      .limit(1);
+    
+    if (results.length > 0) return results[0];
+
     const pendingTransactions = await db
       .select()
       .from(schema.transactions)
@@ -1246,41 +1259,46 @@ export class DbStorage implements IStorage {
     depositsByCurrency: { XOF: number; XAF: number; CDF: number; GNF: number; GMD: number; RWF: number };
     withdrawalsByCurrency: { XOF: number; XAF: number; CDF: number; GNF: number; GMD: number; RWF: number };
   }> {
-    const userCountsResult = await db.execute(sql`
-      SELECT 
-        COUNT(*) as total,
-        COUNT(*) FILTER (WHERE kyc_status = 'verified') as verified
-      FROM users WHERE account_type IS NULL OR account_type = 'personal'
-    `);
-    const totalUsers = Number(userCountsResult.rows[0]?.total || 0);
-    const verifiedUsers = Number(userCountsResult.rows[0]?.verified || 0);
+    const personalFilter = or(isNull(schema.users.accountType), eq(schema.users.accountType, "personal"));
 
-    const depositTypes = ['deposit', 'payment_link', 'merchant_link', 'api_payment'];
-    const withdrawalTypes = ['withdrawal', 'transfer'];
+    const [userCountsResult] = await db.select({
+      total: sql<number>`COUNT(*)`,
+      verified: sql<number>`COUNT(*) FILTER (WHERE ${schema.users.kycStatus} = 'verified')`,
+    }).from(schema.users).where(personalFilter!);
 
-    const depositResult = await db.execute(sql`
-      SELECT COALESCE(t.currency, 'XOF') as currency, SUM(t.amount) as total
-      FROM transactions t
-      INNER JOIN users u ON t.user_id = u.id
-      WHERE (u.account_type IS NULL OR u.account_type = 'personal')
-        AND t.status = 'completed'
-        AND t.type = ANY(${depositTypes})
-      GROUP BY COALESCE(t.currency, 'XOF')
-    `);
+    const totalUsers = Number(userCountsResult?.total || 0);
+    const verifiedUsers = Number(userCountsResult?.verified || 0);
 
-    const withdrawalResult = await db.execute(sql`
-      SELECT COALESCE(t.currency, 'XOF') as currency, SUM(t.amount) as total
-      FROM transactions t
-      INNER JOIN users u ON t.user_id = u.id
-      WHERE (u.account_type IS NULL OR u.account_type = 'personal')
-        AND t.status = 'completed'
-        AND t.type = ANY(${withdrawalTypes})
-      GROUP BY COALESCE(t.currency, 'XOF')
-    `);
+    const depositTypes = ["deposit", "payment_link", "merchant_link", "api_payment"];
+    const withdrawalTypes = ["withdrawal", "transfer"];
+
+    const depositResult = await db.select({
+      currency: sql<string>`COALESCE(${schema.transactions.currency}, 'XOF')`,
+      total: sql<number>`COALESCE(SUM(${schema.transactions.amount}), 0)`,
+    }).from(schema.transactions)
+      .innerJoin(schema.users, eq(schema.transactions.userId, schema.users.id))
+      .where(and(
+        personalFilter!,
+        eq(schema.transactions.status, "completed"),
+        inArray(schema.transactions.type, depositTypes)
+      ))
+      .groupBy(sql`COALESCE(${schema.transactions.currency}, 'XOF')`);
+
+    const withdrawalResult = await db.select({
+      currency: sql<string>`COALESCE(${schema.transactions.currency}, 'XOF')`,
+      total: sql<number>`COALESCE(SUM(${schema.transactions.amount}), 0)`,
+    }).from(schema.transactions)
+      .innerJoin(schema.users, eq(schema.transactions.userId, schema.users.id))
+      .where(and(
+        personalFilter!,
+        eq(schema.transactions.status, "completed"),
+        inArray(schema.transactions.type, withdrawalTypes)
+      ))
+      .groupBy(sql`COALESCE(${schema.transactions.currency}, 'XOF')`);
 
     const depositsByCurrency = { XOF: 0, XAF: 0, CDF: 0, GNF: 0, GMD: 0, RWF: 0 };
     let totalDeposits = 0;
-    for (const row of depositResult.rows) {
+    for (const row of depositResult) {
       const currency = String(row.currency) as keyof typeof depositsByCurrency;
       const amount = Number(row.total || 0);
       if (currency in depositsByCurrency) {
@@ -1293,7 +1311,7 @@ export class DbStorage implements IStorage {
 
     const withdrawalsByCurrency = { XOF: 0, XAF: 0, CDF: 0, GNF: 0, GMD: 0, RWF: 0 };
     let totalWithdrawals = 0;
-    for (const row of withdrawalResult.rows) {
+    for (const row of withdrawalResult) {
       const currency = String(row.currency) as keyof typeof withdrawalsByCurrency;
       const amount = Number(row.total || 0);
       if (currency in withdrawalsByCurrency) {
@@ -1322,41 +1340,46 @@ export class DbStorage implements IStorage {
     depositsByCurrency: Record<string, number>;
     withdrawalsByCurrency: Record<string, number>;
   }> {
-    const userCountsResult = await db.execute(sql`
-      SELECT 
-        COUNT(*) as total,
-        COUNT(*) FILTER (WHERE kyc_status = 'verified') as verified
-      FROM users WHERE account_type = 'business'
-    `);
-    const totalUsers = Number(userCountsResult.rows[0]?.total || 0);
-    const verifiedUsers = Number(userCountsResult.rows[0]?.verified || 0);
+    const businessFilter = eq(schema.users.accountType, "business");
 
-    const depositTypes = ['deposit', 'payment_link', 'merchant_link', 'api_payment'];
-    const withdrawalTypes = ['withdrawal', 'transfer', 'payout'];
+    const [userCountsResult] = await db.select({
+      total: sql<number>`COUNT(*)`,
+      verified: sql<number>`COUNT(*) FILTER (WHERE ${schema.users.kycStatus} = 'verified')`,
+    }).from(schema.users).where(businessFilter);
 
-    const depositResult = await db.execute(sql`
-      SELECT COALESCE(t.currency, 'XOF') as currency, SUM(t.amount) as total
-      FROM transactions t
-      INNER JOIN users u ON t.user_id = u.id
-      WHERE u.account_type = 'business'
-        AND t.status = 'completed'
-        AND t.type = ANY(${depositTypes})
-      GROUP BY COALESCE(t.currency, 'XOF')
-    `);
+    const totalUsers = Number(userCountsResult?.total || 0);
+    const verifiedUsers = Number(userCountsResult?.verified || 0);
 
-    const withdrawalResult = await db.execute(sql`
-      SELECT COALESCE(t.currency, 'XOF') as currency, SUM(t.amount) as total
-      FROM transactions t
-      INNER JOIN users u ON t.user_id = u.id
-      WHERE u.account_type = 'business'
-        AND t.status = 'completed'
-        AND t.type = ANY(${withdrawalTypes})
-      GROUP BY COALESCE(t.currency, 'XOF')
-    `);
+    const depositTypes = ["deposit", "payment_link", "merchant_link", "api_payment"];
+    const withdrawalTypes = ["withdrawal", "transfer", "payout"];
+
+    const depositResult = await db.select({
+      currency: sql<string>`COALESCE(${schema.transactions.currency}, 'XOF')`,
+      total: sql<number>`COALESCE(SUM(${schema.transactions.amount}), 0)`,
+    }).from(schema.transactions)
+      .innerJoin(schema.users, eq(schema.transactions.userId, schema.users.id))
+      .where(and(
+        businessFilter,
+        eq(schema.transactions.status, "completed"),
+        inArray(schema.transactions.type, depositTypes)
+      ))
+      .groupBy(sql`COALESCE(${schema.transactions.currency}, 'XOF')`);
+
+    const withdrawalResult = await db.select({
+      currency: sql<string>`COALESCE(${schema.transactions.currency}, 'XOF')`,
+      total: sql<number>`COALESCE(SUM(${schema.transactions.amount}), 0)`,
+    }).from(schema.transactions)
+      .innerJoin(schema.users, eq(schema.transactions.userId, schema.users.id))
+      .where(and(
+        businessFilter,
+        eq(schema.transactions.status, "completed"),
+        inArray(schema.transactions.type, withdrawalTypes)
+      ))
+      .groupBy(sql`COALESCE(${schema.transactions.currency}, 'XOF')`);
 
     const depositsByCurrency: Record<string, number> = {};
     let totalDeposits = 0;
-    for (const row of depositResult.rows) {
+    for (const row of depositResult) {
       const currency = String(row.currency);
       const amount = Number(row.total || 0);
       depositsByCurrency[currency] = amount;
@@ -1365,7 +1388,7 @@ export class DbStorage implements IStorage {
 
     const withdrawalsByCurrency: Record<string, number> = {};
     let totalWithdrawals = 0;
-    for (const row of withdrawalResult.rows) {
+    for (const row of withdrawalResult) {
       const currency = String(row.currency);
       const amount = Number(row.total || 0);
       withdrawalsByCurrency[currency] = amount;
@@ -2286,42 +2309,18 @@ export class DbStorage implements IStorage {
 
   // Transactions by metadata
   async getTransactionsByMetadataPaymentId(paymentId: string): Promise<Transaction[]> {
-    const allTransactions = await db.select().from(schema.transactions);
-    return allTransactions.filter((t) => {
-      if (!t.metadata) return false;
-      try {
-        const meta = JSON.parse(t.metadata);
-        return meta.paymentId?.toString() === paymentId;
-      } catch {
-        return false;
-      }
-    });
+    return db.select().from(schema.transactions)
+      .where(sql`metadata::text LIKE ${'%"paymentId":"' + paymentId + '"%'} OR metadata::text LIKE ${'%"paymentId":' + paymentId + '%'}`);
   }
 
   async getTransactionsByMetadataPayoutId(payoutId: string): Promise<Transaction[]> {
-    const allTransactions = await db.select().from(schema.transactions);
-    return allTransactions.filter((t) => {
-      if (!t.metadata) return false;
-      try {
-        const meta = JSON.parse(t.metadata);
-        return meta.payoutId?.toString() === payoutId || meta.payoutWithdrawalId?.toString() === payoutId;
-      } catch {
-        return false;
-      }
-    });
+    return db.select().from(schema.transactions)
+      .where(sql`metadata::text LIKE ${'%"payoutId":"' + payoutId + '"%'} OR metadata::text LIKE ${'%"payoutId":' + payoutId + '%'} OR metadata::text LIKE ${'%"payoutWithdrawalId":"' + payoutId + '"%'} OR metadata::text LIKE ${'%"payoutWithdrawalId":' + payoutId + '%'}`);
   }
 
   async getTransactionsByMetadata(key: string, value: string): Promise<Transaction[]> {
-    const allTransactions = await db.select().from(schema.transactions);
-    return allTransactions.filter((t) => {
-      if (!t.metadata) return false;
-      try {
-        const meta = JSON.parse(t.metadata);
-        return meta[key]?.toString() === value;
-      } catch {
-        return false;
-      }
-    });
+    return db.select().from(schema.transactions)
+      .where(sql`metadata::text LIKE ${'%"' + key + '":"' + value + '"%'} OR metadata::text LIKE ${'%"' + key + '":' + value + '%'}`);
   }
 
   // Fee Configuration

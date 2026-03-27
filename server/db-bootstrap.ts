@@ -385,6 +385,17 @@ async function bootstrapDatabase() {
         }
       }
 
+      console.log("⚙️ Ensuring database indexes exist...");
+      await seedClient`CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions (user_id)`;
+      await seedClient`CREATE INDEX IF NOT EXISTS idx_transactions_user_status ON transactions (user_id, status)`;
+      await seedClient`CREATE INDEX IF NOT EXISTS idx_transactions_user_status_type ON transactions (user_id, status, type)`;
+      await seedClient`CREATE INDEX IF NOT EXISTS idx_transactions_status ON transactions (status)`;
+      await seedClient`CREATE INDEX IF NOT EXISTS idx_transactions_created_at ON transactions (created_at DESC)`;
+      await seedClient`CREATE INDEX IF NOT EXISTS idx_transactions_paydunya_token ON transactions (paydunya_token) WHERE paydunya_token IS NOT NULL`;
+      await seedClient`CREATE INDEX IF NOT EXISTS idx_users_account_type ON users (account_type)`;
+      await seedClient`CREATE INDEX IF NOT EXISTS idx_users_kyc_status ON users (kyc_status)`;
+      console.log("✅ Database indexes ready");
+
       await seedClient.end();
       console.log("✅ Database bootstrap completed successfully!");
     } catch (seedError) {
