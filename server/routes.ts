@@ -11701,6 +11701,8 @@ Ton role est de reformuler et ameliorer les messages que l'administrateur souhai
           targetUsers = targetUsers.filter(u => u.kycStatus === "verified");
         } else if (kycFilter === "unverified") {
           targetUsers = targetUsers.filter(u => u.kycStatus !== "verified");
+        } else if (kycFilter === "rejected") {
+          targetUsers = targetUsers.filter(u => u.kycStatus === "rejected");
         }
       }
 

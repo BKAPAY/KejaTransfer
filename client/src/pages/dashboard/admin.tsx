@@ -123,7 +123,7 @@ export default function Admin() {
   const [msgBody, setMsgBody] = useState("");
   const [msgAudienceType, setMsgAudienceType] = useState<"filter" | "selected">("filter");
   const [msgAccountType, setMsgAccountType] = useState<"all" | "personal" | "merchant">("all");
-  const [msgKycFilter, setMsgKycFilter] = useState<"all" | "verified" | "unverified">("all");
+  const [msgKycFilter, setMsgKycFilter] = useState<"all" | "verified" | "unverified" | "rejected">("all");
   const [msgSelectedUserIds, setMsgSelectedUserIds] = useState<string[]>([]);
   const [msgUserSearch, setMsgUserSearch] = useState("");
   const [isPolishing, setIsPolishing] = useState(false);
@@ -1424,6 +1424,14 @@ export default function Admin() {
                         data-testid="button-kyc-unverified"
                       >
                         Non verifies
+                      </Button>
+                      <Button
+                        variant={msgKycFilter === "rejected" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setMsgKycFilter("rejected")}
+                        data-testid="button-kyc-rejected"
+                      >
+                        Rejetes
                       </Button>
                     </div>
                   </div>
