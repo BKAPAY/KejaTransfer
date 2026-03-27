@@ -880,9 +880,19 @@ export default function KYC() {
         <p className="text-sm text-muted-foreground">Renseignez au moins 2 liens parmi les 6 ci-dessous</p>
       </div>
 
+      <Card className="border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-950/30">
+        <CardContent className="p-4 space-y-2">
+          <p className="text-sm font-medium text-orange-800 dark:text-orange-300">Informations importantes :</p>
+          <ul className="text-xs text-orange-700 dark:text-orange-400 space-y-1 list-disc pl-4">
+            <li>Vous n'etes pas oblige de remplir tous les champs. Seuls <strong>2 liens minimum</strong> sont requis parmi les 6 proposes.</li>
+            <li>Les liens fournis doivent correspondre a des pages ou chaines <strong>actives</strong> qui presentent clairement votre activite. Les pages vides, nouvelles ou sans contenu lie a votre activite entraineront un <strong>rejet de votre verification</strong>.</li>
+          </ul>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardContent className="p-4 space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-1">
             <p className="text-sm font-medium">{filledUrlCount}/2 lien(s) renseigne(s) minimum</p>
             <Badge variant={filledUrlCount >= 2 ? "default" : "destructive"}>
               {filledUrlCount >= 2 ? "OK" : "Insuffisant"}
