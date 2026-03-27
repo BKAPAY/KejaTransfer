@@ -11687,7 +11687,7 @@ Ton role est de reformuler et ameliorer les messages que l'administrateur souhai
       let targetUsers: typeof allUsers = [];
 
       if (audienceType === "selected" && userIds && Array.isArray(userIds)) {
-        targetUsers = allUsers.filter(u => userIds.includes(u.id) && !u.isAdmin);
+        targetUsers = allUsers.filter(u => userIds.includes(u.id));
       } else {
         targetUsers = allUsers.filter(u => !u.isAdmin);
 

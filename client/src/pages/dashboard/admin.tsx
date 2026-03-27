@@ -249,8 +249,9 @@ export default function Admin() {
       setPolishedMessage(null);
       setApprovedPolishedMessage(null);
     },
-    onError: () => {
-      toast({ title: "Erreur", description: "Impossible d'envoyer les messages", variant: "destructive" });
+    onError: (error: any) => {
+      const msg = error?.message || "Impossible d'envoyer les messages";
+      toast({ title: "Erreur", description: msg, variant: "destructive" });
     },
   });
 
