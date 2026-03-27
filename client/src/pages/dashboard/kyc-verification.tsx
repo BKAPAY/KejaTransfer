@@ -49,6 +49,7 @@ export default function KycVerificationPage() {
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"submitted" | "verified" | "rejected">("submitted");
   const [lightboxImage, setLightboxImage] = useState<{ src: string; alt: string } | null>(null);
   const [rejectKycConfirm, setRejectKycConfirm] = useState(false);
 
@@ -66,17 +67,28 @@ export default function KycVerificationPage() {
     },
   });
 
+  const statusCounts = useMemo(() => {
+    if (!submissions) return { submitted: 0, verified: 0, rejected: 0 };
+    return {
+      submitted: submissions.filter(u => u.kycStatus === "submitted").length,
+      verified: submissions.filter(u => u.kycStatus === "verified").length,
+      rejected: submissions.filter(u => u.kycStatus === "rejected").length,
+    };
+  }, [submissions]);
+
   const filteredSubmissions = useMemo(() => {
     if (!submissions) return [];
-    if (!searchQuery.trim()) return submissions;
-    
-    const query = searchQuery.toLowerCase().trim();
-    return submissions.filter((user) => {
-      const fullName = `${user.firstName} ${user.lastName}`.toLowerCase();
-      const email = user.email.toLowerCase();
-      return fullName.includes(query) || email.includes(query);
-    });
-  }, [submissions, searchQuery]);
+    let filtered = submissions.filter(u => u.kycStatus === statusFilter);
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter((user) => {
+        const fullName = `${user.firstName} ${user.lastName}`.toLowerCase();
+        const email = user.email.toLowerCase();
+        return fullName.includes(query) || email.includes(query);
+      });
+    }
+    return filtered;
+  }, [submissions, searchQuery, statusFilter]);
 
   const approveMutation = useMutation({
     mutationFn: async (userId: string) => {
@@ -503,6 +515,48 @@ export default function KycVerificationPage() {
 
       {!selectedUserId ? (
         <div className="space-y-4">
+          <div className="flex gap-2 flex-wrap">
+            <Button
+              variant={statusFilter === "submitted" ? "default" : "outline"}
+              onClick={() => setStatusFilter("submitted")}
+              className="relative"
+              data-testid="button-filter-submitted"
+            >
+              En attente
+              {statusCounts.submitted > 0 && (
+                <span className="ml-2 inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full text-xs font-bold bg-orange-500 text-white">
+                  {statusCounts.submitted}
+                </span>
+              )}
+            </Button>
+            <Button
+              variant={statusFilter === "verified" ? "default" : "outline"}
+              onClick={() => setStatusFilter("verified")}
+              className="relative"
+              data-testid="button-filter-verified"
+            >
+              Verifie
+              {statusCounts.verified > 0 && (
+                <span className="ml-2 inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full text-xs font-bold bg-green-500 text-white">
+                  {statusCounts.verified}
+                </span>
+              )}
+            </Button>
+            <Button
+              variant={statusFilter === "rejected" ? "default" : "outline"}
+              onClick={() => setStatusFilter("rejected")}
+              className="relative"
+              data-testid="button-filter-rejected"
+            >
+              Rejete
+              {statusCounts.rejected > 0 && (
+                <span className="ml-2 inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full text-xs font-bold bg-red-500 text-white">
+                  {statusCounts.rejected}
+                </span>
+              )}
+            </Button>
+          </div>
+
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
