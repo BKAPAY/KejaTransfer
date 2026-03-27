@@ -1028,59 +1028,116 @@ export class DbStorage implements IStorage {
   }
 
   async finalizeIncomingTransaction(id: string, extras?: { paydunyaReceiptUrl?: string }): Promise<{ transaction: Transaction; credited: boolean } | null> {
-    const updateData: any = { status: "completed" };
-    if (extras?.paydunyaReceiptUrl) {
-      updateData.paydunyaReceiptUrl = extras.paydunyaReceiptUrl;
-    }
-    
-    const results = await db
-      .update(schema.transactions)
-      .set(updateData)
+    const txRow = await db
+      .select()
+      .from(schema.transactions)
       .where(and(
         eq(schema.transactions.id, id),
         eq(schema.transactions.status, "pending")
       ))
-      .returning();
-    
-    if (results.length === 0) {
+      .limit(1);
+
+    if (txRow.length === 0) {
       return null;
     }
-    
-    const transaction = results[0];
-    
+
+    const pendingTx = txRow[0];
+
     let customerPaysFee = false;
     let netAmountFromMetadata: number | null = null;
-    
-    if (transaction.metadata) {
+    let isBusiness = false;
+    let businessCountry: string | null = null;
+    let businessCurrency: string | null = null;
+
+    if (pendingTx.metadata) {
       try {
-        const metadata = JSON.parse(transaction.metadata);
+        const metadata = JSON.parse(pendingTx.metadata);
         customerPaysFee = metadata.customerPaysFee === true;
         if (typeof metadata.netAmountForUser === 'number') {
           netAmountFromMetadata = metadata.netAmountForUser;
         }
+        if (metadata.scope === "business") {
+          isBusiness = true;
+          businessCountry = metadata.country || pendingTx.country;
+          businessCurrency = metadata.balanceCurrency || metadata.providerCurrency || pendingTx.currency;
+        }
       } catch (e) {}
     }
-    
+
     let netAmount: number;
     if (netAmountFromMetadata !== null) {
       netAmount = netAmountFromMetadata;
     } else if (customerPaysFee) {
-      netAmount = transaction.amount;
+      netAmount = pendingTx.amount;
     } else {
-      netAmount = transaction.amount - (transaction.fee || 0);
+      netAmount = pendingTx.amount - (pendingTx.fee || 0);
     }
-    
+
+    if (isBusiness) {
+      if (!businessCountry || !businessCurrency) {
+        console.error(`[Storage] CRITICAL: Business transaction ${id} missing wallet coordinates (country=${businessCountry}, currency=${businessCurrency}) - NOT crediting personal balance`);
+        const updateData: any = { status: "completed" };
+        if (extras?.paydunyaReceiptUrl) updateData.paydunyaReceiptUrl = extras.paydunyaReceiptUrl;
+        const results = await db
+          .update(schema.transactions)
+          .set(updateData)
+          .where(and(eq(schema.transactions.id, id), eq(schema.transactions.status, "pending")))
+          .returning();
+        return results.length > 0 ? { transaction: results[0], credited: false } : null;
+      }
+
+      const existing = await this.getBusinessWallet(pendingTx.userId, businessCountry, businessCurrency);
+      const currentBalance = existing ? existing.balance : 0;
+
+      const updateData: any = { status: "completed" };
+      if (extras?.paydunyaReceiptUrl) updateData.paydunyaReceiptUrl = extras.paydunyaReceiptUrl;
+
+      const results = await db
+        .update(schema.transactions)
+        .set(updateData)
+        .where(and(eq(schema.transactions.id, id), eq(schema.transactions.status, "pending")))
+        .returning();
+
+      if (results.length === 0) return null;
+
+      if (existing) {
+        await db
+          .update(schema.businessWallets)
+          .set({ balance: currentBalance + netAmount })
+          .where(eq(schema.businessWallets.id, existing.id));
+      } else {
+        await db
+          .insert(schema.businessWallets)
+          .values({ userId: pendingTx.userId, country: businessCountry, currency: businessCurrency, balance: netAmount });
+      }
+
+      console.log(`[Storage] Finalized business transaction ${id}: credited ${netAmount} ${businessCurrency} to business wallet ${businessCountry} for user ${pendingTx.userId} (customerPaysFee: ${customerPaysFee})`);
+      return { transaction: results[0], credited: true };
+    }
+
+    const updateData: any = { status: "completed" };
+    if (extras?.paydunyaReceiptUrl) updateData.paydunyaReceiptUrl = extras.paydunyaReceiptUrl;
+
+    const results = await db
+      .update(schema.transactions)
+      .set(updateData)
+      .where(and(eq(schema.transactions.id, id), eq(schema.transactions.status, "pending")))
+      .returning();
+
+    if (results.length === 0) return null;
+    const transaction = results[0];
+
     const user = await this.getUser(transaction.userId);
     if (user) {
       await db
         .update(schema.users)
         .set({ balance: user.balance + netAmount })
         .where(eq(schema.users.id, transaction.userId));
-      
+
       console.log(`[Storage] Finalized transaction ${id}: credited ${netAmount} to user ${transaction.userId} (customerPaysFee: ${customerPaysFee})`);
       return { transaction, credited: true };
     }
-    
+
     return { transaction, credited: false };
   }
 
