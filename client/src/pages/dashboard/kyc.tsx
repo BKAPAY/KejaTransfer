@@ -870,7 +870,7 @@ export default function KYC() {
 
   const filledUrlCount = [kycUrlWebsite, kycUrlInstagram, kycUrlFacebook, kycUrlTiktok, kycUrlWhatsappGroup, kycUrlWhatsappChannel].filter(u => u.trim()).length;
 
-  const isWhatsappPersonalLink = (url: string) => /wa\.me\/(qr\/|[0-9])/i.test(url);
+  const isWhatsappPersonalLink = (url: string) => /wa\.me\//i.test(url);
 
   const renderStep3 = () => (
     <div className="space-y-6">

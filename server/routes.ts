@@ -1625,12 +1625,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Vous devez renseigner au moins 2 liens d'activite" });
       }
 
-      const waPersonalPattern = /wa\.me\/(qr\/|[0-9])/i;
+      const waPersonalPattern = /wa\.me\//i;
       if (kycUrlWhatsappGroup && waPersonalPattern.test(kycUrlWhatsappGroup)) {
-        return res.status(400).json({ error: "Le lien WhatsApp groupe doit etre un lien de groupe, pas un lien personnel" });
+        return res.status(400).json({ error: "Le lien WhatsApp groupe doit etre un lien de groupe (chat.whatsapp.com/...), pas un lien personnel (wa.me/...)" });
       }
       if (kycUrlWhatsappChannel && waPersonalPattern.test(kycUrlWhatsappChannel)) {
-        return res.status(400).json({ error: "Le lien WhatsApp chaine doit etre un lien de chaine, pas un lien personnel" });
+        return res.status(400).json({ error: "Le lien WhatsApp chaine doit etre un lien de chaine (whatsapp.com/channel/...), pas un lien personnel (wa.me/...)" });
       }
 
       const user = await storage.submitKyc(req.session.userId!, {
