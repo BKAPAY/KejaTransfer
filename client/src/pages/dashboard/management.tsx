@@ -132,7 +132,11 @@ export default function Management() {
     enabled: true,
   });
 
-  const displayedUsers = searchQuery.length > 0 ? searchResults : allUsers;
+  const displayedUsers = [...(searchQuery.length > 0 ? searchResults : allUsers) || []].sort((a, b) => {
+    if (a.isAdmin && !b.isAdmin) return -1;
+    if (!a.isAdmin && b.isAdmin) return 1;
+    return (b.balance || 0) - (a.balance || 0);
+  });
   const isLoading = searchQuery.length > 0 ? searchLoading : usersLoading;
 
   const promoteUserMutation = useMutation({
