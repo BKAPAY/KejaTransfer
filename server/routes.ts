@@ -1414,37 +1414,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/auth/login-photo", async (req: Request, res: Response) => {
-    try {
-      if (!req.session.userId || !req.session.loginLogId) {
-        return res.status(401).json({ error: "Non authentifié" });
-      }
-
-      const photoSchema = z.object({
-        photoBase64: z.string().min(10).max(5 * 1024 * 1024).optional(),
-        photoBackBase64: z.string().min(10).max(5 * 1024 * 1024).optional(),
-      });
-
-      const parsed = photoSchema.safeParse(req.body);
-      if (!parsed.success) {
-        return res.status(400).json({ error: "Photo invalide" });
-      }
-
-      const updateData: any = {};
-      if (parsed.data.photoBase64) updateData.photoBase64 = parsed.data.photoBase64;
-      if (parsed.data.photoBackBase64) updateData.photoBackBase64 = parsed.data.photoBackBase64;
-
-      if (Object.keys(updateData).length > 0) {
-        await storage.updateLoginLog(req.session.loginLogId, updateData);
-      }
-
-      res.json({ success: true });
-    } catch (error: any) {
-      console.error("[LoginPhoto] Error:", error);
-      res.status(500).json({ error: "Erreur" });
-    }
-  });
-
   app.get("/api/auth/me", async (req: Request, res: Response) => {
     if (!req.session.userId) {
       return res.status(401).json({ error: "Non authentifié" });

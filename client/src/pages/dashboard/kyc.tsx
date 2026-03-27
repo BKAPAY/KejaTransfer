@@ -170,7 +170,7 @@ export default function KYC() {
 
       const facingMode = mode === "selfie" ? "user" : "environment";
       const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode, width: { ideal: 2560 }, height: { ideal: 1920 } },
+        video: { facingMode, width: { ideal: 3840 }, height: { ideal: 2160 } },
         audio: false,
       });
 
@@ -222,8 +222,8 @@ export default function KYC() {
 
     if (!ctx) return;
 
-    const maxWidth = 1920;
-    const maxHeight = 1440;
+    const maxWidth = 2560;
+    const maxHeight = 1920;
     let targetWidth = video.videoWidth;
     let targetHeight = video.videoHeight;
     if (targetWidth > maxWidth) {
@@ -238,7 +238,7 @@ export default function KYC() {
     canvas.height = targetHeight;
     ctx.drawImage(video, 0, 0, targetWidth, targetHeight);
 
-    const imageData = canvas.toDataURL("image/jpeg", 0.92);
+    const imageData = canvas.toDataURL("image/jpeg", 0.95);
     const currentMode = cameraMode;
 
     if (currentMode === "front") {
