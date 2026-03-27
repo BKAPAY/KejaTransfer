@@ -169,10 +169,24 @@ export default function KYC() {
       setCameraMode(mode);
 
       const facingMode = mode === "selfie" ? "user" : "environment";
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode, width: { ideal: 3840 }, height: { ideal: 2160 } },
+      const constraints: MediaStreamConstraints = {
+        video: {
+          facingMode,
+          width: { ideal: 1920, min: 1280 },
+          height: { ideal: 1080, min: 720 },
+        },
         audio: false,
-      });
+      };
+
+      let mediaStream: MediaStream;
+      try {
+        mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+      } catch {
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode },
+          audio: false,
+        });
+      }
 
       setStream(mediaStream);
     } catch (error: any) {
@@ -194,9 +208,13 @@ export default function KYC() {
 
   useEffect(() => {
     if (stream && videoRef.current) {
-      videoRef.current.srcObject = stream;
-      videoRef.current.onloadedmetadata = () => {
-        videoRef.current?.play().catch(console.error);
+      const video = videoRef.current;
+      video.srcObject = stream;
+      video.onloadedmetadata = () => {
+        video.play().catch(console.error);
+      };
+      video.onloadeddata = () => {
+        video.play().catch(console.error);
       };
     }
   }, [stream]);
