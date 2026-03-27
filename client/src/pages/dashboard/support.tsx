@@ -82,18 +82,18 @@ export default function Support() {
         <p className="text-sm text-muted-foreground">Nous sommes là pour vous aider</p>
       </div>
 
-      <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="hover-elevate">
-          <CardHeader className="pb-2">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <Card className="hover-elevate min-w-0">
+          <CardHeader className="pb-2 px-3">
             <div className="flex items-center gap-2 mb-1">
-              <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0">
-                <Mail className="w-4 h-4 text-primary" />
+              <div className="w-7 h-7 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <Mail className="w-3.5 h-3.5 text-primary" />
               </div>
-              <CardTitle className="text-sm">Email</CardTitle>
+              <CardTitle className="text-xs">Email</CardTitle>
             </div>
             <CardDescription className="text-xs">Contactez-nous</CardDescription>
           </CardHeader>
-          <CardContent className="text-xs space-y-2">
+          <CardContent className="text-xs space-y-2 px-3 pb-3">
             <p className="text-muted-foreground">Reponse en 24h</p>
             {isLoading ? (
               <div className="flex items-center justify-center h-8">
@@ -103,28 +103,28 @@ export default function Support() {
               <Button 
                 variant="outline" 
                 size="sm" 
-                className="w-full" 
+                className="w-full min-w-0" 
                 data-testid="button-email-support"
                 onClick={() => window.location.href = `mailto:${supportEmail}`}
               >
-                <Mail className="w-3 h-3 mr-1" />
-                {supportEmail}
+                <Mail className="w-3 h-3 mr-1 flex-shrink-0" />
+                <span className="truncate">{supportEmail}</span>
               </Button>
             )}
           </CardContent>
         </Card>
 
-        <Card className="hover-elevate">
-          <CardHeader className="pb-2">
+        <Card className="hover-elevate min-w-0">
+          <CardHeader className="pb-2 px-3">
             <div className="flex items-center gap-2 mb-1">
-              <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0">
-                <Phone className="w-4 h-4 text-primary" />
+              <div className="w-7 h-7 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <Phone className="w-3.5 h-3.5 text-primary" />
               </div>
-              <CardTitle className="text-sm">Telephone</CardTitle>
+              <CardTitle className="text-xs">Telephone</CardTitle>
             </div>
             <CardDescription className="text-xs">Appelez-nous</CardDescription>
           </CardHeader>
-          <CardContent className="text-xs space-y-2">
+          <CardContent className="text-xs space-y-2 px-3 pb-3">
             <p className="text-muted-foreground">Lun-Ven 9h-18h</p>
             {isLoading ? (
               <div className="flex items-center justify-center h-8">
@@ -134,55 +134,55 @@ export default function Support() {
               <Button 
                 variant="outline" 
                 size="sm" 
-                className="w-full" 
+                className="w-full min-w-0" 
                 data-testid="button-phone"
                 onClick={() => window.location.href = `tel:${supportPhone.replace(/\s/g, '')}`}
               >
-                <Phone className="w-3 h-3 mr-1" />
-                {supportPhone}
+                <Phone className="w-3 h-3 mr-1 flex-shrink-0" />
+                <span className="truncate">{supportPhone}</span>
               </Button>
             )}
           </CardContent>
         </Card>
 
         {supportWhatsappPhone && (
-          <Card className="hover-elevate">
-            <CardHeader className="pb-2">
+          <Card className="hover-elevate min-w-0">
+            <CardHeader className="pb-2 px-3">
               <div className="flex items-center gap-2 mb-1">
-                <div className="w-8 h-8 rounded-md bg-green-500/10 flex items-center justify-center flex-shrink-0">
-                  <SiWhatsapp className="w-4 h-4 text-green-600" />
+                <div className="w-7 h-7 rounded-md bg-green-500/10 flex items-center justify-center flex-shrink-0">
+                  <SiWhatsapp className="w-3.5 h-3.5 text-green-600" />
                 </div>
-                <CardTitle className="text-sm">WhatsApp</CardTitle>
+                <CardTitle className="text-xs">WhatsApp</CardTitle>
               </div>
               <CardDescription className="text-xs">Ecrivez-nous</CardDescription>
             </CardHeader>
-            <CardContent className="text-xs space-y-2">
+            <CardContent className="text-xs space-y-2 px-3 pb-3">
               <p className="text-muted-foreground">Reponse rapide</p>
               <Button 
                 variant="outline" 
                 size="sm" 
-                className="w-full bg-green-50 border-green-200 text-green-700 dark:bg-green-950 dark:border-green-800 dark:text-green-400" 
+                className="w-full min-w-0 bg-green-50 border-green-200 text-green-700 dark:bg-green-950 dark:border-green-800 dark:text-green-400" 
                 data-testid="button-whatsapp-support"
                 onClick={() => window.open(whatsappChatUrl, "_blank")}
               >
-                <SiWhatsapp className="w-3 h-3 mr-1" />
-                {supportWhatsappPhone}
+                <SiWhatsapp className="w-3 h-3 mr-1 flex-shrink-0" />
+                <span className="truncate">{supportWhatsappPhone}</span>
               </Button>
             </CardContent>
           </Card>
         )}
 
-        <Card className="hover-elevate">
-          <CardHeader className="pb-2">
+        <Card className="hover-elevate min-w-0">
+          <CardHeader className="pb-2 px-3">
             <div className="flex items-center gap-2 mb-1">
-              <div className="w-8 h-8 rounded-md bg-green-500/10 flex items-center justify-center flex-shrink-0">
-                <SiWhatsapp className="w-4 h-4 text-green-600" />
+              <div className="w-7 h-7 rounded-md bg-green-500/10 flex items-center justify-center flex-shrink-0">
+                <SiWhatsapp className="w-3.5 h-3.5 text-green-600" />
               </div>
-              <CardTitle className="text-sm">Communaute</CardTitle>
+              <CardTitle className="text-xs">Communaute</CardTitle>
             </div>
             <CardDescription className="text-xs">Rejoignez notre groupe</CardDescription>
           </CardHeader>
-          <CardContent className="text-xs space-y-2">
+          <CardContent className="text-xs space-y-2 px-3 pb-3">
             <p className="text-muted-foreground">Echangez avec la communaute</p>
             {isLoading ? (
               <div className="flex items-center justify-center h-8">
@@ -192,12 +192,12 @@ export default function Support() {
               <Button 
                 variant="outline" 
                 size="sm" 
-                className="w-full bg-green-50 border-green-200 text-green-700 dark:bg-green-950 dark:border-green-800 dark:text-green-400" 
+                className="w-full min-w-0 bg-green-50 border-green-200 text-green-700 dark:bg-green-950 dark:border-green-800 dark:text-green-400" 
                 data-testid="button-whatsapp-community"
                 onClick={() => window.open(whatsappLink, "_blank")}
               >
-                <SiWhatsapp className="w-3 h-3 mr-1" />
-                Rejoindre le groupe
+                <SiWhatsapp className="w-3 h-3 mr-1 flex-shrink-0" />
+                <span className="truncate">Rejoindre le groupe</span>
               </Button>
             )}
           </CardContent>
