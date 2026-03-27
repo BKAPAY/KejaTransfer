@@ -1246,62 +1246,66 @@ export class DbStorage implements IStorage {
     depositsByCurrency: { XOF: number; XAF: number; CDF: number; GNF: number; GMD: number; RWF: number };
     withdrawalsByCurrency: { XOF: number; XAF: number; CDF: number; GNF: number; GMD: number; RWF: number };
   }> {
-    const allUsersRaw = await db.select().from(schema.users);
-    const allUsers = allUsersRaw.filter((u) => !u.accountType || u.accountType === "personal");
-    const verifiedUsers = allUsers.filter((u) => u.kycStatus === "verified").length;
+    const userCountsResult = await db.execute(sql`
+      SELECT 
+        COUNT(*) as total,
+        COUNT(*) FILTER (WHERE kyc_status = 'verified') as verified
+      FROM users WHERE account_type IS NULL OR account_type = 'personal'
+    `);
+    const totalUsers = Number(userCountsResult.rows[0]?.total || 0);
+    const verifiedUsers = Number(userCountsResult.rows[0]?.verified || 0);
 
-    const userCurrencyMap = new Map<string, string>();
-    const COUNTRY_CURRENCIES: Record<string, string> = {
-      "BJ": "XOF", "TG": "XOF", "SN": "XOF", "CI": "XOF", "ML": "XOF",
-      "BF": "XOF", "NE": "XOF",
-      "CM": "XAF", "TD": "XAF", "CG": "XAF", "CF": "XAF", "GA": "XAF",
-      "CD": "CDF",
-      "GN": "GNF",
-      "GM": "GMD",
-      "RW": "RWF",
-    };
-    const personalUserIds = new Set<string>();
-    allUsers.forEach(u => {
-      userCurrencyMap.set(u.id, u.country ? COUNTRY_CURRENCIES[u.country] || "XOF" : "XOF");
-      personalUserIds.add(u.id);
-    });
+    const depositTypes = ['deposit', 'payment_link', 'merchant_link', 'api_payment'];
+    const withdrawalTypes = ['withdrawal', 'transfer'];
 
-    const allTransactions = await db.select().from(schema.transactions);
-    const personalTransactions = allTransactions.filter(t => personalUserIds.has(t.userId));
-    const completedDeposits = personalTransactions.filter(
-      (t) =>
-        t.status === "completed" &&
-        ["deposit", "payment_link", "merchant_link", "api_payment"].includes(t.type)
-    );
-    const completedOutgoing = personalTransactions.filter(
-      (t) => t.status === "completed" && ["withdrawal", "transfer"].includes(t.type)
-    );
+    const depositResult = await db.execute(sql`
+      SELECT COALESCE(t.currency, 'XOF') as currency, SUM(t.amount) as total
+      FROM transactions t
+      INNER JOIN users u ON t.user_id = u.id
+      WHERE (u.account_type IS NULL OR u.account_type = 'personal')
+        AND t.status = 'completed'
+        AND t.type = ANY(${depositTypes})
+      GROUP BY COALESCE(t.currency, 'XOF')
+    `);
 
-    const totalDeposits = completedDeposits.reduce((sum, t) => sum + t.amount, 0);
-    const totalWithdrawals = completedOutgoing.reduce((sum, t) => sum + t.amount, 0);
+    const withdrawalResult = await db.execute(sql`
+      SELECT COALESCE(t.currency, 'XOF') as currency, SUM(t.amount) as total
+      FROM transactions t
+      INNER JOIN users u ON t.user_id = u.id
+      WHERE (u.account_type IS NULL OR u.account_type = 'personal')
+        AND t.status = 'completed'
+        AND t.type = ANY(${withdrawalTypes})
+      GROUP BY COALESCE(t.currency, 'XOF')
+    `);
 
     const depositsByCurrency = { XOF: 0, XAF: 0, CDF: 0, GNF: 0, GMD: 0, RWF: 0 };
-    completedDeposits.forEach(t => {
-      const currency = t.currency || userCurrencyMap.get(t.userId) || "XOF";
+    let totalDeposits = 0;
+    for (const row of depositResult.rows) {
+      const currency = String(row.currency) as keyof typeof depositsByCurrency;
+      const amount = Number(row.total || 0);
       if (currency in depositsByCurrency) {
-        depositsByCurrency[currency as keyof typeof depositsByCurrency] += t.amount;
+        depositsByCurrency[currency] += amount;
       } else {
-        depositsByCurrency.XOF += t.amount;
+        depositsByCurrency.XOF += amount;
       }
-    });
+      totalDeposits += amount;
+    }
 
     const withdrawalsByCurrency = { XOF: 0, XAF: 0, CDF: 0, GNF: 0, GMD: 0, RWF: 0 };
-    completedOutgoing.forEach(t => {
-      const currency = t.currency || userCurrencyMap.get(t.userId) || "XOF";
+    let totalWithdrawals = 0;
+    for (const row of withdrawalResult.rows) {
+      const currency = String(row.currency) as keyof typeof withdrawalsByCurrency;
+      const amount = Number(row.total || 0);
       if (currency in withdrawalsByCurrency) {
-        withdrawalsByCurrency[currency as keyof typeof withdrawalsByCurrency] += t.amount;
+        withdrawalsByCurrency[currency] += amount;
       } else {
-        withdrawalsByCurrency.XOF += t.amount;
+        withdrawalsByCurrency.XOF += amount;
       }
-    });
+      totalWithdrawals += amount;
+    }
 
     return {
-      totalUsers: allUsers.length,
+      totalUsers,
       verifiedUsers,
       totalDeposits,
       totalWithdrawals,
@@ -1318,58 +1322,58 @@ export class DbStorage implements IStorage {
     depositsByCurrency: Record<string, number>;
     withdrawalsByCurrency: Record<string, number>;
   }> {
-    const allUsersRaw = await db.select().from(schema.users);
-    const businessUsers = allUsersRaw.filter((u) => u.accountType === "business");
-    const verifiedUsers = businessUsers.filter((u) => u.kycStatus === "verified").length;
+    const userCountsResult = await db.execute(sql`
+      SELECT 
+        COUNT(*) as total,
+        COUNT(*) FILTER (WHERE kyc_status = 'verified') as verified
+      FROM users WHERE account_type = 'business'
+    `);
+    const totalUsers = Number(userCountsResult.rows[0]?.total || 0);
+    const verifiedUsers = Number(userCountsResult.rows[0]?.verified || 0);
 
-    const businessUserIds = new Set<string>();
-    const userCurrencyMap = new Map<string, string>();
-    const COUNTRY_CURRENCIES: Record<string, string> = {
-      "BJ": "XOF", "TG": "XOF", "SN": "XOF", "CI": "XOF", "ML": "XOF",
-      "BF": "XOF", "NE": "XOF",
-      "CM": "XAF", "TD": "XAF", "CG": "XAF", "CF": "XAF", "GA": "XAF",
-      "CD": "CDF",
-      "GN": "GNF",
-      "GM": "GMD",
-      "RW": "RWF",
-      "ZM": "ZMW",
-      "UG": "UGX",
-    };
-    businessUsers.forEach(u => {
-      businessUserIds.add(u.id);
-      userCurrencyMap.set(u.id, u.country ? COUNTRY_CURRENCIES[u.country] || "XOF" : "XOF");
-    });
+    const depositTypes = ['deposit', 'payment_link', 'merchant_link', 'api_payment'];
+    const withdrawalTypes = ['withdrawal', 'transfer', 'payout'];
 
-    const allTransactions = await db.select().from(schema.transactions);
-    const businessTransactions = allTransactions.filter(t => businessUserIds.has(t.userId));
-    const completedDeposits = businessTransactions.filter(
-      (t) =>
-        t.status === "completed" &&
-        ["deposit", "payment_link", "merchant_link", "api_payment"].includes(t.type)
-    );
-    const completedOutgoing = businessTransactions.filter(
-      (t) => t.status === "completed" && ["withdrawal", "transfer", "payout"].includes(t.type)
-    );
+    const depositResult = await db.execute(sql`
+      SELECT COALESCE(t.currency, 'XOF') as currency, SUM(t.amount) as total
+      FROM transactions t
+      INNER JOIN users u ON t.user_id = u.id
+      WHERE u.account_type = 'business'
+        AND t.status = 'completed'
+        AND t.type = ANY(${depositTypes})
+      GROUP BY COALESCE(t.currency, 'XOF')
+    `);
 
-    const totalDeposits = completedDeposits.reduce((sum, t) => sum + t.amount, 0);
-    const totalWithdrawals = completedOutgoing.reduce((sum, t) => sum + t.amount, 0);
+    const withdrawalResult = await db.execute(sql`
+      SELECT COALESCE(t.currency, 'XOF') as currency, SUM(t.amount) as total
+      FROM transactions t
+      INNER JOIN users u ON t.user_id = u.id
+      WHERE u.account_type = 'business'
+        AND t.status = 'completed'
+        AND t.type = ANY(${withdrawalTypes})
+      GROUP BY COALESCE(t.currency, 'XOF')
+    `);
 
-    const depositsByCurrency: Record<string, number> = { XOF: 0, XAF: 0, CDF: 0, ZMW: 0, UGX: 0 };
-    completedDeposits.forEach(t => {
-      const currency = t.currency || userCurrencyMap.get(t.userId) || "XOF";
-      if (!(currency in depositsByCurrency)) depositsByCurrency[currency] = 0;
-      depositsByCurrency[currency] += t.amount;
-    });
+    const depositsByCurrency: Record<string, number> = {};
+    let totalDeposits = 0;
+    for (const row of depositResult.rows) {
+      const currency = String(row.currency);
+      const amount = Number(row.total || 0);
+      depositsByCurrency[currency] = amount;
+      totalDeposits += amount;
+    }
 
-    const withdrawalsByCurrency: Record<string, number> = { XOF: 0, XAF: 0, CDF: 0, ZMW: 0, UGX: 0 };
-    completedOutgoing.forEach(t => {
-      const currency = t.currency || userCurrencyMap.get(t.userId) || "XOF";
-      if (!(currency in withdrawalsByCurrency)) withdrawalsByCurrency[currency] = 0;
-      withdrawalsByCurrency[currency] += t.amount;
-    });
+    const withdrawalsByCurrency: Record<string, number> = {};
+    let totalWithdrawals = 0;
+    for (const row of withdrawalResult.rows) {
+      const currency = String(row.currency);
+      const amount = Number(row.total || 0);
+      withdrawalsByCurrency[currency] = amount;
+      totalWithdrawals += amount;
+    }
 
     return {
-      totalUsers: businessUsers.length,
+      totalUsers,
       verifiedUsers,
       totalDeposits,
       totalWithdrawals,
