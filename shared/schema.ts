@@ -308,6 +308,7 @@ export const supportSettings = pgTable("support_settings", {
   supportEmail: text("support_email").notNull().default("support@bkapay.com"),
   supportPhone: text("support_phone").notNull().default("+229 01 46 44 73 19"),
   whatsappLink: text("whatsapp_link").notNull().default("https://chat.whatsapp.com/DRe55FMRXCt87VxNvjF1EF"),
+  supportWhatsappPhone: text("support_whatsapp_phone").notNull().default(""),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
@@ -322,6 +323,7 @@ export const updateSupportSettingsSchema = z.object({
   supportEmail: z.string().email("Email invalide").optional(),
   supportPhone: z.string().min(8, "Numéro de téléphone invalide").optional(),
   whatsappLink: z.string().url("Lien WhatsApp invalide").optional(),
+  supportWhatsappPhone: z.string().optional(),
 });
 
 // Insert schemas

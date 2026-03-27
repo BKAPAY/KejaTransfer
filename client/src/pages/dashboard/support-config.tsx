@@ -18,6 +18,7 @@ export default function SupportConfig() {
   const [supportEmail, setSupportEmail] = useState("");
   const [supportPhone, setSupportPhone] = useState("");
   const [whatsappLink, setWhatsappLink] = useState("");
+  const [supportWhatsappPhone, setSupportWhatsappPhone] = useState("");
 
   const { data: settings, isLoading } = useQuery<SupportSettings>({
     queryKey: ["/api/support-settings"],
@@ -28,6 +29,7 @@ export default function SupportConfig() {
       setSupportEmail(settings.supportEmail);
       setSupportPhone(settings.supportPhone);
       setWhatsappLink(settings.whatsappLink);
+      setSupportWhatsappPhone(settings.supportWhatsappPhone || "");
     }
   }, [settings]);
 
@@ -37,6 +39,7 @@ export default function SupportConfig() {
         supportEmail,
         supportPhone,
         whatsappLink,
+        supportWhatsappPhone,
       });
       return res.json();
     },
@@ -68,7 +71,7 @@ export default function SupportConfig() {
     if (!supportEmail || !supportPhone || !whatsappLink) {
       toast({
         title: "Erreur",
-        description: "Veuillez remplir tous les champs",
+        description: "Veuillez remplir les champs obligatoires (email, telephone, lien communaute)",
         variant: "destructive",
       });
       return;
@@ -145,6 +148,24 @@ export default function SupportConfig() {
           </div>
 
           <div className="space-y-2">
+            <Label htmlFor="supportWhatsappPhone" className="flex items-center gap-2">
+              <SiWhatsapp className="w-4 h-4 text-green-600" />
+              Numero WhatsApp du Support
+            </Label>
+            <Input
+              id="supportWhatsappPhone"
+              type="tel"
+              value={supportWhatsappPhone}
+              onChange={(e) => setSupportWhatsappPhone(e.target.value)}
+              placeholder="+229 01 46 44 73 19"
+              data-testid="input-support-whatsapp-phone"
+            />
+            <p className="text-xs text-muted-foreground">
+              Les utilisateurs seront rediriges vers ce numero sur WhatsApp. Laissez vide pour masquer cette option.
+            </p>
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="whatsappLink" className="flex items-center gap-2">
               <SiWhatsapp className="w-4 h-4 text-green-600" />
               Lien Communaute WhatsApp
@@ -183,7 +204,7 @@ export default function SupportConfig() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid md:grid-cols-3 gap-4">
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="border rounded-lg p-4">
               <div className="flex items-center gap-2 mb-2">
                 <Mail className="w-4 h-4 text-primary" />
@@ -199,11 +220,19 @@ export default function SupportConfig() {
               </div>
               <p className="text-sm text-muted-foreground">{supportPhone || "Non defini"}</p>
             </div>
+
+            <div className="border rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <SiWhatsapp className="w-4 h-4 text-green-600" />
+                <span className="font-medium">WhatsApp Support</span>
+              </div>
+              <p className="text-sm text-muted-foreground">{supportWhatsappPhone || "Non defini"}</p>
+            </div>
             
             <div className="border rounded-lg p-4">
               <div className="flex items-center gap-2 mb-2">
                 <SiWhatsapp className="w-4 h-4 text-green-600" />
-                <span className="font-medium">WhatsApp</span>
+                <span className="font-medium">Communaute</span>
               </div>
               <p className="text-sm text-muted-foreground truncate">{whatsappLink || "Non defini"}</p>
             </div>

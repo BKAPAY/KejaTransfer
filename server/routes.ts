@@ -10743,6 +10743,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           supportEmail: "support@bkapay.com",
           supportPhone: "+229 01 46 44 73 19",
           whatsappLink: "https://chat.whatsapp.com/DRe55FMRXCt87VxNvjF1EF",
+          supportWhatsappPhone: "",
         });
       }
       
@@ -10756,7 +10757,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Support Settings - Admin update endpoint
   app.put("/api/admin/support-settings", requireAdmin, async (req: Request, res: Response) => {
     try {
-      const { supportEmail, supportPhone, whatsappLink } = req.body;
+      const { supportEmail, supportPhone, whatsappLink, supportWhatsappPhone } = req.body;
       
       // Validate inputs
       if (supportEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(supportEmail)) {
@@ -10773,6 +10774,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         supportEmail,
         supportPhone,
         whatsappLink,
+        supportWhatsappPhone: supportWhatsappPhone || "",
       });
       
       console.log("[SupportSettings] Updated by admin:", settings);

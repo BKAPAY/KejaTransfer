@@ -69,6 +69,11 @@ export default function Support() {
   const supportEmail = settings?.supportEmail || "support@bkapay.com";
   const supportPhone = settings?.supportPhone || "+229 01 46 44 73 19";
   const whatsappLink = settings?.whatsappLink || "https://chat.whatsapp.com/DRe55FMRXCt87VxNvjF1EF";
+  const supportWhatsappPhone = settings?.supportWhatsappPhone || "";
+
+  const whatsappChatUrl = supportWhatsappPhone
+    ? `https://wa.me/${supportWhatsappPhone.replace(/[\s+\-()]/g, '')}`
+    : "";
 
   return (
     <div className="space-y-6">
@@ -77,7 +82,7 @@ export default function Support() {
         <p className="text-sm text-muted-foreground">Nous sommes là pour vous aider</p>
       </div>
 
-      <div className="grid md:grid-cols-3 gap-4">
+      <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="hover-elevate">
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2 mb-1">
@@ -89,7 +94,7 @@ export default function Support() {
             <CardDescription className="text-xs">Contactez-nous</CardDescription>
           </CardHeader>
           <CardContent className="text-xs space-y-2">
-            <p className="text-muted-foreground">Réponse en 24h</p>
+            <p className="text-muted-foreground">Reponse en 24h</p>
             {isLoading ? (
               <div className="flex items-center justify-center h-8">
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -115,7 +120,7 @@ export default function Support() {
               <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0">
                 <Phone className="w-4 h-4 text-primary" />
               </div>
-              <CardTitle className="text-sm">Téléphone</CardTitle>
+              <CardTitle className="text-sm">Telephone</CardTitle>
             </div>
             <CardDescription className="text-xs">Appelez-nous</CardDescription>
           </CardHeader>
@@ -140,18 +145,45 @@ export default function Support() {
           </CardContent>
         </Card>
 
+        {supportWhatsappPhone && (
+          <Card className="hover-elevate">
+            <CardHeader className="pb-2">
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-8 h-8 rounded-md bg-green-500/10 flex items-center justify-center flex-shrink-0">
+                  <SiWhatsapp className="w-4 h-4 text-green-600" />
+                </div>
+                <CardTitle className="text-sm">WhatsApp</CardTitle>
+              </div>
+              <CardDescription className="text-xs">Ecrivez-nous</CardDescription>
+            </CardHeader>
+            <CardContent className="text-xs space-y-2">
+              <p className="text-muted-foreground">Reponse rapide</p>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="w-full bg-green-50 border-green-200 text-green-700 dark:bg-green-950 dark:border-green-800 dark:text-green-400" 
+                data-testid="button-whatsapp-support"
+                onClick={() => window.open(whatsappChatUrl, "_blank")}
+              >
+                <SiWhatsapp className="w-3 h-3 mr-1" />
+                {supportWhatsappPhone}
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
         <Card className="hover-elevate">
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2 mb-1">
               <div className="w-8 h-8 rounded-md bg-green-500/10 flex items-center justify-center flex-shrink-0">
                 <SiWhatsapp className="w-4 h-4 text-green-600" />
               </div>
-              <CardTitle className="text-sm">Communauté</CardTitle>
+              <CardTitle className="text-sm">Communaute</CardTitle>
             </div>
             <CardDescription className="text-xs">Rejoignez notre groupe</CardDescription>
           </CardHeader>
           <CardContent className="text-xs space-y-2">
-            <p className="text-muted-foreground">Échangez avec la communauté</p>
+            <p className="text-muted-foreground">Echangez avec la communaute</p>
             {isLoading ? (
               <div className="flex items-center justify-center h-8">
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -160,7 +192,7 @@ export default function Support() {
               <Button 
                 variant="outline" 
                 size="sm" 
-                className="w-full bg-green-50 hover:bg-green-100 border-green-200 text-green-700 dark:bg-green-950 dark:hover:bg-green-900 dark:border-green-800 dark:text-green-400" 
+                className="w-full bg-green-50 border-green-200 text-green-700 dark:bg-green-950 dark:border-green-800 dark:text-green-400" 
                 data-testid="button-whatsapp-community"
                 onClick={() => window.open(whatsappLink, "_blank")}
               >

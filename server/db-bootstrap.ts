@@ -329,6 +329,16 @@ async function bootstrapDatabase() {
     }
     await btClient.end();
 
+    // Step 6x: Ensure support_whatsapp_phone column exists in support_settings
+    const supportWaClient = postgres(DATABASE_URL);
+    try {
+      await supportWaClient`ALTER TABLE support_settings ADD COLUMN IF NOT EXISTS support_whatsapp_phone TEXT NOT NULL DEFAULT ''`;
+      console.log("✅ support_settings.support_whatsapp_phone column ready");
+    } catch (e) {
+      console.error("⚠️ support_whatsapp_phone column setup error:", e);
+    }
+    await supportWaClient.end();
+
     // Step 7: Ensure primary admin exists
     console.log("👤 Ensuring primary admin exists...");
     const seedClient = postgres(DATABASE_URL);
