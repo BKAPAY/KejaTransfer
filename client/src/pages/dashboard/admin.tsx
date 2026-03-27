@@ -465,6 +465,8 @@ export default function Admin() {
 
   const baseUsers = activeTab === "active7d" ? activeUsers7d : (searchQuery.length > 0 ? searchResults : allUsers);
   const sortedUsers = [...baseUsers].sort((a, b) => {
+    if (a.isAdmin && !b.isAdmin) return -1;
+    if (!a.isAdmin && b.isAdmin) return 1;
     if (userSortBy === "date") {
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     }
