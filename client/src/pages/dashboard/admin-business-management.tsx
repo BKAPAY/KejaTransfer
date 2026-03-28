@@ -81,7 +81,6 @@ export default function AdminBusinessManagement() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("users");
-  const [showSoldes, setShowSoldes] = useState(false);
 
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [depositDialogOpen, setDepositDialogOpen] = useState(false);
@@ -336,15 +335,6 @@ export default function AdminBusinessManagement() {
                 <Users className="w-5 h-5" />
                 Utilisateurs Entreprise
               </CardTitle>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowSoldes(!showSoldes)}
-                data-testid="button-toggle-soldes"
-              >
-                <Wallet className="w-4 h-4 mr-1" />
-                {showSoldes ? "Masquer Soldes" : "Soldes"}
-              </Button>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex gap-2 flex-wrap">
@@ -435,16 +425,6 @@ export default function AdminBusinessManagement() {
                             <p className="text-xs text-muted-foreground mt-1">
                               {user.firstName} {user.lastName} - Cree le {new Date(user.createdAt).toLocaleDateString("fr-FR")}
                             </p>
-                            {showSoldes && (
-                              <div className="mt-2 p-2 bg-muted rounded-md text-xs space-y-1" data-testid={`soldes-${user.id}`}>
-                                <p className="font-medium text-muted-foreground">Soldes par pays :</p>
-                                {countryStats.filter(cs => cs.walletCount > 0).length > 0 ? (
-                                  <p className="text-muted-foreground italic">Voir onglet Pays pour les soldes globaux</p>
-                                ) : (
-                                  <p className="text-muted-foreground">Aucun portefeuille</p>
-                                )}
-                              </div>
-                            )}
                           </div>
                         </div>
 
@@ -638,56 +618,47 @@ export default function AdminBusinessManagement() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Globe className="w-5 h-5" />
-                Statistiques par pays
+                Fonds par pays
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {countryStats.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  Aucune donnee par pays disponible
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {countryStats.map((cs) => {
-                    const cd = COUNTRIES.find(c => c.code === cs.country);
-                    return (
-                      <div key={cs.country} className="border rounded-md p-4" data-testid={`country-stat-${cs.country}`}>
-                        <div className="flex items-center justify-between gap-4 flex-wrap mb-3">
-                          <div className="flex items-center gap-2">
-                            <span className="text-lg">{cd?.flag}</span>
-                            <div>
-                              <h4 className="font-semibold text-sm">{cd?.name || cs.country}</h4>
-                              <p className="text-xs text-muted-foreground">{cs.currency} - {cs.walletCount} portefeuille(s)</p>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-lg font-bold">{formatAmount(cs.balance, cs.currency)}</p>
-                            <p className="text-xs text-muted-foreground">Solde total</p>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="p-2 bg-muted rounded-md">
-                            <div className="flex items-center gap-1 mb-1">
-                              <ArrowDownCircle className="w-3 h-3 text-blue-600" />
-                              <span className="text-xs font-medium">Paiements entrants</span>
-                            </div>
-                            <p className="text-sm font-bold">{cs.incomingCount} transactions</p>
-                            <p className="text-xs text-muted-foreground">{formatAmount(cs.incomingTotal, cs.currency)}</p>
-                          </div>
-                          <div className="p-2 bg-muted rounded-md">
-                            <div className="flex items-center gap-1 mb-1">
-                              <ArrowUpCircle className="w-3 h-3 text-orange-600" />
-                              <span className="text-xs font-medium">Paiements sortants</span>
-                            </div>
-                            <p className="text-sm font-bold">{cs.outgoingCount} transactions</p>
-                            <p className="text-xs text-muted-foreground">{formatAmount(cs.outgoingTotal, cs.currency)}</p>
-                          </div>
+              <div className="space-y-3">
+                {BUSINESS_COUNTRIES.map((code) => {
+                  const cd = COUNTRIES.find(c => c.code === code);
+                  if (!cd) return null;
+                  const cs = countryStats.find(s => s.country === code);
+                  const incomingTotal = cs?.incomingTotal || 0;
+                  const outgoingTotal = cs?.outgoingTotal || 0;
+                  const currency = cs?.currency || cd.currency;
+                  return (
+                    <div key={code} className="border rounded-md p-4" data-testid={`country-stat-${code}`}>
+                      <div className="flex items-center gap-3 mb-3">
+                        <span className="text-lg">{cd.flag}</span>
+                        <div>
+                          <h4 className="font-semibold text-sm">{cd.name}</h4>
+                          <p className="text-xs text-muted-foreground">{currency}</p>
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              )}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="p-2 bg-muted rounded-md">
+                          <div className="flex items-center gap-1 mb-1">
+                            <TrendingDown className="w-3 h-3 text-blue-600" />
+                            <span className="text-xs font-medium">Fonds entrants</span>
+                          </div>
+                          <p className="text-sm font-bold">{formatAmount(incomingTotal, currency)}</p>
+                        </div>
+                        <div className="p-2 bg-muted rounded-md">
+                          <div className="flex items-center gap-1 mb-1">
+                            <TrendingUp className="w-3 h-3 text-orange-600" />
+                            <span className="text-xs font-medium">Fonds sortants</span>
+                          </div>
+                          <p className="text-sm font-bold">{formatAmount(outgoingTotal, currency)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
