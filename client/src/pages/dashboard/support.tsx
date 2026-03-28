@@ -1,65 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Mail, Phone, ChevronDown, Loader2 } from "lucide-react";
+import { Mail, Phone, Loader2 } from "lucide-react";
 import { SiWhatsapp } from "react-icons/si";
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { SupportSettings } from "@shared/schema";
-
-const faqs = [
-  {
-    question: "Comment créer un lien de paiement?",
-    answer: "Allez à la section 'Lien de paiement' dans votre tableau de bord, cliquez sur 'Nouveau lien', remplissez les informations (montant, description) et générez votre lien. Vous pouvez ensuite partager ce lien avec vos clients."
-  },
-  {
-    question: "Quels sont les opérateurs mobiles supportés?",
-    answer: "BKApay supporte les principaux opérateurs mobiles d'Afrique : Orange Money, MTN, Moov, Wave, Free Money, T-Money, Wizall et Expresso. La disponibilité dépend du pays du client."
-  },
-  {
-    question: "Combien de temps prend le traitement d'un paiement?",
-    answer: "Toutes les transactions sont traitées instantanément. Vous recevrez immédiatement la confirmation du paiement."
-  },
-  {
-    question: "Comment générer des clés API?",
-    answer: "Accédez à la section 'API' de votre tableau de bord et cliquez sur 'Générer une clé'. Vous recevrez une clé publique et une clé privée à conserver en sécurité."
-  },
-  {
-    question: "Quels sont les frais appliqués?",
-    answer: "Les frais varient selon le pays et l'opérateur. Ces frais s'appliquent à tous les paiements entrants et transferts sortants. Consultez votre administrateur pour connaître les frais applicables."
-  },
-  {
-    question: "Comment effectuer un retrait (transfert)?",
-    answer: "Allez à la section 'Transfert' de votre tableau de bord, sélectionnez votre opérateur mobile et le pays de destination, entrez le montant et le numéro de destinataire, puis validez la transaction."
-  },
-  {
-    question: "Mes fonds sont-ils sécurisés?",
-    answer: "Oui, vos fonds sont totalement sécurisés. BKApay met en place les mesures de sécurité les plus élevées pour protéger vos transactions et vos données personnelles. Nous respectons les normes internationales en matière de sécurité des paiements."
-  }
-];
-
-function FAQItem({ question, answer }: { question: string; answer: string }) {
-  const [isOpen, setIsOpen] = useState(false);
-
-  return (
-    <div className="border rounded-lg">
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-4 py-3 flex items-center justify-between hover:bg-muted/50 transition-colors"
-        data-testid={`faq-question-${question}`}
-      >
-        <span className="text-sm font-medium text-left">{question}</span>
-        <ChevronDown
-          className={`w-4 h-4 flex-shrink-0 ml-2 transition-transform ${isOpen ? "rotate-180" : ""}`}
-        />
-      </button>
-      {isOpen && (
-        <div className="px-4 py-3 border-t bg-muted/30">
-          <p className="text-sm text-muted-foreground">{answer}</p>
-        </div>
-      )}
-    </div>
-  );
-}
 
 export default function Support() {
   const { data: settings, isLoading } = useQuery<SupportSettings>({
@@ -204,19 +148,6 @@ export default function Support() {
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Foire Aux Questions</CardTitle>
-          <CardDescription>Trouvez les réponses à vos questions</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            {faqs.map((faq, index) => (
-              <FAQItem key={index} question={faq.question} answer={faq.answer} />
-            ))}
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }
