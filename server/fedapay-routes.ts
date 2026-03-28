@@ -334,7 +334,8 @@ export async function handlePaymentLinkPayment(
   country: string,
   operator: string,
   convertedAmount?: number,
-  convertedCurrency?: string
+  convertedCurrency?: string,
+  customFieldResponses?: Record<string, string>
 ): Promise<{ success: boolean; transactionId?: string; message?: string; error?: string }> {
   try {
     if (!FEDAPAY_SUPPORTED_COUNTRIES_COLLECT.includes(country.toLowerCase())) {
@@ -421,6 +422,7 @@ export async function handlePaymentLinkPayment(
         providerCurrency: providerCurrency,
         balanceAmount: feeInfo.netAmount,
         balanceCurrency: ownerCurrency,
+        ...(customFieldResponses ? { customFieldResponses } : {}),
       }),
     });
 

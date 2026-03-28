@@ -78,6 +78,7 @@ import {
   clearEmailConfigCache,
   testEmailConnection,
   EmailType,
+  sendPaymentDocumentsEmail,
 } from "./email-service";
 import nowpaymentsRoutes from "./nowpayments-routes";
 import { SUPPORTED_CRYPTOCURRENCIES } from "./nowpayments";
@@ -2128,11 +2129,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get owner's currency based on their country
       const ownerCurrency = owner?.country ? getCurrencyForCountry(owner.country) : "XOF";
 
+      const { documentUrls: _docUrls, documentNames: _docNames, ...publicLink } = link;
       res.json({
-        ...link,
+        ...publicLink,
         ownerCountry: owner?.country || null,
         ownerCurrency,
         ownerWavePayinEnabled: owner?.wavePayinEnabled || false,
+        hasDocuments: (link.documentUrls?.length || 0) > 0,
+        documentCount: link.documentUrls?.length || 0,
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
+  app.get("/api/payment-links/documents/:token/:transactionId", async (req: Request, res: Response) => {
+    try {
+      const { token, transactionId } = req.params;
+      const link = await storage.getPaymentLinkByToken(token);
+      if (!link) {
+        return res.status(404).json({ error: "Lien non trouvé" });
+      }
+      const transaction = await storage.getTransaction(transactionId);
+      if (!transaction || transaction.status !== "completed") {
+        return res.status(403).json({ error: "Paiement non confirmé" });
+      }
+      let metadata: any = {};
+      try { metadata = JSON.parse(transaction.metadata || "{}"); } catch {}
+      if (metadata.paymentLinkId !== link.id) {
+        return res.status(403).json({ error: "Transaction non liée à ce lien" });
+      }
+      res.json({
+        documentUrls: link.documentUrls || [],
+        documentNames: link.documentNames || [],
       });
     } catch (error: any) {
       res.status(500).json({ error: "Une erreur est survenue" });
@@ -2154,6 +2183,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/payment-links", requireAuth, async (req: Request, res: Response) => {
     try {
       const validatedData = insertPaymentLinkSchema.parse(req.body);
+      if (validatedData.customFields) {
+        try {
+          const fields = JSON.parse(validatedData.customFields);
+          if (!Array.isArray(fields) || fields.length > 3) {
+            return res.status(400).json({ error: "Maximum 3 champs personnalises" });
+          }
+        } catch { return res.status(400).json({ error: "Format champs personnalises invalide" }); }
+      }
+      if (validatedData.documentUrls && validatedData.documentUrls.length > 3) {
+        return res.status(400).json({ error: "Maximum 3 documents" });
+      }
+      if (validatedData.documentNames && validatedData.documentNames.length > 3) {
+        return res.status(400).json({ error: "Maximum 3 documents" });
+      }
       const link = await storage.createPaymentLink({
         ...validatedData,
         userId: req.session.userId!,
@@ -2177,8 +2220,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         allowedCountries: z.array(z.string()).optional(),
         customerPaysFee: z.boolean().optional(),
         customerPaysCryptoFee: z.boolean().optional(),
+        customFields: z.string().nullable().optional(),
+        documentUrls: z.array(z.string()).optional(),
+        documentNames: z.array(z.string()).optional(),
       });
       const validatedData = patchPaymentLinkSchema.parse(req.body);
+
+      if (validatedData.customFields) {
+        try {
+          const fields = JSON.parse(validatedData.customFields);
+          if (!Array.isArray(fields) || fields.length > 3) {
+            return res.status(400).json({ error: "Maximum 3 champs personnalises" });
+          }
+        } catch { return res.status(400).json({ error: "Format champs personnalises invalide" }); }
+      }
+      if (validatedData.documentUrls && validatedData.documentUrls.length > 3) {
+        return res.status(400).json({ error: "Maximum 3 documents" });
+      }
 
       if (validatedData.videoUrl !== undefined) {
         const userLinks = await storage.getPaymentLinks(req.session.userId!);
@@ -4338,6 +4396,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (fedapayStatus.status === "approved" || fedapayStatus.status === "transferred") {
               const result = await storage.finalizeIncomingTransaction(transaction.id, {});
               console.log(`[TransactionStatus] FedaPay CONFIRMED - finalized: ${result ? 'new' : 'already processed'}`);
+              if (result && transaction.type === "payment_link" && transaction.customerEmail && metadata.paymentLinkId) {
+                try {
+                  const pl = await storage.getPaymentLinkById(metadata.paymentLinkId);
+                  if (pl?.documentUrls?.length && pl.documentNames?.length) {
+                    sendPaymentDocumentsEmail(transaction.customerEmail, transaction.customerName || "Client", pl.productName, pl.documentNames, pl.documentUrls).catch(() => {});
+                  }
+                } catch {}
+              }
               return res.json({ 
                 status: "completed",
                 message: "Paiement confirme"
@@ -4364,6 +4430,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
               if (transaction.type === "deposit" || transaction.type === "payment_link" || transaction.type === "merchant_link" || transaction.type === "api_payment") {
                 const result = await storage.finalizeIncomingTransaction(transaction.id, {});
                 console.log(`[TransactionStatus] MbiyoPay CONFIRMED - finalized: ${result ? 'new' : 'already processed'}`);
+                if (result && transaction.type === "payment_link" && transaction.customerEmail && metadata.paymentLinkId) {
+                  try {
+                    const pl = await storage.getPaymentLinkById(metadata.paymentLinkId);
+                    if (pl?.documentUrls?.length && pl.documentNames?.length) {
+                      sendPaymentDocumentsEmail(transaction.customerEmail, transaction.customerName || "Client", pl.productName, pl.documentNames, pl.documentUrls).catch(() => {});
+                    }
+                  } catch {}
+                }
               } else {
                 await storage.updateTransactionStatus(transaction.id, "completed");
               }
@@ -5907,6 +5981,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
           
           trySendPaymentCallback(result.transaction, 'payment.completed', '[WEBHOOK/Paydunya]');
+          
+          if (transaction.type === "payment_link" && transaction.customerEmail) {
+            try {
+              const meta = JSON.parse(transaction.metadata || "{}");
+              if (meta.paymentLinkId) {
+                const pl = await storage.getPaymentLinkById(meta.paymentLinkId);
+                if (pl?.documentUrls?.length && pl.documentNames?.length) {
+                  sendPaymentDocumentsEmail(transaction.customerEmail, transaction.customerName || "Client", pl.productName, pl.documentNames, pl.documentUrls).catch(() => {});
+                }
+              }
+            } catch {}
+          }
         } else {
           console.log("[WEBHOOK] Transaction already processed (not pending):", { transactionId: transaction.id });
         }
@@ -7623,7 +7709,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Payment Link Route - Multi-Provider
   app.post("/api/fedapay/payment-link/:token", async (req: Request, res: Response) => {
     try {
-      const { customerName, customerEmail, customerPhone, country, operator, currency } = req.body;
+      const { customerName, customerEmail, customerPhone, country, operator, currency, customFieldResponses } = req.body;
       const { token } = req.params;
 
       const paymentLink = await storage.getPaymentLinkByToken(token);
@@ -7684,7 +7770,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           country,
           operator,
           amountInPayerCurrency, // converted amount for provider
-          payerCurrency // provider's currency
+          payerCurrency, // provider's currency
+          customFieldResponses || undefined
         );
 
         if (result.success) {
@@ -7809,6 +7896,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               netAmountForUser: netAmountForUser, // In OWNER's currency
               balanceAmount: netAmountForUser,
               balanceCurrency: ownerCurrency,
+              ...(customFieldResponses ? { customFieldResponses } : {}),
             }),
           });
 

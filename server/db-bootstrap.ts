@@ -396,6 +396,18 @@ async function bootstrapDatabase() {
     }
     await settlClient.end();
 
+    // Step 6b: Add custom_fields, document_urls, document_names columns to payment_links
+    const plClient = postgres(DATABASE_URL);
+    try {
+      await plClient`ALTER TABLE payment_links ADD COLUMN IF NOT EXISTS custom_fields TEXT`;
+      await plClient`ALTER TABLE payment_links ADD COLUMN IF NOT EXISTS document_urls TEXT[] DEFAULT '{}'`;
+      await plClient`ALTER TABLE payment_links ADD COLUMN IF NOT EXISTS document_names TEXT[] DEFAULT '{}'`;
+      console.log("✅ Payment links custom fields and documents columns ready");
+    } catch (e) {
+      console.error("⚠️ Payment links columns setup error:", e);
+    }
+    await plClient.end();
+
     // Step 7: Ensure primary admin exists
     console.log("👤 Ensuring primary admin exists...");
     const seedClient = postgres(DATABASE_URL);

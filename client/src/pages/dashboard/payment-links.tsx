@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Copy, ExternalLink, Trash2, Image as ImageIcon, Link as LinkIcon, Edit2, Globe, Wallet, Video } from "lucide-react";
+import { Plus, Copy, ExternalLink, Trash2, Image as ImageIcon, Link as LinkIcon, Edit2, Globe, Wallet, Video, FileText, List } from "lucide-react";
 import { VideoUploader } from "@/components/video-uploader";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -98,6 +98,9 @@ export default function PaymentLinks() {
   const [successImage, setSuccessImage] = useState<string | null>(null);
   const [amountInput, setAmountInput] = useState<string>("");
   const [selectedCurrency, setSelectedCurrency] = useState<string>("XOF");
+  const [customFields, setCustomFields] = useState<{ label: string; type: string }[]>([]);
+  const [documentFiles, setDocumentFiles] = useState<{ name: string; data: string }[]>([]);
+  const [documentUploading, setDocumentUploading] = useState(false);
   const { toast } = useToast();
 
   const { data: paymentLinks, isLoading } = useQuery<(PaymentLink & { hasImages?: boolean; hasVideo?: boolean })[]>({
@@ -166,17 +169,30 @@ export default function PaymentLinks() {
     try {
       const res = await fetch(`/api/payment-links/${link.id}`, { credentials: "include" });
       if (res.ok) {
-        const fullLink: PaymentLink = await res.json();
+        const fullLink: any = await res.json();
         const images = fullLink.imageUrls?.length ? fullLink.imageUrls : (fullLink.imageUrl ? [fullLink.imageUrl] : []);
         setExistingImages(images);
         setVideoUrl(fullLink.videoUrl || null);
+        if (fullLink.customFields) {
+          try { setCustomFields(JSON.parse(fullLink.customFields)); } catch { setCustomFields([]); }
+        } else { setCustomFields([]); }
+        if (fullLink.documentUrls?.length) {
+          setDocumentFiles(fullLink.documentUrls.map((url: string, i: number) => ({
+            name: fullLink.documentNames?.[i] || `Document ${i + 1}`,
+            data: url,
+          })));
+        } else { setDocumentFiles([]); }
       } else {
         setExistingImages([]);
         setVideoUrl(null);
+        setCustomFields([]);
+        setDocumentFiles([]);
       }
     } catch {
       setExistingImages([]);
       setVideoUrl(null);
+      setCustomFields([]);
+      setDocumentFiles([]);
     }
   };
 
@@ -226,6 +242,9 @@ export default function PaymentLinks() {
         allowedCountries: data.allowedCountries,
         customerPaysFee: data.customerPaysFee,
         customerPaysCryptoFee: data.customerPaysCryptoFee,
+        customFields: customFields.length > 0 ? JSON.stringify(customFields) : null,
+        documentUrls: documentFiles.map(d => d.data),
+        documentNames: documentFiles.map(d => d.name),
       });
       return res.json() as Promise<PaymentLink>;
     },
@@ -240,6 +259,8 @@ export default function PaymentLinks() {
       setNewImageFiles([]);
       setExistingImages([]);
       setVideoUrl(null);
+      setCustomFields([]);
+      setDocumentFiles([]);
       form.reset();
     },
     onError: (error: any) => {
@@ -264,6 +285,9 @@ export default function PaymentLinks() {
         allowedCountries: data.allowedCountries,
         customerPaysFee: data.customerPaysFee,
         customerPaysCryptoFee: data.customerPaysCryptoFee,
+        customFields: customFields.length > 0 ? JSON.stringify(customFields) : null,
+        documentUrls: documentFiles.map(d => d.data),
+        documentNames: documentFiles.map(d => d.name),
       });
       return res.json() as Promise<PaymentLink>;
     },
@@ -279,6 +303,8 @@ export default function PaymentLinks() {
       setNewImageFiles([]);
       setExistingImages([]);
       setVideoUrl(null);
+      setCustomFields([]);
+      setDocumentFiles([]);
       form.reset();
     },
     onError: (error: any) => {
@@ -396,6 +422,8 @@ export default function PaymentLinks() {
             setImagePreviews([]);
             setNewImageFiles([]);
             setVideoUrl(null);
+            setCustomFields([]);
+            setDocumentFiles([]);
           }
           setDialogOpen(open);
         }}>
@@ -570,6 +598,133 @@ export default function PaymentLinks() {
                       onVideoChange={setVideoUrl}
                       maxDuration={30}
                     />
+                  )}
+                </div>
+
+                {/* Champs personnalisés */}
+                <div className="space-y-4 border rounded-lg p-4 bg-muted/30">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <List className="w-5 h-5 text-primary" />
+                      <Label className="text-base font-medium">Champs personnalisés</Label>
+                    </div>
+                    <span className="text-xs text-muted-foreground">({customFields.length}/3)</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Ajoutez des champs que le client devra remplir avant de payer (ex: adresse email, nom complet, etc.)
+                  </p>
+                  {customFields.map((field, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      <Input
+                        placeholder="Nom du champ"
+                        value={field.label}
+                        data-testid={`input-custom-field-label-${index}`}
+                        onChange={(e) => {
+                          const updated = [...customFields];
+                          updated[index] = { ...updated[index], label: e.target.value };
+                          setCustomFields(updated);
+                        }}
+                        className="flex-1"
+                      />
+                      <select
+                        value={field.type}
+                        data-testid={`select-custom-field-type-${index}`}
+                        onChange={(e) => {
+                          const updated = [...customFields];
+                          updated[index] = { ...updated[index], type: e.target.value };
+                          setCustomFields(updated);
+                        }}
+                        className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+                      >
+                        <option value="text">Texte</option>
+                        <option value="email">Email</option>
+                        <option value="number">Nombre</option>
+                      </select>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="destructive"
+                        onClick={() => setCustomFields(customFields.filter((_, i) => i !== index))}
+                        data-testid={`btn-remove-custom-field-${index}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  {customFields.length < 3 && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCustomFields([...customFields, { label: "", type: "text" }])}
+                      data-testid="button-add-custom-field"
+                    >
+                      <Plus className="w-4 h-4 mr-1" />
+                      Ajouter un champ
+                    </Button>
+                  )}
+                </div>
+
+                {/* Documents téléchargeables */}
+                <div className="space-y-4 border rounded-lg p-4 bg-muted/30">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <FileText className="w-5 h-5 text-primary" />
+                      <Label className="text-base font-medium">Documents téléchargeables</Label>
+                    </div>
+                    <span className="text-xs text-muted-foreground">({documentFiles.length}/3)</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Ajoutez des fichiers que le client pourra télécharger après le paiement (PDF, images, etc.)
+                  </p>
+                  {documentFiles.map((doc, index) => (
+                    <div key={index} className="flex items-center gap-2 bg-background rounded-md border p-2">
+                      <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                      <span className="text-sm truncate flex-1" data-testid={`text-document-name-${index}`}>{doc.name}</span>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="destructive"
+                        onClick={() => setDocumentFiles(documentFiles.filter((_, i) => i !== index))}
+                        data-testid={`btn-remove-document-${index}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  {documentFiles.length < 3 && (
+                    <label className={`w-full h-12 border-2 border-dashed rounded-md flex items-center justify-center gap-2 cursor-pointer hover:bg-muted/50 ${documentUploading ? 'opacity-50 pointer-events-none' : ''}`}>
+                      <input
+                        type="file"
+                        accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.zip,.rar"
+                        className="hidden"
+                        data-testid="input-document-file"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          if (file.size > 5 * 1024 * 1024) {
+                            toast({ title: "Fichier trop volumineux", description: "Maximum 5 Mo par fichier", variant: "destructive" });
+                            return;
+                          }
+                          setDocumentUploading(true);
+                          const reader = new FileReader();
+                          reader.onload = () => {
+                            setDocumentFiles(prev => [...prev, { name: file.name, data: reader.result as string }]);
+                            setDocumentUploading(false);
+                          };
+                          reader.onerror = () => {
+                            toast({ title: "Erreur", description: "Erreur lors de la lecture du fichier", variant: "destructive" });
+                            setDocumentUploading(false);
+                          };
+                          reader.readAsDataURL(file);
+                          e.target.value = "";
+                        }}
+                      />
+                      <Plus className="h-5 w-5 text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">
+                        {documentUploading ? "Chargement..." : "Ajouter un document"}
+                      </span>
+                    </label>
                   )}
                 </div>
 

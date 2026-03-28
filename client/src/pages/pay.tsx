@@ -16,7 +16,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState, useCallback, useRef } from "react";
-import { CheckCircle2, Clock, Loader2, AlertCircle, XCircle, RefreshCw, ExternalLink, Copy, Check, ChevronLeft, ChevronRight, Volume2, VolumeX } from "lucide-react";
+import { CheckCircle2, Clock, Loader2, AlertCircle, XCircle, RefreshCw, ExternalLink, Copy, Check, ChevronLeft, ChevronRight, Volume2, VolumeX, Download, FileText } from "lucide-react";
 import { PaymentMethodSelector } from "@/components/payment-method-selector";
 import { CryptoPaymentFlow } from "@/components/crypto-payment-flow";
 import { CurrencySelector, getCurrencyLabel } from "@/components/currency-selector";
@@ -25,6 +25,50 @@ import { hasMultiplePawaPayCurrencies, getCurrenciesForCountry as getPawaPayCurr
 import { getCurrencyDecimals } from "@/lib/currency";
 import { OperatorSelector } from "@/components/operator-selector";
 import { CountryFlag } from "@/components/country-flag";
+
+function PaymentDocuments({ token, transactionId }: { token: string; transactionId: string }) {
+  const [docs, setDocs] = useState<{ documentUrls: string[]; documentNames: string[] } | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch(`/api/payment-links/documents/${token}/${transactionId}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) setDocs(data); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [token, transactionId]);
+
+  if (loading) {
+    return (
+      <div className="w-full flex items-center justify-center py-4">
+        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!docs || !docs.documentUrls.length) return null;
+
+  return (
+    <div className="w-full space-y-3">
+      <p className="text-sm font-medium text-foreground">Documents à télécharger</p>
+      {docs.documentUrls.map((url, i) => (
+        <a
+          key={i}
+          href={url}
+          download={docs.documentNames[i] || `Document_${i + 1}`}
+          className="flex items-center gap-3 w-full p-3 rounded-md border hover-elevate"
+          data-testid={`link-download-document-${i}`}
+        >
+          <FileText className="w-5 h-5 text-primary flex-shrink-0" />
+          <span className="text-sm flex-1 text-left truncate">
+            {docs.documentNames[i] || `Document ${i + 1}`}
+          </span>
+          <Download className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+        </a>
+      ))}
+    </div>
+  );
+}
 
 function ImageCarousel({ images, productName }: { images: string[]; productName: string }) {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -274,6 +318,7 @@ export default function Pay() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [savedCountry, setSavedCountry] = useState<string>("");
   const [savedOperator, setSavedOperator] = useState<string>("");
+  const [customFieldResponses, setCustomFieldResponses] = useState<Record<string, string>>({});
   
   // État pour le flux crypto en 2 étapes - restauré depuis localStorage si paiement en cours
   const [cryptoStep, setCryptoStep] = useState<"info" | "payment">(() => {
@@ -660,6 +705,9 @@ export default function Pay() {
         originalAmount: totalAmount,
         originalCurrency: ownerCurrency,
       };
+      if (customFieldResponses && Object.keys(customFieldResponses).length > 0) {
+        body.customFieldResponses = customFieldResponses;
+      }
       if (mbiyoOtpCode || authCode) {
         body.otpCode = mbiyoOtpCode || authCode;
       }
@@ -987,6 +1035,8 @@ export default function Pay() {
                 <span className="font-semibold text-foreground">{formatAmount(paymentLink.amount, ownerCurrency)}</span>
               </div>
             </div>
+
+            {(paymentLink as any).hasDocuments && transactionId && <PaymentDocuments token={token!} transactionId={transactionId} />}
           </CardContent>
         </Card>
       </div>
@@ -1631,6 +1681,44 @@ export default function Pay() {
           </div>
         )}
         
+        {/* Champs personnalisés */}
+        {paymentLink.customFields && (() => {
+          try {
+            const fields = JSON.parse(paymentLink.customFields);
+            if (Array.isArray(fields) && fields.length > 0) {
+              return (
+                <div className="space-y-3">
+                  <p className="text-xs text-muted-foreground font-medium">Informations supplémentaires</p>
+                  {fields.map((f: { label: string; type: string }, i: number) => (
+                    <div key={i}>
+                      <label className="text-xs sm:text-sm font-medium">{f.label}</label>
+                      <Input
+                        type={f.type === "email" ? "email" : f.type === "number" ? "number" : "text"}
+                        placeholder={f.label}
+                        data-testid={`input-custom-field-${i}`}
+                        value={customFieldResponses[f.label] || ""}
+                        onChange={(e) => setCustomFieldResponses(prev => ({ ...prev, [f.label]: e.target.value }))}
+                        className="mt-1"
+                        required
+                      />
+                    </div>
+                  ))}
+                </div>
+              );
+            }
+          } catch {}
+          return null;
+        })()}
+
+        {/* Avertissement documents */}
+        {(paymentLink as any).hasDocuments && (
+          <div className="bg-blue-50 dark:bg-blue-950 p-3 rounded-md border border-blue-200 dark:border-blue-800">
+            <p className="text-xs sm:text-sm text-blue-700 dark:text-blue-300">
+              {(paymentLink as any).documentCount} document(s) sera(ont) disponible(s) au téléchargement après le paiement
+            </p>
+          </div>
+        )}
+
         {isConversionNeeded && conversionData && (
           <div className="bg-green-50 dark:bg-green-950 p-3 rounded-md border border-green-200 dark:border-green-800">
             <p className="text-xs sm:text-sm text-green-700 dark:text-green-300 font-medium">
