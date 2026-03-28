@@ -339,6 +339,63 @@ async function bootstrapDatabase() {
     }
     await supportWaClient.end();
 
+    // Step 6h: Ensure bank account columns on users
+    const bankClient = postgres(DATABASE_URL);
+    try {
+      const bankCols = [
+        "bank_account_holder TEXT",
+        "bank_account_number TEXT",
+        "bank_name TEXT",
+        "bank_swift_bic TEXT",
+        "bank_branch_address TEXT",
+        "bank_branch_name TEXT",
+        "bank_branch_sort_code TEXT",
+        "bank_country TEXT",
+        "bank_currency TEXT",
+      ];
+      for (const col of bankCols) {
+        const name = col.split(" ")[0];
+        await bankClient`SELECT column_name FROM information_schema.columns WHERE table_name='users' AND column_name=${name}`.then(async (rows: any[]) => {
+          if (rows.length === 0) {
+            await bankClient.unsafe(`ALTER TABLE users ADD COLUMN ${col}`);
+          }
+        });
+      }
+      console.log("✅ Bank account columns ready on users");
+    } catch (e) {
+      console.error("⚠️ Bank account columns setup error:", e);
+    }
+    await bankClient.end();
+
+    // Step 6i: Ensure settlements table exists
+    const settlClient = postgres(DATABASE_URL);
+    try {
+      await settlClient`
+        CREATE TABLE IF NOT EXISTS settlements (
+          id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+          user_id VARCHAR NOT NULL REFERENCES users(id),
+          wallet_country TEXT NOT NULL,
+          wallet_currency TEXT NOT NULL,
+          amount INTEGER NOT NULL,
+          status TEXT NOT NULL DEFAULT 'pending',
+          bank_account_holder TEXT,
+          bank_account_number TEXT,
+          bank_name TEXT,
+          bank_swift_bic TEXT,
+          bank_branch_address TEXT,
+          bank_branch_name TEXT,
+          bank_branch_sort_code TEXT,
+          bank_country TEXT,
+          bank_currency TEXT,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `;
+      console.log("✅ Settlements table ready");
+    } catch (e) {
+      console.error("⚠️ Settlements table setup error:", e);
+    }
+    await settlClient.end();
+
     // Step 7: Ensure primary admin exists
     console.log("👤 Ensuring primary admin exists...");
     const seedClient = postgres(DATABASE_URL);

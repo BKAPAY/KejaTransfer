@@ -577,6 +577,210 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== Bank Account Routes =====
+  app.post("/api/business/bank-account", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const schema = z.object({
+        bankAccountHolder: z.string().min(1),
+        bankAccountNumber: z.string().min(1),
+        bankName: z.string().min(1),
+        bankSwiftBic: z.string().optional().default(""),
+        bankBranchAddress: z.string().optional().default(""),
+        bankBranchName: z.string().optional().default(""),
+        bankBranchSortCode: z.string().optional().default(""),
+        bankCountry: z.string().optional().default(""),
+        bankCurrency: z.string().optional().default(""),
+      });
+      const data = schema.parse(req.body);
+      const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+      await pool.query(`
+        UPDATE users SET
+          bank_account_holder = $1,
+          bank_account_number = $2,
+          bank_name = $3,
+          bank_swift_bic = $4,
+          bank_branch_address = $5,
+          bank_branch_name = $6,
+          bank_branch_sort_code = $7,
+          bank_country = $8,
+          bank_currency = $9
+        WHERE id = $10
+      `, [
+        data.bankAccountHolder, data.bankAccountNumber, data.bankName,
+        data.bankSwiftBic, data.bankBranchAddress, data.bankBranchName,
+        data.bankBranchSortCode, data.bankCountry, data.bankCurrency,
+        req.session.userId
+      ]);
+      await pool.end();
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Save bank account error:", error);
+      res.status(400).json({ error: error.message || "Erreur lors de la sauvegarde" });
+    }
+  });
+
+  // ===== Settlement Routes =====
+  app.get("/api/business/settlements", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+      const result = await pool.query(
+        `SELECT * FROM settlements WHERE user_id = $1 ORDER BY created_at DESC`,
+        [req.session.userId]
+      );
+      await pool.end();
+      res.json(result.rows.map((r: any) => ({
+        id: r.id,
+        userId: r.user_id,
+        walletCountry: r.wallet_country,
+        walletCurrency: r.wallet_currency,
+        amount: r.amount,
+        status: r.status,
+        bankAccountHolder: r.bank_account_holder,
+        bankAccountNumber: r.bank_account_number,
+        bankName: r.bank_name,
+        bankSwiftBic: r.bank_swift_bic,
+        bankBranchAddress: r.bank_branch_address,
+        bankBranchName: r.bank_branch_name,
+        bankBranchSortCode: r.bank_branch_sort_code,
+        bankCountry: r.bank_country,
+        bankCurrency: r.bank_currency,
+        createdAt: r.created_at,
+      })));
+    } catch (error: any) {
+      console.error("Get settlements error:", error);
+      res.status(500).json({ error: "Erreur" });
+    }
+  });
+
+  app.post("/api/business/settlements", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const schema = z.object({
+        walletCountry: z.string().min(1),
+        walletCurrency: z.string().min(1),
+        amount: z.number().min(1),
+      });
+      const data = schema.parse(req.body);
+
+      const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+
+        const userResult = await client.query(`SELECT * FROM users WHERE id = $1`, [req.session.userId]);
+        const user = userResult.rows[0];
+        if (!user) { await client.query('ROLLBACK'); client.release(); await pool.end(); return res.status(404).json({ error: "Utilisateur non trouvé" }); }
+        if (!user.bank_account_number || !user.bank_name) {
+          await client.query('ROLLBACK'); client.release(); await pool.end();
+          return res.status(400).json({ error: "Veuillez d'abord configurer votre compte bancaire" });
+        }
+
+        const walletResult = await client.query(
+          `SELECT * FROM business_wallets WHERE user_id = $1 AND country = $2 AND currency = $3 FOR UPDATE`,
+          [req.session.userId, data.walletCountry, data.walletCurrency]
+        );
+        const wallet = walletResult.rows[0];
+        if (!wallet || wallet.balance < data.amount) {
+          await client.query('ROLLBACK'); client.release(); await pool.end();
+          return res.status(400).json({ error: "Solde insuffisant" });
+        }
+
+        await client.query(
+          `UPDATE business_wallets SET balance = balance - $1 WHERE id = $2`,
+          [data.amount, wallet.id]
+        );
+
+        await client.query(
+          `INSERT INTO settlements (user_id, wallet_country, wallet_currency, amount, status,
+           bank_account_holder, bank_account_number, bank_name, bank_swift_bic,
+           bank_branch_address, bank_branch_name, bank_branch_sort_code, bank_country, bank_currency)
+           VALUES ($1, $2, $3, $4, 'pending', $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+          [
+            req.session.userId, data.walletCountry, data.walletCurrency, data.amount,
+            user.bank_account_holder, user.bank_account_number, user.bank_name,
+            user.bank_swift_bic, user.bank_branch_address, user.bank_branch_name,
+            user.bank_branch_sort_code, user.bank_country, user.bank_currency
+          ]
+        );
+
+        await client.query('COMMIT');
+        client.release();
+        await pool.end();
+        res.json({ success: true });
+      } catch (txError) {
+        await client.query('ROLLBACK');
+        client.release();
+        await pool.end();
+        throw txError;
+      }
+    } catch (error: any) {
+      console.error("Create settlement error:", error);
+      res.status(400).json({ error: error.message || "Erreur" });
+    }
+  });
+
+  // ===== Admin Settlement Routes =====
+  app.get("/api/admin/settlements", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+      const result = await pool.query(`
+        SELECT s.*, u.first_name, u.last_name, u.business_name, u.email
+        FROM settlements s
+        JOIN users u ON s.user_id = u.id
+        ORDER BY s.created_at DESC
+      `);
+      await pool.end();
+      res.json(result.rows.map((r: any) => ({
+        id: r.id,
+        userId: r.user_id,
+        walletCountry: r.wallet_country,
+        walletCurrency: r.wallet_currency,
+        amount: r.amount,
+        status: r.status,
+        bankAccountHolder: r.bank_account_holder,
+        bankAccountNumber: r.bank_account_number,
+        bankName: r.bank_name,
+        bankSwiftBic: r.bank_swift_bic,
+        bankBranchAddress: r.bank_branch_address,
+        bankBranchName: r.bank_branch_name,
+        bankBranchSortCode: r.bank_branch_sort_code,
+        bankCountry: r.bank_country,
+        bankCurrency: r.bank_currency,
+        createdAt: r.created_at,
+        userName: r.business_name || `${r.first_name} ${r.last_name}`,
+        userEmail: r.email,
+      })));
+    } catch (error: any) {
+      console.error("Admin get settlements error:", error);
+      res.status(500).json({ error: "Erreur" });
+    }
+  });
+
+  app.post("/api/admin/settlements/:id/complete", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+      const result = await pool.query(`UPDATE settlements SET status = 'completed' WHERE id = $1`, [req.params.id]);
+      await pool.end();
+      if (result.rowCount === 0) {
+        return res.status(404).json({ error: "Règlement non trouvé" });
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Complete settlement error:", error);
+      res.status(500).json({ error: "Erreur" });
+    }
+  });
+
+  app.get("/api/admin/settlements/pending-count", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+      const result = await pool.query(`SELECT COUNT(*) as count FROM settlements WHERE status = 'pending'`);
+      await pool.end();
+      res.json({ count: parseInt(result.rows[0].count) });
+    } catch (error: any) {
+      res.json({ count: 0 });
+    }
+  });
+
   // ===== Admin Business Routes =====
   app.get("/api/admin/business/users", requireAdmin, async (req: Request, res: Response) => {
     try {
@@ -797,6 +1001,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Business admin stats error:", error);
       res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
+  app.get("/api/admin/business/country-stats", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+      const walletResult = await pool.query(`
+        SELECT country, currency, SUM(balance) as total_balance, COUNT(*) as wallet_count
+        FROM business_wallets
+        GROUP BY country, currency
+        ORDER BY country
+      `);
+      const incomingResult = await pool.query(`
+        SELECT t.country, COUNT(*) as count, SUM(t.amount) as total
+        FROM transactions t
+        JOIN users u ON t.user_id = u.id
+        WHERE u.account_type = 'business'
+        AND t.status = 'completed'
+        AND t.type IN ('deposit', 'payment_link', 'merchant_link', 'api_payment')
+        GROUP BY t.country
+      `);
+      const outgoingResult = await pool.query(`
+        SELECT t.country, COUNT(*) as count, SUM(t.amount) as total
+        FROM transactions t
+        JOIN users u ON t.user_id = u.id
+        WHERE u.account_type = 'business'
+        AND t.status = 'completed'
+        AND t.type IN ('transfer', 'withdrawal', 'api_payout')
+        GROUP BY t.country
+      `);
+      await pool.end();
+
+      const entries: Record<string, any> = {};
+      for (const r of walletResult.rows) {
+        const key = `${r.country}-${r.currency}`;
+        if (!entries[key]) entries[key] = { country: r.country, currency: r.currency, balance: 0, walletCount: 0, incomingCount: 0, incomingTotal: 0, outgoingCount: 0, outgoingTotal: 0 };
+        entries[key].balance += parseInt(r.total_balance) || 0;
+        entries[key].walletCount += parseInt(r.wallet_count) || 0;
+      }
+      for (const r of incomingResult.rows) {
+        const existing = Object.values(entries).find((e: any) => e.country === r.country);
+        if (existing) {
+          existing.incomingCount = parseInt(r.count) || 0;
+          existing.incomingTotal = parseInt(r.total) || 0;
+        } else {
+          const key = `${r.country}-XOF`;
+          entries[key] = { country: r.country, currency: "XOF", balance: 0, walletCount: 0, incomingCount: parseInt(r.count) || 0, incomingTotal: parseInt(r.total) || 0, outgoingCount: 0, outgoingTotal: 0 };
+        }
+      }
+      for (const r of outgoingResult.rows) {
+        const existing = Object.values(entries).find((e: any) => e.country === r.country);
+        if (existing) {
+          existing.outgoingCount = parseInt(r.count) || 0;
+          existing.outgoingTotal = parseInt(r.total) || 0;
+        } else {
+          const key = `${r.country}-XOF`;
+          if (!entries[key]) entries[key] = { country: r.country, currency: "XOF", balance: 0, walletCount: 0, incomingCount: 0, incomingTotal: 0, outgoingCount: 0, outgoingTotal: 0 };
+          entries[key].outgoingCount = parseInt(r.count) || 0;
+          entries[key].outgoingTotal = parseInt(r.total) || 0;
+        }
+      }
+
+      res.json(Object.values(entries));
+    } catch (error: any) {
+      console.error("Country stats error:", error);
+      res.status(500).json({ error: "Erreur" });
     }
   });
 
@@ -11562,11 +11832,15 @@ SUPPORT ET CONTACT:
       const pool = new (await import("pg")).default.Pool({ connectionString: process.env.DATABASE_URL });
       const result = await pool.query(`
         SELECT DISTINCT u.* FROM users u
-        INNER JOIN transactions t ON u.id = t.user_id
-        WHERE t.created_at >= NOW() - INTERVAL '7 days'
-        AND t.status = 'completed'
-        AND t.type IN ('deposit', 'withdrawal', 'transfer')
-        AND u.is_admin = false
+        WHERE u.id IN (
+          SELECT DISTINCT t.user_id FROM transactions t
+          WHERE t.created_at >= NOW() - INTERVAL '7 days'
+          AND t.status = 'completed'
+          AND t.type IN ('deposit', 'withdrawal', 'transfer')
+        ) OR u.id IN (
+          SELECT DISTINCT ll.user_id FROM login_logs ll
+          WHERE ll.created_at >= NOW() - INTERVAL '7 days'
+        )
         ORDER BY u.first_name ASC
       `);
       await pool.end();

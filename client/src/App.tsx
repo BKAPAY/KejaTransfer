@@ -81,6 +81,7 @@ import BusinessKyc from "@/pages/dashboard/business/kyc";
 import BusinessApi from "@/pages/dashboard/business/api";
 import BusinessHistory from "@/pages/dashboard/business/history";
 import BusinessSettings from "@/pages/dashboard/business/settings";
+import BusinessSettlements from "@/pages/dashboard/business/settlements";
 import { CURRENT_VERSION } from "@/lib/doc-versions";
 import { COUNTRIES } from "@shared/schema";
 import type { User } from "@shared/schema";
@@ -212,6 +213,9 @@ function Router() {
           <Route path="/dashboard/business/history/incoming" component={BusinessHistory} />
           <Route path="/dashboard/business/history/outgoing" component={BusinessHistory} />
           <Route path="/dashboard/business/settings" component={BusinessSettings} />
+          <Route path="/dashboard/business/settlements" component={BusinessSettlements} />
+          <Route path="/dashboard/business/documentation" component={DocumentationBusiness} />
+          <Route path="/dashboard/business/support" component={Support} />
           <Route path="/dashboard/docs" component={DocumentationLanding} />
           <Route path="/dashboard/documentation-business" component={DocumentationBusiness} />
           <Route component={NotFound} />

@@ -8,7 +8,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Search, Wallet, History, Trash2, Power, ArrowUpCircle, ArrowDownCircle,
   ChevronLeft, User as UserIcon, Users, UserCheck, TrendingDown, TrendingUp,
-  AlertCircle, Unlock, Check, X, RotateCcw, Monitor, Key,
+  AlertCircle, Unlock, Check, X, RotateCcw, Monitor, Key, Globe, Banknote,
+  CheckCircle2, Clock, Building2, Eye,
 } from "lucide-react";
 import { useState } from "react";
 import { useLocation } from "wouter";
@@ -33,6 +34,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CountryFlag } from "@/components/country-flag";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const BUSINESS_COUNTRIES = ["BJ", "TG", "CI", "BF", "SN", "CM", "CD", "GA", "CG", "ZM", "UG"];
 
@@ -45,10 +47,41 @@ interface BusinessStats {
   withdrawalsByCurrency: Record<string, number>;
 }
 
+interface CountryStat {
+  country: string;
+  currency: string;
+  balance: number;
+  walletCount: number;
+  incomingCount: number;
+  incomingTotal: number;
+  outgoingCount: number;
+  outgoingTotal: number;
+}
+
+interface SettlementAdmin {
+  id: string;
+  userId: string;
+  walletCountry: string;
+  walletCurrency: string;
+  amount: number;
+  status: string;
+  bankAccountHolder: string;
+  bankAccountNumber: string;
+  bankName: string;
+  bankSwiftBic: string;
+  bankCountry: string;
+  bankCurrency: string;
+  createdAt: string;
+  userName: string;
+  userEmail: string;
+}
+
 export default function AdminBusinessManagement() {
   const [searchQuery, setSearchQuery] = useState("");
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState("users");
+  const [showSoldes, setShowSoldes] = useState(false);
 
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [depositDialogOpen, setDepositDialogOpen] = useState(false);
@@ -58,6 +91,7 @@ export default function AdminBusinessManagement() {
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; userId?: string; userName?: string }>({ open: false });
   const [suspendDialog, setSuspendDialog] = useState<{ open: boolean; userId?: string; userName?: string }>({ open: false });
   const [unsuspendDialog, setUnsuspendDialog] = useState<{ open: boolean; userId?: string; userName?: string }>({ open: false });
+  const [bankDetailDialog, setBankDetailDialog] = useState<{ open: boolean; user?: User }>({ open: false });
 
   const { data: stats, isLoading: statsLoading } = useQuery<BusinessStats>({
     queryKey: ["/api/admin/business/stats"],
@@ -69,6 +103,19 @@ export default function AdminBusinessManagement() {
     queryKey: ["/api/admin/business/users"],
   });
 
+  const { data: countryStats = [] } = useQuery<CountryStat[]>({
+    queryKey: ["/api/admin/business/country-stats"],
+  });
+
+  const { data: settlements = [] } = useQuery<SettlementAdmin[]>({
+    queryKey: ["/api/admin/settlements"],
+  });
+
+  const { data: pendingSettlementCount } = useQuery<{ count: number }>({
+    queryKey: ["/api/admin/settlements/pending-count"],
+    refetchInterval: 30000,
+  });
+
   const depositMutation = useMutation({
     mutationFn: async ({ userId, amount, country, currency }: { userId: string; amount: number; country: string; currency: string }) => {
       const res = await apiRequest("POST", `/api/admin/business/users/${userId}/wallet/deposit`, { amount, country, currency });
@@ -77,6 +124,7 @@ export default function AdminBusinessManagement() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/business/users"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/business/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/business/country-stats"] });
       setDepositDialogOpen(false);
       setAmount("");
       setSelectedCountry("");
@@ -95,6 +143,7 @@ export default function AdminBusinessManagement() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/business/users"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/business/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/business/country-stats"] });
       setWithdrawDialogOpen(false);
       setAmount("");
       setSelectedCountry("");
@@ -128,10 +177,15 @@ export default function AdminBusinessManagement() {
     },
   });
 
-  const suspendMutation = useMutation({
-    mutationFn: async (userId: string) => {
-      const res = await apiRequest("POST", `/api/admin/business/users/${userId}/wallet/withdraw`, {});
-      return res;
+  const completeSettlementMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("POST", `/api/admin/settlements/${id}/complete`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settlements"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settlements/pending-count"] });
+      toast({ title: "Succes", description: "Reglement marque comme complete" });
     },
   });
 
@@ -148,6 +202,9 @@ export default function AdminBusinessManagement() {
       maximumFractionDigits: 0,
     }).format(amount) + " " + currency;
   };
+
+  const pendingSettlements = settlements.filter(s => s.status === "pending");
+  const completedSettlements = settlements.filter(s => s.status === "completed");
 
   return (
     <div className="space-y-6">
@@ -251,271 +308,484 @@ export default function AdminBusinessManagement() {
         </Card>
       </div>
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
-          <CardTitle className="flex items-center gap-2">
-            <Users className="w-5 h-5" />
-            Utilisateurs Entreprise
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex gap-2 flex-wrap">
-            <div className="relative flex-1 min-w-[200px]">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Rechercher par nom, email..."
-                className="pl-9"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                data-testid="input-search-business-users"
-              />
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setSearchQuery("")}
-              data-testid="button-clear-search"
-            >
-              Reinitialiser
-            </Button>
-          </div>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="users" data-testid="tab-users">
+            <Users className="w-4 h-4 mr-1" />
+            Utilisateurs
+          </TabsTrigger>
+          <TabsTrigger value="countries" data-testid="tab-countries">
+            <Globe className="w-4 h-4 mr-1" />
+            Pays
+          </TabsTrigger>
+          <TabsTrigger value="settlements" data-testid="tab-settlements">
+            <Banknote className="w-4 h-4 mr-1" />
+            Reglements
+            {(pendingSettlementCount?.count || 0) > 0 && (
+              <Badge variant="destructive" className="ml-2 text-xs">
+                {pendingSettlementCount?.count}
+              </Badge>
+            )}
+          </TabsTrigger>
+        </TabsList>
 
-          <div className="space-y-3">
-            {isLoading ? (
-              <div className="space-y-2">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="flex items-center gap-4">
-                    <Skeleton className="h-10 w-10 rounded-full" />
-                    <div className="flex-1 space-y-1">
-                      <Skeleton className="h-4 w-32" />
-                      <Skeleton className="h-3 w-24" />
-                    </div>
-                  </div>
-                ))}
+        <TabsContent value="users" className="mt-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
+              <CardTitle className="flex items-center gap-2">
+                <Users className="w-5 h-5" />
+                Utilisateurs Entreprise
+              </CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowSoldes(!showSoldes)}
+                data-testid="button-toggle-soldes"
+              >
+                <Wallet className="w-4 h-4 mr-1" />
+                {showSoldes ? "Masquer Soldes" : "Soldes"}
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex gap-2 flex-wrap">
+                <div className="relative flex-1 min-w-[200px]">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Rechercher par nom, email..."
+                    className="pl-9"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    data-testid="input-search-business-users"
+                  />
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSearchQuery("")}
+                  data-testid="button-clear-search"
+                >
+                  Reinitialiser
+                </Button>
               </div>
-            ) : filteredUsers.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground" data-testid="text-no-users">
-                Aucun utilisateur entreprise trouve
-              </div>
-            ) : (
-              <div className="border rounded-lg divide-y">
-                {filteredUsers.map((user) => (
-                  <div
-                    key={user.id}
-                    className="p-4 flex flex-col gap-4"
-                    data-testid={`user-row-${user.id}`}
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap mb-1">
-                          <h4 className="font-semibold text-sm" data-testid={`text-business-name-${user.id}`}>
-                            {COUNTRIES.find(c => c.code === user.country)?.flag || ""} {user.businessName || `${user.firstName} ${user.lastName}`}
-                          </h4>
-                          <Badge
-                            variant={user.kycStatus === "verified" ? "default" : user.kycStatus === "rejected" ? "destructive" : "secondary"}
-                            className="text-xs"
-                            data-testid={`badge-kyc-${user.id}`}
-                          >
-                            {user.kycStatus === "verified" ? "Verifie" :
-                             user.kycStatus === "pending" ? "En attente" :
-                             user.kycStatus === "submitted" ? "En examen" :
-                             user.kycStatus === "rejected" ? "Rejete" : user.kycStatus}
-                          </Badge>
-                          <Badge
-                            variant={user.payoutApiEnabled ? "default" : "secondary"}
-                            className="text-xs"
-                            data-testid={`badge-payout-${user.id}`}
-                          >
-                            {user.payoutApiEnabled ? "Payout ON" : "Payout OFF"}
-                          </Badge>
-                          {user.suspended && (
-                            <Badge variant="destructive" className="text-xs" data-testid={`badge-suspended-${user.id}`}>
-                              <AlertCircle className="w-3 h-3 mr-1" />
-                              Suspendu
-                            </Badge>
-                          )}
+
+              <div className="space-y-3">
+                {isLoading ? (
+                  <div className="space-y-2">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="flex items-center gap-4">
+                        <Skeleton className="h-10 w-10 rounded-full" />
+                        <div className="flex-1 space-y-1">
+                          <Skeleton className="h-4 w-32" />
+                          <Skeleton className="h-3 w-24" />
                         </div>
-                        <p className="text-sm text-muted-foreground truncate" data-testid={`text-email-${user.id}`}>
-                          {user.email}
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {user.firstName} {user.lastName} - Cree le {new Date(user.createdAt).toLocaleDateString("fr-FR")}
-                        </p>
                       </div>
-                    </div>
+                    ))}
+                  </div>
+                ) : filteredUsers.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground" data-testid="text-no-users">
+                    Aucun utilisateur entreprise trouve
+                  </div>
+                ) : (
+                  <div className="border rounded-lg divide-y">
+                    {filteredUsers.map((user) => (
+                      <div
+                        key={user.id}
+                        className="p-4 flex flex-col gap-4"
+                        data-testid={`user-row-${user.id}`}
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap mb-1">
+                              <h4 className="font-semibold text-sm" data-testid={`text-business-name-${user.id}`}>
+                                {COUNTRIES.find(c => c.code === user.country)?.flag || ""} {user.businessName || `${user.firstName} ${user.lastName}`}
+                              </h4>
+                              <Badge
+                                variant={user.kycStatus === "verified" ? "default" : user.kycStatus === "rejected" ? "destructive" : "secondary"}
+                                className="text-xs"
+                                data-testid={`badge-kyc-${user.id}`}
+                              >
+                                {user.kycStatus === "verified" ? "Verifie" :
+                                 user.kycStatus === "pending" ? "En attente" :
+                                 user.kycStatus === "submitted" ? "En examen" :
+                                 user.kycStatus === "rejected" ? "Rejete" : user.kycStatus}
+                              </Badge>
+                              <Badge
+                                variant={user.payoutApiEnabled ? "default" : "secondary"}
+                                className="text-xs"
+                                data-testid={`badge-payout-${user.id}`}
+                              >
+                                {user.payoutApiEnabled ? "Payout ON" : "Payout OFF"}
+                              </Badge>
+                              {user.suspended && (
+                                <Badge variant="destructive" className="text-xs" data-testid={`badge-suspended-${user.id}`}>
+                                  <AlertCircle className="w-3 h-3 mr-1" />
+                                  Suspendu
+                                </Badge>
+                              )}
+                              {(user as any).bankAccountNumber && (
+                                <Badge variant="outline" className="text-xs">
+                                  <Building2 className="w-3 h-3 mr-1" />
+                                  Banque
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-sm text-muted-foreground truncate" data-testid={`text-email-${user.id}`}>
+                              {user.email}
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {user.firstName} {user.lastName} - Cree le {new Date(user.createdAt).toLocaleDateString("fr-FR")}
+                            </p>
+                            {showSoldes && (
+                              <div className="mt-2 p-2 bg-muted rounded-md text-xs space-y-1" data-testid={`soldes-${user.id}`}>
+                                <p className="font-medium text-muted-foreground">Soldes par pays :</p>
+                                {countryStats.filter(cs => cs.walletCount > 0).length > 0 ? (
+                                  <p className="text-muted-foreground italic">Voir onglet Pays pour les soldes globaux</p>
+                                ) : (
+                                  <p className="text-muted-foreground">Aucun portefeuille</p>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
 
-                    <div className="flex gap-2 flex-wrap">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setLocation(`/dashboard/admin/business/users/${user.id}/profile`)}
-                        data-testid={`button-view-profile-${user.id}`}
-                      >
-                        <UserIcon className="w-4 h-4 mr-1" />
-                        Profil
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setLocation(`/dashboard/admin/business/users/${user.id}/history`)}
-                        data-testid={`button-view-history-${user.id}`}
-                      >
-                        <History className="w-4 h-4 mr-1" />
-                        Historique
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setLocation(`/dashboard/admin/business/users/${user.id}/transactions`)}
-                        data-testid={`button-view-all-transactions-${user.id}`}
-                      >
-                        <Wallet className="w-4 h-4 mr-1" />
-                        Transactions
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setLocation(`/dashboard/admin/business/users/${user.id}/api`)}
-                        data-testid={`button-view-api-${user.id}`}
-                      >
-                        <Key className="w-4 h-4 mr-1" />
-                        API
-                      </Button>
-                    </div>
-
-                    <div className="flex gap-2 flex-wrap">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          setSelectedUser(user);
-                          setDepositDialogOpen(true);
-                        }}
-                        data-testid={`button-deposit-${user.id}`}
-                      >
-                        <ArrowUpCircle className="w-4 h-4 mr-1" />
-                        Depot
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          setSelectedUser(user);
-                          setWithdrawDialogOpen(true);
-                        }}
-                        data-testid={`button-withdraw-${user.id}`}
-                      >
-                        <ArrowDownCircle className="w-4 h-4 mr-1" />
-                        Retrait
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant={user.payoutApiEnabled ? "default" : "outline"}
-                        onClick={() => payoutToggleMutation.mutate({ userId: user.id, enabled: !user.payoutApiEnabled })}
-                        disabled={payoutToggleMutation.isPending}
-                        data-testid={`button-toggle-payout-${user.id}`}
-                      >
-                        <Power className={`w-4 h-4 mr-1 ${user.payoutApiEnabled ? "text-green-400" : "text-muted-foreground"}`} />
-                        {user.payoutApiEnabled ? "Payout ON" : "Payout OFF"}
-                      </Button>
-                      {user.kycStatus === "submitted" && (
-                        <>
+                        <div className="flex gap-2 flex-wrap">
                           <Button
                             size="sm"
-                            variant="default"
-                            onClick={async () => {
-                              try {
-                                await apiRequest("POST", "/api/admin/approve-kyc", { userId: user.id });
-                                queryClient.invalidateQueries({ queryKey: ["/api/admin/business/users"] });
-                                queryClient.invalidateQueries({ queryKey: ["/api/admin/business/stats"] });
-                                toast({ title: "Succes", description: "KYC approuvee" });
-                              } catch {
-                                toast({ title: "Erreur", description: "Impossible d'approuver la KYC", variant: "destructive" });
-                              }
-                            }}
-                            data-testid={`button-approve-kyc-${user.id}`}
+                            variant="ghost"
+                            onClick={() => setLocation(`/dashboard/admin/business/users/${user.id}/profile`)}
+                            data-testid={`button-view-profile-${user.id}`}
                           >
-                            <Check className="w-4 h-4 mr-1" />
-                            Approuver KYC
+                            <UserIcon className="w-4 h-4 mr-1" />
+                            Profil
                           </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setLocation(`/dashboard/admin/business/users/${user.id}/history`)}
+                            data-testid={`button-view-history-${user.id}`}
+                          >
+                            <History className="w-4 h-4 mr-1" />
+                            Historique
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setLocation(`/dashboard/admin/business/users/${user.id}/transactions`)}
+                            data-testid={`button-view-all-transactions-${user.id}`}
+                          >
+                            <Wallet className="w-4 h-4 mr-1" />
+                            Transactions
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setLocation(`/dashboard/admin/business/users/${user.id}/api`)}
+                            data-testid={`button-view-api-${user.id}`}
+                          >
+                            <Key className="w-4 h-4 mr-1" />
+                            API
+                          </Button>
+                          {(user as any).bankAccountNumber && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setBankDetailDialog({ open: true, user })}
+                              data-testid={`button-view-bank-${user.id}`}
+                            >
+                              <Building2 className="w-4 h-4 mr-1" />
+                              Banque
+                            </Button>
+                          )}
+                        </div>
+
+                        <div className="flex gap-2 flex-wrap">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setSelectedUser(user);
+                              setDepositDialogOpen(true);
+                            }}
+                            data-testid={`button-deposit-${user.id}`}
+                          >
+                            <ArrowUpCircle className="w-4 h-4 mr-1" />
+                            Depot
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setSelectedUser(user);
+                              setWithdrawDialogOpen(true);
+                            }}
+                            data-testid={`button-withdraw-${user.id}`}
+                          >
+                            <ArrowDownCircle className="w-4 h-4 mr-1" />
+                            Retrait
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant={user.payoutApiEnabled ? "default" : "outline"}
+                            onClick={() => payoutToggleMutation.mutate({ userId: user.id, enabled: !user.payoutApiEnabled })}
+                            disabled={payoutToggleMutation.isPending}
+                            data-testid={`button-toggle-payout-${user.id}`}
+                          >
+                            <Power className={`w-4 h-4 mr-1 ${user.payoutApiEnabled ? "text-green-400" : "text-muted-foreground"}`} />
+                            {user.payoutApiEnabled ? "Payout ON" : "Payout OFF"}
+                          </Button>
+                          {user.kycStatus === "submitted" && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="default"
+                                onClick={async () => {
+                                  try {
+                                    await apiRequest("POST", "/api/admin/approve-kyc", { userId: user.id });
+                                    queryClient.invalidateQueries({ queryKey: ["/api/admin/business/users"] });
+                                    queryClient.invalidateQueries({ queryKey: ["/api/admin/business/stats"] });
+                                    toast({ title: "Succes", description: "KYC approuvee" });
+                                  } catch {
+                                    toast({ title: "Erreur", description: "Impossible d'approuver la KYC", variant: "destructive" });
+                                  }
+                                }}
+                                data-testid={`button-approve-kyc-${user.id}`}
+                              >
+                                <Check className="w-4 h-4 mr-1" />
+                                Approuver KYC
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={async () => {
+                                  try {
+                                    await apiRequest("POST", "/api/admin/reject-kyc", { userId: user.id });
+                                    queryClient.invalidateQueries({ queryKey: ["/api/admin/business/users"] });
+                                    queryClient.invalidateQueries({ queryKey: ["/api/admin/business/stats"] });
+                                    toast({ title: "Succes", description: "KYC rejetee" });
+                                  } catch {
+                                    toast({ title: "Erreur", description: "Impossible de rejeter la KYC", variant: "destructive" });
+                                  }
+                                }}
+                                data-testid={`button-reject-kyc-${user.id}`}
+                              >
+                                <X className="w-4 h-4 mr-1" />
+                                Rejeter KYC
+                              </Button>
+                            </>
+                          )}
+                          {user.kycStatus === "verified" && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={async () => {
+                                try {
+                                  await apiRequest("POST", "/api/admin/reject-kyc", { userId: user.id });
+                                  queryClient.invalidateQueries({ queryKey: ["/api/admin/business/users"] });
+                                  queryClient.invalidateQueries({ queryKey: ["/api/admin/business/stats"] });
+                                  toast({ title: "Succes", description: "KYC retiree" });
+                                } catch {
+                                  toast({ title: "Erreur", description: "Impossible de retirer la KYC", variant: "destructive" });
+                                }
+                              }}
+                              data-testid={`button-unverify-kyc-${user.id}`}
+                            >
+                              <X className="w-4 h-4 mr-1" />
+                              Retirer KYC
+                            </Button>
+                          )}
+                          {!user.suspended ? (
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => setSuspendDialog({ open: true, userId: user.id, userName: user.businessName || `${user.firstName} ${user.lastName}` })}
+                              data-testid={`button-suspend-${user.id}`}
+                            >
+                              <AlertCircle className="w-4 h-4 mr-1" />
+                              Suspendre
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setUnsuspendDialog({ open: true, userId: user.id, userName: user.businessName || `${user.firstName} ${user.lastName}` })}
+                              data-testid={`button-unsuspend-${user.id}`}
+                            >
+                              <Unlock className="w-4 h-4 mr-1" />
+                              Reactiver
+                            </Button>
+                          )}
                           <Button
                             size="sm"
                             variant="destructive"
-                            onClick={async () => {
-                              try {
-                                await apiRequest("POST", "/api/admin/reject-kyc", { userId: user.id });
-                                queryClient.invalidateQueries({ queryKey: ["/api/admin/business/users"] });
-                                queryClient.invalidateQueries({ queryKey: ["/api/admin/business/stats"] });
-                                toast({ title: "Succes", description: "KYC rejetee" });
-                              } catch {
-                                toast({ title: "Erreur", description: "Impossible de rejeter la KYC", variant: "destructive" });
-                              }
-                            }}
-                            data-testid={`button-reject-kyc-${user.id}`}
+                            onClick={() => setDeleteDialog({ open: true, userId: user.id, userName: user.businessName || `${user.firstName} ${user.lastName}` })}
+                            data-testid={`button-delete-${user.id}`}
                           >
-                            <X className="w-4 h-4 mr-1" />
-                            Rejeter KYC
+                            <Trash2 className="w-4 h-4 mr-1" />
+                            Supprimer
                           </Button>
-                        </>
-                      )}
-                      {user.kycStatus === "verified" && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={async () => {
-                            try {
-                              await apiRequest("POST", "/api/admin/reject-kyc", { userId: user.id });
-                              queryClient.invalidateQueries({ queryKey: ["/api/admin/business/users"] });
-                              queryClient.invalidateQueries({ queryKey: ["/api/admin/business/stats"] });
-                              toast({ title: "Succes", description: "KYC retiree" });
-                            } catch {
-                              toast({ title: "Erreur", description: "Impossible de retirer la KYC", variant: "destructive" });
-                            }
-                          }}
-                          data-testid={`button-unverify-kyc-${user.id}`}
-                        >
-                          <X className="w-4 h-4 mr-1" />
-                          Retirer KYC
-                        </Button>
-                      )}
-                      {!user.suspended ? (
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={() => setSuspendDialog({ open: true, userId: user.id, userName: user.businessName || `${user.firstName} ${user.lastName}` })}
-                          data-testid={`button-suspend-${user.id}`}
-                        >
-                          <AlertCircle className="w-4 h-4 mr-1" />
-                          Suspendre
-                        </Button>
-                      ) : (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setUnsuspendDialog({ open: true, userId: user.id, userName: user.businessName || `${user.firstName} ${user.lastName}` })}
-                          data-testid={`button-unsuspend-${user.id}`}
-                        >
-                          <Unlock className="w-4 h-4 mr-1" />
-                          Reactiver
-                        </Button>
-                      )}
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={() => setDeleteDialog({ open: true, userId: user.id, userName: user.businessName || `${user.firstName} ${user.lastName}` })}
-                        data-testid={`button-delete-${user.id}`}
-                      >
-                        <Trash2 className="w-4 h-4 mr-1" />
-                        Supprimer
-                      </Button>
-                    </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                )}
               </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="countries" className="mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Globe className="w-5 h-5" />
+                Statistiques par pays
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {countryStats.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  Aucune donnee par pays disponible
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {countryStats.map((cs) => {
+                    const cd = COUNTRIES.find(c => c.code === cs.country);
+                    return (
+                      <div key={cs.country} className="border rounded-md p-4" data-testid={`country-stat-${cs.country}`}>
+                        <div className="flex items-center justify-between gap-4 flex-wrap mb-3">
+                          <div className="flex items-center gap-2">
+                            <span className="text-lg">{cd?.flag}</span>
+                            <div>
+                              <h4 className="font-semibold text-sm">{cd?.name || cs.country}</h4>
+                              <p className="text-xs text-muted-foreground">{cs.currency} - {cs.walletCount} portefeuille(s)</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-lg font-bold">{formatAmount(cs.balance, cs.currency)}</p>
+                            <p className="text-xs text-muted-foreground">Solde total</p>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="p-2 bg-muted rounded-md">
+                            <div className="flex items-center gap-1 mb-1">
+                              <ArrowDownCircle className="w-3 h-3 text-blue-600" />
+                              <span className="text-xs font-medium">Paiements entrants</span>
+                            </div>
+                            <p className="text-sm font-bold">{cs.incomingCount} transactions</p>
+                            <p className="text-xs text-muted-foreground">{formatAmount(cs.incomingTotal, cs.currency)}</p>
+                          </div>
+                          <div className="p-2 bg-muted rounded-md">
+                            <div className="flex items-center gap-1 mb-1">
+                              <ArrowUpCircle className="w-3 h-3 text-orange-600" />
+                              <span className="text-xs font-medium">Paiements sortants</span>
+                            </div>
+                            <p className="text-sm font-bold">{cs.outgoingCount} transactions</p>
+                            <p className="text-xs text-muted-foreground">{formatAmount(cs.outgoingTotal, cs.currency)}</p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="settlements" className="mt-4 space-y-4">
+          {pendingSettlements.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Clock className="w-5 h-5 text-orange-500" />
+                  Reglements en attente
+                  <Badge variant="destructive" className="ml-2">{pendingSettlements.length}</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {pendingSettlements.map((s) => {
+                    const cd = COUNTRIES.find(c => c.code === s.walletCountry);
+                    return (
+                      <div key={s.id} className="border rounded-md p-4" data-testid={`settlement-pending-${s.id}`}>
+                        <div className="flex items-start justify-between gap-4 flex-wrap">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap mb-1">
+                              <span className="font-semibold text-sm">{s.userName}</span>
+                              <Badge variant="secondary"><Clock className="w-3 h-3 mr-1" />En attente</Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground">{s.userEmail}</p>
+                            <div className="mt-2 space-y-1">
+                              <p className="text-sm font-bold">{formatAmount(s.amount, s.walletCurrency)}</p>
+                              <p className="text-xs text-muted-foreground">{cd?.flag} {cd?.name} - {new Date(s.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
+                            </div>
+                            <div className="mt-2 p-2 bg-muted rounded-md text-xs space-y-1">
+                              <p className="font-medium">Compte bancaire :</p>
+                              <p>{s.bankAccountHolder}</p>
+                              <p>{s.bankName} - {s.bankAccountNumber}</p>
+                              {s.bankSwiftBic && <p>SWIFT: {s.bankSwiftBic}</p>}
+                            </div>
+                          </div>
+                          <Button
+                            size="sm"
+                            onClick={() => completeSettlementMutation.mutate(s.id)}
+                            disabled={completeSettlementMutation.isPending}
+                            data-testid={`button-complete-settlement-${s.id}`}
+                          >
+                            <CheckCircle2 className="w-4 h-4 mr-1" />
+                            Marquer complete
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <CheckCircle2 className="w-5 h-5 text-green-600" />
+                Historique des reglements
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {completedSettlements.length === 0 && pendingSettlements.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  Aucun reglement pour le moment
+                </div>
+              ) : completedSettlements.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  Aucun reglement complete
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {completedSettlements.map((s) => {
+                    const cd = COUNTRIES.find(c => c.code === s.walletCountry);
+                    return (
+                      <div key={s.id} className="flex items-center justify-between gap-4 p-3 border rounded-md" data-testid={`settlement-completed-${s.id}`}>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-semibold text-sm">{s.userName}</span>
+                            <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs">
+                              <CheckCircle2 className="w-3 h-3 mr-1" />Complete
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {formatAmount(s.amount, s.walletCurrency)} - {cd?.flag} {cd?.name} - {new Date(s.createdAt).toLocaleDateString("fr-FR")}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       <Dialog open={depositDialogOpen} onOpenChange={(open) => {
         setDepositDialogOpen(open);
@@ -629,6 +899,59 @@ export default function AdminBusinessManagement() {
               Confirmer le retrait
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={bankDetailDialog.open} onOpenChange={(open) => setBankDetailDialog({ ...bankDetailDialog, open })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              <Building2 className="w-5 h-5 inline mr-2" />
+              Compte bancaire - {bankDetailDialog.user?.businessName || `${bankDetailDialog.user?.firstName} ${bankDetailDialog.user?.lastName}`}
+            </DialogTitle>
+          </DialogHeader>
+          {bankDetailDialog.user && (
+            <div className="space-y-3 py-2">
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <p className="text-xs text-muted-foreground">Titulaire</p>
+                  <p className="font-medium">{(bankDetailDialog.user as any).bankAccountHolder || "-"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Numero de compte</p>
+                  <p className="font-medium">{(bankDetailDialog.user as any).bankAccountNumber || "-"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Banque</p>
+                  <p className="font-medium">{(bankDetailDialog.user as any).bankName || "-"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">SWIFT/BIC</p>
+                  <p className="font-medium">{(bankDetailDialog.user as any).bankSwiftBic || "-"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Agence</p>
+                  <p className="font-medium">{(bankDetailDialog.user as any).bankBranchName || "-"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Code guichet</p>
+                  <p className="font-medium">{(bankDetailDialog.user as any).bankBranchSortCode || "-"}</p>
+                </div>
+                <div className="col-span-2">
+                  <p className="text-xs text-muted-foreground">Adresse agence</p>
+                  <p className="font-medium">{(bankDetailDialog.user as any).bankBranchAddress || "-"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Pays banque</p>
+                  <p className="font-medium">{COUNTRIES.find(c => c.code === (bankDetailDialog.user as any).bankCountry)?.name || (bankDetailDialog.user as any).bankCountry || "-"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Devise</p>
+                  <p className="font-medium">{(bankDetailDialog.user as any).bankCurrency || "-"}</p>
+                </div>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 

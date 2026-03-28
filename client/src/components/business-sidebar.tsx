@@ -25,6 +25,9 @@ import {
   ArrowDownCircle,
   ArrowUpCircle,
   Shield,
+  FileText,
+  Headphones,
+  Banknote,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import type { User as UserType } from "@shared/schema";
@@ -184,6 +187,45 @@ export function BusinessSidebar() {
                     </SidebarMenuItem>
                   </SidebarMenu>
                 )}
+              </SidebarMenuItem>
+
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={isActive("/dashboard/business/settlements")}
+                  data-testid="nav-business-settlements"
+                >
+                  <Link href="/dashboard/business/settlements" onClick={handleMenuClick}>
+                    <Banknote className="w-4 h-4" />
+                    <span>Règlement</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={isActive("/dashboard/business/documentation")}
+                  data-testid="nav-business-documentation"
+                >
+                  <Link href="/dashboard/business/documentation" onClick={handleMenuClick}>
+                    <FileText className="w-4 h-4" />
+                    <span>Documentation</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={isActive("/dashboard/business/support")}
+                  data-testid="nav-business-support"
+                >
+                  <Link href="/dashboard/business/support" onClick={handleMenuClick}>
+                    <Headphones className="w-4 h-4" />
+                    <span>Support</span>
+                  </Link>
+                </SidebarMenuButton>
               </SidebarMenuItem>
 
               <SidebarMenuItem>

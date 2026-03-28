@@ -72,6 +72,15 @@ export const users = pgTable("users", {
   payoutApiEnabled: boolean("payout_api_enabled").notNull().default(false),
   wavePayinEnabled: boolean("wave_payin_enabled").notNull().default(false),
   depositOverrideEnabled: boolean("deposit_override_enabled").notNull().default(false),
+  bankAccountHolder: text("bank_account_holder"),
+  bankAccountNumber: text("bank_account_number"),
+  bankName: text("bank_name"),
+  bankSwiftBic: text("bank_swift_bic"),
+  bankBranchAddress: text("bank_branch_address"),
+  bankBranchName: text("bank_branch_name"),
+  bankBranchSortCode: text("bank_branch_sort_code"),
+  bankCountry: text("bank_country"),
+  bankCurrency: text("bank_currency"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -288,6 +297,32 @@ export const insertBusinessTokenSchema = createInsertSchema(businessTokens).omit
   createdAt: true,
 });
 export type InsertBusinessToken = z.infer<typeof insertBusinessTokenSchema>;
+
+export const settlements = pgTable("settlements", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  walletCountry: text("wallet_country").notNull(),
+  walletCurrency: text("wallet_currency").notNull(),
+  amount: integer("amount").notNull(),
+  status: text("status").notNull().default("pending"),
+  bankAccountHolder: text("bank_account_holder"),
+  bankAccountNumber: text("bank_account_number"),
+  bankName: text("bank_name"),
+  bankSwiftBic: text("bank_swift_bic"),
+  bankBranchAddress: text("bank_branch_address"),
+  bankBranchName: text("bank_branch_name"),
+  bankBranchSortCode: text("bank_branch_sort_code"),
+  bankCountry: text("bank_country"),
+  bankCurrency: text("bank_currency"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type Settlement = typeof settlements.$inferSelect;
+export const insertSettlementSchema = createInsertSchema(settlements).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertSettlement = z.infer<typeof insertSettlementSchema>;
 
 export type FeeConfig = typeof feeConfigs.$inferSelect;
 export const insertFeeConfigSchema = createInsertSchema(feeConfigs).omit({
