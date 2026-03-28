@@ -11956,17 +11956,19 @@ Ton role est de reformuler et ameliorer les messages que l'administrateur souhai
       }
 
       const { sendAdminBroadcastEmail } = await import("./email-service");
-      const allUsers = await storage.getAllUsers();
+      const personalUsers = await storage.getAllUsers();
+      const businessUsers = await storage.getBusinessUsers();
+      const combinedUsers = [...personalUsers, ...businessUsers];
 
-      let targetUsers: typeof allUsers = [];
+      let targetUsers: typeof combinedUsers = [];
 
       if (audienceType === "selected" && userIds && Array.isArray(userIds)) {
-        targetUsers = allUsers.filter(u => userIds.includes(u.id));
+        targetUsers = combinedUsers.filter(u => userIds.includes(u.id));
       } else {
-        targetUsers = allUsers.filter(u => !u.isAdmin);
+        targetUsers = combinedUsers.filter(u => !u.isAdmin);
 
         if (accountType === "personal") {
-          targetUsers = targetUsers.filter(u => u.accountType === "personal");
+          targetUsers = targetUsers.filter(u => !u.accountType || u.accountType === "personal");
         } else if (accountType === "merchant") {
           targetUsers = targetUsers.filter(u => u.accountType === "business");
         }
