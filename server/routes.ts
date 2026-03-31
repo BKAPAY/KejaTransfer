@@ -4532,6 +4532,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     if (updatedTx) {
                       trySendPaymentCallback(updatedTx, 'payment.completed', '[TransactionStatus/AfribaPay]');
                     }
+                    if (transaction.type === "payment_link" && transaction.customerEmail && metadata.paymentLinkId) {
+                      try {
+                        const pl = await storage.getPaymentLinkById(metadata.paymentLinkId);
+                        if (pl?.documentUrls?.length && pl.documentNames?.length) {
+                          sendPaymentDocumentsEmail(transaction.customerEmail, transaction.customerName || "Client", pl.productName, pl.documentNames, pl.documentUrls).catch(() => {});
+                        }
+                      } catch {}
+                    }
                   }
                 } else {
                   await storage.updateTransactionStatus(transaction.id, "completed");
@@ -4578,6 +4586,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   paydunyaReceiptUrl: data.invoice?.receipt_url || `https://paydunya.com/receipt/${transaction.paydunyaToken}`,
                 });
                 console.log(`[TransactionStatus] Paydunya CONFIRMED - finalized: ${result ? 'new' : 'already processed'}`);
+                if (result && transaction.type === "payment_link" && transaction.customerEmail && metadata.paymentLinkId) {
+                  try {
+                    const pl = await storage.getPaymentLinkById(metadata.paymentLinkId);
+                    if (pl?.documentUrls?.length && pl.documentNames?.length) {
+                      sendPaymentDocumentsEmail(transaction.customerEmail, transaction.customerName || "Client", pl.productName, pl.documentNames, pl.documentUrls).catch(() => {});
+                    }
+                  } catch {}
+                }
                 return res.json({ 
                   status: "completed",
                   message: "Paiement confirme"
@@ -5762,6 +5778,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
               if (transaction.status === "pending") {
                 const result = await storage.finalizeIncomingTransaction(transaction.id, {});
                 console.log("[VERIFY] FedaPay transaction finalized:", result ? "success" : "already processed");
+                if (result && transaction.type === "payment_link" && transaction.customerEmail) {
+                  try {
+                    const txMeta = JSON.parse(transaction.metadata as string || "{}");
+                    if (txMeta.paymentLinkId) {
+                      const pl = await storage.getPaymentLinkById(txMeta.paymentLinkId);
+                      if (pl?.documentUrls?.length && pl.documentNames?.length) {
+                        sendPaymentDocumentsEmail(transaction.customerEmail, transaction.customerName || "Client", pl.productName, pl.documentNames, pl.documentUrls).catch(() => {});
+                      }
+                    }
+                  } catch {}
+                }
               }
               return res.json({ status: "completed", response_code: "00" });
             } else if (fedapayStatus.status === "declined" || fedapayStatus.status === "canceled" || fedapayStatus.status === "refunded") {
@@ -5840,6 +5867,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
               transactionId: transaction.id,
               credited: result.credited,
             });
+            if (transaction.type === "payment_link" && transaction.customerEmail) {
+              try {
+                const txMeta = JSON.parse(transaction.metadata as string || "{}");
+                if (txMeta.paymentLinkId) {
+                  const pl = await storage.getPaymentLinkById(txMeta.paymentLinkId);
+                  if (pl?.documentUrls?.length && pl.documentNames?.length) {
+                    sendPaymentDocumentsEmail(transaction.customerEmail, transaction.customerName || "Client", pl.productName, pl.documentNames, pl.documentUrls).catch(() => {});
+                  }
+                }
+              } catch {}
+            }
           } else {
             console.log("[SOFTPAY VERIFY] Transaction already processed:", transaction.id);
           }

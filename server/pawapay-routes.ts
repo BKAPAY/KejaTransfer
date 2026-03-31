@@ -4,6 +4,7 @@ import { randomUUID } from "crypto";
 import { calculateIncomingFee, calculateOutgoingFee, calculateOutgoingFeeFromNet, getFeeFromDatabase } from "./utils/fees";
 import { trySendPaymentCallback } from "./utils/callback";
 import { safeRefundOutgoingTransaction, sendApiPayoutCallback } from "./payment-polling";
+import { sendPaymentDocumentsEmail } from "./email-service";
 import {
   createPawaPayDeposit,
   createPawaPayPayout,
@@ -488,6 +489,17 @@ export async function handlePawaPayWebhook(req: Request, res: Response): Promise
           if (result && result.credited) {
             console.log(`[PawaPay Webhook] Deposit ${tx.id} finalized and credited to user ${tx.userId}`);
             await trySendPaymentCallback(tx, "payment.completed", "[PawaPay Webhook]");
+            if (tx.type === "payment_link" && tx.customerEmail) {
+              try {
+                const txMeta = JSON.parse(tx.metadata as string || "{}");
+                if (txMeta.paymentLinkId) {
+                  const pl = await storage.getPaymentLinkById(txMeta.paymentLinkId);
+                  if (pl?.documentUrls?.length && pl.documentNames?.length) {
+                    sendPaymentDocumentsEmail(tx.customerEmail, tx.customerName || "Client", pl.productName, pl.documentNames, pl.documentUrls).catch(() => {});
+                  }
+                }
+              } catch {}
+            }
           } else if (!result) {
             console.log(`[PawaPay Webhook] Deposit ${tx.id} was already finalized by another process (race condition prevented)`);
           }
@@ -605,6 +617,17 @@ export async function pollPawaPayTransaction(txId: string): Promise<void> {
         if (result && result.credited) {
           console.log(`[PawaPay Poll] Deposit ${txId} finalized and credited to user ${tx.userId}`);
           await trySendPaymentCallback(tx, "payment.completed", "[PawaPay Poll]");
+          if (tx.type === "payment_link" && tx.customerEmail) {
+            try {
+              const txMeta = JSON.parse(tx.metadata as string || "{}");
+              if (txMeta.paymentLinkId) {
+                const pl = await storage.getPaymentLinkById(txMeta.paymentLinkId);
+                if (pl?.documentUrls?.length && pl.documentNames?.length) {
+                  sendPaymentDocumentsEmail(tx.customerEmail, tx.customerName || "Client", pl.productName, pl.documentNames, pl.documentUrls).catch(() => {});
+                }
+              }
+            } catch {}
+          }
         } else if (!result) {
           console.log(`[PawaPay Poll] Deposit ${txId} already finalized by another process (race condition prevented)`);
         }

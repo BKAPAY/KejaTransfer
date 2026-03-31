@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import { storage } from "./storage";
 import { randomUUID } from "crypto";
 import { calculateIncomingFee, calculateOutgoingFee, getFeeFromDatabase } from "./utils/fees";
+import { sendPaymentDocumentsEmail } from "./email-service";
 import {
   createAfribaPayPayin,
   createAfribaPayPayout,
@@ -752,6 +753,17 @@ router.post("/webhook", async (req: Request, res: Response) => {
             const { trySendPaymentCallback } = await import("./utils/callback");
             trySendPaymentCallback(updatedTx, 'payment.completed', '[AfribaPay Webhook]');
           }
+          if (tx.type === "payment_link" && tx.customerEmail) {
+            try {
+              const txMeta = JSON.parse(tx.metadata as string || "{}");
+              if (txMeta.paymentLinkId) {
+                const pl = await storage.getPaymentLinkById(txMeta.paymentLinkId);
+                if (pl?.documentUrls?.length && pl.documentNames?.length) {
+                  sendPaymentDocumentsEmail(tx.customerEmail, tx.customerName || "Client", pl.productName, pl.documentNames, pl.documentUrls).catch(() => {});
+                }
+              }
+            } catch {}
+          }
         } else {
           console.log(`[AfribaPay Webhook] Incoming ${tx.id} déjà traité - ignoré`);
         }
@@ -797,6 +809,17 @@ router.get("/verify/:transactionId", async (req: Request, res: Response) => {
     
     if (verification.verified && tx.status === "pending") {
       const result = await storage.finalizeIncomingTransaction(tx.id);
+      if (result?.credited && tx.type === "payment_link" && tx.customerEmail) {
+        try {
+          const txMeta = JSON.parse(tx.metadata as string || "{}");
+          if (txMeta.paymentLinkId) {
+            const pl = await storage.getPaymentLinkById(txMeta.paymentLinkId);
+            if (pl?.documentUrls?.length && pl.documentNames?.length) {
+              sendPaymentDocumentsEmail(tx.customerEmail, tx.customerName || "Client", pl.productName, pl.documentNames, pl.documentUrls).catch(() => {});
+            }
+          }
+        } catch {}
+      }
       return res.json({
         success: true,
         status: "completed",

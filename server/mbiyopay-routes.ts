@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { calculateIncomingFee, calculateOutgoingFee, calculateOutgoingFeeFromNet, getFeeFromDatabase } from "./utils/fees";
 import { safeRefundOutgoingTransaction, sendApiPayoutCallback } from "./payment-polling";
 import { trySendPaymentCallback } from "./utils/callback";
+import { sendPaymentDocumentsEmail } from "./email-service";
 import { 
   createMbiyoPayPayin, 
   createMbiyoPayPayout, 
@@ -1009,6 +1010,17 @@ export async function handleMbiyoPayWebhook(req: Request, res: Response) {
           const updatedTx = await storage.getTransaction(tx.id);
           if (updatedTx) {
             trySendPaymentCallback(updatedTx, 'payment.completed', '[MbiyoPay Webhook]');
+          }
+          if (tx.type === "payment_link" && tx.customerEmail) {
+            try {
+              const txMeta = JSON.parse(tx.metadata as string || "{}");
+              if (txMeta.paymentLinkId) {
+                const pl = await storage.getPaymentLinkById(txMeta.paymentLinkId);
+                if (pl?.documentUrls?.length && pl.documentNames?.length) {
+                  sendPaymentDocumentsEmail(tx.customerEmail, tx.customerName || "Client", pl.productName, pl.documentNames, pl.documentUrls).catch(() => {});
+                }
+              }
+            } catch {}
           }
         } else {
           console.log(`[MbiyoPay Webhook] Transaction ${tx.id} already processed by polling - skipping`);
