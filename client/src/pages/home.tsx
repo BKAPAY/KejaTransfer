@@ -151,6 +151,8 @@ function AdSlideshow() {
               key={index}
               src={slide.src}
               alt={slide.alt}
+              loading="lazy"
+              decoding="async"
               className={`w-full rounded-md transition-opacity duration-1000 ${index === current ? "opacity-100" : "opacity-0 absolute inset-0"}`}
               data-testid={`img-ad-slide-${index}`}
             />
@@ -254,6 +256,8 @@ export default function Home() {
               <img
                 src={mobileMoneyHeroImage}
                 alt="Paiements Mobile Money"
+                loading="lazy"
+                decoding="async"
                 className="w-full rounded-md"
                 data-testid="img-mobile-money-hero"
               />
@@ -312,6 +316,8 @@ export default function Home() {
               <img
                 src={cryptoHeroImage}
                 alt="Paiements en cryptomonnaie"
+                loading="lazy"
+                decoding="async"
                 className="w-full rounded-md"
               />
             </div>
@@ -327,6 +333,8 @@ export default function Home() {
               <img
                 src={cardHeroImage}
                 alt="Paiements par carte bancaire"
+                loading="lazy"
+                decoding="async"
                 className="w-full rounded-md"
               />
             </div>
@@ -372,6 +380,8 @@ export default function Home() {
                 <img 
                   src={feature.image} 
                   alt={feature.title}
+                  loading="lazy"
+                  decoding="async"
                   className="w-full h-40 sm:h-48 object-cover"
                 />
                 <div className="p-3 sm:p-4 lg:p-6 flex flex-col flex-1">
@@ -403,6 +413,8 @@ export default function Home() {
                 <img 
                   src={operator.image} 
                   alt={operator.name} 
+                  loading="lazy"
+                  decoding="async"
                   className="w-12 h-12 sm:w-16 sm:h-16 object-contain"
                 />
               </div>
