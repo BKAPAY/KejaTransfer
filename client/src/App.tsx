@@ -185,9 +185,9 @@ function DashboardLayout({ children, type = "personal" }: { children: React.Reac
               )}
             </div>
             {type === "personal" && (
-              <div className="flex items-center gap-2 bg-sidebar/80 px-4 py-2 rounded-md">
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 rounded-lg" data-testid="header-balance">
                 <Wallet className="h-4 w-4 text-primary" />
-                <span className="text-sm font-medium" data-testid="text-balance">
+                <span className="text-sm font-semibold text-primary" data-testid="text-balance">
                   {formatAmount(stats?.totalBalance ?? user?.balance ?? 0)}
                 </span>
               </div>
