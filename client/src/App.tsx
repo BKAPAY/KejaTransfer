@@ -14,11 +14,11 @@ import { CURRENT_VERSION } from "@/lib/doc-versions";
 import { COUNTRIES } from "@shared/schema";
 import type { User } from "@shared/schema";
 
-const MaintenancePage = lazy(() => import("@/pages/maintenance"));
-const NotFound = lazy(() => import("@/pages/not-found"));
-const Home = lazy(() => import("@/pages/home"));
-const Signup = lazy(() => import("@/pages/signup"));
-const Login = lazy(() => import("@/pages/login"));
+import Home from "@/pages/home";
+import Login from "@/pages/login";
+import Signup from "@/pages/signup";
+import NotFound from "@/pages/not-found";
+import MaintenancePage from "@/pages/maintenance";
 const Dashboard = lazy(() => import("@/pages/dashboard/index"));
 const Profile = lazy(() => import("@/pages/dashboard/profile"));
 const PaymentLinks = lazy(() => import("@/pages/dashboard/payment-links"));
@@ -374,7 +374,7 @@ function MaintenanceGuard({ children }: { children: React.ReactNode }) {
 
   if (maintenanceEnabled && !(user?.isAdmin === true)) {
     if (location !== "/") {
-      return <Suspense fallback={<PageLoader />}><MaintenancePage /></Suspense>;
+      return <MaintenancePage />;
     }
   }
 
