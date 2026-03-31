@@ -241,12 +241,12 @@ export default function ApiPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Link href="/dashboard/docs">
+          <a href="https://bkapay.com/docs" target="_blank" rel="noopener noreferrer">
             <Button variant="outline" data-testid="button-view-documentation">
               <ExternalLink className="w-4 h-4 mr-2" />
               Documentation
             </Button>
-          </Link>
+          </a>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
               <Button 

@@ -205,13 +205,12 @@ export function BusinessSidebar() {
               <SidebarMenuItem>
                 <SidebarMenuButton
                   asChild
-                  isActive={isActive("/dashboard/business/documentation")}
                   data-testid="nav-business-documentation"
                 >
-                  <Link href="/dashboard/business/documentation" onClick={handleMenuClick}>
+                  <a href="https://bkapay.com/docs" target="_blank" rel="noopener noreferrer" onClick={handleMenuClick}>
                     <FileText className="w-4 h-4" />
                     <span>Documentation</span>
-                  </Link>
+                  </a>
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
