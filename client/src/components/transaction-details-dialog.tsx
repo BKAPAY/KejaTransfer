@@ -415,6 +415,30 @@ export function TransactionDetailsDialog({
             </div>
           )}
 
+          {metadata?.customFieldResponses && Object.keys(metadata.customFieldResponses).length > 0 && (
+            <div className="space-y-4 border-t pt-4">
+              <h3 className="font-semibold text-lg">Champs personnalisés</h3>
+              <div className="grid grid-cols-1 gap-3">
+                {Object.entries(metadata.customFieldResponses).map(([label, value]) => (
+                  <div key={label} className="space-y-1">
+                    <p className="text-xs text-muted-foreground">{label}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium">{String(value)}</p>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => copyToClipboard(String(value), label)}
+                        data-testid={`button-copy-custom-${label}`}
+                      >
+                        <Copy className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {!isAdmin && metadata?.apiKeyId && (transaction.status === "completed" || transaction.status === "failed") && (
             <div className="space-y-3 border-t pt-4">
               <h3 className="font-semibold text-base flex items-center gap-2">

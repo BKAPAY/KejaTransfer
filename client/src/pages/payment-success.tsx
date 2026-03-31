@@ -1,11 +1,9 @@
 import { useEffect, useState } from "react";
-import { useLocation } from "wouter";
 import { CheckCircle, Clock, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
 export default function PaymentSuccess() {
-  const [location] = useLocation();
   const [status, setStatus] = useState<"success" | "pending" | "checking">("checking");
   const [redirecting, setRedirecting] = useState(false);
 
@@ -53,7 +51,7 @@ export default function PaymentSuccess() {
             <>
               <Loader2 className="w-14 h-14 text-primary animate-spin" />
               <div>
-                <h1 className="text-xl font-semibold">Paiement confirme</h1>
+                <h1 className="text-xl font-semibold" data-testid="text-payment-confirmed">Paiement confirme</h1>
                 <p className="text-sm text-muted-foreground mt-1">Redirection vers le site marchand...</p>
               </div>
             </>
@@ -61,7 +59,7 @@ export default function PaymentSuccess() {
             <>
               <Loader2 className="w-14 h-14 text-primary animate-spin" />
               <div>
-                <h1 className="text-xl font-semibold">Verification du paiement</h1>
+                <h1 className="text-xl font-semibold" data-testid="text-checking-payment">Verification du paiement</h1>
                 <p className="text-sm text-muted-foreground mt-1">Veuillez patienter quelques instants...</p>
               </div>
             </>
@@ -69,13 +67,16 @@ export default function PaymentSuccess() {
             <>
               <CheckCircle className="w-14 h-14 text-green-500" />
               <div>
-                <h1 className="text-xl font-semibold">Paiement reussi !</h1>
+                <h1 className="text-xl font-semibold" data-testid="text-payment-success">Paiement reussi !</h1>
                 <p className="text-sm text-muted-foreground mt-1">
                   Votre paiement a ete effectue avec succes.
                   Le marchand a ete notifie automatiquement.
                 </p>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Si des documents sont associes a ce paiement, ils vous ont ete envoyes par email.
+                </p>
               </div>
-              <Button variant="outline" onClick={() => window.history.back()}>
+              <Button variant="outline" onClick={() => window.history.back()} data-testid="button-back">
                 Retour
               </Button>
             </>
@@ -83,13 +84,13 @@ export default function PaymentSuccess() {
             <>
               <Clock className="w-14 h-14 text-orange-400" />
               <div>
-                <h1 className="text-xl font-semibold">Paiement en cours</h1>
+                <h1 className="text-xl font-semibold" data-testid="text-payment-pending">Paiement en cours</h1>
                 <p className="text-sm text-muted-foreground mt-1">
                   Votre paiement est en cours de traitement.
                   Vous recevrez une confirmation sous peu.
                 </p>
               </div>
-              <Button variant="outline" onClick={() => window.history.back()}>
+              <Button variant="outline" onClick={() => window.history.back()} data-testid="button-back">
                 Retour
               </Button>
             </>

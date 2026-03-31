@@ -6,7 +6,30 @@ import { getMbiyoPayTransactionStatus, searchMbiyoPayTransactionByOrderId } from
 import { getPawaPayDepositStatus, getPawaPayPayoutStatus, mapPawaPayStatus } from "./pawapay";
 import { getAfribaPayTransaction, mapAfribaPayStatus } from "./afribapay";
 import { trySendPaymentCallback } from "./utils/callback";
+import { sendPaymentDocumentsEmail } from "./email-service";
 import crypto from "crypto";
+
+async function trySendPaymentLinkDocuments(transaction: Transaction) {
+  try {
+    if (transaction.type !== "payment_link" || !transaction.customerEmail) return;
+    let metadata: any = {};
+    try { metadata = JSON.parse(transaction.metadata as string || "{}"); } catch {}
+    if (!metadata.paymentLinkId) return;
+    const pl = await storage.getPaymentLinkById(metadata.paymentLinkId);
+    if (pl?.documentUrls?.length && pl.documentNames?.length) {
+      await sendPaymentDocumentsEmail(
+        transaction.customerEmail,
+        transaction.customerName || "Client",
+        pl.productName,
+        pl.documentNames,
+        pl.documentUrls
+      );
+      console.log(`[PaymentPolling] Documents email sent for transaction ${transaction.id}`);
+    }
+  } catch (err) {
+    console.log(`[PaymentPolling] Failed to send documents email for ${transaction.id}:`, err);
+  }
+}
 
 /**
  * Attempts a single webhook delivery. Returns true if server responded with 2xx, false otherwise.
@@ -324,6 +347,7 @@ async function processFedaPayTransaction(transaction: Transaction & { user?: Use
         const updatedFedaTx = await storage.getTransaction(transaction.id);
         if (updatedFedaTx) {
           trySendPaymentCallback(updatedFedaTx, 'payment.completed', '[PaymentPolling/FedaPay]');
+          trySendPaymentLinkDocuments(updatedFedaTx);
         }
         setImmediate(() => sendBusinessWebhookCallback(transaction.id, "completed", "payin"));
       } else {
@@ -583,6 +607,7 @@ async function processMbiyoPayTransaction(transaction: Transaction & { user?: Us
             const updatedMbiyoTx = await storage.getTransaction(transaction.id);
             if (updatedMbiyoTx) {
               trySendPaymentCallback(updatedMbiyoTx, 'payment.completed', '[PaymentPolling/MbiyoPay]');
+              trySendPaymentLinkDocuments(updatedMbiyoTx);
             }
             setImmediate(() => sendBusinessWebhookCallback(transaction.id, "completed", "payin"));
           } else {
@@ -726,6 +751,7 @@ async function processAfribaPayIncoming(transaction: Transaction & { user?: User
         const updatedTx = await storage.getTransaction(transaction.id);
         if (updatedTx) {
           trySendPaymentCallback(updatedTx, 'payment.completed', '[PaymentPolling/AfribaPay]');
+          trySendPaymentLinkDocuments(updatedTx);
         }
         setImmediate(() => sendBusinessWebhookCallback(transaction.id, "completed", "payin"));
       } else {
@@ -963,6 +989,7 @@ async function processPaydunyaTransaction(transaction: Transaction & { user?: Us
       const updatedPaydTx = await storage.getTransaction(transaction.id);
       if (updatedPaydTx) {
         trySendPaymentCallback(updatedPaydTx, 'payment.completed', '[PaymentPolling/Paydunya]');
+        trySendPaymentLinkDocuments(updatedPaydTx);
       }
       setImmediate(() => sendBusinessWebhookCallback(transaction.id, "completed", "payin"));
     } else {
@@ -1004,6 +1031,7 @@ async function processPawaPayDeposit(transaction: Transaction & { user?: User },
         const updatedTx = await storage.getTransaction(transaction.id);
         if (updatedTx) {
           trySendPaymentCallback(updatedTx, 'payment.completed', '[PaymentPolling/PawaPay]');
+          trySendPaymentLinkDocuments(updatedTx);
         }
         setImmediate(() => sendBusinessWebhookCallback(transaction.id, "completed", "payin"));
       } else {
