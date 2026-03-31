@@ -183,7 +183,7 @@ export default function Home() {
             <div className="flex items-center gap-2 sm:gap-3">
               <img src={logoImage} alt="BKApay" className="h-8 sm:h-10 w-auto" />
             </div>
-            <a href="https://bkapay.com/docs" target="_blank" rel="noopener noreferrer">
+            <a href="https://bkapay.com/docs">
               <Button variant="outline" size="sm" data-testid="button-documentation-api">
                 <Code className="w-4 h-4 mr-1" />
                 Documentation API
@@ -455,7 +455,7 @@ export default function Home() {
               <h3 className="font-semibold mb-3 sm:mb-4 text-foreground text-sm sm:text-base">Support</h3>
               <ul className="space-y-1 sm:space-y-2 text-xs sm:text-sm text-muted-foreground">
                 <li>Centre d'aide</li>
-                <li><a href="https://bkapay.com/docs" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors" data-testid="link-footer-documentation">Documentation</a></li>
+                <li><a href="https://bkapay.com/docs" className="hover:text-foreground transition-colors" data-testid="link-footer-documentation">Documentation</a></li>
                 <li>
                   <a href="mailto:support@bkapay.com" className="hover:text-foreground transition-colors" data-testid="link-support-email">
                     support@bkapay.com

@@ -207,7 +207,7 @@ export function BusinessSidebar() {
                   asChild
                   data-testid="nav-business-documentation"
                 >
-                  <a href="https://bkapay.com/docs" target="_blank" rel="noopener noreferrer" onClick={handleMenuClick}>
+                  <a href="https://bkapay.com/docs" onClick={handleMenuClick}>
                     <FileText className="w-4 h-4" />
                     <span>Documentation</span>
                   </a>

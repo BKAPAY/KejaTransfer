@@ -104,7 +104,6 @@ const menuItems = [
     url: "https://bkapay.com/docs",
     icon: FileText,
     testId: "nav-documentation",
-    external: true,
   },
   {
     title: "Support",
@@ -181,11 +180,11 @@ export function AppSidebar() {
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     asChild
-                    isActive={!item.external && location === item.url}
+                    isActive={location === item.url}
                     data-testid={item.testId}
                   >
-                    {item.external ? (
-                      <a href={item.url} target="_blank" rel="noopener noreferrer" onClick={handleMenuClick}>
+                    {item.url.startsWith("http") ? (
+                      <a href={item.url} onClick={handleMenuClick}>
                         <item.icon className="w-4 h-4" />
                         <span>{item.title}</span>
                       </a>
