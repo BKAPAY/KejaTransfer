@@ -508,6 +508,23 @@ async function callPaydunyaSoftpay(
   }
 }
 
+const platformSettingsCache: Record<string, { value: any; expiry: number }> = {};
+const SETTINGS_CACHE_TTL = 30_000;
+
+function getCachedSetting(key: string): any | undefined {
+  const entry = platformSettingsCache[key];
+  if (entry && Date.now() < entry.expiry) return entry.value;
+  return undefined;
+}
+
+function setCachedSetting(key: string, value: any): void {
+  platformSettingsCache[key] = { value, expiry: Date.now() + SETTINGS_CACHE_TTL };
+}
+
+function invalidateCachedSetting(key: string): void {
+  delete platformSettingsCache[key];
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Open Graph social media preview routes (must be before Vite/SPA handler)
   registerOgRoutes(app);
@@ -9863,11 +9880,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Platform settings - deposit enabled (public)
   app.get("/api/platform-settings/deposit-enabled", async (req: Request, res: Response) => {
     try {
+      const cached = getCachedSetting("deposit_enabled");
+      if (cached !== undefined) return res.json(cached);
       const result = await pgPool.query(
         "SELECT value FROM platform_settings WHERE key = 'deposit_enabled'"
       );
       const enabled = result.rows.length > 0 ? result.rows[0].value === 'true' : true;
-      res.json({ enabled });
+      const data = { enabled };
+      setCachedSetting("deposit_enabled", data);
+      res.json(data);
     } catch (error) {
       res.json({ enabled: true });
     }
@@ -9884,6 +9905,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "INSERT INTO platform_settings (key, value, updated_at) VALUES ('deposit_enabled', $1, NOW()) ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = NOW()",
         [enabled ? 'true' : 'false']
       );
+      invalidateCachedSetting("deposit_enabled");
       if (enabled) {
         await pgPool.query("UPDATE users SET deposit_override_enabled = FALSE");
       }
@@ -9916,11 +9938,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Platform settings - maintenance mode (public)
   app.get("/api/platform-settings/maintenance", async (req: Request, res: Response) => {
     try {
+      const cached = getCachedSetting("maintenance_mode");
+      if (cached !== undefined) return res.json(cached);
       const result = await pgPool.query(
         "SELECT value FROM platform_settings WHERE key = 'maintenance_mode'"
       );
       const enabled = result.rows.length > 0 ? result.rows[0].value === 'true' : false;
-      res.json({ enabled });
+      const data = { enabled };
+      setCachedSetting("maintenance_mode", data);
+      res.json(data);
     } catch (error) {
       res.json({ enabled: false });
     }
@@ -9937,6 +9963,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "INSERT INTO platform_settings (key, value, updated_at) VALUES ('maintenance_mode', $1, NOW()) ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = NOW()",
         [enabled ? 'true' : 'false']
       );
+
+      invalidateCachedSetting("maintenance_mode");
 
       if (enabled) {
         await pgPool.query(`
@@ -9962,11 +9990,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Platform settings - get emali status (public for authenticated users)
   app.get("/api/platform-settings/emali-enabled", async (req: Request, res: Response) => {
     try {
+      const cached = getCachedSetting("emali_enabled");
+      if (cached !== undefined) return res.json(cached);
       const result = await pgPool.query(
         "SELECT value FROM platform_settings WHERE key = 'emali_enabled'"
       );
       const enabled = result.rows.length > 0 ? result.rows[0].value === 'true' : true;
-      res.json({ enabled });
+      const data = { enabled };
+      setCachedSetting("emali_enabled", data);
+      res.json(data);
     } catch (error) {
       res.json({ enabled: true });
     }
@@ -9983,6 +10015,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "INSERT INTO platform_settings (key, value, updated_at) VALUES ('emali_enabled', $1, NOW()) ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = NOW()",
         [enabled ? 'true' : 'false']
       );
+      invalidateCachedSetting("emali_enabled");
       res.json({ success: true, enabled });
     } catch (error: any) {
       console.error("Toggle emali error:", error);

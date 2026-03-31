@@ -83,3 +83,9 @@ The frontend uses React 18 with TypeScript, Shadcn UI, and Tailwind CSS for a pr
 - **Drizzle ORM**: Database interactions.
 - **connect-pg-simple**: PostgreSQL session store.
 - **nodemailer**: Email service (for Gmail SMTP).
+
+## Performance Optimizations
+- **Server-Side Cache**: In-memory cache (`platformSettingsCache`) for frequently-read platform settings (`maintenance_mode`, `deposit_enabled`, `emali_enabled`) with 30s TTL. Cache is invalidated immediately when admin toggles a setting. Functions: `getCachedSetting()`, `setCachedSetting()`, `invalidateCachedSetting()` in `server/routes.ts`.
+- **Frontend Code Splitting**: All page components in `client/src/App.tsx` use `React.lazy()` for on-demand loading. `PageLoader` spinner shown during chunk loading via `Suspense` boundaries.
+- **Reduced Polling**: Maintenance check every 30s (was 10s). Dashboard stats refetch every 60s (was 30s). Analytics refetch every 120s (was 60s). User data staleTime 60s.
+- **PawaPay Active Configuration**: `getPawaPayActiveConf(operationType?)` in `server/pawapay.ts` queries PawaPay API for active corridors. Route: `GET /api/admin/pawapay/active-conf?operation=PAYOUT`.

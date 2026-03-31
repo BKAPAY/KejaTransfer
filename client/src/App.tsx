@@ -6,85 +6,94 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { BusinessSidebar } from "@/components/business-sidebar";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, lazy, Suspense } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import MaintenancePage from "@/pages/maintenance";
-import { Wallet } from "lucide-react";
+import { Wallet, Loader2 } from "lucide-react";
 import { EmaliChatButton } from "@/components/emali-chat";
-import NotFound from "@/pages/not-found";
-import Home from "@/pages/home";
-import Signup from "@/pages/signup";
-import Login from "@/pages/login";
-import Dashboard from "@/pages/dashboard/index";
-import Profile from "@/pages/dashboard/profile";
-import PaymentLinks from "@/pages/dashboard/payment-links";
-import MerchantLinks from "@/pages/dashboard/merchant-links";
-import ApiPage from "@/pages/dashboard/api";
-import ApiPayoutPage from "@/pages/dashboard/api-payout";
-import Analytics from "@/pages/dashboard/analytics";
-import History from "@/pages/dashboard/history";
-import Settings from "@/pages/dashboard/settings";
-import Support from "@/pages/dashboard/support";
-import Deposit from "@/pages/dashboard/deposit";
-import Transfer from "@/pages/dashboard/transfer";
-import Withdrawal from "@/pages/dashboard/withdrawal";
-import Admin from "@/pages/dashboard/admin";
-import AdminBusiness from "@/pages/dashboard/admin-business";
-import AdminBusinessManagement from "@/pages/dashboard/admin-business-management";
-import AdminBusinessKyc from "@/pages/dashboard/admin-business-kyc";
-import AdminBusinessKycDetail from "@/pages/dashboard/admin-business-kyc-detail";
-import AdminBusinessProviders from "@/pages/dashboard/admin-business-providers";
-import AdminBusinessCountryOperator from "@/pages/dashboard/admin-business-country-operator";
-import AdminBusinessFees from "@/pages/dashboard/admin-business-fees";
-import AdminBusinessHistory from "@/pages/dashboard/admin-business-history";
-import ManagementWrapper from "@/pages/dashboard/management-wrapper";
-import AdminAccessCode from "@/pages/dashboard/admin-access-code";
-import KycVerification from "@/pages/dashboard/kyc-verification";
-import KycHistory from "@/pages/dashboard/kyc-history";
-import KYC from "@/pages/dashboard/kyc";
-import CountryOperatorConfig from "@/pages/dashboard/country-operator-config";
-import FeeConfig from "@/pages/dashboard/fee-config";
-import Diagnostic from "@/pages/dashboard/diagnostic";
-import Fournisseurs from "@/pages/dashboard/fournisseurs";
-import SupportConfig from "@/pages/dashboard/support-config";
-import DocumentationBusiness from "@/pages/dashboard/documentation-business";
-import DocumentationLanding from "@/pages/dashboard/documentation-landing";
-import IpAddresses from "@/pages/dashboard/ip-addresses";
-import AdminUserProfile from "@/pages/dashboard/admin-user-profile";
-import AdminUserHistory from "@/pages/dashboard/admin-user-history";
-import AdminUserLinks from "@/pages/dashboard/admin-user-links";
-import AdminUserMerchant from "@/pages/dashboard/admin-user-merchant";
-import AdminUserApi from "@/pages/dashboard/admin-user-api";
-import AdminUserConnections from "@/pages/dashboard/admin-user-connections";
-import Pay from "@/pages/pay";
-import Merchant from "@/pages/merchant";
-import PaymentSuccessPage from "@/pages/payment-success";
-import PaymentFailedPage from "@/pages/payment-failed";
-import ApiPayment from "@/pages/api-payment";
-import PaymentStatus from "@/pages/payment-status";
-import ApiDemo from "@/pages/api-demo";
-import ApiPay from "@/pages/api-pay";
-import Checkout from "@/pages/checkout";
-import Terms from "@/pages/terms";
-import Privacy from "@/pages/privacy";
-import Cookies from "@/pages/cookies";
-import DocumentationVersion from "@/pages/documentation-version";
-import DocumentationRedirect from "@/pages/documentation-redirect";
-import DocumentationInline from "@/pages/documentation-inline";
-import DocumentationPayout from "@/pages/documentation-payout";
-import DocumentationSessions from "@/pages/documentation-sessions";
-import ForgotPassword from "@/pages/forgot-password";
-import LoginVerify from "@/pages/login-verify";
-import BusinessDashboard from "@/pages/dashboard/business/index";
-import BusinessProfile from "@/pages/dashboard/business/profile";
-import BusinessKyc from "@/pages/dashboard/business/kyc";
-import BusinessApi from "@/pages/dashboard/business/api";
-import BusinessHistory from "@/pages/dashboard/business/history";
-import BusinessSettings from "@/pages/dashboard/business/settings";
-import BusinessSettlements from "@/pages/dashboard/business/settlements";
 import { CURRENT_VERSION } from "@/lib/doc-versions";
 import { COUNTRIES } from "@shared/schema";
 import type { User } from "@shared/schema";
+
+const MaintenancePage = lazy(() => import("@/pages/maintenance"));
+const NotFound = lazy(() => import("@/pages/not-found"));
+const Home = lazy(() => import("@/pages/home"));
+const Signup = lazy(() => import("@/pages/signup"));
+const Login = lazy(() => import("@/pages/login"));
+const Dashboard = lazy(() => import("@/pages/dashboard/index"));
+const Profile = lazy(() => import("@/pages/dashboard/profile"));
+const PaymentLinks = lazy(() => import("@/pages/dashboard/payment-links"));
+const MerchantLinks = lazy(() => import("@/pages/dashboard/merchant-links"));
+const ApiPage = lazy(() => import("@/pages/dashboard/api"));
+const ApiPayoutPage = lazy(() => import("@/pages/dashboard/api-payout"));
+const Analytics = lazy(() => import("@/pages/dashboard/analytics"));
+const History = lazy(() => import("@/pages/dashboard/history"));
+const Settings = lazy(() => import("@/pages/dashboard/settings"));
+const Support = lazy(() => import("@/pages/dashboard/support"));
+const Deposit = lazy(() => import("@/pages/dashboard/deposit"));
+const Transfer = lazy(() => import("@/pages/dashboard/transfer"));
+const Withdrawal = lazy(() => import("@/pages/dashboard/withdrawal"));
+const Admin = lazy(() => import("@/pages/dashboard/admin"));
+const AdminBusiness = lazy(() => import("@/pages/dashboard/admin-business"));
+const AdminBusinessManagement = lazy(() => import("@/pages/dashboard/admin-business-management"));
+const AdminBusinessKyc = lazy(() => import("@/pages/dashboard/admin-business-kyc"));
+const AdminBusinessKycDetail = lazy(() => import("@/pages/dashboard/admin-business-kyc-detail"));
+const AdminBusinessProviders = lazy(() => import("@/pages/dashboard/admin-business-providers"));
+const AdminBusinessCountryOperator = lazy(() => import("@/pages/dashboard/admin-business-country-operator"));
+const AdminBusinessFees = lazy(() => import("@/pages/dashboard/admin-business-fees"));
+const AdminBusinessHistory = lazy(() => import("@/pages/dashboard/admin-business-history"));
+const ManagementWrapper = lazy(() => import("@/pages/dashboard/management-wrapper"));
+const AdminAccessCode = lazy(() => import("@/pages/dashboard/admin-access-code"));
+const KycVerification = lazy(() => import("@/pages/dashboard/kyc-verification"));
+const KycHistory = lazy(() => import("@/pages/dashboard/kyc-history"));
+const KYC = lazy(() => import("@/pages/dashboard/kyc"));
+const CountryOperatorConfig = lazy(() => import("@/pages/dashboard/country-operator-config"));
+const FeeConfig = lazy(() => import("@/pages/dashboard/fee-config"));
+const Diagnostic = lazy(() => import("@/pages/dashboard/diagnostic"));
+const Fournisseurs = lazy(() => import("@/pages/dashboard/fournisseurs"));
+const SupportConfig = lazy(() => import("@/pages/dashboard/support-config"));
+const DocumentationBusiness = lazy(() => import("@/pages/dashboard/documentation-business"));
+const DocumentationLanding = lazy(() => import("@/pages/dashboard/documentation-landing"));
+const IpAddresses = lazy(() => import("@/pages/dashboard/ip-addresses"));
+const AdminUserProfile = lazy(() => import("@/pages/dashboard/admin-user-profile"));
+const AdminUserHistory = lazy(() => import("@/pages/dashboard/admin-user-history"));
+const AdminUserLinks = lazy(() => import("@/pages/dashboard/admin-user-links"));
+const AdminUserMerchant = lazy(() => import("@/pages/dashboard/admin-user-merchant"));
+const AdminUserApi = lazy(() => import("@/pages/dashboard/admin-user-api"));
+const AdminUserConnections = lazy(() => import("@/pages/dashboard/admin-user-connections"));
+const Pay = lazy(() => import("@/pages/pay"));
+const Merchant = lazy(() => import("@/pages/merchant"));
+const PaymentSuccessPage = lazy(() => import("@/pages/payment-success"));
+const PaymentFailedPage = lazy(() => import("@/pages/payment-failed"));
+const ApiPayment = lazy(() => import("@/pages/api-payment"));
+const PaymentStatus = lazy(() => import("@/pages/payment-status"));
+const ApiDemo = lazy(() => import("@/pages/api-demo"));
+const ApiPay = lazy(() => import("@/pages/api-pay"));
+const Checkout = lazy(() => import("@/pages/checkout"));
+const Terms = lazy(() => import("@/pages/terms"));
+const Privacy = lazy(() => import("@/pages/privacy"));
+const Cookies = lazy(() => import("@/pages/cookies"));
+const DocumentationVersion = lazy(() => import("@/pages/documentation-version"));
+const DocumentationRedirect = lazy(() => import("@/pages/documentation-redirect"));
+const DocumentationInline = lazy(() => import("@/pages/documentation-inline"));
+const DocumentationPayout = lazy(() => import("@/pages/documentation-payout"));
+const DocumentationSessions = lazy(() => import("@/pages/documentation-sessions"));
+const ForgotPassword = lazy(() => import("@/pages/forgot-password"));
+const LoginVerify = lazy(() => import("@/pages/login-verify"));
+const BusinessDashboard = lazy(() => import("@/pages/dashboard/business/index"));
+const BusinessProfile = lazy(() => import("@/pages/dashboard/business/profile"));
+const BusinessKyc = lazy(() => import("@/pages/dashboard/business/kyc"));
+const BusinessApi = lazy(() => import("@/pages/dashboard/business/api"));
+const BusinessHistory = lazy(() => import("@/pages/dashboard/business/history"));
+const BusinessSettings = lazy(() => import("@/pages/dashboard/business/settings"));
+const BusinessSettlements = lazy(() => import("@/pages/dashboard/business/settlements"));
+
+function PageLoader() {
+  return (
+    <div className="h-full w-full flex items-center justify-center py-20">
+      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+    </div>
+  );
+}
 
 function DashboardLayout({ children, type = "personal" }: { children: React.ReactNode, type?: "personal" | "business" }) {
   const [location, setLocation] = useLocation();
@@ -106,8 +115,8 @@ function DashboardLayout({ children, type = "personal" }: { children: React.Reac
   } | null>({
     queryKey: ["/api/dashboard/stats"],
     queryFn: getQueryFn({ on401: "returnNull" }),
-    staleTime: 15000,
-    refetchInterval: 30000,
+    staleTime: 30000,
+    refetchInterval: 60000,
   });
 
   const userCurrency = user?.country 
@@ -143,7 +152,6 @@ function DashboardLayout({ children, type = "personal" }: { children: React.Reac
 
   
 
-  // En attente de vérification d'auth
   if (isLoading) {
     return (
       <div className="h-screen w-full flex items-center justify-center">
@@ -177,18 +185,18 @@ function DashboardLayout({ children, type = "personal" }: { children: React.Reac
               )}
             </div>
             {type === "personal" && (
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 rounded-lg" data-testid="header-balance">
+              <div className="flex items-center gap-2 bg-sidebar/80 px-4 py-2 rounded-md">
                 <Wallet className="h-4 w-4 text-primary" />
-                <span className="text-sm font-semibold text-primary">
-                  {formatAmount(stats?.totalBalance || 0)}
+                <span className="text-sm font-medium" data-testid="text-balance">
+                  {formatAmount(stats?.totalBalance ?? user?.balance ?? 0)}
                 </span>
               </div>
             )}
           </header>
-          <main className="flex-1 overflow-auto">
-            <div className="container max-w-7xl mx-auto px-4 md:px-8 py-8">
+          <main className="flex-1 overflow-y-auto">
+            <Suspense fallback={<PageLoader />}>
               {children}
-            </div>
+            </Suspense>
           </main>
         </div>
       </div>
@@ -296,44 +304,46 @@ function Router() {
   }
 
   return (
-    <Switch>
-      <Route path="/" component={Home} />
-      <Route path="/documentation/redirect/:version">
-        {(params) => <DocumentationRedirect version={params.version} />}
-      </Route>
-      <Route path="/documentation/inline/:version">
-        {(params) => <DocumentationInline version={params.version} />}
-      </Route>
-      <Route path="/documentation/payout/:version">
-        {(params) => <DocumentationPayout version={params.version} />}
-      </Route>
-      <Route path="/documentation/sessions/:version">
-        {(params) => <DocumentationSessions version={params.version} />}
-      </Route>
-      <Route path="/documentation/:version">
-        {(params) => <DocumentationVersion version={params.version} />}
-      </Route>
-      <Route path="/documentation" component={DocumentationLanding} />
-      <Route path="/docs" component={DocumentationLanding} />
-      <Route path="/documentation-business" component={DocumentationBusiness} />
-      <Route path="/signup" component={Signup} />
-      <Route path="/login" component={Login} />
-      <Route path="/login-verify" component={LoginVerify} />
-      <Route path="/forgot-password" component={ForgotPassword} />
-      <Route path="/terms" component={Terms} />
-      <Route path="/privacy" component={Privacy} />
-      <Route path="/cookies" component={Cookies} />
-      <Route path="/pay/:token" component={Pay} />
-      <Route path="/merchant/:token" component={Merchant} />
-      <Route path="/api-payment/:transactionId" component={ApiPayment} />
-      <Route path="/payment-status/:transactionId" component={PaymentStatus} />
-      <Route path="/demo/api-payment" component={ApiDemo} />
-      <Route path="/api-pay/:key" component={ApiPay} />
-      <Route path="/checkout/:sessionId" component={Checkout} />
-      <Route path="/payment-success" component={PaymentSuccessPage} />
-      <Route path="/payment-failed" component={PaymentFailedPage} />
-      <Route component={NotFound} />
-    </Switch>
+    <Suspense fallback={<PageLoader />}>
+      <Switch>
+        <Route path="/" component={Home} />
+        <Route path="/documentation/redirect/:version">
+          {(params) => <DocumentationRedirect version={params.version} />}
+        </Route>
+        <Route path="/documentation/inline/:version">
+          {(params) => <DocumentationInline version={params.version} />}
+        </Route>
+        <Route path="/documentation/payout/:version">
+          {(params) => <DocumentationPayout version={params.version} />}
+        </Route>
+        <Route path="/documentation/sessions/:version">
+          {(params) => <DocumentationSessions version={params.version} />}
+        </Route>
+        <Route path="/documentation/:version">
+          {(params) => <DocumentationVersion version={params.version} />}
+        </Route>
+        <Route path="/documentation" component={DocumentationLanding} />
+        <Route path="/docs" component={DocumentationLanding} />
+        <Route path="/documentation-business" component={DocumentationBusiness} />
+        <Route path="/signup" component={Signup} />
+        <Route path="/login" component={Login} />
+        <Route path="/login-verify" component={LoginVerify} />
+        <Route path="/forgot-password" component={ForgotPassword} />
+        <Route path="/terms" component={Terms} />
+        <Route path="/privacy" component={Privacy} />
+        <Route path="/cookies" component={Cookies} />
+        <Route path="/pay/:token" component={Pay} />
+        <Route path="/merchant/:token" component={Merchant} />
+        <Route path="/api-payment/:transactionId" component={ApiPayment} />
+        <Route path="/payment-status/:transactionId" component={PaymentStatus} />
+        <Route path="/demo/api-payment" component={ApiDemo} />
+        <Route path="/api-pay/:key" component={ApiPay} />
+        <Route path="/checkout/:sessionId" component={Checkout} />
+        <Route path="/payment-success" component={PaymentSuccessPage} />
+        <Route path="/payment-failed" component={PaymentFailedPage} />
+        <Route component={NotFound} />
+      </Switch>
+    </Suspense>
   );
 }
 
@@ -356,7 +366,7 @@ function MaintenanceGuard({ children }: { children: React.ReactNode }) {
     };
 
     checkMaintenance();
-    const interval = setInterval(checkMaintenance, 10000);
+    const interval = setInterval(checkMaintenance, 30000);
     return () => clearInterval(interval);
   }, []);
 
@@ -364,7 +374,7 @@ function MaintenanceGuard({ children }: { children: React.ReactNode }) {
 
   if (maintenanceEnabled && !(user?.isAdmin === true)) {
     if (location !== "/") {
-      return <MaintenancePage />;
+      return <Suspense fallback={<PageLoader />}><MaintenancePage /></Suspense>;
     }
   }
 
