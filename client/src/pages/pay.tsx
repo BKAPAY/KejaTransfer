@@ -49,22 +49,35 @@ function PaymentDocuments({ token, transactionId }: { token: string; transaction
   if (!docs || !docs.documentUrls.length) return null;
 
   return (
-    <div className="w-full space-y-3">
-      <p className="text-sm font-medium text-foreground">Documents à télécharger</p>
+    <div className="w-full space-y-3 mt-2">
+      <p className="text-sm font-semibold text-foreground">Documents à télécharger</p>
+      <p className="text-xs text-muted-foreground">Les documents ont aussi été envoyés à votre adresse email.</p>
       {docs.documentUrls.map((url, i) => (
-        <a
+        <div
           key={i}
-          href={url}
-          download={docs.documentNames[i] || `Document_${i + 1}`}
-          className="flex items-center gap-3 w-full p-3 rounded-md border hover-elevate"
-          data-testid={`link-download-document-${i}`}
+          className="flex items-center gap-3 w-full p-3 rounded-md border bg-muted/30"
+          data-testid={`doc-row-${i}`}
         >
           <FileText className="w-5 h-5 text-primary flex-shrink-0" />
-          <span className="text-sm flex-1 text-left truncate">
-            {docs.documentNames[i] || `Document ${i + 1}`}
-          </span>
-          <Download className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-        </a>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-foreground">Document {i + 1}</p>
+            <p className="text-xs text-muted-foreground truncate" title={docs.documentNames[i] || `Document ${i + 1}`}>
+              {docs.documentNames[i] || `Document ${i + 1}`}
+            </p>
+          </div>
+          <a
+            href={url}
+            download={docs.documentNames[i] || `Document_${i + 1}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            data-testid={`link-download-document-${i}`}
+          >
+            <Button size="sm" variant="default">
+              <Download className="w-4 h-4 mr-1" />
+              Télécharger
+            </Button>
+          </a>
+        </div>
       ))}
     </div>
   );

@@ -678,9 +678,12 @@ export default function PaymentLinks() {
                     Ajoutez des fichiers que le client pourra télécharger après le paiement (PDF, images, etc.)
                   </p>
                   {documentFiles.map((doc, index) => (
-                    <div key={index} className="flex items-center gap-2 bg-background rounded-md border p-2">
+                    <div key={index} className="flex items-center gap-2 bg-background rounded-md border p-2 min-w-0">
                       <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                      <span className="text-sm truncate flex-1" data-testid={`text-document-name-${index}`}>{doc.name}</span>
+                      <div className="flex-1 min-w-0 overflow-hidden">
+                        <p className="text-xs font-medium text-foreground">Document {index + 1}</p>
+                        <p className="text-xs text-muted-foreground truncate" title={doc.name}>{doc.name}</p>
+                      </div>
                       <Button
                         type="button"
                         size="icon"

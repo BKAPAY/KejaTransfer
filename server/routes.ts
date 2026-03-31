@@ -4695,7 +4695,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Process payment link payment - USSD VERSION
   app.post("/api/payments/process/:token", async (req: Request, res: Response) => {
     try {
-      const { customerName, customerEmail, customerPhone, country, operator } = req.body;
+      const { customerName, customerEmail, customerPhone, country, operator, customFieldResponses } = req.body;
       const { token } = req.params;
 
       console.log("[PAYMENT_LINK] Received request with:", {
@@ -4837,6 +4837,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             providerCurrency: providerCurrency,
             balanceAmount: netAmountForUser,
             balanceCurrency: ownerCurrency,
+            ...(customFieldResponses ? { customFieldResponses } : {}),
           }),
         });
 
