@@ -184,7 +184,7 @@ export function AppSidebar() {
                     data-testid={item.testId}
                   >
                     {item.url.startsWith("http") ? (
-                      <a href={item.url} onClick={handleMenuClick}>
+                      <a href={item.url} target="_blank" rel="noopener noreferrer" onClick={handleMenuClick}>
                         <item.icon className="w-4 h-4" />
                         <span>{item.title}</span>
                       </a>
