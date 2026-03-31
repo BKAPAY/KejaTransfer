@@ -311,6 +311,30 @@ export async function createPawaPayPayout(params: PawaPayPayoutParams): Promise<
   }
 }
 
+export async function getPawaPayActiveConf(operationType?: string): Promise<{ success: boolean; data?: any; error?: string }> {
+  const config = await getPawaPayConfig();
+  if (!config) {
+    return { success: false, error: "PawaPay non configuré" };
+  }
+
+  try {
+    let endpoint = "/v2/active-conf";
+    if (operationType) {
+      endpoint += `?operation=${operationType.toUpperCase()}`;
+    }
+    const result = await pawaPayRequest(config, "GET", endpoint);
+    console.log(`[PawaPay ActiveConf] HTTP ${result.status}, countries found: ${Array.isArray(result.data) ? result.data.length : 'N/A'}`);
+
+    if (result.ok) {
+      return { success: true, data: result.data };
+    }
+    return { success: false, error: `HTTP ${result.status}`, data: result.data };
+  } catch (error: any) {
+    console.error("[PawaPay ActiveConf] Error:", error);
+    return { success: false, error: error.message };
+  }
+}
+
 export async function getPawaPayDepositStatus(depositId: string): Promise<{ status: string; data?: any }> {
   const config = await getPawaPayConfig();
   if (!config) return { status: "error" };

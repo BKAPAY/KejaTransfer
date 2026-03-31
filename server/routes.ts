@@ -10975,6 +10975,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   await storage.ensurePawaPayFeeConfigs();
 
   // ===== Provider Config Routes (API Keys Management) =====
+  app.get("/api/admin/pawapay/active-conf", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { getPawaPayActiveConf } = await import("./pawapay");
+      const operationType = req.query.operation as string | undefined;
+      const result = await getPawaPayActiveConf(operationType);
+      res.json(result);
+    } catch (error: any) {
+      console.error("[Admin PawaPay ActiveConf] Error:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   app.get("/api/admin/providers", requireAdmin, async (req: Request, res: Response) => {
     try {
       const configs = await storage.getProviderConfigs();
