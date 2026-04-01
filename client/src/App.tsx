@@ -169,9 +169,9 @@ function DashboardLayout({ children, type = "personal" }: { children: React.Reac
 
   return (
     <SidebarProvider style={style as React.CSSProperties}>
-      <div className="flex h-screen w-full">
+      <div className="flex h-screen w-full overflow-hidden">
         {type === "business" ? <BusinessSidebar /> : <AppSidebar />}
-        <div className="flex flex-col flex-1 min-w-0">
+        <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
           <header className="flex items-center justify-between gap-4 p-4 border-b bg-card sticky top-0 z-20">
             <div className="flex items-center gap-4">
               <div className="flex flex-col items-center gap-0.5">
