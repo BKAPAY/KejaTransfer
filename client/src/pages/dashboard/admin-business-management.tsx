@@ -11,8 +11,8 @@ import {
   AlertCircle, Unlock, Check, X, RotateCcw, Monitor, Key, Globe, Banknote,
   CheckCircle2, Clock, Building2, Eye, ToggleLeft, ToggleRight,
 } from "lucide-react";
-import { useState } from "react";
-import { useLocation } from "wouter";
+import { useState, useEffect } from "react";
+import { useLocation, useSearch } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
@@ -83,8 +83,16 @@ interface SettlementAdmin {
 export default function AdminBusinessManagement() {
   const [searchQuery, setSearchQuery] = useState("");
   const [, setLocation] = useLocation();
+  const search = useSearch();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState("users");
+
+  const initialTab = new URLSearchParams(search).get("tab") || "users";
+  const [activeTab, setActiveTab] = useState(initialTab);
+
+  useEffect(() => {
+    const tab = new URLSearchParams(search).get("tab");
+    if (tab) setActiveTab(tab);
+  }, [search]);
 
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [depositDialogOpen, setDepositDialogOpen] = useState(false);

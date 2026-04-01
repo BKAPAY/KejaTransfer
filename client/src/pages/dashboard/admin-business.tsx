@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useLocation } from "wouter";
-import { Users, ShieldCheck, Truck, Globe, Percent, ChevronLeft, Lock } from "lucide-react";
+import { Users, ShieldCheck, Truck, Globe, Percent, ChevronLeft, Lock, Wallet } from "lucide-react";
 import { useState } from "react";
 import {
   Dialog,
@@ -81,6 +81,13 @@ export default function AdminBusiness() {
       icon: Percent,
       path: "/dashboard/admin/business/fees",
       description: "Configurer les frais par pays et opérateur",
+      protected: true,
+    },
+    {
+      title: "Gestion Wallets",
+      icon: Wallet,
+      path: "/dashboard/admin/business/management?tab=wallets",
+      description: "Activer ou désactiver les wallets par pays pour tous les utilisateurs",
       protected: true,
     },
   ];
