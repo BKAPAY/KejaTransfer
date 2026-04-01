@@ -241,7 +241,7 @@ export default function ApiPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <a href="https://bkapay.com/docs" target="_blank" rel="noopener noreferrer">
+          <a href="/docs">
             <Button variant="outline" data-testid="button-view-documentation">
               <ExternalLink className="w-4 h-4 mr-2" />
               Documentation
