@@ -162,7 +162,7 @@ export default function BusinessDashboard() {
                 <Card
                   key={key}
                   data-testid={`wallet-card-${key.toLowerCase()}`}
-                  className={`transition-all duration-200 ${isDisabled ? "opacity-40 blur-[1.5px] grayscale pointer-events-none select-none" : ""}`}
+                  className={`transition-all duration-200 ${isDisabled ? "opacity-60 pointer-events-none select-none" : ""}`}
                 >
                   <CardContent className="py-4 px-5 space-y-2">
                     <div className="flex items-center gap-3">
