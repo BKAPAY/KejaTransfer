@@ -183,9 +183,10 @@ export async function createPawaPayDeposit(params: PawaPayDepositParams): Promis
     country: params.country.toUpperCase(),
     correspondent,
     payer: {
-      type: "MSISDN",
-      address: {
-        value: sanitizedPhone,
+      type: "MMO",
+      accountDetails: {
+        phoneNumber: sanitizedPhone,
+        provider: correspondent,
       },
     },
     customerTimestamp: new Date().toISOString(),
@@ -273,9 +274,10 @@ export async function createPawaPayPayout(params: PawaPayPayoutParams): Promise<
     country: params.country.toUpperCase(),
     correspondent,
     recipient: {
-      type: "MSISDN",
-      address: {
-        value: sanitizedPhone,
+      type: "MMO",
+      accountDetails: {
+        phoneNumber: sanitizedPhone,
+        provider: correspondent,
       },
     },
     customerTimestamp: new Date().toISOString(),
@@ -284,6 +286,7 @@ export async function createPawaPayPayout(params: PawaPayPayoutParams): Promise<
 
   const mode = config.isSandbox ? "SANDBOX" : "PRODUCTION";
   console.log(`[PawaPay Payout] [${mode}] Initiating ${amountStr} ${params.currency} via ${correspondent}, phone: ***${sanitizedPhone.slice(-4)}`);
+  console.log(`[PawaPay Payout] [${mode}] Request body: ${JSON.stringify(body)}`);
 
   try {
     const result = await pawaPayRequest(config, "POST", "/v2/payouts", body);
