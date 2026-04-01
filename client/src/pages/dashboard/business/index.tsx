@@ -14,21 +14,55 @@ interface BusinessWallet {
 }
 
 const COUNTRY_INFO: Record<string, { name: string; flag: string; currency: string }> = {
+  // Afrique de l'Ouest — XOF
   BJ: { name: "Bénin", flag: "🇧🇯", currency: "XOF" },
   TG: { name: "Togo", flag: "🇹🇬", currency: "XOF" },
   CI: { name: "Côte d'Ivoire", flag: "🇨🇮", currency: "XOF" },
   BF: { name: "Burkina Faso", flag: "🇧🇫", currency: "XOF" },
-  CM: { name: "Cameroun", flag: "🇨🇲", currency: "XAF" },
-  CD_CDF: { name: "RD Congo", flag: "🇨🇩", currency: "CDF" },
-  CD_USD: { name: "RD Congo", flag: "🇨🇩", currency: "USD" },
-  GA: { name: "Gabon", flag: "🇬🇦", currency: "XAF" },
-  CG: { name: "Congo Brazzaville", flag: "🇨🇬", currency: "XAF" },
   SN: { name: "Sénégal", flag: "🇸🇳", currency: "XOF" },
-  ZM: { name: "Zambie", flag: "🇿🇲", currency: "ZMW" },
+  ML: { name: "Mali", flag: "🇲🇱", currency: "XOF" },
+  NE: { name: "Niger", flag: "🇳🇪", currency: "XOF" },
+  // Afrique de l'Ouest — autres devises
+  GN: { name: "Guinée", flag: "🇬🇳", currency: "GNF" },
+  GM: { name: "Gambie", flag: "🇬🇲", currency: "GMD" },
+  // Afrique Centrale — XAF
+  CM: { name: "Cameroun", flag: "🇨🇲", currency: "XAF" },
+  TD: { name: "Tchad", flag: "🇹🇩", currency: "XAF" },
+  CG: { name: "Congo-Brazzaville", flag: "🇨🇬", currency: "XAF" },
+  CF: { name: "Centrafrique", flag: "🇨🇫", currency: "XAF" },
+  GA: { name: "Gabon", flag: "🇬🇦", currency: "XAF" },
+  // Afrique Centrale — autres devises
+  CD_CDF: { name: "RD Congo (CDF)", flag: "🇨🇩", currency: "CDF" },
+  CD_USD: { name: "RD Congo (USD)", flag: "🇨🇩", currency: "USD" },
+  // Afrique de l'Est & Australe
+  RW: { name: "Rwanda", flag: "🇷🇼", currency: "RWF" },
+  KE: { name: "Kenya", flag: "🇰🇪", currency: "KES" },
+  TZ: { name: "Tanzanie", flag: "🇹🇿", currency: "TZS" },
   UG: { name: "Ouganda", flag: "🇺🇬", currency: "UGX" },
+  ZM: { name: "Zambie", flag: "🇿🇲", currency: "ZMW" },
+  MW: { name: "Malawi", flag: "🇲🇼", currency: "MWK" },
+  MZ: { name: "Mozambique", flag: "🇲🇿", currency: "MZN" },
+  LS: { name: "Lesotho", flag: "🇱🇸", currency: "LSL" },
+  // Afrique de l'Ouest — Anglophone
+  GH: { name: "Ghana", flag: "🇬🇭", currency: "GHS" },
+  NG: { name: "Nigeria", flag: "🇳🇬", currency: "NGN" },
+  SL: { name: "Sierra Leone", flag: "🇸🇱", currency: "SLE" },
 };
 
-const WALLET_ORDER = ["BJ", "TG", "CI", "BF", "CM", "CD_CDF", "CD_USD", "GA", "CG", "SN", "ZM", "UG"];
+const WALLET_ORDER = [
+  // XOF
+  "BJ", "TG", "CI", "BF", "SN", "ML", "NE",
+  // Autres Afrique Ouest
+  "GN", "GM",
+  // XAF
+  "CM", "TD", "CG", "CF", "GA",
+  // RD Congo
+  "CD_CDF", "CD_USD",
+  // Afrique Est & Australe
+  "RW", "KE", "TZ", "UG", "ZM", "MW", "MZ", "LS",
+  // Anglophone
+  "GH", "NG", "SL",
+];
 
 function formatCurrency(amount: number, currency: string): string {
   try {
@@ -67,9 +101,8 @@ export default function BusinessDashboard() {
     });
   }
 
-  const totalXOF = WALLET_ORDER
-    .filter(k => !k.startsWith("CD") && ["BJ", "TG", "CI", "BF", "SN"].includes(k))
-    .reduce((sum, key) => sum + (walletMap[key]?.balance || 0), 0);
+  const XOF_KEYS = ["BJ", "TG", "CI", "BF", "SN", "ML", "NE"];
+  const totalXOF = XOF_KEYS.reduce((sum, key) => sum + (walletMap[key]?.balance || 0), 0);
 
   return (
     <div className="space-y-6">

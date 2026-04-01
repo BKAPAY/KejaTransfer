@@ -343,17 +343,39 @@ echo json_encode(['received' => true]);
 ?>`;
 
   const businessCountries = [
-    { code: "BJ", name: "Benin", currency: "XOF", operators: "MTN, Moov" },
-    { code: "TG", name: "Togo", currency: "XOF", operators: "Moov, T-Money" },
-    { code: "BF", name: "Burkina Faso", currency: "XOF", operators: "Moov, Orange" },
-    { code: "CI", name: "Cote d'Ivoire", currency: "XOF", operators: "MTN, Orange" },
+    // Afrique de l'Ouest — XOF
+    { code: "BJ", name: "Bénin", currency: "XOF", operators: "MTN, Moov, Celtiis" },
+    { code: "TG", name: "Togo", currency: "XOF", operators: "Moov, T-Money, TogoCom" },
+    { code: "CI", name: "Côte d'Ivoire", currency: "XOF", operators: "MTN, Orange, Moov, Wave" },
+    { code: "BF", name: "Burkina Faso", currency: "XOF", operators: "Orange, Moov, Wave, Coris" },
+    { code: "SN", name: "Sénégal", currency: "XOF", operators: "Orange, Free, Wave, Expresso" },
+    { code: "ML", name: "Mali", currency: "XOF", operators: "Orange, Moov" },
+    { code: "NE", name: "Niger", currency: "XOF", operators: "Airtel" },
+    // Afrique de l'Ouest — autres devises
+    { code: "GN", name: "Guinée", currency: "GNF", operators: "Orange, MTN" },
+    { code: "GM", name: "Gambie", currency: "GMD", operators: "Afrimoney, QMoney, Wave" },
+    // Afrique Centrale — XAF
     { code: "CM", name: "Cameroun", currency: "XAF", operators: "MTN, Orange" },
-    { code: "CD", name: "RD Congo", currency: "CDF", operators: "Airtel, Orange, Vodacom" },
-    { code: "GA", name: "Gabon", currency: "XAF", operators: "Airtel" },
-    { code: "CG", name: "Congo Brazzaville", currency: "XAF", operators: "MTN, Airtel" },
-    { code: "SN", name: "Senegal", currency: "XOF", operators: "Free, Orange" },
-    { code: "ZM", name: "Zambie", currency: "ZMW", operators: "MTN" },
-    { code: "UG", name: "Ouganda", currency: "UGX", operators: "MTN" },
+    { code: "TD", name: "Tchad", currency: "XAF", operators: "Airtel, Moov" },
+    { code: "CG", name: "Congo-Brazzaville", currency: "XAF", operators: "MTN, Airtel" },
+    { code: "CF", name: "Centrafrique", currency: "XAF", operators: "Orange, Telecel" },
+    { code: "GA", name: "Gabon", currency: "XAF", operators: "Airtel, Moov" },
+    // Afrique Centrale — autres devises
+    { code: "CD", name: "RD Congo", currency: "CDF / USD", operators: "Orange, Airtel, M-Pesa, Vodacom, Afrimoney" },
+    // Afrique de l'Est & des Grands Lacs
+    { code: "RW", name: "Rwanda", currency: "RWF", operators: "MTN, Airtel" },
+    { code: "KE", name: "Kenya", currency: "KES", operators: "M-Pesa (Safaricom)" },
+    { code: "TZ", name: "Tanzanie", currency: "TZS", operators: "Airtel, Tigo, Halotel" },
+    { code: "UG", name: "Ouganda", currency: "UGX", operators: "MTN, Airtel" },
+    // Afrique Australe
+    { code: "ZM", name: "Zambie", currency: "ZMW", operators: "Airtel, MTN, Zamtel" },
+    { code: "MW", name: "Malawi", currency: "MWK", operators: "Airtel, TNM" },
+    { code: "MZ", name: "Mozambique", currency: "MZN", operators: "M-Pesa, Movitel" },
+    { code: "LS", name: "Lesotho", currency: "LSL", operators: "M-Pesa" },
+    // Afrique de l'Ouest — Anglophone
+    { code: "GH", name: "Ghana", currency: "GHS", operators: "MTN, Vodafone, AirtelTigo" },
+    { code: "NG", name: "Nigeria", currency: "NGN", operators: "MTN, Airtel" },
+    { code: "SL", name: "Sierra Leone", currency: "SLE", operators: "Orange" },
   ];
 
   return (
