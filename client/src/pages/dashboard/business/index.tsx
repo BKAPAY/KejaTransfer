@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Building2, TrendingUp } from "lucide-react";
@@ -84,6 +84,12 @@ function getWalletKey(country: string, currency: string): string {
   return country;
 }
 
+// Get the base country code from a WALLET_ORDER key
+function getCountryCodeFromKey(key: string): string {
+  if (key === "CD_CDF" || key === "CD_USD") return "CD";
+  return key;
+}
+
 export default function BusinessDashboard() {
   const { data: user } = useQuery<User>({
     queryKey: ["/api/auth/me"],
@@ -92,6 +98,11 @@ export default function BusinessDashboard() {
   const { data: wallets, isLoading } = useQuery<BusinessWallet[]>({
     queryKey: ["/api/business/wallets"],
   });
+
+  const { data: walletSettings } = useQuery<{ disabled: string[] }>({
+    queryKey: ["/api/business/wallet-country-settings"],
+  });
+  const disabledCountries: string[] = walletSettings?.disabled ?? [];
 
   const walletMap: Record<string, BusinessWallet> = {};
   if (wallets) {
@@ -103,6 +114,12 @@ export default function BusinessDashboard() {
 
   const XOF_KEYS = ["BJ", "TG", "CI", "BF", "SN", "ML", "NE"];
   const totalXOF = XOF_KEYS.reduce((sum, key) => sum + (walletMap[key]?.balance || 0), 0);
+
+  // Sort: enabled wallets first, disabled last (keep original order within each group)
+  const sortedKeys = [
+    ...WALLET_ORDER.filter(k => !disabledCountries.includes(getCountryCodeFromKey(k))),
+    ...WALLET_ORDER.filter(k => disabledCountries.includes(getCountryCodeFromKey(k))),
+  ];
 
   return (
     <div className="space-y-6">
@@ -132,32 +149,38 @@ export default function BusinessDashboard() {
           ? Array.from({ length: 12 }).map((_, i) => (
               <Skeleton key={i} className="h-20 w-full rounded-lg" />
             ))
-          : WALLET_ORDER.map(key => {
+          : sortedKeys.map(key => {
               const info = COUNTRY_INFO[key];
               if (!info) return null;
               const wallet = walletMap[key];
               const balance = wallet?.balance || 0;
               const isPositive = balance > 0;
+              const countryCode = getCountryCodeFromKey(key);
+              const isDisabled = disabledCountries.includes(countryCode);
 
               return (
                 <Card
                   key={key}
                   data-testid={`wallet-card-${key.toLowerCase()}`}
-                  className="transition-colors"
+                  className={`transition-all duration-200 ${isDisabled ? "opacity-40 blur-[1.5px] grayscale pointer-events-none select-none" : ""}`}
                 >
                   <CardContent className="py-4 px-5 space-y-2">
                     <div className="flex items-center gap-3">
                       <span className="text-2xl flex-shrink-0">{info.flag}</span>
                       <p className="font-medium leading-tight">{info.name}</p>
-                      {isPositive && (
+                      {isDisabled ? (
+                        <Badge variant="secondary" className="text-xs ml-auto">
+                          Indisponible
+                        </Badge>
+                      ) : isPositive ? (
                         <Badge variant="secondary" className="text-xs ml-auto">
                           Actif
                         </Badge>
-                      )}
+                      ) : null}
                     </div>
                     <p
                       className={`font-bold text-xl tabular-nums ${
-                        isPositive ? "text-foreground" : "text-muted-foreground"
+                        isPositive && !isDisabled ? "text-foreground" : "text-muted-foreground"
                       }`}
                       data-testid={`wallet-balance-${key.toLowerCase()}`}
                     >

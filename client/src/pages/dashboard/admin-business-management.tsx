@@ -9,7 +9,7 @@ import {
   Search, Wallet, History, Trash2, Power, ArrowUpCircle, ArrowDownCircle,
   ChevronLeft, User as UserIcon, Users, UserCheck, TrendingDown, TrendingUp,
   AlertCircle, Unlock, Check, X, RotateCcw, Monitor, Key, Globe, Banknote,
-  CheckCircle2, Clock, Building2, Eye,
+  CheckCircle2, Clock, Building2, Eye, ToggleLeft, ToggleRight,
 } from "lucide-react";
 import { useState } from "react";
 import { useLocation } from "wouter";
@@ -117,6 +117,30 @@ export default function AdminBusinessManagement() {
   const { data: pendingSettlementCount } = useQuery<{ count: number }>({
     queryKey: ["/api/admin/settlements/pending-count"],
     refetchInterval: 30000,
+  });
+
+  const { data: walletCountrySettings } = useQuery<{ disabled: string[] }>({
+    queryKey: ["/api/admin/business/disabled-wallet-countries"],
+  });
+  const disabledWalletCountries: string[] = walletCountrySettings?.disabled ?? [];
+
+  const toggleWalletCountryMutation = useMutation({
+    mutationFn: async (country: string) => {
+      const current = disabledWalletCountries;
+      const updated = current.includes(country)
+        ? current.filter((c) => c !== country)
+        : [...current, country];
+      const res = await apiRequest("PUT", "/api/admin/business/disabled-wallet-countries", { disabled: updated });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(["/api/admin/business/disabled-wallet-countries"], data);
+      queryClient.invalidateQueries({ queryKey: ["/api/business/wallet-country-settings"] });
+      toast({ title: "Mis à jour", description: "Statut du wallet modifié." });
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible de modifier le statut.", variant: "destructive" });
+    },
   });
 
   const depositMutation = useMutation({
@@ -634,14 +658,34 @@ export default function AdminBusinessManagement() {
                   const incomingTotal = cs?.incomingTotal || 0;
                   const outgoingTotal = cs?.outgoingTotal || 0;
                   const currency = cs?.currency || cd.currency;
+                  const isDisabled = disabledWalletCountries.includes(code);
                   return (
-                    <div key={code} className="border rounded-md p-4" data-testid={`country-stat-${code}`}>
-                      <div className="flex items-center gap-3 mb-3">
-                        <span className="text-lg">{cd.flag}</span>
-                        <div>
-                          <h4 className="font-semibold text-sm">{cd.name}</h4>
-                          <p className="text-xs text-muted-foreground">{currency}</p>
+                    <div key={code} className={`border rounded-md p-4 transition-opacity ${isDisabled ? "opacity-50" : ""}`} data-testid={`country-stat-${code}`}>
+                      <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+                        <div className="flex items-center gap-3">
+                          <span className="text-lg">{cd.flag}</span>
+                          <div>
+                            <h4 className="font-semibold text-sm">{cd.name}</h4>
+                            <p className="text-xs text-muted-foreground">{currency}</p>
+                          </div>
+                          {isDisabled && (
+                            <Badge variant="destructive" className="text-xs">Désactivé</Badge>
+                          )}
                         </div>
+                        <Button
+                          size="sm"
+                          variant={isDisabled ? "outline" : "secondary"}
+                          onClick={() => toggleWalletCountryMutation.mutate(code)}
+                          disabled={toggleWalletCountryMutation.isPending}
+                          data-testid={`button-toggle-wallet-${code}`}
+                          className="gap-1.5"
+                        >
+                          {isDisabled ? (
+                            <><ToggleLeft className="w-4 h-4 text-muted-foreground" />Activer</>
+                          ) : (
+                            <><ToggleRight className="w-4 h-4 text-green-600" />Désactiver</>
+                          )}
+                        </Button>
                       </div>
                       <div className="grid grid-cols-2 gap-4">
                         <div className="p-2 bg-muted rounded-md">

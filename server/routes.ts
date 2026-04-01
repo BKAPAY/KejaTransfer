@@ -1007,6 +1007,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Disabled business wallet countries (global setting)
+  app.get("/api/admin/business/disabled-wallet-countries", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const result = await pgPool.query(
+        "SELECT value FROM platform_settings WHERE key = 'disabled_business_wallet_countries'"
+      );
+      const disabled: string[] = result.rows[0] ? JSON.parse(result.rows[0].value) : [];
+      res.json({ disabled });
+    } catch {
+      res.json({ disabled: [] });
+    }
+  });
+
+  app.put("/api/admin/business/disabled-wallet-countries", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { disabled } = req.body as { disabled: string[] };
+      if (!Array.isArray(disabled)) return res.status(400).json({ error: "Format invalide" });
+      await pgPool.query(
+        "INSERT INTO platform_settings (key, value, updated_at) VALUES ('disabled_business_wallet_countries', $1, NOW()) ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = NOW()",
+        [JSON.stringify(disabled)]
+      );
+      invalidateCachedSetting('disabled_business_wallet_countries');
+      res.json({ success: true, disabled });
+    } catch (error: any) {
+      res.status(500).json({ error: "Erreur lors de la mise à jour" });
+    }
+  });
+
+  // Public endpoint for business users to check disabled wallet countries
+  app.get("/api/business/wallet-country-settings", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const result = await pgPool.query(
+        "SELECT value FROM platform_settings WHERE key = 'disabled_business_wallet_countries'"
+      );
+      const disabled: string[] = result.rows[0] ? JSON.parse(result.rows[0].value) : [];
+      res.json({ disabled });
+    } catch {
+      res.json({ disabled: [] });
+    }
+  });
+
   app.get("/api/admin/business/stats", requireAdmin, async (req: Request, res: Response) => {
     try {
       res.set({
