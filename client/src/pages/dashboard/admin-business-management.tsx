@@ -345,6 +345,10 @@ export default function AdminBusinessManagement() {
             <Globe className="w-4 h-4 mr-1" />
             Pays
           </TabsTrigger>
+          <TabsTrigger value="wallets" data-testid="tab-wallets">
+            <Wallet className="w-4 h-4 mr-1" />
+            Wallets
+          </TabsTrigger>
           <TabsTrigger value="settlements" data-testid="tab-settlements">
             <Banknote className="w-4 h-4 mr-1" />
             Reglements
@@ -660,32 +664,13 @@ export default function AdminBusinessManagement() {
                   const currency = cs?.currency || cd.currency;
                   const isDisabled = disabledWalletCountries.includes(code);
                   return (
-                    <div key={code} className={`border rounded-md p-4 transition-opacity ${isDisabled ? "opacity-50" : ""}`} data-testid={`country-stat-${code}`}>
-                      <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
-                        <div className="flex items-center gap-3">
-                          <span className="text-lg">{cd.flag}</span>
-                          <div>
-                            <h4 className="font-semibold text-sm">{cd.name}</h4>
-                            <p className="text-xs text-muted-foreground">{currency}</p>
-                          </div>
-                          {isDisabled && (
-                            <Badge variant="destructive" className="text-xs">Désactivé</Badge>
-                          )}
+                    <div key={code} className={`border rounded-md p-4 transition-opacity ${isDisabled ? "opacity-60" : ""}`} data-testid={`country-stat-${code}`}>
+                      <div className="flex items-center gap-3 mb-3">
+                        <span className="text-lg">{cd.flag}</span>
+                        <div>
+                          <h4 className="font-semibold text-sm">{cd.name}</h4>
+                          <p className="text-xs text-muted-foreground">{currency}</p>
                         </div>
-                        <Button
-                          size="sm"
-                          variant={isDisabled ? "outline" : "secondary"}
-                          onClick={() => toggleWalletCountryMutation.mutate(code)}
-                          disabled={toggleWalletCountryMutation.isPending}
-                          data-testid={`button-toggle-wallet-${code}`}
-                          className="gap-1.5"
-                        >
-                          {isDisabled ? (
-                            <><ToggleLeft className="w-4 h-4 text-muted-foreground" />Activer</>
-                          ) : (
-                            <><ToggleRight className="w-4 h-4 text-green-600" />Désactiver</>
-                          )}
-                        </Button>
                       </div>
                       <div className="grid grid-cols-2 gap-4">
                         <div className="p-2 bg-muted rounded-md">
@@ -703,6 +688,75 @@ export default function AdminBusinessManagement() {
                           <p className="text-sm font-bold">{formatAmount(outgoingTotal, currency)}</p>
                         </div>
                       </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="wallets" className="mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Wallet className="w-5 h-5" />
+                Gestion des wallets par pays
+              </CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                Activez ou désactivez les wallets par pays. Un wallet désactivé reste visible pour l'utilisateur mais apparaît flou et inactif en bas de la liste.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="mb-4 flex items-center gap-3 p-3 bg-muted rounded-md">
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="inline-flex items-center gap-1 text-muted-foreground">
+                    <ToggleLeft className="w-4 h-4" /> = Désactivé (flou chez l'utilisateur)
+                  </span>
+                  <span className="mx-2 text-muted-foreground">·</span>
+                  <span className="inline-flex items-center gap-1">
+                    <ToggleRight className="w-4 h-4 text-green-600" /> = Actif (visible normalement)
+                  </span>
+                </div>
+                <Badge variant="secondary" className="ml-auto">
+                  {disabledWalletCountries.length} désactivé{disabledWalletCountries.length !== 1 ? "s" : ""}
+                </Badge>
+              </div>
+              <div className="grid grid-cols-1 gap-2">
+                {BUSINESS_COUNTRIES.map((code) => {
+                  const cd = COUNTRIES.find(c => c.code === code);
+                  if (!cd) return null;
+                  const isDisabled = disabledWalletCountries.includes(code);
+                  return (
+                    <div
+                      key={code}
+                      className={`flex items-center justify-between gap-3 p-3 rounded-md border transition-opacity ${isDisabled ? "opacity-60" : ""}`}
+                      data-testid={`wallet-manage-row-${code}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="text-xl">{cd.flag}</span>
+                        <div>
+                          <p className="text-sm font-medium leading-tight">{cd.name}</p>
+                          <p className="text-xs text-muted-foreground">{cd.currency}</p>
+                        </div>
+                        {isDisabled && (
+                          <Badge variant="destructive" className="text-xs">Désactivé</Badge>
+                        )}
+                      </div>
+                      <Button
+                        size="sm"
+                        variant={isDisabled ? "outline" : "default"}
+                        onClick={() => toggleWalletCountryMutation.mutate(code)}
+                        disabled={toggleWalletCountryMutation.isPending}
+                        data-testid={`button-wallet-toggle-${code}`}
+                        className="gap-1.5 min-w-[110px] justify-center"
+                      >
+                        {isDisabled ? (
+                          <><ToggleLeft className="w-4 h-4" />Activer</>
+                        ) : (
+                          <><ToggleRight className="w-4 h-4" />Désactiver</>
+                        )}
+                      </Button>
                     </div>
                   );
                 })}
