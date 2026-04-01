@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Building2, TrendingUp } from "lucide-react";
 import type { User } from "@shared/schema";
+import { CountryFlag } from "@/components/country-flag";
 
 interface BusinessWallet {
   id: string;
@@ -166,7 +167,7 @@ export default function BusinessDashboard() {
                 >
                   <CardContent className="py-4 px-5 space-y-2">
                     <div className="flex items-center gap-3">
-                      <span className="text-2xl flex-shrink-0">{info.flag}</span>
+                      <CountryFlag code={key.slice(0, 2)} size="md" className="flex-shrink-0" />
                       <p className="font-medium leading-tight">{info.name}</p>
                       {isDisabled ? (
                         <Badge variant="secondary" className="text-xs ml-auto">

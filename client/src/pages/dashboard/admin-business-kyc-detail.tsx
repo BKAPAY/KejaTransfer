@@ -12,8 +12,9 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { jsPDF } from "jspdf";
+import { CountryFlag } from "@/components/country-flag";
 
-function KycField({ label, value }: { label: string; value?: string | null }) {
+function KycField({ label, value }: { label: string; value?: React.ReactNode | null }) {
   return (
     <div className="space-y-1">
       <p className="text-xs text-muted-foreground uppercase font-semibold">{label}</p>
@@ -315,7 +316,13 @@ export default function AdminBusinessKycDetail() {
   const getCountryName = (code?: string | null) => {
     if (!code) return "—";
     const c = COUNTRIES.find(c => c.code === code);
-    return c ? `${c.flag} ${c.name}` : code;
+    return c ? c.name : code;
+  };
+  const getCountryDisplay = (code?: string | null) => {
+    if (!code) return <span className="text-muted-foreground">—</span>;
+    const c = COUNTRIES.find(c => c.code === code);
+    if (!c) return <span>{code}</span>;
+    return <span className="flex items-center gap-1"><CountryFlag code={c.code} size="xs" /> {c.name}</span>;
   };
 
   const businessDocs: string[] = u?.kycBusinessDocuments ? (() => {
@@ -357,7 +364,7 @@ export default function AdminBusinessKycDetail() {
                 return c ? `${c.phoneCode} ${u.businessPhone}` : u.businessPhone;
               })() : null} />
               <KycField label="Date de naissance" value={u?.kycDirectorDob} />
-              <KycField label="Pays de résidence" value={getCountryName(u?.kycDirectorCountry)} />
+              <KycField label="Pays de résidence" value={getCountryDisplay(u?.kycDirectorCountry)} />
               <KycField label="N° pièce d'identité" value={u?.kycDirectorIdNumber} />
               <KycField label="Date d'expiration pièce" value={u?.kycIdExpiryDate} />
             </div>
@@ -368,7 +375,7 @@ export default function AdminBusinessKycDetail() {
               <KycField label="Dénomination sociale" value={user.businessName} />
               <KycField label="RCCM / N° Enregistrement" value={user.businessRegistrationNumber} />
               <KycField label="NIF / Identifiant fiscal" value={u?.kycTaxId} />
-              <KycField label="Pays du siège" value={getCountryName(u?.businessCountry)} />
+              <KycField label="Pays du siège" value={getCountryDisplay(u?.businessCountry)} />
               <KycField label="Tél. entreprise" value={u?.businessEnterprisePhone} />
               <KycField label="Email pro" value={u?.businessEmail} />
               <KycField label="N° compte entreprise" value={u?.kycBusinessAccountNumber} />

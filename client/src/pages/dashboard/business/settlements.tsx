@@ -8,6 +8,7 @@ import { Banknote, Loader2, Inbox, AlertCircle, Clock, CheckCircle2 } from "luci
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { CountryFlag } from "@/components/country-flag";
 import { COUNTRIES } from "@shared/schema";
 import type { Settlement } from "@shared/schema";
 import {
@@ -143,8 +144,8 @@ export default function BusinessSettlements() {
                         </span>
                         <StatusBadge status={s.status} />
                       </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {countryData?.flag} {countryData?.name} - {new Date(s.createdAt).toLocaleDateString("fr-FR", {
+                      <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1 flex-wrap">
+                        {countryData && <CountryFlag code={countryData.code} size="xs" />} {countryData?.name} - {new Date(s.createdAt).toLocaleDateString("fr-FR", {
                           day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit"
                         })}
                       </p>
@@ -185,7 +186,7 @@ export default function BusinessSettlements() {
                     const cd = COUNTRIES.find(c => c.code === w.country);
                     return (
                       <SelectItem key={`${w.country}-${w.currency}`} value={`${w.country}-${w.currency}`}>
-                        {cd?.flag} {cd?.name} - {formatAmount(w.balance, w.currency)}
+                        <span className="flex items-center gap-1">{cd && <CountryFlag code={cd.code} size="xs" />} {cd?.name} - {formatAmount(w.balance, w.currency)}</span>
                       </SelectItem>
                     );
                   })}

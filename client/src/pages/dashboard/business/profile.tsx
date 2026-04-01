@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Building2, Mail, Shield, CheckCircle, Clock, XCircle, Phone, Hash, Pencil, Check, X, Lock, MapPin } from "lucide-react";
 import type { User as UserType } from "@shared/schema";
 import { COUNTRIES } from "@shared/schema";
+import { CountryFlag } from "@/components/country-flag";
 import { PhoneInputWithPrefix } from "@/components/phone-input-with-prefix";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -111,7 +112,8 @@ export default function BusinessProfile() {
 
   const getCountryDisplay = (code: string) => {
     const c = COUNTRIES.find(c => c.code === code);
-    return c ? `${c.flag} ${c.name}` : code;
+    if (!c) return <span>{code}</span>;
+    return <span className="flex items-center gap-1"><CountryFlag code={c.code} size="xs" /> {c.name}</span>;
   };
 
   const getPhoneDisplay = (countryCode: string, digits: string) => {
@@ -207,7 +209,7 @@ export default function BusinessProfile() {
                   <SelectContent>
                     {COUNTRIES.map(c => (
                       <SelectItem key={c.code} value={c.code}>
-                        {c.flag} {c.name} ({c.phoneCode})
+                        <span className="flex items-center gap-1"><CountryFlag code={c.code} size="xs" /> {c.name} ({c.phoneCode})</span>
                       </SelectItem>
                     ))}
                   </SelectContent>

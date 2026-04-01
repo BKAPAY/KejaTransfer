@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CountryFlag } from "@/components/country-flag";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Globe, Percent, Save, ChevronDown, ChevronRight, ArrowDownToLine, ArrowUpFromLine, Building2 } from "lucide-react";
 import { CryptoIcon } from "@/components/crypto-icon";
@@ -725,7 +726,7 @@ export default function FeeConfigPage() {
                           data-testid={`button-expand-${provider.id}-${country.code}`}
                         >
                           <div className="flex items-center gap-3 flex-wrap">
-                            <Globe className="w-5 h-5 text-muted-foreground" />
+                            <CountryFlag code={country.code} size="sm" />
                             <span className="font-medium">{country.name}</span>
                             <Badge variant="outline">{country.code}</Badge>
                             <Badge variant="secondary">{country.operators.length} operateurs</Badge>

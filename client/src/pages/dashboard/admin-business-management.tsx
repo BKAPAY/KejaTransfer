@@ -1,5 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { User, Transaction, BusinessWallet, COUNTRIES } from "@shared/schema";
+import { CountryFlag } from "@/components/country-flag";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -674,7 +675,7 @@ export default function AdminBusinessManagement() {
                   return (
                     <div key={code} className={`border rounded-md p-4 transition-opacity ${isDisabled ? "opacity-60" : ""}`} data-testid={`country-stat-${code}`}>
                       <div className="flex items-center gap-3 mb-3">
-                        <span className="text-lg">{cd.flag}</span>
+                        <CountryFlag code={cd.code} size="md" />
                         <div>
                           <h4 className="font-semibold text-sm">{cd.name}</h4>
                           <p className="text-xs text-muted-foreground">{currency}</p>
@@ -742,7 +743,7 @@ export default function AdminBusinessManagement() {
                       data-testid={`wallet-manage-row-${code}`}
                     >
                       <div className="flex items-center gap-3">
-                        <span className="text-xl">{cd.flag}</span>
+                        <CountryFlag code={cd.code} size="md" />
                         <div>
                           <p className="text-sm font-medium leading-tight">{cd.name}</p>
                           <p className="text-xs text-muted-foreground">{cd.currency}</p>
@@ -798,7 +799,7 @@ export default function AdminBusinessManagement() {
                             <p className="text-xs text-muted-foreground">{s.userEmail}</p>
                             <div className="mt-2 space-y-1">
                               <p className="text-sm font-bold">{formatAmount(s.amount, s.walletCurrency)}</p>
-                              <p className="text-xs text-muted-foreground">{cd?.flag} {cd?.name} - {new Date(s.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
+                              <p className="text-xs text-muted-foreground flex items-center gap-1 flex-wrap">{cd && <CountryFlag code={cd.code} size="xs" />} {cd?.name} - {new Date(s.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
                             </div>
                             <div className="mt-2 p-2 bg-muted rounded-md text-xs space-y-1">
                               <p className="font-medium">Compte bancaire :</p>
@@ -855,7 +856,7 @@ export default function AdminBusinessManagement() {
                             </Badge>
                           </div>
                           <p className="text-xs text-muted-foreground mt-1">
-                            {formatAmount(s.amount, s.walletCurrency)} - {cd?.flag} {cd?.name} - {new Date(s.createdAt).toLocaleDateString("fr-FR")}
+                            <span className="flex items-center gap-1 flex-wrap">{formatAmount(s.amount, s.walletCurrency)} - {cd && <CountryFlag code={cd.code} size="xs" />} {cd?.name} - {new Date(s.createdAt).toLocaleDateString("fr-FR")}</span>
                           </p>
                         </div>
                       </div>
@@ -887,7 +888,7 @@ export default function AdminBusinessManagement() {
                 <SelectContent>
                   {COUNTRIES.filter(c => BUSINESS_COUNTRIES.includes(c.code)).map((c) => (
                     <SelectItem key={c.code} value={c.code}>
-                      {c.flag} {c.name} ({c.currency})
+                      <span className="flex items-center gap-1"><CountryFlag code={c.code} size="xs" /> {c.name} ({c.currency})</span>
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -944,7 +945,7 @@ export default function AdminBusinessManagement() {
                 <SelectContent>
                   {COUNTRIES.filter(c => BUSINESS_COUNTRIES.includes(c.code)).map((c) => (
                     <SelectItem key={c.code} value={c.code}>
-                      {c.flag} {c.name} ({c.currency})
+                      <span className="flex items-center gap-1"><CountryFlag code={c.code} size="xs" /> {c.name} ({c.currency})</span>
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -1024,7 +1025,9 @@ export default function AdminBusinessManagement() {
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Pays banque</p>
-                  <p className="font-medium">{COUNTRIES.find(c => c.code === (bankDetailDialog.user as any).bankCountry)?.name || (bankDetailDialog.user as any).bankCountry || "-"}</p>
+                  <p className="font-medium flex items-center gap-1">
+                    {(() => { const bc = (bankDetailDialog.user as any).bankCountry; const cd = COUNTRIES.find(c => c.code === bc); return cd ? <><CountryFlag code={cd.code} size="xs" /> {cd.name}</> : (bc || "-"); })()}
+                  </p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Devise</p>

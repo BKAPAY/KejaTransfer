@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
+import { CountryFlag } from "@/components/country-flag";
 import {
   CheckCircle, ChevronRight, ChevronLeft, Building2, FileText, Upload,
   Trash2, Loader2, AlertCircle, User, MapPin, Hash, Calendar, CreditCard,
@@ -279,7 +280,8 @@ export default function BusinessKyc() {
   // ---- Helpers ----
   const getCountryDisplay = (code: string) => {
     const c = COUNTRIES.find(c => c.code === code);
-    return c ? `${c.flag} ${c.name}` : code;
+    if (!c) return <span>{code}</span>;
+    return <span className="flex items-center gap-1"><CountryFlag code={c.code} size="xs" /> {c.name}</span>;
   };
 
   const step1Complete = () => {
@@ -499,7 +501,7 @@ export default function BusinessKyc() {
                       </SelectTrigger>
                       <SelectContent>
                         {COUNTRIES.map(c => (
-                          <SelectItem key={c.code} value={c.code}>{c.flag} {c.name} ({c.phoneCode})</SelectItem>
+                          <SelectItem key={c.code} value={c.code}><span className="flex items-center gap-1"><CountryFlag code={c.code} size="xs" /> {c.name} ({c.phoneCode})</span></SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -667,7 +669,7 @@ export default function BusinessKyc() {
                     </SelectTrigger>
                     <SelectContent>
                       {COUNTRIES.map(c => (
-                        <SelectItem key={c.code} value={c.code}>{c.flag} {c.name}</SelectItem>
+                        <SelectItem key={c.code} value={c.code}><span className="flex items-center gap-1"><CountryFlag code={c.code} size="xs" /> {c.name}</span></SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -871,7 +873,7 @@ export default function BusinessKyc() {
   );
 }
 
-function InfoRow({ label, value, className = "" }: { label: string; value?: string | null; className?: string }) {
+function InfoRow({ label, value, className = "" }: { label: string; value?: React.ReactNode | null; className?: string }) {
   return (
     <div className={className}>
       <p className="text-xs text-muted-foreground mb-0.5">{label}</p>

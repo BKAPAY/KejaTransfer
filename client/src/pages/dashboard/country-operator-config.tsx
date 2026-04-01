@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { CountryFlag } from "@/components/country-flag";
 import { Globe, Wifi, CheckCircle2, XCircle, ChevronDown, ChevronRight, AlertCircle } from "lucide-react";
 import { CryptoIcon } from "@/components/crypto-icon";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -381,9 +382,9 @@ export default function CountryOperatorConfigPage() {
                         <div className="p-4 border-b bg-muted/30">
                           <div className="flex items-center justify-between flex-wrap gap-2">
                             <div className="flex items-center gap-3">
-                              <Globe className="w-6 h-6 text-muted-foreground" />
+                              <CountryFlag code={countryCode} size="md" />
                               <div>
-                                <h3 className="font-semibold text-foreground">{countryInfo.name} ({countryCode})</h3>
+                                <h3 className="font-semibold text-foreground flex items-center gap-2">{countryInfo.name} <span className="text-muted-foreground text-sm font-normal">({countryCode})</span></h3>
                                 <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
                                   <span>{countryInfo.operators.length} operateur{countryInfo.operators.length > 1 ? "s" : ""}</span>
                                   <span>-</span>

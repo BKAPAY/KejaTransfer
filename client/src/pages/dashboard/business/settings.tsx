@@ -8,6 +8,7 @@ import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { COUNTRIES } from "@shared/schema";
+import { CountryFlag } from "@/components/country-flag";
 
 export default function BusinessSettings() {
   const { toast } = useToast();
@@ -137,7 +138,7 @@ export default function BusinessSettings() {
                 {bankCountryData && (
                   <div>
                     <p className="text-xs text-muted-foreground">Pays</p>
-                    <p className="text-sm font-medium">{bankCountryData.flag} {bankCountryData.name}</p>
+                    <p className="text-sm font-medium flex items-center gap-1"><CountryFlag code={bankCountryData.code} size="xs" /> {bankCountryData.name}</p>
                   </div>
                 )}
                 {user.bankCurrency && (
@@ -240,7 +241,7 @@ export default function BusinessSettings() {
                     <SelectContent>
                       {COUNTRIES.map((c) => (
                         <SelectItem key={c.code} value={c.code}>
-                          {c.flag} {c.name}
+                          <span className="flex items-center gap-1"><CountryFlag code={c.code} size="xs" /> {c.name}</span>
                         </SelectItem>
                       ))}
                     </SelectContent>

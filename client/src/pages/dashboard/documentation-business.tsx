@@ -5,6 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useLocation } from "wouter";
+import { CountryFlag } from "@/components/country-flag";
 
 function CodeBlock({ label, description, code, copyCode, testId }: {
   label: string;
@@ -814,7 +815,7 @@ echo json_encode(['received' => true]);
                 {businessCountries.map((c) => (
                   <tr key={c.code} className="border-b border-border" data-testid={`row-country-${c.code}`}>
                     <td className="p-2 border border-border">
-                      <span className="mr-1">{c.flag}</span>{c.name}
+                      <span className="inline-flex items-center gap-1"><CountryFlag code={c.code} size="xs" /> {c.name}</span>
                     </td>
                     <td className="p-2 border border-border font-mono text-xs">
                       <Badge variant="outline" className="text-xs">{c.code}</Badge>
@@ -859,7 +860,7 @@ echo json_encode(['received' => true]);
             <div className="space-y-2">
               {businessCountries.filter(c => c.otpOperators.length > 0).map(c => (
                 <div key={c.code} className="flex items-start gap-3 bg-background rounded-md p-2 border border-border">
-                  <span>{c.flag}</span>
+                  <CountryFlag code={c.code} size="sm" />
                   <div>
                     <p className="text-xs font-semibold">{c.name} — Orange Money</p>
                     {c.otpOperators.map(otp => (
