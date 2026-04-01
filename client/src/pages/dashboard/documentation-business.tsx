@@ -344,38 +344,38 @@ echo json_encode(['received' => true]);
 
   const businessCountries = [
     // Afrique de l'Ouest — XOF
-    { code: "BJ", name: "Bénin", currency: "XOF", operators: "MTN, Moov, Celtiis" },
-    { code: "TG", name: "Togo", currency: "XOF", operators: "Moov, T-Money, TogoCom" },
-    { code: "CI", name: "Côte d'Ivoire", currency: "XOF", operators: "MTN, Orange, Moov, Wave" },
-    { code: "BF", name: "Burkina Faso", currency: "XOF", operators: "Orange, Moov, Wave, Coris" },
-    { code: "SN", name: "Sénégal", currency: "XOF", operators: "Orange, Free, Wave, Expresso" },
-    { code: "ML", name: "Mali", currency: "XOF", operators: "Orange, Moov" },
-    { code: "NE", name: "Niger", currency: "XOF", operators: "Airtel" },
+    { code: "BJ", flag: "🇧🇯", name: "Bénin", currency: "XOF", operators: ["MTN", "Moov", "Celtiis"], otpOperators: [] as string[] },
+    { code: "TG", flag: "🇹🇬", name: "Togo", currency: "XOF", operators: ["Moov", "T-Money", "TogoCom"], otpOperators: [] as string[] },
+    { code: "CI", flag: "🇨🇮", name: "Côte d'Ivoire", currency: "XOF", operators: ["MTN", "Orange", "Moov"], otpOperators: ["Orange — #144*82#"] },
+    { code: "BF", flag: "🇧🇫", name: "Burkina Faso", currency: "XOF", operators: ["Orange", "Moov", "Coris"], otpOperators: ["Orange — #144*4*6#"] },
+    { code: "SN", flag: "🇸🇳", name: "Sénégal", currency: "XOF", operators: ["Orange", "Free", "Expresso", "Wizall"], otpOperators: ["Orange — #144#391#"] },
+    { code: "ML", flag: "🇲🇱", name: "Mali", currency: "XOF", operators: ["Orange", "Moov"], otpOperators: ["Orange — #144*8#"] },
+    { code: "NE", flag: "🇳🇪", name: "Niger", currency: "XOF", operators: ["Airtel"], otpOperators: [] as string[] },
     // Afrique de l'Ouest — autres devises
-    { code: "GN", name: "Guinée", currency: "GNF", operators: "Orange, MTN" },
-    { code: "GM", name: "Gambie", currency: "GMD", operators: "Afrimoney, QMoney, Wave" },
+    { code: "GN", flag: "🇬🇳", name: "Guinée", currency: "GNF", operators: ["Orange", "MTN"], otpOperators: ["Orange — #144#"] },
+    { code: "GM", flag: "🇬🇲", name: "Gambie", currency: "GMD", operators: ["Afrimoney", "QMoney"], otpOperators: [] as string[] },
     // Afrique Centrale — XAF
-    { code: "CM", name: "Cameroun", currency: "XAF", operators: "MTN, Orange" },
-    { code: "TD", name: "Tchad", currency: "XAF", operators: "Airtel, Moov" },
-    { code: "CG", name: "Congo-Brazzaville", currency: "XAF", operators: "MTN, Airtel" },
-    { code: "CF", name: "Centrafrique", currency: "XAF", operators: "Orange, Telecel" },
-    { code: "GA", name: "Gabon", currency: "XAF", operators: "Airtel, Moov" },
+    { code: "CM", flag: "🇨🇲", name: "Cameroun", currency: "XAF", operators: ["MTN", "Orange"], otpOperators: ["Orange — #150*50#"] },
+    { code: "TD", flag: "🇹🇩", name: "Tchad", currency: "XAF", operators: ["Airtel", "Moov"], otpOperators: [] as string[] },
+    { code: "CG", flag: "🇨🇬", name: "Congo-Brazzaville", currency: "XAF", operators: ["MTN", "Airtel"], otpOperators: [] as string[] },
+    { code: "CF", flag: "🇨🇫", name: "Centrafrique", currency: "XAF", operators: ["Orange", "Telecel"], otpOperators: [] as string[] },
+    { code: "GA", flag: "🇬🇦", name: "Gabon", currency: "XAF", operators: ["Airtel", "Moov"], otpOperators: [] as string[] },
     // Afrique Centrale — autres devises
-    { code: "CD", name: "RD Congo", currency: "CDF / USD", operators: "Orange, Airtel, M-Pesa, Vodacom, Afrimoney" },
+    { code: "CD", flag: "🇨🇩", name: "RD Congo", currency: "CDF / USD", operators: ["Orange", "Airtel", "M-Pesa", "Vodacom", "Afrimoney"], otpOperators: [] as string[] },
     // Afrique de l'Est & des Grands Lacs
-    { code: "RW", name: "Rwanda", currency: "RWF", operators: "MTN, Airtel" },
-    { code: "KE", name: "Kenya", currency: "KES", operators: "M-Pesa (Safaricom)" },
-    { code: "TZ", name: "Tanzanie", currency: "TZS", operators: "Airtel, Tigo, Halotel" },
-    { code: "UG", name: "Ouganda", currency: "UGX", operators: "MTN, Airtel" },
+    { code: "RW", flag: "🇷🇼", name: "Rwanda", currency: "RWF", operators: ["MTN", "Airtel"], otpOperators: [] as string[] },
+    { code: "KE", flag: "🇰🇪", name: "Kenya", currency: "KES", operators: ["M-Pesa"], otpOperators: [] as string[] },
+    { code: "TZ", flag: "🇹🇿", name: "Tanzanie", currency: "TZS", operators: ["Airtel", "Tigo", "Halotel"], otpOperators: [] as string[] },
+    { code: "UG", flag: "🇺🇬", name: "Ouganda", currency: "UGX", operators: ["MTN", "Airtel"], otpOperators: [] as string[] },
     // Afrique Australe
-    { code: "ZM", name: "Zambie", currency: "ZMW", operators: "Airtel, MTN, Zamtel" },
-    { code: "MW", name: "Malawi", currency: "MWK", operators: "Airtel, TNM" },
-    { code: "MZ", name: "Mozambique", currency: "MZN", operators: "M-Pesa, Movitel" },
-    { code: "LS", name: "Lesotho", currency: "LSL", operators: "M-Pesa" },
+    { code: "ZM", flag: "🇿🇲", name: "Zambie", currency: "ZMW", operators: ["Airtel", "MTN", "Zamtel"], otpOperators: [] as string[] },
+    { code: "MW", flag: "🇲🇼", name: "Malawi", currency: "MWK", operators: ["Airtel", "TNM"], otpOperators: [] as string[] },
+    { code: "MZ", flag: "🇲🇿", name: "Mozambique", currency: "MZN", operators: ["M-Pesa", "Movitel"], otpOperators: [] as string[] },
+    { code: "LS", flag: "🇱🇸", name: "Lesotho", currency: "LSL", operators: ["M-Pesa"], otpOperators: [] as string[] },
     // Afrique de l'Ouest — Anglophone
-    { code: "GH", name: "Ghana", currency: "GHS", operators: "MTN, Vodafone, AirtelTigo" },
-    { code: "NG", name: "Nigeria", currency: "NGN", operators: "MTN, Airtel" },
-    { code: "SL", name: "Sierra Leone", currency: "SLE", operators: "Orange" },
+    { code: "GH", flag: "🇬🇭", name: "Ghana", currency: "GHS", operators: ["MTN", "Vodafone", "AirtelTigo"], otpOperators: [] as string[] },
+    { code: "NG", flag: "🇳🇬", name: "Nigeria", currency: "NGN", operators: ["MTN", "Airtel"], otpOperators: [] as string[] },
+    { code: "SL", flag: "🇸🇱", name: "Sierra Leone", currency: "SLE", operators: ["Orange"], otpOperators: [] as string[] },
   ];
 
   return (
@@ -807,21 +807,80 @@ echo json_encode(['received' => true]);
                   <th className="text-left p-2 font-semibold border border-border">Code</th>
                   <th className="text-left p-2 font-semibold border border-border">Devise</th>
                   <th className="text-left p-2 font-semibold border border-border">Operateurs</th>
+                  <th className="text-left p-2 font-semibold border border-border">OTP requis</th>
                 </tr>
               </thead>
               <tbody>
                 {businessCountries.map((c) => (
                   <tr key={c.code} className="border-b border-border" data-testid={`row-country-${c.code}`}>
-                    <td className="p-2 border border-border">{c.name}</td>
+                    <td className="p-2 border border-border">
+                      <span className="mr-1">{c.flag}</span>{c.name}
+                    </td>
                     <td className="p-2 border border-border font-mono text-xs">
                       <Badge variant="outline" className="text-xs">{c.code}</Badge>
                     </td>
                     <td className="p-2 border border-border font-mono text-xs">{c.currency}</td>
-                    <td className="p-2 border border-border text-muted-foreground text-xs">{c.operators}</td>
+                    <td className="p-2 border border-border text-xs">
+                      <div className="flex flex-wrap gap-1">
+                        {c.operators.map((op) => (
+                          <Badge key={op} variant="secondary" className="text-xs">{op}</Badge>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="p-2 border border-border text-xs">
+                      {c.otpOperators.length > 0 ? (
+                        <div className="space-y-1">
+                          {c.otpOperators.map((otp) => (
+                            <div key={otp} className="flex items-center gap-1">
+                              <Badge variant="destructive" className="text-xs shrink-0">OTP</Badge>
+                              <code className="text-xs font-mono text-muted-foreground">{otp}</code>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">—</span>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+
+          <div className="border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 rounded-md p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <Badge variant="destructive" className="text-xs">OTP</Badge>
+              <p className="font-semibold text-sm">Operateurs necessitant un code OTP</p>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Certains operateurs Orange Money requierent un code OTP genere par USSD avant d'initier le paiement. 
+              Vous devez d'abord demander ce code a votre client, puis l'inclure dans le parametre <code className="font-mono bg-muted px-1 rounded text-xs">otp</code> de votre requete payin.
+            </p>
+            <div className="space-y-2">
+              {businessCountries.filter(c => c.otpOperators.length > 0).map(c => (
+                <div key={c.code} className="flex items-start gap-3 bg-background rounded-md p-2 border border-border">
+                  <span>{c.flag}</span>
+                  <div>
+                    <p className="text-xs font-semibold">{c.name} — Orange Money</p>
+                    {c.otpOperators.map(otp => (
+                      <p key={otp} className="text-xs text-muted-foreground font-mono mt-0.5">{otp.replace("Orange — ", "")}</p>
+                    ))}
+                    <p className="text-xs text-muted-foreground mt-0.5">Le client compose ce code et transmet l'OTP recu</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="bg-muted rounded-md p-3 font-mono text-xs space-y-1">
+              <p className="text-muted-foreground">// Exemple avec OTP (Orange CI)</p>
+              <p>{"{"}</p>
+              <p className="pl-4"><span className="text-foreground">"country"</span>: <span className="text-green-600">"CI"</span>,</p>
+              <p className="pl-4"><span className="text-foreground">"operator"</span>: <span className="text-green-600">"orange"</span>,</p>
+              <p className="pl-4"><span className="text-foreground">"phone"</span>: <span className="text-green-600">"+2250700000000"</span>,</p>
+              <p className="pl-4"><span className="text-foreground">"amount"</span>: <span className="text-blue-500">5000</span>,</p>
+              <p className="pl-4"><span className="text-foreground">"currency"</span>: <span className="text-green-600">"XOF"</span>,</p>
+              <p className="pl-4"><span className="text-foreground">"otp"</span>: <span className="text-green-600">"123456"</span> <span className="text-muted-foreground">// Code OTP genere via #144*82#</span></p>
+              <p>{"}"}</p>
+            </div>
           </div>
 
           <div className="bg-muted/50 rounded-md p-4 text-sm space-y-2">
@@ -829,7 +888,8 @@ echo json_encode(['received' => true]);
             <div className="font-mono text-xs space-y-1 text-muted-foreground">
               <p><span className="text-foreground">country:</span> Code ISO a 2 lettres (ex: "BJ", "CI", "CM")</p>
               <p><span className="text-foreground">currency:</span> Code devise du pays (ex: "XOF", "XAF", "CDF")</p>
-              <p><span className="text-foreground">operator:</span> Nom en minuscules (ex: "mtn", "orange", "moov", "airtel", "tmoney", "vodacom", "free")</p>
+              <p><span className="text-foreground">operator:</span> Nom en minuscules (ex: "mtn", "orange", "moov", "airtel", "tmoney", "mpesa", "free")</p>
+              <p><span className="text-foreground">otp:</span> Code genere par USSD (uniquement pour Orange CI, BF, SN, ML, GN, CM)</p>
             </div>
           </div>
         </CardContent>
