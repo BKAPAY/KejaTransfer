@@ -174,14 +174,12 @@ export async function createPawaPayDeposit(params: PawaPayDepositParams): Promis
   const sanitizedPhone = sanitizePhoneForPawaPay(params.phone, params.country);
 
   const rawMsg = (params.description || "Recharge portefeuille").replace(/[^a-zA-Z0-9 ]/g, "").trim();
-  const statementDescription = rawMsg.substring(0, 22).padEnd(4, " ").substring(0, 22);
+  const customerMessage = rawMsg.substring(0, 22).padEnd(4, " ").substring(0, 22);
 
   const body: any = {
     depositId,
     amount: amountStr,
     currency: params.currency,
-    country: params.country.toUpperCase(),
-    correspondent,
     payer: {
       type: "MMO",
       accountDetails: {
@@ -189,8 +187,7 @@ export async function createPawaPayDeposit(params: PawaPayDepositParams): Promis
         provider: correspondent,
       },
     },
-    customerTimestamp: new Date().toISOString(),
-    statementDescription,
+    customerMessage,
   };
 
   if (params.preAuthorisationCode) {
@@ -265,14 +262,12 @@ export async function createPawaPayPayout(params: PawaPayPayoutParams): Promise<
   const sanitizedPhone = sanitizePhoneForPawaPay(params.phone, params.country);
 
   const rawPayoutMsg = (params.description || "Retrait BKApay").replace(/[^a-zA-Z0-9 ]/g, "").trim();
-  const statementDescription = rawPayoutMsg.substring(0, 22).padEnd(4, " ").substring(0, 22);
+  const customerMessage = rawPayoutMsg.substring(0, 22).padEnd(4, " ").substring(0, 22);
 
   const body: any = {
     payoutId,
     amount: amountStr,
     currency: params.currency,
-    country: params.country.toUpperCase(),
-    correspondent,
     recipient: {
       type: "MMO",
       accountDetails: {
@@ -280,8 +275,7 @@ export async function createPawaPayPayout(params: PawaPayPayoutParams): Promise<
         provider: correspondent,
       },
     },
-    customerTimestamp: new Date().toISOString(),
-    statementDescription,
+    customerMessage,
   };
 
   const mode = config.isSandbox ? "SANDBOX" : "PRODUCTION";
