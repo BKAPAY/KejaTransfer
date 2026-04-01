@@ -345,7 +345,7 @@ echo json_encode(['received' => true]);
   const businessCountries = [
     // Afrique de l'Ouest — XOF
     { code: "BJ", flag: "🇧🇯", name: "Bénin", currency: "XOF", operators: ["MTN", "Moov", "Celtiis"], otpOperators: [] as string[] },
-    { code: "TG", flag: "🇹🇬", name: "Togo", currency: "XOF", operators: ["Moov", "T-Money", "TogoCom"], otpOperators: [] as string[] },
+    { code: "TG", flag: "🇹🇬", name: "Togo", currency: "XOF", operators: ["Moov", "T-Money"], otpOperators: [] as string[] },
     { code: "CI", flag: "🇨🇮", name: "Côte d'Ivoire", currency: "XOF", operators: ["MTN", "Orange", "Moov"], otpOperators: ["Orange — #144*82#"] },
     { code: "BF", flag: "🇧🇫", name: "Burkina Faso", currency: "XOF", operators: ["Orange", "Moov", "Coris"], otpOperators: ["Orange — #144*4*6#"] },
     { code: "SN", flag: "🇸🇳", name: "Sénégal", currency: "XOF", operators: ["Orange", "Free", "Expresso", "Wizall"], otpOperators: ["Orange — #144#391#"] },
