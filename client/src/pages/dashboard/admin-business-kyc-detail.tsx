@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { FileText, Check, X, ChevronLeft, AlertCircle, Download, Loader2, User as UserIcon, Building2, MapPin, Scale, ZoomIn } from "lucide-react";
+import { FileText, Check, CheckCircle, X, ChevronLeft, AlertCircle, Download, Loader2, User as UserIcon, Building2, MapPin, Scale, ZoomIn } from "lucide-react";
 import { useState } from "react";
 import { useLocation, useParams } from "wouter";
 import { useToast } from "@/hooks/use-toast";
@@ -346,8 +346,8 @@ export default function AdminBusinessKycDetail() {
             <Download className="w-4 h-4 mr-2" />
             Rapport PDF
           </Button>
-          <Badge className="px-3 py-1 text-sm" variant={user.kycStatus === "verified" ? "default" : "secondary"}>
-            {user.kycStatus === "verified" ? "Vérifié" : user.kycStatus === "submitted" ? "En examen" : "En attente"}
+          <Badge className="px-3 py-1 text-sm" variant={user.kycStatus === "verified" ? "default" : user.kycStatus === "rejected" ? "destructive" : "secondary"}>
+            {user.kycStatus === "verified" ? "Vérifié" : user.kycStatus === "submitted" ? "En examen" : user.kycStatus === "rejected" ? "Rejeté" : "En attente"}
           </Badge>
         </div>
       </div>
@@ -429,35 +429,48 @@ export default function AdminBusinessKycDetail() {
               <CardTitle className="text-sm font-bold uppercase tracking-wider">Décision administrative</CardTitle>
             </CardHeader>
             <CardContent className="pt-6 space-y-4">
-              {showRejectInput && (
-                <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
-                  <Label className="text-sm font-medium flex items-center gap-2 text-destructive">
+              {user.kycStatus === "rejected" && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-destructive text-sm font-medium">
                     <AlertCircle className="w-4 h-4" />
-                    Motif du rejet
-                  </Label>
-                  <Input
-                    value={rejectReason}
-                    onChange={(e) => setRejectReason(e.target.value)}
-                    placeholder="Ex: Document expiré, flou..."
-                    className="border-destructive/50 focus-visible:ring-destructive"
-                    data-testid="input-rejection-reason"
-                  />
-                  <div className="flex gap-2">
-                    <Button 
-                      className="flex-1" 
-                      variant="destructive"
-                      disabled={!rejectReason.trim() || verifyMutation.isPending}
-                      onClick={() => verifyMutation.mutate({ status: "rejected", reason: rejectReason })}
-                      data-testid="button-confirm-reject-kyc"
-                    >
-                      Confirmer
-                    </Button>
-                    <Button className="flex-1" variant="ghost" onClick={() => setShowRejectInput(false)}>Annuler</Button>
+                    Ce dossier a été rejeté
                   </div>
+                  <Button
+                    className="w-full"
+                    onClick={() => {
+                      if (confirm(`Réapprouver le dossier de ${user.businessName || user.email} ?`)) {
+                        verifyMutation.mutate({ status: "verified" });
+                      }
+                    }}
+                    disabled={verifyMutation.isPending}
+                    data-testid="button-reapprove-kyc"
+                  >
+                    <CheckCircle className="w-4 h-4 mr-2" />
+                    Réapprouver le dossier
+                  </Button>
                 </div>
               )}
 
-              {!showRejectInput && (
+              {user.kycStatus === "verified" && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-green-600 dark:text-green-400 text-sm font-medium">
+                    <CheckCircle className="w-4 h-4" />
+                    Ce dossier est vérifié
+                  </div>
+                  <Button
+                    className="w-full"
+                    variant="destructive"
+                    onClick={() => setShowRejectInput(true)}
+                    disabled={verifyMutation.isPending}
+                    data-testid="button-reject-kyc"
+                  >
+                    <X className="w-4 h-4 mr-2" />
+                    Rejeter le dossier
+                  </Button>
+                </div>
+              )}
+
+              {user.kycStatus === "submitted" && !showRejectInput && (
                 <div className="flex flex-col gap-3">
                   <Button
                     className="w-full"
@@ -482,6 +495,34 @@ export default function AdminBusinessKycDetail() {
                     <Check className="w-4 h-4 mr-2" />
                     Approuver
                   </Button>
+                </div>
+              )}
+
+              {showRejectInput && user.kycStatus !== "rejected" && (
+                <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
+                  <Label className="text-sm font-medium flex items-center gap-2 text-destructive">
+                    <AlertCircle className="w-4 h-4" />
+                    Motif du rejet
+                  </Label>
+                  <Input
+                    value={rejectReason}
+                    onChange={(e) => setRejectReason(e.target.value)}
+                    placeholder="Ex: Document expiré, flou..."
+                    className="border-destructive/50 focus-visible:ring-destructive"
+                    data-testid="input-rejection-reason"
+                  />
+                  <div className="flex gap-2">
+                    <Button 
+                      className="flex-1" 
+                      variant="destructive"
+                      disabled={!rejectReason.trim() || verifyMutation.isPending}
+                      onClick={() => verifyMutation.mutate({ status: "rejected", reason: rejectReason })}
+                      data-testid="button-confirm-reject-kyc"
+                    >
+                      Confirmer
+                    </Button>
+                    <Button className="flex-1" variant="ghost" onClick={() => setShowRejectInput(false)}>Annuler</Button>
+                  </div>
                 </div>
               )}
 
