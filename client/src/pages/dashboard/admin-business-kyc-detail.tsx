@@ -3,7 +3,8 @@ import { User, COUNTRIES } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Check, X, ChevronLeft, AlertCircle, Download, Loader2, User as UserIcon, Building2, MapPin, Scale } from "lucide-react";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { FileText, Check, X, ChevronLeft, AlertCircle, Download, Loader2, User as UserIcon, Building2, MapPin, Scale, ZoomIn } from "lucide-react";
 import { useState } from "react";
 import { useLocation, useParams } from "wouter";
 import { useToast } from "@/hooks/use-toast";
@@ -22,6 +23,8 @@ function KycField({ label, value }: { label: string; value?: string | null }) {
 }
 
 function DocPreview({ label, src }: { label: string; src?: string | null }) {
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+
   if (!src) return (
     <div className="space-y-1">
       <p className="text-xs text-muted-foreground uppercase font-semibold">{label}</p>
@@ -30,24 +33,62 @@ function DocPreview({ label, src }: { label: string; src?: string | null }) {
       </div>
     </div>
   );
-  const isImage = src.startsWith("data:image") || src.startsWith("http");
+
+  const isImage = src.startsWith("data:image") || /\.(jpg|jpeg|png|gif|webp)$/i.test(src);
+  const isPdf = src.startsWith("data:application/pdf") || /\.pdf$/i.test(src);
+
+  const handleDownload = () => {
+    const a = document.createElement("a");
+    a.href = src;
+    a.download = label.toLowerCase().replace(/\s+/g, "_") + (isPdf ? ".pdf" : isImage ? ".jpg" : "");
+    a.click();
+  };
+
   return (
     <div className="space-y-1">
       <p className="text-xs text-muted-foreground uppercase font-semibold">{label}</p>
       {isImage ? (
-        <div className="relative group">
-          <img src={src} alt={label} className="rounded-md border w-full max-h-64 object-contain bg-muted transition-all" />
-          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 rounded-md">
-            <Button size="sm" variant="secondary" onClick={() => window.open(src, '_blank')}>
-              Agrandir
+        <>
+          <div
+            className="relative group cursor-pointer"
+            onClick={() => setLightboxOpen(true)}
+          >
+            <img src={src} alt={label} className="rounded-md border w-full max-h-64 object-contain bg-muted transition-all" />
+            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/30 rounded-md">
+              <div className="flex items-center gap-2 bg-white/90 dark:bg-black/80 rounded-md px-3 py-1.5">
+                <ZoomIn className="w-4 h-4" />
+                <span className="text-xs font-medium">Agrandir</span>
+              </div>
+            </div>
+          </div>
+          <Button variant="outline" size="sm" className="w-full mt-1" onClick={handleDownload}>
+            <Download className="w-3 h-3 mr-1.5" />
+            Télécharger
+          </Button>
+          <Dialog open={lightboxOpen} onOpenChange={setLightboxOpen}>
+            <DialogContent className="max-w-3xl p-2">
+              <DialogTitle className="text-sm font-semibold px-2 pt-1">{label}</DialogTitle>
+              <img src={src} alt={label} className="w-full max-h-[80vh] object-contain rounded-md" />
+            </DialogContent>
+          </Dialog>
+        </>
+      ) : (
+        <div className="rounded-md border bg-muted flex flex-col gap-2 p-3">
+          <div className="flex items-center gap-2">
+            <FileText className="w-5 h-5 text-red-500 flex-shrink-0" />
+            <span className="text-sm flex-1">{isPdf ? "Document PDF" : "Document"}</span>
+          </div>
+          <div className="flex gap-2">
+            <a href={src} target="_blank" rel="noopener noreferrer" className="flex-1">
+              <Button variant="outline" size="sm" className="w-full">
+                Ouvrir
+              </Button>
+            </a>
+            <Button variant="default" size="sm" className="flex-1" onClick={handleDownload}>
+              <Download className="w-3 h-3 mr-1.5" />
+              Télécharger
             </Button>
           </div>
-        </div>
-      ) : (
-        <div className="rounded-md border p-4 bg-muted flex items-center gap-2">
-          <FileText className="w-5 h-5 text-red-500 flex-shrink-0" />
-          <span className="text-sm">Document PDF</span>
-          <a href={src} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline ml-auto">Ouvrir</a>
         </div>
       )}
     </div>
@@ -79,11 +120,17 @@ export default function AdminBusinessKycDetail() {
 
   const verifyMutation = useMutation({
     mutationFn: async ({ status, reason }: { status: string; reason?: string }) => {
-      await apiRequest("POST", `/api/admin/users/${userId}/kyc`, { status, rejectionReason: reason });
+      if (status === "verified") {
+        await apiRequest("POST", "/api/admin/approve-kyc", { userId });
+      } else {
+        await apiRequest("POST", "/api/admin/reject-kyc", { userId, reason });
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/business/users"] });
       queryClient.invalidateQueries({ queryKey: [`/api/admin/user/${userId}/profile`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/kyc-submissions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-kyc-count"] });
       setShowRejectInput(false);
       setRejectReason("");
       toast({ title: "Succès", description: "Statut KYC mis à jour" });
