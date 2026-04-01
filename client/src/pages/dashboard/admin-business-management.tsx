@@ -36,7 +36,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { CountryFlag } from "@/components/country-flag";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-const BUSINESS_COUNTRIES = ["BJ", "TG", "CI", "BF", "SN", "CM", "CD", "GA", "CG", "ZM", "UG"];
+const BUSINESS_COUNTRIES = [
+  "BJ", "CI", "SN", "TG", "BF", "ML", "GN", "NE", "CM", "CD",
+  "TD", "CG", "CF", "GA", "RW", "GM", "GH", "KE", "TZ", "UG",
+  "ZM", "MW", "MZ", "NG", "SL", "LS",
+];
 
 interface BusinessStats {
   totalUsers: number;
