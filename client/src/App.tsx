@@ -168,39 +168,41 @@ function DashboardLayout({ children, type = "personal" }: { children: React.Reac
   };
 
   return (
-    <SidebarProvider style={style as React.CSSProperties}>
-      <div className="flex h-screen w-full overflow-hidden">
-        {type === "business" ? <BusinessSidebar /> : <AppSidebar />}
-        <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-          <header className="flex items-center justify-between gap-4 p-4 border-b bg-card sticky top-0 z-20">
-            <div className="flex items-center gap-4">
-              <div className="flex flex-col items-center gap-0.5">
-                <SidebarTrigger size="lg" data-testid="button-sidebar-toggle" />
-                <span className="text-[10px] font-medium text-muted-foreground leading-none">MENU</span>
+    <div className="h-screen w-full overflow-hidden">
+      <SidebarProvider style={style as React.CSSProperties} className="h-full">
+        <div className="flex h-full w-full overflow-hidden">
+          {type === "business" ? <BusinessSidebar /> : <AppSidebar />}
+          <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+            <header className="flex items-center justify-between gap-4 p-4 border-b bg-card sticky top-0 z-20">
+              <div className="flex items-center gap-4">
+                <div className="flex flex-col items-center gap-0.5">
+                  <SidebarTrigger size="lg" data-testid="button-sidebar-toggle" />
+                  <span className="text-[10px] font-medium text-muted-foreground leading-none">MENU</span>
+                </div>
+                {type === "personal" && (
+                  <div className="relative">
+                    <EmaliChatButton />
+                  </div>
+                )}
               </div>
               {type === "personal" && (
-                <div className="relative">
-                  <EmaliChatButton />
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 rounded-lg" data-testid="header-balance">
+                  <Wallet className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-semibold text-primary" data-testid="text-balance">
+                    {formatAmount(stats?.totalBalance ?? user?.balance ?? 0)}
+                  </span>
                 </div>
               )}
-            </div>
-            {type === "personal" && (
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 rounded-lg" data-testid="header-balance">
-                <Wallet className="h-4 w-4 text-primary" />
-                <span className="text-sm font-semibold text-primary" data-testid="text-balance">
-                  {formatAmount(stats?.totalBalance ?? user?.balance ?? 0)}
-                </span>
-              </div>
-            )}
-          </header>
-          <main className="flex-1 overflow-y-auto">
-            <Suspense fallback={<PageLoader />}>
-              {children}
-            </Suspense>
-          </main>
+            </header>
+            <main className="flex-1 overflow-y-auto">
+              <Suspense fallback={<PageLoader />}>
+                {children}
+              </Suspense>
+            </main>
+          </div>
         </div>
-      </div>
-    </SidebarProvider>
+      </SidebarProvider>
+    </div>
   );
 }
 
