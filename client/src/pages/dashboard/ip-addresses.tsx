@@ -102,16 +102,23 @@ export default function IpAddresses() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               {uniqueAfribapayIps.map((ip) => (
-                <div key={ip} className="flex items-center gap-2 p-3 rounded-md bg-muted/50">
-                  <code className="text-base font-mono font-bold flex-1" data-testid={`text-ip-afribapay-${ip}`}>{ip}</code>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => copyIp(ip)}
-                    data-testid={`button-copy-afribapay-${ip}`}
-                  >
-                    {copiedIp === ip ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                  </Button>
+                <div key={ip} className="rounded-md bg-muted/50 overflow-hidden">
+                  <div className="flex items-center gap-2 p-3">
+                    <code className="text-base font-mono font-bold flex-1 break-all" data-testid={`text-ip-afribapay-${ip}`}>{ip}</code>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => copyIp(ip)}
+                      data-testid={`button-copy-afribapay-${ip}`}
+                    >
+                      {copiedIp === ip ? <><Check className="w-4 h-4 mr-1" />Copie</> : <><Copy className="w-4 h-4 mr-1" />Copier</>}
+                    </Button>
+                  </div>
+                  {ip.endsWith("::") && (
+                    <div className="px-3 pb-2 text-xs text-muted-foreground">
+                      Cette adresse est une IPv6 complete — les "::" remplacent des zeros. Copiez-la telle quelle dans AfribaPay.
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -212,7 +219,7 @@ export default function IpAddresses() {
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <code className="font-mono font-bold text-sm">{log.ip_address}</code>
+                      <code className="font-mono font-bold text-sm break-all">{log.ip_address}</code>
                       <Badge variant={log.resolved ? "secondary" : "destructive"}>
                         {log.resolved ? "Configuree" : "A configurer"}
                       </Badge>

@@ -335,13 +335,36 @@ export async function createAfribaPayPayout(params: AfribaPayPayoutParams): Prom
       const isIpError =
         (errorCode === 403 || response.status === 403) &&
         (errorMsg || "").toLowerCase().includes("ip");
-      if (isIpError && data.request_ip) {
-        logAfribaPayIpError(
-          data.request_ip,
-          errorMsg || "No PAYOUT or ALL IPs configured",
-          params.countryCode,
-          params.operator
-        );
+      if (isIpError) {
+        // Priorité 1 : IP directement dans data.request_ip
+        // Priorité 2 : extraire l'IP du message d'erreur (ex: "Please whitelist IP 2600:... for PAYOUT")
+        // Priorité 3 : récupérer l'IP publique du serveur
+        let ipToLog: string | null = data.request_ip || null;
+        if (!ipToLog) {
+          const ipMatch = (errorMsg || "").match(/\b([0-9a-fA-F:]{2,}(?::[0-9a-fA-F:]*)+)\b/);
+          if (ipMatch) ipToLog = ipMatch[1];
+        }
+        if (!ipToLog) {
+          try {
+            const r = await fetch("https://api6.ipify.org?format=json", { signal: AbortSignal.timeout(4000) });
+            const d = await r.json();
+            ipToLog = d.ip || null;
+          } catch {
+            try {
+              const r2 = await fetch("https://api.ipify.org?format=json", { signal: AbortSignal.timeout(4000) });
+              const d2 = await r2.json();
+              ipToLog = d2.ip || null;
+            } catch { /* impossible d'obtenir l'IP */ }
+          }
+        }
+        if (ipToLog) {
+          logAfribaPayIpError(
+            ipToLog,
+            errorMsg || "No PAYOUT or ALL IPs configured",
+            params.countryCode,
+            params.operator
+          );
+        }
       }
 
       return {
