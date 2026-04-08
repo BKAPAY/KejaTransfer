@@ -11991,6 +11991,20 @@ SUPPORT ET CONTACT:
     }
   });
 
+  // Server IP - Admin endpoint
+  app.get("/api/admin/server-ip", requireAdmin, async (req: Request, res: Response) => {
+    const results: Record<string, string | null> = { ipv4: null, ipv6: null };
+    try {
+      const [r4, r6] = await Promise.allSettled([
+        fetch("https://api.ipify.org?format=json", { signal: AbortSignal.timeout(5000) }).then(r => r.json()),
+        fetch("https://api6.ipify.org?format=json", { signal: AbortSignal.timeout(5000) }).then(r => r.json()),
+      ]);
+      if (r4.status === "fulfilled") results.ipv4 = r4.value.ip || null;
+      if (r6.status === "fulfilled") results.ipv6 = r6.value.ip || null;
+    } catch {}
+    res.json(results);
+  });
+
   // MoneyFusion IP Logs - Admin routes
   app.get("/api/admin/moneyfusion-ip-logs", requireAdmin, async (req: Request, res: Response) => {
     try {
