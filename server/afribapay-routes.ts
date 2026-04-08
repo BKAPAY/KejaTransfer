@@ -263,8 +263,9 @@ export async function handleAfribaPayTransfer(
     const balanceCurrency = userCurrency || providerCurrency;
 
     const feeConfig = await getFeeFromDatabase(storage, "afribapay", country, operator);
-    const feePercentage = feeConfig.outgoing;
-    const feeAmount = Math.ceil(netAmount * (feePercentage / 100));
+    const feeInfo = calculateOutgoingFee(netAmount, feeConfig.outgoing);
+    const feePercentage = feeInfo.feePercentage;
+    const feeAmount = feeInfo.feeAmount;
     const totalDeducted = netAmount + feeAmount;
 
     if (user.balance < totalDeducted) {
