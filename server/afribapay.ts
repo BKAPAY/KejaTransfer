@@ -260,6 +260,21 @@ export interface AfribaPayPayoutResult {
   fees?: number;
 }
 
+async function logAfribaPayIpError(ipAddress: string, errorMessage: string, countryCode: string, operatorCode: string) {
+  try {
+    const postgres = (await import("postgres")).default;
+    const client = postgres(process.env.DATABASE_URL!);
+    await client`
+      INSERT INTO moneyfusion_ip_logs (ip_address, error_message, country_code, operator_code, provider)
+      VALUES (${ipAddress}, ${errorMessage}, ${countryCode}, ${operatorCode}, 'afribapay')
+    `;
+    await client.end();
+    console.log(`[AfribaPay IP Log] IP ${ipAddress} loggee pour ${countryCode}/${operatorCode}`);
+  } catch (e) {
+    console.error("[AfribaPay IP Log] Echec du log IP:", e);
+  }
+}
+
 export async function createAfribaPayPayout(params: AfribaPayPayoutParams): Promise<AfribaPayPayoutResult> {
   try {
     const config = await getAfribaPayConfig();
@@ -314,6 +329,21 @@ export async function createAfribaPayPayout(params: AfribaPayPayoutParams): Prom
         data.message ||
         (typeof data.error === "string" ? data.error : data.error?.message) ||
         "Erreur lors de l'initiation du transfert";
+
+      // Si c'est une erreur IP (403 + message IP), logger pour l'admin
+      const errorCode = typeof data.error === "object" ? data.error?.code : null;
+      const isIpError =
+        (errorCode === 403 || response.status === 403) &&
+        (errorMsg || "").toLowerCase().includes("ip");
+      if (isIpError && data.request_ip) {
+        logAfribaPayIpError(
+          data.request_ip,
+          errorMsg || "No PAYOUT or ALL IPs configured",
+          params.countryCode,
+          params.operator
+        );
+      }
+
       return {
         success: false,
         error: errorMsg,

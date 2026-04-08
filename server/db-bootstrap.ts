@@ -213,6 +213,9 @@ async function bootstrapDatabase() {
           created_at TIMESTAMP DEFAULT NOW()
         )
       `;
+      await ipLogsClient`
+        ALTER TABLE moneyfusion_ip_logs ADD COLUMN IF NOT EXISTS provider TEXT DEFAULT 'moneyfusion'
+      `;
       console.log("✅ MoneyFusion IP logs table ready");
     } catch (e) {
       console.error("⚠️ MoneyFusion IP logs setup error:", e);

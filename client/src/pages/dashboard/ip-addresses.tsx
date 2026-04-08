@@ -17,6 +17,7 @@ interface IpLog {
   operator_code: string;
   resolved: boolean;
   created_at: string;
+  provider?: string;
 }
 
 export default function IpAddresses() {
@@ -64,8 +65,13 @@ export default function IpAddresses() {
     setTimeout(() => setCopiedIp(null), 2000);
   };
 
-  const uniqueIps = ipLogs ? Array.from(new Set(ipLogs.filter(l => !l.resolved).map(l => l.ip_address))) : [];
-  const unresolvedCount = ipLogs?.filter(l => !l.resolved).length || 0;
+  const unresolvedLogs = ipLogs?.filter(l => !l.resolved) || [];
+
+  const afribapayUnresolved = unresolvedLogs.filter(l => l.provider === "afribapay");
+  const moneyfusionUnresolved = unresolvedLogs.filter(l => !l.provider || l.provider === "moneyfusion");
+
+  const uniqueAfribapayIps = Array.from(new Set(afribapayUnresolved.map(l => l.ip_address)));
+  const uniqueMoneyfusionIps = Array.from(new Set(moneyfusionUnresolved.map(l => l.ip_address)));
 
   return (
     <div className="space-y-6">
@@ -74,27 +80,71 @@ export default function IpAddresses() {
           <ArrowLeft className="w-4 h-4" />
         </Button>
         <div className="flex-1 min-w-0">
-          <h1 className="text-2xl font-bold text-foreground">Adresses IP - MoneyFusion</h1>
+          <h1 className="text-2xl font-bold text-foreground">Adresses IP a configurer</h1>
           <p className="text-sm text-muted-foreground">
-            Adresses IP du serveur a configurer dans le tableau de bord MoneyFusion pour autoriser les retraits
+            IPs du serveur detectees lors d'echecs de retraits/transferts — a autoriser dans les tableaux de bord fournisseurs
           </p>
         </div>
       </div>
 
-      {unresolvedCount > 0 && uniqueIps.length > 0 && (
+      {/* Bloc AfribaPay */}
+      {uniqueAfribapayIps.length > 0 && (
         <Card className="border-orange-200 dark:border-orange-800">
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
               <AlertCircle className="w-5 h-5 text-orange-500" />
-              IP a configurer chez MoneyFusion
+              AfribaPay — IP a configurer pour les PAYOUT
+            </CardTitle>
+            <CardDescription>
+              Des retraits ou transferts AfribaPay ont echoue a cause de ces adresses IP non autorisees
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              {uniqueAfribapayIps.map((ip) => (
+                <div key={ip} className="flex items-center gap-2 p-3 rounded-md bg-muted/50">
+                  <code className="text-base font-mono font-bold flex-1" data-testid={`text-ip-afribapay-${ip}`}>{ip}</code>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => copyIp(ip)}
+                    data-testid={`button-copy-afribapay-${ip}`}
+                  >
+                    {copiedIp === ip ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  </Button>
+                </div>
+              ))}
+            </div>
+            <div className="rounded-md bg-muted/40 p-4 space-y-2 text-sm">
+              <p className="font-semibold text-foreground">Comment configurer dans AfribaPay :</p>
+              <ol className="space-y-1 text-muted-foreground list-none">
+                <li><span className="font-bold text-foreground">1.</span> Connectez-vous sur <span className="font-mono">cp.afribapay.com</span></li>
+                <li><span className="font-bold text-foreground">2.</span> Allez dans <span className="font-semibold">Securite &amp; API</span> → <span className="font-semibold">Adresses IP autorisees</span></li>
+                <li><span className="font-bold text-foreground">3.</span> Selectionnez le type de transaction : <span className="font-semibold">PAYOUT</span></li>
+                <li><span className="font-bold text-foreground">4.</span> Donnez un nom au serveur (ex: <span className="font-mono">BKApay Production</span>)</li>
+                <li><span className="font-bold text-foreground">5.</span> Collez l'adresse IP ci-dessus dans le champ "Adresse IP"</li>
+                <li><span className="font-bold text-foreground">6.</span> Cliquez sur <span className="font-semibold">Mettre a jour</span></li>
+              </ol>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Bloc MoneyFusion */}
+      {uniqueMoneyfusionIps.length > 0 && (
+        <Card className="border-orange-200 dark:border-orange-800">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-orange-500" />
+              MoneyFusion — IP a configurer
             </CardTitle>
             <CardDescription>
               Copiez ces adresses IP et ajoutez-les dans la section Parametres de votre tableau de bord MoneyFusion
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
             <div className="space-y-2">
-              {uniqueIps.map((ip) => (
+              {uniqueMoneyfusionIps.map((ip) => (
                 <div key={ip} className="flex items-center gap-2 p-3 rounded-md bg-muted/50">
                   <code className="text-base font-mono font-bold flex-1" data-testid={`text-ip-${ip}`}>{ip}</code>
                   <Button
@@ -108,10 +158,20 @@ export default function IpAddresses() {
                 </div>
               ))}
             </div>
+            <div className="rounded-md bg-muted/40 p-4 space-y-2 text-sm">
+              <p className="font-semibold text-foreground">Comment configurer dans MoneyFusion :</p>
+              <ol className="space-y-1 text-muted-foreground list-none">
+                <li><span className="font-bold text-foreground">1.</span> Connectez-vous sur votre tableau de bord MoneyFusion</li>
+                <li><span className="font-bold text-foreground">2.</span> Allez dans <span className="font-semibold">Parametres</span> → <span className="font-semibold">Adresses IP autorisees</span></li>
+                <li><span className="font-bold text-foreground">3.</span> Ajoutez l'adresse IP ci-dessus</li>
+                <li><span className="font-bold text-foreground">4.</span> Sauvegardez les modifications</li>
+              </ol>
+            </div>
           </CardContent>
         </Card>
       )}
 
+      {/* Historique complet */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-2">
           <div>
@@ -140,7 +200,7 @@ export default function IpAddresses() {
             <div className="text-center py-8 text-muted-foreground">
               <Network className="w-10 h-10 mx-auto mb-2 opacity-40" />
               <p>Aucune erreur IP enregistree</p>
-              <p className="text-xs mt-1">Les erreurs d'adresse IP MoneyFusion apparaitront ici automatiquement</p>
+              <p className="text-xs mt-1">Les erreurs d'adresse IP (AfribaPay, MoneyFusion) apparaitront ici automatiquement lors d'echecs de retraits</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -156,12 +216,15 @@ export default function IpAddresses() {
                       <Badge variant={log.resolved ? "secondary" : "destructive"}>
                         {log.resolved ? "Configuree" : "A configurer"}
                       </Badge>
+                      <Badge variant="outline">
+                        {log.provider === "afribapay" ? "AfribaPay" : "MoneyFusion"}
+                      </Badge>
                       {log.country_code && (
                         <Badge variant="outline">{log.country_code.toUpperCase()}/{log.operator_code}</Badge>
                       )}
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {log.error_message} - {new Date(log.created_at).toLocaleString("fr-FR")}
+                      {log.error_message} — {new Date(log.created_at).toLocaleString("fr-FR")}
                     </p>
                   </div>
                   <div className="flex items-center gap-1">
