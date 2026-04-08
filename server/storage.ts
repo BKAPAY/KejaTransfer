@@ -120,6 +120,7 @@ export interface IStorage {
   updateTransaction(id: string, updates: Partial<Pick<Transaction, 'paydunyaToken' | 'country' | 'operator' | 'status' | 'metadata' | 'paydunyaReceiptUrl'>>): Promise<Transaction | undefined>;
   updateTransactionMetadata(id: string, metadata: string): Promise<Transaction | undefined>;
   atomicMarkRefundedAndCredit(transactionId: string, userId: string, refundAmount: number, source: string): Promise<boolean>;
+  atomicFailAndRefundBusinessWallet(transactionId: string, userId: string, country: string, currency: string, refundAmount: number, source: string): Promise<boolean>;
   finalizeIncomingTransaction(id: string, extras?: { paydunyaReceiptUrl?: string }): Promise<{ transaction: Transaction; credited: boolean } | null>;
   atomicFailAndRefundPayout(transactionId: string, userId: string, refundAmount: number): Promise<boolean>;
   atomicCompleteTransaction(transactionId: string): Promise<boolean>;
@@ -1084,72 +1085,99 @@ export class DbStorage implements IStorage {
       netAmount = pendingTx.amount - (pendingTx.fee || 0);
     }
 
+    const receiptUrl = extras?.paydunyaReceiptUrl ?? null;
+
     if (isBusiness) {
       if (!businessCountry || !businessCurrency) {
         console.error(`[Storage] CRITICAL: Business transaction ${id} missing wallet coordinates (country=${businessCountry}, currency=${businessCurrency}) - NOT crediting personal balance`);
-        const updateData: any = { status: "completed" };
-        if (extras?.paydunyaReceiptUrl) updateData.paydunyaReceiptUrl = extras.paydunyaReceiptUrl;
-        const results = await db
-          .update(schema.transactions)
-          .set(updateData)
-          .where(and(eq(schema.transactions.id, id), eq(schema.transactions.status, "pending")))
-          .returning();
-        return results.length > 0 ? { transaction: results[0], credited: false } : null;
+        const result = await client.begin(async (tx) => {
+          let updated: any[];
+          if (receiptUrl) {
+            updated = await tx`UPDATE transactions SET status = 'completed', paydunya_receipt_url = ${receiptUrl} WHERE id = ${id} AND status = 'pending' RETURNING *`;
+          } else {
+            updated = await tx`UPDATE transactions SET status = 'completed' WHERE id = ${id} AND status = 'pending' RETURNING *`;
+          }
+          return updated.length > 0 ? { transaction: updated[0] as unknown as Transaction, credited: false } : null;
+        });
+        return result;
       }
 
-      const existing = await this.getBusinessWallet(pendingTx.userId, businessCountry, businessCurrency);
-      const currentBalance = existing ? existing.balance : 0;
+      const result = await client.begin(async (tx) => {
+        let updated: any[];
+        if (receiptUrl) {
+          updated = await tx`UPDATE transactions SET status = 'completed', paydunya_receipt_url = ${receiptUrl} WHERE id = ${id} AND status = 'pending' RETURNING *`;
+        } else {
+          updated = await tx`UPDATE transactions SET status = 'completed' WHERE id = ${id} AND status = 'pending' RETURNING *`;
+        }
+        if (updated.length === 0) return null;
 
-      const updateData: any = { status: "completed" };
-      if (extras?.paydunyaReceiptUrl) updateData.paydunyaReceiptUrl = extras.paydunyaReceiptUrl;
+        await tx`
+          INSERT INTO business_wallets (id, user_id, country, currency, balance, created_at)
+          VALUES (gen_random_uuid(), ${pendingTx.userId}, ${businessCountry}, ${businessCurrency}, ${netAmount}, now())
+          ON CONFLICT (user_id, country, currency)
+          DO UPDATE SET balance = business_wallets.balance + ${netAmount}
+        `;
 
-      const results = await db
-        .update(schema.transactions)
-        .set(updateData)
-        .where(and(eq(schema.transactions.id, id), eq(schema.transactions.status, "pending")))
-        .returning();
+        return { transaction: updated[0] as unknown as Transaction, credited: true };
+      });
 
-      if (results.length === 0) return null;
+      if (result?.credited) {
+        console.log(`[Storage] Finalized business transaction ${id}: credited ${netAmount} ${businessCurrency} to business wallet ${businessCountry} for user ${pendingTx.userId} (customerPaysFee: ${customerPaysFee})`);
+      }
+      return result;
+    }
 
-      if (existing) {
-        await db
-          .update(schema.businessWallets)
-          .set({ balance: currentBalance + netAmount })
-          .where(eq(schema.businessWallets.id, existing.id));
+    const result = await client.begin(async (tx) => {
+      let updated: any[];
+      if (receiptUrl) {
+        updated = await tx`UPDATE transactions SET status = 'completed', paydunya_receipt_url = ${receiptUrl} WHERE id = ${id} AND status = 'pending' RETURNING *`;
       } else {
-        await db
-          .insert(schema.businessWallets)
-          .values({ userId: pendingTx.userId, country: businessCountry, currency: businessCurrency, balance: netAmount });
+        updated = await tx`UPDATE transactions SET status = 'completed' WHERE id = ${id} AND status = 'pending' RETURNING *`;
+      }
+      if (updated.length === 0) return null;
+
+      const userUpdated = await tx`UPDATE users SET balance = balance + ${netAmount} WHERE id = ${pendingTx.userId} RETURNING id`;
+
+      return {
+        transaction: updated[0] as unknown as Transaction,
+        credited: userUpdated.length > 0,
+      };
+    });
+
+    if (result?.credited) {
+      console.log(`[Storage] Finalized transaction ${id}: credited ${netAmount} to user ${pendingTx.userId} (customerPaysFee: ${customerPaysFee})`);
+    }
+    return result;
+  }
+
+  async atomicFailAndRefundBusinessWallet(transactionId: string, userId: string, country: string, currency: string, refundAmount: number, source: string): Promise<boolean> {
+    const result = await client.begin(async (tx) => {
+      const updated = await tx`
+        UPDATE transactions
+        SET status = 'failed'
+        WHERE id = ${transactionId}
+          AND status = 'pending'
+        RETURNING id
+      `;
+
+      if (updated.length === 0) {
+        return false;
       }
 
-      console.log(`[Storage] Finalized business transaction ${id}: credited ${netAmount} ${businessCurrency} to business wallet ${businessCountry} for user ${pendingTx.userId} (customerPaysFee: ${customerPaysFee})`);
-      return { transaction: results[0], credited: true };
+      await tx`
+        INSERT INTO business_wallets (id, user_id, country, currency, balance, created_at)
+        VALUES (gen_random_uuid(), ${userId}, ${country}, ${currency}, ${refundAmount}, now())
+        ON CONFLICT (user_id, country, currency)
+        DO UPDATE SET balance = business_wallets.balance + ${refundAmount}
+      `;
+
+      return true;
+    });
+
+    if (result) {
+      console.log(`[Storage] atomicFailAndRefundBusinessWallet: refunded ${refundAmount} ${currency} to business wallet ${country} for user ${userId} (tx: ${transactionId}, source: ${source})`);
     }
-
-    const updateData: any = { status: "completed" };
-    if (extras?.paydunyaReceiptUrl) updateData.paydunyaReceiptUrl = extras.paydunyaReceiptUrl;
-
-    const results = await db
-      .update(schema.transactions)
-      .set(updateData)
-      .where(and(eq(schema.transactions.id, id), eq(schema.transactions.status, "pending")))
-      .returning();
-
-    if (results.length === 0) return null;
-    const transaction = results[0];
-
-    const user = await this.getUser(transaction.userId);
-    if (user) {
-      await db
-        .update(schema.users)
-        .set({ balance: user.balance + netAmount })
-        .where(eq(schema.users.id, transaction.userId));
-
-      console.log(`[Storage] Finalized transaction ${id}: credited ${netAmount} to user ${transaction.userId} (customerPaysFee: ${customerPaysFee})`);
-      return { transaction, credited: true };
-    }
-
-    return { transaction, credited: false };
+    return result;
   }
 
   async atomicFailAndRefundPayout(transactionId: string, userId: string, refundAmount: number): Promise<boolean> {
