@@ -208,9 +208,13 @@ export async function createAfribaPayPayin(params: AfribaPayPayinParams): Promis
 
     if (!response.ok || !data.data?.transaction_id) {
       console.error("[AfribaPay Payin] Error:", data);
+      const errorMsg =
+        data.message ||
+        (typeof data.error === "string" ? data.error : data.error?.message) ||
+        "Erreur lors de l'initiation du paiement";
       return {
         success: false,
-        error: data.message || data.error || "Erreur lors de l'initiation du paiement",
+        error: errorMsg,
       };
     }
 
@@ -306,9 +310,13 @@ export async function createAfribaPayPayout(params: AfribaPayPayoutParams): Prom
 
     if (!response.ok || !data.data?.transaction_id) {
       console.error("[AfribaPay Payout] Error:", data);
+      const errorMsg =
+        data.message ||
+        (typeof data.error === "string" ? data.error : data.error?.message) ||
+        "Erreur lors de l'initiation du transfert";
       return {
         success: false,
-        error: data.message || data.error || "Erreur lors de l'initiation du transfert",
+        error: errorMsg,
       };
     }
 
@@ -369,9 +377,13 @@ export async function getAfribaPayTransaction(transactionId: string): Promise<Af
 
     if (!response.ok || !data.data) {
       console.error("[AfribaPay Transaction] Error:", data);
+      const errorMsg =
+        data.message ||
+        (typeof data.error === "string" ? data.error : data.error?.message) ||
+        "Transaction non trouvee";
       return {
         success: false,
-        error: data.message || data.error || "Transaction non trouvee",
+        error: errorMsg,
       };
     }
 
@@ -512,7 +524,7 @@ export function mapAfribaPayStatus(afribaPayStatus: string): string {
   return AFRIBAPAY_STATUS_MAPPING[afribaPayStatus?.toUpperCase()] || "pending";
 }
 
-export function translateAfribaPayError(rawError: string | undefined, context: "deposit" | "withdrawal" | "transfer" = "withdrawal"): string {
+export function translateAfribaPayError(rawError: any, context: "deposit" | "withdrawal" | "transfer" = "withdrawal"): string {
   if (!rawError) {
     const defaults: Record<string, string> = {
       deposit: "Le paiement a echoue. Veuillez reessayer.",
@@ -522,7 +534,17 @@ export function translateAfribaPayError(rawError: string | undefined, context: "
     return defaults[context];
   }
 
-  const err = rawError.toLowerCase();
+  // Normaliser l'erreur en string quelle que soit sa forme (string ou objet)
+  let errorStr: string;
+  if (typeof rawError === "string") {
+    errorStr = rawError;
+  } else if (typeof rawError === "object") {
+    errorStr = rawError?.message || rawError?.error?.message || JSON.stringify(rawError);
+  } else {
+    errorStr = String(rawError);
+  }
+
+  const err = errorStr.toLowerCase();
 
   if (err.includes("insufficient") || err.includes("solde insuffisant") || err.includes("balance") || err.includes("fonds")) {
     return "Votre solde est insuffisant pour cette operation.";
