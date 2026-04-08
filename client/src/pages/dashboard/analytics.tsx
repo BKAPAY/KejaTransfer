@@ -75,6 +75,7 @@ const OPERATOR_LOGOS: Record<string, string> = {
   expresso: expressoImage,
   coris: corisImage,
   afrimoney: afrimoneyImage,
+  africell: airtelImage,
   qmoney: qmoneyImage,
   telecel: telecelImage,
   wizall: wizallImage,

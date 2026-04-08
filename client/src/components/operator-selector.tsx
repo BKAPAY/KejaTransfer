@@ -47,6 +47,7 @@ const OPERATOR_LOGOS: Record<string, { image?: string; color: string; bgColor: s
   expresso: { image: expressoImage, color: "#673AB7", bgColor: "bg-violet-100 dark:bg-violet-950", textColor: "text-violet-600 dark:text-violet-400" },
   coris: { image: corisImage, color: "#FF9800", bgColor: "bg-amber-100 dark:bg-amber-950", textColor: "text-amber-600 dark:text-amber-400" },
   afrimoney: { image: afrimoneyImage, color: "#2196F3", bgColor: "bg-sky-100 dark:bg-sky-950", textColor: "text-sky-600 dark:text-sky-400" },
+  africell: { image: airtelImage, color: "#E53935", bgColor: "bg-red-100 dark:bg-red-950", textColor: "text-red-600 dark:text-red-400" },
   qmoney: { image: qmoneyImage, color: "#607D8B", bgColor: "bg-slate-100 dark:bg-slate-800", textColor: "text-slate-600 dark:text-slate-400" },
   telecel: { image: telecelImage, color: "#795548", bgColor: "bg-stone-100 dark:bg-stone-900", textColor: "text-stone-600 dark:text-stone-400" },
   wizall: { image: wizallImage, color: "#00BCD4", bgColor: "bg-cyan-100 dark:bg-cyan-950", textColor: "text-cyan-600 dark:text-cyan-400" },
