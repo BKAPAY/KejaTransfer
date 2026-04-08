@@ -91,16 +91,16 @@ export default function Deposit() {
     onFailed: () => {
       setPaymentStep("form");
       toast({
-        title: "Paiement echoue",
-        description: "Le paiement n'a pas abouti",
+        title: "Transaction non aboutie",
+        description: "Le paiement n'a pas pu etre effectue. Veuillez verifier votre solde mobile money et reessayer.",
         variant: "destructive",
       });
     },
     onExpired: () => {
       setPaymentStep("form");
       toast({
-        title: "Delai expire",
-        description: "Le paiement n'a pas ete confirme dans le delai imparti",
+        title: "Delai de validation depasse",
+        description: "La transaction n'a pas ete confirmee dans le temps imparti. Aucun montant n'a ete debite. Veuillez reessayer.",
         variant: "destructive",
       });
     },
@@ -377,8 +377,8 @@ export default function Deposit() {
         countdown.resetCountdown();
         setPaymentStep("form");
         toast({
-          title: "Erreur",
-          description: response.error || "Erreur lors du depot",
+          title: "Paiement non effectue",
+          description: response.error || "Le depot n'a pas pu etre initie. Veuillez verifier vos informations et reessayer.",
           variant: "destructive",
         });
       }
@@ -387,8 +387,8 @@ export default function Deposit() {
       countdown.resetCountdown();
       setPaymentStep("form");
       toast({
-        title: "Erreur",
-        description: error.message || "Erreur lors du depot",
+        title: "Paiement non effectue",
+        description: error.message || "Le depot n'a pas pu etre initie. Veuillez verifier vos informations et reessayer.",
         variant: "destructive",
       });
     },
@@ -453,16 +453,16 @@ export default function Deposit() {
         }
       } else {
         toast({
-          title: "Erreur",
-          description: response.error || "Code OTP invalide",
+          title: "Validation echouee",
+          description: response.error || "Le code OTP est invalide ou a expire. Veuillez generer un nouveau code et reessayer.",
           variant: "destructive",
         });
       }
     },
     onError: (error: any) => {
       toast({
-        title: "Erreur",
-        description: error.message || "Erreur lors de la validation du code",
+        title: "Validation echouee",
+        description: error.message || "La validation du code n'a pas abouti. Veuillez reessayer.",
         variant: "destructive",
       });
     },
@@ -471,7 +471,7 @@ export default function Deposit() {
   const handleOtpSubmit = () => {
     if (!otpCode.trim()) {
       toast({
-        title: "Erreur",
+        title: "Code requis",
         description: "Veuillez entrer le code OTP",
         variant: "destructive",
       });
@@ -480,8 +480,8 @@ export default function Deposit() {
     
     if (paymentData.provider !== "mbiyopay" && (!paymentData.paydunyaToken || !paymentData.transactionId)) {
       toast({
-        title: "Erreur",
-        description: "Donnees de paiement manquantes. Veuillez recommencer.",
+        title: "Donnees manquantes",
+        description: "Les informations de paiement sont incompletes. Veuillez recommencer.",
         variant: "destructive",
       });
       setPaymentStep("form");

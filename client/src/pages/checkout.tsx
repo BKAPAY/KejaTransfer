@@ -495,7 +495,7 @@ export default function Checkout() {
       setStage("form");
       setPaymentActive(false);
       paymentCountdown.resetCountdown();
-      toast({ title: "Erreur", description: error.message, variant: "destructive" });
+      toast({ title: "Paiement non effectue", description: error.message || "Le paiement n'a pas pu etre initie. Veuillez reessayer.", variant: "destructive" });
     },
   });
 

@@ -26,7 +26,7 @@ export default function PaymentFailed() {
             <>
               <Loader2 className="w-14 h-14 text-primary animate-spin" />
               <div>
-                <h1 className="text-xl font-semibold">Paiement annule</h1>
+                <h1 className="text-xl font-semibold">Transaction annulee</h1>
                 <p className="text-sm text-muted-foreground mt-1">Redirection vers le site marchand...</p>
               </div>
             </>
@@ -34,9 +34,9 @@ export default function PaymentFailed() {
             <>
               <XCircle className="w-14 h-14 text-destructive" />
               <div>
-                <h1 className="text-xl font-semibold">Paiement echoue</h1>
+                <h1 className="text-xl font-semibold">Transaction non aboutie</h1>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Votre paiement n'a pas pu etre traite.
+                  Votre paiement n'a pas pu etre effectue. Aucun montant n'a ete debite de votre compte.
                   Veuillez reessayer ou contacter le marchand.
                 </p>
               </div>

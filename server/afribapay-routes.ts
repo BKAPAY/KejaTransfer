@@ -87,7 +87,7 @@ export async function handleAfribaPayDeposit(
     });
 
     if (!result.success) {
-      return { success: false, error: result.error || "Erreur lors du depot" };
+      return { success: false, error: translateAfribaPayError(result.error, "deposit") };
     }
 
     const tx = await storage.createTransaction({
@@ -125,7 +125,7 @@ export async function handleAfribaPayDeposit(
     };
   } catch (error: any) {
     console.error("[AfribaPay Deposit] Error:", error);
-    return { success: false, error: "Erreur lors du depot" };
+    return { success: false, error: translateAfribaPayError(error?.message, "deposit") };
   }
 }
 
@@ -407,7 +407,7 @@ export async function handleAfribaPayPaymentLink(
     });
 
     if (!result.success) {
-      return { success: false, error: result.error || "Erreur lors du paiement" };
+      return { success: false, error: translateAfribaPayError(result.error, "deposit") };
     }
 
     const tx = await storage.createTransaction({
@@ -446,7 +446,7 @@ export async function handleAfribaPayPaymentLink(
     };
   } catch (error: any) {
     console.error("[AfribaPay PaymentLink] Error:", error);
-    return { success: false, error: "Erreur lors du paiement" };
+    return { success: false, error: translateAfribaPayError(error?.message, "deposit") };
   }
 }
 
@@ -518,7 +518,7 @@ export async function handleAfribaPayMerchantLink(
     });
 
     if (!result.success) {
-      return { success: false, error: result.error || "Erreur lors du paiement" };
+      return { success: false, error: translateAfribaPayError(result.error, "deposit") };
     }
 
     const tx = await storage.createTransaction({
@@ -557,7 +557,7 @@ export async function handleAfribaPayMerchantLink(
     };
   } catch (error: any) {
     console.error("[AfribaPay MerchantLink] Error:", error);
-    return { success: false, error: "Erreur lors du paiement" };
+    return { success: false, error: translateAfribaPayError(error?.message, "deposit") };
   }
 }
 
@@ -631,7 +631,7 @@ export async function handleAfribaPayApiPayment(
     });
 
     if (!result.success) {
-      return { success: false, error: result.error || "Erreur lors du paiement" };
+      return { success: false, error: translateAfribaPayError(result.error, "deposit") };
     }
 
     const tx = await storage.createTransaction({
@@ -671,7 +671,7 @@ export async function handleAfribaPayApiPayment(
     };
   } catch (error: any) {
     console.error("[AfribaPay API Payment] Error:", error);
-    return { success: false, error: "Erreur lors du paiement" };
+    return { success: false, error: translateAfribaPayError(error?.message, "deposit") };
   }
 }
 

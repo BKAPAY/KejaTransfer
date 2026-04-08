@@ -223,9 +223,11 @@ export default function PaymentStatus() {
             </div>
 
             <div className="space-y-2">
-              <h2 className="text-2xl font-bold text-red-600 dark:text-red-400">Paiement Échoué</h2>
+              <h2 className="text-2xl font-bold text-red-600 dark:text-red-400">Transaction non aboutie</h2>
               <p className="text-sm text-muted-foreground">
-                {isExpired ? "Le délai de validation a expiré" : "La transaction n'a pas pu être complétée"}
+                {isExpired
+                  ? "Le delai de validation a expire. Aucun montant n'a ete debite de votre compte."
+                  : "Le paiement n'a pas pu etre effectue. Veuillez reessayer ou contacter le support."}
               </p>
             </div>
 

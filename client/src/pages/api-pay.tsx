@@ -449,8 +449,8 @@ export default function ApiPay() {
       setPaymentStage("failed");
       if (key) clearPaymentState(key);
       toast({
-        title: "Paiement echoue",
-        description: "La transaction n'a pas pu etre completee",
+        title: "Transaction non aboutie",
+        description: "Le paiement n'a pas pu etre effectue. Veuillez verifier votre solde mobile money et reessayer.",
         variant: "destructive",
       });
       if (isInlineMode && window.parent !== window) {
@@ -472,8 +472,8 @@ export default function ApiPay() {
       setPaymentStage("failed");
       if (key) clearPaymentState(key);
       toast({
-        title: "Delai expire",
-        description: "Le temps de validation a expire",
+        title: "Delai de validation depasse",
+        description: "La transaction n'a pas ete confirmee dans le temps imparti. Aucun montant n'a ete debite. Veuillez reessayer.",
         variant: "destructive",
       });
       if (isInlineMode && window.parent !== window) {
@@ -609,8 +609,8 @@ export default function ApiPay() {
       countdown.resetCountdown();
       setPaymentStage("failed");
       toast({
-        title: "Erreur",
-        description: error.message || "Erreur lors de l'initialisation du paiement",
+        title: "Paiement non effectue",
+        description: error.message || "Le paiement n'a pas pu etre initie. Veuillez verifier vos informations et reessayer.",
         variant: "destructive",
       });
     },
@@ -677,8 +677,8 @@ export default function ApiPay() {
     },
     onError: (error: any) => {
       toast({
-        title: "Erreur",
-        description: error.message || "Erreur lors de la confirmation du paiement",
+        title: "Confirmation echouee",
+        description: error.message || "La confirmation du paiement n'a pas abouti. Veuillez reessayer.",
         variant: "destructive",
       });
     },
@@ -687,8 +687,8 @@ export default function ApiPay() {
   const handleSubmit = () => {
     if (!customerName || !customerEmail || !customerPhone || !country || !operator) {
       toast({
-        title: "Erreur",
-        description: "Veuillez remplir tous les champs",
+        title: "Champs requis",
+        description: "Veuillez remplir tous les champs avant de continuer.",
         variant: "destructive",
       });
       return;
@@ -703,8 +703,8 @@ export default function ApiPay() {
   const handleConfirm = () => {
     if (!transactionId || !invoiceToken) {
       toast({
-        title: "Erreur",
-        description: "Informations de paiement manquantes",
+        title: "Donnees manquantes",
+        description: "Les informations de paiement sont incompletes. Veuillez recommencer.",
         variant: "destructive",
       });
       return;

@@ -625,8 +625,8 @@ export default function Merchant() {
         setPaymentStage("failed");
         if (token) clearMerchantPaymentState(token);
         toast({
-          title: "Paiement echoue",
-          description: data.error || "Erreur lors de l'initialisation du paiement",
+          title: "Paiement non effectue",
+          description: data.error || "Le paiement n'a pas pu etre initie. Veuillez verifier vos informations et reessayer.",
           variant: "destructive",
         });
       }
@@ -636,8 +636,8 @@ export default function Merchant() {
       setPaymentStage("failed");
       if (token) clearMerchantPaymentState(token);
       toast({
-        title: "Paiement echoue",
-        description: error.message || "Erreur lors de l'initialisation du paiement",
+        title: "Paiement non effectue",
+        description: error.message || "Le paiement n'a pas pu etre initie. Veuillez verifier vos informations et reessayer.",
         variant: "destructive",
       });
     },
@@ -712,8 +712,8 @@ export default function Merchant() {
     },
     onError: (error: any) => {
       toast({
-        title: "Erreur",
-        description: error.message || "Erreur lors de la confirmation du paiement",
+        title: "Confirmation echouee",
+        description: error.message || "La confirmation du paiement n'a pas abouti. Veuillez reessayer.",
         variant: "destructive",
       });
       setPaymentStage("form");
@@ -732,8 +732,8 @@ export default function Merchant() {
   const handleConfirm = async () => {
     if (!transactionId || !invoiceToken) {
       toast({
-        title: "Erreur",
-        description: "Informations de paiement manquantes",
+        title: "Donnees manquantes",
+        description: "Les informations de paiement sont incompletes. Veuillez recommencer.",
         variant: "destructive",
       });
       return;
