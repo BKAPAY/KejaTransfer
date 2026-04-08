@@ -87,6 +87,7 @@ const PROVIDERS: ProviderInfo[] = [
       { code: "ML", name: "Mali", operators: [
         { code: "orange", name: "Orange Money" },
         { code: "moov", name: "Moov Money" },
+        { code: "wave", name: "Wave" },
       ]},
       { code: "GN", name: "Guinee", operators: [
         { code: "orange", name: "Orange Money" },
@@ -106,9 +107,11 @@ const PROVIDERS: ProviderInfo[] = [
         { code: "airteltigo", name: "AirtelTigo Money" },
       ]},
       { code: "CD", name: "RD Congo", operators: [
-        { code: "mpesa", name: "M-Pesa" },
-        { code: "airtel", name: "Airtel Money" },
         { code: "orange", name: "Orange Money" },
+        { code: "airtel", name: "Airtel Money" },
+        { code: "mpesa", name: "M-Pesa" },
+        { code: "africell", name: "Africell" },
+        { code: "vodacom", name: "Vodacom" },
       ]},
       { code: "TD", name: "Tchad", operators: [
         { code: "airtel", name: "Airtel Money" },
@@ -124,6 +127,10 @@ const PROVIDERS: ProviderInfo[] = [
       { code: "GA", name: "Gabon", operators: [
         { code: "airtel", name: "Airtel Money" },
         { code: "moov", name: "Moov Money" },
+      ]},
+      { code: "RW", name: "Rwanda", operators: [
+        { code: "mtn", name: "MTN Mobile Money" },
+        { code: "airtel", name: "Airtel Money" },
       ]},
     ],
   },

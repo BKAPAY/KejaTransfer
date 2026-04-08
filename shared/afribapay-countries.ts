@@ -60,6 +60,7 @@ export const AFRIBAPAY_COUNTRIES: AfribaPayCountry[] = [
     operators: [
       { code: "moov", name: "Moov Money", requiresOtp: false, payin: true, payout: true },
       { code: "mtn", name: "MTN Mobile Money", requiresOtp: false, payin: true, payout: true },
+      { code: "celtiis", name: "Celtiis Money", requiresOtp: false, payin: true, payout: true },
     ],
   },
   {
@@ -116,7 +117,8 @@ export const AFRIBAPAY_COUNTRIES: AfribaPayCountry[] = [
     currency: "XOF",
     operators: [
       { code: "moov", name: "Moov Money", requiresOtp: false, payin: true, payout: true },
-      { code: "tmoney", name: "Togocell", requiresOtp: false, payin: true, payout: true },
+      { code: "tmoney", name: "Togocell (T-Money)", requiresOtp: false, payin: true, payout: true },
+      { code: "togocom", name: "Togocom", requiresOtp: false, payin: true, payout: true },
     ],
   },
   {
@@ -130,6 +132,7 @@ export const AFRIBAPAY_COUNTRIES: AfribaPayCountry[] = [
     operators: [
       { code: "orange", name: "Orange Money", requiresOtp: false, payin: true, payout: true },
       { code: "moov", name: "Moov Money", requiresOtp: false, payin: true, payout: true },
+      { code: "wave", name: "Wave", requiresOtp: false, payin: true, payout: false },
     ],
   },
   {
@@ -155,6 +158,7 @@ export const AFRIBAPAY_COUNTRIES: AfribaPayCountry[] = [
     currency: "XOF",
     operators: [
       { code: "airtel", name: "Airtel Money", requiresOtp: false, payin: true, payout: true },
+      { code: "moov", name: "Moov Money", requiresOtp: false, payin: true, payout: true },
     ],
   },
   {
@@ -181,8 +185,9 @@ export const AFRIBAPAY_COUNTRIES: AfribaPayCountry[] = [
     operators: [
       { code: "orange", name: "Orange Money", requiresOtp: false, payin: true, payout: true },
       { code: "airtel", name: "Airtel Money", requiresOtp: false, payin: true, payout: true },
-      { code: "mpesa", name: "Mpesa", requiresOtp: false, payin: true, payout: true },
+      { code: "mpesa", name: "M-Pesa", requiresOtp: false, payin: true, payout: true },
       { code: "africell", name: "Africell", requiresOtp: false, payin: true, payout: true },
+      { code: "vodacom", name: "Vodacom", requiresOtp: false, payin: true, payout: true },
     ],
   },
   {
@@ -235,6 +240,19 @@ export const AFRIBAPAY_COUNTRIES: AfribaPayCountry[] = [
     operators: [
       { code: "airtel", name: "Airtel Money", requiresOtp: false, payin: true, payout: true },
       { code: "moov", name: "Moov Money", requiresOtp: false, payin: true, payout: true },
+    ],
+  },
+  {
+    code: "RW",
+    name: "Rwanda",
+    flag: "🇷🇼",
+    phoneCode: "+250",
+    phoneDigits: 9,
+    phoneFormat: "7XXXXXXXX",
+    currency: "RWF",
+    operators: [
+      { code: "mtn", name: "MTN Mobile Money", requiresOtp: false, payin: true, payout: true },
+      { code: "airtel", name: "Airtel Money", requiresOtp: false, payin: true, payout: true },
     ],
   },
 ];
