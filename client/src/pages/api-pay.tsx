@@ -26,7 +26,7 @@ import { getCurrencyDecimals } from "@/lib/currency";
 import { CurrencySelector, getCurrencyLabel } from "@/components/currency-selector";
 import { OperatorSelector } from "@/components/operator-selector";
 import { hasMultipleCurrencies, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
-import { hasMultiplePawaPayCurrencies, getCurrenciesForCountry as getPawaPayCurrenciesForCountry, getOperatorCodesForCurrency } from "@shared/pawapay-countries";
+import { hasMultiplePawaPayCurrencies, getCurrenciesForCountry as getPawaPayCurrenciesForCountry, getOperatorCodesForCurrency, operatorSupportsCurrency } from "@shared/pawapay-countries";
 import { CountryFlag } from "@/components/country-flag";
 
 interface ApiKeyInfo {
@@ -330,7 +330,7 @@ export default function ApiPay() {
     : allCountryOperators.filter(op => enabledOperatorsForCountry.includes(op.code));
   
   const countryOperators = (country && hasMultiplePawaPayCurrencies(country))
-    ? enabledFilteredOperators.filter(op => getOperatorCodesForCurrency(country, selectedCurrency).includes(op.code))
+    ? enabledFilteredOperators.filter(op => operatorSupportsCurrency(country, op.code, selectedCurrency))
     : enabledFilteredOperators;
   
   const noOperatorsAvailable = !isLoadingOperators && !!country && countryOperators.length === 0;

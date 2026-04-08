@@ -327,7 +327,7 @@ export function operatorSupportsCurrency(countryCode: string, operatorCode: stri
   );
   if (!country) return false;
   const op = country.operators.find(o => o.code.toLowerCase() === operatorCode.toLowerCase());
-  if (!op) return false;
+  if (!op) return true;
   const opCurrencies = (op as any).currencies as string[] | undefined;
   if (opCurrencies && opCurrencies.length > 0) {
     return opCurrencies.map(c => c.toUpperCase()).includes(currency.toUpperCase());

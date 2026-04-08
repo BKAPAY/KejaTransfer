@@ -19,7 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { PaymentMethodSelector } from "@/components/payment-method-selector";
 import { CryptoPaymentFlow } from "@/components/crypto-payment-flow";
 import { CurrencySelector } from "@/components/currency-selector";
-import { hasMultiplePawaPayCurrencies, getCurrenciesForCountry as getPawaPayCurrenciesForCountry, getOperatorCodesForCurrency } from "@shared/pawapay-countries";
+import { hasMultiplePawaPayCurrencies, getCurrenciesForCountry as getPawaPayCurrenciesForCountry, getOperatorCodesForCurrency, operatorSupportsCurrency } from "@shared/pawapay-countries";
 import { hasMultipleCurrencies, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
 
 interface SessionInfo {
@@ -204,7 +204,7 @@ export default function Checkout() {
   );
 
   const countryOperators = (country && hasMultiplePawaPayCurrencies(country))
-    ? enabledFilteredOperators.filter(op => getOperatorCodesForCurrency(country, selectedCurrency).includes(op.code))
+    ? enabledFilteredOperators.filter(op => operatorSupportsCurrency(country, op.code, selectedCurrency))
     : enabledFilteredOperators;
 
   const noOperatorsAvailable = country && countryOperators.length === 0 && !isLoadingOperators;

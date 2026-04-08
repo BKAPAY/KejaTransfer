@@ -21,7 +21,7 @@ import { PaymentMethodSelector } from "@/components/payment-method-selector";
 import { CryptoPaymentFlow } from "@/components/crypto-payment-flow";
 import { CurrencySelector, getCurrencyLabel } from "@/components/currency-selector";
 import { hasMultipleCurrencies, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
-import { hasMultiplePawaPayCurrencies, getCurrenciesForCountry as getPawaPayCurrenciesForCountry, getOperatorCodesForCurrency } from "@shared/pawapay-countries";
+import { hasMultiplePawaPayCurrencies, getCurrenciesForCountry as getPawaPayCurrenciesForCountry, getOperatorCodesForCurrency, operatorSupportsCurrency } from "@shared/pawapay-countries";
 import { getCurrencyDecimals } from "@/lib/currency";
 import { OperatorSelector } from "@/components/operator-selector";
 import { CountryFlag } from "@/components/country-flag";
@@ -539,7 +539,7 @@ export default function Pay() {
     : allCountryOperators.filter(op => enabledOperatorsForCountry.includes(op.code));
   
   const countryOperators = (selectedCountry && hasMultiplePawaPayCurrencies(selectedCountry))
-    ? enabledFilteredOperators.filter(op => getOperatorCodesForCurrency(selectedCountry, selectedCurrency).includes(op.code))
+    ? enabledFilteredOperators.filter(op => operatorSupportsCurrency(selectedCountry, op.code, selectedCurrency))
     : enabledFilteredOperators;
   
   const noOperatorsAvailable = !isLoadingOperators && selectedCountry && countryOperators.length === 0;

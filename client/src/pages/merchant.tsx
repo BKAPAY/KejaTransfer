@@ -23,7 +23,7 @@ import { CurrencySelector, getCurrencyLabel } from "@/components/currency-select
 import { OperatorSelector } from "@/components/operator-selector";
 import { CountryFlag } from "@/components/country-flag";
 import { hasMultipleCurrencies, getMbiyoPayCurrenciesForCountry } from "@shared/mbiyopay-countries";
-import { hasMultiplePawaPayCurrencies, getCurrenciesForCountry as getPawaPayCurrenciesForCountry, getOperatorCodesForCurrency } from "@shared/pawapay-countries";
+import { hasMultiplePawaPayCurrencies, getCurrenciesForCountry as getPawaPayCurrenciesForCountry, getOperatorCodesForCurrency, operatorSupportsCurrency } from "@shared/pawapay-countries";
 import { getCurrencyDecimals } from "@/lib/currency";
 
 interface ConversionData {
@@ -335,7 +335,7 @@ export default function Merchant() {
     : allCountryOperators.filter(op => enabledOperatorsForCountry.includes(op.code));
   
   const countryOperators = (selectedCountry && hasMultiplePawaPayCurrencies(selectedCountry))
-    ? enabledFilteredOperators.filter(op => getOperatorCodesForCurrency(selectedCountry, selectedCurrency).includes(op.code))
+    ? enabledFilteredOperators.filter(op => operatorSupportsCurrency(selectedCountry, op.code, selectedCurrency))
     : enabledFilteredOperators;
   
   const noOperatorsAvailable = !isLoadingOperators && selectedCountry && countryOperators.length === 0;
