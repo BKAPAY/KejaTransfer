@@ -5,6 +5,7 @@ import { NowPaymentsClient } from "./nowpayments";
 import { getMbiyoPayTransactionStatus, searchMbiyoPayTransactionByOrderId } from "./mbiyopay";
 import { getPawaPayDepositStatus, getPawaPayPayoutStatus, mapPawaPayStatus } from "./pawapay";
 import { getAfribaPayTransaction, mapAfribaPayStatus } from "./afribapay";
+import { getFeeXPayConfig, checkFeeXPayTransactionStatus, mapFeeXPayStatus } from "./feexpay";
 import { trySendPaymentCallback } from "./utils/callback";
 import { sendPaymentDocumentsEmail } from "./email-service";
 import crypto from "crypto";
@@ -1112,8 +1113,126 @@ async function processPawaPayPayout(transaction: Transaction & { user?: User }, 
   }
 }
 
+async function processFeeXPayTransaction(transaction: Transaction & { user?: User }, metadata: any): Promise<boolean> {
+  const feeXPayReference = metadata.feeXPayReference;
+  const transactionAge = getTransactionAge(transaction);
+  const remainingTime = Math.max(0, PAYMENT_TIMEOUT_MS - transactionAge);
+  const remainingSeconds = Math.round(remainingTime / 1000);
+  const isOutgoing = transaction.type === "withdrawal" || transaction.type === "transfer";
+
+  console.log(`[PaymentPolling] Checking FeeXPay ${isOutgoing ? "payout" : "payin"} ${transaction.id} (ref: ${feeXPayReference}, ${remainingSeconds}s remaining)`);
+
+  const config = await getFeeXPayConfig();
+  if (!config) {
+    console.log(`[PaymentPolling] FeeXPay config not available - skipping ${transaction.id}`);
+    return false;
+  }
+
+  try {
+    const statusResult = await checkFeeXPayTransactionStatus(config, feeXPayReference);
+
+    if (!statusResult.success) {
+      console.log(`[PaymentPolling] FeeXPay status check failed for ${transaction.id}: ${statusResult.error}`);
+      if (hasPaymentExpired(transaction)) {
+        console.log(`[PaymentPolling] ⏱️ FeeXPay transaction ${transaction.id} TIMEOUT - marking as failed`);
+        if (isOutgoing) {
+          await safeRefundOutgoingTransaction(transaction.id, transaction.userId, metadata, "polling-feexpay-timeout");
+        }
+        await storage.updateTransactionStatus(transaction.id, "failed");
+        setImmediate(() => sendBusinessWebhookCallback(transaction.id, "failed", isOutgoing ? "payout" : "payin"));
+        return true;
+      }
+      return false;
+    }
+
+    const mapped = statusResult.mappedStatus || "pending";
+    console.log(`[PaymentPolling] FeeXPay transaction ${transaction.id} - raw: ${statusResult.status}, mapped: ${mapped}`);
+
+    if (mapped === "completed") {
+      const latestTx = await storage.getTransaction(transaction.id);
+      if (!latestTx || latestTx.status !== "pending") {
+        console.log(`[PaymentPolling] FeeXPay transaction ${transaction.id} already processed (status: ${latestTx?.status}) - skipping`);
+        return true;
+      }
+
+      if (isOutgoing) {
+        await storage.updateTransactionStatus(transaction.id, "completed");
+        console.log(`[PaymentPolling] ✅ FeeXPay ${transaction.type} ${transaction.id} COMPLETED`);
+        setImmediate(() => sendApiPayoutCallback(transaction.id, metadata, "completed"));
+        setImmediate(() => sendBusinessWebhookCallback(transaction.id, "completed", "payout"));
+      } else {
+        const result = await storage.finalizeIncomingTransaction(transaction.id, {});
+        if (result) {
+          console.log(`[PaymentPolling] ✅ FeeXPay deposit ${transaction.id} CONFIRMED - credited=${result.credited}`);
+          const updatedTx = await storage.getTransaction(transaction.id);
+          if (updatedTx) {
+            trySendPaymentCallback(updatedTx, 'payment.completed', '[PaymentPolling/FeeXPay]');
+            trySendPaymentLinkDocuments(updatedTx);
+          }
+          setImmediate(() => sendBusinessWebhookCallback(transaction.id, "completed", "payin"));
+        } else {
+          console.log(`[PaymentPolling] FeeXPay transaction ${transaction.id} already finalized - skipping`);
+        }
+      }
+      return true;
+    }
+
+    if (mapped === "failed") {
+      const latestTx = await storage.getTransaction(transaction.id);
+      if (!latestTx || latestTx.status !== "pending") {
+        console.log(`[PaymentPolling] FeeXPay transaction ${transaction.id} already processed (status: ${latestTx?.status}) - skipping`);
+        return true;
+      }
+
+      console.log(`[PaymentPolling] ❌ FeeXPay transaction ${transaction.id} FAILED (raw: ${statusResult.status})`);
+      if (isOutgoing) {
+        await safeRefundOutgoingTransaction(transaction.id, transaction.userId, metadata, "polling-feexpay-failed");
+      } else {
+        await storage.updateTransactionStatus(transaction.id, "failed");
+      }
+      setImmediate(() => sendBusinessWebhookCallback(transaction.id, "failed", isOutgoing ? "payout" : "payin"));
+      return true;
+    }
+
+    if (hasPaymentExpired(transaction)) {
+      const latestTx = await storage.getTransaction(transaction.id);
+      if (!latestTx || latestTx.status !== "pending") {
+        console.log(`[PaymentPolling] FeeXPay transaction ${transaction.id} already processed (status: ${latestTx?.status}) during timeout - skipping`);
+        return true;
+      }
+
+      console.log(`[PaymentPolling] ⏱️ FeeXPay transaction ${transaction.id} TIMEOUT (still pending after ${Math.round(transactionAge / 60000)}min)`);
+      if (isOutgoing) {
+        await safeRefundOutgoingTransaction(transaction.id, transaction.userId, metadata, "polling-feexpay-timeout");
+      } else {
+        await storage.updateTransactionStatus(transaction.id, "failed");
+      }
+      setImmediate(() => sendBusinessWebhookCallback(transaction.id, "failed", isOutgoing ? "payout" : "payin"));
+      return true;
+    }
+
+    console.log(`[PaymentPolling] ⏳ FeeXPay transaction ${transaction.id} still pending (${remainingSeconds}s remaining)`);
+    return false;
+  } catch (error) {
+    console.error(`[PaymentPolling] Error checking FeeXPay transaction ${transaction.id}:`, error);
+    if (hasPaymentExpired(transaction)) {
+      const latestTx = await storage.getTransaction(transaction.id);
+      if (!latestTx || latestTx.status !== "pending") {
+        return true;
+      }
+      if (isOutgoing) {
+        await safeRefundOutgoingTransaction(transaction.id, transaction.userId, metadata, "polling-feexpay-error");
+      } else {
+        await storage.updateTransactionStatus(transaction.id, "failed");
+      }
+      setImmediate(() => sendBusinessWebhookCallback(transaction.id, "failed", isOutgoing ? "payout" : "payin"));
+      return true;
+    }
+    return false;
+  }
+}
+
 async function processTransaction(transaction: Transaction & { user?: User }): Promise<void> {
-  // Parse metadata to determine which payment provider to check
   let metadata: any = {};
   if (transaction.metadata) {
     try {
@@ -1152,6 +1271,12 @@ async function processTransaction(transaction: Transaction & { user?: User }): P
     } else {
       await processAfribaPayIncoming(transaction, metadata);
     }
+    return;
+  }
+
+  // Check if this is a FeeXPay transaction
+  if (metadata.paymentProvider === "feexpay" || metadata.provider === "feexpay" || metadata.feeXPayReference) {
+    await processFeeXPayTransaction(transaction, metadata);
     return;
   }
 

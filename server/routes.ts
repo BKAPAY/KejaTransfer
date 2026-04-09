@@ -4724,6 +4724,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
 
+        // Check FeeXPay if we have a FeeXPay reference
+        if (metadata.feeXPayReference) {
+          try {
+            const { getFeeXPayConfig, checkFeeXPayTransactionStatus, mapFeeXPayStatus: mapFeexStatus } = await import("./feexpay");
+            const feexConfig = await getFeeXPayConfig();
+            if (feexConfig) {
+              const feexStatusResult = await checkFeeXPayTransactionStatus(feexConfig, metadata.feeXPayReference);
+              console.log(`[TransactionStatus] FeeXPay check for ${transaction.id}: raw=${feexStatusResult.status}, mapped=${feexStatusResult.mappedStatus}`);
+
+              if (feexStatusResult.success && feexStatusResult.mappedStatus === "completed") {
+                const isIncoming = transaction.type === "deposit" || transaction.type === "payment_link" || transaction.type === "merchant_link" || transaction.type === "api_payment";
+                if (isIncoming) {
+                  const result = await storage.finalizeIncomingTransaction(transaction.id, {});
+                  console.log(`[TransactionStatus] FeeXPay CONFIRMED - finalized: ${result ? 'new' : 'already processed'}`);
+                  if (result) {
+                    const updatedTx = await storage.getTransaction(transaction.id);
+                    if (updatedTx) {
+                      trySendPaymentCallback(updatedTx, 'payment.completed', '[TransactionStatus/FeeXPay]');
+                    }
+                    if (transaction.type === "payment_link" && transaction.customerEmail && metadata.paymentLinkId) {
+                      try {
+                        const pl = await storage.getPaymentLinkById(metadata.paymentLinkId);
+                        if (pl?.documentUrls?.length && pl.documentNames?.length) {
+                          sendPaymentDocumentsEmail(transaction.customerEmail, transaction.customerName || "Client", pl.productName, pl.documentNames, pl.documentUrls).catch(() => {});
+                        }
+                      } catch {}
+                    }
+                  }
+                } else {
+                  await storage.updateTransactionStatus(transaction.id, "completed");
+                }
+                return res.json({ status: "completed", message: "Paiement confirme" });
+              } else if (feexStatusResult.success && feexStatusResult.mappedStatus === "failed") {
+                const isOutgoing = transaction.type === "withdrawal" || transaction.type === "transfer";
+                if (isOutgoing) {
+                  await safeRefundOutgoingTransaction(transaction.id, transaction.userId, metadata, "status-check-feexpay-failed");
+                }
+                await storage.updateTransactionStatus(transaction.id, "failed");
+                return res.json({ status: "failed", message: "Paiement echoue ou annule" });
+              }
+            }
+          } catch (checkError) {
+            console.log(`[TransactionStatus] Error checking FeeXPay for ${transaction.id}:`, checkError);
+          }
+        }
+
         // Fallback: Check Paydunya if we have a Paydunya token
         if (transaction.paydunyaToken) {
           try {
@@ -6273,22 +6319,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(200).json({ received: true });
       }
 
-      if (tx.status !== "completed" && tx.status !== "failed") {
-        await storage.updateTransaction(tx.id, { status: mappedStatus });
+      if (tx.status === "completed" || tx.status === "failed") {
+        console.log(`[FeeXPay Webhook] Transaction ${tx.id} already in final state (${tx.status}) - ignoring duplicate`);
+        return res.status(200).json({ received: true });
+      }
 
-        if (mappedStatus === "completed" && tx.type === "deposit") {
-          const meta = tx.metadata ? JSON.parse(tx.metadata) : {};
-          const netAmount = meta.netAmountForUser ?? tx.amount;
-          await storage.updateUserBalance(tx.userId, netAmount);
-          console.log(`[FeeXPay Webhook] Deposit completed for tx ${tx.id} — credited ${netAmount} to user ${tx.userId}`);
+      if (mappedStatus === "completed") {
+        const isIncoming = tx.type === "deposit" || tx.type === "payment_link" || tx.type === "merchant_link" || tx.type === "api_payment";
+        if (isIncoming) {
+          const result = await storage.finalizeIncomingTransaction(tx.id, {});
+          if (result) {
+            console.log(`[FeeXPay Webhook] ✅ Deposit ${tx.id} finalized - credited=${result.credited}`);
+            const updatedTx = await storage.getTransaction(tx.id);
+            if (updatedTx) {
+              trySendPaymentCallback(updatedTx, 'payment.completed', '[FeeXPay Webhook]');
+            }
+          } else {
+            console.log(`[FeeXPay Webhook] Transaction ${tx.id} already finalized (race condition) - skipping`);
+          }
+        } else {
+          await storage.updateTransactionStatus(tx.id, "completed");
+          console.log(`[FeeXPay Webhook] ✅ ${tx.type} ${tx.id} COMPLETED`);
         }
-
-        if (mappedStatus === "failed" && (tx.type === "withdrawal" || tx.type === "transfer")) {
+      } else if (mappedStatus === "failed") {
+        const isOutgoing = tx.type === "withdrawal" || tx.type === "transfer";
+        if (isOutgoing) {
           const meta = tx.metadata ? JSON.parse(tx.metadata) : {};
-          const refundAmount = meta.deductedFromBalance ?? meta.totalDebited ?? tx.amount;
-          await storage.updateUserBalance(tx.userId, refundAmount);
-          console.log(`[FeeXPay Webhook] ${tx.type} failed for tx ${tx.id} — refunded ${refundAmount} to user ${tx.userId}`);
+          const { safeRefundOutgoingTransaction } = await import("./payment-polling");
+          const refunded = await safeRefundOutgoingTransaction(tx.id, tx.userId, meta, "webhook-feexpay-failed");
+          console.log(`[FeeXPay Webhook] ❌ ${tx.type} ${tx.id} FAILED - refund ${refunded ? 'processed' : 'skipped (already handled)'}`);
+        } else {
+          await storage.updateTransactionStatus(tx.id, "failed");
+          console.log(`[FeeXPay Webhook] ❌ Deposit ${tx.id} FAILED`);
         }
+      } else {
+        console.log(`[FeeXPay Webhook] Transaction ${tx.id} status: ${status} -> mapped: ${mappedStatus} (still pending)`);
       }
 
       return res.status(200).json({ received: true });

@@ -189,6 +189,57 @@ export async function createFeeXPayPayout(
   }
 }
 
+export interface FeeXPayStatusResult {
+  success: boolean;
+  status?: string;
+  mappedStatus?: "pending" | "completed" | "failed";
+  raw?: any;
+  error?: string;
+}
+
+export async function checkFeeXPayTransactionStatus(
+  config: FeeXPayConfig,
+  reference: string
+): Promise<FeeXPayStatusResult> {
+  const endpoints = [
+    `${FEEXPAY_BASE_URL}/api/transactions/public/${reference}`,
+    `${FEEXPAY_BASE_URL}/api/transactions/${config.shopId}/${reference}`,
+    `${FEEXPAY_BASE_URL}/api/transactions/${reference}`,
+  ];
+
+  for (const url of endpoints) {
+    try {
+      const response = await fetch(url, {
+        method: "GET",
+        headers: getAuthHeaders(config.apiKey),
+      });
+
+      if (response.status === 404) continue;
+
+      if (!response.ok) {
+        console.log(`[FeeXPay] Status check ${url} returned HTTP ${response.status}`);
+        continue;
+      }
+
+      const data = await response.json();
+      const rawStatus = data?.status || data?.transaction?.status || data?.data?.status;
+
+      if (!rawStatus) {
+        return { success: true, status: "pending", mappedStatus: "pending", raw: data };
+      }
+
+      const mapped = mapFeeXPayStatus(rawStatus);
+      console.log(`[FeeXPay] Status found via ${url.replace(FEEXPAY_BASE_URL, '')}: ${rawStatus} -> ${mapped}`);
+      return { success: true, status: rawStatus, mappedStatus: mapped, raw: data };
+    } catch (error: any) {
+      console.log(`[FeeXPay] Status check error for ${url}: ${error?.message}`);
+      continue;
+    }
+  }
+
+  return { success: false, error: "Transaction not found on any endpoint" };
+}
+
 export function mapFeeXPayStatus(status: string): "pending" | "completed" | "failed" {
   const s = (status || "").toLowerCase();
   if (s === "successful" || s === "success" || s === "completed" || s === "paid") return "completed";
