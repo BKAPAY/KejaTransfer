@@ -7615,7 +7615,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           userCurrency
         );
         if (result.requiresOtp) {
-          return res.status(400).json({
+          return res.json({
             success: false,
             error: result.error,
             requiresOTP: true,
@@ -7624,12 +7624,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
         if (result.success) {
-          return res.json({
+          const response: Record<string, unknown> = {
             success: true,
             transactionId: result.transactionId,
             message: result.message || "Paiement initie avec succes. Validez sur votre telephone.",
             provider: "feexpay",
-          });
+          };
+          if (result.redirectUrl) {
+            response.redirectUrl = result.redirectUrl;
+          }
+          return res.json(response);
         } else {
           return res.status(400).json({ success: false, error: result.error });
         }

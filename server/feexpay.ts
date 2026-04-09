@@ -40,6 +40,10 @@ export interface FeeXPayPayinParams {
   amount: number;
   phoneNumber: string;
   otpCode?: string;
+  firstName?: string;
+  lastName?: string;
+  description?: string;
+  callbackUrl?: string;
 }
 
 export interface FeeXPayPayinResult {
@@ -48,6 +52,7 @@ export interface FeeXPayPayinResult {
   transactionId?: string;
   message?: string;
   requiresOtp?: boolean;
+  redirectUrl?: string;
   error?: string;
 }
 
@@ -61,9 +66,13 @@ export async function createFeeXPayPayin(
       amount: params.amount,
       phoneNumber: Number(params.phoneNumber),
     };
-    if (params.otpCode) {
+    if (params.otpCode !== undefined) {
       body.otp = params.otpCode;
     }
+    if (params.firstName) body.firstName = params.firstName;
+    if (params.lastName) body.lastName = params.lastName;
+    if (params.description) body.description = params.description;
+    if (params.callbackUrl) body.callback_url = params.callbackUrl;
 
     const url = `${FEEXPAY_BASE_URL}/api/transactions/public/requesttopay/${params.networkKey}`;
     console.log(`[FeeXPay] Payin request to ${params.networkKey}:`, { amount: params.amount, phone: params.phoneNumber });
@@ -75,7 +84,7 @@ export async function createFeeXPayPayin(
     });
 
     const data = await response.json();
-    console.log(`[FeeXPay] Payin response:`, JSON.stringify(data).slice(0, 300));
+    console.log(`[FeeXPay] Payin response:`, JSON.stringify(data).slice(0, 500));
 
     if (!response.ok) {
       return {
@@ -93,11 +102,14 @@ export async function createFeeXPayPayin(
       console.warn("[FeeXPay] No reference in response:", data);
     }
 
+    const redirectUrl = data?.redirect_url || data?.redirectUrl || data?.url;
+
     return {
       success: true,
       reference,
       transactionId: reference,
       message: data?.message || "Paiement initie avec succes",
+      redirectUrl,
     };
   } catch (error: any) {
     console.error("[FeeXPay] Payin error:", error);
@@ -110,6 +122,10 @@ export interface FeeXPayPayoutParams {
   shopId: string;
   amount: number;
   phoneNumber: string;
+  firstName?: string;
+  lastName?: string;
+  description?: string;
+  callbackUrl?: string;
 }
 
 export interface FeeXPayPayoutResult {
@@ -125,14 +141,19 @@ export async function createFeeXPayPayout(
   params: FeeXPayPayoutParams
 ): Promise<FeeXPayPayoutResult> {
   try {
-    const body = {
+    const body: Record<string, unknown> = {
       shop: params.shopId,
       amount: params.amount,
       phoneNumber: Number(params.phoneNumber),
+      operator: params.networkKey,
     };
+    if (params.firstName) body.firstName = params.firstName;
+    if (params.lastName) body.lastName = params.lastName;
+    if (params.description) body.description = params.description;
+    if (params.callbackUrl) body.callback_url = params.callbackUrl;
 
-    const url = `${FEEXPAY_BASE_URL}/api/transactions/public/payout/${params.networkKey}`;
-    console.log(`[FeeXPay] Payout request to ${params.networkKey}:`, { amount: params.amount, phone: params.phoneNumber });
+    const url = `${FEEXPAY_BASE_URL}/api/transactions/public/payout`;
+    console.log(`[FeeXPay] Payout request (operator=${params.networkKey}):`, { amount: params.amount, phone: params.phoneNumber });
 
     const response = await fetch(url, {
       method: "POST",
@@ -141,7 +162,7 @@ export async function createFeeXPayPayout(
     });
 
     const data = await response.json();
-    console.log(`[FeeXPay] Payout response:`, JSON.stringify(data).slice(0, 300));
+    console.log(`[FeeXPay] Payout response:`, JSON.stringify(data).slice(0, 500));
 
     if (!response.ok) {
       return {

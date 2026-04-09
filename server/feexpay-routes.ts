@@ -12,6 +12,7 @@ import {
   getNetworkKey,
   operatorRequiresOtp,
   formatPhoneForFeeXPay,
+  isRedirectFlowOperator,
 } from "@shared/feexpay-countries";
 
 export async function handleFeeXPayDeposit(
@@ -33,6 +34,7 @@ export async function handleFeeXPayDeposit(
   error?: string;
   requiresOtp?: boolean;
   otpInstructions?: string;
+  redirectUrl?: string;
 }> {
   try {
     const countryCode = country.toUpperCase();
@@ -46,15 +48,6 @@ export async function handleFeeXPayDeposit(
       return { success: false, error: `Operateur ${operator} non supporte pour ${country} (FeeXPay)` };
     }
 
-    if (operatorConfig.requiresOtp && !otpCode) {
-      return {
-        success: false,
-        error: "Code OTP requis pour ce paiement",
-        requiresOtp: true,
-        otpInstructions: `Composez le code USSD pour generer un OTP, puis entrez-le ici.`,
-      };
-    }
-
     const config = await getFeeXPayConfig();
     if (!config) {
       return { success: false, error: "FeeXPay non configure" };
@@ -63,6 +56,29 @@ export async function handleFeeXPayDeposit(
     const networkKey = getNetworkKey(countryCode, operator);
     if (!networkKey) {
       return { success: false, error: "Reseau non supporte" };
+    }
+
+    if (operatorConfig.requiresOtp && !otpCode) {
+      const formattedPhone = formatPhoneForFeeXPay(phone, countryCode);
+      const providerAmount = Math.floor(amount);
+      const triggerResult = await createFeeXPayPayin(config, {
+        networkKey,
+        shopId: config.shopId,
+        amount: providerAmount,
+        phoneNumber: formattedPhone,
+        otpCode: "",
+      });
+
+      if (!triggerResult.success) {
+        return { success: false, error: translateFeeXPayError(triggerResult.error, "deposit") };
+      }
+
+      return {
+        success: false,
+        error: "Code OTP requis pour ce paiement",
+        requiresOtp: true,
+        otpInstructions: `Un code OTP a ete envoye par SMS au ${phone}. Entrez-le pour confirmer le paiement.`,
+      };
     }
 
     const providerCurrency = currency || getCurrencyForCountry(countryCode);
@@ -87,6 +103,10 @@ export async function handleFeeXPayDeposit(
       return { success: false, error: translateFeeXPayError(result.error, "deposit") };
     }
 
+    if (operatorConfig.isRedirectFlow && !result.redirectUrl) {
+      console.warn(`[FeeXPay Deposit] Redirect operator ${networkKey} did not return a redirect URL`);
+    }
+
     const tx = await storage.createTransaction({
       userId,
       type: "deposit",
@@ -109,14 +129,21 @@ export async function handleFeeXPayDeposit(
         netAmountForUser: feeInfo.netAmount,
         balanceAmount: feeInfo.netAmount,
         balanceCurrency: userCurrency,
+        ...(result.redirectUrl ? { redirectUrl: result.redirectUrl } : {}),
       }),
     });
+
+    let message = result.message || "Paiement initie avec succes. Validez sur votre telephone.";
+    if (result.redirectUrl) {
+      message = "Paiement initie. Veuillez suivre le lien pour finaliser.";
+    }
 
     return {
       success: true,
       transactionId: tx.id,
       feeXPayReference: result.reference,
-      message: result.message || "Paiement initie avec succes. Validez sur votre telephone.",
+      message,
+      redirectUrl: result.redirectUrl,
     };
   } catch (error: any) {
     console.error("[FeeXPay Deposit] Error:", error);
@@ -142,7 +169,7 @@ export async function handleFeeXPayWithdrawal(
 
     const operatorConfig = countryConfig.operators.find(op => op.code === operator.toLowerCase() && op.payout);
     if (!operatorConfig) {
-      return { success: false, error: "Retrait echoue" };
+      return { success: false, error: "Operateur non supporte pour les retraits (FeeXPay)" };
     }
 
     if (user.kycStatus !== "verified") {
@@ -251,7 +278,7 @@ export async function handleFeeXPayTransfer(
 
     const operatorConfig = countryConfig.operators.find(op => op.code === operator.toLowerCase() && op.payout);
     if (!operatorConfig) {
-      return { success: false, error: "Transfert echoue" };
+      return { success: false, error: "Operateur non supporte pour les transferts (FeeXPay)" };
     }
 
     if (user.kycStatus !== "verified") {

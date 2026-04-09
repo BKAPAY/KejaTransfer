@@ -78,6 +78,7 @@ The frontend uses React 18 with TypeScript, Shadcn UI, and Tailwind CSS for a pr
 - **FedaPay API**: Payment gateway.
 - **MbiyoPay API**: Payment gateway.
 - **MoneyFusion API**: Payout-only payment gateway (24 countries, withdrawals/transfers only). Documentation officielle: https://docs.moneyfusion.net/fr/payout. Endpoint: `POST https://pay.moneyfusion.net/api/v1/withdraw`. Header: `moneyfusion-private-key`. Body: `{countryCode, phone (format local sans préfixe), amount, withdraw_mode, webhook_url}`. Webhooks: `payout.session.completed` / `payout.session.cancelled`. IP du serveur doit être whitelistée dans le dashboard MoneyFusion.
+- **FeeXPay API**: Payment gateway for 7 countries (BJ, TG, BF, SN, CI, CM, CG). Base URL: `https://api.feexpay.me`. Auth: `Bearer fp_API_KEY`. Pay-in: `POST /api/transactions/public/requesttopay/{networkKey}`. Payout: `POST /api/transactions/public/payout` (single endpoint, `operator` in body). Operators: MTN, Moov, Orange, Togocom, Celtiis, Free, Wave. Wave (SN/CI) uses redirect flow (`redirectUrl`). Coris (BJ) uses 2-step OTP flow (1st call `otp:""` triggers SMS, 2nd call with code). Config: `apiKey` (Bearer token), `publicKey` (Shop/Merchant ID). Phone format: international without `+`. Files: `shared/feexpay-countries.ts`, `server/feexpay.ts`, `server/feexpay-routes.ts`.
 - **NOWPayments API**: Cryptocurrency payment gateway.
 - **PostgreSQL**: Primary database.
 - **Drizzle ORM**: Database interactions.

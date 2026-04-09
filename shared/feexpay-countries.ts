@@ -5,6 +5,7 @@ export interface FeeXPayOperator {
   requiresOtp: boolean;
   payin: boolean;
   payout: boolean;
+  isRedirectFlow?: boolean;
 }
 
 export interface FeeXPayCountry {
@@ -56,40 +57,30 @@ export const FEEXPAY_COUNTRIES: FeeXPayCountry[] = [
         networkKey: "coris",
         requiresOtp: true,
         payin: true,
-        payout: false,
-      },
-    ],
-  },
-  {
-    code: "CI",
-    name: "Côte d'Ivoire",
-    flag: "🇨🇮",
-    phoneCode: "+225",
-    phoneDigits: 10,
-    currency: "XOF",
-    operators: [
-      {
-        code: "mtn",
-        name: "MTN Mobile Money",
-        networkKey: "mtn_ci",
-        requiresOtp: false,
-        payin: true,
         payout: true,
       },
     ],
   },
   {
-    code: "CM",
-    name: "Cameroun",
-    flag: "🇨🇲",
-    phoneCode: "+237",
-    phoneDigits: 9,
-    currency: "XAF",
+    code: "TG",
+    name: "Togo",
+    flag: "🇹🇬",
+    phoneCode: "+228",
+    phoneDigits: 8,
+    currency: "XOF",
     operators: [
       {
-        code: "mtn",
-        name: "MTN Mobile Money",
-        networkKey: "mtn_cm",
+        code: "togocom",
+        name: "Togocom (T-Money)",
+        networkKey: "togocom_tg",
+        requiresOtp: false,
+        payin: true,
+        payout: true,
+      },
+      {
+        code: "moov",
+        name: "Moov Money",
+        networkKey: "moov_tg",
         requiresOtp: false,
         payin: true,
         payout: true,
@@ -105,17 +96,17 @@ export const FEEXPAY_COUNTRIES: FeeXPayCountry[] = [
     currency: "XOF",
     operators: [
       {
-        code: "orange",
-        name: "Orange Money",
-        networkKey: "orange_bf",
+        code: "moov",
+        name: "Moov Money",
+        networkKey: "moov_bf",
         requiresOtp: false,
         payin: true,
         payout: true,
       },
       {
-        code: "moov",
-        name: "Moov Money",
-        networkKey: "moov_bf",
+        code: "orange",
+        name: "Orange Money",
+        networkKey: "orange_bf",
         requiresOtp: false,
         payin: true,
         payout: true,
@@ -142,6 +133,102 @@ export const FEEXPAY_COUNTRIES: FeeXPayCountry[] = [
         code: "free",
         name: "Free Money",
         networkKey: "free_sn",
+        requiresOtp: false,
+        payin: true,
+        payout: true,
+      },
+      {
+        code: "wave",
+        name: "Wave",
+        networkKey: "wave_sn",
+        requiresOtp: false,
+        payin: true,
+        payout: true,
+        isRedirectFlow: true,
+      },
+    ],
+  },
+  {
+    code: "CI",
+    name: "Côte d'Ivoire",
+    flag: "🇨🇮",
+    phoneCode: "+225",
+    phoneDigits: 10,
+    currency: "XOF",
+    operators: [
+      {
+        code: "mtn",
+        name: "MTN Mobile Money",
+        networkKey: "mtn_ci",
+        requiresOtp: false,
+        payin: true,
+        payout: true,
+      },
+      {
+        code: "moov",
+        name: "Moov Money",
+        networkKey: "moov_ci",
+        requiresOtp: false,
+        payin: true,
+        payout: true,
+      },
+      {
+        code: "orange",
+        name: "Orange Money",
+        networkKey: "orange_ci",
+        requiresOtp: false,
+        payin: true,
+        payout: true,
+      },
+      {
+        code: "wave",
+        name: "Wave",
+        networkKey: "wave_ci",
+        requiresOtp: false,
+        payin: true,
+        payout: true,
+        isRedirectFlow: true,
+      },
+    ],
+  },
+  {
+    code: "CM",
+    name: "Cameroun",
+    flag: "🇨🇲",
+    phoneCode: "+237",
+    phoneDigits: 9,
+    currency: "XAF",
+    operators: [
+      {
+        code: "mtn",
+        name: "MTN Mobile Money",
+        networkKey: "mtn_cm",
+        requiresOtp: false,
+        payin: true,
+        payout: true,
+      },
+      {
+        code: "orange",
+        name: "Orange Money",
+        networkKey: "orange_cm",
+        requiresOtp: false,
+        payin: true,
+        payout: true,
+      },
+    ],
+  },
+  {
+    code: "CG",
+    name: "Congo-Brazzaville",
+    flag: "🇨🇬",
+    phoneCode: "+242",
+    phoneDigits: 9,
+    currency: "XAF",
+    operators: [
+      {
+        code: "mtn",
+        name: "MTN Mobile Money",
+        networkKey: "mtn_cg",
         requiresOtp: false,
         payin: true,
         payout: true,
@@ -197,6 +284,20 @@ export function operatorSupportsPayout(
     (op) => op.code === operatorCode.toLowerCase()
   );
   return operator?.payout || false;
+}
+
+export function isRedirectFlowOperator(
+  countryCode: string,
+  operatorCode: string
+): boolean {
+  const country = FEEXPAY_COUNTRIES.find(
+    (c) => c.code === countryCode.toUpperCase()
+  );
+  if (!country) return false;
+  const operator = country.operators.find(
+    (op) => op.code === operatorCode.toLowerCase()
+  );
+  return operator?.isRedirectFlow || false;
 }
 
 export function formatPhoneForFeeXPay(
