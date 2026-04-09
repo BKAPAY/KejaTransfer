@@ -106,6 +106,13 @@ import {
   handleMoneyFusionTransfer,
 } from "./moneyfusion-routes";
 import {
+  handleFeeXPayDeposit,
+  handleFeeXPayWithdrawal,
+  handleFeeXPayTransfer,
+} from "./feexpay-routes";
+import { mapFeeXPayStatus } from "./feexpay";
+import { FEEXPAY_COUNTRIES } from "@shared/feexpay-countries";
+import {
   validateMoneyFusionWebhook,
   isMoneyFusionPayoutCompleted,
   isMoneyFusionPayoutFailed,
@@ -3384,6 +3391,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
           message: pawaResult.message || "Paiement initie. Veuillez valider sur votre telephone.",
           provider: "pawapay",
         });
+      } else if (activeProvider === "feexpay") {
+        // Use FeeXPay for API payments
+        const { getFeeXPayConfig, createFeeXPayPayin, translateFeeXPayError: feeXPayTranslateErr } = await import("./feexpay");
+        const { getNetworkKey: feexNetworkKey, formatPhoneForFeeXPay: feexFormatPhone, getCurrencyForCountry: feexCurrency, operatorRequiresOtp: feexNeedsOtp } = await import("@shared/feexpay-countries");
+        const { otpCode: fxOtpCode } = req.body;
+
+        const feexConfig = await getFeeXPayConfig();
+        if (!feexConfig) {
+          return res.status(503).json({ success: false, error: "FeeXPay non configure" });
+        }
+
+        const feexNeedsOtpVal = feexNeedsOtp(country.toUpperCase(), operator);
+        if (feexNeedsOtpVal && !fxOtpCode) {
+          return res.json({ success: false, requiresOTP: true, otpInstructions: "Composez le code USSD pour obtenir votre OTP puis entrez-le ici.", provider: "feexpay", error: "Code OTP requis pour ce paiement" });
+        }
+
+        const feexProviderCurrency = requestCurrency || feexCurrency(country.toUpperCase());
+        let feexConvertedAmount = amountForProvider;
+        if (ownerCurrency !== feexProviderCurrency) {
+          const { convertCurrency } = await import("./currency-converter");
+          const conv = await convertCurrency(amountForProvider, ownerCurrency, feexProviderCurrency);
+          if (conv.success) feexConvertedAmount = Math.floor(conv.convertedAmount);
+          else return res.status(500).json({ error: "Erreur de conversion de devise" });
+        }
+
+        const feexNetKey = feexNetworkKey(country.toUpperCase(), operator);
+        if (!feexNetKey) return res.status(400).json({ success: false, error: "Reseau non supporte" });
+        const feexPhone = feexFormatPhone(customerPhone, country.toUpperCase());
+
+        const feexResult = await createFeeXPayPayin(feexConfig, {
+          networkKey: feexNetKey, shopId: feexConfig.shopId,
+          amount: feexConvertedAmount, phoneNumber: feexPhone, otpCode: fxOtpCode,
+        });
+
+        if (!feexResult.success) {
+          return res.status(400).json({ success: false, error: feeXPayTranslateErr(feexResult.error, "deposit") });
+        }
+
+        const tx = await storage.createTransaction({
+          userId: apiKey.userId, type: "api_payment", amount: baseAmount,
+          fee: feeAmount, feePercentage, currency: ownerCurrency, status: "pending",
+          country: country.toUpperCase(), operator,
+          description: description || "Paiement via API",
+          customerPhone, customerName: customerName || "Client", customerEmail: customerEmail || null,
+          metadata: JSON.stringify({
+            feeXPayReference: feexResult.reference,
+            apiKeyId: apiKey.id, apiKeyPublicKey: publicKey,
+            callbackUrl: callbackUrl || null, orderId: orderId || null,
+            successUrl: successUrl || null, cancelUrl: cancelUrl || null,
+            provider: "feexpay", netAmountForUser, providerAmount: feexConvertedAmount,
+            providerCurrency: feexProviderCurrency, balanceAmount: netAmountForUser,
+            balanceCurrency: ownerCurrency, customerPaysFee: apiKey.customerPaysFee, feeAmount,
+          }),
+        });
+
+        return res.json({ success: true, transactionId: tx.id, token: tx.id, message: feexResult.message || "Paiement initie. Validez sur votre telephone.", provider: "feexpay" });
       } else {
         return res.status(503).json({ 
           success: false, 
@@ -3957,6 +4020,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
         await storage.updatePaymentSession(session.id, { transactionId: tx.id });
         return res.json({ success: true, transactionId: tx.id, redirectUrl: result.providerLink, message: result.message || "Paiement initié", provider: "afribapay" });
+
+      } else if (activeProvider === "feexpay") {
+        const { getFeeXPayConfig: feexGetConfig, createFeeXPayPayin: feexPayin, translateFeeXPayError: feexTransErr } = await import("./feexpay");
+        const { getNetworkKey: sessFeexNet, formatPhoneForFeeXPay: sessFeexPhone, getCurrencyForCountry: sessFeexCurrency, operatorRequiresOtp: sessFeexNeedsOtp } = await import("@shared/feexpay-countries");
+
+        const feexConf = await feexGetConfig();
+        if (!feexConf) {
+          await storage.updatePaymentSession(session.id, { status: "pending" });
+          return res.status(503).json({ success: false, error: "FeeXPay non configure" });
+        }
+
+        if (sessFeexNeedsOtp(country.toUpperCase(), operator) && !otpCode) {
+          await storage.updatePaymentSession(session.id, { status: "pending" });
+          return res.status(400).json({ success: false, requiresOTP: true, otpInstructions: "Composez le code USSD pour obtenir votre OTP.", provider: "feexpay", error: "Code OTP requis" });
+        }
+
+        const sessFeexCurr = sessFeexCurrency(country.toUpperCase());
+        let sessFeexAmount = amountForProvider;
+        if (ownerCurrency !== sessFeexCurr) {
+          const { convertCurrency } = await import("./currency-converter");
+          const conv = await convertCurrency(amountForProvider, ownerCurrency, sessFeexCurr);
+          if (conv.success) sessFeexAmount = Math.floor(conv.convertedAmount);
+          else {
+            await storage.updatePaymentSession(session.id, { status: "pending" });
+            return res.status(500).json({ success: false, error: "Erreur de conversion" });
+          }
+        }
+
+        const sessFeexNetKey = sessFeexNet(country.toUpperCase(), operator);
+        if (!sessFeexNetKey) {
+          await storage.updatePaymentSession(session.id, { status: "pending" });
+          return res.status(400).json({ success: false, error: "Reseau non supporte" });
+        }
+
+        const sessFeexRes = await feexPayin(feexConf, {
+          networkKey: sessFeexNetKey, shopId: feexConf.shopId,
+          amount: sessFeexAmount, phoneNumber: sessFeexPhone(customerPhone, country.toUpperCase()), otpCode,
+        });
+
+        if (!sessFeexRes.success) {
+          await storage.updatePaymentSession(session.id, { status: "pending" });
+          return res.status(400).json({ success: false, error: feexTransErr(sessFeexRes.error, "deposit") });
+        }
+
+        const tx = await storage.createTransaction({
+          userId: apiKey.userId, type: "api_payment", amount: session.amount,
+          fee: feeAmount, feePercentage, currency: ownerCurrency, status: "pending",
+          country: country.toUpperCase(), operator, description: session.description || "Paiement API",
+          customerPhone, customerName: customerName || "Client", customerEmail: customerEmail || null,
+          metadata: JSON.stringify({
+            feeXPayReference: sessFeexRes.reference, provider: "feexpay",
+            sessionId: session.id, apiKeyId: apiKey.id,
+            successUrl: session.successUrl, cancelUrl: session.cancelUrl,
+            callbackUrl: session.callbackUrl, orderId: session.orderId,
+            netAmountForUser, providerAmount: sessFeexAmount, providerCurrency: sessFeexCurr,
+          }),
+        });
+
+        await storage.updatePaymentSession(session.id, { transactionId: tx.id });
+        return res.json({ success: true, transactionId: tx.id, message: sessFeexRes.message || "Paiement initié. Validez sur votre téléphone.", provider: "feexpay" });
 
       } else {
         await storage.updatePaymentSession(session.id, { status: "pending" });
@@ -6128,6 +6251,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ===== PawaPay Webhook =====
   app.post("/api/webhooks/pawapay", handlePawaPayWebhook);
 
+  // ===== FeeXPay Webhook =====
+  app.post("/api/webhooks/feexpay", async (req: Request, res: Response) => {
+    try {
+      console.log("[FeeXPay Webhook] Received:", JSON.stringify(req.body).slice(0, 500));
+
+      const payload = req.body;
+      const reference = payload?.reference || payload?.id || payload?.transactionId;
+      const status = payload?.status;
+
+      if (!reference || !status) {
+        console.warn("[FeeXPay Webhook] Missing reference or status:", payload);
+        return res.status(200).json({ received: true });
+      }
+
+      const mappedStatus = mapFeeXPayStatus(status);
+
+      const tx = await storage.getTransactionByFeeXPayReference(reference);
+      if (!tx) {
+        console.warn("[FeeXPay Webhook] No transaction found for reference:", reference);
+        return res.status(200).json({ received: true });
+      }
+
+      if (tx.status !== "completed" && tx.status !== "failed") {
+        await storage.updateTransaction(tx.id, { status: mappedStatus });
+
+        if (mappedStatus === "completed" && tx.type === "deposit") {
+          const meta = tx.metadata ? JSON.parse(tx.metadata) : {};
+          const netAmount = meta.netAmountForUser ?? tx.amount;
+          await storage.updateUserBalance(tx.userId, netAmount);
+          console.log(`[FeeXPay Webhook] Deposit completed for tx ${tx.id} — credited ${netAmount} to user ${tx.userId}`);
+        }
+
+        if (mappedStatus === "failed" && (tx.type === "withdrawal" || tx.type === "transfer")) {
+          const meta = tx.metadata ? JSON.parse(tx.metadata) : {};
+          const refundAmount = meta.deductedFromBalance ?? meta.totalDebited ?? tx.amount;
+          await storage.updateUserBalance(tx.userId, refundAmount);
+          console.log(`[FeeXPay Webhook] ${tx.type} failed for tx ${tx.id} — refunded ${refundAmount} to user ${tx.userId}`);
+        }
+      }
+
+      return res.status(200).json({ received: true });
+    } catch (error) {
+      console.error("[FeeXPay Webhook] Error:", error);
+      return res.status(200).json({ received: true });
+    }
+  });
+
   // Admin diagnostic endpoint to check MbiyoPay merchant account status
   app.get("/api/admin/mbiyopay/diagnostic", async (req: Request, res: Response) => {
     if (!req.session?.userId) return res.status(401).json({ error: "Non authentifie" });
@@ -7428,6 +7598,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } else {
           return res.status(400).json({ success: false, error: result.error });
         }
+      } else if (activeProvider === "feexpay") {
+        // Use FeeXPay for deposit
+        console.log(`[DEPOSIT] Using FeeXPay for ${country}/${operator}`);
+        const { otpCode } = req.body;
+        const result = await handleFeeXPayDeposit(
+          req.session.userId!,
+          user,
+          providerAmount,
+          country,
+          operator,
+          phone,
+          otpCode,
+          providerCurrency,
+          balanceAmount,
+          userCurrency
+        );
+        if (result.requiresOtp) {
+          return res.status(400).json({
+            success: false,
+            error: result.error,
+            requiresOTP: true,
+            otpInstructions: result.otpInstructions,
+            provider: "feexpay",
+          });
+        }
+        if (result.success) {
+          return res.json({
+            success: true,
+            transactionId: result.transactionId,
+            message: result.message || "Paiement initie avec succes. Validez sur votre telephone.",
+            provider: "feexpay",
+          });
+        } else {
+          return res.status(400).json({ success: false, error: result.error });
+        }
       } else {
         return res.status(503).json({ 
           success: false, 
@@ -7786,6 +7991,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
             transactionId: result.transactionId,
             message: result.message || (isTransfer ? "Transfert en cours de traitement." : "Retrait en cours de traitement."),
             provider: "pawapay",
+          });
+        } else {
+          return res.status(400).json({ success: false, error: result.error });
+        }
+      } else if (activeProvider === "feexpay") {
+        console.log(`[WITHDRAWAL] Using FeeXPay for ${country}/${operator}, userCurrency=${userCurrency}`);
+
+        const result = isTransfer
+          ? await handleFeeXPayTransfer(req.session.userId!, user, amount, country, operator, phone, userCurrency)
+          : await handleFeeXPayWithdrawal(req.session.userId!, user, amount, country, operator, phone, userCurrency);
+
+        if (result.success) {
+          return res.json({
+            success: true,
+            transactionId: result.transactionId,
+            message: result.message || (isTransfer ? "Transfert en cours de traitement." : "Retrait en cours de traitement."),
+            provider: "feexpay",
           });
         } else {
           return res.status(400).json({ success: false, error: result.error });
@@ -8812,6 +9034,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
           message: pawaResult.message || "Paiement initié. Validez sur votre téléphone.",
           provider: "pawapay",
         });
+      } else if (activeProvider === "feexpay") {
+        console.log(`[API_PAYMENT] Using FeeXPay for ${country}/${operator}`);
+        const { getFeeXPayConfig: fxExecConf, createFeeXPayPayin: fxExecPayin, translateFeeXPayError: fxExecErr } = await import("./feexpay");
+        const { getNetworkKey: fxExecNet, formatPhoneForFeeXPay: fxExecPhone, getCurrencyForCountry: fxExecCurr, operatorRequiresOtp: fxExecOtp } = await import("@shared/feexpay-countries");
+        const { otpCode: fxExecOtpCode } = req.body;
+
+        const fxExecConfig = await fxExecConf();
+        if (!fxExecConfig) return res.status(503).json({ success: false, error: "FeeXPay non configure" });
+
+        if (fxExecOtp(country.toUpperCase(), operator) && !fxExecOtpCode) {
+          return res.json({ success: false, requiresOTP: true, otpInstructions: "Composez le code USSD pour obtenir votre OTP.", provider: "feexpay", error: "Code OTP requis" });
+        }
+
+        const fxExecNetKey = fxExecNet(country.toUpperCase(), operator);
+        if (!fxExecNetKey) return res.status(400).json({ success: false, error: "Reseau non supporte" });
+
+        const effectivePhone = customerPhone || transaction.customerPhone || "";
+        const fxExecResult = await fxExecPayin(fxExecConfig, {
+          networkKey: fxExecNetKey, shopId: fxExecConfig.shopId,
+          amount: transaction.amount,
+          phoneNumber: fxExecPhone(effectivePhone, country.toUpperCase()),
+          otpCode: fxExecOtpCode,
+        });
+
+        if (!fxExecResult.success) {
+          return res.status(400).json({ success: false, error: fxExecErr(fxExecResult.error, "deposit") });
+        }
+
+        const existingMeta = JSON.parse(transaction.metadata || "{}");
+        await storage.updateTransaction(transaction.id, {
+          country, operator,
+          metadata: JSON.stringify({ ...existingMeta, feeXPayReference: fxExecResult.reference, provider: "feexpay" }),
+        });
+
+        return res.json({ success: true, transactionId: transaction.id, message: fxExecResult.message || "Paiement initie. Validez sur votre telephone.", provider: "feexpay" });
       } else {
         return res.status(503).json({
           success: false,
@@ -11138,10 +11395,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (token !== undefined) updates.token = token || null;
       if (ipnSecret !== undefined) updates.ipnSecret = ipnSecret || null;
 
-      const config = await storage.updateProviderConfig(provider, updates);
+      let config = await storage.updateProviderConfig(provider, updates);
 
       if (!config) {
-        return res.status(404).json({ error: "Fournisseur non trouvé" });
+        // Provider doesn't exist yet — initialize all missing providers and retry
+        await storage.initializeProviderConfigs();
+        config = await storage.updateProviderConfig(provider, updates);
+        if (!config) return res.status(404).json({ error: "Fournisseur non trouvé" });
       }
 
       // Clear Mailtrap config cache when settings are updated

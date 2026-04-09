@@ -110,6 +110,7 @@ export interface IStorage {
   getTransactionByPaydunyaToken(paydunyaToken: string): Promise<Transaction | undefined>;
   getTransactionByFedapayId(fedapayId: number): Promise<Transaction | undefined>;
   getTransactionByAfribaPayId(afribaPayId: string): Promise<Transaction | undefined>;
+  getTransactionByFeeXPayReference(reference: string): Promise<Transaction | undefined>;
   getTransactionByOrderId(orderId: string, userId: string): Promise<Transaction | undefined>;
   getRecentApiPaymentByPhoneAmount(userId: string, phone: string, amount: number, secondsAgo: number): Promise<Transaction | undefined>;
   getRecentTransactionsByDescription(userId: string, description: string, since: Date): Promise<Transaction[]>;
@@ -859,6 +860,26 @@ export class DbStorage implements IStorage {
         try {
           const metadata = JSON.parse(tx.metadata as string);
           if (metadata.afribaPayTransactionId === afribaPayId) {
+            return tx;
+          }
+        } catch {}
+      }
+    }
+    return undefined;
+  }
+
+  async getTransactionByFeeXPayReference(reference: string): Promise<Transaction | undefined> {
+    const recentTransactions = await db
+      .select()
+      .from(schema.transactions)
+      .orderBy(desc(schema.transactions.createdAt))
+      .limit(200);
+
+    for (const tx of recentTransactions) {
+      if (tx.metadata) {
+        try {
+          const metadata = JSON.parse(tx.metadata as string);
+          if (metadata.feeXPayReference === reference) {
             return tx;
           }
         } catch {}
@@ -2152,7 +2173,7 @@ export class DbStorage implements IStorage {
   }
 
   async initializeProviderConfigs(): Promise<void> {
-    const providers = ["afribapay", "paydunya", "fedapay", "mbiyopay", "moneyfusion", "nowpayments", "pawapay", "exchangerate", "mailtrap"];
+    const providers = ["afribapay", "paydunya", "fedapay", "mbiyopay", "moneyfusion", "nowpayments", "pawapay", "exchangerate", "mailtrap", "feexpay"];
     const scopes = ["personal", "business"];
 
     for (const scope of scopes) {

@@ -110,6 +110,13 @@ const PROVIDER_INFO = {
     fields: ["apiKey", "secretKey", "publicKey"],
     countries: "Global - Emails transactionnels",
   },
+  feexpay: {
+    name: "FeeXPay",
+    description: "Passerelle mobile money (dépôts et retraits) pour Bénin, Côte d'Ivoire et Cameroun",
+    color: "bg-emerald-500",
+    fields: ["apiKey", "publicKey"],
+    countries: "3 pays (Bénin, Côte d'Ivoire, Cameroun) — MTN, Moov, Celtiis, Coris",
+  },
 };
 
 const getFieldLabel = (provider: string, field: string): string => {
@@ -153,6 +160,10 @@ const getFieldLabel = (provider: string, field: string): string => {
   if (provider === "pawapay") {
     if (field === "apiKey") return "Token API PawaPay (Bearer Token du Dashboard PawaPay)";
     if (field === "secretKey") return "Mode : entrez exactement 'live' pour compte production PawaPay (obligatoire pour les vrais paiements). Laisser vide = mode sandbox uniquement.";
+  }
+  if (provider === "feexpay") {
+    if (field === "apiKey") return "Clé API FeeXPay (Bearer Token — fp_...)";
+    if (field === "publicKey") return "Merchant ID (Shop ID depuis votre tableau de bord FeeXPay)";
   }
   if (provider === "exchangerate") {
     if (field === "apiKey") return "Clé API ExchangeRate (exchangerate-api.com)";
