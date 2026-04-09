@@ -3423,6 +3423,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const feexResult = await createFeeXPayPayin(feexConfig, {
           networkKey: feexNetKey, shopId: feexConfig.shopId,
           amount: feexConvertedAmount, phoneNumber: feexPhone, otpCode: fxOtpCode,
+          callbackUrl: process.env.BASE_URL ? `${process.env.BASE_URL}/api/webhooks/feexpay` : undefined,
         });
 
         if (!feexResult.success) {
@@ -3446,7 +3447,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }),
         });
 
-        return res.json({ success: true, transactionId: tx.id, token: tx.id, message: feexResult.message || "Paiement initie. Validez sur votre telephone.", provider: "feexpay" });
+        return res.json({
+          success: true, transactionId: tx.id, token: tx.id,
+          message: feexResult.message || "Paiement initie. Validez sur votre telephone.", provider: "feexpay",
+          ...(feexResult.redirectUrl ? { redirectUrl: feexResult.redirectUrl } : {}),
+        });
       } else {
         return res.status(503).json({ 
           success: false, 
@@ -4057,6 +4062,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const sessFeexRes = await feexPayin(feexConf, {
           networkKey: sessFeexNetKey, shopId: feexConf.shopId,
           amount: sessFeexAmount, phoneNumber: sessFeexPhone(customerPhone, country.toUpperCase()), otpCode,
+          callbackUrl: process.env.BASE_URL ? `${process.env.BASE_URL}/api/webhooks/feexpay` : undefined,
         });
 
         if (!sessFeexRes.success) {
@@ -4079,7 +4085,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
 
         await storage.updatePaymentSession(session.id, { transactionId: tx.id });
-        return res.json({ success: true, transactionId: tx.id, message: sessFeexRes.message || "Paiement initié. Validez sur votre téléphone.", provider: "feexpay" });
+        return res.json({
+          success: true, transactionId: tx.id,
+          message: sessFeexRes.message || "Paiement initié. Validez sur votre téléphone.", provider: "feexpay",
+          ...(sessFeexRes.redirectUrl ? { redirectUrl: sessFeexRes.redirectUrl } : {}),
+        });
 
       } else {
         await storage.updatePaymentSession(session.id, { status: "pending" });
@@ -6743,7 +6753,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const { handleFeeXPayDeposit } = await import("./feexpay-routes");
         result = await handleFeeXPayDeposit(
           user.id, user, requestedAmount, countryCode, normalizedOperator, localPhone, otpCode,
-          requestedCurrency, requestedAmount, requestedCurrency
+          requestedCurrency, requestedAmount, requestedCurrency,
+          {
+            transactionType: "api_payment",
+            transactionDescription: txDescription,
+            customerPaysFee,
+            extraMetadata: { scope: "business", businessTokenId: businessToken.id, orderId: orderId || null },
+          }
         );
       } else if (activeProvider === "paydunya") {
         const paydunyaData = {
@@ -8107,7 +8123,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Payment Link Route - Multi-Provider
   app.post("/api/fedapay/payment-link/:token", async (req: Request, res: Response) => {
     try {
-      const { customerName, customerEmail, customerPhone, country, operator, currency, customFieldResponses } = req.body;
+      const { customerName, customerEmail, customerPhone, country, operator, currency, customFieldResponses, otpCode } = req.body;
       const { token } = req.params;
 
       const paymentLink = await storage.getPaymentLinkByToken(token);
@@ -8470,6 +8486,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } else {
           return res.status(400).json({ success: false, error: result.error });
         }
+      } else if (activeProvider === "feexpay") {
+        console.log(`[PAYMENT_LINK] Using FeeXPay for ${country}/${operator}`);
+        const effectiveCustomerName = customerName || "Client";
+        const result = await handleFeeXPayDeposit(
+          paymentLink.userId,
+          owner!,
+          Math.floor(amountInPayerCurrency),
+          country,
+          operator,
+          customerPhone,
+          otpCode,
+          payerCurrency,
+          paymentLink.amount,
+          ownerCurrency,
+          {
+            transactionType: "payment_link",
+            transactionDescription: paymentLink.description || `Paiement - ${paymentLink.productName}`,
+            customerName: effectiveCustomerName,
+            customerEmail: customerEmail || undefined,
+            customerPaysFee: paymentLink.customerPaysFee ?? false,
+            extraMetadata: {
+              paymentLinkId: paymentLink.id,
+              providerCurrency: payerCurrency,
+              conversionRate,
+              conversionApplied,
+              ...(customFieldResponses ? { customFieldResponses } : {}),
+            },
+          }
+        );
+        if (result.requiresOtp) {
+          return res.json({
+            success: false,
+            requiresOTP: true,
+            otpInstructions: result.otpInstructions,
+            provider: "feexpay",
+            error: result.error,
+          });
+        }
+        if (result.success) {
+          return res.json({
+            success: true,
+            transactionId: result.transactionId,
+            message: result.message || "Paiement initie. Validez sur votre telephone.",
+            provider: "feexpay",
+            ...(result.redirectUrl ? { redirectUrl: result.redirectUrl } : {}),
+          });
+        } else {
+          return res.status(400).json({ success: false, error: result.error });
+        }
       } else {
         return res.status(503).json({
           success: false,
@@ -8485,7 +8550,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Merchant Link Route - Multi-Provider
   app.post("/api/fedapay/merchant-link/:token", async (req: Request, res: Response) => {
     try {
-      const { customerName, customerEmail, customerPhone, amount, country, operator, currency, originalAmount, originalCurrency } = req.body;
+      const { customerName, customerEmail, customerPhone, amount, country, operator, currency, originalAmount, originalCurrency, otpCode } = req.body;
       const { token } = req.params;
 
       const merchantLink = await storage.getMerchantLinkByToken(token);
@@ -8791,6 +8856,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
             transactionId: result.transactionId,
             message: result.message || "Paiement initié. Validez sur votre téléphone.",
             provider: "pawapay",
+          });
+        } else {
+          return res.status(400).json({ success: false, error: result.error });
+        }
+      } else if (activeProvider === "feexpay") {
+        console.log(`[MERCHANT_LINK] Using FeeXPay for ${country}/${operator}`);
+        const mlOwnerCurrency = ownerCurrency;
+        const mlPayerCurrency = payerCurrency;
+        const mlOriginalAmount = originalAmount ? Math.floor(originalAmount) : Math.floor(amount);
+        const mlOriginalCurrency = originalCurrency || mlOwnerCurrency;
+        const result = await handleFeeXPayDeposit(
+          merchantLink.userId,
+          owner!,
+          Math.floor(amount),
+          country,
+          operator,
+          customerPhone,
+          otpCode,
+          mlPayerCurrency,
+          mlOriginalAmount,
+          mlOriginalCurrency,
+          {
+            transactionType: "merchant_link",
+            transactionDescription: `Paiement ${merchantLink.merchantName}`,
+            customerName: customerName || "Client",
+            customerEmail: customerEmail || undefined,
+            extraMetadata: { merchantLinkId: merchantLink.id },
+          }
+        );
+        if (result.requiresOtp) {
+          return res.json({
+            success: false,
+            requiresOTP: true,
+            otpInstructions: result.otpInstructions,
+            provider: "feexpay",
+            error: result.error,
+          });
+        }
+        if (result.success) {
+          return res.json({
+            success: true,
+            transactionId: result.transactionId,
+            message: result.message || "Paiement initie. Validez sur votre telephone.",
+            provider: "feexpay",
+            ...(result.redirectUrl ? { redirectUrl: result.redirectUrl } : {}),
           });
         } else {
           return res.status(400).json({ success: false, error: result.error });
@@ -9135,6 +9245,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           amount: transaction.amount,
           phoneNumber: fxExecPhone(effectivePhone, country.toUpperCase()),
           otpCode: fxExecOtpCode,
+          callbackUrl: process.env.BASE_URL ? `${process.env.BASE_URL}/api/webhooks/feexpay` : undefined,
         });
 
         if (!fxExecResult.success) {

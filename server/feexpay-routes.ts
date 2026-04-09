@@ -25,7 +25,15 @@ export async function handleFeeXPayDeposit(
   otpCode?: string,
   currency?: string,
   originalAmount?: number,
-  originalCurrency?: string
+  originalCurrency?: string,
+  options?: {
+    transactionType?: "deposit" | "payment_link" | "merchant_link" | "api_payment";
+    transactionDescription?: string;
+    customerName?: string;
+    customerEmail?: string;
+    customerPaysFee?: boolean;
+    extraMetadata?: Record<string, any>;
+  }
 ): Promise<{
   success: boolean;
   transactionId?: string;
@@ -58,6 +66,10 @@ export async function handleFeeXPayDeposit(
       return { success: false, error: "Reseau non supporte" };
     }
 
+    const webhookUrl = process.env.BASE_URL
+      ? `${process.env.BASE_URL}/api/webhooks/feexpay`
+      : undefined;
+
     if (operatorConfig.requiresOtp && !otpCode) {
       const formattedPhone = formatPhoneForFeeXPay(phone, countryCode);
       const providerAmount = Math.floor(amount);
@@ -67,6 +79,7 @@ export async function handleFeeXPayDeposit(
         amount: providerAmount,
         phoneNumber: formattedPhone,
         otpCode: "",
+        callbackUrl: webhookUrl,
       });
 
       if (!triggerResult.success) {
@@ -97,6 +110,7 @@ export async function handleFeeXPayDeposit(
       amount: providerAmount,
       phoneNumber: formattedPhone,
       otpCode,
+      callbackUrl: webhookUrl,
     });
 
     if (!result.success) {
@@ -107,9 +121,12 @@ export async function handleFeeXPayDeposit(
       console.warn(`[FeeXPay Deposit] Redirect operator ${networkKey} did not return a redirect URL`);
     }
 
+    const txType = options?.transactionType || "deposit";
+    const txDescription = options?.transactionDescription || `Depot de ${providerAmount} ${providerCurrency}`;
+
     const tx = await storage.createTransaction({
       userId,
-      type: "deposit",
+      type: txType,
       amount: feeInfo.grossAmount,
       fee: feeInfo.feeAmount,
       feePercentage: feeInfo.feePercentage,
@@ -117,8 +134,10 @@ export async function handleFeeXPayDeposit(
       status: "pending",
       country: countryCode,
       operator,
-      description: `Depot de ${providerAmount} ${providerCurrency}`,
+      description: txDescription,
       customerPhone: phone,
+      customerName: options?.customerName || null,
+      customerEmail: options?.customerEmail || null,
       metadata: JSON.stringify({
         feeXPayReference: result.reference,
         phone,
@@ -129,7 +148,9 @@ export async function handleFeeXPayDeposit(
         netAmountForUser: feeInfo.netAmount,
         balanceAmount: feeInfo.netAmount,
         balanceCurrency: userCurrency,
+        ...(options?.customerPaysFee !== undefined ? { customerPaysFee: options.customerPaysFee } : {}),
         ...(result.redirectUrl ? { redirectUrl: result.redirectUrl } : {}),
+        ...(options?.extraMetadata || {}),
       }),
     });
 
