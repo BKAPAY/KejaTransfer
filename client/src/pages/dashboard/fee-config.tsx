@@ -611,7 +611,7 @@ export default function FeeConfigPage() {
   });
 
   const getConfigForOperator = (provider: string, country: string, operator: string): FeeConfig | undefined => {
-    return feeConfigs?.find(c => c.provider === provider && c.country === country && c.operator === operator);
+    return feeConfigs?.find(c => c.provider === provider && c.country === country && c.operator === operator && c.scope === "personal");
   };
 
   const getEditingFee = (provider: string, country: string, operator: string) => {
