@@ -220,6 +220,8 @@ export interface IStorage {
   initializeFeeConfigs(): Promise<void>;
   ensurePaydunyaFeeConfigs(): Promise<void>;
   ensurePawaPayFeeConfigs(): Promise<void>;
+  ensureFeeXPayFeeConfigs(): Promise<void>;
+  ensureMoneyFusionFeeConfigs(): Promise<void>;
 
   // Support Settings
   getSupportSettings(): Promise<SupportSettings | undefined>;
@@ -1922,6 +1924,14 @@ export class DbStorage implements IStorage {
           await insertIfNotExists("pawapay", country.code, operator.code);
         }
       }
+
+      // Initialize FeeXPay
+      const { FEEXPAY_COUNTRIES } = await import("@shared/feexpay-countries");
+      for (const country of FEEXPAY_COUNTRIES) {
+        for (const operator of country.operators) {
+          await insertIfNotExists("feexpay", country.code, operator.code);
+        }
+      }
     }
   }
 
@@ -2042,6 +2052,12 @@ export class DbStorage implements IStorage {
       const { PAWAPAY_COUNTRIES } = await import("@shared/pawapay-countries");
       for (const country of PAWAPAY_COUNTRIES) {
         await insertIfNotExists("pawapay", country.code);
+      }
+
+      // Initialize FeeXPay countries
+      const { FEEXPAY_COUNTRIES } = await import("@shared/feexpay-countries");
+      for (const country of FEEXPAY_COUNTRIES) {
+        await insertIfNotExists("feexpay", country.code);
       }
     }
   }
@@ -2587,6 +2603,66 @@ export class DbStorage implements IStorage {
       if (toInsert.length > 0) {
         await db.insert(schema.feeConfigs).values(toInsert);
         console.log(`[FeeConfigs] Added ${toInsert.length} PawaPay fee configurations for scope ${scope} (default 6%)`);
+      }
+    }
+  }
+
+  async ensureFeeXPayFeeConfigs(): Promise<void> {
+    const { FEEXPAY_COUNTRIES } = await import("@shared/feexpay-countries");
+    const scopes = ["personal", "business"];
+    for (const scope of scopes) {
+      const existing = await this.getFeeConfigsByProvider("feexpay", scope);
+      const existingSet = new Set(existing.map(c => `${c.country}-${c.operator}`));
+
+      const toInsert: InsertFeeConfig[] = [];
+      for (const country of FEEXPAY_COUNTRIES) {
+        for (const op of country.operators) {
+          const key = `${country.code}-${op.code}`;
+          if (existingSet.has(key)) continue;
+          toInsert.push({
+            provider: "feexpay",
+            country: country.code,
+            operator: op.code,
+            incomingFeePercentage: 60,
+            outgoingFeePercentage: 60,
+            scope,
+          });
+        }
+      }
+
+      if (toInsert.length > 0) {
+        await db.insert(schema.feeConfigs).values(toInsert);
+        console.log(`[FeeConfigs] Added ${toInsert.length} FeeXPay fee configurations for scope ${scope} (default 6%)`);
+      }
+    }
+  }
+
+  async ensureMoneyFusionFeeConfigs(): Promise<void> {
+    const { MONEYFUSION_COUNTRIES } = await import("@shared/moneyfusion-countries");
+    const scopes = ["personal", "business"];
+    for (const scope of scopes) {
+      const existing = await this.getFeeConfigsByProvider("moneyfusion", scope);
+      const existingSet = new Set(existing.map(c => `${c.country}-${c.operator}`));
+
+      const toInsert: InsertFeeConfig[] = [];
+      for (const country of MONEYFUSION_COUNTRIES) {
+        for (const op of country.operators) {
+          const key = `${country.code}-${op.code}`;
+          if (existingSet.has(key)) continue;
+          toInsert.push({
+            provider: "moneyfusion",
+            country: country.code,
+            operator: op.code,
+            incomingFeePercentage: 60,
+            outgoingFeePercentage: 60,
+            scope,
+          });
+        }
+      }
+
+      if (toInsert.length > 0) {
+        await db.insert(schema.feeConfigs).values(toInsert);
+        console.log(`[FeeConfigs] Added ${toInsert.length} MoneyFusion fee configurations for scope ${scope} (default 6%)`);
       }
     }
   }

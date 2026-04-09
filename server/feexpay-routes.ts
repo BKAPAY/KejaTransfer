@@ -158,7 +158,10 @@ export async function handleFeeXPayWithdrawal(
   country: string,
   operator: string,
   phone: string,
-  userCurrency?: string
+  userCurrency?: string,
+  isTransfer: boolean = false,
+  securityCode?: string,
+  skipBalanceOps: boolean = false
 ): Promise<{ success: boolean; transactionId?: string; message?: string; error?: string }> {
   try {
     const countryCode = country.toUpperCase();
@@ -193,7 +196,7 @@ export async function handleFeeXPayWithdrawal(
     const feeConfig = await getFeeFromDatabase(storage, "feexpay", country, operator);
     const feeInfo = calculateOutgoingFee(grossAmount, feeConfig.outgoing);
 
-    if (user.balance < feeInfo.totalDeductedFromBalance) {
+    if (!skipBalanceOps && user.balance < feeInfo.totalDeductedFromBalance) {
       return { success: false, error: "Solde insuffisant" };
     }
 
@@ -221,7 +224,9 @@ export async function handleFeeXPayWithdrawal(
       return { success: false, error: translateFeeXPayError(result.error, "withdrawal") };
     }
 
-    await storage.updateUserBalance(userId, -feeInfo.totalDeductedFromBalance);
+    if (!skipBalanceOps) {
+      await storage.updateUserBalance(userId, -feeInfo.totalDeductedFromBalance);
+    }
 
     const tx = await storage.createTransaction({
       userId,

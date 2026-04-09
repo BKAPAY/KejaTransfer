@@ -6673,6 +6673,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else if (activeProvider === "mbiyopay") {
         const { handleMbiyoPayDeposit } = await import("./mbiyopay-routes");
         result = await handleMbiyoPayDeposit(user.id, user, requestedAmount, countryCode, normalizedOperator, localPhone, requestedCurrency, requestedAmount, requestedCurrency);
+      } else if (activeProvider === "feexpay") {
+        const { otpCode } = req.body;
+        const { handleFeeXPayDeposit } = await import("./feexpay-routes");
+        result = await handleFeeXPayDeposit(
+          user.id, user, requestedAmount, countryCode, normalizedOperator, localPhone, otpCode,
+          requestedCurrency, requestedAmount, requestedCurrency
+        );
       } else if (activeProvider === "paydunya") {
         const paydunyaData = {
           invoice: {
@@ -6772,7 +6779,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         result = { success: false, error: "Service de paiement temporairement indisponible" };
       }
 
-      const providerNames = ["pawapay", "paydunya", "fedapay", "mbiyopay", "moneyfusion", "afribapay", "PawaPay", "Paydunya", "FedaPay", "MbiyoPay", "MoneyFusion", "AfribaPay"];
+      const providerNames = ["pawapay", "paydunya", "fedapay", "mbiyopay", "moneyfusion", "afribapay", "feexpay", "PawaPay", "Paydunya", "FedaPay", "MbiyoPay", "MoneyFusion", "AfribaPay", "FeeXPay"];
       const sanitizeBusinessError = (msg: string | undefined): string => {
         if (!msg) return "La transaction a échoué";
         let sanitized = msg;
@@ -6968,6 +6975,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         result = await handleMbiyoPayWithdrawal(user.id, user, requestedAmount, countryCode, normalizedOperator, localPhone, requestedCurrency, requestedCurrency, true, undefined, true);
       } else if (activeProvider === "moneyfusion") {
         result = await handleMoneyFusionWithdrawal(user.id, user, requestedAmount, countryCode, normalizedOperator, localPhone, requestedCurrency, true, undefined, true);
+      } else if (activeProvider === "feexpay") {
+        const { handleFeeXPayWithdrawal } = await import("./feexpay-routes");
+        result = await handleFeeXPayWithdrawal(user.id, user, requestedAmount, countryCode, normalizedOperator, localPhone, requestedCurrency, true, undefined, true);
       } else if (activeProvider === "paydunya") {
         const countryWithdrawModes: Record<string, Record<string, string>> = {
           "SN": { "orange": "orange-money-senegal", "free": "free-money-senegal", "wave": "wave-senegal" },
@@ -7017,7 +7027,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.creditBusinessWallet(user.id, countryCode, requestedCurrency, feeInfo.totalDeductedFromBalance);
       }
 
-      const providerNames = ["pawapay", "paydunya", "fedapay", "mbiyopay", "moneyfusion", "afribapay", "PawaPay", "Paydunya", "FedaPay", "MbiyoPay", "MoneyFusion", "AfribaPay"];
+      const providerNames = ["pawapay", "paydunya", "fedapay", "mbiyopay", "moneyfusion", "afribapay", "feexpay", "PawaPay", "Paydunya", "FedaPay", "MbiyoPay", "MoneyFusion", "AfribaPay", "FeeXPay"];
       const sanitizePayoutError = (msg: string | undefined): string => {
         if (!msg) return "La transaction a échoué";
         let sanitized = msg;
@@ -11347,6 +11357,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   await storage.initializeFeeConfigs();
   await storage.ensurePaydunyaFeeConfigs();
   await storage.ensurePawaPayFeeConfigs();
+  await storage.ensureFeeXPayFeeConfigs();
+  await storage.ensureMoneyFusionFeeConfigs();
 
   // ===== Provider Config Routes (API Keys Management) =====
   app.get("/api/admin/pawapay/active-conf", requireAdmin, async (req: Request, res: Response) => {
