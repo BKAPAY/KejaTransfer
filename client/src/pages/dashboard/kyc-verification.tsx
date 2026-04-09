@@ -1009,6 +1009,35 @@ export default function KycVerificationPage() {
                 </CardContent>
               </Card>
             )}
+
+            {selectedUserDetails.kycStatus === "rejected" && (
+              <Card className="border-green-200 dark:border-green-800">
+                <CardHeader>
+                  <CardTitle className="text-base text-green-700 dark:text-green-400 flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4" />
+                    Réapprouver cette vérification
+                  </CardTitle>
+                  <CardDescription>
+                    Approuver manuellement ce dossier KYC malgré le rejet précédent.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Button
+                    onClick={() => approveMutation.mutate(selectedUserDetails.id)}
+                    disabled={approveMutation.isPending}
+                    className="w-full bg-green-600 hover:bg-green-700"
+                    data-testid="button-reapprove-kyc"
+                  >
+                    {approveMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="w-4 h-4 mr-2" />
+                    )}
+                    Réapprouver le KYC
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
       ) : (
