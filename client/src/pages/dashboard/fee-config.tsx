@@ -17,6 +17,7 @@ import { FEDAPAY_COUNTRIES } from "@shared/fedapay-countries";
 import { MONEYFUSION_COUNTRIES } from "@shared/moneyfusion-countries";
 import { PAWAPAY_COUNTRIES } from "@shared/pawapay-countries";
 import { PAYDUNYA_COUNTRIES } from "@shared/paydunya-countries";
+import { FEEXPAY_COUNTRIES } from "@shared/feexpay-countries";
 
 interface ProviderCountry {
   code: string;
@@ -174,6 +175,16 @@ const PROVIDERS: ProviderInfo[] = [
     name: "Paydunya",
     color: "bg-blue-500",
     countries: PAYDUNYA_COUNTRIES.map(c => ({
+      code: c.code,
+      name: c.name,
+      operators: c.operators.map(op => ({ code: op.code, name: op.name })),
+    })),
+  },
+  {
+    id: "feexpay",
+    name: "FeeXPay",
+    color: "bg-emerald-500",
+    countries: FEEXPAY_COUNTRIES.map(c => ({
       code: c.code,
       name: c.name,
       operators: c.operators.map(op => ({ code: op.code, name: op.name })),

@@ -15,6 +15,7 @@ import { FEDAPAY_COUNTRIES } from "@shared/fedapay-countries";
 import { MBIYOPAY_COUNTRIES } from "@shared/mbiyopay-countries";
 import { MONEYFUSION_COUNTRIES } from "@shared/moneyfusion-countries";
 import { PAWAPAY_COUNTRIES } from "@shared/pawapay-countries";
+import { FEEXPAY_COUNTRIES } from "@shared/feexpay-countries";
 
 interface ProviderConfig {
   id: string;
@@ -58,6 +59,12 @@ const PROVIDERS = [
     name: "PawaPay",
     color: "bg-yellow-500",
     countries: PAWAPAY_COUNTRIES,
+  },
+  {
+    id: "feexpay",
+    name: "FeeXPay",
+    color: "bg-emerald-500",
+    countries: FEEXPAY_COUNTRIES,
   },
 ];
 
