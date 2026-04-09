@@ -198,7 +198,7 @@ export default function Home() {
       {/* Hero Section with background image */}
       <section className="relative py-12 md:py-24 lg:py-36 overflow-hidden">
         <div className="absolute inset-0">
-          <img src={heroMainImage} alt="" className="w-full h-full object-cover" />
+          <img src={heroMainImage} alt="" className="w-full h-full object-cover" fetchPriority="high" decoding="async" />
           <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/60 to-black/40" />
         </div>
         <div className="container mx-auto px-2 sm:px-4 md:px-8 max-w-7xl relative z-10">
@@ -264,10 +264,10 @@ export default function Home() {
             </div>
             <div className="animate-on-scroll anim-slide-right">
               <div className="flex items-center -space-x-1 mb-3 sm:mb-4">
-                <img src={omImage} alt="Orange Money" className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-contain bg-white border border-border" />
-                <img src={mtnImage} alt="MTN" className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-contain bg-white border border-border" />
-                <img src={moovImage} alt="Moov" className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-contain bg-white border border-border" />
-                <img src={waveImage} alt="Wave" className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-contain bg-white border border-border" />
+                <img src={omImage} alt="Orange Money" loading="lazy" decoding="async" className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-contain bg-white border border-border" />
+                <img src={mtnImage} alt="MTN" loading="lazy" decoding="async" className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-contain bg-white border border-border" />
+                <img src={moovImage} alt="Moov" loading="lazy" decoding="async" className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-contain bg-white border border-border" />
+                <img src={waveImage} alt="Wave" loading="lazy" decoding="async" className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-contain bg-white border border-border" />
               </div>
               <h2 className="text-lg sm:text-2xl md:text-3xl lg:text-4xl font-bold mb-3 sm:mb-4 text-foreground">
                 Paiements Mobile Money
@@ -276,10 +276,10 @@ export default function Home() {
                 Acceptez les paiements via tous les opérateurs Mobile Money d'Afrique. Orange Money, MTN, Moov, Wave, Free Money, T-Money et bien plus. Transactions instantanées, sécurisées et fiables.
               </p>
               <div className="flex flex-wrap gap-2 sm:gap-3">
-                <span className="inline-flex items-center gap-1.5 px-2 py-1 sm:px-3 sm:py-1.5 bg-orange-100 dark:bg-orange-950 text-orange-700 dark:text-orange-400 rounded-md text-xs sm:text-sm font-medium"><img src={omImage} alt="OM" className="w-4 h-4 rounded-full object-contain" /> Orange Money</span>
-                <span className="inline-flex items-center gap-1.5 px-2 py-1 sm:px-3 sm:py-1.5 bg-yellow-100 dark:bg-yellow-950 text-yellow-700 dark:text-yellow-400 rounded-md text-xs sm:text-sm font-medium"><img src={mtnImage} alt="MTN" className="w-4 h-4 rounded-full object-contain" /> MTN</span>
-                <span className="inline-flex items-center gap-1.5 px-2 py-1 sm:px-3 sm:py-1.5 bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400 rounded-md text-xs sm:text-sm font-medium"><img src={moovImage} alt="Moov" className="w-4 h-4 rounded-full object-contain" /> Moov</span>
-                <span className="inline-flex items-center gap-1.5 px-2 py-1 sm:px-3 sm:py-1.5 bg-cyan-100 dark:bg-cyan-950 text-cyan-700 dark:text-cyan-400 rounded-md text-xs sm:text-sm font-medium"><img src={waveImage} alt="Wave" className="w-4 h-4 rounded-full object-contain" /> Wave</span>
+                <span className="inline-flex items-center gap-1.5 px-2 py-1 sm:px-3 sm:py-1.5 bg-orange-100 dark:bg-orange-950 text-orange-700 dark:text-orange-400 rounded-md text-xs sm:text-sm font-medium"><img src={omImage} alt="OM" loading="lazy" decoding="async" className="w-4 h-4 rounded-full object-contain" /> Orange Money</span>
+                <span className="inline-flex items-center gap-1.5 px-2 py-1 sm:px-3 sm:py-1.5 bg-yellow-100 dark:bg-yellow-950 text-yellow-700 dark:text-yellow-400 rounded-md text-xs sm:text-sm font-medium"><img src={mtnImage} alt="MTN" loading="lazy" decoding="async" className="w-4 h-4 rounded-full object-contain" /> MTN</span>
+                <span className="inline-flex items-center gap-1.5 px-2 py-1 sm:px-3 sm:py-1.5 bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400 rounded-md text-xs sm:text-sm font-medium"><img src={moovImage} alt="Moov" loading="lazy" decoding="async" className="w-4 h-4 rounded-full object-contain" /> Moov</span>
+                <span className="inline-flex items-center gap-1.5 px-2 py-1 sm:px-3 sm:py-1.5 bg-cyan-100 dark:bg-cyan-950 text-cyan-700 dark:text-cyan-400 rounded-md text-xs sm:text-sm font-medium"><img src={waveImage} alt="Wave" loading="lazy" decoding="async" className="w-4 h-4 rounded-full object-contain" /> Wave</span>
                 <span className="inline-flex items-center gap-1.5 px-2 py-1 sm:px-3 sm:py-1.5 bg-muted text-muted-foreground rounded-md text-xs sm:text-sm font-medium">+ 11 autres</span>
               </div>
             </div>
@@ -448,7 +448,7 @@ export default function Home() {
           <div className="grid md:grid-cols-3 gap-6 sm:gap-8 lg:gap-12 mb-4 sm:mb-8">
             <div>
               <div className="flex items-center gap-2 mb-2 sm:mb-4">
-                <img src={logoImage} alt="BKApay" className="h-6 sm:h-8 w-auto" />
+                <img src={logoImage} alt="BKApay" loading="lazy" decoding="async" className="h-6 sm:h-8 w-auto" />
               </div>
               <p className="text-xs sm:text-sm text-muted-foreground">
                 Plateforme de paiement mobile money pour l'Afrique
