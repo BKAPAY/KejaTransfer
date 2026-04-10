@@ -94,3 +94,39 @@ export function calculateOutgoingFee(requestedAmount: number, feePercentageValue
 export function formatFeePercentage(value: number): string {
   return `${(value / 10).toFixed(1).replace(/\.0$/, '')}%`;
 }
+
+// Cache for exchange fee percentages
+const exchangeFeeCache: Map<string, { feePercentage: number; isActive: number; timestamp: number }> = new Map();
+
+export async function fetchExchangeFee(fromCurrency: string, toCurrency: string): Promise<{ feePercentage: number; isActive: number }> {
+  if (fromCurrency === toCurrency) return { feePercentage: 0, isActive: 1 };
+  const cacheKey = `${fromCurrency}-${toCurrency}`;
+  const cached = exchangeFeeCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return { feePercentage: cached.feePercentage, isActive: cached.isActive };
+  }
+  try {
+    const response = await fetch(`/api/currency-exchange-fee/${fromCurrency}/${toCurrency}`);
+    if (response.ok) {
+      const data = await response.json();
+      const result = { feePercentage: data.feePercentage ?? 0, isActive: data.isActive ?? 1 };
+      exchangeFeeCache.set(cacheKey, { ...result, timestamp: Date.now() });
+      return result;
+    }
+  } catch (error) {
+    console.warn('Failed to fetch exchange fee, using 0:', error);
+  }
+  return { feePercentage: 0, isActive: 1 };
+}
+
+export function calculateExchangeFee(netAmountAfterTxFee: number, exchangeFeePercentage: number): {
+  exchangeFeeAmount: number;
+  finalNetAmount: number;
+} {
+  if (!exchangeFeePercentage) return { exchangeFeeAmount: 0, finalNetAmount: netAmountAfterTxFee };
+  const exchangeFeeAmount = Math.floor((netAmountAfterTxFee * exchangeFeePercentage) / 1000);
+  return {
+    exchangeFeeAmount,
+    finalNetAmount: netAmountAfterTxFee - exchangeFeeAmount,
+  };
+}

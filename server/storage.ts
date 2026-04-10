@@ -1114,6 +1114,43 @@ export class DbStorage implements IStorage {
       netAmount = pendingTx.amount - (pendingTx.fee || 0);
     }
 
+    // ===== Currency Exchange Fee (personal accounts only) =====
+    // If the payment currency differs from the user's balance currency,
+    // deduct the exchange fee silently before crediting the balance.
+    if (!isBusiness && pendingTx.currency) {
+      try {
+        const { COUNTRIES } = await import("@shared/schema");
+        const userRows = await db.select({ country: schema.users.country }).from(schema.users).where(eq(schema.users.id, pendingTx.userId)).limit(1);
+        const userCountry = userRows[0]?.country;
+        const userCurrency = userCountry ? (COUNTRIES.find((c: any) => c.code === userCountry)?.currency || "XOF") : "XOF";
+        const paymentCurrency = pendingTx.currency.toUpperCase();
+
+        if (paymentCurrency !== userCurrency) {
+          const exchangeFeeRows = await db
+            .select()
+            .from(schema.currencyExchangeFees)
+            .where(
+              and(
+                eq(schema.currencyExchangeFees.fromCurrency, paymentCurrency),
+                eq(schema.currencyExchangeFees.toCurrency, userCurrency),
+                eq(schema.currencyExchangeFees.isActive, 1)
+              )
+            )
+            .limit(1);
+
+          if (exchangeFeeRows.length > 0 && exchangeFeeRows[0].feePercentage > 0) {
+            const exchangeFeeAmount = Math.floor((netAmount * exchangeFeeRows[0].feePercentage) / 1000);
+            const netAfterExchange = netAmount - exchangeFeeAmount;
+            console.log(`[Storage] Exchange fee applied: ${paymentCurrency}→${userCurrency} (${exchangeFeeRows[0].feePercentage / 10}%) = -${exchangeFeeAmount} ${userCurrency} | Net: ${netAmount} → ${netAfterExchange}`);
+            netAmount = netAfterExchange;
+          }
+        }
+      } catch (exchangeErr) {
+        console.error(`[Storage] Exchange fee lookup failed for tx ${id}:`, exchangeErr);
+        // Do not block finalization - proceed without exchange fee deduction
+      }
+    }
+
     const receiptUrl = extras?.paydunyaReceiptUrl ?? null;
 
     if (isBusiness) {

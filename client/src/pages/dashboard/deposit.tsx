@@ -15,7 +15,7 @@ import { PhoneInputWithPrefix } from "@/components/phone-input-with-prefix";
 import { CountryFlag } from "@/components/country-flag";
 import { ArrowDownToLine, CheckCircle2, Clock, ExternalLink, Info, Loader2, Smartphone } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { calculateIncomingFee, fetchFeeConfig, formatFeePercentage } from "@/lib/fees";
+import { calculateIncomingFee, calculateExchangeFee, fetchFeeConfig, fetchExchangeFee, formatFeePercentage } from "@/lib/fees";
 import { useState, useEffect, useCallback } from "react";
 import { PaymentMethodSelector } from "@/components/payment-method-selector";
 import { CryptoPaymentFlow } from "@/components/crypto-payment-flow";
@@ -107,6 +107,7 @@ export default function Deposit() {
   });
   const [selectedCurrency, setSelectedCurrency] = useState<string>("XOF");
   const [feePercentage, setFeePercentage] = useState<number>(60);
+  const [exchangeFeePercentage, setExchangeFeePercentage] = useState<number>(0);
 
   const { data: user } = useQuery<User>({
     queryKey: ["/api/auth/me"],
@@ -223,8 +224,6 @@ export default function Deposit() {
     }
   }, [selectedCountry, selectedOperator]);
 
-  const netAmount = amount ? calculateIncomingFee(Math.floor(amount), feePercentage).netAmount : 0;
-
   // Handle currency selection when country changes
   useEffect(() => {
     if (selectedCountry && hasMultiplePawaPayCurrencies(selectedCountry)) {
@@ -257,6 +256,24 @@ export default function Deposit() {
     : userBalanceCurrency;
   // Only need conversion if a country is selected AND its currency differs from user's currency
   const needsConversion = selectedCountry && paymentCurrency !== userBalanceCurrency;
+
+  // Fetch exchange fee when payment currency differs from user's balance currency
+  useEffect(() => {
+    if (paymentCurrency && userBalanceCurrency && paymentCurrency !== userBalanceCurrency) {
+      fetchExchangeFee(paymentCurrency, userBalanceCurrency).then(data => {
+        setExchangeFeePercentage(data.isActive === 1 ? data.feePercentage : 0);
+      });
+    } else {
+      setExchangeFeePercentage(0);
+    }
+  }, [paymentCurrency, userBalanceCurrency]);
+
+  // Fee calculations
+  const { feeAmount: txFeeAmount, netAmount } = amount
+    ? calculateIncomingFee(Math.floor(amount), feePercentage)
+    : { feeAmount: 0, netAmount: 0 };
+
+  const { exchangeFeeAmount, finalNetAmount } = calculateExchangeFee(netAmount, exchangeFeePercentage);
 
   const fetchConversion = useCallback(async (amountToConvert: number, fromCurrency: string, toCurrency: string) => {
     if (!amountToConvert || amountToConvert <= 0 || fromCurrency === toCurrency) {
@@ -971,16 +988,28 @@ export default function Deposit() {
                     )}
 
                     {amount && selectedCountry && selectedOperator && netAmount > 0 && (
-                      <div className="bg-muted p-3 rounded-md border">
-                        <p className="text-sm text-muted-foreground">
-                          Vous recevrez
-                        </p>
-                        <p className="text-lg font-semibold text-foreground" data-testid="text-net-amount">
-                          {new Intl.NumberFormat("fr-FR", {
-                            minimumFractionDigits: getCurrencyDecimals(userBalanceCurrency),
-                            maximumFractionDigits: getCurrencyDecimals(userBalanceCurrency),
-                          }).format(netAmount)} {userBalanceCurrency}
-                        </p>
+                      <div className="bg-muted p-3 rounded-md border space-y-1">
+                        {/* Transaction fee line */}
+                        <div className="flex justify-between text-sm text-muted-foreground">
+                          <span>Frais de transaction ({formatFeePercentage(feePercentage)})</span>
+                          <span>- {new Intl.NumberFormat("fr-FR").format(txFeeAmount)} {paymentCurrency}</span>
+                        </div>
+                        {/* Exchange fee line — shown only when currencies differ and fee > 0 */}
+                        {exchangeFeePercentage > 0 && (
+                          <div className="flex justify-between text-sm text-muted-foreground" data-testid="text-exchange-fee-row">
+                            <span>Frais de change ({paymentCurrency}→{userBalanceCurrency}) ({formatFeePercentage(exchangeFeePercentage)})</span>
+                            <span>- {new Intl.NumberFormat("fr-FR").format(exchangeFeeAmount)} {userBalanceCurrency}</span>
+                          </div>
+                        )}
+                        <div className="border-t pt-1 mt-1 flex justify-between items-center">
+                          <p className="text-sm font-medium text-foreground">Vous recevrez</p>
+                          <p className="text-lg font-bold text-foreground" data-testid="text-net-amount">
+                            {new Intl.NumberFormat("fr-FR", {
+                              minimumFractionDigits: getCurrencyDecimals(userBalanceCurrency),
+                              maximumFractionDigits: getCurrencyDecimals(userBalanceCurrency),
+                            }).format(finalNetAmount)} {userBalanceCurrency}
+                          </p>
+                        </div>
                       </div>
                     )}
 
