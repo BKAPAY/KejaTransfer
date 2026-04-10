@@ -179,7 +179,7 @@ export const countryOperatorConfig = pgTable("country_operator_config", {
 });
 
 // Countries allowed for user registration
-export const ALLOWED_REGISTRATION_COUNTRIES = ["BJ", "CI", "SN", "TG", "BF", "CM", "CD", "CG", "ML"] as const;
+export const ALLOWED_REGISTRATION_COUNTRIES = ["BJ", "CI", "SN", "TG", "CM", "CD", "CG"] as const;
 
 // Email verification codes
 export const verificationCodes = pgTable("verification_codes", {
