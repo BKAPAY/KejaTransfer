@@ -4338,7 +4338,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const { currencyExchangeFees: cef } = await import("@shared/schema");
           const { eq: eqEx, and: andEx } = await import("drizzle-orm");
           const exRows = await dbEx.select().from(cef).where(
-            andEx(eqEx(cef.fromCurrency, userCurrency), eqEx(cef.toCurrency, payoutDestCurrency), eqEx(cef.isEnabled, true))
+            andEx(eqEx(cef.fromCurrency, userCurrency), eqEx(cef.toCurrency, payoutDestCurrency), eqEx(cef.isActive, 1))
           );
           if (exRows.length > 0 && exRows[0].feePercentage > 0) {
             apiPayoutExchangeFee = Math.floor((amountInUserCurrency * exRows[0].feePercentage) / 1000);
@@ -7882,7 +7882,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             and(
               eq(currencyExchangeFees.fromCurrency, userCurrencyPre),
               eq(currencyExchangeFees.toCurrency, destCurrencyPre),
-              eq(currencyExchangeFees.isEnabled, true),
+              eq(currencyExchangeFees.isActive, 1),
             )
           );
           if (preRows.length > 0 && preRows[0].feePercentage > 0) {
@@ -7997,7 +7997,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               and(
                 eq(currencyExchangeFees.fromCurrency, userCurrency),
                 eq(currencyExchangeFees.toCurrency, providerCurrency),
-                eq(currencyExchangeFees.isEnabled, true),
+                eq(currencyExchangeFees.isActive, 1),
               )
             );
             if (feeRowsF.length > 0 && feeRowsF[0].feePercentage > 0) {
@@ -9442,7 +9442,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             and(
               eq(currencyExchangeFees.fromCurrency, userCurrencyForTransfer),
               eq(currencyExchangeFees.toCurrency, destCurrencyForTransfer),
-              eq(currencyExchangeFees.isEnabled, true),
+              eq(currencyExchangeFees.isActive, 1),
             )
           );
           if (feeRows.length > 0 && feeRows[0].feePercentage > 0) {
