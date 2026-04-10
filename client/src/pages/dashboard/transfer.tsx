@@ -508,9 +508,9 @@ export default function Transfer() {
                           </p>
                         </div>
                         {needsConversion && conversionData && !conversionData.isLoading && conversionData.convertedAmount > 0 && (
-                          <div className="bg-muted p-3 rounded-md border flex justify-between items-center">
-                            <p className="text-sm text-muted-foreground">Destinataire recevra</p>
-                            <p className="text-lg font-semibold text-foreground" data-testid="text-converted-amount">
+                          <div className="bg-green-50 dark:bg-green-950/30 p-3 rounded-md border border-green-200 dark:border-green-800 flex justify-between items-center">
+                            <p className="text-sm text-green-700 dark:text-green-400">Destinataire recevra</p>
+                            <p className="text-lg font-semibold text-green-700 dark:text-green-400" data-testid="text-converted-amount">
                               {new Intl.NumberFormat("fr-FR", {
                                 minimumFractionDigits: getCurrencyDecimals(conversionData.targetCurrency),
                                 maximumFractionDigits: getCurrencyDecimals(conversionData.targetCurrency),
