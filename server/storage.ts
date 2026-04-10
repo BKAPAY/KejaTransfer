@@ -1089,6 +1089,7 @@ export class DbStorage implements IStorage {
     let isBusiness = false;
     let businessCountry: string | null = null;
     let businessCurrency: string | null = null;
+    let providerCurrencyFromMetadata: string | null = null;
 
     if (pendingTx.metadata) {
       try {
@@ -1096,6 +1097,9 @@ export class DbStorage implements IStorage {
         customerPaysFee = metadata.customerPaysFee === true;
         if (typeof metadata.netAmountForUser === 'number') {
           netAmountFromMetadata = metadata.netAmountForUser;
+        }
+        if (metadata.providerCurrency) {
+          providerCurrencyFromMetadata = metadata.providerCurrency;
         }
         if (metadata.scope === "business") {
           isBusiness = true;
@@ -1117,15 +1121,17 @@ export class DbStorage implements IStorage {
     // ===== Currency Exchange Fee (personal accounts only) =====
     // If the payment currency differs from the user's balance currency,
     // deduct the exchange fee silently before crediting the balance.
-    if (!isBusiness && pendingTx.currency) {
+    // IMPORTANT: Use providerCurrency from metadata (the payer's actual currency, e.g. XAF),
+    // NOT pendingTx.currency which is stored in the owner's balance currency (e.g. XOF).
+    if (!isBusiness) {
       try {
         const { COUNTRIES } = await import("@shared/schema");
         const userRows = await db.select({ country: schema.users.country }).from(schema.users).where(eq(schema.users.id, pendingTx.userId)).limit(1);
         const userCountry = userRows[0]?.country;
         const userCurrency = userCountry ? (COUNTRIES.find((c: any) => c.code === userCountry)?.currency || "XOF") : "XOF";
-        const paymentCurrency = pendingTx.currency.toUpperCase();
+        const paymentCurrency = (providerCurrencyFromMetadata || pendingTx.currency || "").toUpperCase();
 
-        if (paymentCurrency !== userCurrency) {
+        if (paymentCurrency && paymentCurrency !== userCurrency) {
           const exchangeFeeRows = await db
             .select()
             .from(schema.currencyExchangeFees)
