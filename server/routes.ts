@@ -8192,6 +8192,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           : await handleFeeXPayWithdrawal(req.session.userId!, user, amount, country, operator, phone, userCurrency);
 
         if (result.success) {
+          if (preExchangeFee > 0) {
+            await storage.updateUserBalance(req.session.userId!, -preExchangeFee);
+            console.log(`[TRANSFER feexpay] Exchange fee deducted: ${preExchangeFee} ${userCurrencyPre}`);
+          }
           return res.json({
             success: true,
             transactionId: result.transactionId,
