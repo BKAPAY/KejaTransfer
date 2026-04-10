@@ -7871,7 +7871,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Pre-calculate outgoing exchange fee for balance check (personal accounts only)
       const userCurrencyPre = user.country ? getCurrencyForCountry(user.country) : "XOF";
-      const destCurrencyPre = getCurrencyForCountry(country?.toUpperCase() || "");
+      // Use reqTargetCurrency if provided (e.g. user chose USD for CD), otherwise use country default
+      const destCurrencyPre = reqTargetCurrency || getCurrencyForCountry(country?.toUpperCase() || "");
       let preExchangeFee = 0;
       if (user.accountType === "personal" && destCurrencyPre && destCurrencyPre !== userCurrencyPre) {
         try {
