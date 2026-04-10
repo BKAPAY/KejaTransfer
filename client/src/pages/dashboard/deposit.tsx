@@ -988,28 +988,14 @@ export default function Deposit() {
                     )}
 
                     {amount && selectedCountry && selectedOperator && netAmount > 0 && (
-                      <div className="bg-muted p-3 rounded-md border space-y-1">
-                        {/* Transaction fee line */}
-                        <div className="flex justify-between text-sm text-muted-foreground">
-                          <span>Frais de transaction ({formatFeePercentage(feePercentage)})</span>
-                          <span>- {new Intl.NumberFormat("fr-FR").format(txFeeAmount)} {paymentCurrency}</span>
-                        </div>
-                        {/* Exchange fee line — shown only when currencies differ and fee > 0 */}
-                        {exchangeFeePercentage > 0 && (
-                          <div className="flex justify-between text-sm text-muted-foreground" data-testid="text-exchange-fee-row">
-                            <span>Frais de change ({paymentCurrency}→{userBalanceCurrency}) ({formatFeePercentage(exchangeFeePercentage)})</span>
-                            <span>- {new Intl.NumberFormat("fr-FR").format(exchangeFeeAmount)} {userBalanceCurrency}</span>
-                          </div>
-                        )}
-                        <div className="border-t pt-1 mt-1 flex justify-between items-center">
-                          <p className="text-sm font-medium text-foreground">Vous recevrez</p>
-                          <p className="text-lg font-bold text-foreground" data-testid="text-net-amount">
-                            {new Intl.NumberFormat("fr-FR", {
-                              minimumFractionDigits: getCurrencyDecimals(userBalanceCurrency),
-                              maximumFractionDigits: getCurrencyDecimals(userBalanceCurrency),
-                            }).format(finalNetAmount)} {userBalanceCurrency}
-                          </p>
-                        </div>
+                      <div className="bg-muted p-3 rounded-md border flex justify-between items-center">
+                        <p className="text-sm text-muted-foreground">Vous recevrez</p>
+                        <p className="text-lg font-semibold text-foreground" data-testid="text-net-amount">
+                          {new Intl.NumberFormat("fr-FR", {
+                            minimumFractionDigits: getCurrencyDecimals(userBalanceCurrency),
+                            maximumFractionDigits: getCurrencyDecimals(userBalanceCurrency),
+                          }).format(finalNetAmount)} {userBalanceCurrency}
+                        </p>
                       </div>
                     )}
 

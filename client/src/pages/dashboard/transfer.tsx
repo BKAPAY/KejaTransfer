@@ -484,66 +484,30 @@ export default function Transfer() {
                     />
 
                     {amount && selectedCountry && selectedOperator && feeInfo && (
-                      <div className="bg-muted p-4 rounded-md border space-y-3">
-                        <div className="flex items-start gap-3">
-                          <Info className="h-4 w-4 mt-0.5 text-muted-foreground flex-shrink-0" />
-                          <div className="text-sm space-y-2 w-full">
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">Montant a envoyer:</span>
-                              <span className="font-medium">
-                                {new Intl.NumberFormat("fr-FR", {
-                                  style: "currency",
-                                  currency: userBalanceCurrency,
-                                  minimumFractionDigits: 0,
-                                }).format(amount)}
-                              </span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">Frais:</span>
-                              <span className="font-medium text-orange-600 dark:text-orange-400" data-testid="text-fee-amount">
-                                +{new Intl.NumberFormat("fr-FR", {
-                                  style: "currency",
-                                  currency: userBalanceCurrency,
-                                  minimumFractionDigits: 0,
-                                }).format(feeInfo.feeAmount)}
-                              </span>
-                            </div>
-                            <div className="border-t pt-2 flex justify-between font-semibold">
-                              <span>Total debite du solde:</span>
-                              <span className="text-foreground" data-testid="text-total-deducted">
-                                {new Intl.NumberFormat("fr-FR", {
-                                  style: "currency",
-                                  currency: userBalanceCurrency,
-                                  minimumFractionDigits: 0,
-                                }).format(amount + feeInfo.feeAmount)}
-                              </span>
-                            </div>
-                            {needsConversion && conversionData && !conversionData.isLoading && conversionData.convertedAmount > 0 && (
-                              <div className="border-t pt-2 mt-2 bg-green-50 dark:bg-green-950/30 p-3 rounded-md">
-                                <div className="flex justify-between text-green-700 dark:text-green-400 font-semibold">
-                                  <span>Destinataire recevra:</span>
-                                  <span data-testid="text-converted-amount">
-                                    {new Intl.NumberFormat("fr-FR", {
-                                      style: "currency",
-                                      currency: conversionData.targetCurrency,
-                                      minimumFractionDigits: getCurrencyDecimals(conversionData.targetCurrency),
-                                      maximumFractionDigits: getCurrencyDecimals(conversionData.targetCurrency),
-                                    }).format(conversionData.convertedAmount)}
-                                  </span>
-                                </div>
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  Taux: 1 {userBalanceCurrency} = {conversionData.conversionRate.toFixed(6)} {conversionData.targetCurrency}
-                                </p>
-                              </div>
-                            )}
-                            {needsConversion && (conversionData?.isLoading || !conversionData) && (
-                              <div className="border-t pt-2 mt-2 flex items-center gap-2 text-muted-foreground">
-                                <Loader2 className="h-3 w-3 animate-spin" />
-                                <span className="text-xs">Calcul de la conversion {userBalanceCurrency} → {targetCurrency}...</span>
-                              </div>
-                            )}
-                          </div>
+                      <div className="space-y-2">
+                        <div className="bg-muted p-3 rounded-md border flex justify-between items-center">
+                          <p className="text-sm text-muted-foreground">Vous débitez</p>
+                          <p className="text-lg font-semibold text-foreground" data-testid="text-total-deducted">
+                            {new Intl.NumberFormat("fr-FR").format(amount + feeInfo.feeAmount)} {userBalanceCurrency}
+                          </p>
                         </div>
+                        {needsConversion && conversionData && !conversionData.isLoading && conversionData.convertedAmount > 0 && (
+                          <div className="bg-muted p-3 rounded-md border flex justify-between items-center">
+                            <p className="text-sm text-muted-foreground">Le destinataire recevra</p>
+                            <p className="text-lg font-semibold text-foreground" data-testid="text-converted-amount">
+                              {new Intl.NumberFormat("fr-FR", {
+                                minimumFractionDigits: getCurrencyDecimals(conversionData.targetCurrency),
+                                maximumFractionDigits: getCurrencyDecimals(conversionData.targetCurrency),
+                              }).format(conversionData.convertedAmount)} {conversionData.targetCurrency}
+                            </p>
+                          </div>
+                        )}
+                        {needsConversion && (conversionData?.isLoading || !conversionData) && (
+                          <div className="bg-muted p-3 rounded-md border flex items-center gap-2 text-muted-foreground">
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                            <span className="text-sm">Calcul de la conversion...</span>
+                          </div>
+                        )}
                       </div>
                     )}
 
