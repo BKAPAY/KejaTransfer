@@ -223,6 +223,12 @@ export interface IStorage {
   ensureFeeXPayFeeConfigs(): Promise<void>;
   ensureMoneyFusionFeeConfigs(): Promise<void>;
 
+  // Currency Exchange Fees
+  getAllCurrencyExchangeFees(): Promise<schema.CurrencyExchangeFee[]>;
+  getCurrencyExchangeFee(fromCurrency: string, toCurrency: string): Promise<schema.CurrencyExchangeFee | undefined>;
+  upsertCurrencyExchangeFee(fromCurrency: string, toCurrency: string, feePercentage: number, isActive?: number): Promise<schema.CurrencyExchangeFee>;
+  initializeCurrencyExchangeFees(): Promise<void>;
+
   // Support Settings
   getSupportSettings(): Promise<SupportSettings | undefined>;
   updateSupportSettings(updates: { supportEmail?: string; supportPhone?: string; whatsappLink?: string }): Promise<SupportSettings>;
@@ -2764,6 +2770,62 @@ export class DbStorage implements IStorage {
 
   async getBusinessUsers(): Promise<User[]> {
     return db.select().from(schema.users).where(eq(schema.users.accountType, "business"));
+  }
+
+  // ===== Currency Exchange Fees =====
+  async getAllCurrencyExchangeFees(): Promise<schema.CurrencyExchangeFee[]> {
+    return db.select().from(schema.currencyExchangeFees).orderBy(
+      schema.currencyExchangeFees.fromCurrency,
+      schema.currencyExchangeFees.toCurrency
+    );
+  }
+
+  async getCurrencyExchangeFee(fromCurrency: string, toCurrency: string): Promise<schema.CurrencyExchangeFee | undefined> {
+    const results = await db.select().from(schema.currencyExchangeFees).where(
+      and(
+        eq(schema.currencyExchangeFees.fromCurrency, fromCurrency),
+        eq(schema.currencyExchangeFees.toCurrency, toCurrency)
+      )
+    );
+    return results[0];
+  }
+
+  async upsertCurrencyExchangeFee(fromCurrency: string, toCurrency: string, feePercentage: number, isActive: number = 1): Promise<schema.CurrencyExchangeFee> {
+    const existing = await this.getCurrencyExchangeFee(fromCurrency, toCurrency);
+    if (existing) {
+      const updated = await db
+        .update(schema.currencyExchangeFees)
+        .set({ feePercentage, isActive, updatedAt: new Date() })
+        .where(
+          and(
+            eq(schema.currencyExchangeFees.fromCurrency, fromCurrency),
+            eq(schema.currencyExchangeFees.toCurrency, toCurrency)
+          )
+        )
+        .returning();
+      return updated[0];
+    } else {
+      const created = await db
+        .insert(schema.currencyExchangeFees)
+        .values({ fromCurrency, toCurrency, feePercentage, isActive })
+        .returning();
+      return created[0];
+    }
+  }
+
+  async initializeCurrencyExchangeFees(): Promise<void> {
+    const { CURRENCY_EXCHANGE_PAIRS } = await import("@shared/schema");
+    for (const pair of CURRENCY_EXCHANGE_PAIRS) {
+      const existing = await this.getCurrencyExchangeFee(pair.from, pair.to);
+      if (!existing) {
+        await db.insert(schema.currencyExchangeFees).values({
+          fromCurrency: pair.from,
+          toCurrency: pair.to,
+          feePercentage: 0,
+          isActive: 1,
+        });
+      }
+    }
   }
 }
 

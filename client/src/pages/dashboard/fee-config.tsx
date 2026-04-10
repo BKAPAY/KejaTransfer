@@ -5,13 +5,14 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CountryFlag } from "@/components/country-flag";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Globe, Percent, Save, ChevronDown, ChevronRight, ArrowDownToLine, ArrowUpFromLine, Building2 } from "lucide-react";
+import { Globe, Percent, Save, ChevronDown, ChevronRight, ArrowDownToLine, ArrowUpFromLine, Building2, ArrowLeftRight, ToggleLeft, ToggleRight } from "lucide-react";
 import { CryptoIcon } from "@/components/crypto-icon";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { FeeConfig } from "@shared/schema";
+import type { FeeConfig, CurrencyExchangeFee } from "@shared/schema";
+import { CURRENCY_EXCHANGE_PAIRS } from "@shared/schema";
 import { MBIYOPAY_COUNTRIES } from "@shared/mbiyopay-countries";
 import { FEDAPAY_COUNTRIES } from "@shared/fedapay-countries";
 import { MONEYFUSION_COUNTRIES } from "@shared/moneyfusion-countries";
@@ -571,6 +572,174 @@ function NowPaymentsFeeTab({
   );
 }
 
+function CurrencyExchangeFeeTab({ toast }: { toast: ReturnType<typeof useToast>["toast"] }) {
+  const [editingFees, setEditingFees] = useState<Record<string, string>>({});
+
+  const { data: exchangeFees, isLoading } = useQuery<CurrencyExchangeFee[]>({
+    queryKey: ["/api/admin/currency-exchange-fees"],
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ fromCurrency, toCurrency, feePercentage, isActive }: {
+      fromCurrency: string;
+      toCurrency: string;
+      feePercentage: number;
+      isActive?: number;
+    }) => {
+      return apiRequest("PUT", `/api/admin/currency-exchange-fees/${fromCurrency}/${toCurrency}`, {
+        feePercentage,
+        isActive,
+      });
+    },
+    onSuccess: () => {
+      toast({ title: "Succes", description: "Frais de change mis a jour" });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/currency-exchange-fees"] });
+    },
+    onError: (error: any) => {
+      toast({ title: "Erreur", description: error.message || "Impossible de mettre a jour", variant: "destructive" });
+    },
+  });
+
+  const getFeeForPair = (from: string, to: string): CurrencyExchangeFee | undefined => {
+    return exchangeFees?.find(f => f.fromCurrency === from && f.toCurrency === to);
+  };
+
+  const pairKey = (from: string, to: string) => `${from}-${to}`;
+
+  const handleEdit = (from: string, to: string, value: string) => {
+    setEditingFees(prev => ({ ...prev, [pairKey(from, to)]: value }));
+  };
+
+  const handleSave = (from: string, to: string) => {
+    const key = pairKey(from, to);
+    const val = editingFees[key];
+    if (val === undefined) return;
+    const parsed = parseFloat(val);
+    if (isNaN(parsed) || parsed < 0 || parsed > 100) {
+      toast({ title: "Erreur", description: "Pourcentage invalide (0-100)", variant: "destructive" });
+      return;
+    }
+    const stored = Math.round(parsed * 10);
+    updateMutation.mutate({ fromCurrency: from, toCurrency: to, feePercentage: stored });
+    setEditingFees(prev => { const s = { ...prev }; delete s[key]; return s; });
+  };
+
+  const handleToggleActive = (fee: CurrencyExchangeFee) => {
+    const newActive = fee.isActive === 1 ? 0 : 1;
+    updateMutation.mutate({
+      fromCurrency: fee.fromCurrency,
+      toCurrency: fee.toCurrency,
+      feePercentage: fee.feePercentage,
+      isActive: newActive,
+    });
+  };
+
+  const formatDisplay = (pct: number | undefined) => {
+    if (pct === undefined) return "0.0%";
+    return `${(pct / 10).toFixed(1)}%`;
+  };
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="pt-6 space-y-3">
+          {[1,2,3,4,5,6].map(i => <Skeleton key={i} className="h-12 w-full" />)}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-violet-500 flex items-center justify-center shrink-0">
+            <ArrowLeftRight className="w-4 h-4 text-white" />
+          </div>
+          <div>
+            <CardTitle className="text-base">Frais Supplementaires de Change de Devise</CardTitle>
+            <CardDescription className="text-xs mt-0.5">
+              Ces frais s'appliquent automatiquement et silencieusement quand la devise du paiement entrant differ de la devise du compte de l'utilisateur. Ils sont deduits du montant recu, en plus des frais de transaction habituels.
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-2">
+          {/* Header row */}
+          <div className="grid grid-cols-[1fr_1fr_120px_80px_40px] gap-3 px-3 pb-1 text-xs font-medium text-muted-foreground border-b">
+            <span>Devise source</span>
+            <span>Devise cible</span>
+            <span>Frais (%)</span>
+            <span>Actuel</span>
+            <span>ON/OFF</span>
+          </div>
+          {CURRENCY_EXCHANGE_PAIRS.map(({ from, to }) => {
+            const fee = getFeeForPair(from, to);
+            const key = pairKey(from, to);
+            const editing = editingFees[key];
+            const isActive = fee?.isActive ?? 1;
+            return (
+              <div
+                key={key}
+                className={`grid grid-cols-[1fr_1fr_120px_80px_40px] gap-3 items-center px-3 py-2 rounded-md ${isActive === 0 ? "opacity-50" : ""}`}
+                data-testid={`row-exchange-fee-${key}`}
+              >
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="font-mono text-xs" data-testid={`badge-from-${key}`}>{from}</Badge>
+                </div>
+                <div className="flex items-center gap-2">
+                  <ArrowLeftRight className="w-3 h-3 text-muted-foreground shrink-0" />
+                  <Badge variant="outline" className="font-mono text-xs" data-testid={`badge-to-${key}`}>{to}</Badge>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="relative flex-1">
+                    <Input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                      value={editing !== undefined ? editing : fee ? (fee.feePercentage / 10).toFixed(1) : "0.0"}
+                      onChange={(e) => handleEdit(from, to, e.target.value)}
+                      className="pr-6 text-center text-sm"
+                      data-testid={`input-exchange-fee-${key}`}
+                    />
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">%</span>
+                  </div>
+                  {editing !== undefined && (
+                    <Button
+                      size="icon"
+                      onClick={() => handleSave(from, to)}
+                      disabled={updateMutation.isPending}
+                      data-testid={`button-save-exchange-${key}`}
+                    >
+                      <Save className="w-3 h-3" />
+                    </Button>
+                  )}
+                </div>
+                <div className="text-xs text-muted-foreground font-mono" data-testid={`text-current-exchange-${key}`}>
+                  {formatDisplay(fee?.feePercentage)}
+                </div>
+                <button
+                  onClick={() => fee && handleToggleActive(fee)}
+                  disabled={!fee || updateMutation.isPending}
+                  className="flex items-center justify-center"
+                  data-testid={`toggle-active-${key}`}
+                >
+                  {isActive === 1
+                    ? <ToggleRight className="w-5 h-5 text-green-500" />
+                    : <ToggleLeft className="w-5 h-5 text-muted-foreground" />
+                  }
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function FeeConfigPage() {
   const { toast } = useToast();
   const [activeProvider, setActiveProvider] = useState("mbiyopay");
@@ -709,6 +878,10 @@ export default function FeeConfigPage() {
           <TabsTrigger value="nowpayments" className="gap-1 px-3 py-2 text-xs sm:text-sm whitespace-nowrap" data-testid="tab-fee-nowpayments">
             <span className="w-2 h-2 rounded-full shrink-0 bg-orange-500" />
             <span className="truncate">NOWPayments</span>
+          </TabsTrigger>
+          <TabsTrigger value="exchange" className="gap-1 px-3 py-2 text-xs sm:text-sm whitespace-nowrap" data-testid="tab-fee-exchange">
+            <span className="w-2 h-2 rounded-full shrink-0 bg-violet-500" />
+            <span className="truncate">Frais de Change</span>
           </TabsTrigger>
         </TabsList>
 
@@ -857,6 +1030,10 @@ export default function FeeConfigPage() {
 
         <TabsContent value="nowpayments" className="mt-4">
           <NowPaymentsFeeTab feeConfigs={feeConfigs} toast={toast} />
+        </TabsContent>
+
+        <TabsContent value="exchange" className="mt-4">
+          <CurrencyExchangeFeeTab toast={toast} />
         </TabsContent>
       </Tabs>
     </div>

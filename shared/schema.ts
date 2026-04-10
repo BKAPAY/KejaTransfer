@@ -772,5 +772,37 @@ export const insertPaymentSessionSchema = createInsertSchema(paymentSessions).om
 export type PaymentSession = typeof paymentSessions.$inferSelect;
 export type InsertPaymentSession = z.infer<typeof insertPaymentSessionSchema>;
 
+// Currency exchange fees (applied when sender/receiver currencies differ)
+export const currencyExchangeFees = pgTable("currency_exchange_fees", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  fromCurrency: text("from_currency").notNull(), // "XOF", "XAF", "CDF", etc.
+  toCurrency: text("to_currency").notNull(),     // "XOF", "XAF", "CDF", etc.
+  feePercentage: integer("fee_percentage").notNull().default(0), // 10 = 1.0%, 25 = 2.5%, etc.
+  isActive: integer("is_active").notNull().default(1), // 1 = active, 0 = disabled
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export type CurrencyExchangeFee = typeof currencyExchangeFees.$inferSelect;
+export const insertCurrencyExchangeFeeSchema = createInsertSchema(currencyExchangeFees).omit({ id: true, updatedAt: true });
+export type InsertCurrencyExchangeFee = z.infer<typeof insertCurrencyExchangeFeeSchema>;
+
+// All supported currency pairs for exchange fee configuration
+export const CURRENCY_EXCHANGE_PAIRS = [
+  { from: "XOF", to: "XAF" },
+  { from: "XAF", to: "XOF" },
+  { from: "CDF", to: "XAF" },
+  { from: "XAF", to: "CDF" },
+  { from: "XOF", to: "CDF" },
+  { from: "CDF", to: "XOF" },
+  { from: "XOF", to: "USD" },
+  { from: "XAF", to: "USD" },
+  { from: "XOF", to: "EUR" },
+  { from: "XAF", to: "EUR" },
+  { from: "XOF", to: "GHS" },
+  { from: "XAF", to: "GHS" },
+  { from: "XOF", to: "GNF" },
+  { from: "XAF", to: "GNF" },
+] as const;
+
 // Chat schema for EMALI
 export * from "./models/chat";

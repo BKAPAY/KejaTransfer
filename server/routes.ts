@@ -11451,6 +11451,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== Currency Exchange Fee Routes =====
+  app.get("/api/admin/currency-exchange-fees", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const fees = await storage.getAllCurrencyExchangeFees();
+      res.json(fees);
+    } catch (error: any) {
+      console.error("Get currency exchange fees error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
+  app.put("/api/admin/currency-exchange-fees/:fromCurrency/:toCurrency", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { fromCurrency, toCurrency } = req.params;
+      const { feePercentage, isActive } = req.body;
+
+      if (feePercentage === undefined || feePercentage < 0 || feePercentage > 1000) {
+        return res.status(400).json({ error: "Le pourcentage des frais doit être entre 0 et 100" });
+      }
+
+      const fee = await storage.upsertCurrencyExchangeFee(
+        fromCurrency.toUpperCase(),
+        toCurrency.toUpperCase(),
+        Math.round(feePercentage),
+        isActive !== undefined ? (isActive ? 1 : 0) : 1
+      );
+      res.json(fee);
+    } catch (error: any) {
+      console.error("Update currency exchange fee error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
+  // Public endpoint to get currency exchange fee for a pair
+  app.get("/api/currency-exchange-fee/:fromCurrency/:toCurrency", async (req: Request, res: Response) => {
+    try {
+      const { fromCurrency, toCurrency } = req.params;
+      const fee = await storage.getCurrencyExchangeFee(fromCurrency.toUpperCase(), toCurrency.toUpperCase());
+      res.json({
+        fromCurrency: fromCurrency.toUpperCase(),
+        toCurrency: toCurrency.toUpperCase(),
+        feePercentage: fee?.feePercentage ?? 0,
+        isActive: fee?.isActive ?? 1,
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
   // Public endpoint to get fee for a specific provider/country/operator (3 params - must be first)
   app.get("/api/fees/:provider/:country/:operator", async (req: Request, res: Response) => {
     try {
@@ -11535,6 +11584,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   await storage.ensurePawaPayFeeConfigs();
   await storage.ensureFeeXPayFeeConfigs();
   await storage.ensureMoneyFusionFeeConfigs();
+  await storage.initializeCurrencyExchangeFees();
 
   // ===== Provider Config Routes (API Keys Management) =====
   app.get("/api/admin/pawapay/active-conf", requireAdmin, async (req: Request, res: Response) => {
