@@ -74,11 +74,19 @@ export function generateVerificationCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
+interface MailtrapAttachment {
+  content: string;
+  filename: string;
+  type: string;
+  disposition: "attachment";
+}
+
 async function sendMailtrapEmail(
   to: string,
   subject: string,
   textContent: string,
-  htmlContent: string
+  htmlContent: string,
+  attachments?: MailtrapAttachment[]
 ): Promise<boolean> {
   const config = await getMailtrapConfigFromDB();
   
@@ -90,22 +98,28 @@ async function sendMailtrapEmail(
   try {
     console.log(`[Email] Envoi via Mailtrap a ${to}...`);
     
+    const payload: Record<string, any> = {
+      from: {
+        name: config.senderName || "BKApay",
+        email: config.senderEmail,
+      },
+      to: [{ email: to }],
+      subject,
+      text: textContent,
+      html: htmlContent,
+    };
+
+    if (attachments && attachments.length > 0) {
+      payload.attachments = attachments;
+    }
+
     const response = await fetch("https://send.api.mailtrap.io/api/send", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Api-Token": config.apiToken,
       },
-      body: JSON.stringify({
-        from: {
-          name: config.senderName || "BKApay",
-          email: config.senderEmail,
-        },
-        to: [{ email: to }],
-        subject,
-        text: textContent,
-        html: htmlContent,
-      }),
+      body: JSON.stringify(payload),
     });
     
     if (!response.ok) {
@@ -832,13 +846,52 @@ export async function sendPaymentDocumentsEmail(
   const safeName = escapeHtml(customerName);
   const safeProduct = escapeHtml(productName);
 
-  const docLinks = documentNames.map((name, i) => {
-    const safeName = escapeHtml(name);
-    const url = documentUrls[i];
-    return `<tr><td style="padding: 8px 16px; border-bottom: 1px solid #e5e7eb;">
-      <a href="${url}" style="color: #2563eb; text-decoration: none; font-family: Arial, sans-serif; font-size: 14px;">${safeName}</a>
-    </td></tr>`;
-  }).join("\n");
+  // Build attachments from base64 data URIs stored in documentUrls
+  const attachments: MailtrapAttachment[] = [];
+  for (let i = 0; i < documentUrls.length; i++) {
+    const raw = documentUrls[i];
+    const filename = documentNames[i] || `document_${i + 1}`;
+    if (!raw) continue;
+
+    // Format: "data:<mime>;base64,<content>" or raw base64
+    const dataUriMatch = raw.match(/^data:([^;]+);base64,(.+)$/s);
+    if (dataUriMatch) {
+      attachments.push({
+        content: dataUriMatch[2],
+        filename,
+        type: dataUriMatch[1],
+        disposition: "attachment",
+      });
+    } else if (raw.length > 100) {
+      // Likely a raw base64 string — infer type from filename extension
+      const ext = filename.split(".").pop()?.toLowerCase() || "";
+      const mimeMap: Record<string, string> = {
+        pdf: "application/pdf",
+        png: "image/png",
+        jpg: "image/jpeg",
+        jpeg: "image/jpeg",
+        gif: "image/gif",
+        webp: "image/webp",
+        doc: "application/msword",
+        docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        xls: "application/vnd.ms-excel",
+        xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        txt: "text/plain",
+        zip: "application/zip",
+      };
+      attachments.push({
+        content: raw,
+        filename,
+        type: mimeMap[ext] || "application/octet-stream",
+        disposition: "attachment",
+      });
+    }
+  }
+
+  // List of document names for the email body
+  const docListItems = documentNames
+    .map(name => `<tr><td style="padding: 8px 16px; border-bottom: 1px solid #e5e7eb; font-family: Arial, sans-serif; font-size: 14px; color: #374151;">${escapeHtml(name)}</td></tr>`)
+    .join("\n");
 
   const htmlContent = `
     <!DOCTYPE html>
@@ -865,14 +918,14 @@ export async function sendPaymentDocumentsEmail(
                     Bonjour <strong>${safeName}</strong>,
                   </p>
                   <p style="margin: 0 0 20px; color: #4b5563; font-family: Arial, sans-serif; font-size: 16px; line-height: 1.5;">
-                    Merci pour votre paiement pour <strong>${safeProduct}</strong>. Voici vos documents :
+                    Merci pour votre paiement pour <strong>${safeProduct}</strong>. Vos documents sont joints en pi&egrave;ces jointes &agrave; cet email :
                   </p>
                 </td>
               </tr>
               <tr>
                 <td style="padding: 0 40px 30px;">
                   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
-                    ${docLinks}
+                    ${docListItems}
                   </table>
                 </td>
               </tr>
@@ -892,7 +945,8 @@ export async function sendPaymentDocumentsEmail(
     </html>
   `;
 
-  const textContent = `Bonjour ${customerName},\n\nMerci pour votre paiement pour ${productName}. Vos documents sont disponibles.\n\nBKApay - bkapay.com`;
+  const textContent = `Bonjour ${customerName},\n\nMerci pour votre paiement pour ${productName}. Vos documents sont joints en pièces jointes à cet email.\n\nBKApay - bkapay.com`;
 
-  return sendMailtrapEmail(to, "Vos documents - " + productName, textContent, htmlContent);
+  console.log(`[Email] Envoi documents (${attachments.length} pièces jointes) à ${to} pour "${productName}"`);
+  return sendMailtrapEmail(to, "Vos documents - " + productName, textContent, htmlContent, attachments.length > 0 ? attachments : undefined);
 }
