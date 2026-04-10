@@ -787,21 +787,39 @@ export const insertCurrencyExchangeFeeSchema = createInsertSchema(currencyExchan
 export type InsertCurrencyExchangeFee = z.infer<typeof insertCurrencyExchangeFeeSchema>;
 
 // All supported currency pairs for exchange fee configuration
+// Currencies used in supported countries: XOF, XAF, CDF, GNF (Guinée), GHS (Ghana), RWF (Rwanda)
 export const CURRENCY_EXCHANGE_PAIRS = [
+  // Entre XOF, XAF, CDF (paires dédiées paiements entrants/sortants)
   { from: "XOF", to: "XAF" },
   { from: "XAF", to: "XOF" },
-  { from: "CDF", to: "XAF" },
-  { from: "XAF", to: "CDF" },
   { from: "XOF", to: "CDF" },
   { from: "CDF", to: "XOF" },
-  { from: "XOF", to: "USD" },
-  { from: "XAF", to: "USD" },
-  { from: "XOF", to: "EUR" },
-  { from: "XAF", to: "EUR" },
-  { from: "XOF", to: "GHS" },
-  { from: "XAF", to: "GHS" },
+  { from: "XAF", to: "CDF" },
+  { from: "CDF", to: "XAF" },
+  // XOF vers autres devises africaines du site
   { from: "XOF", to: "GNF" },
+  { from: "XOF", to: "GHS" },
+  { from: "XOF", to: "RWF" },
+  // XAF vers autres devises africaines du site
   { from: "XAF", to: "GNF" },
+  { from: "XAF", to: "GHS" },
+  { from: "XAF", to: "RWF" },
+  // CDF vers autres devises africaines du site
+  { from: "CDF", to: "GNF" },
+  { from: "CDF", to: "GHS" },
+  { from: "CDF", to: "RWF" },
+  // GNF vers XOF, XAF, CDF
+  { from: "GNF", to: "XOF" },
+  { from: "GNF", to: "XAF" },
+  { from: "GNF", to: "CDF" },
+  // GHS vers XOF, XAF, CDF
+  { from: "GHS", to: "XOF" },
+  { from: "GHS", to: "XAF" },
+  { from: "GHS", to: "CDF" },
+  // RWF vers XOF, XAF, CDF
+  { from: "RWF", to: "XOF" },
+  { from: "RWF", to: "XAF" },
+  { from: "RWF", to: "CDF" },
 ] as const;
 
 // Chat schema for EMALI
