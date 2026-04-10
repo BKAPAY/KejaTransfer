@@ -4328,7 +4328,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 11. Pre-check balance using netMode: recipient gets exact amount, fees added on top
       const feeConfig = await getFeeFromDatabase(storage, activeProvider, countryCode, normalizedOperator);
       const feeInfo = calculateOutgoingFeeFromNet(amountInUserCurrency, feeConfig.outgoing);
-      if (user.balance < feeInfo.totalDeductedFromBalance) {
+
+      // Exchange fee for personal accounts when payout currency differs from balance currency
+      const payoutDestCurrency = requestedCurrency || userCurrency;
+      let apiPayoutExchangeFee = 0;
+      if (user.accountType === "personal" && payoutDestCurrency !== userCurrency) {
+        try {
+          const { db: dbEx } = await import("./db");
+          const { currencyExchangeFees: cef } = await import("@shared/schema");
+          const { eq: eqEx, and: andEx } = await import("drizzle-orm");
+          const exRows = await dbEx.select().from(cef).where(
+            andEx(eqEx(cef.fromCurrency, userCurrency), eqEx(cef.toCurrency, payoutDestCurrency), eqEx(cef.isEnabled, true))
+          );
+          if (exRows.length > 0 && exRows[0].feePercentage > 0) {
+            apiPayoutExchangeFee = Math.floor((amountInUserCurrency * exRows[0].feePercentage) / 1000);
+            console.log(`[API Payout] Exchange fee ${userCurrency}→${payoutDestCurrency} (${exRows[0].feePercentage / 10}%) = ${apiPayoutExchangeFee} ${userCurrency}`);
+          }
+        } catch (_) { /* best effort */ }
+      }
+
+      if (user.balance < feeInfo.totalDeductedFromBalance + apiPayoutExchangeFee) {
         return res.status(400).json({
           success: false,
           error: { code: "INSUFFICIENT_FUNDS", message: `Solde insuffisant sur votre compte BKApay` }
@@ -4392,8 +4411,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (submitResp.response_code !== "00") {
             return { success: false, error: "Échec de l'envoi du payout" };
           }
-          // Debit: exact amount + fees from user balance
-          await storage.updateUserBalance(apiKey.userId, -feeInfo.totalDeductedFromBalance);
+          // Debit: exact amount + fees + exchange fee (if applicable) from user balance
+          await storage.updateUserBalance(apiKey.userId, -(feeInfo.totalDeductedFromBalance + apiPayoutExchangeFee));
           const tx = await storage.createTransaction({
             userId: apiKey.userId, type: "withdrawal",
             amount: amountInUserCurrency, fee: feeInfo.feeAmount,
@@ -4436,6 +4455,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           success: false,
           error: { code: "TRANSACTION_FAILED", message: "La transaction a échoué. Vérifiez le numéro, l'opérateur et réessayez." }
         });
+      }
+
+      // Apply exchange fee for non-Paydunya providers (Paydunya already includes it in its inline deduction)
+      if (activeProvider !== "paydunya" && apiPayoutExchangeFee > 0) {
+        await storage.updateUserBalance(apiKey.userId, -apiPayoutExchangeFee);
+        console.log(`[API Payout ${activeProvider}] Exchange fee deducted: ${apiPayoutExchangeFee} ${userCurrency}`);
       }
 
       // 14. Send async callback webhook if configured (using payout-specific callback fields)
@@ -7888,6 +7913,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           : await handleFedaPayWithdrawal(req.session.userId!, user, amount, country, operator, phone, userCurrency);
 
         if (result.success) {
+          if (preExchangeFee > 0) {
+            await storage.updateUserBalance(req.session.userId!, -preExchangeFee);
+            console.log(`[TRANSFER fedapay] Exchange fee deducted: ${preExchangeFee} ${userCurrencyPre}`);
+          }
           return res.json({
             success: true,
             transactionId: result.transactionId,
@@ -8078,6 +8107,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           : await handleMbiyoPayWithdrawal(req.session.userId!, user, amount, country, operator, phone, userCurrency, targetCurrency);
 
         if (result.success) {
+          if (preExchangeFee > 0) {
+            await storage.updateUserBalance(req.session.userId!, -preExchangeFee);
+            console.log(`[TRANSFER mbiyopay] Exchange fee deducted: ${preExchangeFee} ${userCurrencyPre}`);
+          }
           return res.json({
             success: true,
             transactionId: result.transactionId,
@@ -8096,6 +8129,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           : await handleAfribaPayWithdrawal(req.session.userId!, user, amount, country, operator, phone, userCurrency);
 
         if (result.success) {
+          if (preExchangeFee > 0) {
+            await storage.updateUserBalance(req.session.userId!, -preExchangeFee);
+            console.log(`[TRANSFER afribapay] Exchange fee deducted: ${preExchangeFee} ${userCurrencyPre}`);
+          }
           return res.json({
             success: true,
             transactionId: result.transactionId,
@@ -8113,6 +8150,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           : await handleMoneyFusionWithdrawal(req.session.userId!, user, amount, country, operator, phone, userCurrency);
 
         if (result.success) {
+          if (preExchangeFee > 0) {
+            await storage.updateUserBalance(req.session.userId!, -preExchangeFee);
+            console.log(`[TRANSFER moneyfusion] Exchange fee deducted: ${preExchangeFee} ${userCurrencyPre}`);
+          }
           return res.json({
             success: true,
             transactionId: result.transactionId,
@@ -8129,6 +8170,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           : await handlePawaPayWithdrawal(req.session.userId!, user, amount, country, operator, phone, userCurrency, targetCurrency);
 
         if (result.success) {
+          if (preExchangeFee > 0) {
+            await storage.updateUserBalance(req.session.userId!, -preExchangeFee);
+            console.log(`[TRANSFER pawapay] Exchange fee deducted: ${preExchangeFee} ${userCurrencyPre}`);
+          }
           return res.json({
             success: true,
             transactionId: result.transactionId,
