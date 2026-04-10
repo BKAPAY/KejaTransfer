@@ -173,7 +173,7 @@ export async function createPawaPayDeposit(params: PawaPayDepositParams): Promis
 
   const sanitizedPhone = sanitizePhoneForPawaPay(params.phone, params.country);
 
-  const rawMsg = (params.description || "Recharge portefeuille").replace(/[^a-zA-Z0-9 ]/g, "").trim();
+  const rawMsg = (params.description || "Paiement BKApay").replace(/[^a-zA-Z0-9 ]/g, "").trim();
   const customerMessage = rawMsg.substring(0, 22).padEnd(4, " ").substring(0, 22);
 
   const body: any = {
