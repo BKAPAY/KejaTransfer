@@ -7840,9 +7840,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Calculer le montant à débiter selon le type (transfert vs retrait)
       // TRANSFERT: débiter montant + frais | RETRAIT: débiter montant uniquement
       const isTransfer = type === "transfer";
-      const requiredBalance = isTransfer 
+      const baseRequired = isTransfer 
         ? (Math.floor(amount) + feeInfo.feeAmount) 
         : feeInfo.totalDeductedFromBalance;
+
+      // Pre-calculate outgoing exchange fee for balance check (personal accounts only)
+      const userCurrencyPre = user.country ? getCurrencyForCountry(user.country) : "XOF";
+      const destCurrencyPre = getCurrencyForCountry(country?.toUpperCase() || "");
+      let preExchangeFee = 0;
+      if (user.accountType === "personal" && destCurrencyPre && destCurrencyPre !== userCurrencyPre) {
+        try {
+          const { db } = await import("./db");
+          const { currencyExchangeFees } = await import("@shared/schema");
+          const { eq, and } = await import("drizzle-orm");
+          const preRows = await db.select().from(currencyExchangeFees).where(
+            and(
+              eq(currencyExchangeFees.fromCurrency, userCurrencyPre),
+              eq(currencyExchangeFees.toCurrency, destCurrencyPre),
+              eq(currencyExchangeFees.isEnabled, true),
+            )
+          );
+          if (preRows.length > 0 && preRows[0].feePercentage > 0) {
+            preExchangeFee = Math.floor((Math.floor(amount) * preRows[0].feePercentage) / 1000);
+          }
+        } catch (_) { /* ignore - best effort */ }
+      }
+      const requiredBalance = baseRequired + preExchangeFee;
 
       // Check balance avec le bon montant selon le type
       if (user.balance < requiredBalance) {
@@ -7932,7 +7955,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const payduynaCountryCurrencies6021: Record<string, string> = { "CM": "XAF" };
         const providerCurrency = payduynaCountryCurrencies6021[country.toUpperCase()] || "XOF";
         const amountInUserCurrency = isTransfer ? Math.floor(amount) : feeInfo.amountReceived;
-        const amountToDebit = isTransfer ? (Math.floor(amount) + feeInfo.feeAmount) : feeInfo.totalDeductedFromBalance;
+        const baseAmountToDebit = isTransfer ? (Math.floor(amount) + feeInfo.feeAmount) : feeInfo.totalDeductedFromBalance;
+
+        // Apply outgoing exchange fee for personal accounts when currencies differ
+        let outgoingExchangeFeeForFedapay = 0;
+        if (user.accountType === "personal" && providerCurrency !== userCurrency) {
+          try {
+            const { db } = await import("./db");
+            const { currencyExchangeFees } = await import("@shared/schema");
+            const { eq, and } = await import("drizzle-orm");
+            const feeRowsF = await db.select().from(currencyExchangeFees).where(
+              and(
+                eq(currencyExchangeFees.fromCurrency, userCurrency),
+                eq(currencyExchangeFees.toCurrency, providerCurrency),
+                eq(currencyExchangeFees.isEnabled, true),
+              )
+            );
+            if (feeRowsF.length > 0 && feeRowsF[0].feePercentage > 0) {
+              outgoingExchangeFeeForFedapay = Math.floor((Math.floor(amount) * feeRowsF[0].feePercentage) / 1000);
+              console.log(`[WITHDRAWAL] Outgoing exchange fee ${userCurrency}→${providerCurrency} (${feeRowsF[0].feePercentage / 10}%) = +${outgoingExchangeFeeForFedapay} ${userCurrency}`);
+            }
+          } catch (exErrF) {
+            console.error("[WITHDRAWAL] Exchange fee lookup error:", exErrF);
+          }
+        }
+        const amountToDebit = baseAmountToDebit + outgoingExchangeFeeForFedapay;
 
         // CRITICAL: Convert amount from user's currency to provider currency if different
         let amountForProvider = amountInUserCurrency;
@@ -8005,6 +8052,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               balanceAmount: Math.floor(amount),
               balanceCurrency: userCurrency,
               amountDebitedFromBalance: amountToDebit,
+              ...(outgoingExchangeFeeForFedapay > 0 ? { outgoingExchangeFee: outgoingExchangeFeeForFedapay, outgoingExchangeFeeCurrency: userCurrency } : {}),
             }),
           });
 
@@ -9336,7 +9384,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Calculate fees with dynamic percentage
       const feeInfo = calculateOutgoingFee(Math.floor(amount), feeConfig.outgoing);
 
-      if (user.balance < feeInfo.totalDeductedFromBalance) {
+      // Calculate outgoing exchange fee for personal accounts when currencies differ
+      const userCurrencyForTransfer = user.country ? getCurrencyForCountry(user.country) : "XOF";
+      const destCurrencyForTransfer = getCurrencyForCountry(country?.toUpperCase() || "");
+      let outgoingExchangeFeeAmount = 0;
+      if (user.accountType === "personal" && destCurrencyForTransfer && destCurrencyForTransfer !== userCurrencyForTransfer) {
+        try {
+          const { db } = await import("./db");
+          const { currencyExchangeFees } = await import("@shared/schema");
+          const { eq, and } = await import("drizzle-orm");
+          const feeRows = await db.select().from(currencyExchangeFees).where(
+            and(
+              eq(currencyExchangeFees.fromCurrency, userCurrencyForTransfer),
+              eq(currencyExchangeFees.toCurrency, destCurrencyForTransfer),
+              eq(currencyExchangeFees.isEnabled, true),
+            )
+          );
+          if (feeRows.length > 0 && feeRows[0].feePercentage > 0) {
+            outgoingExchangeFeeAmount = Math.floor((Math.floor(amount) * feeRows[0].feePercentage) / 1000);
+            console.log(`[Withdrawal] Outgoing exchange fee ${userCurrencyForTransfer}→${destCurrencyForTransfer} (${feeRows[0].feePercentage / 10}%) = +${outgoingExchangeFeeAmount} ${userCurrencyForTransfer}`);
+          }
+        } catch (exErr) {
+          console.error("[Withdrawal] Exchange fee lookup error:", exErr);
+        }
+      }
+
+      const totalToDeduct = feeInfo.totalDeductedFromBalance + outgoingExchangeFeeAmount;
+
+      if (user.balance < totalToDeduct) {
         return res.status(400).json({ 
           error: "Retrait échoué"
         });
@@ -9487,8 +9562,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("[Withdrawal] Submit-invoice response:", submitResponse);
 
       if (submitResponse.response_code === "00") {
-        // Success - Deduct balance immediately
-        await storage.updateUserBalance(req.session.userId!, -feeInfo.totalDeductedFromBalance);
+        // Success - Deduct balance (transaction fee + exchange fee if applicable)
+        await storage.updateUserBalance(req.session.userId!, -totalToDeduct);
         
         // Create transaction record
         await storage.createTransaction({
@@ -9507,15 +9582,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           metadata: JSON.stringify({
             paydunyaTransactionId: submitResponse.transaction_id,
             disburseId: submitData.disburse_id,
+            ...(outgoingExchangeFeeAmount > 0 ? { outgoingExchangeFee: outgoingExchangeFeeAmount, outgoingExchangeFeeCurrency: userCurrencyForTransfer } : {}),
           }),
         });
 
-        console.log("[Withdrawal] Success - Balance deducted:", feeInfo.totalDeductedFromBalance);
+        console.log(`[Withdrawal] Success - Balance deducted: ${totalToDeduct} (transfer: ${feeInfo.totalDeductedFromBalance} + exchange: ${outgoingExchangeFeeAmount})`);
 
         res.json({
           success: true,
           message: "Retrait effectué avec succès",
-          totalDeducted: feeInfo.totalDeductedFromBalance,
+          totalDeducted: totalToDeduct,
           amountSent: Math.floor(amount),
           fee: feeInfo.feeAmount,
         });
