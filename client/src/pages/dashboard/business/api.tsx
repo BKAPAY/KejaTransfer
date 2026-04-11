@@ -305,7 +305,7 @@ export default function BusinessApiPage() {
                       <div className="space-y-3">
                         {token.callbackSecret && (
                           <div>
-                            <label className="text-xs font-medium text-muted-foreground">Secret de signature payin (HMAC-SHA256)</label>
+                            <label className="text-xs font-medium text-muted-foreground">Secret de signature (HMAC-SHA256)</label>
                             <div className="flex items-center gap-2 p-2 bg-muted rounded-md mt-1">
                               <code className="flex-1 text-xs font-mono truncate" data-testid={`text-callback-secret-${token.id}`}>
                                 {visibleFields[`secret-${token.id}`] ? token.callbackSecret : maskValue(token.callbackSecret)}
@@ -313,27 +313,11 @@ export default function BusinessApiPage() {
                               <Button variant="ghost" size="sm" onClick={() => toggleVisibility(`secret-${token.id}`)} data-testid={`button-toggle-secret-${token.id}`}>
                                 {visibleFields[`secret-${token.id}`] ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
                               </Button>
-                              <Button variant="ghost" size="sm" onClick={() => copyToClipboard(token.callbackSecret!, "Secret payin")} data-testid={`button-copy-secret-${token.id}`}>
+                              <Button variant="ghost" size="sm" onClick={() => copyToClipboard(token.callbackSecret!, "Secret de signature")} data-testid={`button-copy-secret-${token.id}`}>
                                 <Copy className="w-3 h-3" />
                               </Button>
                               <Button variant="ghost" size="sm" onClick={() => regenerateCallbackSecretMutation.mutate(token.id)} disabled={regenerateCallbackSecretMutation.isPending} data-testid={`button-regenerate-secret-${token.id}`}>
                                 <RefreshCw className="w-3 h-3" />
-                              </Button>
-                            </div>
-                          </div>
-                        )}
-                        {(token as any).payoutCallbackSecret && (
-                          <div>
-                            <label className="text-xs font-medium text-muted-foreground">Secret de signature payout (HMAC-SHA256)</label>
-                            <div className="flex items-center gap-2 p-2 bg-muted rounded-md mt-1">
-                              <code className="flex-1 text-xs font-mono truncate" data-testid={`text-payout-secret-${token.id}`}>
-                                {visibleFields[`payout-secret-${token.id}`] ? (token as any).payoutCallbackSecret : maskValue((token as any).payoutCallbackSecret)}
-                              </code>
-                              <Button variant="ghost" size="sm" onClick={() => toggleVisibility(`payout-secret-${token.id}`)} data-testid={`button-toggle-payout-secret-${token.id}`}>
-                                {visibleFields[`payout-secret-${token.id}`] ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                              </Button>
-                              <Button variant="ghost" size="sm" onClick={() => copyToClipboard((token as any).payoutCallbackSecret, "Secret payout")} data-testid={`button-copy-payout-secret-${token.id}`}>
-                                <Copy className="w-3 h-3" />
                               </Button>
                             </div>
                           </div>
