@@ -292,12 +292,7 @@ export default function BusinessApiPage() {
                         />
                         <p className="text-xs text-muted-foreground">L'URL doit utiliser HTTPS</p>
                         <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            onClick={() => updateMutation.mutate({ id: token.id, data: { callbackUrl: callbackUrls[token.id] ?? token.callbackUrl ?? "" } })}
-                            disabled={updateMutation.isPending}
-                            data-testid={`button-save-callback-${token.id}`}
-                          >
+                          <Button size="sm" onClick={() => updateMutation.mutate({ id: token.id, data: { callbackUrl: callbackUrls[token.id] ?? token.callbackUrl ?? "" } })} disabled={updateMutation.isPending} data-testid={`button-save-callback-${token.id}`}>
                             <Check className="w-4 h-4 mr-1" />
                             {updateMutation.isPending ? "..." : "Enregistrer"}
                           </Button>
@@ -308,6 +303,41 @@ export default function BusinessApiPage() {
                       </div>
                     ) : (
                       <div className="space-y-3">
+                        {token.callbackSecret && (
+                          <div>
+                            <label className="text-xs font-medium text-muted-foreground">Secret de signature payin (HMAC-SHA256)</label>
+                            <div className="flex items-center gap-2 p-2 bg-muted rounded-md mt-1">
+                              <code className="flex-1 text-xs font-mono truncate" data-testid={`text-callback-secret-${token.id}`}>
+                                {visibleFields[`secret-${token.id}`] ? token.callbackSecret : maskValue(token.callbackSecret)}
+                              </code>
+                              <Button variant="ghost" size="sm" onClick={() => toggleVisibility(`secret-${token.id}`)} data-testid={`button-toggle-secret-${token.id}`}>
+                                {visibleFields[`secret-${token.id}`] ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={() => copyToClipboard(token.callbackSecret!, "Secret payin")} data-testid={`button-copy-secret-${token.id}`}>
+                                <Copy className="w-3 h-3" />
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={() => regenerateCallbackSecretMutation.mutate(token.id)} disabled={regenerateCallbackSecretMutation.isPending} data-testid={`button-regenerate-secret-${token.id}`}>
+                                <RefreshCw className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                        {(token as any).payoutCallbackSecret && (
+                          <div>
+                            <label className="text-xs font-medium text-muted-foreground">Secret de signature payout (HMAC-SHA256)</label>
+                            <div className="flex items-center gap-2 p-2 bg-muted rounded-md mt-1">
+                              <code className="flex-1 text-xs font-mono truncate" data-testid={`text-payout-secret-${token.id}`}>
+                                {visibleFields[`payout-secret-${token.id}`] ? (token as any).payoutCallbackSecret : maskValue((token as any).payoutCallbackSecret)}
+                              </code>
+                              <Button variant="ghost" size="sm" onClick={() => toggleVisibility(`payout-secret-${token.id}`)} data-testid={`button-toggle-payout-secret-${token.id}`}>
+                                {visibleFields[`payout-secret-${token.id}`] ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={() => copyToClipboard((token as any).payoutCallbackSecret, "Secret payout")} data-testid={`button-copy-payout-secret-${token.id}`}>
+                                <Copy className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          </div>
+                        )}
                         {token.callbackUrl ? (
                           <>
                             <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-md">
@@ -316,27 +346,8 @@ export default function BusinessApiPage() {
                                 <Copy className="w-4 h-4" />
                               </Button>
                             </div>
-                            {token.callbackSecret && (
-                              <div>
-                                <label className="text-xs font-medium text-muted-foreground">Secret HMAC-SHA256</label>
-                                <div className="flex items-center gap-2 p-2 bg-muted rounded-md mt-1">
-                                  <code className="flex-1 text-xs font-mono truncate" data-testid={`text-callback-secret-${token.id}`}>
-                                    {visibleFields[`secret-${token.id}`] ? token.callbackSecret : maskValue(token.callbackSecret)}
-                                  </code>
-                                  <Button variant="ghost" size="sm" onClick={() => toggleVisibility(`secret-${token.id}`)} data-testid={`button-toggle-secret-${token.id}`}>
-                                    {visibleFields[`secret-${token.id}`] ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                                  </Button>
-                                  <Button variant="ghost" size="sm" onClick={() => copyToClipboard(token.callbackSecret!, "Secret webhook")} data-testid={`button-copy-secret-${token.id}`}>
-                                    <Copy className="w-3 h-3" />
-                                  </Button>
-                                  <Button variant="ghost" size="sm" onClick={() => regenerateCallbackSecretMutation.mutate(token.id)} disabled={regenerateCallbackSecretMutation.isPending} data-testid={`button-regenerate-secret-${token.id}`}>
-                                    <RefreshCw className="w-3 h-3" />
-                                  </Button>
-                                </div>
-                              </div>
-                            )}
                             <div className="flex gap-2">
-                              <Button size="sm" variant="outline" onClick={() => { setCallbackUrls(prev => ({ ...prev, [token.id]: token.callbackUrl || "" })); setEditingCallbackId(token.id); }} data-testid={`button-edit-callback-${token.id}`}>Modifier</Button>
+                              <Button size="sm" variant="outline" onClick={() => { setCallbackUrls(prev => ({ ...prev, [token.id]: token.callbackUrl || "" })); setEditingCallbackId(token.id); }} data-testid={`button-edit-callback-${token.id}`}>Modifier l'URL</Button>
                               <Button size="sm" variant="ghost" onClick={() => { if (confirm("Supprimer ce webhook ?")) updateMutation.mutate({ id: token.id, data: { callbackUrl: "" } }); }} disabled={updateMutation.isPending} data-testid={`button-remove-callback-${token.id}`}>Supprimer</Button>
                             </div>
                           </>
