@@ -312,33 +312,47 @@ export default function ApiPayoutPage() {
                     </label>
                   </div>
 
+                  {(apiKey as any).payoutCallbackSecret && (
+                    <div className="mb-3">
+                      <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                        Secret de signature (HMAC-SHA256)
+                      </label>
+                      <div className="flex items-center gap-2 p-2 bg-muted rounded-md">
+                        <code className="flex-1 text-xs font-mono truncate">
+                          {visibleKeys[apiKey.id + "-sig"]
+                            ? (apiKey as any).payoutCallbackSecret
+                            : maskKey((apiKey as any).payoutCallbackSecret)}
+                        </code>
+                        <Button variant="ghost" size="sm" onClick={() => toggleKeyVisibility(apiKey.id + "-sig")} data-testid={`button-toggle-sig-${apiKey.id}`}>
+                          {visibleKeys[apiKey.id + "-sig"] ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => copyToClipboard((apiKey as any).payoutCallbackSecret, "Secret payout")} data-testid={`button-copy-sig-${apiKey.id}`}>
+                          <Copy className="w-3 h-3" />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => regenerateSecretMutation.mutate(apiKey.id)} disabled={regenerateSecretMutation.isPending} title="Regenerer le secret payout" data-testid={`button-regenerate-sig-${apiKey.id}`}>
+                          <RefreshCw className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
                   {editingCallback === apiKey.id ? (
                     <div className="space-y-2">
                       <Input
                         placeholder="https://votre-site.com/api/webhook/bkapay-payout"
-                        value={callbackUrls[apiKey.id] ?? ""}
+                        value={callbackUrls[apiKey.id] ?? (apiKey as any).payoutCallbackUrl ?? ""}
                         onChange={(e) => setCallbackUrls((prev) => ({ ...prev, [apiKey.id]: e.target.value }))}
                         className="text-sm font-mono"
                         data-testid={`input-callback-${apiKey.id}`}
                       />
+                      <p className="text-xs text-muted-foreground">L'URL doit utiliser HTTPS</p>
                       <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          onClick={() => callbackMutation.mutate({ id: apiKey.id, payoutCallbackUrl: callbackUrls[apiKey.id] ?? "" })}
-                          disabled={callbackMutation.isPending}
-                          data-testid={`button-save-callback-${apiKey.id}`}
-                        >
+                        <Button size="sm" onClick={() => callbackMutation.mutate({ id: apiKey.id, payoutCallbackUrl: callbackUrls[apiKey.id] ?? (apiKey as any).payoutCallbackUrl ?? "" })} disabled={callbackMutation.isPending} data-testid={`button-save-callback-${apiKey.id}`}>
                           <Check className="w-4 h-4 mr-1" />
                           {callbackMutation.isPending ? "..." : "Enregistrer"}
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => { setEditingCallback(null); setCallbackUrls((prev) => { const c = { ...prev }; delete c[apiKey.id]; return c; }); }}
-                          data-testid={`button-cancel-callback-${apiKey.id}`}
-                        >
-                          <X className="w-4 h-4 mr-1" />
-                          Annuler
+                        <Button size="sm" variant="ghost" onClick={() => { setEditingCallback(null); setCallbackUrls((prev) => { const c = { ...prev }; delete c[apiKey.id]; return c; }); }} data-testid={`button-cancel-callback-${apiKey.id}`}>
+                          <X className="w-4 h-4 mr-1" /> Annuler
                         </Button>
                       </div>
                     </div>
@@ -354,56 +368,17 @@ export default function ApiPayoutPage() {
                               <Copy className="w-4 h-4" />
                             </Button>
                           </div>
-
-                          {(apiKey as any).payoutCallbackSecret && (
-                            <div>
-                              <label className="text-xs font-medium text-muted-foreground mb-1 block">
-                                Secret de signature payout (pour verifier les webhooks)
-                              </label>
-                              <div className="flex items-center gap-2 p-2 bg-muted rounded-md">
-                                <code className="flex-1 text-xs font-mono truncate">
-                                  {visibleKeys[apiKey.id + "-sig"]
-                                    ? (apiKey as any).payoutCallbackSecret
-                                    : maskKey((apiKey as any).payoutCallbackSecret)}
-                                </code>
-                                <Button variant="ghost" size="sm" onClick={() => toggleKeyVisibility(apiKey.id + "-sig")} data-testid={`button-toggle-sig-${apiKey.id}`}>
-                                  {visibleKeys[apiKey.id + "-sig"] ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                                </Button>
-                                <Button variant="ghost" size="sm" onClick={() => copyToClipboard((apiKey as any).payoutCallbackSecret, "Secret payout")} data-testid={`button-copy-sig-${apiKey.id}`}>
-                                  <Copy className="w-3 h-3" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => regenerateSecretMutation.mutate(apiKey.id)}
-                                  disabled={regenerateSecretMutation.isPending}
-                                  title="Regenerer le secret payout"
-                                  data-testid={`button-regenerate-sig-${apiKey.id}`}
-                                >
-                                  <RefreshCw className="w-3 h-3" />
-                                </Button>
-                              </div>
-                            </div>
-                          )}
-
                           <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => { setCallbackUrls((prev) => ({ ...prev, [apiKey.id]: (apiKey as any).payoutCallbackUrl || "" })); setEditingCallback(apiKey.id); }}
-                              data-testid={`button-edit-callback-${apiKey.id}`}
-                            >
-                              Modifier le webhook payout
+                            <Button size="sm" variant="outline" onClick={() => { setCallbackUrls((prev) => ({ ...prev, [apiKey.id]: (apiKey as any).payoutCallbackUrl || "" })); setEditingCallback(apiKey.id); }} data-testid={`button-edit-callback-${apiKey.id}`}>
+                              Modifier l'URL
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={() => { if (confirm("Supprimer ce webhook ?")) callbackMutation.mutate({ id: apiKey.id, payoutCallbackUrl: "" }); }} disabled={callbackMutation.isPending} data-testid={`button-remove-callback-${apiKey.id}`}>
+                              Supprimer
                             </Button>
                           </div>
                         </>
                       ) : (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setEditingCallback(apiKey.id)}
-                          data-testid={`button-add-callback-${apiKey.id}`}
-                        >
+                        <Button size="sm" variant="outline" onClick={() => setEditingCallback(apiKey.id)} data-testid={`button-add-callback-${apiKey.id}`}>
                           <Webhook className="w-4 h-4 mr-2" />
                           Configurer un webhook payout
                         </Button>
