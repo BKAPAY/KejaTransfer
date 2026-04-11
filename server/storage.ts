@@ -614,7 +614,9 @@ export class DbStorage implements IStorage {
     const publicKey = `pk_live_${randomUUID()}`;
     const privateKey = `sk_live_${randomUUID()}`;
     const payinPrivateKey = `sk_payin_live_${randomUUID()}`;
-    const results = await db.insert(schema.apiKeys).values({ ...key, publicKey, privateKey, payinPrivateKey }).returning();
+    const callbackSecret = `cs_${randomUUID().replace(/-/g, '')}`;
+    const payoutCallbackSecret = `cs_${randomUUID().replace(/-/g, '')}`;
+    const results = await db.insert(schema.apiKeys).values({ ...key, publicKey, privateKey, payinPrivateKey, callbackSecret, payoutCallbackSecret: payoutCallbackSecret as any }).returning();
     return results[0];
   }
 
@@ -646,14 +648,9 @@ export class DbStorage implements IStorage {
 
     const updateData: any = { callbackUrl };
     
-    // Generate secret if setting callback URL and no secret exists
-    if (callbackUrl && !existing[0].callbackSecret) {
+    // Generate secret if no secret exists yet (should not happen for new keys, but handle legacy)
+    if (!existing[0].callbackSecret) {
       updateData.callbackSecret = `cs_${randomUUID().replace(/-/g, '')}`;
-    }
-    
-    // Clear secret if removing callback URL
-    if (!callbackUrl) {
-      updateData.callbackSecret = null;
     }
 
     const results = await db
@@ -692,11 +689,9 @@ export class DbStorage implements IStorage {
 
     const updateData: any = { payoutCallbackUrl };
 
-    if (payoutCallbackUrl && !(existing[0] as any).payoutCallbackSecret) {
+    // Generate payout secret if no secret exists yet (legacy keys)
+    if (!(existing[0] as any).payoutCallbackSecret) {
       updateData.payoutCallbackSecret = `cs_${randomUUID().replace(/-/g, '')}`;
-    }
-    if (!payoutCallbackUrl) {
-      updateData.payoutCallbackSecret = null;
     }
 
     const results = await db

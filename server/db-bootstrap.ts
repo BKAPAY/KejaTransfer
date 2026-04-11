@@ -306,6 +306,29 @@ async function bootstrapDatabase() {
     }
     await payinKeyClient.end();
 
+    // Step 6f2: Auto-generate callbackSecret and payoutCallbackSecret for existing API keys that lack them
+    const secretsClient = postgres(DATABASE_URL);
+    try {
+      const { randomUUID } = await import("crypto");
+      const keysNeedingPayinSecret = await secretsClient`SELECT id FROM api_keys WHERE callback_secret IS NULL`;
+      for (const row of keysNeedingPayinSecret) {
+        await secretsClient`UPDATE api_keys SET callback_secret = ${`cs_${randomUUID().replace(/-/g, '')}`} WHERE id = ${row.id}`;
+      }
+      if (keysNeedingPayinSecret.length > 0) {
+        console.log(`✅ Generated callback_secret for ${keysNeedingPayinSecret.length} existing API key(s)`);
+      }
+      const keysNeedingPayoutSecret = await secretsClient`SELECT id FROM api_keys WHERE payout_callback_secret IS NULL`;
+      for (const row of keysNeedingPayoutSecret) {
+        await secretsClient`UPDATE api_keys SET payout_callback_secret = ${`cs_${randomUUID().replace(/-/g, '')}`} WHERE id = ${row.id}`;
+      }
+      if (keysNeedingPayoutSecret.length > 0) {
+        console.log(`✅ Generated payout_callback_secret for ${keysNeedingPayoutSecret.length} existing API key(s)`);
+      }
+    } catch (e) {
+      console.error("⚠️ Secrets auto-generation error:", e);
+    }
+    await secretsClient.end();
+
     // Step 6g: Ensure business_tokens table exists
     const btClient = postgres(DATABASE_URL);
     try {
