@@ -12,7 +12,7 @@ import path from "path";
 import { insertUserSchema, insertPaymentLinkSchema, insertMerchantLinkSchema, insertApiKeySchema } from "@shared/schema";
 import { validatePhoneOperator } from "@shared/phone-utils";
 import { randomUUID } from "crypto";
-import { calculateIncomingFee, calculateOutgoingFee, calculateOutgoingFeeFromNet, calculateCustomerPaysFee, getFeeFromDatabase, getDynamicFees, getDynamicOutgoingFees, getActiveProviderForCountry, getActivePayoutProviderForCountry, getIncomingExchangeFee } from "./utils/fees";
+import { calculateIncomingFee, calculateOutgoingFee, calculateOutgoingFeeFromNet, calculateCustomerPaysFee, getFeeFromDatabase, getDynamicFees, getDynamicOutgoingFees, getActiveProviderForCountry, getActivePayoutProviderForCountry, getIncomingExchangeFee, getOutgoingExchangeFee } from "./utils/fees";
 import { trySendPaymentCallback } from "./utils/callback";
 import { recordLoginLog } from "./utils/login-tracker";
 import { 
@@ -4339,21 +4339,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const feeInfo = calculateOutgoingFeeFromNet(amountInUserCurrency, feeConfig.outgoing);
 
       // Exchange fee for personal accounts when payout currency differs from balance currency
-      const payoutDestCurrency = requestedCurrency || userCurrency;
-      let apiPayoutExchangeFee = 0;
-      if (user.accountType === "personal" && payoutDestCurrency !== userCurrency) {
+      let payoutDestCurrency = requestedCurrency || getCurrencyForCountry(countryCode);
+      if (!requestedCurrency && activeProvider === "pawapay") {
         try {
-          const { db: dbEx } = await import("./db");
-          const { currencyExchangeFees: cef } = await import("@shared/schema");
-          const { eq: eqEx, and: andEx } = await import("drizzle-orm");
-          const exRows = await dbEx.select().from(cef).where(
-            andEx(eqEx(cef.fromCurrency, userCurrency), eqEx(cef.toCurrency, payoutDestCurrency), eqEx(cef.isActive, 1))
-          );
-          if (exRows.length > 0 && exRows[0].feePercentage > 0) {
-            apiPayoutExchangeFee = Math.floor((amountInUserCurrency * exRows[0].feePercentage) / 1000);
-            console.log(`[API Payout] Exchange fee ${userCurrency}→${payoutDestCurrency} (${exRows[0].feePercentage / 10}%) = ${apiPayoutExchangeFee} ${userCurrency}`);
-          }
-        } catch (_) { /* best effort */ }
+          const { getCurrencyForOperator: getOpCurrPayout } = await import("@shared/pawapay-countries");
+          const opCurrPayout = getOpCurrPayout(countryCode, normalizedOperator);
+          if (opCurrPayout) payoutDestCurrency = opCurrPayout;
+        } catch (_) {}
+      }
+      const xFeeApiPayout = await getOutgoingExchangeFee(userCurrency, payoutDestCurrency, amountInUserCurrency, user.accountType || "personal");
+      const apiPayoutExchangeFee = xFeeApiPayout.feeAmount;
+      if (apiPayoutExchangeFee > 0) {
+        console.log(`[API Payout] Exchange fee ${userCurrency}→${payoutDestCurrency} (${xFeeApiPayout.feePercentage / 10}%) = ${apiPayoutExchangeFee} ${userCurrency}`);
       }
 
       if (user.balance < feeInfo.totalDeductedFromBalance + apiPayoutExchangeFee) {
@@ -9508,27 +9505,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Calculate outgoing exchange fee for personal accounts when currencies differ
       const userCurrencyForTransfer = user.country ? getCurrencyForCountry(user.country) : "XOF";
-      const destCurrencyForTransfer = getCurrencyForCountry(country?.toUpperCase() || "");
-      let outgoingExchangeFeeAmount = 0;
-      if (user.accountType === "personal" && destCurrencyForTransfer && destCurrencyForTransfer !== userCurrencyForTransfer) {
+      let destCurrencyForTransfer = getCurrencyForCountry(country?.toUpperCase() || "");
+      const withdrawalProvider = await getActiveProviderForWithdrawal(country?.toUpperCase() || "", operator);
+      if (withdrawalProvider === "pawapay") {
         try {
-          const { db } = await import("./db");
-          const { currencyExchangeFees } = await import("@shared/schema");
-          const { eq, and } = await import("drizzle-orm");
-          const feeRows = await db.select().from(currencyExchangeFees).where(
-            and(
-              eq(currencyExchangeFees.fromCurrency, userCurrencyForTransfer),
-              eq(currencyExchangeFees.toCurrency, destCurrencyForTransfer),
-              eq(currencyExchangeFees.isActive, 1),
-            )
-          );
-          if (feeRows.length > 0 && feeRows[0].feePercentage > 0) {
-            outgoingExchangeFeeAmount = Math.floor((Math.floor(amount) * feeRows[0].feePercentage) / 1000);
-            console.log(`[Withdrawal] Outgoing exchange fee ${userCurrencyForTransfer}→${destCurrencyForTransfer} (${feeRows[0].feePercentage / 10}%) = +${outgoingExchangeFeeAmount} ${userCurrencyForTransfer}`);
-          }
-        } catch (exErr) {
-          console.error("[Withdrawal] Exchange fee lookup error:", exErr);
-        }
+          const { getCurrencyForOperator: getOpCurrW } = await import("@shared/pawapay-countries");
+          const opCurrW = getOpCurrW(country?.toUpperCase() || "", operator);
+          if (opCurrW) destCurrencyForTransfer = opCurrW;
+        } catch (_) {}
+      }
+      const xFeeWeb = await getOutgoingExchangeFee(userCurrencyForTransfer, destCurrencyForTransfer, Math.floor(amount), user.accountType || "personal");
+      const outgoingExchangeFeeAmount = xFeeWeb.feeAmount;
+      if (outgoingExchangeFeeAmount > 0) {
+        console.log(`[Withdrawal] Outgoing exchange fee ${userCurrencyForTransfer}→${destCurrencyForTransfer} (${xFeeWeb.feePercentage / 10}%) = +${outgoingExchangeFeeAmount} ${userCurrencyForTransfer}`);
       }
 
       const totalToDeduct = feeInfo.totalDeductedFromBalance + outgoingExchangeFeeAmount;
@@ -12409,26 +12398,51 @@ SUPPORT ET CONTACT:
               const feeInfo = calculateOutgoingFee(Math.floor(amount), feeData.outgoing);
               const feePct = (feeData.outgoing / 10).toFixed(1);
 
+              const calcUser = await storage.getUser(userId);
+              const calcUserCurrency = calcUser?.country ? getCurrencyForCountry(calcUser.country) : "XOF";
+              let calcDestCurrency = getCurrencyForCountry(country?.toUpperCase() || "");
+              const calcProvider = await getActiveProviderForWithdrawal(country, operator);
+              if (calcProvider === "pawapay") {
+                try {
+                  const { getCurrencyForOperator: getOpCurr } = await import("@shared/pawapay-countries");
+                  const opCurr = getOpCurr(country?.toUpperCase() || "", operator);
+                  if (opCurr) calcDestCurrency = opCurr;
+                } catch (_) {}
+              }
+              const xFeeCalc = await getOutgoingExchangeFee(calcUserCurrency, calcDestCurrency, Math.floor(amount), calcUser?.accountType || "personal");
+
               if (type === "transfer") {
-                const totalDebited = Math.floor(amount) + feeInfo.feeAmount;
-                return JSON.stringify({
+                const totalDebited = Math.floor(amount) + feeInfo.feeAmount + xFeeCalc.feeAmount;
+                const result: any = {
                   success: true,
                   type: "transfer",
                   montantNet: Math.floor(amount),
                   frais: feeInfo.feeAmount,
                   pourcentageFrais: feePct + "%",
                   montantTotalDebite: totalDebited,
-                });
+                };
+                if (xFeeCalc.feeAmount > 0) {
+                  result.fraisEchangeDevise = xFeeCalc.feeAmount;
+                  result.pourcentageEchangeDevise = (xFeeCalc.feePercentage / 10).toFixed(1) + "%";
+                  result.deviseSource = calcUserCurrency;
+                  result.deviseDest = calcDestCurrency;
+                }
+                return JSON.stringify(result);
               } else {
-                return JSON.stringify({
+                const result: any = {
                   success: true,
                   type: "withdrawal",
                   montantBrut: Math.floor(amount),
                   frais: feeInfo.feeAmount,
                   pourcentageFrais: feePct + "%",
                   montantRecuParDestinataire: feeInfo.amountReceived,
-                  montantDebiteDuSolde: feeInfo.totalDeductedFromBalance,
-                });
+                  montantDebiteDuSolde: feeInfo.totalDeductedFromBalance + xFeeCalc.feeAmount,
+                };
+                if (xFeeCalc.feeAmount > 0) {
+                  result.fraisEchangeDevise = xFeeCalc.feeAmount;
+                  result.pourcentageEchangeDevise = (xFeeCalc.feePercentage / 10).toFixed(1) + "%";
+                }
+                return JSON.stringify(result);
               }
             }
 
@@ -12579,7 +12593,17 @@ SUPPORT ET CONTACT:
 
               const feeConfigT = await getFeeFromDatabase(storage, activeProviderT, country, operator);
               const feeInfoT = calculateOutgoingFee(Math.floor(amount), feeConfigT.outgoing);
-              const requiredBalanceT = Math.floor(amount) + feeInfoT.feeAmount;
+
+              let destCurrencyT = getCurrencyForCountry(country?.toUpperCase() || "");
+              if (activeProviderT === "pawapay") {
+                try {
+                  const { getCurrencyForOperator: getOpCurrT } = await import("@shared/pawapay-countries");
+                  const opCurrT = getOpCurrT(country?.toUpperCase() || "", operator);
+                  if (opCurrT) destCurrencyT = opCurrT;
+                } catch (_) {}
+              }
+              const xFeeT = await getOutgoingExchangeFee(userCurrencyT, destCurrencyT, Math.floor(amount), user.accountType || "personal");
+              const requiredBalanceT = Math.floor(amount) + feeInfoT.feeAmount + xFeeT.feeAmount;
 
               if (user.balance < requiredBalanceT) {
                 return JSON.stringify({ success: false, error: `Solde insuffisant. Solde: ${user.balance.toLocaleString("fr-FR")} ${userCurrencyT}, Requis: ${requiredBalanceT.toLocaleString("fr-FR")} ${userCurrencyT}` });
@@ -12653,17 +12677,45 @@ SUPPORT ET CONTACT:
                   return JSON.stringify({ success: true, message: `Transfert de ${Math.floor(amount).toLocaleString("fr-FR")} ${userCurrencyT} envoyé avec succès. Frais: ${feeInfoT.feeAmount.toLocaleString("fr-FR")} ${userCurrencyT}. Total débité: ${requiredBalanceT.toLocaleString("fr-FR")} ${userCurrencyT}. Transaction ID: ${txT.id}` });
                 }
                 return JSON.stringify({ success: false, error: "Transfert échoué" });
+              } else if (activeProviderT === "pawapay") {
+                const result = await handlePawaPayTransfer(userId, user, Math.floor(amount), country, operator, sanitizedPhoneT, userCurrencyT, destCurrencyT);
+                if (result.success) {
+                  if (xFeeT.feeAmount > 0) {
+                    await storage.updateUserBalance(userId, -xFeeT.feeAmount);
+                    console.log(`[EMALI Transfer pawapay] Exchange fee deducted: ${xFeeT.feeAmount} ${userCurrencyT}`);
+                  }
+                  return JSON.stringify({ success: true, message: `Transfert de ${Math.floor(amount).toLocaleString("fr-FR")} ${userCurrencyT} envoyé avec succès vers ${phone}. Frais: ${feeInfoT.feeAmount.toLocaleString("fr-FR")} ${userCurrencyT}.${xFeeT.feeAmount > 0 ? ` Frais de change: ${xFeeT.feeAmount.toLocaleString("fr-FR")} ${userCurrencyT}.` : ""} Total débité: ${requiredBalanceT.toLocaleString("fr-FR")} ${userCurrencyT}. Transaction ID: ${result.transactionId}` });
+                }
+                return JSON.stringify({ success: false, error: result.error || "Erreur lors du transfert" });
               } else if (activeProviderT === "mbiyopay") {
                 const result = await handleMbiyoPayTransfer(userId, user, Math.floor(amount), country, operator, sanitizedPhoneT, userCurrencyT);
-                if (result.success) return JSON.stringify({ success: true, message: `Transfert envoyé avec succès. Transaction ID: ${result.transactionId}` });
+                if (result.success) {
+                  if (xFeeT.feeAmount > 0) {
+                    await storage.updateUserBalance(userId, -xFeeT.feeAmount);
+                    console.log(`[EMALI Transfer mbiyopay] Exchange fee deducted: ${xFeeT.feeAmount} ${userCurrencyT}`);
+                  }
+                  return JSON.stringify({ success: true, message: `Transfert envoyé avec succès.${xFeeT.feeAmount > 0 ? ` Frais de change: ${xFeeT.feeAmount.toLocaleString("fr-FR")} ${userCurrencyT}.` : ""} Total débité: ${requiredBalanceT.toLocaleString("fr-FR")} ${userCurrencyT}. Transaction ID: ${result.transactionId}` });
+                }
                 return JSON.stringify({ success: false, error: result.error || "Erreur lors du transfert" });
               } else if (activeProviderT === "afribapay") {
                 const result = await handleAfribaPayTransfer(userId, user, Math.floor(amount), country, operator, sanitizedPhoneT, userCurrencyT);
-                if (result.success) return JSON.stringify({ success: true, message: `Transfert envoyé avec succès. Transaction ID: ${result.transactionId}` });
+                if (result.success) {
+                  if (xFeeT.feeAmount > 0) {
+                    await storage.updateUserBalance(userId, -xFeeT.feeAmount);
+                    console.log(`[EMALI Transfer afribapay] Exchange fee deducted: ${xFeeT.feeAmount} ${userCurrencyT}`);
+                  }
+                  return JSON.stringify({ success: true, message: `Transfert envoyé avec succès.${xFeeT.feeAmount > 0 ? ` Frais de change: ${xFeeT.feeAmount.toLocaleString("fr-FR")} ${userCurrencyT}.` : ""} Total débité: ${requiredBalanceT.toLocaleString("fr-FR")} ${userCurrencyT}. Transaction ID: ${result.transactionId}` });
+                }
                 return JSON.stringify({ success: false, error: result.error || "Erreur lors du transfert" });
               } else if (activeProviderT === "moneyfusion") {
                 const result = await handleMoneyFusionTransfer(userId, user, Math.floor(amount), country, operator, sanitizedPhoneT, userCurrencyT);
-                if (result.success) return JSON.stringify({ success: true, message: `Transfert envoyé avec succès. Transaction ID: ${result.transactionId}` });
+                if (result.success) {
+                  if (xFeeT.feeAmount > 0) {
+                    await storage.updateUserBalance(userId, -xFeeT.feeAmount);
+                    console.log(`[EMALI Transfer moneyfusion] Exchange fee deducted: ${xFeeT.feeAmount} ${userCurrencyT}`);
+                  }
+                  return JSON.stringify({ success: true, message: `Transfert envoyé avec succès.${xFeeT.feeAmount > 0 ? ` Frais de change: ${xFeeT.feeAmount.toLocaleString("fr-FR")} ${userCurrencyT}.` : ""} Total débité: ${requiredBalanceT.toLocaleString("fr-FR")} ${userCurrencyT}. Transaction ID: ${result.transactionId}` });
+                }
                 return JSON.stringify({ success: false, error: result.error || "Erreur lors du transfert" });
               }
 

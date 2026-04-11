@@ -395,3 +395,33 @@ export function calculateOutgoingFeeFromNet(netAmount: number, feePercentageValu
     totalDeductedFromBalance,
   };
 }
+
+export async function getOutgoingExchangeFee(
+  userCurrency: string,
+  destCurrency: string,
+  amount: number,
+  accountType: string
+): Promise<{ feeAmount: number; feePercentage: number }> {
+  if (!userCurrency || !destCurrency || userCurrency === destCurrency || accountType !== "personal") {
+    return { feeAmount: 0, feePercentage: 0 };
+  }
+  try {
+    const { db } = await import("../db");
+    const { currencyExchangeFees } = await import("@shared/schema");
+    const { eq, and } = await import("drizzle-orm");
+    const rows = await db.select().from(currencyExchangeFees).where(
+      and(
+        eq(currencyExchangeFees.fromCurrency, userCurrency),
+        eq(currencyExchangeFees.toCurrency, destCurrency),
+        eq(currencyExchangeFees.isActive, 1),
+      )
+    );
+    if (rows.length > 0 && rows[0].feePercentage > 0) {
+      return {
+        feeAmount: Math.floor((Math.floor(amount) * rows[0].feePercentage) / 1000),
+        feePercentage: rows[0].feePercentage,
+      };
+    }
+  } catch (_) {}
+  return { feeAmount: 0, feePercentage: 0 };
+}
