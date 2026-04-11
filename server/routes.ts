@@ -12058,9 +12058,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
               const opConfig = opConfigs.find((oc: any) => oc.provider === fc.provider && oc.operator === op.code);
               return opConfig ? opConfig.outgoingEnabled : false;
             });
-            const inLabel = hasPayin ? `Entrant: ${inPct}%` : `Entrant: NON DISPO`;
-            const outLabel = hasPayout ? `Sortant: ${outPct}%` : `Sortant: NON DISPO`;
-            countryFeeDetailLines.push(`  • ${op.name}: ${inLabel} | ${outLabel}`);
+            if (!hasPayin && !hasPayout) continue;
+            const parts: string[] = [];
+            if (hasPayin) parts.push(`Entrant: ${inPct}%`);
+            if (hasPayout) parts.push(`Sortant: ${outPct}%`);
+            countryFeeDetailLines.push(`  • ${op.name}: ${parts.join(" | ")}`);
           }
           countryFeeDetailLines.push(``);
         }
@@ -12140,15 +12142,14 @@ Quand l'utilisateur demande les frais, tu DOIS reproduire CHAQUE pays dans ce fo
 
 [DRAPEAU] **NOM DU PAYS** | Devise: XXX
 • Opérateur1: Entrant: X.X% | Sortant: X.X%
-• Opérateur2: Entrant: X.X% | Sortant: NON DISPO
+• Opérateur2: Entrant: X.X%
 (ligne vide)
 [DRAPEAU] **NOM DU PAYS SUIVANT** | Devise: XXX
 ...
 
 Tu DOIS mettre le nom du pays en gras avec ** autour.
-Tu DOIS lister TOUS les opérateurs du pays, un par ligne avec •.
+Tu DOIS lister UNIQUEMENT les opérateurs actifs du pays, un par ligne avec •. N'écris jamais "disponible" ou "non disponible" — tu n'affiches que ce qui est actif.
 Tu DOIS mettre une ligne vide entre chaque pays.
-Tu DOIS afficher "NON DISPO" quand un opérateur n'est pas disponible.
 A la toute fin de ta réponse sur les frais (après TOUS les pays), tu DOIS ajouter cette note:
 
 > **NB:** Des frais d'échange de devise supplémentaires s'appliquent si vous collectez ou transférez de l'argent dans une devise différente de votre devise principale.
@@ -12246,7 +12247,7 @@ ${withdrawalCountryLines.length > 0 ? withdrawalCountryLines.join("\n") : "Aucun
 
 === FRAIS DE TRANSACTION PAR PAYS ET OPÉRATEUR (données en temps réel) ===
 RÈGLE ABSOLUE: Quand l'utilisateur pose une question sur les frais, tu DOIS afficher TOUS les pays ci-dessous en utilisant EXACTEMENT le FORMAT OBLIGATOIRE défini au début de ce prompt (drapeau, nom en gras, opérateurs avec •, entrant/sortant, ligne vide entre pays, NB à la fin). Tu n'as PAS le droit de sauter des pays. Tu n'as PAS le droit de changer le format. Tu n'as PAS le droit de dire que tu ne peux pas fournir ces informations.
-RAPPEL FORMAT: [DRAPEAU] **PAYS** | Devise: XXX → puis • Opérateur: Entrant: X% | Sortant: X% pour chaque opérateur → ligne vide → pays suivant → NB à la toute fin.
+RAPPEL FORMAT: [DRAPEAU] **PAYS** | Devise: XXX → puis • Opérateur: Entrant: X% | Sortant: X% (n'affiche que les opérateurs actifs, sans mentionner "disponible") → ligne vide → pays suivant → NB à la toute fin.
 
 ${countryFeeDetailLines.length > 0 ? countryFeeDetailLines.join("\n") : "Frais standard de 6% pour tous les pays et opérateurs."}
 
