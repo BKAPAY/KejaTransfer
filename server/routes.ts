@@ -11973,11 +11973,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const withdrawalCountryLines: string[] = [];
       const countryFeeDetailLines: string[] = [];
 
+      // Si country_status est vide, se baser sur provider_configs (clé API présente) pour déterminer les providers actifs
+      const noStatusData = countryStatusData.length === 0;
+      const noOpConfigData = countryOperatorConfigsData.length === 0;
+      // Providers considérés comme actifs (payin ET payout) : ceux qui ont une clé API configurée
+      const activeProvidersByKey = new Set<string>();
+      if (noStatusData) {
+        for (const pc of providerConfigsData) {
+          if (pc.apiKey && pc.apiKey.trim() !== "") {
+            activeProvidersByKey.add(pc.provider);
+          }
+        }
+      }
+
       for (const country of COUNTRIES) {
         const countryCode = country.code as keyof typeof OPERATORS;
         const operators = OPERATORS[countryCode] || [];
         const statuses = countryStatusData.filter((cs: any) => cs.country === country.code);
-        const countryFees = feeConfigsData.filter((fc: any) => fc.country === country.code);
+        const countryFees = feeConfigsData.filter((fc: any) => fc.country === country.code && fc.scope === "personal");
         const opConfigs = countryOperatorConfigsData.filter((oc: any) => oc.country === country.code);
 
         const payinActiveOps: string[] = [];
@@ -11992,18 +12005,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const inPct = feeEntry ? (feeEntry.incomingFeePercentage / 10).toFixed(1) : "N/A";
           const outPct = feeEntry ? (feeEntry.outgoingFeePercentage / 10).toFixed(1) : "N/A";
 
-          const hasPayin = opProviders.some((fc: any) => {
-            const providerEnabled = statuses.some((cs: any) => cs.provider === fc.provider && cs.payinEnabled);
-            if (!providerEnabled) return false;
-            const opConfig = opConfigs.find((oc: any) => oc.provider === fc.provider && oc.operator === op.code);
-            return opConfig ? opConfig.incomingEnabled : false;
-          });
-          const hasPayout = opProviders.some((fc: any) => {
-            const providerEnabled = statuses.some((cs: any) => cs.provider === fc.provider && cs.payoutEnabled);
-            if (!providerEnabled) return false;
-            const opConfig = opConfigs.find((oc: any) => oc.provider === fc.provider && oc.operator === op.code);
-            return opConfig ? opConfig.outgoingEnabled : false;
-          });
+          let hasPayin: boolean;
+          let hasPayout: boolean;
+
+          if (noStatusData) {
+            // Pas de statuts configurés : actif si le provider a une clé API et a des frais pour cet opérateur
+            hasPayin = opProviders.some((fc: any) => activeProvidersByKey.has(fc.provider));
+            hasPayout = opProviders.some((fc: any) => activeProvidersByKey.has(fc.provider));
+          } else {
+            hasPayin = opProviders.some((fc: any) => {
+              const providerEnabled = statuses.some((cs: any) => cs.provider === fc.provider && cs.payinEnabled);
+              if (!providerEnabled) return false;
+              if (noOpConfigData) return true;
+              const opConfig = opConfigs.find((oc: any) => oc.provider === fc.provider && oc.operator === op.code);
+              return opConfig ? opConfig.incomingEnabled : true;
+            });
+            hasPayout = opProviders.some((fc: any) => {
+              const providerEnabled = statuses.some((cs: any) => cs.provider === fc.provider && cs.payoutEnabled);
+              if (!providerEnabled) return false;
+              if (noOpConfigData) return true;
+              const opConfig = opConfigs.find((oc: any) => oc.provider === fc.provider && oc.operator === op.code);
+              return opConfig ? opConfig.outgoingEnabled : true;
+            });
+          }
 
           if (hasPayin) payinActiveOps.push(op.name);
           if (hasPayout) payoutActiveOps.push(op.name);
@@ -12041,9 +12065,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const opCount = operators.length;
         if (opCount > 0) {
           // Build operator lines first — only add country if at least one operator is active
-          // Si aucune config de statut en base → on affiche tous les opérateurs qui ont des frais configurés
-          const noStatusData = countryStatusData.length === 0;
-          const noOpConfigData = countryOperatorConfigsData.length === 0;
           const activeOpLines: string[] = [];
           for (const op of operators) {
             const opProviders = countryFees.filter((fc: any) => fc.operator === op.code);
@@ -12054,9 +12075,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             let hasPayin: boolean;
             let hasPayout: boolean;
             if (noStatusData) {
-              // Pas de statuts configurés → afficher entrant ET sortant si frais configurés
-              hasPayin = true;
-              hasPayout = true;
+              // Pas de statuts configurés : actif si le provider a une clé API
+              hasPayin = opProviders.some((fc: any) => activeProvidersByKey.has(fc.provider));
+              hasPayout = opProviders.some((fc: any) => activeProvidersByKey.has(fc.provider));
             } else {
               hasPayin = opProviders.some((fc: any) => {
                 const providerEnabled = statuses.some((cs: any) => cs.provider === fc.provider && cs.payinEnabled);
