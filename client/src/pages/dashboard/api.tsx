@@ -499,7 +499,6 @@ export default function ApiPage() {
                   <div className="flex items-center gap-2 mb-2">
                     <Webhook className="w-4 h-4 text-muted-foreground" />
                     <label className="text-sm font-medium">URL de Callback (Webhook)</label>
-                    <Badge variant="outline" className="text-xs">Abonnements</Badge>
                   </div>
                   <p className="text-xs text-muted-foreground mb-3">
                     Recevez une notification automatique quand un paiement est complete. Ideal pour activer automatiquement les abonnements.
