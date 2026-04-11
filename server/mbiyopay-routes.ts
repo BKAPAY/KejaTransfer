@@ -548,6 +548,27 @@ export async function handleMbiyoPayPaymentLink(
       providerAmount = Math.ceil(providerAmount * (1 + feePercentage / 100));
     }
 
+    // Calculate exchange fee if payer currency differs from merchant currency
+    let incomingExchangeFee = 0;
+    let incomingExchangeFeePercentage = 0;
+    if (providerCurrency !== balanceCurrency) {
+      try {
+        let efRow = await storage.getCurrencyExchangeFee(providerCurrency, balanceCurrency);
+        if (!efRow || !efRow.isActive) {
+          efRow = await storage.getCurrencyExchangeFee(balanceCurrency, providerCurrency);
+        }
+        if (efRow && efRow.isActive && efRow.feePercentage > 0) {
+          incomingExchangeFee = Math.floor((baseAmount * efRow.feePercentage) / 1000);
+          incomingExchangeFeePercentage = efRow.feePercentage;
+        }
+      } catch (_) { /* ignore */ }
+    }
+    const netAmountForUser = customerPaysFee
+      ? Math.max(0, baseAmount - incomingExchangeFee)
+      : Math.max(0, feeInfo.netAmount - incomingExchangeFee);
+    const totalFeeAmount = customerPaysFee ? incomingExchangeFee : (feeInfo.feeAmount + incomingExchangeFee);
+    const totalFeePercentage = customerPaysFee ? incomingExchangeFeePercentage : (feeInfo.feePercentage + incomingExchangeFeePercentage);
+
     const orderId = `BKAPAY-PL-${paymentLink.id}-${Date.now()}`;
     const startTime = Date.now();
 
@@ -556,8 +577,8 @@ export async function handleMbiyoPayPaymentLink(
       userId: paymentLink.userId,
       type: "payment_link",
       amount: baseAmount,
-      fee: feeInfo.feeAmount,
-      feePercentage: feeInfo.feePercentage,
+      fee: totalFeeAmount,
+      feePercentage: totalFeePercentage,
       currency: balanceCurrency,
       status: "pending",
       country: country.toUpperCase(),
@@ -569,11 +590,12 @@ export async function handleMbiyoPayPaymentLink(
       metadata: JSON.stringify({
         paymentLinkId: paymentLink.id,
         customerPaysFee,
-        netAmountForUser: customerPaysFee ? baseAmount : feeInfo.netAmount,
+        netAmountForUser,
         providerAmount,
         providerCurrency,
-        balanceAmount: customerPaysFee ? baseAmount : feeInfo.netAmount,
+        balanceAmount: netAmountForUser,
         balanceCurrency,
+        ...(incomingExchangeFee > 0 ? { exchangeFee: incomingExchangeFee, exchangeFeePercentage: incomingExchangeFeePercentage } : {}),
         provider: "mbiyopay",
         paymentProvider: "mbiyopay",
         orderId,
@@ -611,11 +633,12 @@ export async function handleMbiyoPayPaymentLink(
       redirectUrl: result.redirectUrl,
       paymentLinkId: paymentLink.id,
       customerPaysFee,
-      netAmountForUser: customerPaysFee ? baseAmount : feeInfo.netAmount,
+      netAmountForUser,
       providerAmount,
       providerCurrency,
-      balanceAmount: customerPaysFee ? baseAmount : feeInfo.netAmount,
+      balanceAmount: netAmountForUser,
       balanceCurrency,
+      ...(incomingExchangeFee > 0 ? { exchangeFee: incomingExchangeFee, exchangeFeePercentage: incomingExchangeFeePercentage } : {}),
       provider: "mbiyopay",
       paymentProvider: "mbiyopay",
       orderId,

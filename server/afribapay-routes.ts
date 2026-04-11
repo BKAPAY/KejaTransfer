@@ -390,6 +390,23 @@ export async function handleAfribaPayPaymentLink(
     const feeConfig = await getFeeFromDatabase(storage, "afribapay", country, operator);
     const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming);
 
+    // Calculate exchange fee if payer currency differs from merchant currency
+    let incomingExchangeFee = 0;
+    let incomingExchangeFeePercentage = 0;
+    if (providerCurrency !== ownerCurrency) {
+      try {
+        let efRow = await storage.getCurrencyExchangeFee(providerCurrency, ownerCurrency);
+        if (!efRow || !efRow.isActive) {
+          efRow = await storage.getCurrencyExchangeFee(ownerCurrency, providerCurrency);
+        }
+        if (efRow && efRow.isActive && efRow.feePercentage > 0) {
+          incomingExchangeFee = Math.floor((balanceAmount * efRow.feePercentage) / 1000);
+          incomingExchangeFeePercentage = efRow.feePercentage;
+        }
+      } catch (_) { /* ignore */ }
+    }
+    const netAmountForUser = Math.max(0, feeInfo.netAmount - incomingExchangeFee);
+
     const baseUrl = process.env.BASE_URL || "https://bkapay.com";
     const orderId = `BKAPAY-PL-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
@@ -414,9 +431,9 @@ export async function handleAfribaPayPaymentLink(
     const tx = await storage.createTransaction({
       userId: paymentLink.userId,
       type: "payment_link",
-      amount: feeInfo.grossAmount,
-      fee: feeInfo.feeAmount,
-      feePercentage: feeInfo.feePercentage,
+      amount: balanceAmount,
+      fee: feeInfo.feeAmount + incomingExchangeFee,
+      feePercentage: feeInfo.feePercentage + incomingExchangeFeePercentage,
       currency: ownerCurrency,
       status: "pending",
       country: countryCode,
@@ -431,11 +448,12 @@ export async function handleAfribaPayPaymentLink(
         providerLink: result.providerLink,
         paymentLinkId: paymentLink.id,
         provider: "afribapay",
-        netAmountForUser: feeInfo.netAmount,
+        netAmountForUser,
         providerAmount: amount,
         providerCurrency,
-        balanceAmount: feeInfo.netAmount,
+        balanceAmount: netAmountForUser,
         balanceCurrency: ownerCurrency,
+        ...(incomingExchangeFee > 0 ? { exchangeFee: incomingExchangeFee, exchangeFeePercentage: incomingExchangeFeePercentage } : {}),
       }),
     });
 

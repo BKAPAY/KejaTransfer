@@ -102,6 +102,25 @@ export async function handleFeeXPayDeposit(
     const feeConfig = await getFeeFromDatabase(storage, "feexpay", country, operator);
     const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming);
 
+    // Calculate exchange fee if payer currency differs from merchant currency
+    let incomingExchangeFee = 0;
+    let incomingExchangeFeePercentage = 0;
+    if (providerCurrency !== userCurrency) {
+      try {
+        let efRow = await storage.getCurrencyExchangeFee(providerCurrency, userCurrency);
+        if (!efRow || !efRow.isActive) {
+          efRow = await storage.getCurrencyExchangeFee(userCurrency, providerCurrency);
+        }
+        if (efRow && efRow.isActive && efRow.feePercentage > 0) {
+          incomingExchangeFee = Math.floor((balanceAmount * efRow.feePercentage) / 1000);
+          incomingExchangeFeePercentage = efRow.feePercentage;
+        }
+      } catch (_) { /* ignore */ }
+    }
+    const netAmountForUser = Math.max(0, feeInfo.netAmount - incomingExchangeFee);
+    const totalFeeAmount = feeInfo.feeAmount + incomingExchangeFee;
+    const totalFeePercentage = feeInfo.feePercentage + incomingExchangeFeePercentage;
+
     const formattedPhone = formatPhoneForFeeXPay(phone, countryCode);
 
     const result = await createFeeXPayPayin(config, {
@@ -127,9 +146,9 @@ export async function handleFeeXPayDeposit(
     const tx = await storage.createTransaction({
       userId,
       type: txType,
-      amount: feeInfo.grossAmount,
-      fee: feeInfo.feeAmount,
-      feePercentage: feeInfo.feePercentage,
+      amount: balanceAmount,
+      fee: totalFeeAmount,
+      feePercentage: totalFeePercentage,
       currency: userCurrency,
       status: "pending",
       country: countryCode,
@@ -145,9 +164,10 @@ export async function handleFeeXPayDeposit(
         networkKey,
         providerAmount,
         providerCurrency,
-        netAmountForUser: feeInfo.netAmount,
-        balanceAmount: feeInfo.netAmount,
+        netAmountForUser,
+        balanceAmount: netAmountForUser,
         balanceCurrency: userCurrency,
+        ...(incomingExchangeFee > 0 ? { exchangeFee: incomingExchangeFee, exchangeFeePercentage: incomingExchangeFeePercentage } : {}),
         ...(options?.customerPaysFee !== undefined ? { customerPaysFee: options.customerPaysFee } : {}),
         ...(result.redirectUrl ? { redirectUrl: result.redirectUrl } : {}),
         ...(options?.extraMetadata || {}),

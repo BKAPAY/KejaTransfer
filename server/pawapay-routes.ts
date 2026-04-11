@@ -88,11 +88,29 @@ export async function handlePawaPayDeposit(
     const feeConfig = await getFeeFromDatabase(storage, "pawapay", country, operator);
     const customerPaysFee = options?.customerPaysFee ?? false;
     const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming);
-    // If customer pays fee: owner receives full balanceAmount (no deduction)
-    // If owner pays fee: owner receives balanceAmount - fee
-    const netAmountForUser = customerPaysFee ? balanceAmount : feeInfo.netAmount;
-    const txFeeAmount = customerPaysFee ? 0 : feeInfo.feeAmount;
-    const txFeePercentage = customerPaysFee ? 0 : feeInfo.feePercentage;
+
+    // Calculate exchange fee if payer currency differs from merchant currency
+    let incomingExchangeFee = 0;
+    let incomingExchangeFeePercentage = 0;
+    if (providerCurrency !== userCurrency) {
+      try {
+        let efRow = await storage.getCurrencyExchangeFee(providerCurrency, userCurrency);
+        if (!efRow || !efRow.isActive) {
+          efRow = await storage.getCurrencyExchangeFee(userCurrency, providerCurrency);
+        }
+        if (efRow && efRow.isActive && efRow.feePercentage > 0) {
+          incomingExchangeFee = Math.floor((balanceAmount * efRow.feePercentage) / 1000);
+          incomingExchangeFeePercentage = efRow.feePercentage;
+        }
+      } catch (_) { /* ignore */ }
+    }
+
+    // Transaction fee charged to customer or merchant; exchange fee always borne by merchant
+    const netAmountForUser = customerPaysFee
+      ? Math.max(0, balanceAmount - incomingExchangeFee)
+      : Math.max(0, feeInfo.netAmount - incomingExchangeFee);
+    const txFeeAmount = customerPaysFee ? incomingExchangeFee : (feeInfo.feeAmount + incomingExchangeFee);
+    const txFeePercentage = customerPaysFee ? incomingExchangeFeePercentage : (feeInfo.feePercentage + incomingExchangeFeePercentage);
 
     const txType = options?.transactionType || "deposit";
     const txDescription = options?.transactionDescription || `Dépôt de ${providerAmount} ${providerCurrency}`;
@@ -152,9 +170,10 @@ export async function handlePawaPayDeposit(
       paymentProvider: "pawapay",
       providerAmount,
       providerCurrency,
-      netAmountForUser: feeInfo.netAmount,
-      balanceAmount: feeInfo.netAmount,
+      netAmountForUser,
+      balanceAmount: netAmountForUser,
       balanceCurrency: userCurrency,
+      ...(incomingExchangeFee > 0 ? { exchangeFee: incomingExchangeFee, exchangeFeePercentage: incomingExchangeFeePercentage } : {}),
       orderId,
       startTime,
       ...(options?.extraMetadata || {}),
