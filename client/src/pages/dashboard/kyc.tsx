@@ -111,17 +111,36 @@ export default function KYC() {
     const interval = setInterval(() => {
       setUploadState(prev => {
         const current = prev[type].progress;
-        if (current < 90) {
-          return { ...prev, [type]: { ...prev[type], progress: current + 10 } };
+        if (current < 85) {
+          return { ...prev, [type]: { ...prev[type], progress: current + 3 } };
         }
         return prev;
       });
-    }, 100);
+    }, 400);
 
     const maxRetries = 3;
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        await apiRequest("POST", "/api/kyc/upload", { type, data });
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 90000);
+        try {
+          const res = await fetch("/api/kyc/upload", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ type, data }),
+            credentials: "include",
+            signal: controller.signal,
+          });
+          clearTimeout(timeoutId);
+          if (!res.ok) {
+            const text = await res.text().catch(() => "");
+            let msg = "Erreur lors du telechargement";
+            try { const j = JSON.parse(text); if (j.error) msg = j.error; } catch {}
+            throw new Error(msg);
+          }
+        } finally {
+          clearTimeout(timeoutId);
+        }
 
         clearInterval(interval);
         setUploadState(prev => ({
@@ -134,9 +153,10 @@ export default function KYC() {
           description: "Le document a ete enregistre avec succes",
         });
         return;
-      } catch (error) {
+      } catch (error: any) {
+        const isAbort = error?.name === "AbortError";
         if (attempt < maxRetries) {
-          await new Promise(r => setTimeout(r, 2000 * attempt));
+          await new Promise(r => setTimeout(r, 3000 * attempt));
           continue;
         }
         clearInterval(interval);
@@ -146,8 +166,10 @@ export default function KYC() {
         }));
 
         toast({
-          title: "Erreur",
-          description: "Erreur lors du telechargement. Verifiez votre connexion internet et reessayez.",
+          title: "Telechargement echoue",
+          description: isAbort
+            ? "Le telechargement a pris trop de temps. Verifiez votre connexion et reessayez."
+            : "Erreur lors du telechargement. Verifiez votre connexion internet et reessayez.",
           variant: "destructive",
         });
       }
@@ -240,8 +262,8 @@ export default function KYC() {
 
     if (!ctx) return;
 
-    const maxWidth = 2560;
-    const maxHeight = 1920;
+    const maxWidth = 1280;
+    const maxHeight = 960;
     let targetWidth = video.videoWidth;
     let targetHeight = video.videoHeight;
     if (targetWidth > maxWidth) {
@@ -256,7 +278,7 @@ export default function KYC() {
     canvas.height = targetHeight;
     ctx.drawImage(video, 0, 0, targetWidth, targetHeight);
 
-    const imageData = canvas.toDataURL("image/jpeg", 0.95);
+    const imageData = canvas.toDataURL("image/jpeg", 0.80);
     const currentMode = cameraMode;
 
     if (currentMode === "front") {
