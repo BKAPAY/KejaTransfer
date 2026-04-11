@@ -7899,8 +7899,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Pre-calculate outgoing exchange fee for balance check (personal accounts only)
       const userCurrencyPre = user.country ? getCurrencyForCountry(user.country) : "XOF";
-      // Use reqTargetCurrency if provided (e.g. user chose USD for CD), otherwise use country default
-      const destCurrencyPre = reqTargetCurrency || getCurrencyForCountry(country?.toUpperCase() || "");
+      // Determine real provider currency: PawaPay uses its own per-operator currency (e.g. USD for CD)
+      // which may differ from the country default currency (e.g. CDF for CD)
+      let destCurrencyPre = reqTargetCurrency || getCurrencyForCountry(country?.toUpperCase() || "");
+      if (!reqTargetCurrency && activeProvider === "pawapay") {
+        try {
+          const { getCurrencyForOperator: getOpCurrency } = await import("@shared/pawapay-countries");
+          const pawaOpCurrency = getOpCurrency(country?.toUpperCase() || "", operator);
+          if (pawaOpCurrency) destCurrencyPre = pawaOpCurrency;
+        } catch (_) { /* ignore */ }
+      }
       let preExchangeFee = 0;
       if (user.accountType === "personal" && destCurrencyPre && destCurrencyPre !== userCurrencyPre) {
         try {
@@ -8201,7 +8209,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (result.success) {
           if (preExchangeFee > 0) {
             await storage.updateUserBalance(req.session.userId!, -preExchangeFee);
-            console.log(`[TRANSFER pawapay] Exchange fee deducted: ${preExchangeFee} ${userCurrencyPre}`);
+            console.log(`[TRANSFER pawapay] Exchange fee deducted: ${preExchangeFee} ${userCurrencyPre} (${userCurrencyPre}→${destCurrencyPre})`);
+            // Add exchange fee to transaction metadata for visibility in history
+            if (result.transactionId) {
+              try {
+                const txToUpdate = await storage.getTransaction(result.transactionId);
+                if (txToUpdate) {
+                  const existingMeta = txToUpdate.metadata ? JSON.parse(txToUpdate.metadata) : {};
+                  await storage.updateTransactionMetadata(result.transactionId, JSON.stringify({
+                    ...existingMeta,
+                    exchangeFee: preExchangeFee,
+                    exchangeFeePercentage: Math.round((preExchangeFee / Math.floor(amount)) * 1000),
+                    exchangeFeeFrom: userCurrencyPre,
+                    exchangeFeeTo: destCurrencyPre,
+                    totalDebited: (existingMeta.totalDebited || (Math.floor(amount) + (existingMeta.fee || 0))) + preExchangeFee,
+                  }));
+                }
+              } catch (_) { /* best effort */ }
+            }
           }
           return res.json({
             success: true,
