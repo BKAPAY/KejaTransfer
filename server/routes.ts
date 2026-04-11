@@ -1383,6 +1383,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Auto-login: Create session for the new user
       req.session.userId = user.id;
+      req.session.loginVerified = true;
       
       res.json({ 
         success: true, 
