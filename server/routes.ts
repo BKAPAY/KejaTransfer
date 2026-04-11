@@ -12040,7 +12040,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const flag = countryFlags[country.code] || "🌍";
         const opCount = operators.length;
         if (opCount > 0) {
-          countryFeeDetailLines.push(`${flag} ${country.name.toUpperCase()} (${country.code}) | Devise: ${country.currency}`);
+          // Build operator lines first — only add country if at least one operator is active
+          const activeOpLines: string[] = [];
           for (const op of operators) {
             const opProviders = countryFees.filter((fc: any) => fc.operator === op.code);
             const feeEntry = opProviders[0];
@@ -12062,9 +12063,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const parts: string[] = [];
             if (hasPayin) parts.push(`Entrant: ${inPct}%`);
             if (hasPayout) parts.push(`Sortant: ${outPct}%`);
-            countryFeeDetailLines.push(`  • ${op.name}: ${parts.join(" | ")}`);
+            activeOpLines.push(`  • ${op.name}: ${parts.join(" | ")}`);
           }
-          countryFeeDetailLines.push(``);
+          if (activeOpLines.length > 0) {
+            countryFeeDetailLines.push(`${flag} ${country.name.toUpperCase()} (${country.code}) | Devise: ${country.currency}`);
+            countryFeeDetailLines.push(...activeOpLines);
+            countryFeeDetailLines.push(``);
+          }
         }
       }
 
