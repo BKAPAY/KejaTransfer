@@ -12041,24 +12041,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const opCount = operators.length;
         if (opCount > 0) {
           // Build operator lines first — only add country if at least one operator is active
+          // Si aucune config de statut en base → on affiche tous les opérateurs qui ont des frais configurés
+          const noStatusData = countryStatusData.length === 0;
+          const noOpConfigData = countryOperatorConfigsData.length === 0;
           const activeOpLines: string[] = [];
           for (const op of operators) {
             const opProviders = countryFees.filter((fc: any) => fc.operator === op.code);
+            if (opProviders.length === 0) continue;
             const feeEntry = opProviders[0];
-            const inPct = feeEntry ? (feeEntry.incomingFeePercentage / 10).toFixed(1) : "N/A";
-            const outPct = feeEntry ? (feeEntry.outgoingFeePercentage / 10).toFixed(1) : "N/A";
-            const hasPayin = opProviders.some((fc: any) => {
-              const providerEnabled = statuses.some((cs: any) => cs.provider === fc.provider && cs.payinEnabled);
-              if (!providerEnabled) return false;
-              const opConfig = opConfigs.find((oc: any) => oc.provider === fc.provider && oc.operator === op.code);
-              return opConfig ? opConfig.incomingEnabled : false;
-            });
-            const hasPayout = opProviders.some((fc: any) => {
-              const providerEnabled = statuses.some((cs: any) => cs.provider === fc.provider && cs.payoutEnabled);
-              if (!providerEnabled) return false;
-              const opConfig = opConfigs.find((oc: any) => oc.provider === fc.provider && oc.operator === op.code);
-              return opConfig ? opConfig.outgoingEnabled : false;
-            });
+            const inPct = (feeEntry.incomingFeePercentage / 10).toFixed(1);
+            const outPct = (feeEntry.outgoingFeePercentage / 10).toFixed(1);
+            let hasPayin: boolean;
+            let hasPayout: boolean;
+            if (noStatusData) {
+              // Pas de statuts configurés → afficher entrant ET sortant si frais configurés
+              hasPayin = true;
+              hasPayout = true;
+            } else {
+              hasPayin = opProviders.some((fc: any) => {
+                const providerEnabled = statuses.some((cs: any) => cs.provider === fc.provider && cs.payinEnabled);
+                if (!providerEnabled) return false;
+                if (noOpConfigData) return true;
+                const opConfig = opConfigs.find((oc: any) => oc.provider === fc.provider && oc.operator === op.code);
+                return opConfig ? opConfig.incomingEnabled : true;
+              });
+              hasPayout = opProviders.some((fc: any) => {
+                const providerEnabled = statuses.some((cs: any) => cs.provider === fc.provider && cs.payoutEnabled);
+                if (!providerEnabled) return false;
+                if (noOpConfigData) return true;
+                const opConfig = opConfigs.find((oc: any) => oc.provider === fc.provider && oc.operator === op.code);
+                return opConfig ? opConfig.outgoingEnabled : true;
+              });
+            }
             if (!hasPayin && !hasPayout) continue;
             const parts: string[] = [];
             if (hasPayin) parts.push(`Entrant: ${inPct}%`);
