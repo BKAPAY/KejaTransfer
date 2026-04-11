@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import { storage } from "./storage";
 import { randomUUID } from "crypto";
-import { calculateIncomingFee, calculateOutgoingFee, getFeeFromDatabase } from "./utils/fees";
+import { calculateIncomingFee, calculateOutgoingFee, getFeeFromDatabase, getIncomingExchangeFee } from "./utils/fees";
 import { sendPaymentDocumentsEmail } from "./email-service";
 import {
   createAfribaPayPayin,
@@ -69,6 +69,13 @@ export async function handleAfribaPayDeposit(
     const feeConfig = await getFeeFromDatabase(storage, "afribapay", country, operator);
     const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming);
 
+    // Exchange fee when payer's currency differs from user's balance currency
+    const { feeAmount: incomingExchangeFee, feePercentage: exchangeFeePercentage } =
+      await getIncomingExchangeFee(storage, balanceAmount, providerCurrency, userCurrency);
+    const netAmountForUser = Math.max(0, feeInfo.netAmount - incomingExchangeFee);
+    const totalFeeAmount = feeInfo.feeAmount + incomingExchangeFee;
+    const totalFeePercentage = feeInfo.feePercentage + exchangeFeePercentage;
+
     const baseUrl = process.env.BASE_URL || "https://bkapay.com";
     const orderId = `BKAPAY-DEP-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
@@ -94,8 +101,8 @@ export async function handleAfribaPayDeposit(
       userId: userId,
       type: "deposit",
       amount: feeInfo.grossAmount,
-      fee: feeInfo.feeAmount,
-      feePercentage: feeInfo.feePercentage,
+      fee: totalFeeAmount,
+      feePercentage: totalFeePercentage,
       currency: userCurrency,
       status: "pending",
       country: countryCode,
@@ -110,9 +117,10 @@ export async function handleAfribaPayDeposit(
         provider: "afribapay",
         providerAmount,
         providerCurrency,
-        netAmountForUser: feeInfo.netAmount,
-        balanceAmount: feeInfo.netAmount,
+        netAmountForUser,
+        balanceAmount: netAmountForUser,
         balanceCurrency: userCurrency,
+        ...(incomingExchangeFee > 0 ? { exchangeFee: incomingExchangeFee, exchangeFeePercentage } : {}),
       }),
     });
 
@@ -519,6 +527,13 @@ export async function handleAfribaPayMerchantLink(
     const feeConfig = await getFeeFromDatabase(storage, "afribapay", country, operator);
     const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming);
 
+    // Exchange fee when payer's currency differs from merchant's balance currency
+    const { feeAmount: incomingExchangeFee, feePercentage: exchangeFeePercentage } =
+      await getIncomingExchangeFee(storage, balanceAmount, providerCurrency, ownerCurrency);
+    const netAmountForUser = Math.max(0, feeInfo.netAmount - incomingExchangeFee);
+    const totalFeeAmount = feeInfo.feeAmount + incomingExchangeFee;
+    const totalFeePercentage = feeInfo.feePercentage + exchangeFeePercentage;
+
     const baseUrl = process.env.BASE_URL || "https://bkapay.com";
     const orderId = `BKAPAY-ML-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
@@ -544,8 +559,8 @@ export async function handleAfribaPayMerchantLink(
       userId: merchantLink.userId,
       type: "merchant_link",
       amount: feeInfo.grossAmount,
-      fee: feeInfo.feeAmount,
-      feePercentage: feeInfo.feePercentage,
+      fee: totalFeeAmount,
+      feePercentage: totalFeePercentage,
       currency: ownerCurrency,
       status: "pending",
       country: countryCode,
@@ -560,11 +575,12 @@ export async function handleAfribaPayMerchantLink(
         providerLink: result.providerLink,
         merchantLinkId: merchantLink.id,
         provider: "afribapay",
-        netAmountForUser: feeInfo.netAmount,
+        netAmountForUser,
         providerAmount: amount,
         providerCurrency,
-        balanceAmount: feeInfo.netAmount,
+        balanceAmount: netAmountForUser,
         balanceCurrency: ownerCurrency,
+        ...(incomingExchangeFee > 0 ? { exchangeFee: incomingExchangeFee, exchangeFeePercentage } : {}),
       }),
     });
 
@@ -632,6 +648,13 @@ export async function handleAfribaPayApiPayment(
     const feeConfig = await getFeeFromDatabase(storage, "afribapay", country, operator);
     const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming);
 
+    // Exchange fee when payer's currency differs from API owner's balance currency
+    const { feeAmount: incomingExchangeFee, feePercentage: exchangeFeePercentage } =
+      await getIncomingExchangeFee(storage, balanceAmount, providerCurrency, ownerCurrency);
+    const netAmountForUser = Math.max(0, feeInfo.netAmount - incomingExchangeFee);
+    const totalFeeAmount = feeInfo.feeAmount + incomingExchangeFee;
+    const totalFeePercentage = feeInfo.feePercentage + exchangeFeePercentage;
+
     const baseUrl = process.env.BASE_URL || "https://bkapay.com";
     const orderId = `BKAPAY-API-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
@@ -657,8 +680,8 @@ export async function handleAfribaPayApiPayment(
       userId: apiKey.userId,
       type: "api_payment",
       amount: feeInfo.grossAmount,
-      fee: feeInfo.feeAmount,
-      feePercentage: feeInfo.feePercentage,
+      fee: totalFeeAmount,
+      feePercentage: totalFeePercentage,
       currency: ownerCurrency,
       status: "pending",
       country: countryCode,
@@ -673,11 +696,12 @@ export async function handleAfribaPayApiPayment(
         providerLink: result.providerLink,
         apiKeyId: apiKey.id,
         provider: "afribapay",
-        netAmountForUser: feeInfo.netAmount,
+        netAmountForUser,
         providerAmount: amount,
         providerCurrency,
-        balanceAmount: feeInfo.netAmount,
+        balanceAmount: netAmountForUser,
         balanceCurrency: ownerCurrency,
+        ...(incomingExchangeFee > 0 ? { exchangeFee: incomingExchangeFee, exchangeFeePercentage } : {}),
       }),
     });
 

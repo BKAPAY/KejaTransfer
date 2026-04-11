@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
 import { storage } from "./storage";
 
-import { calculateIncomingFee, calculateOutgoingFee, calculateOutgoingFeeFromNet, getFeeFromDatabase } from "./utils/fees";
+import { calculateIncomingFee, calculateOutgoingFee, calculateOutgoingFeeFromNet, getFeeFromDatabase, getIncomingExchangeFee } from "./utils/fees";
 import { safeRefundOutgoingTransaction, sendApiPayoutCallback } from "./payment-polling";
 import { trySendPaymentCallback } from "./utils/callback";
 import { sendPaymentDocumentsEmail } from "./email-service";
@@ -47,6 +47,13 @@ export async function handleMbiyoPayDeposit(
     const feeConfig = await getFeeFromDatabase(storage, "mbiyopay", country, operator);
     const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming);
 
+    // Exchange fee when payer's currency differs from user's balance currency
+    const { feeAmount: incomingExchangeFee, feePercentage: exchangeFeePercentage } =
+      await getIncomingExchangeFee(storage, balanceAmount, providerCurrency, userCurrency);
+    const netAmountForUser = Math.max(0, feeInfo.netAmount - incomingExchangeFee);
+    const totalFeeAmount = feeInfo.feeAmount + incomingExchangeFee;
+    const totalFeePercentage = feeInfo.feePercentage + exchangeFeePercentage;
+
     const orderId = `BKAPAY-DEP-${Date.now()}`;
     const startTime = Date.now();
 
@@ -55,8 +62,8 @@ export async function handleMbiyoPayDeposit(
       userId: userId,
       type: "deposit",
       amount: feeInfo.grossAmount,
-      fee: feeInfo.feeAmount,
-      feePercentage: feeInfo.feePercentage,
+      fee: totalFeeAmount,
+      feePercentage: totalFeePercentage,
       currency: userCurrency,
       status: "pending",
       country: country.toUpperCase(),
@@ -69,11 +76,12 @@ export async function handleMbiyoPayDeposit(
         paymentProvider: "mbiyopay",
         providerAmount,
         providerCurrency,
-        netAmountForUser: feeInfo.netAmount,
-        balanceAmount: feeInfo.netAmount,
+        netAmountForUser,
+        balanceAmount: netAmountForUser,
         balanceCurrency: userCurrency,
         orderId,
         startTime,
+        ...(incomingExchangeFee > 0 ? { exchangeFee: incomingExchangeFee, exchangeFeePercentage } : {}),
       }),
     });
 
@@ -111,11 +119,12 @@ export async function handleMbiyoPayDeposit(
       paymentProvider: "mbiyopay",
       providerAmount,
       providerCurrency,
-      netAmountForUser: feeInfo.netAmount,
-      balanceAmount: feeInfo.netAmount,
+      netAmountForUser,
+      balanceAmount: netAmountForUser,
       balanceCurrency: userCurrency,
       orderId,
       startTime,
+      ...(incomingExchangeFee > 0 ? { exchangeFee: incomingExchangeFee, exchangeFeePercentage } : {}),
     });
     await storage.updateTransactionMetadata(tx.id, updatedMetadata);
 
@@ -695,6 +704,13 @@ export async function handleMbiyoPayMerchantLink(
     const feeConfig = await getFeeFromDatabase(storage, "mbiyopay", country, operator);
     const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming);
 
+    // Exchange fee when payer's currency differs from merchant's balance currency
+    const { feeAmount: incomingExchangeFee, feePercentage: exchangeFeePercentage } =
+      await getIncomingExchangeFee(storage, balanceAmount, providerCurrency, balanceCurrency);
+    const netAmountForUser = Math.max(0, feeInfo.netAmount - incomingExchangeFee);
+    const totalFeeAmount = feeInfo.feeAmount + incomingExchangeFee;
+    const totalFeePercentage = feeInfo.feePercentage + exchangeFeePercentage;
+
     const orderId = `BKAPAY-ML-${merchantLink.id}-${Date.now()}`;
     const startTime = Date.now();
 
@@ -703,8 +719,8 @@ export async function handleMbiyoPayMerchantLink(
       userId: merchantLink.userId,
       type: "merchant_link",
       amount: balanceAmount,
-      fee: feeInfo.feeAmount,
-      feePercentage: feeInfo.feePercentage,
+      fee: totalFeeAmount,
+      feePercentage: totalFeePercentage,
       currency: balanceCurrency,
       status: "pending",
       country: country.toUpperCase(),
@@ -715,15 +731,16 @@ export async function handleMbiyoPayMerchantLink(
       customerEmail: customerEmail,
       metadata: JSON.stringify({
         merchantLinkId: merchantLink.id,
-        netAmountForUser: feeInfo.netAmount,
+        netAmountForUser,
         providerAmount,
         providerCurrency,
-        balanceAmount: feeInfo.netAmount,
+        balanceAmount: netAmountForUser,
         balanceCurrency,
         provider: "mbiyopay",
         paymentProvider: "mbiyopay",
         orderId,
         startTime,
+        ...(incomingExchangeFee > 0 ? { exchangeFee: incomingExchangeFee, exchangeFeePercentage } : {}),
       }),
     });
 
@@ -756,15 +773,16 @@ export async function handleMbiyoPayMerchantLink(
       mbiyopayTransactionId: result.transactionId,
       redirectUrl: result.redirectUrl,
       merchantLinkId: merchantLink.id,
-      netAmountForUser: feeInfo.netAmount,
+      netAmountForUser,
       providerAmount,
       providerCurrency,
-      balanceAmount: feeInfo.netAmount,
+      balanceAmount: netAmountForUser,
       balanceCurrency,
       provider: "mbiyopay",
       paymentProvider: "mbiyopay",
       orderId,
       startTime,
+      ...(incomingExchangeFee > 0 ? { exchangeFee: incomingExchangeFee, exchangeFeePercentage } : {}),
     });
     await storage.updateTransactionMetadata(tx.id, updatedMetadata);
 

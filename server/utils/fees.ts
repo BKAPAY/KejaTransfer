@@ -328,6 +328,39 @@ export function calculateOutgoingFee(grossAmount: number, feePercentageValue?: n
 }
 
 /**
+ * Look up incoming exchange fee from the database.
+ * Checks direct pair (payerCurrency → merchantCurrency) first,
+ * then falls back to reverse pair (merchantCurrency → payerCurrency).
+ *
+ * Returns { feeAmount, feePercentage } — both 0 if same currency or not configured.
+ *
+ * Formula (consistent with outgoing): Math.floor(balanceAmount * feePercentage / 1000)
+ */
+export async function getIncomingExchangeFee(
+  storage: any,
+  balanceAmount: number,
+  payerCurrency: string,
+  merchantCurrency: string
+): Promise<{ feeAmount: number; feePercentage: number }> {
+  if (!payerCurrency || !merchantCurrency || payerCurrency === merchantCurrency) {
+    return { feeAmount: 0, feePercentage: 0 };
+  }
+  try {
+    let efRow = await storage.getCurrencyExchangeFee(payerCurrency, merchantCurrency);
+    if (!efRow || !efRow.isActive) {
+      efRow = await storage.getCurrencyExchangeFee(merchantCurrency, payerCurrency);
+    }
+    if (efRow && efRow.isActive && efRow.feePercentage > 0) {
+      return {
+        feeAmount: Math.floor((balanceAmount * efRow.feePercentage) / 1000),
+        feePercentage: efRow.feePercentage,
+      };
+    }
+  } catch (_) { /* ignore — best effort */ }
+  return { feeAmount: 0, feePercentage: 0 };
+}
+
+/**
  * Calculate fees for API PAYOUT — the recipient receives the EXACT NET amount.
  * Fees are added ON TOP and deducted from the merchant's BKApay balance.
  *

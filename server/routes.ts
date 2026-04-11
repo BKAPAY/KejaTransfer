@@ -12,7 +12,7 @@ import path from "path";
 import { insertUserSchema, insertPaymentLinkSchema, insertMerchantLinkSchema, insertApiKeySchema } from "@shared/schema";
 import { validatePhoneOperator } from "@shared/phone-utils";
 import { randomUUID } from "crypto";
-import { calculateIncomingFee, calculateOutgoingFee, calculateOutgoingFeeFromNet, calculateCustomerPaysFee, getFeeFromDatabase, getDynamicFees, getDynamicOutgoingFees, getActiveProviderForCountry, getActivePayoutProviderForCountry } from "./utils/fees";
+import { calculateIncomingFee, calculateOutgoingFee, calculateOutgoingFeeFromNet, calculateCustomerPaysFee, getFeeFromDatabase, getDynamicFees, getDynamicOutgoingFees, getActiveProviderForCountry, getActivePayoutProviderForCountry, getIncomingExchangeFee } from "./utils/fees";
 import { trySendPaymentCallback } from "./utils/callback";
 import { recordLoginLog } from "./utils/login-tracker";
 import { 
@@ -2832,7 +2832,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Calculate fees on the amount in owner's currency with dynamic fee from database
-      const { calculateIncomingFee, calculateCustomerPaysFee, getFeeFromDatabase } = await import("./utils/fees");
+      const { calculateIncomingFee, calculateCustomerPaysFee, getFeeFromDatabase, getIncomingExchangeFee: getApiPayXFee } = await import("./utils/fees");
       const apiInitFeeConfig = await getFeeFromDatabase(storage, activeProvider, country, operator);
       
       // Handle customerPaysFee logic like payment links
@@ -2915,13 +2915,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ success: false, error: result.error || "Erreur lors du paiement" });
         }
 
+        // Exchange fee when payer's currency differs from API owner's balance currency
+        const { feeAmount: apiMbiyoXFee, feePercentage: apiMbiyoXFeePct } =
+          await getApiPayXFee(storage, baseAmount, providerCurrency, ownerCurrency);
+        const apiMbiyoNet = Math.max(0, netAmountForUser - apiMbiyoXFee);
+        const apiMbiyoTotalFee = feeAmount + apiMbiyoXFee;
+        const apiMbiyoTotalFeePct = feePercentage + apiMbiyoXFeePct;
+
         // Create transaction record - store base amount for user balance credit
         const tx = await storage.createTransaction({
           userId: apiKey.userId,
           type: "api_payment",
           amount: baseAmount, // Store base amount in owner's currency
-          fee: feeAmount,
-          feePercentage: feePercentage,
+          fee: apiMbiyoTotalFee,
+          feePercentage: apiMbiyoTotalFeePct,
           currency: ownerCurrency, // Store in owner's currency
           status: "pending",
           country: country.toUpperCase(),
@@ -2940,13 +2947,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             successUrl: successUrl || null,
             cancelUrl: cancelUrl || null,
             provider: "mbiyopay",
-            netAmountForUser: netAmountForUser,
+            netAmountForUser: apiMbiyoNet,
             providerAmount: convertedAmountForProvider,
             providerCurrency: providerCurrency,
-            balanceAmount: netAmountForUser,
+            balanceAmount: apiMbiyoNet,
             balanceCurrency: ownerCurrency,
             customerPaysFee: apiKey.customerPaysFee,
-            feeAmount: feeAmount,
+            feeAmount: apiMbiyoTotalFee,
+            ...(apiMbiyoXFee > 0 ? { exchangeFee: apiMbiyoXFee, exchangeFeePercentage: apiMbiyoXFeePct } : {}),
           }),
         });
 
@@ -5023,6 +5031,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         netAmountForUser = feeInfo.netAmount;
       }
 
+      // Exchange fee when payer's currency differs from merchant's balance currency
+      if (providerCurrency !== ownerCurrency) {
+        const { feeAmount: xFee, feePercentage: xFeePct } =
+          await getIncomingExchangeFee(storage, paymentLink.amount, providerCurrency, ownerCurrency);
+        if (xFee > 0) {
+          netAmountForUser = Math.max(0, netAmountForUser - xFee);
+          feeAmount += xFee;
+          feePercentage += xFeePct;
+        }
+      }
+
       // CRITICAL: Convert amount to provider currency (XOF) if owner's currency is different
       let convertedAmountForProvider = amountForProvider;
       if (ownerCurrency !== providerCurrency) {
@@ -5210,6 +5229,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Calculate fees for INCOMING payment with dynamic fee from database (auto-detect active provider)
         const feeConfig = await getDynamicFees(storage, country, operator);
         const feeInfo = calculateIncomingFee(baseAmountInOwnerCurrency, feeConfig.incoming);
+
+        // Exchange fee when payer's currency differs from merchant's balance currency
+        const { feeAmount: mlXFee, feePercentage: mlXFeePct } =
+          await getIncomingExchangeFee(storage, baseAmountInOwnerCurrency, providerCurrency, ownerCurrency);
+        const mlNetAmountForUser = Math.max(0, feeInfo.netAmount - mlXFee);
+        const mlTotalFee = feeInfo.feeAmount + mlXFee;
+        const mlTotalFeePct = feeInfo.feePercentage + mlXFeePct;
         
         // Create transaction - store in owner's currency for balance credit
         const transactionId = randomUUID();
@@ -5217,8 +5243,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           userId: merchantLink.userId,
           type: "merchant_link",
           amount: baseAmountInOwnerCurrency, // Store in owner's currency for balance
-          fee: feeInfo.feeAmount,
-          feePercentage: feeInfo.feePercentage,
+          fee: mlTotalFee,
+          feePercentage: mlTotalFeePct,
           currency: ownerCurrency, // Store in owner's currency
           status: "pending",
           country,
@@ -5230,11 +5256,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           paydunyaToken: paydunyaResponse.token, // Store in dedicated column
           metadata: JSON.stringify({
             merchantLinkId: merchantLink.id,
-            netAmountForUser: feeInfo.netAmount,
+            netAmountForUser: mlNetAmountForUser,
             providerAmount: convertedAmountForProvider,
             providerCurrency: providerCurrency,
-            balanceAmount: feeInfo.netAmount,
+            balanceAmount: mlNetAmountForUser,
             balanceCurrency: ownerCurrency,
+            ...(mlXFee > 0 ? { exchangeFee: mlXFee, exchangeFeePercentage: mlXFeePct } : {}),
           }),
         });
 
@@ -8322,6 +8349,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           feePercentage = feeInfo.feePercentage;
           netAmountForUser = feeInfo.netAmount; // User receives base - fee in their currency
         }
+
+        // Exchange fee when payer's currency differs from merchant's balance currency
+        if (conversionApplied) {
+          const { feeAmount: xFee, feePercentage: xFeePct } =
+            await getIncomingExchangeFee(storage, paymentLink.amount, payerCurrency, ownerCurrency);
+          if (xFee > 0) {
+            netAmountForUser = Math.max(0, netAmountForUser - xFee);
+            feeAmount += xFee;
+            feePercentage += xFeePct;
+          }
+        }
         
         // Calculate provider amount in payer's currency
         // If customerPaysFee: provider collects converted(baseAmount + fee)
@@ -8757,14 +8795,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Calculate fees on the OWNER's currency amount (not the provider XOF amount)
           const merchantPaydunyaFeeConfig = await getDynamicFees(storage, country, operator);
           const feeInfo = calculateIncomingFee(baseAmountInOwnerCurrency, merchantPaydunyaFeeConfig.incoming);
+
+          // Exchange fee when payer's currency differs from merchant's balance currency
+          const { feeAmount: mlXFee2, feePercentage: mlXFeePct2 } =
+            await getIncomingExchangeFee(storage, baseAmountInOwnerCurrency, providerCurrency, ownerCurrency);
+          const mlNet2 = Math.max(0, feeInfo.netAmount - mlXFee2);
+          const mlFee2 = feeInfo.feeAmount + mlXFee2;
+          const mlFeePct2 = feeInfo.feePercentage + mlXFeePct2;
           
           const transactionId = randomUUID();
           await storage.createTransaction({
             userId: merchantLink.userId,
             type: "merchant_link",
             amount: baseAmountInOwnerCurrency,
-            fee: feeInfo.feeAmount,
-            feePercentage: feeInfo.feePercentage,
+            fee: mlFee2,
+            feePercentage: mlFeePct2,
             currency: ownerCurrency,
             status: "pending",
             country,
@@ -8779,11 +8824,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
               customerName: effectiveCustomerName,
               provider: "paydunya",
               merchantLinkId: merchantLink.id,
-              netAmountForUser: feeInfo.netAmount,
+              netAmountForUser: mlNet2,
               providerAmount: convertedAmountForProvider,
               providerCurrency: providerCurrency,
-              balanceAmount: feeInfo.netAmount,
+              balanceAmount: mlNet2,
               balanceCurrency: ownerCurrency,
+              ...(mlXFee2 > 0 ? { exchangeFee: mlXFee2, exchangeFeePercentage: mlXFeePct2 } : {}),
             }),
           });
 

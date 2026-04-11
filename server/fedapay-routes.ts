@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
 import { storage } from "./storage";
 import { randomUUID } from "crypto";
-import { calculateIncomingFee, calculateOutgoingFee, calculateOutgoingFeeFromNet, getFeeFromDatabase } from "./utils/fees";
+import { calculateIncomingFee, calculateOutgoingFee, calculateOutgoingFeeFromNet, getFeeFromDatabase, getIncomingExchangeFee } from "./utils/fees";
 import { safeRefundOutgoingTransaction } from "./payment-polling";
 import { 
   createCollect, 
@@ -398,12 +398,20 @@ export async function handlePaymentLinkPayment(
 
     // Store transaction with user's base currency for balance credit
     const ownerCurrency = (paymentLink as any)?.ownerCurrency || "XOF";
+
+    // Exchange fee when payer's currency differs from merchant's balance currency
+    const { feeAmount: plXFee, feePercentage: plXFeePct } =
+      await getIncomingExchangeFee(storage, baseAmount, providerCurrency, ownerCurrency);
+    const plNetAmount = Math.max(0, feeInfo.netAmount - plXFee);
+    const plTotalFee = feeInfo.feeAmount + plXFee;
+    const plTotalFeePct = feeInfo.feePercentage + plXFeePct;
+
     const tx = await storage.createTransaction({
       userId: paymentLink.userId,
       type: "payment_link",
       amount: baseAmount, // Store base amount for balance credit
-      fee: feeInfo.feeAmount,
-      feePercentage: feeInfo.feePercentage,
+      fee: plTotalFee,
+      feePercentage: plTotalFeePct,
       currency: ownerCurrency,
       status: "pending",
       country: country.toUpperCase(),
@@ -417,12 +425,13 @@ export async function handlePaymentLinkPayment(
         fedapayReference: result.reference,
         paymentLinkId: paymentLink.id,
         customerPaysFee: customerPaysFee,
-        netAmountForUser: feeInfo.netAmount,
+        netAmountForUser: plNetAmount,
         providerAmount: grossAmount,
         providerCurrency: providerCurrency,
-        balanceAmount: feeInfo.netAmount,
+        balanceAmount: plNetAmount,
         balanceCurrency: ownerCurrency,
         ...(customFieldResponses ? { customFieldResponses } : {}),
+        ...(plXFee > 0 ? { exchangeFee: plXFee, exchangeFeePercentage: plXFeePct } : {}),
       }),
     });
 
@@ -487,12 +496,20 @@ export async function handleMerchantLinkPayment(
       return { success: false, error: result.error || "Erreur lors du paiement" };
     }
 
+    // Exchange fee when payer's currency differs from merchant's balance currency
+    const providerCurrencyML = "XOF"; // FedaPay operates in XOF
+    const { feeAmount: mlXFeeF, feePercentage: mlXFeePctF } =
+      await getIncomingExchangeFee(storage, balanceAmount, providerCurrencyML, ownerCurrency);
+    const mlNetF = Math.max(0, feeInfo.netAmount - mlXFeeF);
+    const mlFeeF = feeInfo.feeAmount + mlXFeeF;
+    const mlFeePctF = feeInfo.feePercentage + mlXFeePctF;
+
     const tx = await storage.createTransaction({
       userId: merchantLink.userId,
       type: "merchant_link",
       amount: balanceAmount,
-      fee: feeInfo.feeAmount,
-      feePercentage: feeInfo.feePercentage,
+      fee: mlFeeF,
+      feePercentage: mlFeePctF,
       currency: ownerCurrency,
       status: "pending",
       country: country.toUpperCase(),
@@ -505,11 +522,12 @@ export async function handleMerchantLinkPayment(
         fedapayTransactionId: result.transactionId,
         fedapayReference: result.reference,
         merchantLinkId: merchantLink.id,
-        netAmountForUser: feeInfo.netAmount,
+        netAmountForUser: mlNetF,
         providerAmount: providerAmount,
-        providerCurrency: "XOF",
-        balanceAmount: feeInfo.netAmount,
+        providerCurrency: providerCurrencyML,
+        balanceAmount: mlNetF,
         balanceCurrency: ownerCurrency,
+        ...(mlXFeeF > 0 ? { exchangeFee: mlXFeeF, exchangeFeePercentage: mlXFeePctF } : {}),
       }),
     });
 
