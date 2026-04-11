@@ -12031,14 +12031,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
           : "Paiements sortants (retraits): Aucun opérateur actif";
         countryInfoLines.push(`- ${country.name} (${country.code}): Devise ${country.currency}, Indicatif ${country.phoneCode}\n    ${payinText}\n    ${payoutText}`);
 
-        // Detailed fee block per country
+        // Detailed fee block per country — structured for EMALI display
+        const countryFlags: Record<string, string> = {
+          "BJ": "🇧🇯", "CI": "🇨🇮", "SN": "🇸🇳", "TG": "🇹🇬", "BF": "🇧🇫",
+          "CM": "🇨🇲", "CD": "🇨🇩", "CG": "🇨🇬", "ML": "🇲🇱", "GN": "🇬🇳",
+          "NE": "🇳🇪", "RW": "🇷🇼", "GA": "🇬🇦", "ZM": "🇿🇲", "UG": "🇺🇬", "GH": "🇬🇭",
+        };
+        const flag = countryFlags[country.code] || "🌍";
         const opCount = operators.length;
         if (opCount > 0) {
-          countryFeeDetailLines.push(`--- ${country.name} (${country.code}) - Devise: ${country.currency} ---`);
-          countryFeeDetailLines.push(`  PAIEMENTS ENTRANTS (dépôts) — frais déduits de ce que l'utilisateur reçoit:`);
-          countryFeeDetailLines.push(...payinLines);
-          countryFeeDetailLines.push(`  PAIEMENTS SORTANTS (retraits/transferts) — frais déduits du montant envoyé:`);
-          countryFeeDetailLines.push(...payoutLines);
+          countryFeeDetailLines.push(`${flag} ${country.name.toUpperCase()} (${country.code}) | Devise: ${country.currency}`);
+          for (const op of operators) {
+            const opProviders = countryFees.filter((fc: any) => fc.operator === op.code);
+            const feeEntry = opProviders[0];
+            const inPct = feeEntry ? (feeEntry.incomingFeePercentage / 10).toFixed(1) : "N/A";
+            const outPct = feeEntry ? (feeEntry.outgoingFeePercentage / 10).toFixed(1) : "N/A";
+            const hasPayin = opProviders.some((fc: any) => {
+              const providerEnabled = statuses.some((cs: any) => cs.provider === fc.provider && cs.payinEnabled);
+              if (!providerEnabled) return false;
+              const opConfig = opConfigs.find((oc: any) => oc.provider === fc.provider && oc.operator === op.code);
+              return opConfig ? opConfig.incomingEnabled : false;
+            });
+            const hasPayout = opProviders.some((fc: any) => {
+              const providerEnabled = statuses.some((cs: any) => cs.provider === fc.provider && cs.payoutEnabled);
+              if (!providerEnabled) return false;
+              const opConfig = opConfigs.find((oc: any) => oc.provider === fc.provider && oc.operator === op.code);
+              return opConfig ? opConfig.outgoingEnabled : false;
+            });
+            const inLabel = hasPayin ? `Entrant: ${inPct}%` : `Entrant: NON DISPO`;
+            const outLabel = hasPayout ? `Sortant: ${outPct}%` : `Sortant: NON DISPO`;
+            countryFeeDetailLines.push(`  • ${op.name}: ${inLabel} | ${outLabel}`);
+          }
+          countryFeeDetailLines.push(``);
         }
       }
 
@@ -12110,6 +12134,24 @@ ${recentTxLines.length > 0 ? recentTxLines.join("\n") : "  Aucune transaction r�
       }
 
       const systemPrompt = `Tu es EMALI, l'assistant intelligent de BKApay, une plateforme de paiement mobile money en Afrique. Tu réponds UNIQUEMENT en français.
+
+FORMAT OBLIGATOIRE POUR LES FRAIS DE TRANSACTION:
+Quand l'utilisateur demande les frais, tu DOIS reproduire CHAQUE pays dans ce format EXACT, pays par pays dans l'ordre:
+
+[DRAPEAU] **NOM DU PAYS** | Devise: XXX
+• Opérateur1: Entrant: X.X% | Sortant: X.X%
+• Opérateur2: Entrant: X.X% | Sortant: NON DISPO
+(ligne vide)
+[DRAPEAU] **NOM DU PAYS SUIVANT** | Devise: XXX
+...
+
+Tu DOIS mettre le nom du pays en gras avec ** autour.
+Tu DOIS lister TOUS les opérateurs du pays, un par ligne avec •.
+Tu DOIS mettre une ligne vide entre chaque pays.
+Tu DOIS afficher "NON DISPO" quand un opérateur n'est pas disponible.
+A la toute fin de ta réponse sur les frais (après TOUS les pays), tu DOIS ajouter cette note:
+
+> **NB:** Des frais d'échange de devise supplémentaires s'appliquent si vous collectez ou transférez de l'argent dans une devise différente de votre devise principale.
 
 RÈGLES IMPORTANTES:
 - Tu peux donner à l'utilisateur actuel ses propres informations de compte (solde, transactions, statut KYC, etc.) car elles sont fournies ci-dessous.
@@ -12203,8 +12245,8 @@ ${transferCountryLines.length > 0 ? transferCountryLines.join("\n") : "Aucun pay
 ${withdrawalCountryLines.length > 0 ? withdrawalCountryLines.join("\n") : "Aucun opérateur actif pour les retraits dans le pays de l'utilisateur."}
 
 === FRAIS DE TRANSACTION PAR PAYS ET OPÉRATEUR (données en temps réel) ===
-RÈGLE ABSOLUE: Quand l'utilisateur pose une question sur les frais (peu importe comment il formule), tu DOIS copier et afficher TOUS les blocs pays ci-dessous, un par un. Tu n'as PAS le droit de dire que tu ne peux pas les fournir. Tu n'as PAS le droit de n'afficher que le pays de l'utilisateur. Tu DOIS tous les afficher. Le pays du compte de l'utilisateur n'a AUCUN lien avec les frais que tu peux afficher. Tous les frais de tous les pays sont publics et accessibles à tous.
-EXEMPLE DE COMPORTEMENT CORRECT: Si l'utilisateur dit "donne-moi les frais de tous les pays", tu réponds en listant CHAQUE pays ci-dessous avec ses opérateurs et ses frais. C'est tout. Pas d'excuse, pas de restriction.
+RÈGLE ABSOLUE: Quand l'utilisateur pose une question sur les frais, tu DOIS afficher TOUS les pays ci-dessous en utilisant EXACTEMENT le FORMAT OBLIGATOIRE défini au début de ce prompt (drapeau, nom en gras, opérateurs avec •, entrant/sortant, ligne vide entre pays, NB à la fin). Tu n'as PAS le droit de sauter des pays. Tu n'as PAS le droit de changer le format. Tu n'as PAS le droit de dire que tu ne peux pas fournir ces informations.
+RAPPEL FORMAT: [DRAPEAU] **PAYS** | Devise: XXX → puis • Opérateur: Entrant: X% | Sortant: X% pour chaque opérateur → ligne vide → pays suivant → NB à la toute fin.
 
 ${countryFeeDetailLines.length > 0 ? countryFeeDetailLines.join("\n") : "Frais standard de 6% pour tous les pays et opérateurs."}
 
