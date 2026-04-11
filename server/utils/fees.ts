@@ -403,6 +403,7 @@ export async function getOutgoingExchangeFee(
   accountType: string
 ): Promise<{ feeAmount: number; feePercentage: number }> {
   if (!userCurrency || !destCurrency || userCurrency === destCurrency || accountType !== "personal") {
+    console.log(`[ExchangeFee] Skipped: userCurrency=${userCurrency}, destCurrency=${destCurrency}, accountType=${accountType}, same=${userCurrency === destCurrency}`);
     return { feeAmount: 0, feePercentage: 0 };
   }
   try {
@@ -416,12 +417,17 @@ export async function getOutgoingExchangeFee(
         eq(currencyExchangeFees.isActive, 1),
       )
     );
+    console.log(`[ExchangeFee] DB query ${userCurrency}→${destCurrency}: ${rows.length} rows found${rows.length > 0 ? `, feePercentage=${rows[0].feePercentage}, isActive=${rows[0].isActive}` : ""}`);
     if (rows.length > 0 && rows[0].feePercentage > 0) {
+      const feeAmount = Math.floor((Math.floor(amount) * rows[0].feePercentage) / 1000);
+      console.log(`[ExchangeFee] Calculated: ${amount} * ${rows[0].feePercentage} / 1000 = ${feeAmount}`);
       return {
-        feeAmount: Math.floor((Math.floor(amount) * rows[0].feePercentage) / 1000),
+        feeAmount,
         feePercentage: rows[0].feePercentage,
       };
     }
-  } catch (_) {}
+  } catch (err) {
+    console.error(`[ExchangeFee] ERROR querying ${userCurrency}→${destCurrency}:`, err);
+  }
   return { feeAmount: 0, feePercentage: 0 };
 }

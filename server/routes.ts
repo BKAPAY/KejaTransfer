@@ -7894,36 +7894,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? (Math.floor(amount) + feeInfo.feeAmount) 
         : feeInfo.totalDeductedFromBalance;
 
-      // Pre-calculate outgoing exchange fee for balance check (personal accounts only)
       const userCurrencyPre = user.country ? getCurrencyForCountry(user.country) : "XOF";
-      // Determine real provider currency: PawaPay uses its own per-operator currency (e.g. USD for CD)
-      // which may differ from the country default currency (e.g. CDF for CD)
       let destCurrencyPre = reqTargetCurrency || getCurrencyForCountry(country?.toUpperCase() || "");
       if (!reqTargetCurrency && activeProvider === "pawapay") {
         try {
           const { getCurrencyForOperator: getOpCurrency } = await import("@shared/pawapay-countries");
           const pawaOpCurrency = getOpCurrency(country?.toUpperCase() || "", operator);
           if (pawaOpCurrency) destCurrencyPre = pawaOpCurrency;
-        } catch (_) { /* ignore */ }
+        } catch (_) {}
       }
-      let preExchangeFee = 0;
-      if (user.accountType === "personal" && destCurrencyPre && destCurrencyPre !== userCurrencyPre) {
-        try {
-          const { db } = await import("./db");
-          const { currencyExchangeFees } = await import("@shared/schema");
-          const { eq, and } = await import("drizzle-orm");
-          const preRows = await db.select().from(currencyExchangeFees).where(
-            and(
-              eq(currencyExchangeFees.fromCurrency, userCurrencyPre),
-              eq(currencyExchangeFees.toCurrency, destCurrencyPre),
-              eq(currencyExchangeFees.isActive, 1),
-            )
-          );
-          if (preRows.length > 0 && preRows[0].feePercentage > 0) {
-            preExchangeFee = Math.floor((Math.floor(amount) * preRows[0].feePercentage) / 1000);
-          }
-        } catch (_) { /* ignore - best effort */ }
-      }
+      const exchangeFeeResult = await getOutgoingExchangeFee(userCurrencyPre, destCurrencyPre, Math.floor(amount), user.accountType || "personal");
+      const preExchangeFee = exchangeFeeResult.feeAmount;
+      console.log(`[WITHDRAWAL] Exchange fee calc: ${userCurrencyPre}→${destCurrencyPre}, amount=${Math.floor(amount)}, accountType=${user.accountType}, fee=${preExchangeFee}, pct=${exchangeFeeResult.feePercentage}`);
       const requiredBalance = baseRequired + preExchangeFee;
 
       // Check balance avec le bon montant selon le type
