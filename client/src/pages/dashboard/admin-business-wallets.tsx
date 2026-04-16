@@ -114,9 +114,6 @@ export default function AdminBusinessWallets() {
     });
   }
 
-  const XOF_KEYS = ["BJ", "TG", "CI", "BF", "SN", "ML", "NE"];
-  const totalXOF = XOF_KEYS.reduce((sum, key) => sum + (walletMap[key]?.balance || 0), 0);
-
   const sortedKeys = [
     ...WALLET_ORDER.filter(k => !disabledCountries.includes(getCountryCodeFromKey(k))),
     ...WALLET_ORDER.filter(k => disabledCountries.includes(getCountryCodeFromKey(k))),
@@ -157,18 +154,11 @@ export default function AdminBusinessWallets() {
         </div>
       </div>
 
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <div className="flex items-center gap-2">
-          <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm text-muted-foreground">
-            Wallets par pays — soldes en temps réel
-          </span>
-        </div>
-        {totalXOF > 0 && (
-          <div className="text-sm text-muted-foreground">
-            Total XOF : <span className="font-semibold text-foreground">{formatCurrency(totalXOF, "XOF")}</span>
-          </div>
-        )}
+      <div className="flex items-center gap-2">
+        <TrendingUp className="h-4 w-4 text-muted-foreground" />
+        <span className="text-sm text-muted-foreground">
+          Wallets par pays — soldes en temps réel
+        </span>
       </div>
 
       <div className="space-y-3">
