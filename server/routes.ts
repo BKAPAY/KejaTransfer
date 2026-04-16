@@ -3828,7 +3828,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const ownerCurrency = owner.country ? getCurrencyForCountry(owner.country) : "XOF";
-      const { calculateIncomingFee, calculateCustomerPaysFee, getFeeFromDatabase } = await import("./utils/fees");
+      const { calculateIncomingFee, calculateCustomerPaysFee, getFeeFromDatabase, getIncomingExchangeFee: getSessionXFee } = await import("./utils/fees");
       const feeConfig = await getFeeFromDatabase(storage, activeProvider, country, operator);
 
       let amountForProvider: number;
@@ -3873,6 +3873,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         const providerCurrency = requestCurrency || getPawaPayCurrencyForOp(country.toUpperCase(), operator);
+
+        // Frais d'échange entrant si la devise du payeur diffère de celle du marchand
+        const { feeAmount: sessXFeePawa, feePercentage: sessXFeePawaPct } =
+          await getSessionXFee(storage, netAmountForUser, providerCurrency, ownerCurrency);
+        if (sessXFeePawa > 0) {
+          netAmountForUser = Math.max(0, netAmountForUser - sessXFeePawa);
+          feeAmount += sessXFeePawa;
+          feePercentage += sessXFeePawaPct;
+          console.log(`[SESSION PAY PawaPay] Frais échange ${providerCurrency}→${ownerCurrency}: -${sessXFeePawa} (${sessXFeePawaPct / 10}%)`);
+        }
+
         let convertedAmount = amountForProvider;
         if (ownerCurrency !== providerCurrency) {
           const { convertCurrency } = await import("./currency-converter");
@@ -3927,8 +3938,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             callbackUrl: session.callbackUrl,
             orderId: session.orderId,
             netAmountForUser,
+            balanceAmount: netAmountForUser,
+            balanceCurrency: ownerCurrency,
             providerAmount: convertedAmount,
             providerCurrency,
+            ...(sessXFeePawa > 0 ? { exchangeFee: sessXFeePawa, exchangeFeePercentage: sessXFeePawaPct } : {}),
           }),
         });
 
@@ -4027,6 +4041,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const otpInfo = getMbiyoOtpInfo(country);
           return res.json({ success: false, requiresOTP: true, otpInstructions: otpInfo.instructions, otpUssdCode: otpInfo.ussdCode, otpHint: otpInfo.hint, provider: "mbiyopay", error: "Code OTP requis" });
         }
+
+        // Frais d'échange entrant si la devise du payeur diffère de celle du marchand
+        const { feeAmount: sessXFeeMbiy, feePercentage: sessXFeeMbiyPct } =
+          await getSessionXFee(storage, netAmountForUser, providerCurrency, ownerCurrency);
+        if (sessXFeeMbiy > 0) {
+          netAmountForUser = Math.max(0, netAmountForUser - sessXFeeMbiy);
+          feeAmount += sessXFeeMbiy;
+          feePercentage += sessXFeeMbiyPct;
+          console.log(`[SESSION PAY MbiyoPay] Frais échange ${providerCurrency}→${ownerCurrency}: -${sessXFeeMbiy} (${sessXFeeMbiyPct / 10}%)`);
+        }
+
         let convertedAmount = amountForProvider;
         if (ownerCurrency !== providerCurrency) {
           const { convertCurrency } = await import("./currency-converter");
@@ -4044,7 +4069,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           country: country.toUpperCase(), operator,
           description: session.description || "Paiement API", customerPhone,
           customerName: customerName || "Client", customerEmail: customerEmail || null,
-          metadata: JSON.stringify({ sessionId: session.id, apiKeyId: apiKey.id, successUrl: session.successUrl, cancelUrl: session.cancelUrl, callbackUrl: session.callbackUrl, orderId: session.orderId, provider: "mbiyopay", mbiyopayTransactionId: result.transactionId }),
+          metadata: JSON.stringify({
+            sessionId: session.id, apiKeyId: apiKey.id, successUrl: session.successUrl,
+            cancelUrl: session.cancelUrl, callbackUrl: session.callbackUrl, orderId: session.orderId,
+            provider: "mbiyopay", mbiyopayTransactionId: result.transactionId,
+            netAmountForUser, balanceAmount: netAmountForUser, balanceCurrency: ownerCurrency,
+            providerAmount: convertedAmount, providerCurrency,
+            ...(sessXFeeMbiy > 0 ? { exchangeFee: sessXFeeMbiy, exchangeFeePercentage: sessXFeeMbiyPct } : {}),
+          }),
         });
         await storage.updatePaymentSession(session.id, { transactionId: tx.id });
         return res.json({ success: true, transactionId: tx.id, redirectUrl: result.redirectUrl, instructions: result.instructions, message: result.message || "Paiement initié", provider: "mbiyopay" });
@@ -4086,6 +4118,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         const sessFeexCurr = sessFeexCurrency(country.toUpperCase());
+
+        // Frais d'échange entrant si la devise du payeur diffère de celle du marchand
+        const { feeAmount: sessXFeeFeex, feePercentage: sessXFeeFeexPct } =
+          await getSessionXFee(storage, netAmountForUser, sessFeexCurr, ownerCurrency);
+        if (sessXFeeFeex > 0) {
+          netAmountForUser = Math.max(0, netAmountForUser - sessXFeeFeex);
+          feeAmount += sessXFeeFeex;
+          feePercentage += sessXFeeFeexPct;
+          console.log(`[SESSION PAY FeeXPay] Frais échange ${sessFeexCurr}→${ownerCurrency}: -${sessXFeeFeex} (${sessXFeeFeexPct / 10}%)`);
+        }
+
         let sessFeexAmount = amountForProvider;
         if (ownerCurrency !== sessFeexCurr) {
           const { convertCurrency } = await import("./currency-converter");
@@ -4124,7 +4167,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             sessionId: session.id, apiKeyId: apiKey.id,
             successUrl: session.successUrl, cancelUrl: session.cancelUrl,
             callbackUrl: session.callbackUrl, orderId: session.orderId,
-            netAmountForUser, providerAmount: sessFeexAmount, providerCurrency: sessFeexCurr,
+            netAmountForUser, balanceAmount: netAmountForUser, balanceCurrency: ownerCurrency,
+            providerAmount: sessFeexAmount, providerCurrency: sessFeexCurr,
+            ...(sessXFeeFeex > 0 ? { exchangeFee: sessXFeeFeex, exchangeFeePercentage: sessXFeeFeexPct } : {}),
           }),
         });
 
@@ -7966,7 +8011,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (result.success) {
           if (preExchangeFee > 0) {
             await storage.updateUserBalance(req.session.userId!, -preExchangeFee);
-            console.log(`[TRANSFER fedapay] Exchange fee deducted: ${preExchangeFee} ${userCurrencyPre}`);
+            console.log(`[TRANSFER fedapay] Exchange fee deducted: ${preExchangeFee} ${userCurrencyPre} (${userCurrencyPre}→${destCurrencyPre})`);
+            if (result.transactionId) {
+              try {
+                const txToUpdate = await storage.getTransaction(result.transactionId);
+                if (txToUpdate) {
+                  const existingMeta = txToUpdate.metadata ? JSON.parse(txToUpdate.metadata) : {};
+                  await storage.updateTransactionMetadata(result.transactionId, JSON.stringify({
+                    ...existingMeta,
+                    exchangeFee: preExchangeFee,
+                    exchangeFeePercentage: exchangeFeeResult.feePercentage,
+                    exchangeFeeFrom: userCurrencyPre,
+                    exchangeFeeTo: destCurrencyPre,
+                  }));
+                }
+              } catch (_) { /* best effort */ }
+            }
           }
           return res.json({
             success: true,
@@ -8160,7 +8220,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (result.success) {
           if (preExchangeFee > 0) {
             await storage.updateUserBalance(req.session.userId!, -preExchangeFee);
-            console.log(`[TRANSFER mbiyopay] Exchange fee deducted: ${preExchangeFee} ${userCurrencyPre}`);
+            console.log(`[TRANSFER mbiyopay] Exchange fee deducted: ${preExchangeFee} ${userCurrencyPre} (${userCurrencyPre}→${destCurrencyPre})`);
+            if (result.transactionId) {
+              try {
+                const txToUpdate = await storage.getTransaction(result.transactionId);
+                if (txToUpdate) {
+                  const existingMeta = txToUpdate.metadata ? JSON.parse(txToUpdate.metadata) : {};
+                  await storage.updateTransactionMetadata(result.transactionId, JSON.stringify({
+                    ...existingMeta,
+                    exchangeFee: preExchangeFee,
+                    exchangeFeePercentage: exchangeFeeResult.feePercentage,
+                    exchangeFeeFrom: userCurrencyPre,
+                    exchangeFeeTo: destCurrencyPre,
+                  }));
+                }
+              } catch (_) { /* best effort */ }
+            }
           }
           return res.json({
             success: true,
@@ -8182,7 +8257,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (result.success) {
           if (preExchangeFee > 0) {
             await storage.updateUserBalance(req.session.userId!, -preExchangeFee);
-            console.log(`[TRANSFER afribapay] Exchange fee deducted: ${preExchangeFee} ${userCurrencyPre}`);
+            console.log(`[TRANSFER afribapay] Exchange fee deducted: ${preExchangeFee} ${userCurrencyPre} (${userCurrencyPre}→${destCurrencyPre})`);
+            if (result.transactionId) {
+              try {
+                const txToUpdate = await storage.getTransaction(result.transactionId);
+                if (txToUpdate) {
+                  const existingMeta = txToUpdate.metadata ? JSON.parse(txToUpdate.metadata) : {};
+                  await storage.updateTransactionMetadata(result.transactionId, JSON.stringify({
+                    ...existingMeta,
+                    exchangeFee: preExchangeFee,
+                    exchangeFeePercentage: exchangeFeeResult.feePercentage,
+                    exchangeFeeFrom: userCurrencyPre,
+                    exchangeFeeTo: destCurrencyPre,
+                  }));
+                }
+              } catch (_) { /* best effort */ }
+            }
           }
           return res.json({
             success: true,
@@ -8203,7 +8293,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (result.success) {
           if (preExchangeFee > 0) {
             await storage.updateUserBalance(req.session.userId!, -preExchangeFee);
-            console.log(`[TRANSFER moneyfusion] Exchange fee deducted: ${preExchangeFee} ${userCurrencyPre}`);
+            console.log(`[TRANSFER moneyfusion] Exchange fee deducted: ${preExchangeFee} ${userCurrencyPre} (${userCurrencyPre}→${destCurrencyPre})`);
+            if (result.transactionId) {
+              try {
+                const txToUpdate = await storage.getTransaction(result.transactionId);
+                if (txToUpdate) {
+                  const existingMeta = txToUpdate.metadata ? JSON.parse(txToUpdate.metadata) : {};
+                  await storage.updateTransactionMetadata(result.transactionId, JSON.stringify({
+                    ...existingMeta,
+                    exchangeFee: preExchangeFee,
+                    exchangeFeePercentage: exchangeFeeResult.feePercentage,
+                    exchangeFeeFrom: userCurrencyPre,
+                    exchangeFeeTo: destCurrencyPre,
+                  }));
+                }
+              } catch (_) { /* best effort */ }
+            }
           }
           return res.json({
             success: true,
@@ -8261,7 +8366,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (result.success) {
           if (preExchangeFee > 0) {
             await storage.updateUserBalance(req.session.userId!, -preExchangeFee);
-            console.log(`[TRANSFER feexpay] Exchange fee deducted: ${preExchangeFee} ${userCurrencyPre}`);
+            console.log(`[TRANSFER feexpay] Exchange fee deducted: ${preExchangeFee} ${userCurrencyPre} (${userCurrencyPre}→${destCurrencyPre})`);
+            if (result.transactionId) {
+              try {
+                const txToUpdate = await storage.getTransaction(result.transactionId);
+                if (txToUpdate) {
+                  const existingMeta = txToUpdate.metadata ? JSON.parse(txToUpdate.metadata) : {};
+                  await storage.updateTransactionMetadata(result.transactionId, JSON.stringify({
+                    ...existingMeta,
+                    exchangeFee: preExchangeFee,
+                    exchangeFeePercentage: exchangeFeeResult.feePercentage,
+                    exchangeFeeFrom: userCurrencyPre,
+                    exchangeFeeTo: destCurrencyPre,
+                  }));
+                }
+              } catch (_) { /* best effort */ }
+            }
           }
           return res.json({
             success: true,
