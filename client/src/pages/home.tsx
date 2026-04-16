@@ -428,7 +428,6 @@ export default function Home() {
                   {[
                     "Recevez de l'argent via votre lien de paiement personnel",
                     "Retrait instantané vers votre mobile money",
-                    "Transferts entre comptes BKApay",
                     "Tableau de bord & historique complet des transactions",
                     "Assistant Emali intégré (IA mobile money)",
                     "KYC simplifié & sécurisé",
