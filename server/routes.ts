@@ -8233,28 +8233,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const amountInUserCurrency = useFeeOnTopModel ? Math.floor(amount) : feeInfo.amountReceived;
         const baseAmountToDebit = useFeeOnTopModel ? (Math.floor(amount) + feeInfo.feeAmount) : feeInfo.totalDeductedFromBalance;
 
-        // Apply outgoing exchange fee for personal accounts when currencies differ
-        let outgoingExchangeFeeForFedapay = 0;
-        if (user.accountType === "personal" && providerCurrency !== userCurrency) {
-          try {
-            const { db } = await import("./db");
-            const { currencyExchangeFees } = await import("@shared/schema");
-            const { eq, and } = await import("drizzle-orm");
-            const feeRowsF = await db.select().from(currencyExchangeFees).where(
-              and(
-                eq(currencyExchangeFees.fromCurrency, userCurrency),
-                eq(currencyExchangeFees.toCurrency, providerCurrency),
-                eq(currencyExchangeFees.isActive, 1),
-              )
-            );
-            if (feeRowsF.length > 0 && feeRowsF[0].feePercentage > 0) {
-              outgoingExchangeFeeForFedapay = Math.floor((Math.floor(amount) * feeRowsF[0].feePercentage) / 1000);
-              console.log(`[WITHDRAWAL] Outgoing exchange fee ${userCurrency}→${providerCurrency} (${feeRowsF[0].feePercentage / 10}%) = +${outgoingExchangeFeeForFedapay} ${userCurrency}`);
-            }
-          } catch (exErrF) {
-            console.error("[WITHDRAWAL] Exchange fee lookup error:", exErrF);
-          }
-        }
+        // Utilise preExchangeFee (bidirectionnel, calculé ligne ~8103 via getOutgoingExchangeFee)
+        const outgoingExchangeFeeForFedapay = preExchangeFee;
         const amountToDebit = baseAmountToDebit + outgoingExchangeFeeForFedapay;
 
         // CRITICAL: Convert amount from user's currency to provider currency if different
