@@ -34,7 +34,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CountryFlag } from "@/components/country-flag";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const BUSINESS_COUNTRIES = [
@@ -104,6 +103,7 @@ export default function AdminBusinessManagement() {
   const [suspendDialog, setSuspendDialog] = useState<{ open: boolean; userId?: string; userName?: string }>({ open: false });
   const [unsuspendDialog, setUnsuspendDialog] = useState<{ open: boolean; userId?: string; userName?: string }>({ open: false });
   const [bankDetailDialog, setBankDetailDialog] = useState<{ open: boolean; user?: User }>({ open: false });
+  const [walletViewUser, setWalletViewUser] = useState<User | null>(null);
 
   const { data: stats, isLoading: statsLoading } = useQuery<BusinessStats>({
     queryKey: ["/api/admin/business/stats"],
@@ -132,6 +132,15 @@ export default function AdminBusinessManagement() {
     queryKey: ["/api/admin/business/disabled-wallet-countries"],
   });
   const disabledWalletCountries: string[] = walletCountrySettings?.disabled ?? [];
+
+  const { data: walletViewData, isLoading: walletViewLoading } = useQuery<BusinessWallet[]>({
+    queryKey: ["/api/admin/business/users", walletViewUser?.id, "wallets"],
+    queryFn: async () => {
+      const res = await fetch(`/api/admin/business/users/${walletViewUser!.id}/wallets`);
+      return res.json();
+    },
+    enabled: !!walletViewUser,
+  });
 
   const toggleWalletCountryMutation = useMutation({
     mutationFn: async (country: string) => {
@@ -505,6 +514,15 @@ export default function AdminBusinessManagement() {
                           >
                             <Key className="w-4 h-4 mr-1" />
                             API
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setWalletViewUser(user)}
+                            data-testid={`button-view-wallets-${user.id}`}
+                          >
+                            <Banknote className="w-4 h-4 mr-1" />
+                            Soldes
                           </Button>
                           {(user as any).bankAccountNumber && (
                             <Button
@@ -1124,6 +1142,59 @@ export default function AdminBusinessManagement() {
           </div>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Wallets / Soldes Dialog */}
+      <Dialog open={!!walletViewUser} onOpenChange={(open) => { if (!open) setWalletViewUser(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Banknote className="w-5 h-5" />
+              Soldes de {walletViewUser?.businessName || `${walletViewUser?.firstName} ${walletViewUser?.lastName}`}
+            </DialogTitle>
+            <DialogDescription>
+              {walletViewUser?.email}
+            </DialogDescription>
+          </DialogHeader>
+          {walletViewLoading ? (
+            <div className="space-y-2 py-4">
+              {[1, 2, 3].map(i => <Skeleton key={i} className="h-14 w-full" />)}
+            </div>
+          ) : walletViewData && walletViewData.length > 0 ? (
+            <div className="space-y-2 max-h-[60vh] overflow-y-auto py-2">
+              {walletViewData.map((wallet) => {
+                const countryInfo = COUNTRIES.find(c => c.code === wallet.country);
+                return (
+                  <div
+                    key={wallet.id}
+                    className="flex items-center justify-between p-3 rounded-md border"
+                    data-testid={`wallet-row-${wallet.id}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-lg">{countryInfo?.flag || ""}</span>
+                      <div>
+                        <p className="font-medium text-sm">{countryInfo?.name || wallet.country}</p>
+                        <p className="text-xs text-muted-foreground">{wallet.currency}</p>
+                      </div>
+                    </div>
+                    <p className="font-semibold" data-testid={`wallet-balance-${wallet.id}`}>
+                      {wallet.balance.toLocaleString("fr-FR")} {wallet.currency}
+                    </p>
+                  </div>
+                );
+              })}
+              <div className="pt-2 border-t">
+                <p className="text-xs text-muted-foreground text-right">
+                  {walletViewData.length} wallet{walletViewData.length > 1 ? "s" : ""}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="py-8 text-center text-muted-foreground text-sm">
+              Aucun wallet trouvé pour cet utilisateur.
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
