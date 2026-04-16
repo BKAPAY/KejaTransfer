@@ -2,7 +2,7 @@ import { Link } from "wouter";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { CreditCard, Link as LinkIcon, Code, BarChart3, Shield, Zap, User, Building2, Check, ArrowRight, ChevronRight } from "lucide-react";
+import { CreditCard, Link as LinkIcon, Code, BarChart3, Shield, Zap, User, Building2, Check, ArrowRight, ChevronRight, BookOpen } from "lucide-react";
 import { CryptoIcon } from "@/components/crypto-icon";
 import { CardBrandIcon } from "@/components/card-brand-icon";
 import { COUNTRIES } from "@shared/schema";
@@ -576,6 +576,29 @@ export default function Home() {
                 />
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Developer CTA Banner */}
+      <section className="py-6 sm:py-8 md:py-10">
+        <div className="container mx-auto px-2 sm:px-4 md:px-8 max-w-7xl">
+          <div className="animate-on-scroll anim-fade-up flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-6 p-5 sm:p-6 rounded-md bg-card border">
+            <div className="flex items-start gap-3 sm:gap-4 flex-1 text-center sm:text-left">
+              <div className="hidden sm:flex bg-primary/10 w-10 h-10 rounded-md items-center justify-center flex-shrink-0">
+                <Code className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm sm:text-base font-semibold text-foreground mb-0.5 sm:mb-1">Vous êtes développeur ?</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Consultez notre documentation technique complète avec exemples de code, guide d'intégration et référence API.</p>
+              </div>
+            </div>
+            <a href="/docs" className="flex-shrink-0">
+              <Button variant="outline" data-testid="button-view-docs">
+                <BookOpen className="w-4 h-4 mr-2" />
+                Voir la documentation
+              </Button>
+            </a>
           </div>
         </div>
       </section>
