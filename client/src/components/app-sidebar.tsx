@@ -16,7 +16,6 @@ import {
   LayoutDashboard,
   User,
   Link as LinkIcon,
-  Store,
   Code,
   History,
   Settings,
@@ -88,12 +87,6 @@ const generalItems = [
 ];
 
 const businessItems = [
-  {
-    title: "Lien marchand",
-    url: "/dashboard/merchant-links",
-    icon: Store,
-    testId: "nav-merchant-links",
-  },
   {
     title: "API Payin",
     url: "/dashboard/api",
