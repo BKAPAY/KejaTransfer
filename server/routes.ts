@@ -11062,6 +11062,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin: get business tokens for a specific user
+  app.get("/api/admin/business/users/:id/tokens", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const tokens = await storage.getBusinessTokensByUserId(req.params.id);
+      res.json(tokens);
+    } catch (error: any) {
+      console.error("Get business tokens error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
+  // Admin: get business wallets for a specific user
+  app.get("/api/admin/business/users/:id/wallets", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const wallets = await storage.getBusinessWallets(req.params.id);
+      res.json(wallets);
+    } catch (error: any) {
+      console.error("Get business wallets admin error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
   // ===== Pending Transactions Management =====
   app.get("/api/admin/pending-transactions", requireAdmin, async (req: Request, res: Response) => {
     try {
