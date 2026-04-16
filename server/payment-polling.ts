@@ -312,6 +312,12 @@ function getPaymentTimeoutForTransaction(transaction: Transaction, metadata: any
 }
 
 function hasPaymentExpired(transaction: Transaction): boolean {
+  // Les transactions sortantes (retraits, transferts) ne s'expirent jamais automatiquement.
+  // On laisse le fournisseur répondre, peu importe le délai.
+  if (transaction.type === "withdrawal" || transaction.type === "transfer") {
+    return false;
+  }
+
   let metadata: any = {};
   if (transaction.metadata) {
     try {
