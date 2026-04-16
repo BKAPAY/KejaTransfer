@@ -294,53 +294,6 @@ export default function AdminBusinessManagement() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-            <CardTitle className="text-xs font-medium">Total Depots</CardTitle>
-            <TrendingDown className="h-4 w-4 text-blue-600" />
-          </CardHeader>
-          <CardContent>
-            {statsLoading ? (
-              <Skeleton className="h-8 w-24" />
-            ) : (
-              <div className="space-y-1" data-testid="stat-business-deposits">
-                {stats?.depositsByCurrency && Object.entries(stats.depositsByCurrency)
-                  .filter(([, val]) => val > 0)
-                  .map(([currency, val]) => (
-                    <div key={currency} className="text-lg font-bold">{formatAmount(val, currency)}</div>
-                  ))}
-                {(!stats?.depositsByCurrency || Object.values(stats.depositsByCurrency).every(v => v === 0)) && (
-                  <div className="text-lg font-bold">0 XOF</div>
-                )}
-                <p className="text-xs text-muted-foreground">Argent entrant</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-            <CardTitle className="text-xs font-medium">Total Retraits</CardTitle>
-            <TrendingUp className="h-4 w-4 text-orange-600" />
-          </CardHeader>
-          <CardContent>
-            {statsLoading ? (
-              <Skeleton className="h-8 w-24" />
-            ) : (
-              <div className="space-y-1" data-testid="stat-business-withdrawals">
-                {stats?.withdrawalsByCurrency && Object.entries(stats.withdrawalsByCurrency)
-                  .filter(([, val]) => val > 0)
-                  .map(([currency, val]) => (
-                    <div key={currency} className="text-lg font-bold">{formatAmount(val, currency)}</div>
-                  ))}
-                {(!stats?.withdrawalsByCurrency || Object.values(stats.withdrawalsByCurrency).every(v => v === 0)) && (
-                  <div className="text-lg font-bold">0 XOF</div>
-                )}
-                <p className="text-xs text-muted-foreground">Argent sortant</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
