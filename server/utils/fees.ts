@@ -401,40 +401,23 @@ export function calculateOutgoingFeeFromNet(netAmount: number, feePercentageValu
 }
 
 export async function getOutgoingExchangeFee(
+  storage: any,
   userCurrency: string,
   destCurrency: string,
   amount: number,
   accountType: string
 ): Promise<{ feeAmount: number; feePercentage: number }> {
   if (!userCurrency || !destCurrency || userCurrency === destCurrency || accountType !== "personal") {
-    console.log(`[ExchangeFee] Skipped: userCurrency=${userCurrency}, destCurrency=${destCurrency}, accountType=${accountType}, same=${userCurrency === destCurrency}`);
     return { feeAmount: 0, feePercentage: 0 };
   }
   try {
-    const { db } = await import("../db");
-    const { currencyExchangeFees } = await import("@shared/schema");
-    const { eq, and, or } = await import("drizzle-orm");
-    // Try direct direction first, then reverse (admin may configure either direction)
-    const rows = await db.select().from(currencyExchangeFees).where(
-      and(
-        or(
-          and(eq(currencyExchangeFees.fromCurrency, userCurrency), eq(currencyExchangeFees.toCurrency, destCurrency)),
-          and(eq(currencyExchangeFees.fromCurrency, destCurrency), eq(currencyExchangeFees.toCurrency, userCurrency)),
-        ),
-        eq(currencyExchangeFees.isActive, 1),
-      )
-    );
-    // Prefer direct direction (userCurrency→destCurrency) if both exist
-    const directRow = rows.find(r => r.fromCurrency === userCurrency && r.toCurrency === destCurrency);
-    const row = directRow ?? rows[0];
-    console.log(`[ExchangeFee] DB query ${userCurrency}↔${destCurrency}: ${rows.length} rows found${row ? `, feePercentage=${row.feePercentage}, direction=${row.fromCurrency}→${row.toCurrency}` : ""}`);
-    if (row && row.feePercentage > 0) {
-      const feeAmount = Math.floor((Math.floor(amount) * row.feePercentage) / 1000);
-      console.log(`[ExchangeFee] Calculated: ${amount} * ${row.feePercentage} / 1000 = ${feeAmount}`);
-      return {
-        feeAmount,
-        feePercentage: row.feePercentage,
-      };
+    let efRow = await storage.getCurrencyExchangeFee(userCurrency, destCurrency);
+    if (!efRow || !efRow.isActive) {
+      efRow = await storage.getCurrencyExchangeFee(destCurrency, userCurrency);
+    }
+    if (efRow && efRow.isActive && efRow.feePercentage > 0) {
+      const feeAmount = Math.floor((Math.floor(amount) * efRow.feePercentage) / 1000);
+      return { feeAmount, feePercentage: efRow.feePercentage };
     }
   } catch (err) {
     console.error(`[ExchangeFee] ERROR querying ${userCurrency}↔${destCurrency}:`, err);

@@ -4534,7 +4534,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (opCurrPayout) payoutDestCurrency = opCurrPayout;
         } catch (_) {}
       }
-      const xFeeApiPayout = await getOutgoingExchangeFee(userCurrency, payoutDestCurrency, amountInUserCurrency, user.accountType || "personal");
+      const xFeeApiPayout = await getOutgoingExchangeFee(storage, userCurrency, payoutDestCurrency, amountInUserCurrency, user.accountType || "personal");
       const apiPayoutExchangeFee = xFeeApiPayout.feeAmount;
       if (apiPayoutExchangeFee > 0) {
         console.log(`[API Payout] Exchange fee ${userCurrency}→${payoutDestCurrency} (${xFeeApiPayout.feePercentage / 10}%) = ${apiPayoutExchangeFee} ${userCurrency}`);
@@ -8100,7 +8100,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (pawaOpCurrency) destCurrencyPre = pawaOpCurrency;
         } catch (_) {}
       }
-      const exchangeFeeResult = await getOutgoingExchangeFee(userCurrencyPre, destCurrencyPre, Math.floor(amount), user.accountType || "personal");
+      const exchangeFeeResult = await getOutgoingExchangeFee(storage, userCurrencyPre, destCurrencyPre, Math.floor(amount), user.accountType || "personal");
       const preExchangeFee = exchangeFeeResult.feeAmount;
       console.log(`[WITHDRAWAL] Exchange fee calc: ${userCurrencyPre}→${destCurrencyPre}, amount=${Math.floor(amount)}, accountType=${user.accountType}, fee=${preExchangeFee}, pct=${exchangeFeeResult.feePercentage}`);
 
@@ -9811,7 +9811,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (opCurrW) destCurrencyForTransfer = opCurrW;
         } catch (_) {}
       }
-      const xFeeWeb = await getOutgoingExchangeFee(userCurrencyForTransfer, destCurrencyForTransfer, Math.floor(amount), user.accountType || "personal");
+      const xFeeWeb = await getOutgoingExchangeFee(storage, userCurrencyForTransfer, destCurrencyForTransfer, Math.floor(amount), user.accountType || "personal");
       const outgoingExchangeFeeAmount = xFeeWeb.feeAmount;
       if (outgoingExchangeFeeAmount > 0) {
         console.log(`[Withdrawal] Outgoing exchange fee ${userCurrencyForTransfer}→${destCurrencyForTransfer} (${xFeeWeb.feePercentage / 10}%) = +${outgoingExchangeFeeAmount} ${userCurrencyForTransfer}`);
@@ -12771,7 +12771,7 @@ SUPPORT ET CONTACT:
                   if (opCurr) calcDestCurrency = opCurr;
                 } catch (_) {}
               }
-              const xFeeCalc = await getOutgoingExchangeFee(calcUserCurrency, calcDestCurrency, Math.floor(amount), calcUser?.accountType || "personal");
+              const xFeeCalc = await getOutgoingExchangeFee(storage, calcUserCurrency, calcDestCurrency, Math.floor(amount), calcUser?.accountType || "personal");
 
               if (type === "transfer") {
                 const totalDebited = Math.floor(amount) + feeInfo.feeAmount + xFeeCalc.feeAmount;
@@ -12964,7 +12964,7 @@ SUPPORT ET CONTACT:
                   if (opCurrT) destCurrencyT = opCurrT;
                 } catch (_) {}
               }
-              const xFeeT = await getOutgoingExchangeFee(userCurrencyT, destCurrencyT, Math.floor(amount), user.accountType || "personal");
+              const xFeeT = await getOutgoingExchangeFee(storage, userCurrencyT, destCurrencyT, Math.floor(amount), user.accountType || "personal");
               const requiredBalanceT = Math.floor(amount) + feeInfoT.feeAmount + xFeeT.feeAmount;
 
               if (user.balance < requiredBalanceT) {
