@@ -118,7 +118,7 @@ export interface IStorage {
   getAllTransactionsForAdmin(limit?: number): Promise<(Transaction & { user?: User })[]>;
   createTransaction(transaction: InsertTransaction): Promise<Transaction>;
   updateTransactionStatus(id: string, status: string, paydunyaData?: any): Promise<Transaction | undefined>;
-  updateTransaction(id: string, updates: Partial<Pick<Transaction, 'paydunyaToken' | 'country' | 'operator' | 'status' | 'metadata' | 'paydunyaReceiptUrl'>>): Promise<Transaction | undefined>;
+  updateTransaction(id: string, updates: Partial<Pick<Transaction, 'paydunyaToken' | 'country' | 'operator' | 'status' | 'metadata' | 'paydunyaReceiptUrl' | 'type' | 'description'>>): Promise<Transaction | undefined>;
   updateTransactionMetadata(id: string, metadata: string): Promise<Transaction | undefined>;
   atomicMarkRefundedAndCredit(transactionId: string, userId: string, refundAmount: number, source: string): Promise<boolean>;
   atomicFailAndRefundBusinessWallet(transactionId: string, userId: string, country: string, currency: string, refundAmount: number, source: string): Promise<boolean>;
@@ -1008,7 +1008,7 @@ export class DbStorage implements IStorage {
     return results[0];
   }
 
-  async updateTransaction(id: string, updates: Partial<Pick<Transaction, 'paydunyaToken' | 'country' | 'operator' | 'status' | 'metadata' | 'paydunyaReceiptUrl'>>): Promise<Transaction | undefined> {
+  async updateTransaction(id: string, updates: Partial<Pick<Transaction, 'paydunyaToken' | 'country' | 'operator' | 'status' | 'metadata' | 'paydunyaReceiptUrl' | 'type' | 'description'>>): Promise<Transaction | undefined> {
     const results = await db
       .update(schema.transactions)
       .set(updates)

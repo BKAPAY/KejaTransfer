@@ -16,7 +16,7 @@ import { OPERATORS, COUNTRIES } from "@shared/schema";
 import type { User } from "@shared/schema";
 import { ArrowUpFromLine, Info, CheckCircle2, Loader2, Settings, AlertCircle, Lock } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { calculateOutgoingFee, fetchFeeConfig, formatFeePercentage } from "@/lib/fees";
+import { calculateOutgoingFee, fetchFeeConfig, formatFeePercentage, fetchExchangeFee } from "@/lib/fees";
 import { useLocation } from "wouter";
 import { CurrencySelector, getCurrencyLabel } from "@/components/currency-selector";
 import { OperatorSelector } from "@/components/operator-selector";
@@ -44,6 +44,7 @@ export default function Withdrawal() {
   const [pendingData, setPendingData] = useState<WithdrawalFormData | null>(null);
   const [selectedCurrency, setSelectedCurrency] = useState<string>("XOF");
   const [feePercentage, setFeePercentage] = useState<number>(60);
+  const [outgoingExchangeFeePercentage, setOutgoingExchangeFeePercentage] = useState<number>(0);
   const [conversionData, setConversionData] = useState<{
     convertedAmount: number;
     targetCurrency: string;
@@ -169,6 +170,21 @@ export default function Withdrawal() {
       setConversionData(null);
     }
   }, [needsConversion, amount, userBalanceCurrency, withdrawalCurrency, fetchConversion, selectedCurrency]);
+
+  // Frais d'échange sortant pour comptes personnels inter-devises
+  useEffect(() => {
+    if (needsConversion && user?.accountType === "personal") {
+      fetchExchangeFee(userBalanceCurrency, withdrawalCurrency).then(result => {
+        setOutgoingExchangeFeePercentage(result.isActive ? result.feePercentage : 0);
+      });
+    } else {
+      setOutgoingExchangeFeePercentage(0);
+    }
+  }, [needsConversion, userBalanceCurrency, withdrawalCurrency, user?.accountType]);
+
+  const outgoingExchangeFeeAmount = (amount && outgoingExchangeFeePercentage > 0)
+    ? Math.floor(amount * outgoingExchangeFeePercentage / 1000)
+    : 0;
 
   const withdrawalMutation = useMutation({
     mutationFn: async (data: { formData: WithdrawalFormData; securityCode: string }) => {
@@ -504,7 +520,9 @@ export default function Withdrawal() {
                               </span>
                             </div>
                             <div className="flex justify-between">
-                              <span className="text-muted-foreground">Frais:</span>
+                              <span className="text-muted-foreground">
+                                Frais de transaction ({formatFeePercentage(feePercentage)}):
+                              </span>
                               <span className="font-medium text-orange-600 dark:text-orange-400" data-testid="text-fee-amount">
                                 -{new Intl.NumberFormat("fr-FR", {
                                   style: "currency",
@@ -513,20 +531,36 @@ export default function Withdrawal() {
                                 }).format(feeInfo.feeAmount)}
                               </span>
                             </div>
-                            <div className="flex justify-between font-semibold text-green-600 dark:text-green-400">
-                              <span>Montant recu ({userBalanceCurrency}):</span>
-                              <span data-testid="text-amount-received">
-                                {new Intl.NumberFormat("fr-FR", {
-                                  style: "currency",
-                                  currency: userBalanceCurrency,
-                                  minimumFractionDigits: 0,
-                                }).format(feeInfo.amountReceived)}
-                              </span>
-                            </div>
+                            {outgoingExchangeFeeAmount > 0 && (
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">
+                                  Frais d'echange ({formatFeePercentage(outgoingExchangeFeePercentage)}):
+                                </span>
+                                <span className="font-medium text-orange-600 dark:text-orange-400" data-testid="text-exchange-fee-amount">
+                                  -{new Intl.NumberFormat("fr-FR", {
+                                    style: "currency",
+                                    currency: userBalanceCurrency,
+                                    minimumFractionDigits: 0,
+                                  }).format(outgoingExchangeFeeAmount)}
+                                </span>
+                              </div>
+                            )}
+                            {!needsConversion && (
+                              <div className="flex justify-between font-semibold text-green-600 dark:text-green-400">
+                                <span>Montant recu ({userBalanceCurrency}):</span>
+                                <span data-testid="text-amount-received">
+                                  {new Intl.NumberFormat("fr-FR", {
+                                    style: "currency",
+                                    currency: userBalanceCurrency,
+                                    minimumFractionDigits: 0,
+                                  }).format(feeInfo.amountReceived)}
+                                </span>
+                              </div>
+                            )}
                             {needsConversion && conversionData && !conversionData.isLoading && conversionData.convertedAmount > 0 && (
                               <div className="bg-blue-50 dark:bg-blue-950/30 p-3 rounded-md">
                                 <div className="flex justify-between font-semibold text-blue-700 dark:text-blue-400">
-                                  <span>Equivalent en {conversionData.targetCurrency}:</span>
+                                  <span>Destinataire recoit ({conversionData.targetCurrency}):</span>
                                   <span data-testid="text-converted-amount">
                                     {new Intl.NumberFormat("fr-FR", {
                                       style: "currency",
@@ -547,14 +581,14 @@ export default function Withdrawal() {
                                 <span className="text-xs">Calcul de la conversion {userBalanceCurrency} → {withdrawalCurrency}...</span>
                               </div>
                             )}
-                            <div className="border-t pt-2 flex justify-between">
+                            <div className="border-t pt-2 flex justify-between font-semibold">
                               <span className="text-muted-foreground">Debite du solde:</span>
-                              <span className="font-medium text-foreground" data-testid="text-total-deducted">
+                              <span className="text-foreground" data-testid="text-total-deducted">
                                 {new Intl.NumberFormat("fr-FR", {
                                   style: "currency",
                                   currency: userBalanceCurrency,
                                   minimumFractionDigits: 0,
-                                }).format(feeInfo.totalDeductedFromBalance)}
+                                }).format(amount + feeInfo.feeAmount + outgoingExchangeFeeAmount)}
                               </span>
                             </div>
                           </div>

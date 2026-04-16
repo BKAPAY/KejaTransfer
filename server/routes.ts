@@ -7967,13 +7967,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Calculate fees with dynamic percentage
       const feeInfo = calculateOutgoingFee(Math.floor(amount), feeConfig.outgoing);
 
-      // Calculer le montant à débiter selon le type (transfert vs retrait)
-      // TRANSFERT: débiter montant + frais | RETRAIT: débiter montant uniquement
       const isTransfer = type === "transfer";
-      const baseRequired = isTransfer 
-        ? (Math.floor(amount) + feeInfo.feeAmount) 
-        : feeInfo.totalDeductedFromBalance;
 
+      // Calculer les frais d'échange AVANT baseRequired pour déterminer le modèle de frais
       const userCurrencyPre = user.country ? getCurrencyForCountry(user.country) : "XOF";
       let destCurrencyPre = reqTargetCurrency || getCurrencyForCountry(country?.toUpperCase() || "");
       if (!reqTargetCurrency && activeProvider === "pawapay") {
@@ -7986,6 +7982,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const exchangeFeeResult = await getOutgoingExchangeFee(userCurrencyPre, destCurrencyPre, Math.floor(amount), user.accountType || "personal");
       const preExchangeFee = exchangeFeeResult.feeAmount;
       console.log(`[WITHDRAWAL] Exchange fee calc: ${userCurrencyPre}→${destCurrencyPre}, amount=${Math.floor(amount)}, accountType=${user.accountType}, fee=${preExchangeFee}, pct=${exchangeFeeResult.feePercentage}`);
+
+      // Modèle "frais par-dessus" (cumulatif) pour :
+      //   - Tous les TRANSFERTS (type="transfer")
+      //   - Les RETRAITS inter-devises (preExchangeFee > 0) : les deux frais s'additionnent
+      // Modèle classique pour les RETRAITS en même devise : frais déduits du montant reçu
+      const useFeeOnTopModel = isTransfer || preExchangeFee > 0;
+      const baseRequired = useFeeOnTopModel
+        ? (Math.floor(amount) + feeInfo.feeAmount)
+        : feeInfo.totalDeductedFromBalance;
+
       const requiredBalance = baseRequired + preExchangeFee;
 
       // Check balance avec le bon montant selon le type
@@ -8004,7 +8010,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (activeProvider === "fedapay") {
         // Use FedaPay - pass user's currency for conversion
-        const result = isTransfer 
+        const result = useFeeOnTopModel
           ? await handleFedaPayTransfer(req.session.userId!, user, amount, country, operator, phone, userCurrency)
           : await handleFedaPayWithdrawal(req.session.userId!, user, amount, country, operator, phone, userCurrency);
 
@@ -8027,6 +8033,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 }
               } catch (_) { /* best effort */ }
             }
+          }
+          // Si retrait inter-devises traité avec le handler Transfer, recorriger le type en DB
+          if (!isTransfer && result.transactionId) {
+            try {
+              await storage.updateTransaction(result.transactionId, {
+                type: "withdrawal",
+                description: `Retrait de ${Math.floor(amount)} ${userCurrency}`,
+              });
+            } catch (_) { /* best effort */ }
           }
           return res.json({
             success: true,
@@ -8094,8 +8109,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // RETRAIT: L'utilisateur écrit 1000 → débité 1000 → fournisseur reçoit 940 → utilisateur reçoit 940
         const payduynaCountryCurrencies6021: Record<string, string> = { "CM": "XAF" };
         const providerCurrency = payduynaCountryCurrencies6021[country.toUpperCase()] || "XOF";
-        const amountInUserCurrency = isTransfer ? Math.floor(amount) : feeInfo.amountReceived;
-        const baseAmountToDebit = isTransfer ? (Math.floor(amount) + feeInfo.feeAmount) : feeInfo.totalDeductedFromBalance;
+        const amountInUserCurrency = useFeeOnTopModel ? Math.floor(amount) : feeInfo.amountReceived;
+        const baseAmountToDebit = useFeeOnTopModel ? (Math.floor(amount) + feeInfo.feeAmount) : feeInfo.totalDeductedFromBalance;
 
         // Apply outgoing exchange fee for personal accounts when currencies differ
         let outgoingExchangeFeeForFedapay = 0;
@@ -8213,7 +8228,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Use MbiyoPay for withdrawals/transfers - pass user's balance currency and target currency
         console.log(`[WITHDRAWAL] Using MbiyoPay for ${country}/${operator}, userCurrency=${userCurrency}, targetCurrency=${targetCurrency}`);
         
-        const result = isTransfer 
+        const result = useFeeOnTopModel
           ? await handleMbiyoPayTransfer(req.session.userId!, user, amount, country, operator, phone, userCurrency, targetCurrency)
           : await handleMbiyoPayWithdrawal(req.session.userId!, user, amount, country, operator, phone, userCurrency, targetCurrency);
 
@@ -8237,6 +8252,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
               } catch (_) { /* best effort */ }
             }
           }
+          if (!isTransfer && result.transactionId) {
+            try {
+              await storage.updateTransaction(result.transactionId, {
+                type: "withdrawal",
+                description: `Retrait de ${Math.floor(amount)} ${userCurrency}`,
+              });
+            } catch (_) { /* best effort */ }
+          }
           return res.json({
             success: true,
             transactionId: result.transactionId,
@@ -8250,7 +8273,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Use AfribaPay for withdrawals/transfers
         console.log(`[WITHDRAWAL] Using AfribaPay for ${country}/${operator}, userCurrency=${userCurrency}`);
         
-        const result = isTransfer 
+        const result = useFeeOnTopModel
           ? await handleAfribaPayTransfer(req.session.userId!, user, amount, country, operator, phone, userCurrency)
           : await handleAfribaPayWithdrawal(req.session.userId!, user, amount, country, operator, phone, userCurrency);
 
@@ -8274,6 +8297,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
               } catch (_) { /* best effort */ }
             }
           }
+          if (!isTransfer && result.transactionId) {
+            try {
+              await storage.updateTransaction(result.transactionId, {
+                type: "withdrawal",
+                description: `Retrait de ${Math.floor(amount)} ${userCurrency}`,
+              });
+            } catch (_) { /* best effort */ }
+          }
           return res.json({
             success: true,
             transactionId: result.transactionId,
@@ -8286,7 +8317,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else if (activeProvider === "moneyfusion") {
         console.log(`[WITHDRAWAL] Using MoneyFusion for ${country}/${operator}, userCurrency=${userCurrency}`);
         
-        const result = isTransfer 
+        const result = useFeeOnTopModel
           ? await handleMoneyFusionTransfer(req.session.userId!, user, amount, country, operator, phone, userCurrency)
           : await handleMoneyFusionWithdrawal(req.session.userId!, user, amount, country, operator, phone, userCurrency);
 
@@ -8310,6 +8341,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
               } catch (_) { /* best effort */ }
             }
           }
+          if (!isTransfer && result.transactionId) {
+            try {
+              await storage.updateTransaction(result.transactionId, {
+                type: "withdrawal",
+                description: `Retrait de ${Math.floor(amount)} ${userCurrency}`,
+              });
+            } catch (_) { /* best effort */ }
+          }
           return res.json({
             success: true,
             transactionId: result.transactionId,
@@ -8321,7 +8360,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else if (activeProvider === "pawapay") {
         console.log(`[WITHDRAWAL] Using PawaPay for ${country}/${operator}, userCurrency=${userCurrency}`);
 
-        const result = isTransfer
+        const result = useFeeOnTopModel
           ? await handlePawaPayTransfer(req.session.userId!, user, amount, country, operator, phone, userCurrency, targetCurrency)
           : await handlePawaPayWithdrawal(req.session.userId!, user, amount, country, operator, phone, userCurrency, targetCurrency);
 
@@ -8347,6 +8386,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
               } catch (_) { /* best effort */ }
             }
           }
+          if (!isTransfer && result.transactionId) {
+            try {
+              await storage.updateTransaction(result.transactionId, {
+                type: "withdrawal",
+                description: `Retrait de ${Math.floor(amount)} ${userCurrency}`,
+              });
+            } catch (_) { /* best effort */ }
+          }
           return res.json({
             success: true,
             transactionId: result.transactionId,
@@ -8359,7 +8406,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else if (activeProvider === "feexpay") {
         console.log(`[WITHDRAWAL] Using FeeXPay for ${country}/${operator}, userCurrency=${userCurrency}`);
 
-        const result = isTransfer
+        const result = useFeeOnTopModel
           ? await handleFeeXPayTransfer(req.session.userId!, user, amount, country, operator, phone, userCurrency)
           : await handleFeeXPayWithdrawal(req.session.userId!, user, amount, country, operator, phone, userCurrency);
 
@@ -8382,6 +8429,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 }
               } catch (_) { /* best effort */ }
             }
+          }
+          if (!isTransfer && result.transactionId) {
+            try {
+              await storage.updateTransaction(result.transactionId, {
+                type: "withdrawal",
+                description: `Retrait de ${Math.floor(amount)} ${userCurrency}`,
+              });
+            } catch (_) { /* best effort */ }
           }
           return res.json({
             success: true,
@@ -9657,7 +9712,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`[Withdrawal] Outgoing exchange fee ${userCurrencyForTransfer}→${destCurrencyForTransfer} (${xFeeWeb.feePercentage / 10}%) = +${outgoingExchangeFeeAmount} ${userCurrencyForTransfer}`);
       }
 
-      const totalToDeduct = feeInfo.totalDeductedFromBalance + outgoingExchangeFeeAmount;
+      // Frais cumulatifs : fraisTransaction + fraisEchange (tous deux sur le solde de l'expéditeur)
+      // Le fournisseur reçoit le montant complet (Math.floor(amount)), le destinataire reçoit le montant complet
+      const totalToDeduct = feeInfo.totalDeductedFromBalance + feeInfo.feeAmount + outgoingExchangeFeeAmount;
 
       if (user.balance < totalToDeduct) {
         return res.status(400).json({ 
