@@ -419,10 +419,7 @@ export default function Home() {
                     Pour les personnels
                   </span>
                 </div>
-                <h3 className="text-base sm:text-xl lg:text-2xl font-bold text-foreground mb-1 sm:mb-2">Compte Personnel</h3>
-                <p className="text-xs sm:text-sm text-muted-foreground mb-5 sm:mb-7 leading-relaxed">
-                  Pour les particuliers qui souhaitent recevoir de l'argent facilement via mobile money, effectuer des retraits et des transferts entre proches.
-                </p>
+                <h3 className="text-base sm:text-xl lg:text-2xl font-bold text-foreground mb-5 sm:mb-7">Compte Personnel</h3>
 
                 <div className="space-y-2.5 sm:space-y-3 flex-1 mb-6 sm:mb-8">
                   {[
@@ -479,10 +476,7 @@ export default function Home() {
                     Pour les entreprises
                   </span>
                 </div>
-                <h3 className="text-base sm:text-xl lg:text-2xl font-bold text-foreground mb-1 sm:mb-2">Compte Entreprise</h3>
-                <p className="text-xs sm:text-sm text-muted-foreground mb-5 sm:mb-7 leading-relaxed">
-                  Pour les entreprises et développeurs qui veulent intégrer des paiements mobile money dans leurs systèmes via API directe, sans interface manuelle.
-                </p>
+                <h3 className="text-base sm:text-xl lg:text-2xl font-bold text-foreground mb-5 sm:mb-7">Compte Entreprise</h3>
 
                 <div className="space-y-2.5 sm:space-y-3 flex-1 mb-6 sm:mb-8">
                   {[
