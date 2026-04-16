@@ -603,25 +603,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="py-8 sm:py-12 md:py-16 lg:py-20 bg-gradient-to-br from-primary to-primary/80">
-        <div className="container mx-auto px-2 sm:px-4 md:px-8 max-w-4xl text-center">
-          <h2 className="animate-on-scroll anim-fade-up text-lg sm:text-2xl md:text-3xl lg:text-4xl font-bold mb-3 sm:mb-6 text-primary-foreground">
-            Prêt à commencer ?
-          </h2>
-          <p className="animate-on-scroll anim-fade-up anim-delay-1 text-xs sm:text-sm md:text-base lg:text-lg text-primary-foreground/90 mb-4 sm:mb-8">
-            Rejoignez des milliers d'entreprises qui font confiance à BKApay
-          </p>
-          <div className="animate-on-scroll anim-fade-up anim-delay-2">
-            <Link href="/signup">
-              <Button variant="secondary" className="text-xs sm:text-sm md:text-base" data-testid="button-cta-signup">
-                Créer un compte
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </section>
-
       {/* Footer */}
       <footer className="bg-card border-t py-6 sm:py-8 md:py-10 lg:py-12">
         <div className="container mx-auto px-2 sm:px-4 md:px-8 max-w-7xl">
