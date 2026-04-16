@@ -69,9 +69,9 @@ export async function handleAfribaPayDeposit(
     const feeConfig = await getFeeFromDatabase(storage, "afribapay", country, operator);
     const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming);
 
-    // Exchange fee when payer's currency differs from user's balance currency
+    // Exchange fee when payer's currency differs from user's balance currency (personal accounts only)
     const { feeAmount: incomingExchangeFee, feePercentage: exchangeFeePercentage } =
-      await getIncomingExchangeFee(storage, balanceAmount, providerCurrency, userCurrency);
+      await getIncomingExchangeFee(storage, balanceAmount, providerCurrency, userCurrency, user.accountType);
     const netAmountForUser = Math.max(0, feeInfo.netAmount - incomingExchangeFee);
     const totalFeeAmount = feeInfo.feeAmount + incomingExchangeFee;
     const totalFeePercentage = feeInfo.feePercentage + exchangeFeePercentage;
@@ -398,10 +398,10 @@ export async function handleAfribaPayPaymentLink(
     const feeConfig = await getFeeFromDatabase(storage, "afribapay", country, operator);
     const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming);
 
-    // Calculate exchange fee if payer currency differs from merchant currency
+    // Calculate exchange fee if payer currency differs from merchant currency (personal accounts only)
     let incomingExchangeFee = 0;
     let incomingExchangeFeePercentage = 0;
-    if (providerCurrency !== ownerCurrency) {
+    if (providerCurrency !== ownerCurrency && owner?.accountType === "personal") {
       try {
         let efRow = await storage.getCurrencyExchangeFee(providerCurrency, ownerCurrency);
         if (!efRow || !efRow.isActive) {
@@ -648,9 +648,9 @@ export async function handleAfribaPayApiPayment(
     const feeConfig = await getFeeFromDatabase(storage, "afribapay", country, operator);
     const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming);
 
-    // Exchange fee when payer's currency differs from API owner's balance currency
+    // Exchange fee when payer's currency differs from merchant's balance currency (personal accounts only)
     const { feeAmount: incomingExchangeFee, feePercentage: exchangeFeePercentage } =
-      await getIncomingExchangeFee(storage, balanceAmount, providerCurrency, ownerCurrency);
+      await getIncomingExchangeFee(storage, balanceAmount, providerCurrency, ownerCurrency, owner?.accountType);
     const netAmountForUser = Math.max(0, feeInfo.netAmount - incomingExchangeFee);
     const totalFeeAmount = feeInfo.feeAmount + incomingExchangeFee;
     const totalFeePercentage = feeInfo.feePercentage + exchangeFeePercentage;

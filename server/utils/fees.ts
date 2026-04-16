@@ -340,9 +340,13 @@ export async function getIncomingExchangeFee(
   storage: any,
   balanceAmount: number,
   payerCurrency: string,
-  merchantCurrency: string
+  merchantCurrency: string,
+  ownerAccountType?: string
 ): Promise<{ feeAmount: number; feePercentage: number }> {
   if (!payerCurrency || !merchantCurrency || payerCurrency === merchantCurrency) {
+    return { feeAmount: 0, feePercentage: 0 };
+  }
+  if (ownerAccountType !== undefined && ownerAccountType !== "personal") {
     return { feeAmount: 0, feePercentage: 0 };
   }
   try {

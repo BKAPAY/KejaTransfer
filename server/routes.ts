@@ -5215,10 +5215,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         netAmountForUser = feeInfo.netAmount;
       }
 
-      // Exchange fee when payer's currency differs from merchant's balance currency
+      // Exchange fee when payer's currency differs from merchant's balance currency (personal accounts only)
       if (providerCurrency !== ownerCurrency) {
         const { feeAmount: xFee, feePercentage: xFeePct } =
-          await getIncomingExchangeFee(storage, paymentLink.amount, providerCurrency, ownerCurrency);
+          await getIncomingExchangeFee(storage, paymentLink.amount, providerCurrency, ownerCurrency, owner?.accountType);
         if (xFee > 0) {
           netAmountForUser = Math.max(0, netAmountForUser - xFee);
           feeAmount += xFee;
@@ -5414,9 +5414,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const feeConfig = await getDynamicFees(storage, country, operator);
         const feeInfo = calculateIncomingFee(baseAmountInOwnerCurrency, feeConfig.incoming);
 
-        // Exchange fee when payer's currency differs from merchant's balance currency
+        // Exchange fee when payer's currency differs from merchant's balance currency (personal accounts only)
         const { feeAmount: mlXFee, feePercentage: mlXFeePct } =
-          await getIncomingExchangeFee(storage, baseAmountInOwnerCurrency, providerCurrency, ownerCurrency);
+          await getIncomingExchangeFee(storage, baseAmountInOwnerCurrency, providerCurrency, ownerCurrency, owner?.accountType);
         const mlNetAmountForUser = Math.max(0, feeInfo.netAmount - mlXFee);
         const mlTotalFee = feeInfo.feeAmount + mlXFee;
         const mlTotalFeePct = feeInfo.feePercentage + mlXFeePct;
@@ -7720,9 +7720,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const depositPaydunyaFeeConfig = await getDynamicFees(storage, country, operator);
           const feeInfo = calculateIncomingFee(depositBalanceAmt, depositPaydunyaFeeConfig.incoming);
 
-          // Frais d'échange si devise fournisseur ≠ devise utilisateur
+          // Frais d'échange si devise fournisseur ≠ devise utilisateur (comptes personnels uniquement)
           const { feeAmount: depXFee, feePercentage: depXFeePct } =
-            await getIncomingExchangeFee(storage, depositBalanceAmt, depositProviderCurrency, userCurrency);
+            await getIncomingExchangeFee(storage, depositBalanceAmt, depositProviderCurrency, userCurrency, user?.accountType);
           const depNetAmountForUser = Math.max(0, feeInfo.netAmount - depXFee);
           const depTotalFee = feeInfo.feeAmount + depXFee;
           const depTotalFeePct = feeInfo.feePercentage + depXFeePct;
@@ -8626,7 +8626,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           operator,
           amountInPayerCurrency, // converted amount for provider
           payerCurrency, // provider's currency
-          customFieldResponses || undefined
+          customFieldResponses || undefined,
+          owner?.accountType
         );
 
         if (result.success) {
@@ -8665,10 +8666,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           netAmountForUser = feeInfo.netAmount; // User receives base - fee in their currency
         }
 
-        // Exchange fee when payer's currency differs from merchant's balance currency
+        // Exchange fee when payer's currency differs from merchant's balance currency (personal accounts only)
         if (conversionApplied) {
           const { feeAmount: xFee, feePercentage: xFeePct } =
-            await getIncomingExchangeFee(storage, paymentLink.amount, payerCurrency, ownerCurrency);
+            await getIncomingExchangeFee(storage, paymentLink.amount, payerCurrency, ownerCurrency, owner?.accountType);
           if (xFee > 0) {
             netAmountForUser = Math.max(0, netAmountForUser - xFee);
             feeAmount += xFee;
@@ -8841,7 +8842,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           amountInPayerCurrency,
           payerCurrency,
           ownerCurrency,
-          otpCode
+          otpCode,
+          owner?.accountType
         );
 
         if (result.success) {
@@ -9045,7 +9047,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           country,
           operator,
           originalAmount || amount, // original amount for balance credit
-          originalCurrency || ownerCurrency // owner's currency
+          originalCurrency || ownerCurrency, // owner's currency
+          owner?.accountType
         );
 
         if (result.success) {
@@ -9111,9 +9114,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const merchantPaydunyaFeeConfig = await getDynamicFees(storage, country, operator);
           const feeInfo = calculateIncomingFee(baseAmountInOwnerCurrency, merchantPaydunyaFeeConfig.incoming);
 
-          // Exchange fee when payer's currency differs from merchant's balance currency
+          // Exchange fee when payer's currency differs from merchant's balance currency (personal accounts only)
           const { feeAmount: mlXFee2, feePercentage: mlXFeePct2 } =
-            await getIncomingExchangeFee(storage, baseAmountInOwnerCurrency, providerCurrency, ownerCurrency);
+            await getIncomingExchangeFee(storage, baseAmountInOwnerCurrency, providerCurrency, ownerCurrency, owner?.accountType);
           const mlNet2 = Math.max(0, feeInfo.netAmount - mlXFee2);
           const mlFee2 = feeInfo.feeAmount + mlXFee2;
           const mlFeePct2 = feeInfo.feePercentage + mlXFeePct2;
@@ -9224,7 +9227,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           originalAmount || amount,
           originalCurrency || ownerCurrency,
           payerCurrency,
-          otpCode
+          otpCode,
+          owner?.accountType
         );
 
         if (result.success) {

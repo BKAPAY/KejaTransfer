@@ -89,10 +89,10 @@ export async function handlePawaPayDeposit(
     const customerPaysFee = options?.customerPaysFee ?? false;
     const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming);
 
-    // Calculate exchange fee if payer currency differs from merchant currency
+    // Calculate exchange fee if payer currency differs from merchant currency (personal accounts only)
     let incomingExchangeFee = 0;
     let incomingExchangeFeePercentage = 0;
-    if (providerCurrency !== userCurrency) {
+    if (providerCurrency !== userCurrency && user.accountType === "personal") {
       try {
         let efRow = await storage.getCurrencyExchangeFee(providerCurrency, userCurrency);
         if (!efRow || !efRow.isActive) {

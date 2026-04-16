@@ -47,9 +47,9 @@ export async function handleMbiyoPayDeposit(
     const feeConfig = await getFeeFromDatabase(storage, "mbiyopay", country, operator);
     const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming);
 
-    // Exchange fee when payer's currency differs from user's balance currency
+    // Exchange fee when payer's currency differs from user's balance currency (personal accounts only)
     const { feeAmount: incomingExchangeFee, feePercentage: exchangeFeePercentage } =
-      await getIncomingExchangeFee(storage, balanceAmount, providerCurrency, userCurrency);
+      await getIncomingExchangeFee(storage, balanceAmount, providerCurrency, userCurrency, user.accountType);
     const netAmountForUser = Math.max(0, feeInfo.netAmount - incomingExchangeFee);
     const totalFeeAmount = feeInfo.feeAmount + incomingExchangeFee;
     const totalFeePercentage = feeInfo.feePercentage + exchangeFeePercentage;
@@ -528,7 +528,8 @@ export async function handleMbiyoPayPaymentLink(
   convertedAmount?: number,
   convertedCurrency?: string,
   ownerCurrency?: string,
-  otpCode?: string
+  otpCode?: string,
+  ownerAccountType?: string
 ): Promise<{ success: boolean; transactionId?: string; mbiyopayTransactionId?: string; redirectUrl?: string; message?: string; error?: string; instructions?: string }> {
   try {
     // Use payer's country for the payment provider
@@ -557,10 +558,10 @@ export async function handleMbiyoPayPaymentLink(
       providerAmount = Math.ceil(providerAmount * (1 + feePercentage / 100));
     }
 
-    // Calculate exchange fee if payer currency differs from merchant currency
+    // Calculate exchange fee if payer currency differs from merchant currency (personal accounts only)
     let incomingExchangeFee = 0;
     let incomingExchangeFeePercentage = 0;
-    if (providerCurrency !== balanceCurrency) {
+    if (providerCurrency !== balanceCurrency && ownerAccountType === "personal") {
       try {
         let efRow = await storage.getCurrencyExchangeFee(providerCurrency, balanceCurrency);
         if (!efRow || !efRow.isActive) {
@@ -680,7 +681,8 @@ export async function handleMbiyoPayMerchantLink(
   originalAmount?: number,
   originalCurrency?: string,
   payerCurrency?: string,
-  otpCode?: string
+  otpCode?: string,
+  ownerAccountType?: string
 ): Promise<{ success: boolean; transactionId?: string; mbiyopayTransactionId?: string; redirectUrl?: string; message?: string; error?: string; instructions?: string }> {
   try {
     // Use payer's country for the payment provider
@@ -704,9 +706,9 @@ export async function handleMbiyoPayMerchantLink(
     const feeConfig = await getFeeFromDatabase(storage, "mbiyopay", country, operator);
     const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming);
 
-    // Exchange fee when payer's currency differs from merchant's balance currency
+    // Exchange fee when payer's currency differs from merchant's balance currency (personal accounts only)
     const { feeAmount: incomingExchangeFee, feePercentage: exchangeFeePercentage } =
-      await getIncomingExchangeFee(storage, balanceAmount, providerCurrency, balanceCurrency);
+      await getIncomingExchangeFee(storage, balanceAmount, providerCurrency, balanceCurrency, ownerAccountType);
     const netAmountForUser = Math.max(0, feeInfo.netAmount - incomingExchangeFee);
     const totalFeeAmount = feeInfo.feeAmount + incomingExchangeFee;
     const totalFeePercentage = feeInfo.feePercentage + exchangeFeePercentage;

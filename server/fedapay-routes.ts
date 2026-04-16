@@ -46,9 +46,9 @@ export async function handleFedaPayDeposit(
     const feeConfig = await getFeeFromDatabase(storage, "fedapay", country, operator);
     const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming);
 
-    // Frais d'échange si devise fournisseur ≠ devise utilisateur
+    // Frais d'échange si devise fournisseur ≠ devise utilisateur (comptes personnels uniquement)
     const { feeAmount: incomingExchangeFee, feePercentage: exchangeFeePercentage } =
-      await getIncomingExchangeFee(storage, balanceAmount, providerCurrency, userCurrency);
+      await getIncomingExchangeFee(storage, balanceAmount, providerCurrency, userCurrency, user.accountType);
     const netAmountForUser = Math.max(0, feeInfo.netAmount - incomingExchangeFee);
     const totalFeeAmount = feeInfo.feeAmount + incomingExchangeFee;
     const totalFeePercentage = feeInfo.feePercentage + exchangeFeePercentage;
@@ -343,7 +343,8 @@ export async function handlePaymentLinkPayment(
   operator: string,
   convertedAmount?: number,
   convertedCurrency?: string,
-  customFieldResponses?: Record<string, string>
+  customFieldResponses?: Record<string, string>,
+  ownerAccountType?: string
 ): Promise<{ success: boolean; transactionId?: string; message?: string; error?: string }> {
   try {
     if (!FEDAPAY_SUPPORTED_COUNTRIES_COLLECT.includes(country.toLowerCase())) {
@@ -407,9 +408,9 @@ export async function handlePaymentLinkPayment(
     // Store transaction with user's base currency for balance credit
     const ownerCurrency = (paymentLink as any)?.ownerCurrency || "XOF";
 
-    // Exchange fee when payer's currency differs from merchant's balance currency
+    // Exchange fee when payer's currency differs from merchant's balance currency (personal accounts only)
     const { feeAmount: plXFee, feePercentage: plXFeePct } =
-      await getIncomingExchangeFee(storage, baseAmount, providerCurrency, ownerCurrency);
+      await getIncomingExchangeFee(storage, baseAmount, providerCurrency, ownerCurrency, ownerAccountType);
     const plNetAmount = Math.max(0, feeInfo.netAmount - plXFee);
     const plTotalFee = feeInfo.feeAmount + plXFee;
     const plTotalFeePct = feeInfo.feePercentage + plXFeePct;
@@ -463,7 +464,8 @@ export async function handleMerchantLinkPayment(
   country: string,
   operator: string,
   originalAmount?: number,
-  originalCurrency?: string
+  originalCurrency?: string,
+  ownerAccountType?: string
 ): Promise<{ success: boolean; transactionId?: string; message?: string; error?: string }> {
   try {
     if (!FEDAPAY_SUPPORTED_COUNTRIES_COLLECT.includes(country.toLowerCase())) {
@@ -504,10 +506,10 @@ export async function handleMerchantLinkPayment(
       return { success: false, error: result.error || "Erreur lors du paiement" };
     }
 
-    // Exchange fee when payer's currency differs from merchant's balance currency
+    // Exchange fee when payer's currency differs from merchant's balance currency (personal accounts only)
     const providerCurrencyML = "XOF"; // FedaPay operates in XOF
     const { feeAmount: mlXFeeF, feePercentage: mlXFeePctF } =
-      await getIncomingExchangeFee(storage, balanceAmount, providerCurrencyML, ownerCurrency);
+      await getIncomingExchangeFee(storage, balanceAmount, providerCurrencyML, ownerCurrency, ownerAccountType);
     const mlNetF = Math.max(0, feeInfo.netAmount - mlXFeeF);
     const mlFeeF = feeInfo.feeAmount + mlXFeeF;
     const mlFeePctF = feeInfo.feePercentage + mlXFeePctF;
