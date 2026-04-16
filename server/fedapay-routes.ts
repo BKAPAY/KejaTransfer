@@ -46,6 +46,13 @@ export async function handleFedaPayDeposit(
     const feeConfig = await getFeeFromDatabase(storage, "fedapay", country, operator);
     const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming);
 
+    // Frais d'échange si devise fournisseur ≠ devise utilisateur
+    const { feeAmount: incomingExchangeFee, feePercentage: exchangeFeePercentage } =
+      await getIncomingExchangeFee(storage, balanceAmount, providerCurrency, userCurrency);
+    const netAmountForUser = Math.max(0, feeInfo.netAmount - incomingExchangeFee);
+    const totalFeeAmount = feeInfo.feeAmount + incomingExchangeFee;
+    const totalFeePercentage = feeInfo.feePercentage + exchangeFeePercentage;
+
     const nameParts = (user.firstName + " " + user.lastName).split(" ");
     const firstName = nameParts[0] || "Client";
     const lastName = nameParts.slice(1).join(" ") || "BKApay";
@@ -71,8 +78,8 @@ export async function handleFedaPayDeposit(
       userId: userId,
       type: "deposit",
       amount: feeInfo.grossAmount,
-      fee: feeInfo.feeAmount,
-      feePercentage: feeInfo.feePercentage,
+      fee: totalFeeAmount,
+      feePercentage: totalFeePercentage,
       currency: userCurrency,
       status: "pending",
       country: country.toUpperCase(),
@@ -85,9 +92,10 @@ export async function handleFedaPayDeposit(
         phone,
         providerAmount,
         providerCurrency,
-        netAmountForUser: feeInfo.netAmount,
-        balanceAmount: feeInfo.netAmount,
+        netAmountForUser,
+        balanceAmount: netAmountForUser,
         balanceCurrency: userCurrency,
+        ...(incomingExchangeFee > 0 ? { exchangeFee: incomingExchangeFee, exchangeFeePercentage } : {}),
       }),
     });
 

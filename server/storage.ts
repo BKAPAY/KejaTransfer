@@ -1132,8 +1132,16 @@ export class DbStorage implements IStorage {
             .from(schema.currencyExchangeFees)
             .where(
               and(
-                eq(schema.currencyExchangeFees.fromCurrency, paymentCurrency),
-                eq(schema.currencyExchangeFees.toCurrency, userCurrency),
+                or(
+                  and(
+                    eq(schema.currencyExchangeFees.fromCurrency, paymentCurrency),
+                    eq(schema.currencyExchangeFees.toCurrency, userCurrency),
+                  ),
+                  and(
+                    eq(schema.currencyExchangeFees.fromCurrency, userCurrency),
+                    eq(schema.currencyExchangeFees.toCurrency, paymentCurrency),
+                  )
+                ),
                 eq(schema.currencyExchangeFees.isActive, 1)
               )
             )

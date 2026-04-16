@@ -7715,27 +7715,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const paydunyaResponse = await callPaydunyaAPI("/checkout-invoice/create", paydunyaData);
 
         if (paydunyaResponse.response_code === "00" && paydunyaResponse.token) {
-          const grossAmount = Math.floor(amount);
+          // Calculer les frais sur le montant en devise utilisateur (balanceAmount)
+          const depositBalanceAmt = balanceAmount || Math.floor(amount);
           const depositPaydunyaFeeConfig = await getDynamicFees(storage, country, operator);
-          const feeInfo = calculateIncomingFee(grossAmount, depositPaydunyaFeeConfig.incoming);
-          
+          const feeInfo = calculateIncomingFee(depositBalanceAmt, depositPaydunyaFeeConfig.incoming);
+
+          // Frais d'échange si devise fournisseur ≠ devise utilisateur
+          const { feeAmount: depXFee, feePercentage: depXFeePct } =
+            await getIncomingExchangeFee(storage, depositBalanceAmt, depositProviderCurrency, userCurrency);
+          const depNetAmountForUser = Math.max(0, feeInfo.netAmount - depXFee);
+          const depTotalFee = feeInfo.feeAmount + depXFee;
+          const depTotalFeePct = feeInfo.feePercentage + depXFeePct;
+
           const transactionId = randomUUID();
           await storage.createTransaction({
             userId: req.session.userId!,
             type: "deposit",
             amount: feeInfo.grossAmount,
-            fee: feeInfo.feeAmount,
-            feePercentage: feeInfo.feePercentage,
-            currency: depositProviderCurrency,
+            fee: depTotalFee,
+            feePercentage: depTotalFeePct,
+            currency: userCurrency,
             status: "pending",
             country,
             operator,
-            description: `Depot de ${grossAmount} ${depositProviderCurrency}`,
+            description: `Depot de ${Math.floor(amount)} ${depositProviderCurrency}`,
             paydunyaToken: paydunyaResponse.token,
             metadata: JSON.stringify({
               phone,
               customerName: effectiveCustomerName,
               provider: "paydunya",
+              providerCurrency: depositProviderCurrency,
+              providerAmount: Math.floor(amount),
+              netAmountForUser: depNetAmountForUser,
+              balanceAmount: depNetAmountForUser,
+              balanceCurrency: userCurrency,
+              ...(depXFee > 0 ? { exchangeFee: depXFee, exchangeFeePercentage: depXFeePct } : {}),
             }),
           });
 
