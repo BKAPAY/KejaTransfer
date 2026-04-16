@@ -41,6 +41,7 @@ const AdminBusinessProviders = lazy(() => import("@/pages/dashboard/admin-busine
 const AdminBusinessCountryOperator = lazy(() => import("@/pages/dashboard/admin-business-country-operator"));
 const AdminBusinessFees = lazy(() => import("@/pages/dashboard/admin-business-fees"));
 const AdminBusinessHistory = lazy(() => import("@/pages/dashboard/admin-business-history"));
+const AdminBusinessWallets = lazy(() => import("@/pages/dashboard/admin-business-wallets"));
 const ManagementWrapper = lazy(() => import("@/pages/dashboard/management-wrapper"));
 const AdminAccessCode = lazy(() => import("@/pages/dashboard/admin-access-code"));
 const KycVerification = lazy(() => import("@/pages/dashboard/kyc-verification"));
@@ -298,6 +299,7 @@ function Router() {
           <Route path="/dashboard/admin/business/users/:userId/history" component={AdminUserHistory} />
           <Route path="/dashboard/admin/business/users/:userId/transactions" component={AdminUserHistory} />
           <Route path="/dashboard/admin/business/users/:userId/api" component={AdminUserApi} />
+          <Route path="/dashboard/admin/business/users/:userId/wallets" component={AdminBusinessWallets} />
           <Route path="/dashboard/admin/business/users/:userId/connections" component={AdminUserConnections} />
           <Route component={NotFound} />
         </Switch>
