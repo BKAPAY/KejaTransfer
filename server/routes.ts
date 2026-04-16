@@ -12104,7 +12104,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const currentUserId = req.session?.userId;
 
       // Collect real-time data from DB
-      const [feeConfigsData, countryStatusData, countryOperatorConfigsData, cryptoCurrenciesData, providerConfigsData, supportSettingsData, currentUser, userStats] = await Promise.all([
+      const [feeConfigsData, countryStatusData, countryOperatorConfigsData, cryptoCurrenciesData, providerConfigsData, supportSettingsData, currentUser, userStats, exchangeFeesData] = await Promise.all([
         storage.getAllFeeConfigs(),
         storage.getCountryStatuses(),
         storage.getCountryOperatorConfigs(),
@@ -12113,6 +12113,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         storage.getSupportSettings(),
         currentUserId ? storage.getUser(currentUserId) : Promise.resolve(null),
         currentUserId ? storage.getUserStats(currentUserId) : Promise.resolve(null),
+        storage.getAllCurrencyExchangeFees(),
       ]);
 
       // Build unified country + operator + fees + availability info
@@ -12149,41 +12150,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         for (const op of operators) {
           const opProviders = countryFees.filter((fc: any) => fc.operator === op.code);
-          const feeEntry = opProviders[0];
-          const inPct = feeEntry ? (feeEntry.incomingFeePercentage / 10).toFixed(1) : "N/A";
-          const outPct = feeEntry ? (feeEntry.outgoingFeePercentage / 10).toFixed(1) : "N/A";
 
+          // Determine which fee entry to use — pick the ACTIVE provider's fee, not just the first
+          let activeFeeIn: any = opProviders[0];
+          let activeFeeOut: any = opProviders[0];
           let hasPayin: boolean;
           let hasPayout: boolean;
 
           if (noStatusData) {
             // Pas de statuts configurés : actif si le provider a une clé API et a des frais pour cet opérateur
+            const activeEntry = opProviders.find((fc: any) => activeProvidersByKey.has(fc.provider));
+            if (activeEntry) { activeFeeIn = activeEntry; activeFeeOut = activeEntry; }
             hasPayin = opProviders.some((fc: any) => activeProvidersByKey.has(fc.provider));
             hasPayout = opProviders.some((fc: any) => activeProvidersByKey.has(fc.provider));
           } else {
-            hasPayin = opProviders.some((fc: any) => {
+            const payinEntry = opProviders.find((fc: any) => {
               const providerEnabled = statuses.some((cs: any) => cs.provider === fc.provider && cs.payinEnabled);
               if (!providerEnabled) return false;
               if (noOpConfigData) return true;
-              const opConfig = opConfigs.find((oc: any) => oc.provider === fc.provider && oc.operator === op.code);
-              return opConfig ? opConfig.incomingEnabled : true;
+              const oc = opConfigs.find((c: any) => c.provider === fc.provider && c.operator === op.code);
+              return oc ? oc.incomingEnabled : true;
             });
-            hasPayout = opProviders.some((fc: any) => {
+            const payoutEntry = opProviders.find((fc: any) => {
               const providerEnabled = statuses.some((cs: any) => cs.provider === fc.provider && cs.payoutEnabled);
               if (!providerEnabled) return false;
               if (noOpConfigData) return true;
-              const opConfig = opConfigs.find((oc: any) => oc.provider === fc.provider && oc.operator === op.code);
-              return opConfig ? opConfig.outgoingEnabled : true;
+              const oc = opConfigs.find((c: any) => c.provider === fc.provider && c.operator === op.code);
+              return oc ? oc.outgoingEnabled : true;
             });
+            if (payinEntry) activeFeeIn = payinEntry;
+            if (payoutEntry) activeFeeOut = payoutEntry;
+            hasPayin = !!payinEntry;
+            hasPayout = !!payoutEntry;
           }
 
-          if (hasPayin) payinActiveOps.push(op.name);
-          if (hasPayout) payoutActiveOps.push(op.name);
+          const inPct = activeFeeIn ? (activeFeeIn.incomingFeePercentage / 10).toFixed(1) : "N/A";
+          const outPct = activeFeeOut ? (activeFeeOut.outgoingFeePercentage / 10).toFixed(1) : "N/A";
+
+          // Include operator code in display so EMALI knows the exact code to use in tools
+          if (hasPayin) payinActiveOps.push(`${op.name} [code: ${op.code}]`);
+          if (hasPayout) payoutActiveOps.push(`${op.name} [code: ${op.code}]`);
 
           const payinStatus = hasPayin ? "DISPONIBLE" : "NON DISPONIBLE";
           const payoutStatus = hasPayout ? "DISPONIBLE" : "NON DISPONIBLE";
-          payinLines.push(`    - ${op.name}: Frais ${inPct}% → ${payinStatus}`);
-          payoutLines.push(`    - ${op.name}: Frais ${outPct}% → ${payoutStatus}`);
+          payinLines.push(`    - ${op.name} (code: ${op.code}): Frais ${inPct}% → ${payinStatus}`);
+          payoutLines.push(`    - ${op.name} (code: ${op.code}): Frais ${outPct}% → ${payoutStatus}`);
         }
 
         // Simple availability line for transfer/withdrawal lists
@@ -12217,36 +12228,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
           for (const op of operators) {
             const opProviders = countryFees.filter((fc: any) => fc.operator === op.code);
             if (opProviders.length === 0) continue;
-            const feeEntry = opProviders[0];
-            const inPct = (feeEntry.incomingFeePercentage / 10).toFixed(1);
-            const outPct = (feeEntry.outgoingFeePercentage / 10).toFixed(1);
+
+            // Pick the ACTIVE provider's fee entry for each direction
+            let detailFeeIn: any = opProviders[0];
+            let detailFeeOut: any = opProviders[0];
             let hasPayin: boolean;
             let hasPayout: boolean;
+
             if (noStatusData) {
-              // Pas de statuts configurés : actif si le provider a une clé API
+              const activeEntry = opProviders.find((fc: any) => activeProvidersByKey.has(fc.provider));
+              if (activeEntry) { detailFeeIn = activeEntry; detailFeeOut = activeEntry; }
               hasPayin = opProviders.some((fc: any) => activeProvidersByKey.has(fc.provider));
               hasPayout = opProviders.some((fc: any) => activeProvidersByKey.has(fc.provider));
             } else {
-              hasPayin = opProviders.some((fc: any) => {
+              const payinEntry = opProviders.find((fc: any) => {
                 const providerEnabled = statuses.some((cs: any) => cs.provider === fc.provider && cs.payinEnabled);
                 if (!providerEnabled) return false;
                 if (noOpConfigData) return true;
-                const opConfig = opConfigs.find((oc: any) => oc.provider === fc.provider && oc.operator === op.code);
-                return opConfig ? opConfig.incomingEnabled : true;
+                const oc = opConfigs.find((c: any) => c.provider === fc.provider && c.operator === op.code);
+                return oc ? oc.incomingEnabled : true;
               });
-              hasPayout = opProviders.some((fc: any) => {
+              const payoutEntry = opProviders.find((fc: any) => {
                 const providerEnabled = statuses.some((cs: any) => cs.provider === fc.provider && cs.payoutEnabled);
                 if (!providerEnabled) return false;
                 if (noOpConfigData) return true;
-                const opConfig = opConfigs.find((oc: any) => oc.provider === fc.provider && oc.operator === op.code);
-                return opConfig ? opConfig.outgoingEnabled : true;
+                const oc = opConfigs.find((c: any) => c.provider === fc.provider && c.operator === op.code);
+                return oc ? oc.outgoingEnabled : true;
               });
+              if (payinEntry) detailFeeIn = payinEntry;
+              if (payoutEntry) detailFeeOut = payoutEntry;
+              hasPayin = !!payinEntry;
+              hasPayout = !!payoutEntry;
             }
+
             if (!hasPayin && !hasPayout) continue;
+            const inPct = detailFeeIn ? (detailFeeIn.incomingFeePercentage / 10).toFixed(1) : "N/A";
+            const outPct = detailFeeOut ? (detailFeeOut.outgoingFeePercentage / 10).toFixed(1) : "N/A";
             const parts: string[] = [];
             if (hasPayin) parts.push(`Entrant: ${inPct}%`);
             if (hasPayout) parts.push(`Sortant: ${outPct}%`);
-            activeOpLines.push(`  • ${op.name}: ${parts.join(" | ")}`);
+            // Include operator code so EMALI knows the exact code to pass to tools
+            activeOpLines.push(`  • ${op.name} [code: ${op.code}]: ${parts.join(" | ")}`);
           }
           if (activeOpLines.length > 0) {
             countryFeeDetailLines.push(`${flag} ${country.name.toUpperCase()} (${country.code}) | Devise: ${country.currency}`);
@@ -12268,6 +12290,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const nowpaymentsConfig = providerConfigsData.find((p: any) => p.provider === "nowpayments");
       const cryptoMarkup = nowpaymentsConfig?.cryptoMarkupPercent ? (nowpaymentsConfig.cryptoMarkupPercent / 10).toFixed(1) : "10";
       const cryptoFee = nowpaymentsConfig?.cryptoFeePercent ? (nowpaymentsConfig.cryptoFeePercent / 10).toFixed(1) : "15";
+
+      // Build exchange fees section
+      const activeExchangeFees = (exchangeFeesData || []).filter((ef: any) => ef.isActive && ef.feePercentage > 0);
+      const exchangeFeeLines: string[] = [];
+      for (const ef of activeExchangeFees) {
+        const pct = (ef.feePercentage / 10).toFixed(1);
+        exchangeFeeLines.push(`- ${ef.fromCurrency} → ${ef.toCurrency}: ${pct}%`);
+      }
 
       // Build user personal info section
       let userInfoSection = "";
@@ -12301,19 +12331,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           };
           const amountF = tx.amount.toLocaleString("fr-FR");
           const date = new Date(tx.createdAt).toLocaleDateString("fr-FR");
-          return `  - ${typeMap[tx.type] || tx.type}: ${amountF} FCFA - ${statusMap[tx.status] || tx.status} (${date})`;
+          const userCurrencyDisplay = userCountry?.currency || "XOF";
+          return `  - ${typeMap[tx.type] || tx.type}: ${amountF} ${userCurrencyDisplay} - ${statusMap[tx.status] || tx.status} (${date})`;
         }) || [];
 
+        const userCurrencyLabel = userCountry?.currency || "XOF";
         userInfoSection = `
 === INFORMATIONS DE L'UTILISATEUR ACTUEL ===
 - Nom: ${currentUser.firstName} ${currentUser.lastName}
 - Email: ${currentUser.email}
 - Pays: ${userCountry?.name || currentUser.country || "Non défini"}
-- Devise: ${userCountry?.currency || "XOF"}
-- Solde actuel: ${balanceFormatted} FCFA
-- Total des dépôts (complétés): ${totalDepositsFormatted} FCFA
-- Total des retraits (complétés): ${totalWithdrawalsFormatted} FCFA
-- Total des transferts (complétés): ${totalTransfersFormatted} FCFA
+- Devise: ${userCurrencyLabel}
+- Solde actuel: ${balanceFormatted} ${userCurrencyLabel}
+- Total des dépôts (complétés): ${totalDepositsFormatted} ${userCurrencyLabel}
+- Total des retraits (complétés): ${totalWithdrawalsFormatted} ${userCurrencyLabel}
+- Total des transferts (complétés): ${totalTransfersFormatted} ${userCurrencyLabel}
 - Statut KYC: ${kycStatusMap[currentUser.kycStatus] || currentUser.kycStatus}${currentUser.kycRejectionReason ? `\n- Motif de rejet KYC: ${currentUser.kycRejectionReason}` : ""}
 - Numéros de retrait configurés: ${currentUser.withdrawalPhones && currentUser.withdrawalPhones.length > 0 ? currentUser.withdrawalPhones.join(", ") : "Aucun configuré"}
 - Code de sécurité: ${currentUser.securityCode ? "Configuré" : "Non configuré"}
@@ -12326,7 +12358,7 @@ ${recentTxLines.length > 0 ? recentTxLines.join("\n") : "  Aucune transaction r�
       const systemPrompt = `Tu es EMALI, l'assistant intelligent de BKApay, une plateforme de paiement mobile money en Afrique. Tu réponds UNIQUEMENT en français.
 
 FORMAT OBLIGATOIRE POUR LES FRAIS DE TRANSACTION:
-Quand l'utilisateur demande les frais, tu DOIS reproduire CHAQUE pays dans ce format EXACT, pays par pays dans l'ordre:
+Quand l'utilisateur demande les frais, tu DOIS reproduire CHAQUE pays dans ce format EXACT, pays par pays dans l'ordre (n'affiche PAS les codes opérateur entre crochets dans ta réponse utilisateur, affiche seulement le nom):
 
 [DRAPEAU] **NOM DU PAYS** | Devise: XXX
 • Opérateur1: Entrant: X.X% | Sortant: X.X%
@@ -12336,11 +12368,14 @@ Quand l'utilisateur demande les frais, tu DOIS reproduire CHAQUE pays dans ce fo
 ...
 
 Tu DOIS mettre le nom du pays en gras avec ** autour.
-Tu DOIS lister UNIQUEMENT les opérateurs actifs du pays, un par ligne avec •. N'écris jamais "disponible" ou "non disponible" — tu n'affiches que ce qui est actif.
+Tu DOIS lister UNIQUEMENT les opérateurs actifs du pays, un par ligne avec •. N'écris jamais "disponible" ou "non disponible" — tu n'affiches que ce qui est actif. N'affiche pas les codes [code: xxx] dans la réponse utilisateur — ils sont uniquement pour les appels d'outils.
 Tu DOIS mettre une ligne vide entre chaque pays.
-A la toute fin de ta réponse sur les frais (après TOUS les pays), tu DOIS ajouter cette note:
+A la toute fin de ta réponse sur les frais (après TOUS les pays), tu DOIS ajouter la section des frais d'échange de devise ET la note, dans cet ordre exact:
 
-> **NB:** Des frais d'échange de devise supplémentaires s'appliquent si vous collectez ou transférez de l'argent dans une devise différente de votre devise principale.
+**Frais d'échange de devise** (s'appliquent en plus des frais de transaction si les devises diffèrent):
+(liste les paires de devises avec leurs pourcentages)
+
+> **NB:** Ces frais d'échange s'appliquent EN PLUS des frais de transaction habituels si les devises source et destination sont différentes.
 
 RÈGLES IMPORTANTES:
 - Tu peux donner à l'utilisateur actuel ses propres informations de compte (solde, transactions, statut KYC, etc.) car elles sont fournies ci-dessous.
@@ -12402,7 +12437,7 @@ RÈGLES POUR LES OPÉRATIONS:
 - Vérifie que le solde est suffisant avant d'exécuter
 - Le code de sécurité est OBLIGATOIRE pour les retraits ET les transferts
 - N'exécute JAMAIS une opération sans récapitulatif et confirmation préalable de l'utilisateur
-- Utilise les codes opérateur en minuscules: orange, mtn, moov, wave, free, tmoney, wizall, expresso, coris
+- CRITIQUE: Pour les outils (calculate_fees, execute_withdrawal, execute_transfer), utilise TOUJOURS le code complet affiché entre crochets [code: xxx] dans les sections de frais et d'opérateurs. Le code inclut le suffixe pays (ex: orange-bj, mtn-bj, moov-bj, wave-sn, orange-ci, mtn-cm, airtel-cd, tmoney-tg). N'utilise JAMAIS un code court sans suffixe (jamais "orange" seul, toujours "orange-bj" pour le Bénin).
 - Utilise les codes pays en majuscules: BJ, CI, SN, TG, BF, CM, CD, CG, ML
 - Le numéro de téléphone doit inclure l'indicatif pays (ex: +229XXXXXXXX)
 - Pour les retraits, utilise TOUJOURS le pays de l'utilisateur, ne le demande jamais
@@ -12440,9 +12475,15 @@ RAPPEL FORMAT: [DRAPEAU] **PAYS** | Devise: XXX → puis • Opérateur: Entrant
 ${countryFeeDetailLines.length > 0 ? countryFeeDetailLines.join("\n") : "Frais standard de 6% pour tous les pays et opérateurs."}
 
 RÈGLES DES FRAIS:
-- Dépôts (paiements entrants): Le client paie le montant brut, l'utilisateur reçoit le net (brut - frais).
-- Retraits (paiements sortants): L'utilisateur entre le montant brut, le destinataire reçoit le net (brut - frais). Le solde est débité du montant brut.
-- Transferts: L'utilisateur entre le montant net que le destinataire recevra. Le solde est débité du net + frais.
+- Dépôts (paiements entrants): Le client paie le montant brut, l'utilisateur reçoit le net (brut - frais de transaction - frais d'échange si devises différentes).
+- Retraits (paiements sortants): L'utilisateur entre le montant brut, le destinataire reçoit le net (brut - frais). Le solde est débité du montant brut + frais d'échange si devises différentes.
+- Transferts: L'utilisateur entre le montant net que le destinataire recevra. Le solde est débité du net + frais de transaction + frais d'échange si devises différentes.
+- Pour les comptes personnels, les frais d'échange s'appliquent TOUJOURS quand les devises sont différentes (ex: utilisateur XOF qui transfère vers pays CDF).
+
+=== FRAIS D'ÉCHANGE DE DEVISE (données en temps réel) ===
+Ces frais s'ajoutent aux frais de transaction standard quand les devises source et destination sont différentes.
+${exchangeFeeLines.length > 0 ? exchangeFeeLines.join("\n") : "Aucun frais d'échange configuré actuellement (0%)."}
+IMPORTANT: Un compte personnel peut avoir DEUX types de frais pour une même opération internationale: (1) frais de transaction standard selon l'opérateur/pays, ET (2) frais d'échange de devise si les devises diffèrent. La fonction calculate_fees inclut déjà les deux automatiquement.
 
 CRYPTOMONNAIES DISPONIBLES (données en temps réel):
 ${cryptoInfoLines.length > 0 ? cryptoInfoLines.join("\n") : "Aucune cryptomonnaie configurée actuellement."}
@@ -12481,14 +12522,14 @@ SUPPORT ET CONTACT:
           type: "function" as const,
           function: {
             name: "calculate_fees",
-            description: "Calcule les frais et le montant net pour un retrait ou transfert mobile money. Appelle cette fonction AVANT d'exécuter une opération pour montrer le récapitulatif à l'utilisateur.",
+            description: "Calcule les frais et le montant net pour un retrait ou transfert mobile money. Appelle cette fonction AVANT d'exécuter une opération pour montrer le récapitulatif à l'utilisateur. IMPORTANT: Inclut automatiquement les frais d'échange de devise si les devises source et destination sont différentes.",
             parameters: {
               type: "object",
               properties: {
-                amount: { type: "number", description: "Montant en unité de devise (FCFA, CDF, etc.)" },
+                amount: { type: "number", description: "Montant en unité de devise (XOF, CDF, XAF, etc.)" },
                 type: { type: "string", enum: ["withdrawal", "transfer"], description: "Type: withdrawal (retrait) ou transfer (transfert)" },
-                country: { type: "string", description: "Code pays du destinataire (BJ, CI, SN, TG, BF, CM, CD, CG, ML)" },
-                operator: { type: "string", description: "Code opérateur en minuscules (orange, mtn, moov, wave, free, tmoney, wizall, expresso, coris)" },
+                country: { type: "string", description: "Code pays en majuscules (BJ, CI, SN, TG, BF, CM, CD, CG, ML)" },
+                operator: { type: "string", description: "Code opérateur COMPLET avec suffixe pays, en minuscules. Utilise EXACTEMENT le code [code: ...] affiché dans les informations des pays. Exemples: orange-bj, mtn-bj, moov-bj, orange-ci, mtn-ci, wave-ci, orange-sn, free-sn, wave-sn, orange-cm, mtn-cm, orange-cd, airtel-cd, tmoney-tg, moov-tg, orange-bf, moov-bf" },
               },
               required: ["amount", "type", "country", "operator"],
             },
@@ -12503,8 +12544,8 @@ SUPPORT ET CONTACT:
               type: "object",
               properties: {
                 amount: { type: "number", description: "Montant brut à retirer" },
-                country: { type: "string", description: "Code pays (BJ, CI, SN, TG, BF, CM, CD, CG, ML)" },
-                operator: { type: "string", description: "Code opérateur en minuscules" },
+                country: { type: "string", description: "Code pays en majuscules (BJ, CI, SN, TG, BF, CM, CD, CG, ML)" },
+                operator: { type: "string", description: "Code opérateur COMPLET avec suffixe pays, en minuscules (ex: orange-bj, mtn-bj, wave-sn, orange-cm, airtel-cd). Utilise EXACTEMENT le code [code: ...] affiché dans les informations des pays." },
                 phone: { type: "string", description: "Numéro de téléphone complet avec indicatif (ex: +22997000000)" },
                 securityCode: { type: "string", description: "Code de sécurité à 6 chiffres fourni par l'utilisateur" },
               },
@@ -12516,13 +12557,13 @@ SUPPORT ET CONTACT:
           type: "function" as const,
           function: {
             name: "execute_transfer",
-            description: "Exécute un transfert mobile money vers un numéro tiers. REQUIERT: KYC vérifié, code de sécurité, solde suffisant. Le montant est le montant NET que le destinataire recevra. Le solde sera débité du montant + frais.",
+            description: "Exécute un transfert mobile money vers un numéro tiers. REQUIERT: KYC vérifié, code de sécurité, solde suffisant. Le montant est le montant NET que le destinataire recevra. Le solde sera débité du montant + frais de transaction + frais d'échange si les devises sont différentes.",
             parameters: {
               type: "object",
               properties: {
                 amount: { type: "number", description: "Montant net que le destinataire recevra" },
-                country: { type: "string", description: "Code pays du destinataire" },
-                operator: { type: "string", description: "Code opérateur du destinataire en minuscules" },
+                country: { type: "string", description: "Code pays du destinataire en majuscules (BJ, CI, SN, TG, BF, CM, CD, CG, ML)" },
+                operator: { type: "string", description: "Code opérateur COMPLET avec suffixe pays, en minuscules (ex: orange-bj, mtn-bj, wave-sn, orange-cm, airtel-cd). Utilise EXACTEMENT le code [code: ...] affiché dans les informations des pays." },
                 phone: { type: "string", description: "Numéro de téléphone du destinataire avec indicatif" },
                 securityCode: { type: "string", description: "Code de sécurité à 6 chiffres fourni par l'utilisateur" },
               },
