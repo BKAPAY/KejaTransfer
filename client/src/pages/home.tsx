@@ -2,7 +2,7 @@ import { Link } from "wouter";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { CreditCard, Link as LinkIcon, Code, BarChart3, Shield, Zap, User, Building2, Check, Webhook, BookOpen, Store, ArrowRight, ChevronRight } from "lucide-react";
+import { CreditCard, Link as LinkIcon, Code, BarChart3, Shield, Zap, User, Building2, Check, ArrowRight, ChevronRight } from "lucide-react";
 import { CryptoIcon } from "@/components/crypto-icon";
 import { CardBrandIcon } from "@/components/card-brand-icon";
 import { COUNTRIES } from "@shared/schema";
@@ -482,26 +482,25 @@ export default function Home() {
                 </div>
                 <h3 className="text-base sm:text-xl lg:text-2xl font-bold text-foreground mb-1 sm:mb-2">Compte Entreprise</h3>
                 <p className="text-xs sm:text-sm text-muted-foreground mb-5 sm:mb-7 leading-relaxed">
-                  Pour les commerces, startups et développeurs qui veulent intégrer les paiements mobile money dans leurs produits et services via API ou liens personnalisés.
+                  Pour les entreprises et développeurs qui veulent intégrer des paiements mobile money dans leurs systèmes via API directe, sans interface manuelle.
                 </p>
 
                 <div className="space-y-2.5 sm:space-y-3 flex-1 mb-6 sm:mb-8">
                   {[
-                    "Tout ce que le compte personnel inclut",
-                    "Lien marchand permanent (votre vitrine en ligne)",
-                    "Liens de paiement avancés (produit, montant, image)",
-                    "API de collecte (payin) intégrable dans votre app ou site",
-                    "API de décaissement (payout) pour envoyer des fonds en masse",
-                    "Tokens API & webhooks en temps réel",
-                    "Retraits vers plusieurs numéros mobile money",
+                    "API de collecte (payin) : déclenchez des paiements depuis votre app ou site",
+                    "API de décaissement (payout) : envoyez des fonds en masse vers n'importe quel mobile money",
+                    "Tokens API sécurisés (clé publique + clé privée)",
+                    "Webhooks en temps réel pour chaque événement de paiement",
+                    "Tableau de bord & statistiques de transactions",
                     "Multi-devises : XOF, XAF, CDF, USD",
-                    "Support prioritaire & documentation complète",
+                    "Couverture dans 15 pays africains",
+                    "Documentation technique complète & support prioritaire",
                   ].map((item, i) => (
                     <div key={i} className="flex items-start gap-2.5 sm:gap-3">
                       <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
                         <Check className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-primary" />
                       </div>
-                      <span className="text-xs sm:text-sm text-foreground">{i === 0 ? <strong>{item}</strong> : item}</span>
+                      <span className="text-xs sm:text-sm text-foreground">{item}</span>
                     </div>
                   ))}
                 </div>
@@ -577,207 +576,6 @@ export default function Home() {
                 />
               </div>
             ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Integration Types Section */}
-      <section className="py-10 sm:py-16 md:py-20 lg:py-24 bg-card overflow-hidden">
-        <div className="container mx-auto px-2 sm:px-4 md:px-8 max-w-7xl">
-          <div className="text-center mb-8 sm:mb-12 lg:mb-16">
-            <h2 className="animate-on-scroll anim-fade-up text-lg sm:text-2xl md:text-3xl lg:text-4xl font-bold mb-2 sm:mb-4 text-foreground">Types d'intégrations disponibles</h2>
-            <p className="animate-on-scroll anim-fade-up anim-delay-1 text-xs sm:text-sm md:text-base lg:text-lg text-muted-foreground max-w-2xl mx-auto">
-              Plusieurs méthodes pour intégrer les paiements mobile money selon votre besoin, même sans compétences techniques.
-            </p>
-          </div>
-
-          {/* Primary integrations - large 2-col */}
-          <div className="grid md:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
-            {/* Lien de paiement */}
-            <div className="animate-on-scroll anim-slide-left">
-              <Card className="overflow-hidden h-full flex flex-col">
-                <img
-                  src={paymentLinksImage}
-                  alt="Liens de paiement BKApay"
-                  loading="lazy"
-                  decoding="async"
-                  className="w-full h-44 sm:h-56 object-cover"
-                />
-                <div className="p-4 sm:p-6 flex flex-col flex-1">
-                  <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
-                    <div className="bg-primary/10 w-8 h-8 sm:w-9 sm:h-9 rounded-md flex items-center justify-center flex-shrink-0">
-                      <LinkIcon className="w-4 h-4 text-primary" />
-                    </div>
-                    <div>
-                      <h3 className="text-sm sm:text-base lg:text-lg font-semibold text-foreground">Lien de Paiement</h3>
-                      <span className="text-xs text-muted-foreground">Sans code — compte personnel & entreprise</span>
-                    </div>
-                  </div>
-                  <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4 leading-relaxed">
-                    Créez un lien en quelques clics avec un montant défini, une description et l'image de votre produit. Partagez-le par WhatsApp, réseaux sociaux ou email. Votre client paie en quelques secondes.
-                  </p>
-                  <div className="space-y-1.5 sm:space-y-2 mt-auto">
-                    {["Montant fixe ou libre", "Image & description du produit", "Compatible tous les opérateurs", "Notifications en temps réel"].map((f, i) => (
-                      <div key={i} className="flex items-center gap-2 text-xs sm:text-sm text-foreground">
-                        <Check className="w-3.5 h-3.5 text-primary flex-shrink-0" />
-                        {f}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </Card>
-            </div>
-
-            {/* Lien marchand */}
-            <div className="animate-on-scroll anim-slide-right">
-              <Card className="overflow-hidden h-full flex flex-col">
-                <img
-                  src={merchantLinksImage}
-                  alt="Liens marchands BKApay"
-                  loading="lazy"
-                  decoding="async"
-                  className="w-full h-44 sm:h-56 object-cover"
-                />
-                <div className="p-4 sm:p-6 flex flex-col flex-1">
-                  <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
-                    <div className="bg-primary/10 w-8 h-8 sm:w-9 sm:h-9 rounded-md flex items-center justify-center flex-shrink-0">
-                      <Store className="w-4 h-4 text-primary" />
-                    </div>
-                    <div>
-                      <h3 className="text-sm sm:text-base lg:text-lg font-semibold text-foreground">Lien Marchand</h3>
-                      <span className="text-xs text-muted-foreground">Sans code — compte entreprise</span>
-                    </div>
-                  </div>
-                  <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4 leading-relaxed">
-                    Une URL permanente dédiée à votre boutique. Vos clients arrivent sur votre page de paiement personnalisée, saisissent le montant et paient directement. Idéal pour les boutiques et prestataires de services.
-                  </p>
-                  <div className="space-y-1.5 sm:space-y-2 mt-auto">
-                    {["URL fixe & personnalisée", "Logo et nom de votre entreprise", "Le client choisit le montant", "Partageable en permanence"].map((f, i) => (
-                      <div key={i} className="flex items-center gap-2 text-xs sm:text-sm text-foreground">
-                        <Check className="w-3.5 h-3.5 text-primary flex-shrink-0" />
-                        {f}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </Card>
-            </div>
-          </div>
-
-          {/* Secondary integrations - 3-col */}
-          <div className="grid sm:grid-cols-3 gap-4 sm:gap-6">
-            {/* API Collecte */}
-            <div className="animate-on-scroll anim-scale-in anim-delay-1">
-              <Card className="overflow-hidden h-full flex flex-col">
-                <img
-                  src={apiGatewayImage}
-                  alt="API de collecte BKApay"
-                  loading="lazy"
-                  decoding="async"
-                  className="w-full h-32 sm:h-40 object-cover"
-                />
-                <div className="p-4 sm:p-5 flex flex-col flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="bg-primary/10 w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0">
-                      <Code className="w-3.5 h-3.5 text-primary" />
-                    </div>
-                    <h3 className="text-sm font-semibold text-foreground">API de Collecte</h3>
-                  </div>
-                  <span className="text-xs text-muted-foreground mb-2">Compte entreprise + KYC validé</span>
-                  <p className="text-xs text-muted-foreground mb-3 leading-relaxed flex-1">
-                    Intégrez le paiement mobile money directement dans votre site web ou application mobile. Déclenchez des paiements via notre API REST et recevez les confirmations par webhook.
-                  </p>
-                  <div className="space-y-1.5">
-                    {["API REST sécurisée", "Webhooks temps réel", "Payin depuis 15 pays"].map((f, i) => (
-                      <div key={i} className="flex items-center gap-2 text-xs text-foreground">
-                        <Check className="w-3 h-3 text-primary flex-shrink-0" />
-                        {f}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </Card>
-            </div>
-
-            {/* API Décaissement */}
-            <div className="animate-on-scroll anim-scale-in anim-delay-2">
-              <Card className="overflow-hidden h-full flex flex-col">
-                <img
-                  src={fastPaymentImage}
-                  alt="API de décaissement BKApay"
-                  loading="lazy"
-                  decoding="async"
-                  className="w-full h-32 sm:h-40 object-cover"
-                />
-                <div className="p-4 sm:p-5 flex flex-col flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="bg-primary/10 w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0">
-                      <Zap className="w-3.5 h-3.5 text-primary" />
-                    </div>
-                    <h3 className="text-sm font-semibold text-foreground">API de Décaissement</h3>
-                  </div>
-                  <span className="text-xs text-muted-foreground mb-2">Compte entreprise + KYC validé</span>
-                  <p className="text-xs text-muted-foreground mb-3 leading-relaxed flex-1">
-                    Envoyez automatiquement des fonds vers n'importe quel numéro mobile money via notre API. Idéal pour les plateformes de livraison, de freelances ou de cashback.
-                  </p>
-                  <div className="space-y-1.5">
-                    {["Payout automatisé", "Multi-opérateurs & pays", "Traitement instantané"].map((f, i) => (
-                      <div key={i} className="flex items-center gap-2 text-xs text-foreground">
-                        <Check className="w-3 h-3 text-primary flex-shrink-0" />
-                        {f}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </Card>
-            </div>
-
-            {/* Webhooks & Documentation */}
-            <div className="animate-on-scroll anim-scale-in anim-delay-3">
-              <Card className="overflow-hidden h-full flex flex-col">
-                <img
-                  src={dashboardImage}
-                  alt="Webhooks et dashboard BKApay"
-                  loading="lazy"
-                  decoding="async"
-                  className="w-full h-32 sm:h-40 object-cover"
-                />
-                <div className="p-4 sm:p-5 flex flex-col flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="bg-primary/10 w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0">
-                      <Webhook className="w-3.5 h-3.5 text-primary" />
-                    </div>
-                    <h3 className="text-sm font-semibold text-foreground">Webhooks & Tableau de bord</h3>
-                  </div>
-                  <span className="text-xs text-muted-foreground mb-2">Compte entreprise</span>
-                  <p className="text-xs text-muted-foreground mb-3 leading-relaxed flex-1">
-                    Recevez des notifications HTTP en temps réel pour chaque transaction. Gérez vos tokens API, vos webhooks et vos statistiques depuis un tableau de bord dédié.
-                  </p>
-                  <div className="space-y-1.5">
-                    {["Notifications instantanées", "Signature HMAC sécurisée", "Statistiques avancées"].map((f, i) => (
-                      <div key={i} className="flex items-center gap-2 text-xs text-foreground">
-                        <Check className="w-3 h-3 text-primary flex-shrink-0" />
-                        {f}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </Card>
-            </div>
-          </div>
-
-          {/* Documentation CTA */}
-          <div className="animate-on-scroll anim-fade-up mt-8 sm:mt-10 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 p-5 sm:p-6 rounded-md bg-background text-center sm:text-left">
-            <div className="flex-1">
-              <p className="text-sm sm:text-base font-semibold text-foreground mb-1">Vous êtes développeur ?</p>
-              <p className="text-xs sm:text-sm text-muted-foreground">Consultez notre documentation technique complète avec exemples de code, guide d'intégration et référence API.</p>
-            </div>
-            <a href="/docs" className="flex-shrink-0">
-              <Button variant="outline" data-testid="button-view-docs">
-                <BookOpen className="w-4 h-4 mr-2" />
-                Voir la documentation
-              </Button>
-            </a>
           </div>
         </div>
       </section>
