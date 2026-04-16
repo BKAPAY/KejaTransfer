@@ -63,7 +63,7 @@ import {
   handlePawaPayWebhook,
   pollPawaPayTransaction,
 } from "./pawapay-routes";
-import { safeRefundOutgoingTransaction, sendApiPayoutCallback } from "./payment-polling";
+import { safeRefundOutgoingTransaction, sendApiPayoutCallback, sendBusinessWebhookCallback } from "./payment-polling";
 import {
   MBIYOPAY_SUPPORTED_COUNTRIES,
   MBIYOPAY_OPERATORS,
@@ -2690,6 +2690,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.json({ success: true, message: "Webhook renvoyé avec succès" });
     } catch (error) {
       console.error("Error resending payout webhook:", error);
+      res.status(500).json({ error: "Erreur lors du renvoi du webhook" });
+    }
+  });
+
+  // Business webhook resend (payin or payout)
+  app.post("/api/business-transactions/:txId/resend-webhook", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session.userId!;
+      const { txId } = req.params;
+      const tx = await storage.getTransaction(txId);
+      if (!tx || tx.userId !== userId) {
+        return res.status(404).json({ error: "Transaction introuvable" });
+      }
+      let meta: any = {};
+      try { meta = JSON.parse(tx.metadata || "{}"); } catch {}
+      if (meta.scope !== "business" || !meta.businessTokenId) {
+        return res.status(400).json({ error: "Cette transaction n'est pas une transaction business" });
+      }
+      const businessToken = await storage.getBusinessTokenById(meta.businessTokenId);
+      if (!businessToken) {
+        return res.status(400).json({ error: "Token business introuvable" });
+      }
+      // Detect direction: INCOMING_TYPES = deposit, payment_link, merchant_link, api_payment
+      const INCOMING_TYPES = ["deposit", "payment_link", "merchant_link", "api_payment"];
+      const txType: "payin" | "payout" = INCOMING_TYPES.includes(tx.type) ? "payin" : "payout";
+      const cbUrl = txType === "payin" ? businessToken.callbackUrl : (businessToken.payoutCallbackUrl || businessToken.callbackUrl);
+      const cbSecret = txType === "payin" ? businessToken.callbackSecret : (businessToken.payoutCallbackSecret || businessToken.callbackSecret);
+      if (!cbUrl || !cbSecret) {
+        return res.status(400).json({ error: `Aucun webhook ${txType} configuré. Configurez une URL de callback dans les paramètres.` });
+      }
+      const finalStatus: "completed" | "failed" = tx.status === "completed" ? "completed" : "failed";
+      sendBusinessWebhookCallback(txId, finalStatus, txType);
+      return res.json({ success: true, message: "Webhook renvoyé avec succès" });
+    } catch (error) {
+      console.error("Error resending business webhook:", error);
       res.status(500).json({ error: "Erreur lors du renvoi du webhook" });
     }
   });

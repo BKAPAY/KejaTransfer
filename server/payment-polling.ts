@@ -132,7 +132,7 @@ export async function sendApiPayoutCallback(transactionId: string, metadata: any
  * Checks if the transaction metadata contains scope="business" and businessTokenId.
  * Retries every 3 seconds for up to 15 minutes if the server doesn't respond with 2xx.
  */
-async function sendBusinessWebhookCallback(
+export async function sendBusinessWebhookCallback(
   transactionId: string,
   finalStatus: "completed" | "failed",
   txType: "payin" | "payout"

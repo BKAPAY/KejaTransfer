@@ -60,6 +60,7 @@ export function TransactionDetailsDialog({
   const [adminCode, setAdminCode] = useState("");
   const [adminCodeError, setAdminCodeError] = useState(false);
   const [webhookSent, setWebhookSent] = useState(false);
+  const [businessWebhookSent, setBusinessWebhookSent] = useState(false);
 
   const metadata = useMemo<TransactionMetadata | null>(() => {
     if (!transaction?.metadata) return null;
@@ -108,6 +109,25 @@ export function TransactionDetailsDialog({
         setWebhookSent(true);
         toast({ title: "Webhook renvoyé", description: "Le statut a été renvoyé à votre URL de callback." });
         setTimeout(() => setWebhookSent(false), 3000);
+      } else {
+        toast({ title: "Erreur", description: data.error || "Echec du renvoi", variant: "destructive" });
+      }
+    },
+    onError: (error: any) => {
+      toast({ title: "Erreur", description: error.message || "Echec du renvoi du webhook", variant: "destructive" });
+    },
+  });
+
+  const resendBusinessWebhookMutation = useMutation({
+    mutationFn: async (txId: string) => {
+      const res = await apiRequest("POST", `/api/business-transactions/${txId}/resend-webhook`, {});
+      return res.json();
+    },
+    onSuccess: (data) => {
+      if (data.success) {
+        setBusinessWebhookSent(true);
+        toast({ title: "Webhook renvoyé", description: "La notification a été renvoyée à votre URL de callback." });
+        setTimeout(() => setBusinessWebhookSent(false), 3000);
       } else {
         toast({ title: "Erreur", description: data.error || "Echec du renvoi", variant: "destructive" });
       }
@@ -439,7 +459,7 @@ export function TransactionDetailsDialog({
             </div>
           )}
 
-          {!isAdmin && metadata?.apiKeyId && (transaction.status === "completed" || transaction.status === "failed") && (
+          {!isAdmin && metadata?.apiKeyId && !metadata?.businessTokenId && (transaction.status === "completed" || transaction.status === "failed") && (
             <div className="space-y-3 border-t pt-4">
               <h3 className="font-semibold text-base flex items-center gap-2">
                 <Webhook className="w-4 h-4 text-muted-foreground" />
@@ -458,6 +478,33 @@ export function TransactionDetailsDialog({
                 {resendWebhookMutation.isPending
                   ? "Envoi en cours..."
                   : webhookSent
+                  ? "Webhook envoyé !"
+                  : "Renvoyer le webhook"}
+              </Button>
+            </div>
+          )}
+
+          {!isAdmin && metadata?.scope === "business" && metadata?.businessTokenId && (transaction.status === "completed" || transaction.status === "failed") && (
+            <div className="space-y-3 border-t pt-4">
+              <h3 className="font-semibold text-base flex items-center gap-2">
+                <Webhook className="w-4 h-4 text-muted-foreground" />
+                {["deposit", "payment_link", "merchant_link", "api_payment"].includes(transaction.type)
+                  ? "Webhook Payin"
+                  : "Webhook Payout"}
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                Si votre serveur n'a pas reçu la notification de statut, vous pouvez la renvoyer manuellement.
+              </p>
+              <Button
+                variant="outline"
+                onClick={() => resendBusinessWebhookMutation.mutate(transaction.id)}
+                disabled={resendBusinessWebhookMutation.isPending || businessWebhookSent}
+                data-testid="button-resend-business-webhook"
+              >
+                <RotateCcw className={`w-4 h-4 mr-2 ${resendBusinessWebhookMutation.isPending ? "animate-spin" : ""}`} />
+                {resendBusinessWebhookMutation.isPending
+                  ? "Envoi en cours..."
+                  : businessWebhookSent
                   ? "Webhook envoyé !"
                   : "Renvoyer le webhook"}
               </Button>
