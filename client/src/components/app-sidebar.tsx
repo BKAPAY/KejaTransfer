@@ -16,6 +16,7 @@ import {
   LayoutDashboard,
   User,
   Link as LinkIcon,
+  Store,
   Code,
   History,
   Settings,
@@ -52,6 +53,12 @@ const generalItems = [
     url: "/dashboard/payment-links",
     icon: LinkIcon,
     testId: "nav-payment-links",
+  },
+  {
+    title: "Lien marchand",
+    url: "/dashboard/merchant-links",
+    icon: Store,
+    testId: "nav-merchant-links",
   },
   {
     title: "Verification KYC",
