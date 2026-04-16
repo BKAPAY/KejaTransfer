@@ -227,6 +227,7 @@ function Router() {
           <Route path="/dashboard/business/settlements" component={BusinessSettlements} />
           <Route path="/dashboard/business/documentation" component={DocumentationBusiness} />
           <Route path="/dashboard/business/support" component={Support} />
+          <Route path="/dashboard/business/analytics" component={Analytics} />
           <Route path="/dashboard/docs" component={DocumentationLanding} />
           <Route path="/dashboard/documentation-business" component={DocumentationBusiness} />
           <Route component={NotFound} />
