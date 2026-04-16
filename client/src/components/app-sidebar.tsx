@@ -25,7 +25,6 @@ import {
   TrendingUp,
   Shield,
   Send,
-  Building2,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import type { User as UserType } from "@shared/schema";
@@ -158,8 +157,6 @@ export function AppSidebar() {
     }
   };
 
-  const isBusinessAccount = user?.accountType === "business";
-
   const adminItems = user?.isAdmin
     ? [{ title: "Administration", url: "/dashboard/admin", icon: Shield, testId: "nav-admin" }]
     : [];
@@ -206,22 +203,17 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {/* Business group — visible only for business accounts */}
-        {isBusinessAccount && (
-          <SidebarGroup>
-            <SidebarGroupLabel className="flex items-center gap-1.5">
-              <Building2 className="w-3.5 h-3.5" />
-              Entreprise
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenuItems
-                items={businessItems}
-                location={location}
-                onMenuClick={handleMenuClick}
-              />
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
+        {/* Outils — API et Analytique pour tous les comptes */}
+        <SidebarGroup>
+          <SidebarGroupLabel>Outils</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenuItems
+              items={businessItems}
+              location={location}
+              onMenuClick={handleMenuClick}
+            />
+          </SidebarGroupContent>
+        </SidebarGroup>
       </SidebarContent>
 
       <SidebarFooter className="p-4">
