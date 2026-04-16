@@ -26,6 +26,7 @@ const MerchantLinks = lazy(() => import("@/pages/dashboard/merchant-links"));
 const ApiPage = lazy(() => import("@/pages/dashboard/api"));
 const ApiPayoutPage = lazy(() => import("@/pages/dashboard/api-payout"));
 const Analytics = lazy(() => import("@/pages/dashboard/analytics"));
+const AnalyticsBusiness = lazy(() => import("@/pages/dashboard/analytics-business"));
 const History = lazy(() => import("@/pages/dashboard/history"));
 const Settings = lazy(() => import("@/pages/dashboard/settings"));
 const Support = lazy(() => import("@/pages/dashboard/support"));
@@ -227,7 +228,7 @@ function Router() {
           <Route path="/dashboard/business/settlements" component={BusinessSettlements} />
           <Route path="/dashboard/business/documentation" component={DocumentationBusiness} />
           <Route path="/dashboard/business/support" component={Support} />
-          <Route path="/dashboard/business/analytics" component={Analytics} />
+          <Route path="/dashboard/business/analytics" component={AnalyticsBusiness} />
           <Route path="/dashboard/docs" component={DocumentationLanding} />
           <Route path="/dashboard/documentation-business" component={DocumentationBusiness} />
           <Route component={NotFound} />
