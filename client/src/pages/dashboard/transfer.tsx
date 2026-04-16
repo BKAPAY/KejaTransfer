@@ -501,11 +501,29 @@ export default function Transfer() {
 
                     {amount && selectedCountry && selectedOperator && feeInfo && (
                       <div className="space-y-2">
-                        <div className="bg-muted p-3 rounded-md border flex justify-between items-center">
-                          <p className="text-sm text-muted-foreground">Total débité du solde</p>
-                          <p className="text-lg font-semibold text-foreground" data-testid="text-total-deducted">
-                            {new Intl.NumberFormat("fr-FR").format(amount + feeInfo.feeAmount + outgoingExchangeFeeAmount)} {userBalanceCurrency}
-                          </p>
+                        <div className="bg-muted p-3 rounded-md border space-y-1.5">
+                          {feeInfo.feeAmount > 0 && (
+                            <div className="flex justify-between items-center">
+                              <p className="text-xs text-muted-foreground">Frais de service</p>
+                              <p className="text-xs text-muted-foreground" data-testid="text-tx-fee-transfer">
+                                -{new Intl.NumberFormat("fr-FR").format(feeInfo.feeAmount)} {userBalanceCurrency}
+                              </p>
+                            </div>
+                          )}
+                          {outgoingExchangeFeeAmount > 0 && (
+                            <div className="flex justify-between items-center">
+                              <p className="text-xs text-muted-foreground">Frais d'échange ({userBalanceCurrency}&rarr;{targetCurrency})</p>
+                              <p className="text-xs text-muted-foreground" data-testid="text-exchange-fee-transfer">
+                                -{new Intl.NumberFormat("fr-FR").format(outgoingExchangeFeeAmount)} {userBalanceCurrency}
+                              </p>
+                            </div>
+                          )}
+                          <div className="flex justify-between items-center pt-0.5 border-t">
+                            <p className="text-sm text-muted-foreground">Total débité du solde</p>
+                            <p className="text-lg font-semibold text-foreground" data-testid="text-total-deducted">
+                              {new Intl.NumberFormat("fr-FR").format(amount + feeInfo.feeAmount + outgoingExchangeFeeAmount)} {userBalanceCurrency}
+                            </p>
+                          </div>
                         </div>
                         {needsConversion && conversionData && !conversionData.isLoading && conversionData.convertedAmount > 0 && (
                           <div className="bg-green-50 dark:bg-green-950/30 p-3 rounded-md border border-green-200 dark:border-green-800 flex justify-between items-center">
