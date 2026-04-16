@@ -2950,9 +2950,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ success: false, error: result.error || "Erreur lors du paiement" });
         }
 
-        // Exchange fee when payer's currency differs from API owner's balance currency
+        // Exchange fee for personal accounts when payer's currency differs from API owner's balance currency
         const { feeAmount: apiMbiyoXFee, feePercentage: apiMbiyoXFeePct } =
-          await getApiPayXFee(storage, baseAmount, providerCurrency, ownerCurrency);
+          (owner?.accountType === "personal" && ownerCurrency !== providerCurrency)
+            ? await getApiPayXFee(storage, baseAmount, providerCurrency, ownerCurrency)
+            : { feeAmount: 0, feePercentage: 0 };
         const apiMbiyoNet = Math.max(0, netAmountForUser - apiMbiyoXFee);
         const apiMbiyoTotalFee = feeAmount + apiMbiyoXFee;
         const apiMbiyoTotalFeePct = feePercentage + apiMbiyoXFeePct;
@@ -3037,13 +3039,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ success: false, error: "Paiement echoue" });
         }
 
+        // Exchange fee for personal accounts when payer's currency differs from API owner's balance currency
+        const { feeAmount: fedaXFee, feePercentage: fedaXFeePct } =
+          (owner?.accountType === "personal" && ownerCurrency !== providerCurrency)
+            ? await getApiPayXFee(storage, baseAmount, providerCurrency, ownerCurrency)
+            : { feeAmount: 0, feePercentage: 0 };
+        const fedaNet = Math.max(0, netAmountForUser - fedaXFee);
+        const fedaTotalFee = feeAmount + fedaXFee;
+        const fedaTotalFeePct = feePercentage + fedaXFeePct;
+
         // Create transaction record - store base amount for user balance credit
         const tx = await storage.createTransaction({
           userId: apiKey.userId,
           type: "api_payment",
           amount: baseAmount, // Store base amount in owner's currency
-          fee: feeAmount,
-          feePercentage: feePercentage,
+          fee: fedaTotalFee,
+          feePercentage: fedaTotalFeePct,
           currency: ownerCurrency, // Store in owner's currency
           status: "pending",
           country: country.toUpperCase(),
@@ -3062,13 +3073,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             successUrl: successUrl || null,
             cancelUrl: cancelUrl || null,
             provider: "fedapay",
-            netAmountForUser: netAmountForUser,
+            netAmountForUser: fedaNet,
             providerAmount: convertedAmountForProvider,
             providerCurrency: providerCurrency,
-            balanceAmount: netAmountForUser,
+            balanceAmount: fedaNet,
             balanceCurrency: ownerCurrency,
             customerPaysFee: apiKey.customerPaysFee,
-            feeAmount: feeAmount,
+            feeAmount: fedaTotalFee,
+            ...(fedaXFee > 0 ? { exchangeFee: fedaXFee, exchangeFeePercentage: fedaXFeePct } : {}),
           }),
         });
 
@@ -3133,13 +3145,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ success: false, error: "Paiement echoue" });
         }
 
+        // Exchange fee for personal accounts when payer's currency differs from API owner's balance currency
+        const { feeAmount: pdXFee, feePercentage: pdXFeePct } =
+          (owner?.accountType === "personal" && ownerCurrency !== providerCurrency)
+            ? await getApiPayXFee(storage, baseAmount, providerCurrency, ownerCurrency)
+            : { feeAmount: 0, feePercentage: 0 };
+        const pdNet = Math.max(0, netAmountForUser - pdXFee);
+        const pdTotalFee = feeAmount + pdXFee;
+        const pdTotalFeePct = feePercentage + pdXFeePct;
+
         // Create transaction record - store base amount for user balance credit
         const tx = await storage.createTransaction({
           userId: apiKey.userId,
           type: "api_payment",
           amount: baseAmount, // Store base amount in owner's currency
-          fee: feeAmount,
-          feePercentage: feePercentage,
+          fee: pdTotalFee,
+          feePercentage: pdTotalFeePct,
           currency: ownerCurrency, // Store in owner's currency
           status: "pending",
           country: country.toUpperCase(),
@@ -3160,13 +3181,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             provider: "paydunya",
             country: country.toUpperCase(),
             operator: operator,
-            netAmountForUser: netAmountForUser,
+            netAmountForUser: pdNet,
             providerAmount: convertedAmountForProvider,
             providerCurrency: providerCurrency,
-            balanceAmount: netAmountForUser,
+            balanceAmount: pdNet,
             balanceCurrency: ownerCurrency,
             customerPaysFee: apiKey.customerPaysFee,
-            feeAmount: feeAmount,
+            feeAmount: pdTotalFee,
+            ...(pdXFee > 0 ? { exchangeFee: pdXFee, exchangeFeePercentage: pdXFeePct } : {}),
           }),
         });
 
@@ -3293,12 +3315,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ success: false, error: translateAfribaPayError(afribaResult.error, "deposit") });
         }
 
+        // Exchange fee for personal accounts when payer's currency differs from API owner's balance currency
+        const { feeAmount: afribaXFee, feePercentage: afribaXFeePct } =
+          (owner?.accountType === "personal" && ownerCurrency !== providerCurrency)
+            ? await getApiPayXFee(storage, baseAmount, providerCurrency, ownerCurrency)
+            : { feeAmount: 0, feePercentage: 0 };
+        const afribaNet = Math.max(0, netAmountForUser - afribaXFee);
+        const afribaTotalFee = feeAmount + afribaXFee;
+        const afribaTotalFeePct = feePercentage + afribaXFeePct;
+
         const tx = await storage.createTransaction({
           userId: apiKey.userId,
           type: "api_payment",
           amount: baseAmount,
-          fee: feeAmount,
-          feePercentage: feePercentage,
+          fee: afribaTotalFee,
+          feePercentage: afribaTotalFeePct,
           currency: ownerCurrency,
           status: "pending",
           country: country.toUpperCase(),
@@ -3318,13 +3349,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             successUrl: successUrl || null,
             cancelUrl: cancelUrl || null,
             provider: "afribapay",
-            netAmountForUser: netAmountForUser,
+            netAmountForUser: afribaNet,
             providerAmount: convertedAmountForProvider,
             providerCurrency: providerCurrency,
-            balanceAmount: netAmountForUser,
+            balanceAmount: afribaNet,
             balanceCurrency: ownerCurrency,
             customerPaysFee: apiKey.customerPaysFee,
-            feeAmount: feeAmount,
+            feeAmount: afribaTotalFee,
+            ...(afribaXFee > 0 ? { exchangeFee: afribaXFee, exchangeFeePercentage: afribaXFeePct } : {}),
           }),
         });
 
@@ -3395,12 +3427,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ success: false, error: pawaResult.error || "Paiement non effectué. Veuillez réessayer." });
         }
 
+        // Exchange fee for personal accounts when payer's currency differs from API owner's balance currency
+        const { feeAmount: pawaXFee, feePercentage: pawaXFeePct } =
+          (owner?.accountType === "personal" && ownerCurrency !== providerCurrency)
+            ? await getApiPayXFee(storage, baseAmount, providerCurrency, ownerCurrency)
+            : { feeAmount: 0, feePercentage: 0 };
+        const pawaNet = Math.max(0, netAmountForUser - pawaXFee);
+        const pawaTotalFee = feeAmount + pawaXFee;
+        const pawaTotalFeePct = feePercentage + pawaXFeePct;
+
         const tx = await storage.createTransaction({
           userId: apiKey.userId,
           type: "api_payment",
           amount: baseAmount,
-          fee: feeAmount,
-          feePercentage: feePercentage,
+          fee: pawaTotalFee,
+          feePercentage: pawaTotalFeePct,
           currency: ownerCurrency,
           status: "pending",
           country: country.toUpperCase(),
@@ -3418,13 +3459,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             successUrl: successUrl || null,
             cancelUrl: cancelUrl || null,
             provider: "pawapay",
-            netAmountForUser: netAmountForUser,
+            netAmountForUser: pawaNet,
             providerAmount: convertedAmountForProvider,
             providerCurrency: providerCurrency,
-            balanceAmount: netAmountForUser,
+            balanceAmount: pawaNet,
             balanceCurrency: ownerCurrency,
             customerPaysFee: apiKey.customerPaysFee,
-            feeAmount: feeAmount,
+            feeAmount: pawaTotalFee,
+            ...(pawaXFee > 0 ? { exchangeFee: pawaXFee, exchangeFeePercentage: pawaXFeePct } : {}),
           }),
         });
 
@@ -3474,9 +3516,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ success: false, error: feeXPayTranslateErr(feexResult.error, "deposit") });
         }
 
+        // Exchange fee for personal accounts when payer's currency differs from API owner's balance currency
+        const { feeAmount: feexXFee, feePercentage: feexXFeePct } =
+          (owner?.accountType === "personal" && ownerCurrency !== feexProviderCurrency)
+            ? await getApiPayXFee(storage, baseAmount, feexProviderCurrency, ownerCurrency)
+            : { feeAmount: 0, feePercentage: 0 };
+        const feexNet = Math.max(0, netAmountForUser - feexXFee);
+        const feexTotalFee = feeAmount + feexXFee;
+        const feexTotalFeePct = feePercentage + feexXFeePct;
+
         const tx = await storage.createTransaction({
           userId: apiKey.userId, type: "api_payment", amount: baseAmount,
-          fee: feeAmount, feePercentage, currency: ownerCurrency, status: "pending",
+          fee: feexTotalFee, feePercentage: feexTotalFeePct, currency: ownerCurrency, status: "pending",
           country: country.toUpperCase(), operator,
           description: description || "Paiement via API",
           customerPhone, customerName: customerName || "Client", customerEmail: customerEmail || null,
@@ -3485,9 +3536,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             apiKeyId: apiKey.id, apiKeyPublicKey: publicKey,
             callbackUrl: callbackUrl || null, orderId: orderId || null,
             successUrl: successUrl || null, cancelUrl: cancelUrl || null,
-            provider: "feexpay", netAmountForUser, providerAmount: feexConvertedAmount,
-            providerCurrency: feexProviderCurrency, balanceAmount: netAmountForUser,
-            balanceCurrency: ownerCurrency, customerPaysFee: apiKey.customerPaysFee, feeAmount,
+            provider: "feexpay", netAmountForUser: feexNet, providerAmount: feexConvertedAmount,
+            providerCurrency: feexProviderCurrency, balanceAmount: feexNet,
+            balanceCurrency: ownerCurrency, customerPaysFee: apiKey.customerPaysFee, feeAmount: feexTotalFee,
+            ...(feexXFee > 0 ? { exchangeFee: feexXFee, exchangeFeePercentage: feexXFeePct } : {}),
           }),
         });
 
@@ -3874,9 +3926,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const providerCurrency = requestCurrency || getPawaPayCurrencyForOp(country.toUpperCase(), operator);
 
-        // Frais d'échange entrant si la devise du payeur diffère de celle du marchand
+        // Frais d'échange entrant pour comptes personnels si la devise du payeur diffère de celle du marchand
         const { feeAmount: sessXFeePawa, feePercentage: sessXFeePawaPct } =
-          await getSessionXFee(storage, netAmountForUser, providerCurrency, ownerCurrency);
+          (owner.accountType === "personal" && ownerCurrency !== providerCurrency)
+            ? await getSessionXFee(storage, netAmountForUser, providerCurrency, ownerCurrency)
+            : { feeAmount: 0, feePercentage: 0 };
         if (sessXFeePawa > 0) {
           netAmountForUser = Math.max(0, netAmountForUser - sessXFeePawa);
           feeAmount += sessXFeePawa;
@@ -3967,6 +4021,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ success: false, error: result.error });
         }
 
+        // Frais d'échange entrant pour comptes personnels (FedaPay utilise toujours XOF)
+        const fedaSessionProvCurr = "XOF";
+        const { feeAmount: sessXFeeFeda, feePercentage: sessXFedaPct } =
+          (owner.accountType === "personal" && ownerCurrency !== fedaSessionProvCurr)
+            ? await getSessionXFee(storage, netAmountForUser, fedaSessionProvCurr, ownerCurrency)
+            : { feeAmount: 0, feePercentage: 0 };
+        if (sessXFeeFeda > 0) {
+          netAmountForUser = Math.max(0, netAmountForUser - sessXFeeFeda);
+          feeAmount += sessXFeeFeda;
+          feePercentage += sessXFedaPct;
+        }
+
         const tx = await storage.createTransaction({
           userId: apiKey.userId, type: "api_payment", amount: session.amount,
           fee: feeAmount, feePercentage, currency: ownerCurrency, status: "pending",
@@ -3978,6 +4044,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             successUrl: session.successUrl, cancelUrl: session.cancelUrl,
             callbackUrl: session.callbackUrl, orderId: session.orderId,
             fedapayTransactionId: result.transactionId,
+            netAmountForUser, balanceAmount: netAmountForUser, balanceCurrency: ownerCurrency,
+            providerCurrency: fedaSessionProvCurr,
+            ...(sessXFeeFeda > 0 ? { exchangeFee: sessXFeeFeda, exchangeFeePercentage: sessXFedaPct } : {}),
           }),
         });
 
@@ -4002,6 +4071,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ success: false, error: paydunyaResp.response_text || "Erreur lors de la création de la facture" });
         }
 
+        // Frais d'échange entrant pour comptes personnels (Paydunya — XAF pour CM, XOF sinon)
+        const pdSessionProvCurr = (country.toUpperCase() === "CM") ? "XAF" : "XOF";
+        const { feeAmount: sessXFeePd, feePercentage: sessXFeePdPct } =
+          (owner.accountType === "personal" && ownerCurrency !== pdSessionProvCurr)
+            ? await getSessionXFee(storage, netAmountForUser, pdSessionProvCurr, ownerCurrency)
+            : { feeAmount: 0, feePercentage: 0 };
+        if (sessXFeePd > 0) {
+          netAmountForUser = Math.max(0, netAmountForUser - sessXFeePd);
+          feeAmount += sessXFeePd;
+          feePercentage += sessXFeePdPct;
+        }
+
         const tx = await storage.createTransaction({
           userId: apiKey.userId, type: "api_payment", amount: session.amount,
           fee: feeAmount, feePercentage, currency: ownerCurrency, status: "pending",
@@ -4013,6 +4094,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             sessionId: session.id, apiKeyId: apiKey.id,
             successUrl: session.successUrl, cancelUrl: session.cancelUrl,
             callbackUrl: session.callbackUrl, orderId: session.orderId,
+            netAmountForUser, balanceAmount: netAmountForUser, balanceCurrency: ownerCurrency,
+            providerCurrency: pdSessionProvCurr,
+            ...(sessXFeePd > 0 ? { exchangeFee: sessXFeePd, exchangeFeePercentage: sessXFeePdPct } : {}),
           }),
         });
 
@@ -4042,9 +4126,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.json({ success: false, requiresOTP: true, otpInstructions: otpInfo.instructions, otpUssdCode: otpInfo.ussdCode, otpHint: otpInfo.hint, provider: "mbiyopay", error: "Code OTP requis" });
         }
 
-        // Frais d'échange entrant si la devise du payeur diffère de celle du marchand
+        // Frais d'échange entrant pour comptes personnels si la devise du payeur diffère de celle du marchand
         const { feeAmount: sessXFeeMbiy, feePercentage: sessXFeeMbiyPct } =
-          await getSessionXFee(storage, netAmountForUser, providerCurrency, ownerCurrency);
+          (owner.accountType === "personal" && ownerCurrency !== providerCurrency)
+            ? await getSessionXFee(storage, netAmountForUser, providerCurrency, ownerCurrency)
+            : { feeAmount: 0, feePercentage: 0 };
         if (sessXFeeMbiy > 0) {
           netAmountForUser = Math.max(0, netAmountForUser - sessXFeeMbiy);
           feeAmount += sessXFeeMbiy;
@@ -4092,12 +4178,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await storage.updatePaymentSession(session.id, { status: "pending" });
           return res.status(400).json({ success: false, error: result.error });
         }
+        // Frais d'échange entrant pour comptes personnels (AfribaPay — devise selon le pays)
+        const { getCurrencyForCountry: getAfribaSessionCurr } = await import("@shared/afribapay-countries");
+        const afribaSessionProvCurr = getAfribaSessionCurr(country.toUpperCase());
+        const { feeAmount: sessXFeeAfriba, feePercentage: sessXFeeAfrPct } =
+          (owner.accountType === "personal" && ownerCurrency !== afribaSessionProvCurr)
+            ? await getSessionXFee(storage, netAmountForUser, afribaSessionProvCurr, ownerCurrency)
+            : { feeAmount: 0, feePercentage: 0 };
+        if (sessXFeeAfriba > 0) {
+          netAmountForUser = Math.max(0, netAmountForUser - sessXFeeAfriba);
+          feeAmount += sessXFeeAfriba;
+          feePercentage += sessXFeeAfrPct;
+        }
         const tx = await storage.createTransaction({
           userId: apiKey.userId, type: "api_payment", amount: session.amount,
           fee: feeAmount, feePercentage, currency: ownerCurrency, status: "pending",
           country: country.toUpperCase(), operator, description: session.description || "Paiement API",
           customerPhone, customerName: customerName || "Client", customerEmail: customerEmail || null,
-          metadata: JSON.stringify({ sessionId: session.id, apiKeyId: apiKey.id, successUrl: session.successUrl, cancelUrl: session.cancelUrl, callbackUrl: session.callbackUrl, orderId: session.orderId, provider: "afribapay", afribaPayTransactionId: result.afribaPayTransactionId }),
+          metadata: JSON.stringify({
+            sessionId: session.id, apiKeyId: apiKey.id, successUrl: session.successUrl,
+            cancelUrl: session.cancelUrl, callbackUrl: session.callbackUrl, orderId: session.orderId,
+            provider: "afribapay", afribaPayTransactionId: result.afribaPayTransactionId,
+            netAmountForUser, balanceAmount: netAmountForUser, balanceCurrency: ownerCurrency,
+            providerCurrency: afribaSessionProvCurr,
+            ...(sessXFeeAfriba > 0 ? { exchangeFee: sessXFeeAfriba, exchangeFeePercentage: sessXFeeAfrPct } : {}),
+          }),
         });
         await storage.updatePaymentSession(session.id, { transactionId: tx.id });
         return res.json({ success: true, transactionId: tx.id, redirectUrl: result.providerLink, message: result.message || "Paiement initié", provider: "afribapay" });
@@ -4119,9 +4224,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const sessFeexCurr = sessFeexCurrency(country.toUpperCase());
 
-        // Frais d'échange entrant si la devise du payeur diffère de celle du marchand
+        // Frais d'échange entrant pour comptes personnels si la devise du payeur diffère de celle du marchand
         const { feeAmount: sessXFeeFeex, feePercentage: sessXFeeFeexPct } =
-          await getSessionXFee(storage, netAmountForUser, sessFeexCurr, ownerCurrency);
+          (owner.accountType === "personal" && ownerCurrency !== sessFeexCurr)
+            ? await getSessionXFee(storage, netAmountForUser, sessFeexCurr, ownerCurrency)
+            : { feeAmount: 0, feePercentage: 0 };
         if (sessXFeeFeex > 0) {
           netAmountForUser = Math.max(0, netAmountForUser - sessXFeeFeex);
           feeAmount += sessXFeeFeex;

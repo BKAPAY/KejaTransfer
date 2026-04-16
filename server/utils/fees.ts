@@ -409,25 +409,31 @@ export async function getOutgoingExchangeFee(
   try {
     const { db } = await import("../db");
     const { currencyExchangeFees } = await import("@shared/schema");
-    const { eq, and } = await import("drizzle-orm");
+    const { eq, and, or } = await import("drizzle-orm");
+    // Try direct direction first, then reverse (admin may configure either direction)
     const rows = await db.select().from(currencyExchangeFees).where(
       and(
-        eq(currencyExchangeFees.fromCurrency, userCurrency),
-        eq(currencyExchangeFees.toCurrency, destCurrency),
+        or(
+          and(eq(currencyExchangeFees.fromCurrency, userCurrency), eq(currencyExchangeFees.toCurrency, destCurrency)),
+          and(eq(currencyExchangeFees.fromCurrency, destCurrency), eq(currencyExchangeFees.toCurrency, userCurrency)),
+        ),
         eq(currencyExchangeFees.isActive, 1),
       )
     );
-    console.log(`[ExchangeFee] DB query ${userCurrency}→${destCurrency}: ${rows.length} rows found${rows.length > 0 ? `, feePercentage=${rows[0].feePercentage}, isActive=${rows[0].isActive}` : ""}`);
-    if (rows.length > 0 && rows[0].feePercentage > 0) {
-      const feeAmount = Math.floor((Math.floor(amount) * rows[0].feePercentage) / 1000);
-      console.log(`[ExchangeFee] Calculated: ${amount} * ${rows[0].feePercentage} / 1000 = ${feeAmount}`);
+    // Prefer direct direction (userCurrency→destCurrency) if both exist
+    const directRow = rows.find(r => r.fromCurrency === userCurrency && r.toCurrency === destCurrency);
+    const row = directRow ?? rows[0];
+    console.log(`[ExchangeFee] DB query ${userCurrency}↔${destCurrency}: ${rows.length} rows found${row ? `, feePercentage=${row.feePercentage}, direction=${row.fromCurrency}→${row.toCurrency}` : ""}`);
+    if (row && row.feePercentage > 0) {
+      const feeAmount = Math.floor((Math.floor(amount) * row.feePercentage) / 1000);
+      console.log(`[ExchangeFee] Calculated: ${amount} * ${row.feePercentage} / 1000 = ${feeAmount}`);
       return {
         feeAmount,
-        feePercentage: rows[0].feePercentage,
+        feePercentage: row.feePercentage,
       };
     }
   } catch (err) {
-    console.error(`[ExchangeFee] ERROR querying ${userCurrency}→${destCurrency}:`, err);
+    console.error(`[ExchangeFee] ERROR querying ${userCurrency}↔${destCurrency}:`, err);
   }
   return { feeAmount: 0, feePercentage: 0 };
 }
