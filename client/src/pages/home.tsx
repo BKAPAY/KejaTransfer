@@ -74,7 +74,7 @@ const features = [
   },
   {
     icon: Code,
-    title: "API Gateway",
+    title: "API",
     description: "Intégrez les paiements directement dans votre site web ou application avec notre API sécurisée.",
     image: apiGatewayImage,
   },
