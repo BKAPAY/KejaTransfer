@@ -126,7 +126,7 @@ function useScrollAnimation() {
 }
 
 const adSlides = [
-  { src: adAfricaMapImage, alt: "BKApay - 15 pays connectés en Afrique" },
+  { src: adAfricaMapImage, alt: "BKApay - Plus de 17 pays connectés en Afrique" },
   { src: adMarketImage, alt: "BKApay - Acceptez les paiements partout" },
   { src: adCryptoImage, alt: "BKApay - Mobile Money + Crypto" },
   { src: adManJumpImage, alt: "BKApay - La joie des paiements réussis" },
@@ -208,7 +208,7 @@ export default function Home() {
                 Paiements Mobile Money pour l'Afrique
               </h1>
               <p className="text-xs sm:text-sm md:text-base lg:text-lg text-white/80">
-                Acceptez les paiements Orange Money, MTN, Moov, Wave et plus dans 15 pays. Plateforme simple, sécurisée et fiable.
+                Acceptez les paiements Orange Money, MTN, Moov, Wave et plus dans plus de 17 pays. Plateforme simple, sécurisée et fiable.
               </p>
             </div>
             <div className="flex flex-wrap gap-2 sm:gap-4">
@@ -231,7 +231,7 @@ export default function Home() {
       <section className="py-6 sm:py-8 md:py-12 lg:py-16 bg-card overflow-hidden">
         <div className="container mx-auto px-2 sm:px-4 md:px-8 max-w-7xl">
           <div className="text-center mb-4 sm:mb-8">
-            <h2 className="animate-on-scroll anim-fade-up text-lg sm:text-xl md:text-3xl lg:text-4xl font-bold mb-2 sm:mb-4 text-foreground">Disponible dans 15 pays</h2>
+            <h2 className="animate-on-scroll anim-fade-up text-lg sm:text-xl md:text-3xl lg:text-4xl font-bold mb-2 sm:mb-4 text-foreground">Disponible dans plus de 17 pays</h2>
             <p className="animate-on-scroll anim-fade-up anim-delay-1 text-xs sm:text-sm md:text-base lg:text-lg text-muted-foreground">Couvrant toute l'Afrique francophone et anglophone</p>
           </div>
           <div className="flex gap-2 sm:gap-4 carousel-scroll">
@@ -455,7 +455,7 @@ export default function Home() {
                     </div>
                     <div className="flex items-center gap-2">
                       <ChevronRight className="w-3.5 h-3.5 text-primary flex-shrink-0" />
-                      <span>Disponible dans 15 pays africains</span>
+                      <span>Disponible dans plus de 17 pays africains</span>
                     </div>
                   </div>
                   <Link href="/signup">
@@ -493,7 +493,7 @@ export default function Home() {
                     "Webhooks en temps réel pour chaque événement de paiement",
                     "Tableau de bord & statistiques de transactions",
                     "Multi-devises : XOF, XAF, CDF, USD",
-                    "Couverture dans 15 pays africains",
+                    "Couverture dans plus de 17 pays africains",
                     "Documentation technique complète & support prioritaire",
                   ].map((item, i) => (
                     <div key={i} className="flex items-start gap-2.5 sm:gap-3">
