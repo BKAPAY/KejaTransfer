@@ -372,13 +372,13 @@ export default function PaymentLinks() {
               />
             )}
             <div className="bg-muted rounded-md p-3 flex items-center justify-between gap-2 w-full">
-              <code className="text-xs sm:text-sm font-mono text-foreground flex-1 text-center">
-                {successToken}
+              <code className="text-xs font-mono text-foreground flex-1 text-left break-all">
+                {`${window.location.origin}/pay/${successToken}`}
               </code>
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={() => copyToClipboard(successToken, true)}
+                onClick={() => copyToClipboard(successToken, false)}
                 className="flex-shrink-0"
                 data-testid="button-copy-success"
               >
