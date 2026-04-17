@@ -572,15 +572,14 @@ export async function handlePawaPayWebhook(req: Request, res: Response): Promise
             const country = tx.country || meta.country;
             const currency = tx.currency || meta.balanceCurrency;
             if (country && currency) {
-              try {
-                await storage.creditBusinessWallet(tx.userId, country, currency, refundAmount);
-                await storage.updateTransactionStatus(tx.id, "failed");
+              const refunded = await storage.atomicFailAndRefundBusinessWallet(tx.id, tx.userId, country, currency, refundAmount, "pawapay-webhook");
+              if (refunded) {
                 console.log(`[PawaPay Webhook] Business payout ${tx.id} failed — refunded ${refundAmount} ${currency} to business wallet ${country}`);
-              } catch (err) {
-                console.error(`[PawaPay Webhook] CRITICAL: Failed to refund business wallet for payout ${tx.id}:`, err);
+                await sendApiPayoutCallback(tx.id, meta, "failed");
+              } else {
+                console.log(`[PawaPay Webhook] Business payout ${tx.id} already processed by another process`);
               }
             }
-            await sendApiPayoutCallback(tx.id, meta, "failed");
           } else {
             const refundAmount = (meta.deductedFromBalance || meta.totalDebited || tx.amount) + (meta.exchangeFee || 0);
             const refunded = await storage.atomicFailAndRefundPayout(tx.id, tx.userId, refundAmount);
@@ -679,15 +678,14 @@ export async function pollPawaPayTransaction(txId: string): Promise<void> {
           const country = tx.country || meta.country;
           const currency = tx.currency || meta.balanceCurrency;
           if (country && currency) {
-            try {
-              await storage.creditBusinessWallet(tx.userId, country, currency, refundAmount);
-              await storage.updateTransactionStatus(txId, "failed");
+            const refunded = await storage.atomicFailAndRefundBusinessWallet(txId, tx.userId, country, currency, refundAmount, "pawapay-poll");
+            if (refunded) {
               console.log(`[PawaPay Poll] Business payout ${txId} failed — refunded ${refundAmount} ${currency} to business wallet ${country}`);
-            } catch (err) {
-              console.error(`[PawaPay Poll] CRITICAL: Failed to refund business wallet for payout ${txId}:`, err);
+              await sendApiPayoutCallback(txId, meta, "failed");
+            } else {
+              console.log(`[PawaPay Poll] Business payout ${txId} already processed by another process`);
             }
           }
-          await sendApiPayoutCallback(txId, meta, "failed");
         } else {
           const refundAmount = (meta.deductedFromBalance || meta.totalDebited || tx.amount) + (meta.exchangeFee || 0);
           const refunded = await storage.atomicFailAndRefundPayout(txId, tx.userId, refundAmount);

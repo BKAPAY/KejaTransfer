@@ -1234,7 +1234,17 @@ export class DbStorage implements IStorage {
     const result = await client.begin(async (tx) => {
       const updated = await tx`
         UPDATE transactions
-        SET status = 'failed'
+        SET status = 'failed',
+            metadata = jsonb_set(
+              jsonb_set(
+                jsonb_set(
+                  COALESCE(metadata::jsonb, '{}'::jsonb),
+                  '{refunded}', 'true'::jsonb
+                ),
+                '{refundedAt}', to_jsonb(now()::text)
+              ),
+              '{refundedAmount}', to_jsonb(${refundAmount}::numeric)
+            )::text
         WHERE id = ${transactionId}
           AND status = 'pending'
         RETURNING id
@@ -1264,7 +1274,17 @@ export class DbStorage implements IStorage {
     const result = await client.begin(async (tx) => {
       const updated = await tx`
         UPDATE transactions
-        SET status = 'failed'
+        SET status = 'failed',
+            metadata = jsonb_set(
+              jsonb_set(
+                jsonb_set(
+                  COALESCE(metadata::jsonb, '{}'::jsonb),
+                  '{refunded}', 'true'::jsonb
+                ),
+                '{refundedAt}', to_jsonb(now()::text)
+              ),
+              '{refundedAmount}', to_jsonb(${refundAmount}::numeric)
+            )::text
         WHERE id = ${transactionId}
           AND status = 'pending'
         RETURNING id
