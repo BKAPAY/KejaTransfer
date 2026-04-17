@@ -938,11 +938,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { provider, country, operator } = req.params;
       const { incomingFeePercentage, outgoingFeePercentage } = req.body;
-      const config = await storage.updateFeeConfig(provider, country, operator, {
-        incomingFeePercentage,
-        outgoingFeePercentage
-      }, "business");
-      if (!config) return res.status(404).json({ error: "Config non trouvée" });
+      const config = await storage.createOrUpdateFeeConfig({
+        provider,
+        country,
+        operator,
+        incomingFeePercentage: incomingFeePercentage ?? 60,
+        outgoingFeePercentage: outgoingFeePercentage ?? 60,
+        scope: "business",
+      });
       res.json(config);
     } catch (error: any) {
       console.error("Update business fee config error:", error);
@@ -1063,12 +1066,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const DEFAULT_FEE = 60;
 
       const result = activeConfigs.map(cfg => {
+        // Priority: business scope + exact provider match, then business any provider, then personal exact provider, then personal any
         const feeMatch = allFeeConfigs.find(
+          f => f.provider === cfg.provider && f.country === cfg.country && f.operator === cfg.operator && f.scope === "business"
+        ) || allFeeConfigs.find(
           f => f.country === cfg.country && f.operator === cfg.operator && f.scope === "business"
         ) || allFeeConfigs.find(
-          f => f.country === cfg.country && f.operator === cfg.operator && f.scope === "personal"
+          f => f.provider === cfg.provider && f.country === cfg.country && f.operator === cfg.operator && f.scope === "personal"
         ) || allFeeConfigs.find(
-          f => f.country === cfg.country && f.operator === cfg.operator
+          f => f.country === cfg.country && f.operator === cfg.operator && f.scope === "personal"
         );
         return {
           country: cfg.country,
