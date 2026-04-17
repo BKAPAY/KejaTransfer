@@ -372,7 +372,7 @@ export function DownloadReceiptButtons({ transaction, metadata }: DownloadReceip
     <>
       <div className="flex gap-2">
         <Button
-          variant="outline"
+          variant="default"
           onClick={downloadImage}
           disabled={!!loading}
           data-testid="button-download-receipt-image"
@@ -381,7 +381,7 @@ export function DownloadReceiptButtons({ transaction, metadata }: DownloadReceip
           {loading === "image" ? "Export..." : "Image"}
         </Button>
         <Button
-          variant="outline"
+          variant="destructive"
           onClick={downloadPdf}
           disabled={!!loading}
           data-testid="button-download-receipt-pdf"
