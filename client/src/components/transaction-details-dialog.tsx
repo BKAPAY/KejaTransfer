@@ -118,20 +118,28 @@ function FinancialBreakdown({
   metadata: TransactionMetadata | null;
 }) {
   const currency = transaction.currency || "XOF";
-  const totalFee = transaction.fee || 0;
+  // transaction.fee = frais de service UNIQUEMENT (stocké par le handler fournisseur)
+  // metadata.exchangeFee = frais d'échange SÉPARÉS (ajoutés après coup pour les transferts cross-border)
+  const serviceFee = transaction.fee || 0;
   const exchangeFee = metadata?.exchangeFee || 0;
-  const serviceFee = totalFee - exchangeFee;
+  const totalFee = serviceFee + exchangeFee;
   const isOutgoing = OUTGOING_TYPES.includes(transaction.type);
   const isIncoming = INCOMING_TYPES.includes(transaction.type);
 
-  // API payout / netMode: transaction.amount = NET recipient gets, fees added on top
+  // Modèle "frais par-dessus" : destinataire reçoit transaction.amount exactement,
+  // l'expéditeur paie transaction.amount + frais.
+  // S'applique à : tous les TRANSFERTS, les retraits cross-devises (exchangeFee > 0),
+  // et les API payouts (netMode).
   const isNetMode = !!(metadata?.netMode) || !!(metadata?.apiKeyId && !metadata?.businessTokenId);
+  const isFeeOnTop = transaction.type === "transfer"
+    || (transaction.type === "withdrawal" && exchangeFee > 0)
+    || isNetMode;
 
   if (totalFee === 0) return null;
 
   if (isOutgoing) {
-    if (isNetMode) {
-      // recipient gets transaction.amount exactly; balance = amount + fee
+    if (isFeeOnTop) {
+      // Destinataire reçoit transaction.amount exactement ; solde débité = amount + frais
       const net = transaction.amount;
       const balanceDeducted = net + totalFee;
       return (
@@ -158,10 +166,10 @@ function FinancialBreakdown({
       );
     }
 
-    // Standard withdrawal/transfer: fee deducted FROM the gross amount
-    // transaction.amount = gross entered; balance = gross; recipient = gross - fee
+    // Retrait standard (même devise) : frais déduits du montant brut
+    // transaction.amount = montant brut saisi ; destinataire = montant - frais de service
     const gross = transaction.amount;
-    const netReceived = Math.max(0, gross - totalFee);
+    const netReceived = Math.max(0, gross - serviceFee);
 
     return (
       <div className="space-y-2">
@@ -175,9 +183,6 @@ function FinancialBreakdown({
             {serviceFee > 0 && (
               <FinancialRow label="Frais de service" value={`-${fmtAmount(serviceFee, currency)}`} color="red" />
             )}
-            {exchangeFee > 0 && (
-              <FinancialRow label="Frais d'échange de devise" value={`-${fmtAmount(exchangeFee, currency)}`} color="orange" />
-            )}
           </div>
           <div className="border-t px-4 py-3 bg-muted/20 space-y-1">
             <FinancialRow label="Reçu par le destinataire" value={fmtAmount(netReceived, currency)} color="green" bold size="md" />
@@ -188,7 +193,7 @@ function FinancialBreakdown({
   }
 
   if (isIncoming) {
-    // transaction.amount = GROSS (payer sent); fee deducted from it; net credited = gross - fee
+    // transaction.amount = BRUT (payeur a envoyé) ; frais déduits ; net crédité = brut - frais
     const gross = transaction.amount;
     const netCredited = Math.max(0, gross - totalFee);
 
@@ -313,7 +318,13 @@ export function TransactionDetailsDialog({
 
   const currency = transaction.currency || "XOF";
   const isOutgoing = OUTGOING_TYPES.includes(transaction.type);
-  const totalFee = transaction.fee || 0;
+  const serviceFeeHeader = transaction.fee || 0;
+  const exchangeFeeHeader = metadata?.exchangeFee || 0;
+  const totalFee = serviceFeeHeader + exchangeFeeHeader;
+  const isFeeOnTopHeader = transaction.type === "transfer"
+    || (transaction.type === "withdrawal" && exchangeFeeHeader > 0)
+    || !!(metadata?.netMode)
+    || !!(metadata?.apiKeyId && !metadata?.businessTokenId);
 
   const getStatusConfig = (status: string) => {
     const configs: Record<string, { label: string; icon: typeof CheckCircle; bg: string; text: string; border: string }> = {
@@ -398,12 +409,16 @@ export function TransactionDetailsDialog({
             </div>
             <div className="mt-3 pt-3 border-t border-current/10">
               <p className="text-xs text-muted-foreground mb-1">
-                {isOutgoing ? "Montant saisi" : totalFee > 0 ? "Montant brut reçu" : "Montant"}
+                {isOutgoing
+                  ? (isFeeOnTopHeader ? "Montant envoyé au destinataire" : "Montant saisi")
+                  : totalFee > 0 ? "Montant brut reçu" : "Montant"}
               </p>
               <p className={`text-3xl font-bold tabular-nums ${statusConfig.text}`}>{displayAmount}</p>
               {isOutgoing && totalFee > 0 && (
                 <p className="text-xs text-muted-foreground mt-1">
-                  Net destinataire : {fmtAmount(Math.max(0, transaction.amount - totalFee), currency)}
+                  {isFeeOnTopHeader
+                    ? `Débité de votre solde : ${fmtAmount(transaction.amount + totalFee, currency)}`
+                    : `Net destinataire : ${fmtAmount(Math.max(0, transaction.amount - serviceFeeHeader), currency)}`}
                 </p>
               )}
               {!isOutgoing && totalFee > 0 && (
