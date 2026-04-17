@@ -224,12 +224,32 @@ export default function AdminBusinessManagement() {
     },
   });
 
-  const filteredUsers = users.filter(user =>
-    user.businessName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    user.firstName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    user.lastName?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const { data: searchResults = [] } = useQuery<User[]>({
+    queryKey: ["/api/admin/business/search", searchQuery],
+    queryFn: async () => {
+      if (!searchQuery.trim()) return [];
+      const res = await fetch(`/api/admin/business/search?q=${encodeURIComponent(searchQuery)}`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: searchQuery.trim().length > 0,
+    staleTime: 10000,
+  });
+
+  const filteredUsers = searchQuery.trim()
+    ? (() => {
+        const localMatches = users.filter(user =>
+          user.businessName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          user.firstName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          user.lastName?.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+        const resultMap = new Map<string, User>();
+        localMatches.forEach(u => resultMap.set(u.id, u));
+        searchResults.forEach(u => resultMap.set(u.id, u));
+        return Array.from(resultMap.values());
+      })()
+    : users;
 
   const formatAmount = (amount: number, currency: string = "XOF") => {
     return new Intl.NumberFormat("fr-FR", {

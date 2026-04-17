@@ -817,6 +817,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/admin/business/search", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const query = req.query.q as string;
+      if (!query || query.length === 0) return res.json([]);
+      const allResults = await storage.searchUsers(query);
+      const businessResults = allResults.filter((u: any) => u.accountType === "business");
+      res.json(businessResults);
+    } catch (error: any) {
+      console.error("Business search error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
   app.get("/api/admin/business/users/:id/transactions", requireAdmin, async (req: Request, res: Response) => {
     try {
       const transactions = await storage.getTransactions(req.params.id);
