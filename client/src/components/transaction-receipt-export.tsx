@@ -235,15 +235,26 @@ const ReceiptTemplate = forwardRef<HTMLDivElement, ReceiptTemplateProps>(
                     <ReceiptRow label="Débité de votre solde" value={fmtAmt(transaction.amount + totalFee, currency)} color="#b91c1c" bold />
                   </>
                 )}
-                {isIncoming && (
-                  <>
-                    <ReceiptRow label="Montant reçu du payeur" value={fmtAmt(transaction.amount, currency)} />
-                    {serviceFee > 0 && <ReceiptRow label="Frais de service" value={`-${fmtAmt(serviceFee, currency)}`} color="#ef4444" />}
-                    {exchangeFee > 0 && <ReceiptRow label="Frais d'échange" value={`-${fmtAmt(exchangeFee, currency)}`} color="#f97316" />}
-                    <div style={{ borderTop: "1px solid #e2e8f0", margin: "8px 0" }} />
-                    <ReceiptRow label="Crédité sur votre compte" value={fmtAmt(Math.max(0, transaction.amount - totalFee), currency)} color="#15803d" bold />
-                  </>
-                )}
+                {isIncoming && (() => {
+                  const cpf = !!(metadata?.customerPaysFee);
+                  const gross = transaction.amount;
+                  const baseForOwner = Math.max(0, gross - serviceFee);
+                  const netAfterExchange = Math.max(0, baseForOwner - exchangeFee);
+                  const netStandard = Math.max(0, gross - totalFee);
+                  return (
+                    <>
+                      <ReceiptRow label="Montant reçu du payeur" value={fmtAmt(gross, currency)} />
+                      {cpf ? (
+                        serviceFee > 0 && <ReceiptRow label="Frais réglés par le client" value={fmtAmt(serviceFee, currency)} color="#64748b" />
+                      ) : (
+                        serviceFee > 0 && <ReceiptRow label="Frais de service" value={`-${fmtAmt(serviceFee, currency)}`} color="#ef4444" />
+                      )}
+                      {exchangeFee > 0 && <ReceiptRow label="Frais d'échange" value={`-${fmtAmt(exchangeFee, currency)}`} color="#f97316" />}
+                      <div style={{ borderTop: "1px solid #e2e8f0", margin: "8px 0" }} />
+                      <ReceiptRow label="Crédité sur votre compte" value={fmtAmt(cpf ? netAfterExchange : netStandard, currency)} color="#15803d" bold />
+                    </>
+                  );
+                })()}
               </div>
             </>
           )}

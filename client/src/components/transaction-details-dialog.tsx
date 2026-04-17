@@ -193,8 +193,45 @@ function FinancialBreakdown({
   }
 
   if (isIncoming) {
-    // transaction.amount = BRUT (payeur a envoyé) ; frais déduits ; net crédité = brut - frais
+    const customerPaysFee = !!(metadata?.customerPaysFee);
     const gross = transaction.amount;
+
+    if (customerPaysFee) {
+      // Frais de service pris en charge par le client : ne pas les déduire du propriétaire.
+      // Seuls les frais d'échange éventuels restent à la charge du propriétaire.
+      const baseForOwner = Math.max(0, gross - serviceFee);
+      const netAfterExchange = Math.max(0, baseForOwner - exchangeFee);
+
+      return (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 mb-3">
+            <Receipt className="w-4 h-4 text-muted-foreground" />
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Récapitulatif financier</h3>
+          </div>
+          <div className="rounded-lg border overflow-hidden">
+            <div className="p-4 space-y-3 bg-card">
+              <FinancialRow label="Montant reçu du payeur" value={fmtAmount(gross, currency)} />
+              {serviceFee > 0 && (
+                <FinancialRow
+                  label="Frais réglés par le client"
+                  value={fmtAmount(serviceFee, currency)}
+                  sublabel="pris en charge par le payeur"
+                  color="muted"
+                />
+              )}
+              {exchangeFee > 0 && (
+                <FinancialRow label="Frais d'échange de devise" value={`-${fmtAmount(exchangeFee, currency)}`} color="orange" />
+              )}
+            </div>
+            <div className="border-t px-4 py-3 bg-emerald-50 dark:bg-emerald-950/20 space-y-1">
+              <FinancialRow label="Crédité sur votre compte" value={fmtAmount(netAfterExchange, currency)} color="green" bold size="md" />
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Cas standard : frais à la charge du propriétaire
     const netCredited = Math.max(0, gross - totalFee);
 
     return (
