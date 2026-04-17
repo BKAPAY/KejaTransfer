@@ -197,10 +197,12 @@ function FinancialBreakdown({
     const gross = transaction.amount;
 
     if (customerPaysFee) {
-      // Frais de service pris en charge par le client : ne pas les déduire du propriétaire.
-      // Seuls les frais d'échange éventuels restent à la charge du propriétaire.
-      const baseForOwner = Math.max(0, gross - serviceFee);
-      const netAfterExchange = Math.max(0, baseForOwner - exchangeFee);
+      // Le client a payé les frais de service EN PLUS du montant de base.
+      // transaction.amount = montant BASE (ce que le marchand reçoit)
+      // gross du client = transaction.amount + serviceFee
+      // Seuls les frais d'échange restent à la charge du marchand.
+      const grossFromClient = gross + serviceFee;
+      const creditedToOwner = Math.max(0, gross - exchangeFee);
 
       return (
         <div className="space-y-2">
@@ -210,11 +212,11 @@ function FinancialBreakdown({
           </div>
           <div className="rounded-lg border overflow-hidden">
             <div className="p-4 space-y-3 bg-card">
-              <FinancialRow label="Montant reçu du payeur" value={fmtAmount(gross, currency)} />
+              <FinancialRow label="Total payé par le client" value={fmtAmount(grossFromClient, currency)} />
               {serviceFee > 0 && (
                 <FinancialRow
                   label="Frais réglés par le client"
-                  value={fmtAmount(serviceFee, currency)}
+                  value={`+${fmtAmount(serviceFee, currency)}`}
                   sublabel="pris en charge par le payeur"
                   color="muted"
                 />
@@ -224,7 +226,7 @@ function FinancialBreakdown({
               )}
             </div>
             <div className="border-t px-4 py-3 bg-emerald-50 dark:bg-emerald-950/20 space-y-1">
-              <FinancialRow label="Crédité sur votre compte" value={fmtAmount(netAfterExchange, currency)} color="green" bold size="md" />
+              <FinancialRow label="Crédité sur votre compte" value={fmtAmount(creditedToOwner, currency)} color="green" bold size="md" />
             </div>
           </div>
         </div>
@@ -362,6 +364,7 @@ export function TransactionDetailsDialog({
     || (transaction.type === "withdrawal" && exchangeFeeHeader > 0)
     || !!(metadata?.netMode)
     || !!(metadata?.apiKeyId && !metadata?.businessTokenId);
+  const customerPaysFeeHeader = !!(metadata?.customerPaysFee);
 
   const getStatusConfig = (status: string) => {
     const configs: Record<string, { label: string; icon: typeof CheckCircle; bg: string; text: string; border: string }> = {
@@ -448,7 +451,9 @@ export function TransactionDetailsDialog({
               <p className="text-xs text-muted-foreground mb-1">
                 {isOutgoing
                   ? (isFeeOnTopHeader ? "Montant envoyé au destinataire" : "Montant saisi")
-                  : totalFee > 0 ? "Montant brut reçu" : "Montant"}
+                  : customerPaysFeeHeader
+                    ? "Montant"
+                    : totalFee > 0 ? "Montant brut reçu" : "Montant"}
               </p>
               <p className={`text-3xl font-bold tabular-nums ${statusConfig.text}`}>{displayAmount}</p>
               {isOutgoing && totalFee > 0 && (
@@ -458,9 +463,14 @@ export function TransactionDetailsDialog({
                     : `Net destinataire : ${fmtAmount(Math.max(0, transaction.amount - serviceFeeHeader), currency)}`}
                 </p>
               )}
-              {!isOutgoing && totalFee > 0 && (
+              {!isOutgoing && !customerPaysFeeHeader && totalFee > 0 && (
                 <p className="text-xs text-muted-foreground mt-1">
                   Net crédité : {fmtAmount(Math.max(0, transaction.amount - totalFee), currency)}
+                </p>
+              )}
+              {!isOutgoing && customerPaysFeeHeader && exchangeFeeHeader > 0 && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Net crédité : {fmtAmount(Math.max(0, transaction.amount - exchangeFeeHeader), currency)}
                 </p>
               )}
             </div>

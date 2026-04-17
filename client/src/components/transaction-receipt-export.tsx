@@ -125,6 +125,7 @@ const ReceiptTemplate = forwardRef<HTMLDivElement, ReceiptTemplateProps>(
     const isOutgoing = OUTGOING_TYPES.includes(transaction.type);
     const isIncoming = INCOMING_TYPES.includes(transaction.type);
     const isNetMode = !!(metadata?.netMode) || !!(metadata?.apiKeyId && !metadata?.businessTokenId);
+    const cpf = isIncoming && !!(metadata?.customerPaysFee);
     const status = STATUS_CONF[transaction.status] || STATUS_CONF.pending;
     const typeLabel = TYPE_LABELS[transaction.type] || transaction.type;
 
@@ -133,13 +134,18 @@ const ReceiptTemplate = forwardRef<HTMLDivElement, ReceiptTemplateProps>(
       hour: "2-digit", minute: "2-digit",
     });
 
-    const amountLabel = isOutgoing ? "MONTANT SAISI" : totalFee > 0 ? "MONTANT BRUT REÇU" : "MONTANT";
+    // cpf=true : transaction.amount = BASE (marchand reçoit), client paie base+fee
+    const amountLabel = isOutgoing
+      ? "MONTANT SAISI"
+      : cpf ? "MONTANT" : totalFee > 0 ? "MONTANT BRUT REÇU" : "MONTANT";
     const mainAmount = fmtAmt(transaction.amount, currency);
     const subtitleAmount = totalFee > 0
       ? (isOutgoing && !isNetMode
           ? `Net destinataire : ${fmtAmt(Math.max(0, transaction.amount - totalFee), currency)}`
           : isOutgoing && isNetMode
           ? `Débité du solde : ${fmtAmt(transaction.amount + totalFee, currency)}`
+          : cpf
+          ? (exchangeFee > 0 ? `Net crédité : ${fmtAmt(Math.max(0, transaction.amount - exchangeFee), currency)}` : null)
           : `Net crédité : ${fmtAmt(Math.max(0, transaction.amount - totalFee), currency)}`)
       : null;
 
@@ -237,21 +243,25 @@ const ReceiptTemplate = forwardRef<HTMLDivElement, ReceiptTemplateProps>(
                 )}
                 {isIncoming && (() => {
                   const cpf = !!(metadata?.customerPaysFee);
-                  const gross = transaction.amount;
-                  const baseForOwner = Math.max(0, gross - serviceFee);
-                  const netAfterExchange = Math.max(0, baseForOwner - exchangeFee);
-                  const netStandard = Math.max(0, gross - totalFee);
+                  const base = transaction.amount;
+                  // cpf=true : transaction.amount = montant BASE (marchand reçoit), client paie base+fee
+                  const grossFromClient = cpf ? base + serviceFee : base;
+                  const netStandard = Math.max(0, base - totalFee);
+                  const creditedCpf = Math.max(0, base - exchangeFee);
                   return (
                     <>
-                      <ReceiptRow label="Montant reçu du payeur" value={fmtAmt(gross, currency)} />
+                      <ReceiptRow
+                        label={cpf ? "Total payé par le client" : "Montant reçu du payeur"}
+                        value={fmtAmt(cpf ? grossFromClient : base, currency)}
+                      />
                       {cpf ? (
-                        serviceFee > 0 && <ReceiptRow label="Frais réglés par le client" value={fmtAmt(serviceFee, currency)} color="#64748b" />
+                        serviceFee > 0 && <ReceiptRow label="Frais réglés par le client" value={`+${fmtAmt(serviceFee, currency)}`} color="#64748b" />
                       ) : (
                         serviceFee > 0 && <ReceiptRow label="Frais de service" value={`-${fmtAmt(serviceFee, currency)}`} color="#ef4444" />
                       )}
                       {exchangeFee > 0 && <ReceiptRow label="Frais d'échange" value={`-${fmtAmt(exchangeFee, currency)}`} color="#f97316" />}
                       <div style={{ borderTop: "1px solid #e2e8f0", margin: "8px 0" }} />
-                      <ReceiptRow label="Crédité sur votre compte" value={fmtAmt(cpf ? netAfterExchange : netStandard, currency)} color="#15803d" bold />
+                      <ReceiptRow label="Crédité sur votre compte" value={fmtAmt(cpf ? creditedCpf : netStandard, currency)} color="#15803d" bold />
                     </>
                   );
                 })()}
