@@ -3,8 +3,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 import { CountryFlag, getCountryName } from "@/components/country-flag";
-import { ArrowDownToLine, ArrowUpFromLine, Info } from "lucide-react";
+import { ArrowDownToLine, ArrowUpFromLine, Info, Download, RefreshCw } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { useState } from "react";
 
 import omImage from "@assets/om_1763835083036.png";
 import mtnImage from "@assets/mtn (1)_1763835082904.png";
@@ -73,12 +76,17 @@ type FeeRate = {
 };
 
 function fmtFee(val: number): string {
-  return (val / 10).toFixed(1).replace(".0", "") + "%";
+  const pct = val / 10;
+  return (Number.isInteger(pct) ? pct.toString() : pct.toFixed(1)) + "%";
+}
+
+function getOperatorName(op: string) {
+  return OPERATOR_NAMES[op.toLowerCase()] || op.charAt(0).toUpperCase() + op.slice(1);
 }
 
 function OperatorRow({ rate, type }: { rate: FeeRate; type: "payin" | "payout" }) {
   const logo = OPERATOR_LOGOS[rate.operator.toLowerCase()];
-  const name = OPERATOR_NAMES[rate.operator.toLowerCase()] || rate.operator.charAt(0).toUpperCase() + rate.operator.slice(1);
+  const name = getOperatorName(rate.operator);
   const fee = type === "payin" ? rate.incomingFeePercentage : rate.outgoingFeePercentage;
 
   return (
@@ -107,59 +115,212 @@ function OperatorRow({ rate, type }: { rate: FeeRate; type: "payin" | "payout" }
           <p className="text-xs text-muted-foreground">{getCountryName(rate.country)}</p>
         </div>
       </div>
-      <Badge variant="secondary" className="text-sm font-semibold flex-shrink-0" data-testid={`fee-badge-${type}-${rate.country}-${rate.operator}`}>
+      <Badge variant="secondary" className="text-sm font-semibold flex-shrink-0">
         {fmtFee(fee)}
       </Badge>
     </div>
   );
 }
 
-function CountryGroup({ country, rates, type }: { country: string; rates: FeeRate[]; type: "payin" | "payout" }) {
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-2 mb-1">
-        <CountryFlag code={country} size="sm" />
-        <span className="text-sm font-semibold text-foreground">{getCountryName(country)}</span>
-      </div>
-      <div className="space-y-2 pl-1">
-        {rates.map(rate => (
-          <OperatorRow key={`${rate.country}-${rate.operator}`} rate={rate} type={type} />
-        ))}
-      </div>
-    </div>
-  );
+function groupByCountry(rates: FeeRate[]): [string, FeeRate[]][] {
+  const map = new Map<string, FeeRate[]>();
+  for (const r of rates) {
+    if (!map.has(r.country)) map.set(r.country, []);
+    map.get(r.country)!.push(r);
+  }
+  return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
+}
+
+async function generatePDF(
+  payinRates: FeeRate[],
+  payoutRates: FeeRate[],
+  toast: (opts: { title: string; description?: string; variant?: "destructive" }) => void
+) {
+  try {
+    const { default: jsPDF } = await import("jspdf");
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+
+    const pageW = 210;
+    const margin = 15;
+    const colW = pageW - margin * 2;
+    const date = new Date().toLocaleDateString("fr-FR", { year: "numeric", month: "long", day: "numeric" });
+
+    let y = 20;
+
+    const drawHeader = () => {
+      doc.setFillColor(30, 41, 59);
+      doc.rect(0, 0, pageW, 16, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.text("BKApay — Grille tarifaire", margin, 10);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      doc.text(date, pageW - margin, 10, { align: "right" });
+      doc.setTextColor(0, 0, 0);
+    };
+
+    const checkPage = (needed: number) => {
+      if (y + needed > 280) {
+        doc.addPage();
+        drawHeader();
+        y = 24;
+      }
+    };
+
+    drawHeader();
+    y = 24;
+
+    const drawSectionTitle = (title: string, iconChar: string) => {
+      checkPage(14);
+      doc.setFillColor(241, 245, 249);
+      doc.rect(margin, y, colW, 9, "F");
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(30, 41, 59);
+      doc.text(`${iconChar}  ${title}`, margin + 3, y + 6);
+      doc.setTextColor(0, 0, 0);
+      y += 12;
+    };
+
+    const drawTableRow = (
+      country: string,
+      operator: string,
+      fee: string,
+      isHeader: boolean,
+      isAlt: boolean
+    ) => {
+      checkPage(8);
+      if (isHeader) {
+        doc.setFillColor(226, 232, 240);
+        doc.rect(margin, y, colW, 7, "F");
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(8);
+        doc.setTextColor(71, 85, 105);
+        doc.text(country, margin + 3, y + 5);
+        doc.text(operator, margin + 65, y + 5);
+        doc.text(fee, pageW - margin - 3, y + 5, { align: "right" });
+        doc.setTextColor(0, 0, 0);
+      } else {
+        if (isAlt) {
+          doc.setFillColor(248, 250, 252);
+          doc.rect(margin, y, colW, 7, "F");
+        }
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        doc.setTextColor(51, 65, 85);
+        doc.text(country, margin + 3, y + 5);
+        doc.setTextColor(30, 41, 59);
+        doc.text(operator, margin + 65, y + 5);
+        doc.setFillColor(99, 102, 241);
+        doc.roundedRect(pageW - margin - 20, y + 1, 17, 5, 1, 1, "F");
+        doc.setTextColor(255, 255, 255);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(8);
+        doc.text(fee, pageW - margin - 3, y + 5, { align: "right" });
+        doc.setTextColor(0, 0, 0);
+      }
+      y += 7;
+    };
+
+    const drawBorderLine = () => {
+      doc.setDrawColor(203, 213, 225);
+      doc.line(margin, y, margin + colW, y);
+      y += 4;
+    };
+
+    const renderSection = (rates: FeeRate[], type: "payin" | "payout", title: string, icon: string) => {
+      if (rates.length === 0) return;
+      drawSectionTitle(title, icon);
+      drawTableRow("Pays", "Opérateur", "Frais", true, false);
+      drawBorderLine();
+
+      let rowIndex = 0;
+      for (const [, countryRates] of groupByCountry(rates)) {
+        for (const rate of countryRates) {
+          const fee = type === "payin" ? rate.incomingFeePercentage : rate.outgoingFeePercentage;
+          drawTableRow(getCountryName(rate.country), getOperatorName(rate.operator), fmtFee(fee), false, rowIndex % 2 === 1);
+          rowIndex++;
+        }
+      }
+      y += 6;
+    };
+
+    renderSection(payinRates, "payin", "Payin — Paiements entrants", "↓");
+    renderSection(payoutRates, "payout", "Payout — Paiements sortants", "↑");
+
+    checkPage(14);
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "italic");
+    doc.setTextColor(148, 163, 184);
+    doc.text(
+      "Les frais sont susceptibles d'être modifiés. Consultez la plateforme pour les tarifs en vigueur.",
+      margin,
+      y + 4
+    );
+
+    doc.save(`BKApay_frais_${new Date().toISOString().slice(0, 10)}.pdf`);
+  } catch (err) {
+    console.error("PDF generation error:", err);
+    toast({ title: "Erreur", description: "Impossible de générer le PDF", variant: "destructive" });
+  }
 }
 
 export default function BusinessFees() {
-  const { data: feeRates = [], isLoading } = useQuery<FeeRate[]>({
+  const { toast } = useToast();
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const { data: feeRates = [], isLoading, refetch } = useQuery<FeeRate[]>({
     queryKey: ["/api/business/fee-rates"],
+    staleTime: 0,
   });
 
   const payinRates = feeRates.filter(r => r.incomingEnabled);
   const payoutRates = feeRates.filter(r => r.outgoingEnabled);
 
-  function groupByCountry(rates: FeeRate[]): [string, FeeRate[]][] {
-    const map = new Map<string, FeeRate[]>();
-    for (const r of rates) {
-      if (!map.has(r.country)) map.set(r.country, []);
-      map.get(r.country)!.push(r);
-    }
-    return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
-  }
+  const handleDownloadPDF = async () => {
+    setIsGenerating(true);
+    await generatePDF(payinRates, payoutRates, toast);
+    setIsGenerating(false);
+  };
 
   return (
     <div className="p-4 md:p-6 max-w-2xl mx-auto space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground" data-testid="title-fees">Grille tarifaire</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Frais applicables sur vos transactions selon le canal de paiement
-        </p>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground" data-testid="title-fees">Grille tarifaire</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Frais applicables sur vos transactions selon le canal de paiement
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="default"
+            onClick={() => refetch()}
+            disabled={isLoading}
+            data-testid="button-refresh-fees"
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
+            Actualiser
+          </Button>
+          <Button
+            variant="default"
+            size="default"
+            onClick={handleDownloadPDF}
+            disabled={isLoading || isGenerating || feeRates.length === 0}
+            data-testid="button-download-pdf"
+          >
+            <Download className="w-4 h-4 mr-2" />
+            {isGenerating ? "Génération..." : "Télécharger PDF"}
+          </Button>
+        </div>
       </div>
 
       <div className="flex items-start gap-2 p-3 rounded-md bg-muted/50 border">
         <Info className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
         <p className="text-xs text-muted-foreground leading-relaxed">
-          Les frais indiqués sont prélevés sur chaque transaction. Pour un paiement entrant, le montant reçu est net des frais. Pour un paiement sortant, les frais sont ajoutés au montant envoyé.
+          Les frais sont calculés sur chaque transaction. Pour un paiement entrant (Payin), le montant reçu est net de frais. Pour un paiement sortant (Payout), les frais sont ajoutés au montant envoyé.
         </p>
       </div>
 
@@ -188,7 +349,17 @@ export default function BusinessFees() {
             </Card>
           ) : (
             groupByCountry(payinRates).map(([country, rates]) => (
-              <CountryGroup key={country} country={country} rates={rates} type="payin" />
+              <div key={country} className="space-y-2">
+                <div className="flex items-center gap-2 mb-1">
+                  <CountryFlag code={country} size="sm" />
+                  <span className="text-sm font-semibold text-foreground">{getCountryName(country)}</span>
+                </div>
+                <div className="space-y-2 pl-1">
+                  {rates.map(rate => (
+                    <OperatorRow key={`${rate.country}-${rate.operator}`} rate={rate} type="payin" />
+                  ))}
+                </div>
+              </div>
             ))
           )}
         </TabsContent>
@@ -206,7 +377,17 @@ export default function BusinessFees() {
             </Card>
           ) : (
             groupByCountry(payoutRates).map(([country, rates]) => (
-              <CountryGroup key={country} country={country} rates={rates} type="payout" />
+              <div key={country} className="space-y-2">
+                <div className="flex items-center gap-2 mb-1">
+                  <CountryFlag code={country} size="sm" />
+                  <span className="text-sm font-semibold text-foreground">{getCountryName(country)}</span>
+                </div>
+                <div className="space-y-2 pl-1">
+                  {rates.map(rate => (
+                    <OperatorRow key={`${rate.country}-${rate.operator}`} rate={rate} type="payout" />
+                  ))}
+                </div>
+              </div>
             ))
           )}
         </TabsContent>
