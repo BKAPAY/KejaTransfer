@@ -218,10 +218,18 @@ export async function safeRefundOutgoingTransaction(
   }
 
   const latestMeta = JSON.parse(latestTx.metadata || "{}");
-  const refundAmount = latestMeta.deductedFromBalance || latestMeta.totalDebited || latestTx.amount;
+  // deductedFromBalance / totalDebited = montant + frais de service (stockés par le handler fournisseur)
+  // exchangeFee = frais d'échange déduits SÉPARÉMENT dans routes.ts pour les transferts cross-devises
+  // → il faut rembourser les deux pour restituer la totalité du solde débité
+  const baseRefundAmount = latestMeta.deductedFromBalance || latestMeta.totalDebited || latestTx.amount;
+  const exchangeFeeToRefund = latestMeta.exchangeFee || 0;
+  const refundAmount = baseRefundAmount + exchangeFeeToRefund;
   if (!refundAmount || refundAmount <= 0) {
     console.log(`[SafeRefund] Transaction ${transactionId} no valid refund amount - skipping (source: ${source})`);
     return false;
+  }
+  if (exchangeFeeToRefund > 0) {
+    console.log(`[SafeRefund] Including exchange fee in refund: base=${baseRefundAmount} + exchangeFee=${exchangeFeeToRefund} = total=${refundAmount} (source: ${source})`);
   }
 
   if (latestMeta.scope === "business") {
