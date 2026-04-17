@@ -9,8 +9,9 @@ import type { Transaction } from "@shared/schema";
 import {
   Copy, Mail, Phone, Wallet, AlertTriangle, CheckCircle, XCircle,
   Lock, ShieldCheck, RotateCcw, Webhook, ArrowDownLeft, ArrowUpRight,
-  ArrowLeftRight, TrendingUp, Receipt, Clock,
+  ArrowLeftRight, TrendingUp, Receipt, Clock, Download,
 } from "lucide-react";
+import { DownloadReceiptButtons } from "@/components/transaction-receipt-export";
 import { CryptoIcon } from "@/components/crypto-icon";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -422,6 +423,15 @@ export function TransactionDetailsDialog({
                 <Copy className="w-3.5 h-3.5" />
               </Button>
             </div>
+          </div>
+
+          {/* Download Receipt */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Download className="w-4 h-4 text-muted-foreground" />
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Télécharger le reçu</h3>
+            </div>
+            <DownloadReceiptButtons transaction={transaction} metadata={metadata} />
           </div>
 
           {/* Financial Breakdown */}
