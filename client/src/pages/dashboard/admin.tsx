@@ -418,6 +418,11 @@ export default function Admin() {
     queryKey: ["/api/admin/users"],
   });
 
+  const { data: allUsersForBroadcast = [] } = useQuery<User[]>({
+    queryKey: ["/api/admin/users-all"],
+    enabled: mainTab === "messages",
+  });
+
   const { data: searchResults = [], isLoading: searchLoading } = useQuery<User[]>({
     queryKey: ["/api/admin/search", searchQuery],
     queryFn: async () => {
@@ -454,15 +459,16 @@ export default function Admin() {
   });
 
   const msgFilteredUsers = useMemo(() => {
-    if (!allUsers.length) return [];
-    if (!msgUserSearch.trim()) return allUsers.slice(0, 50);
+    const source = allUsersForBroadcast.length ? allUsersForBroadcast : allUsers;
+    if (!source.length) return [];
+    if (!msgUserSearch.trim()) return source.slice(0, 50);
     const q = msgUserSearch.toLowerCase();
-    return allUsers.filter(u =>
+    return source.filter(u =>
       u.email.toLowerCase().includes(q) ||
       (u.firstName && u.firstName.toLowerCase().includes(q)) ||
       (u.lastName && u.lastName.toLowerCase().includes(q))
     ).slice(0, 50);
-  }, [allUsers, msgUserSearch]);
+  }, [allUsersForBroadcast, allUsers, msgUserSearch]);
 
   const baseUsers = activeTab === "active7d" ? activeUsers7d : (searchQuery.length > 0 ? searchResults : allUsers);
   const sortedUsers = [...baseUsers].sort((a, b) => {

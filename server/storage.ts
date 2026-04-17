@@ -1545,6 +1545,43 @@ export class DbStorage implements IStorage {
       .orderBy(desc(schema.users.balance));
   }
 
+  async getAllUsersForBroadcast(): Promise<User[]> {
+    return db.select({
+      id: schema.users.id,
+      email: schema.users.email,
+      password: schema.users.password,
+      firstName: schema.users.firstName,
+      lastName: schema.users.lastName,
+      balance: schema.users.balance,
+      kycStatus: schema.users.kycStatus,
+      kycRejectionReason: schema.users.kycRejectionReason,
+      kycRejectionCount: schema.users.kycRejectionCount,
+      isAdmin: schema.users.isAdmin,
+      isPrimaryAdmin: schema.users.isPrimaryAdmin,
+      suspended: schema.users.suspended,
+      transfersEnabled: schema.users.transfersEnabled,
+      withdrawalsEnabled: schema.users.withdrawalsEnabled,
+      payoutApiEnabled: schema.users.payoutApiEnabled,
+      wavePayinEnabled: schema.users.wavePayinEnabled,
+      depositOverrideEnabled: schema.users.depositOverrideEnabled,
+      createdAt: schema.users.createdAt,
+      country: schema.users.country,
+      withdrawalPhones: schema.users.withdrawalPhones,
+      securityCode: schema.users.securityCode,
+      accountType: schema.users.accountType,
+      kycIdFront: sql<string | null>`NULL`.as('kycIdFront'),
+      kycIdBack: sql<string | null>`NULL`.as('kycIdBack'),
+      kycSelfie: sql<string | null>`NULL`.as('kycSelfie'),
+      kycSignature: sql<string | null>`NULL`.as('kycSignature'),
+      kycActivityDescription: sql<string | null>`NULL`.as('kycActivityDescription'),
+      kycLatitude: sql<string | null>`NULL`.as('kycLatitude'),
+      kycLongitude: sql<string | null>`NULL`.as('kycLongitude'),
+      kycAddress: sql<string | null>`NULL`.as('kycAddress'),
+      kycAcceptedTerms: sql<string | null>`NULL`.as('kycAcceptedTerms'),
+    }).from(schema.users)
+      .orderBy(desc(schema.users.balance));
+  }
+
   async getAllUsersWithKyc(): Promise<User[]> {
     return db.select().from(schema.users)
       .where(or(isNull(schema.users.accountType), ne(schema.users.accountType, "business")))

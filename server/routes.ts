@@ -10522,6 +10522,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/admin/users-all", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      res.set({
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      });
+      const users = await storage.getAllUsersForBroadcast();
+      res.json(users);
+    } catch (error: any) {
+      console.error("Admin users-all error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
   app.get("/api/admin/search", requireAdmin, async (req: Request, res: Response) => {
     try {
       res.set({
