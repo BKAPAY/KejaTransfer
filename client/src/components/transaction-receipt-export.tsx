@@ -281,6 +281,21 @@ const ReceiptTemplate = forwardRef<HTMLDivElement, ReceiptTemplateProps>(
             </>
           )}
 
+          {/* Custom fields */}
+          {metadata?.customFieldResponses && Object.keys(metadata.customFieldResponses).length > 0 && (
+            <>
+              <DashedLine />
+              <div>
+                <div style={{ fontSize: 9, fontWeight: 700, color: "#94a3b8", letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 8 }}>
+                  Informations supplémentaires
+                </div>
+                {Object.entries(metadata.customFieldResponses).map(([label, value]) => (
+                  <ReceiptRow key={label} label={label} value={String(value)} />
+                ))}
+              </div>
+            </>
+          )}
+
           {/* Perforation + Transaction ID */}
           <PerforationLine />
 
