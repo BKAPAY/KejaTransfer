@@ -1055,6 +1055,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/business/fee-rates", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const operatorConfigs = await storage.getCountryOperatorConfigs("business");
+      const activeConfigs = operatorConfigs.filter(c => c.incomingEnabled || c.outgoingEnabled);
+      const allFeeConfigs = await storage.getAllFeeConfigs();
+      const DEFAULT_FEE = 60;
+
+      const result = activeConfigs.map(cfg => {
+        const feeMatch = allFeeConfigs.find(
+          f => f.country === cfg.country && f.operator === cfg.operator && f.scope === "business"
+        ) || allFeeConfigs.find(
+          f => f.country === cfg.country && f.operator === cfg.operator && f.scope === "personal"
+        ) || allFeeConfigs.find(
+          f => f.country === cfg.country && f.operator === cfg.operator
+        );
+        return {
+          country: cfg.country,
+          operator: cfg.operator,
+          provider: cfg.provider,
+          incomingEnabled: cfg.incomingEnabled,
+          outgoingEnabled: cfg.outgoingEnabled,
+          incomingFeePercentage: feeMatch ? feeMatch.incomingFeePercentage : DEFAULT_FEE,
+          outgoingFeePercentage: feeMatch ? feeMatch.outgoingFeePercentage : DEFAULT_FEE,
+        };
+      });
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("Business fee rates error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
   app.get("/api/admin/business/stats", requireAdmin, async (req: Request, res: Response) => {
     try {
       res.set({

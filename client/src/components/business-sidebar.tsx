@@ -29,6 +29,7 @@ import {
   Headphones,
   Banknote,
   BarChart2,
+  Percent,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import type { User as UserType } from "@shared/schema";
@@ -156,6 +157,19 @@ export function BusinessSidebar() {
                   <Link href="/dashboard/business/analytics" onClick={handleMenuClick}>
                     <BarChart2 className="w-4 h-4" />
                     <span>Analytique</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={isActive("/dashboard/business/fees")}
+                  data-testid="nav-business-fees"
+                >
+                  <Link href="/dashboard/business/fees" onClick={handleMenuClick}>
+                    <Percent className="w-4 h-4" />
+                    <span>Frais</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
