@@ -24,6 +24,7 @@ export default function AdminUserHistory() {
   const backUrl = isBusinessContext ? "/dashboard/admin/business/management" : "/dashboard/management";
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "completed" | "pending" | "failed">("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
@@ -96,20 +97,36 @@ export default function AdminUserHistory() {
     return `${amount.toLocaleString("fr-FR")} ${currencyCode}`;
   };
 
+  const statusCounts = React.useMemo(() => {
+    if (!transactions) return { completed: 0, pending: 0, failed: 0 };
+    return {
+      completed: transactions.filter(t => t.status === "completed").length,
+      pending: transactions.filter(t => t.status === "pending").length,
+      failed: transactions.filter(t => t.status === "failed" || t.status === "cancelled").length,
+    };
+  }, [transactions]);
+
   const filteredTransactions = React.useMemo(() => {
     if (!transactions) return [];
-    if (!searchQuery.trim()) return transactions;
+    let result = transactions;
 
+    if (statusFilter !== "all") {
+      result = result.filter(t =>
+        statusFilter === "failed"
+          ? t.status === "failed" || t.status === "cancelled"
+          : t.status === statusFilter
+      );
+    }
+
+    if (!searchQuery.trim()) return result;
     const query = searchQuery.toLowerCase().trim();
-    
-    return transactions.filter((tx) => {
+    return result.filter((tx) => {
       const customerName = (tx.customerName || "").toLowerCase();
       const customerEmail = (tx.customerEmail || "").toLowerCase();
       const customerPhone = (tx.customerPhone || "").toLowerCase();
       const paydunyaToken = (tx.paydunyaToken || "").toLowerCase();
       const txId = tx.id.toLowerCase();
       const metadata = (tx.metadata || "").toLowerCase();
-      
       return (
         customerName.includes(query) ||
         customerEmail.includes(query) ||
@@ -119,11 +136,16 @@ export default function AdminUserHistory() {
         metadata.includes(query)
       );
     });
-  }, [transactions, searchQuery]);
+  }, [transactions, searchQuery, statusFilter]);
 
   const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedTransactions = filteredTransactions.slice(startIndex, startIndex + itemsPerPage);
+
+  const handleStatusFilter = (f: "all" | "completed" | "pending" | "failed") => {
+    setStatusFilter(prev => prev === f ? "all" : f);
+    setCurrentPage(1);
+  };
 
   const handleItemsPerPageChange = (value: string) => {
     setItemsPerPage(parseInt(value));
@@ -163,7 +185,7 @@ export default function AdminUserHistory() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="relative mb-4">
+          <div className="relative mb-3">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <input
               type="text"
@@ -183,6 +205,42 @@ export default function AdminUserHistory() {
                 <X className="h-4 w-4" />
               </Button>
             )}
+          </div>
+
+          <div className="flex flex-wrap gap-2 mb-4">
+            <Button
+              size="sm"
+              onClick={() => handleStatusFilter("completed")}
+              data-testid="button-filter-completed"
+              className={statusFilter === "completed"
+                ? "bg-green-600 text-white border-green-600 hover:bg-green-700"
+                : "border-green-500 text-green-600 bg-transparent hover:bg-green-50 dark:hover:bg-green-950 border"}
+            >
+              Complétées
+              <span className="ml-2 bg-white/20 text-inherit rounded px-1.5 py-0.5 text-xs font-semibold">{statusCounts.completed}</span>
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => handleStatusFilter("failed")}
+              data-testid="button-filter-failed"
+              className={statusFilter === "failed"
+                ? "bg-red-600 text-white border-red-600 hover:bg-red-700"
+                : "border-red-500 text-red-600 bg-transparent hover:bg-red-50 dark:hover:bg-red-950 border"}
+            >
+              Échouées
+              <span className="ml-2 bg-white/20 text-inherit rounded px-1.5 py-0.5 text-xs font-semibold">{statusCounts.failed}</span>
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => handleStatusFilter("pending")}
+              data-testid="button-filter-pending"
+              className={statusFilter === "pending"
+                ? "bg-amber-500 text-white border-amber-500 hover:bg-amber-600"
+                : "border-amber-500 text-amber-600 bg-transparent hover:bg-amber-50 dark:hover:bg-amber-950 border"}
+            >
+              En attente
+              <span className="ml-2 bg-white/20 text-inherit rounded px-1.5 py-0.5 text-xs font-semibold">{statusCounts.pending}</span>
+            </Button>
           </div>
 
           {searchQuery && (

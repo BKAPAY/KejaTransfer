@@ -58,10 +58,13 @@ function getTransactionLabel(tx: Transaction): string {
   return tx.description || getTypeText(tx.type);
 }
 
+type StatusFilter = "all" | "completed" | "pending" | "failed";
+
 function TransactionList({ direction }: { direction: "incoming" | "outgoing" }) {
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [currentPage, setCurrentPage] = useState(1);
 
   const { data: transactions, isLoading } = useQuery<Transaction[]>({
@@ -70,13 +73,32 @@ function TransactionList({ direction }: { direction: "incoming" | "outgoing" }) 
     refetchInterval: 15000,
   });
 
+  const statusCounts = useMemo(() => {
+    if (!transactions) return { completed: 0, pending: 0, failed: 0 };
+    const byType = transactions.filter(tx =>
+      direction === "incoming" ? INCOMING_TYPES.includes(tx.type) : OUTGOING_TYPES.includes(tx.type)
+    );
+    return {
+      completed: byType.filter(t => t.status === "completed").length,
+      pending: byType.filter(t => t.status === "pending").length,
+      failed: byType.filter(t => t.status === "failed" || t.status === "cancelled").length,
+    };
+  }, [transactions, direction]);
+
   const filtered = useMemo(() => {
     if (!transactions) return [];
-    const byType = transactions.filter(tx =>
+    let byType = transactions.filter(tx =>
       direction === "incoming"
         ? INCOMING_TYPES.includes(tx.type)
         : OUTGOING_TYPES.includes(tx.type)
     );
+    if (statusFilter !== "all") {
+      byType = byType.filter(tx =>
+        statusFilter === "failed"
+          ? tx.status === "failed" || tx.status === "cancelled"
+          : tx.status === statusFilter
+      );
+    }
     if (!searchQuery.trim()) return byType;
     const q = searchQuery.toLowerCase().trim();
     return byType.filter(tx =>
@@ -87,7 +109,12 @@ function TransactionList({ direction }: { direction: "incoming" | "outgoing" }) 
       tx.id.toLowerCase().includes(q) ||
       (tx.description || "").toLowerCase().includes(q)
     );
-  }, [transactions, direction, searchQuery]);
+  }, [transactions, direction, searchQuery, statusFilter]);
+
+  const handleStatusFilter = (f: StatusFilter) => {
+    setStatusFilter(prev => prev === f ? "all" : f);
+    setCurrentPage(1);
+  };
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
   const paginated = useMemo(() => {
@@ -135,6 +162,42 @@ function TransactionList({ direction }: { direction: "incoming" | "outgoing" }) 
             <X className="h-4 w-4" />
           </Button>
         )}
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <Button
+          size="sm"
+          onClick={() => handleStatusFilter("completed")}
+          data-testid="button-filter-completed"
+          className={statusFilter === "completed"
+            ? "bg-green-600 text-white border-green-600 hover:bg-green-700"
+            : "border-green-500 text-green-600 bg-transparent hover:bg-green-50 dark:hover:bg-green-950 border"}
+        >
+          Complétées
+          <span className="ml-2 bg-white/20 text-inherit rounded px-1.5 py-0.5 text-xs font-semibold">{statusCounts.completed}</span>
+        </Button>
+        <Button
+          size="sm"
+          onClick={() => handleStatusFilter("failed")}
+          data-testid="button-filter-failed"
+          className={statusFilter === "failed"
+            ? "bg-red-600 text-white border-red-600 hover:bg-red-700"
+            : "border-red-500 text-red-600 bg-transparent hover:bg-red-50 dark:hover:bg-red-950 border"}
+        >
+          Échouées
+          <span className="ml-2 bg-white/20 text-inherit rounded px-1.5 py-0.5 text-xs font-semibold">{statusCounts.failed}</span>
+        </Button>
+        <Button
+          size="sm"
+          onClick={() => handleStatusFilter("pending")}
+          data-testid="button-filter-pending"
+          className={statusFilter === "pending"
+            ? "bg-amber-500 text-white border-amber-500 hover:bg-amber-600"
+            : "border-amber-500 text-amber-600 bg-transparent hover:bg-amber-50 dark:hover:bg-amber-950 border"}
+        >
+          En attente
+          <span className="ml-2 bg-white/20 text-inherit rounded px-1.5 py-0.5 text-xs font-semibold">{statusCounts.pending}</span>
+        </Button>
       </div>
 
       {searchQuery && (

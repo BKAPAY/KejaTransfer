@@ -214,40 +214,37 @@ export default function History() {
 
           <div className="flex flex-wrap gap-2 mt-1">
             <Button
-              variant={statusFilter === "all" ? "default" : "outline"}
               size="sm"
-              onClick={() => handleStatusFilter("all")}
-              data-testid="button-filter-all"
-            >
-              Toutes
-              <Badge variant="secondary" className="ml-2">{statusCounts.all}</Badge>
-            </Button>
-            <Button
-              variant={statusFilter === "completed" ? "default" : "outline"}
-              size="sm"
-              onClick={() => handleStatusFilter("completed")}
+              onClick={() => handleStatusFilter(statusFilter === "completed" ? "all" : "completed")}
               data-testid="button-filter-completed"
+              className={statusFilter === "completed"
+                ? "bg-green-600 text-white border-green-600 hover:bg-green-700"
+                : "border-green-500 text-green-600 bg-transparent hover:bg-green-50 dark:hover:bg-green-950 border"}
             >
               Complétées
-              <Badge variant="secondary" className="ml-2">{statusCounts.completed}</Badge>
+              <span className="ml-2 bg-white/20 text-inherit rounded px-1.5 py-0.5 text-xs font-semibold">{statusCounts.completed}</span>
             </Button>
             <Button
-              variant={statusFilter === "pending" ? "default" : "outline"}
               size="sm"
-              onClick={() => handleStatusFilter("pending")}
-              data-testid="button-filter-pending"
-            >
-              En attente
-              <Badge variant="secondary" className="ml-2">{statusCounts.pending}</Badge>
-            </Button>
-            <Button
-              variant={statusFilter === "failed" ? "destructive" : "outline"}
-              size="sm"
-              onClick={() => handleStatusFilter("failed")}
+              onClick={() => handleStatusFilter(statusFilter === "failed" ? "all" : "failed")}
               data-testid="button-filter-failed"
+              className={statusFilter === "failed"
+                ? "bg-red-600 text-white border-red-600 hover:bg-red-700"
+                : "border-red-500 text-red-600 bg-transparent hover:bg-red-50 dark:hover:bg-red-950 border"}
             >
               Échouées
-              <Badge variant="secondary" className="ml-2">{statusCounts.failed}</Badge>
+              <span className="ml-2 bg-white/20 text-inherit rounded px-1.5 py-0.5 text-xs font-semibold">{statusCounts.failed}</span>
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => handleStatusFilter(statusFilter === "pending" ? "all" : "pending")}
+              data-testid="button-filter-pending"
+              className={statusFilter === "pending"
+                ? "bg-amber-500 text-white border-amber-500 hover:bg-amber-600"
+                : "border-amber-500 text-amber-600 bg-transparent hover:bg-amber-50 dark:hover:bg-amber-950 border"}
+            >
+              En attente
+              <span className="ml-2 bg-white/20 text-inherit rounded px-1.5 py-0.5 text-xs font-semibold">{statusCounts.pending}</span>
             </Button>
           </div>
 

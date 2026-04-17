@@ -22,6 +22,7 @@ export default function AdminBusinessHistory() {
   const userId = params.userId;
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "completed" | "pending" | "failed">("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
@@ -94,20 +95,39 @@ export default function AdminBusinessHistory() {
     return `${amount.toLocaleString("fr-FR")} ${currencyCode}`;
   };
 
+  const statusCounts = React.useMemo(() => {
+    let byTab = transactions;
+    if (activeTab === "incoming") {
+      byTab = byTab.filter(tx => ["deposit", "api_payment", "payment_link", "merchant_link"].includes(tx.type));
+    } else {
+      byTab = byTab.filter(tx => ["withdrawal", "transfer"].includes(tx.type));
+    }
+    return {
+      completed: byTab.filter(t => t.status === "completed").length,
+      pending: byTab.filter(t => t.status === "pending").length,
+      failed: byTab.filter(t => t.status === "failed" || t.status === "cancelled").length,
+    };
+  }, [transactions, activeTab]);
+
   const filteredTransactions = React.useMemo(() => {
     let filtered = transactions;
     
-    // Filter by tab
     if (activeTab === "incoming") {
       filtered = filtered.filter(tx => ["deposit", "api_payment", "payment_link", "merchant_link"].includes(tx.type));
     } else {
       filtered = filtered.filter(tx => ["withdrawal", "transfer"].includes(tx.type));
     }
 
-    if (!searchQuery.trim()) return filtered;
+    if (statusFilter !== "all") {
+      filtered = filtered.filter(t =>
+        statusFilter === "failed"
+          ? t.status === "failed" || t.status === "cancelled"
+          : t.status === statusFilter
+      );
+    }
 
+    if (!searchQuery.trim()) return filtered;
     const query = searchQuery.toLowerCase().trim();
-    
     return filtered.filter((tx) => {
       const customerName = (tx.customerName || "").toLowerCase();
       const customerEmail = (tx.customerEmail || "").toLowerCase();
@@ -115,7 +135,6 @@ export default function AdminBusinessHistory() {
       const paydunyaToken = (tx.paydunyaToken || "").toLowerCase();
       const txId = tx.id.toLowerCase();
       const metadata = (typeof tx.metadata === 'string' ? tx.metadata : JSON.stringify(tx.metadata || "")).toLowerCase();
-      
       return (
         customerName.includes(query) ||
         customerEmail.includes(query) ||
@@ -125,11 +144,16 @@ export default function AdminBusinessHistory() {
         metadata.includes(query)
       );
     });
-  }, [transactions, searchQuery, activeTab]);
+  }, [transactions, searchQuery, activeTab, statusFilter]);
 
   const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedTransactions = filteredTransactions.slice(startIndex, startIndex + itemsPerPage);
+
+  const handleStatusFilter = (f: "all" | "completed" | "pending" | "failed") => {
+    setStatusFilter(prev => prev === f ? "all" : f);
+    setCurrentPage(1);
+  };
 
   const handleItemsPerPageChange = (value: string) => {
     setItemsPerPage(parseInt(value));
@@ -138,7 +162,12 @@ export default function AdminBusinessHistory() {
 
   React.useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, activeTab]);
+    setStatusFilter("all");
+  }, [activeTab]);
+
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
 
   const handleTransactionClick = (tx: Transaction) => {
     setSelectedTransaction(tx);
@@ -181,7 +210,7 @@ export default function AdminBusinessHistory() {
             </TabsList>
           </Tabs>
 
-          <div className="relative mb-4">
+          <div className="relative mb-3">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <input
               type="text"
@@ -201,6 +230,42 @@ export default function AdminBusinessHistory() {
                 <X className="h-4 w-4" />
               </Button>
             )}
+          </div>
+
+          <div className="flex flex-wrap gap-2 mb-4">
+            <Button
+              size="sm"
+              onClick={() => handleStatusFilter("completed")}
+              data-testid="button-filter-completed"
+              className={statusFilter === "completed"
+                ? "bg-green-600 text-white border-green-600 hover:bg-green-700"
+                : "border-green-500 text-green-600 bg-transparent hover:bg-green-50 dark:hover:bg-green-950 border"}
+            >
+              Complétées
+              <span className="ml-2 bg-white/20 text-inherit rounded px-1.5 py-0.5 text-xs font-semibold">{statusCounts.completed}</span>
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => handleStatusFilter("failed")}
+              data-testid="button-filter-failed"
+              className={statusFilter === "failed"
+                ? "bg-red-600 text-white border-red-600 hover:bg-red-700"
+                : "border-red-500 text-red-600 bg-transparent hover:bg-red-50 dark:hover:bg-red-950 border"}
+            >
+              Échouées
+              <span className="ml-2 bg-white/20 text-inherit rounded px-1.5 py-0.5 text-xs font-semibold">{statusCounts.failed}</span>
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => handleStatusFilter("pending")}
+              data-testid="button-filter-pending"
+              className={statusFilter === "pending"
+                ? "bg-amber-500 text-white border-amber-500 hover:bg-amber-600"
+                : "border-amber-500 text-amber-600 bg-transparent hover:bg-amber-50 dark:hover:bg-amber-950 border"}
+            >
+              En attente
+              <span className="ml-2 bg-white/20 text-inherit rounded px-1.5 py-0.5 text-xs font-semibold">{statusCounts.pending}</span>
+            </Button>
           </div>
 
           {paginatedTransactions.length > 0 ? (
