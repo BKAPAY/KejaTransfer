@@ -1071,11 +1071,12 @@ export async function handleMbiyoPayWebhook(req: Request, res: Response) {
       } else if (tx.type === "withdrawal" || tx.type === "transfer") {
         if (wasAlreadyFailed) {
           // For outgoing transactions that were already "failed" and refunded:
-          // We must re-debit the user's balance before marking as completed
+          // We must re-debit the user's balance before marking as completed.
+          // Include exchangeFee since safeRefundOutgoingTransaction refunded it too.
           const txMetadata = JSON.parse(tx.metadata || "{}");
-          const reDebitAmount = txMetadata.deductedFromBalance || txMetadata.totalDebited || tx.amount;
+          const reDebitAmount = (txMetadata.deductedFromBalance || txMetadata.totalDebited || tx.amount) + (txMetadata.exchangeFee || 0);
           await storage.updateUserBalance(tx.userId, -reDebitAmount);
-          console.log(`[MbiyoPay Webhook] Re-debited ${reDebitAmount} from user ${tx.userId} for recovered ${tx.type} ${tx.id}`);
+          console.log(`[MbiyoPay Webhook] Re-debited ${reDebitAmount} from user ${tx.userId} for recovered ${tx.type} ${tx.id} (includes exchangeFee=${txMetadata.exchangeFee || 0})`);
         }
         await storage.updateTransactionStatus(tx.id, "completed");
         console.log(`[MbiyoPay Webhook] Withdrawal/Transfer completed: ${tx.id}`);
