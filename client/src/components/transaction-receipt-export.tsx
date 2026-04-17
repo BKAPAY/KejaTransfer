@@ -121,9 +121,12 @@ const ReceiptTemplate = forwardRef<HTMLDivElement, ReceiptTemplateProps>(
     const currency = transaction.currency || "XOF";
     const serviceFee = transaction.fee || 0;
     const exchangeFee = metadata?.exchangeFee || 0;
-    const totalFee = serviceFee + exchangeFee;
     const isOutgoing = OUTGOING_TYPES.includes(transaction.type);
     const isIncoming = INCOMING_TYPES.includes(transaction.type);
+    // Pour les entrantes cross-devise : transaction.fee = service + échange combinés
+    // → soustraire exchangeFee pour isoler les vrais frais de service
+    const trueServiceFee = isIncoming ? Math.max(0, serviceFee - exchangeFee) : serviceFee;
+    const totalFee = trueServiceFee + exchangeFee;
     const isNetMode = !!(metadata?.netMode) || !!(metadata?.apiKeyId && !metadata?.businessTokenId);
     const cpf = isIncoming && !!(metadata?.customerPaysFee);
     const status = STATUS_CONF[transaction.status] || STATUS_CONF.pending;
@@ -247,7 +250,9 @@ const ReceiptTemplate = forwardRef<HTMLDivElement, ReceiptTemplateProps>(
                   // cpf=true : transaction.amount = montant BASE (marchand reçoit), client paie base+displayServiceFee
                   // Quand cross-devise (PawaPay), transaction.fee = exchangeFee → displayServiceFee = 0 (évite double-comptage)
                   // Quand même devise, transaction.fee = service fee → displayServiceFee = serviceFee
-                  const displayServiceFee = cpf ? Math.max(0, serviceFee - exchangeFee) : 0;
+                  // Pour CPF : displayServiceFee = frais réglés par le client (= trueServiceFee)
+                  // Pour standard : on utilise trueServiceFee (déjà corrigé du double-comptage)
+                  const displayServiceFee = cpf ? trueServiceFee : 0;
                   const grossFromClient = cpf ? base + displayServiceFee : base;
                   const netStandard = Math.max(0, base - totalFee);
                   const creditedCpf = Math.max(0, base - exchangeFee);
@@ -260,7 +265,7 @@ const ReceiptTemplate = forwardRef<HTMLDivElement, ReceiptTemplateProps>(
                       {cpf ? (
                         displayServiceFee > 0 && <ReceiptRow label="Frais réglés par le client" value={`+${fmtAmt(displayServiceFee, currency)}`} color="#64748b" />
                       ) : (
-                        serviceFee > 0 && <ReceiptRow label="Frais de service" value={`-${fmtAmt(serviceFee, currency)}`} color="#ef4444" />
+                        trueServiceFee > 0 && <ReceiptRow label="Frais de service" value={`-${fmtAmt(trueServiceFee, currency)}`} color="#ef4444" />
                       )}
                       {exchangeFee > 0 && <ReceiptRow label="Frais d'échange" value={`-${fmtAmt(exchangeFee, currency)}`} color="#f97316" />}
                       <div style={{ borderTop: "1px solid #e2e8f0", margin: "8px 0" }} />

@@ -118,13 +118,18 @@ function FinancialBreakdown({
   metadata: TransactionMetadata | null;
 }) {
   const currency = transaction.currency || "XOF";
-  // transaction.fee = frais de service UNIQUEMENT (stocké par le handler fournisseur)
-  // metadata.exchangeFee = frais d'échange SÉPARÉS (ajoutés après coup pour les transferts cross-border)
+  // Pour les transactions SORTANTES : transaction.fee = frais de service seuls,
+  //   metadata.exchangeFee = frais d'échange séparés → totalFee = service + échange OK
+  // Pour les transactions ENTRANTES cross-devise : transaction.fee = service + échange combinés,
+  //   metadata.exchangeFee = échange encore une fois → il faut soustraire pour éviter le double-comptage.
   const serviceFee = transaction.fee || 0;
   const exchangeFee = metadata?.exchangeFee || 0;
-  const totalFee = serviceFee + exchangeFee;
   const isOutgoing = OUTGOING_TYPES.includes(transaction.type);
   const isIncoming = INCOMING_TYPES.includes(transaction.type);
+  // Pour entrantes : trueServiceFee = max(0, tx.fee - exchangeFee) → isole les frais de service réels
+  // Pour sortantes : tx.fee est déjà service seul, pas de soustraction
+  const trueServiceFee = isIncoming ? Math.max(0, serviceFee - exchangeFee) : serviceFee;
+  const totalFee = trueServiceFee + exchangeFee;
 
   // Modèle "frais par-dessus" : destinataire reçoit transaction.amount exactement,
   // l'expéditeur paie transaction.amount + frais.
@@ -236,6 +241,7 @@ function FinancialBreakdown({
     }
 
     // Cas standard : frais à la charge du propriétaire
+    // totalFee = trueServiceFee + exchangeFee (double-comptage déjà corrigé via trueServiceFee)
     const netCredited = Math.max(0, gross - totalFee);
 
     return (
@@ -247,8 +253,8 @@ function FinancialBreakdown({
         <div className="rounded-lg border overflow-hidden">
           <div className="p-4 space-y-3 bg-card">
             <FinancialRow label="Montant reçu du payeur" value={fmtAmount(gross, currency)} />
-            {serviceFee > 0 && (
-              <FinancialRow label="Frais de service" value={`-${fmtAmount(serviceFee, currency)}`} color="red" />
+            {trueServiceFee > 0 && (
+              <FinancialRow label="Frais de service" value={`-${fmtAmount(trueServiceFee, currency)}`} color="red" />
             )}
             {exchangeFee > 0 && (
               <FinancialRow label="Frais d'échange de devise" value={`-${fmtAmount(exchangeFee, currency)}`} color="orange" />
@@ -361,7 +367,9 @@ export function TransactionDetailsDialog({
   const isOutgoing = OUTGOING_TYPES.includes(transaction.type);
   const serviceFeeHeader = transaction.fee || 0;
   const exchangeFeeHeader = metadata?.exchangeFee || 0;
-  const totalFee = serviceFeeHeader + exchangeFeeHeader;
+  // Pour les entrantes, transaction.fee inclut déjà exchangeFee → soustraire pour éviter le double-comptage
+  const trueServiceFeeHeader = !isOutgoing ? Math.max(0, serviceFeeHeader - exchangeFeeHeader) : serviceFeeHeader;
+  const totalFee = trueServiceFeeHeader + exchangeFeeHeader;
   const isFeeOnTopHeader = transaction.type === "transfer"
     || (transaction.type === "withdrawal" && exchangeFeeHeader > 0)
     || !!(metadata?.netMode)
