@@ -118,19 +118,49 @@ function FinancialBreakdown({
 }) {
   const currency = transaction.currency || "XOF";
   const totalFee = transaction.fee || 0;
-  const feePercentage = transaction.feePercentage || 0;
   const exchangeFee = metadata?.exchangeFee || 0;
-  const exchangeFeePercentage = metadata?.exchangeFeePercentage || 0;
   const serviceFee = totalFee - exchangeFee;
   const isOutgoing = OUTGOING_TYPES.includes(transaction.type);
   const isIncoming = INCOMING_TYPES.includes(transaction.type);
 
-  if (totalFee === 0 && !isOutgoing) return null;
+  // API payout / netMode: transaction.amount = NET recipient gets, fees added on top
+  const isNetMode = !!(metadata?.netMode) || !!(metadata?.apiKeyId && !metadata?.businessTokenId);
+
+  if (totalFee === 0) return null;
 
   if (isOutgoing) {
+    if (isNetMode) {
+      // recipient gets transaction.amount exactly; balance = amount + fee
+      const net = transaction.amount;
+      const balanceDeducted = net + totalFee;
+      return (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 mb-3">
+            <Receipt className="w-4 h-4 text-muted-foreground" />
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Récapitulatif financier</h3>
+          </div>
+          <div className="rounded-lg border overflow-hidden">
+            <div className="p-4 space-y-3 bg-card">
+              <FinancialRow label="Montant envoyé au destinataire" value={fmtAmount(net, currency)} />
+              {serviceFee > 0 && (
+                <FinancialRow label="Frais de service" value={`+${fmtAmount(serviceFee, currency)}`} color="red" />
+              )}
+              {exchangeFee > 0 && (
+                <FinancialRow label="Frais d'échange de devise" value={`+${fmtAmount(exchangeFee, currency)}`} color="orange" />
+              )}
+            </div>
+            <div className="border-t px-4 py-3 bg-amber-50 dark:bg-amber-950/20 space-y-1">
+              <FinancialRow label="Débité de votre solde" value={fmtAmount(balanceDeducted, currency)} color="red" bold size="md" />
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Standard withdrawal/transfer: fee deducted FROM the gross amount
+    // transaction.amount = gross entered; balance = gross; recipient = gross - fee
     const gross = transaction.amount;
-    const netReceived = gross - totalFee;
-    const balanceDeducted = gross + totalFee;
+    const netReceived = Math.max(0, gross - totalFee);
 
     return (
       <div className="space-y-2">
@@ -140,48 +170,26 @@ function FinancialBreakdown({
         </div>
         <div className="rounded-lg border overflow-hidden">
           <div className="p-4 space-y-3 bg-card">
-            <FinancialRow
-              label="Montant saisi"
-              value={fmtAmount(gross, currency)}
-            />
+            <FinancialRow label="Montant saisi" value={fmtAmount(gross, currency)} />
             {serviceFee > 0 && (
-              <FinancialRow
-                label="Frais de service"
-                value={`-${fmtAmount(serviceFee, currency)}`}
-                color="red"
-              />
+              <FinancialRow label="Frais de service" value={`-${fmtAmount(serviceFee, currency)}`} color="red" />
             )}
             {exchangeFee > 0 && (
-              <FinancialRow
-                label="Frais d'échange de devise"
-                value={`-${fmtAmount(exchangeFee, currency)}`}
-                color="orange"
-              />
+              <FinancialRow label="Frais d'échange de devise" value={`-${fmtAmount(exchangeFee, currency)}`} color="orange" />
             )}
           </div>
-          <div className="border-t px-4 py-3 bg-muted/20 space-y-2">
-            <FinancialRow
-              label="Reçu par le destinataire"
-              value={fmtAmount(Math.max(0, netReceived), currency)}
-              color="green"
-              bold
-              size="md"
-            />
-            <FinancialRow
-              label="Débité de votre solde"
-              value={fmtAmount(balanceDeducted, currency)}
-              color="muted"
-              size="sm"
-            />
+          <div className="border-t px-4 py-3 bg-muted/20 space-y-1">
+            <FinancialRow label="Reçu par le destinataire" value={fmtAmount(netReceived, currency)} color="green" bold size="md" />
           </div>
         </div>
       </div>
     );
   }
 
-  if (isIncoming && totalFee > 0) {
-    const net = transaction.amount;
-    const gross = net + totalFee;
+  if (isIncoming) {
+    // transaction.amount = GROSS (payer sent); fee deducted from it; net credited = gross - fee
+    const gross = transaction.amount;
+    const netCredited = Math.max(0, gross - totalFee);
 
     return (
       <div className="space-y-2">
@@ -191,33 +199,16 @@ function FinancialBreakdown({
         </div>
         <div className="rounded-lg border overflow-hidden">
           <div className="p-4 space-y-3 bg-card">
-            <FinancialRow
-              label="Montant brut envoyé"
-              value={fmtAmount(gross, currency)}
-            />
+            <FinancialRow label="Montant reçu du payeur" value={fmtAmount(gross, currency)} />
             {serviceFee > 0 && (
-              <FinancialRow
-                label="Frais de service"
-                value={`-${fmtAmount(serviceFee, currency)}`}
-                color="red"
-              />
+              <FinancialRow label="Frais de service" value={`-${fmtAmount(serviceFee, currency)}`} color="red" />
             )}
             {exchangeFee > 0 && (
-              <FinancialRow
-                label="Frais d'échange de devise"
-                value={`-${fmtAmount(exchangeFee, currency)}`}
-                color="orange"
-              />
+              <FinancialRow label="Frais d'échange de devise" value={`-${fmtAmount(exchangeFee, currency)}`} color="orange" />
             )}
           </div>
           <div className="border-t px-4 py-3 bg-emerald-50 dark:bg-emerald-950/20 space-y-1">
-            <FinancialRow
-              label="Crédité sur votre compte"
-              value={fmtAmount(net, currency)}
-              color="green"
-              bold
-              size="md"
-            />
+            <FinancialRow label="Crédité sur votre compte" value={fmtAmount(netCredited, currency)} color="green" bold size="md" />
           </div>
         </div>
       </div>
@@ -406,7 +397,7 @@ export function TransactionDetailsDialog({
             </div>
             <div className="mt-3 pt-3 border-t border-current/10">
               <p className="text-xs text-muted-foreground mb-1">
-                {isOutgoing ? "Montant saisi" : totalFee > 0 ? "Montant crédité" : "Montant"}
+                {isOutgoing ? "Montant saisi" : totalFee > 0 ? "Montant brut reçu" : "Montant"}
               </p>
               <p className={`text-3xl font-bold tabular-nums ${statusConfig.text}`}>{displayAmount}</p>
               {isOutgoing && totalFee > 0 && (
@@ -416,7 +407,7 @@ export function TransactionDetailsDialog({
               )}
               {!isOutgoing && totalFee > 0 && (
                 <p className="text-xs text-muted-foreground mt-1">
-                  Montant brut : {fmtAmount(transaction.amount + totalFee, currency)}
+                  Net crédité : {fmtAmount(Math.max(0, transaction.amount - totalFee), currency)}
                 </p>
               )}
             </div>
