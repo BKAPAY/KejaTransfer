@@ -22,7 +22,7 @@ export default function AdminBusinessHistory() {
   const userId = params.userId;
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "completed" | "pending" | "failed">("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "completed" | "pending" | "failed">("completed");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
@@ -151,7 +151,7 @@ export default function AdminBusinessHistory() {
   const paginatedTransactions = filteredTransactions.slice(startIndex, startIndex + itemsPerPage);
 
   const handleStatusFilter = (f: "all" | "completed" | "pending" | "failed") => {
-    setStatusFilter(prev => prev === f ? "all" : f);
+    setStatusFilter(f);
     setCurrentPage(1);
   };
 
@@ -162,7 +162,7 @@ export default function AdminBusinessHistory() {
 
   React.useEffect(() => {
     setCurrentPage(1);
-    setStatusFilter("all");
+    setStatusFilter("completed");
   }, [activeTab]);
 
   React.useEffect(() => {

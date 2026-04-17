@@ -19,7 +19,7 @@ export default function History() {
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("completed");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
 
@@ -215,7 +215,7 @@ export default function History() {
           <div className="flex flex-wrap gap-2 mt-1">
             <Button
               size="sm"
-              onClick={() => handleStatusFilter(statusFilter === "completed" ? "all" : "completed")}
+              onClick={() => handleStatusFilter("completed")}
               data-testid="button-filter-completed"
               className={statusFilter === "completed"
                 ? "bg-green-600 text-white border-green-600 hover:bg-green-700"
@@ -226,7 +226,7 @@ export default function History() {
             </Button>
             <Button
               size="sm"
-              onClick={() => handleStatusFilter(statusFilter === "failed" ? "all" : "failed")}
+              onClick={() => handleStatusFilter("failed")}
               data-testid="button-filter-failed"
               className={statusFilter === "failed"
                 ? "bg-red-600 text-white border-red-600 hover:bg-red-700"
@@ -237,7 +237,7 @@ export default function History() {
             </Button>
             <Button
               size="sm"
-              onClick={() => handleStatusFilter(statusFilter === "pending" ? "all" : "pending")}
+              onClick={() => handleStatusFilter("pending")}
               data-testid="button-filter-pending"
               className={statusFilter === "pending"
                 ? "bg-amber-500 text-white border-amber-500 hover:bg-amber-600"
@@ -445,8 +445,8 @@ export default function History() {
                 {statusFilter === "pending" && "Aucune transaction en attente"}
                 {statusFilter === "failed" && "Aucune transaction échouée"}
               </p>
-              <Button variant="ghost" onClick={() => handleStatusFilter("all")} className="mt-2">
-                Voir toutes les transactions
+              <Button variant="ghost" onClick={() => handleStatusFilter("completed")} className="mt-2">
+                Voir les transactions complétées
               </Button>
             </div>
           ) : (

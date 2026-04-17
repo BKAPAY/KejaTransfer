@@ -64,7 +64,7 @@ function TransactionList({ direction }: { direction: "incoming" | "outgoing" }) 
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("completed");
   const [currentPage, setCurrentPage] = useState(1);
 
   const { data: transactions, isLoading } = useQuery<Transaction[]>({
@@ -112,7 +112,7 @@ function TransactionList({ direction }: { direction: "incoming" | "outgoing" }) 
   }, [transactions, direction, searchQuery, statusFilter]);
 
   const handleStatusFilter = (f: StatusFilter) => {
-    setStatusFilter(prev => prev === f ? "all" : f);
+    setStatusFilter(f);
     setCurrentPage(1);
   };
 
