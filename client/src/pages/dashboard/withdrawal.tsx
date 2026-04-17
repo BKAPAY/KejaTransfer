@@ -588,7 +588,7 @@ export default function Withdrawal() {
                                   style: "currency",
                                   currency: userBalanceCurrency,
                                   minimumFractionDigits: 0,
-                                }).format(amount + feeInfo.feeAmount + outgoingExchangeFeeAmount)}
+                                }).format(feeInfo.totalDeductedFromBalance + outgoingExchangeFeeAmount)}
                               </span>
                             </div>
                           </div>
