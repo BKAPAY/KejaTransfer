@@ -18,7 +18,7 @@ import { PhoneInputWithPrefix } from "@/components/phone-input-with-prefix";
 import { CountryFlag } from "@/components/country-flag";
 import { Send, Info, CheckCircle2, Loader2, Lock, AlertCircle, Settings } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { calculateOutgoingFee, fetchFeeConfig, formatFeePercentage, fetchExchangeFee } from "@/lib/fees";
+import { calculateOutgoingFee, fetchFeeConfig, fetchExchangeFee } from "@/lib/fees";
 import { useLocation } from "wouter";
 import { CurrencySelector, getCurrencyLabel } from "@/components/currency-selector";
 import { OperatorSelector } from "@/components/operator-selector";

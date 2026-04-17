@@ -16,7 +16,7 @@ import { OPERATORS, COUNTRIES } from "@shared/schema";
 import type { User } from "@shared/schema";
 import { ArrowUpFromLine, Info, CheckCircle2, Loader2, Settings, AlertCircle, Lock } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { calculateOutgoingFee, fetchFeeConfig, formatFeePercentage, fetchExchangeFee } from "@/lib/fees";
+import { calculateOutgoingFee, fetchFeeConfig, fetchExchangeFee } from "@/lib/fees";
 import { useLocation } from "wouter";
 import { CurrencySelector, getCurrencyLabel } from "@/components/currency-selector";
 import { OperatorSelector } from "@/components/operator-selector";
@@ -520,9 +520,7 @@ export default function Withdrawal() {
                               </span>
                             </div>
                             <div className="flex justify-between">
-                              <span className="text-muted-foreground">
-                                Frais de transaction ({formatFeePercentage(feePercentage)}):
-                              </span>
+                              <span className="text-muted-foreground">Frais de service:</span>
                               <span className="font-medium text-orange-600 dark:text-orange-400" data-testid="text-fee-amount">
                                 -{new Intl.NumberFormat("fr-FR", {
                                   style: "currency",
@@ -533,9 +531,7 @@ export default function Withdrawal() {
                             </div>
                             {outgoingExchangeFeeAmount > 0 && (
                               <div className="flex justify-between">
-                                <span className="text-muted-foreground">
-                                  Frais d'echange ({formatFeePercentage(outgoingExchangeFeePercentage)}):
-                                </span>
+                                <span className="text-muted-foreground">Frais d'echange:</span>
                                 <span className="font-medium text-orange-600 dark:text-orange-400" data-testid="text-exchange-fee-amount">
                                   -{new Intl.NumberFormat("fr-FR", {
                                     style: "currency",
