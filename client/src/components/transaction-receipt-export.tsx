@@ -119,9 +119,9 @@ interface ReceiptTemplateProps {
 const ReceiptTemplate = forwardRef<HTMLDivElement, ReceiptTemplateProps>(
   ({ transaction, metadata }, ref) => {
     const currency = transaction.currency || "XOF";
-    const totalFee = transaction.fee || 0;
+    const serviceFee = transaction.fee || 0;
     const exchangeFee = metadata?.exchangeFee || 0;
-    const serviceFee = totalFee - exchangeFee;
+    const totalFee = serviceFee + exchangeFee;
     const isOutgoing = OUTGOING_TYPES.includes(transaction.type);
     const isIncoming = INCOMING_TYPES.includes(transaction.type);
     const isNetMode = !!(metadata?.netMode) || !!(metadata?.apiKeyId && !metadata?.businessTokenId);
