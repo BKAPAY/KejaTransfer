@@ -798,13 +798,14 @@ export class DbStorage implements IStorage {
     return results[0];
   }
 
-  async getTransactions(userId: string, limit: number = 50): Promise<Transaction[]> {
-    return db
+  async getTransactions(userId: string, limit?: number): Promise<Transaction[]> {
+    const query = db
       .select()
       .from(schema.transactions)
       .where(eq(schema.transactions.userId, userId))
-      .orderBy(desc(schema.transactions.createdAt))
-      .limit(limit);
+      .orderBy(desc(schema.transactions.createdAt));
+    if (limit !== undefined) return query.limit(limit);
+    return query;
   }
 
   async getTransactionByPaydunyaToken(paydunyaToken: string): Promise<Transaction | undefined> {

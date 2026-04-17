@@ -13,10 +13,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 const ITEMS_PER_PAGE_OPTIONS = [10, 20, 50, 100];
 
+type StatusFilter = "all" | "completed" | "pending" | "failed";
+
 export default function History() {
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
 
@@ -34,13 +37,31 @@ export default function History() {
     ? COUNTRIES.find(c => c.code === user.country)?.currency || "XOF"
     : "XOF";
 
+  const statusCounts = useMemo(() => {
+    if (!transactions) return { all: 0, completed: 0, pending: 0, failed: 0 };
+    return {
+      all: transactions.length,
+      completed: transactions.filter(t => t.status === "completed").length,
+      pending: transactions.filter(t => t.status === "pending").length,
+      failed: transactions.filter(t => t.status === "failed" || t.status === "cancelled").length,
+    };
+  }, [transactions]);
+
   const filteredTransactions = useMemo(() => {
     if (!transactions) return [];
-    if (!searchQuery.trim()) return transactions;
+    let result = transactions;
 
+    if (statusFilter !== "all") {
+      result = result.filter(t =>
+        statusFilter === "failed"
+          ? t.status === "failed" || t.status === "cancelled"
+          : t.status === statusFilter
+      );
+    }
+
+    if (!searchQuery.trim()) return result;
     const query = searchQuery.toLowerCase().trim();
-    
-    return transactions.filter((transaction) => {
+    return result.filter((transaction) => {
       const customerName = (transaction.customerName || "").toLowerCase();
       const customerEmail = (transaction.customerEmail || "").toLowerCase();
       const customerPhone = (transaction.customerPhone || "").toLowerCase();
@@ -48,7 +69,6 @@ export default function History() {
       const txId = transaction.id.toLowerCase();
       const description = (transaction.description || "").toLowerCase();
       const metadata = (transaction.metadata || "").toLowerCase();
-      
       return (
         customerName.includes(query) ||
         customerEmail.includes(query) ||
@@ -59,7 +79,7 @@ export default function History() {
         metadata.includes(query)
       );
     });
-  }, [transactions, searchQuery]);
+  }, [transactions, searchQuery, statusFilter]);
 
   const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
   
@@ -81,6 +101,11 @@ export default function History() {
 
   const handleSearchChange = (value: string) => {
     setSearchQuery(value);
+    setCurrentPage(1);
+  };
+
+  const handleStatusFilter = (filter: StatusFilter) => {
+    setStatusFilter(filter);
     setCurrentPage(1);
   };
 
@@ -186,6 +211,46 @@ export default function History() {
               )}
             </div>
           </div>
+
+          <div className="flex flex-wrap gap-2 mt-1">
+            <Button
+              variant={statusFilter === "all" ? "default" : "outline"}
+              size="sm"
+              onClick={() => handleStatusFilter("all")}
+              data-testid="button-filter-all"
+            >
+              Toutes
+              <Badge variant="secondary" className="ml-2">{statusCounts.all}</Badge>
+            </Button>
+            <Button
+              variant={statusFilter === "completed" ? "default" : "outline"}
+              size="sm"
+              onClick={() => handleStatusFilter("completed")}
+              data-testid="button-filter-completed"
+            >
+              Complétées
+              <Badge variant="secondary" className="ml-2">{statusCounts.completed}</Badge>
+            </Button>
+            <Button
+              variant={statusFilter === "pending" ? "default" : "outline"}
+              size="sm"
+              onClick={() => handleStatusFilter("pending")}
+              data-testid="button-filter-pending"
+            >
+              En attente
+              <Badge variant="secondary" className="ml-2">{statusCounts.pending}</Badge>
+            </Button>
+            <Button
+              variant={statusFilter === "failed" ? "destructive" : "outline"}
+              size="sm"
+              onClick={() => handleStatusFilter("failed")}
+              data-testid="button-filter-failed"
+            >
+              Échouées
+              <Badge variant="secondary" className="ml-2">{statusCounts.failed}</Badge>
+            </Button>
+          </div>
+
           {searchQuery && (
             <p className="text-xs text-muted-foreground mt-2">
               {filteredTransactions.length} résultat(s) pour "{searchQuery}"
@@ -373,6 +438,18 @@ export default function History() {
               <p className="text-muted-foreground">Aucune transaction trouvée pour "{searchQuery}"</p>
               <Button variant="ghost" onClick={clearSearch} className="mt-2">
                 Effacer la recherche
+              </Button>
+            </div>
+          ) : statusFilter !== "all" ? (
+            <div className="text-center py-12">
+              <HistoryIcon className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+              <p className="text-muted-foreground">
+                {statusFilter === "completed" && "Aucune transaction complétée"}
+                {statusFilter === "pending" && "Aucune transaction en attente"}
+                {statusFilter === "failed" && "Aucune transaction échouée"}
+              </p>
+              <Button variant="ghost" onClick={() => handleStatusFilter("all")} className="mt-2">
+                Voir toutes les transactions
               </Button>
             </div>
           ) : (
