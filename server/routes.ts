@@ -938,14 +938,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { provider, country, operator } = req.params;
       const { incomingFeePercentage, outgoingFeePercentage } = req.body;
-      const config = await storage.createOrUpdateFeeConfig({
-        provider,
-        country,
-        operator,
-        incomingFeePercentage: incomingFeePercentage ?? 60,
-        outgoingFeePercentage: outgoingFeePercentage ?? 60,
-        scope: "business",
-      });
+
+      if (incomingFeePercentage !== undefined && (incomingFeePercentage < 0 || incomingFeePercentage > 1000)) {
+        return res.status(400).json({ error: "Le pourcentage des frais entrants doit etre entre 0 et 100" });
+      }
+      if (outgoingFeePercentage !== undefined && (outgoingFeePercentage < 0 || outgoingFeePercentage > 1000)) {
+        return res.status(400).json({ error: "Le pourcentage des frais sortants doit etre entre 0 et 100" });
+      }
+
+      let config = await storage.getFeeConfig(provider, country, operator, "business");
+      if (!config) {
+        // Config doesn't exist yet — create it with defaults for missing fields
+        config = await storage.createOrUpdateFeeConfig({
+          provider,
+          country,
+          operator,
+          incomingFeePercentage: incomingFeePercentage ?? 60,
+          outgoingFeePercentage: outgoingFeePercentage ?? 60,
+          scope: "business",
+        });
+      } else {
+        // Config exists — only update the provided field, leave the other unchanged
+        config = await storage.updateFeeConfig(provider, country, operator, {
+          incomingFeePercentage,
+          outgoingFeePercentage,
+        }, "business");
+      }
+
       res.json(config);
     } catch (error: any) {
       console.error("Update business fee config error:", error);
