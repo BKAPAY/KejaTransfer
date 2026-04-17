@@ -147,7 +147,6 @@ function FinancialBreakdown({
             {serviceFee > 0 && (
               <FinancialRow
                 label="Frais de service"
-                sublabel={feePercentage > 0 ? fmtPct(feePercentage) : undefined}
                 value={`-${fmtAmount(serviceFee, currency)}`}
                 color="red"
               />
@@ -155,7 +154,6 @@ function FinancialBreakdown({
             {exchangeFee > 0 && (
               <FinancialRow
                 label="Frais d'échange de devise"
-                sublabel={exchangeFeePercentage > 0 ? fmtPct(exchangeFeePercentage) : undefined}
                 value={`-${fmtAmount(exchangeFee, currency)}`}
                 color="orange"
               />
@@ -200,7 +198,6 @@ function FinancialBreakdown({
             {serviceFee > 0 && (
               <FinancialRow
                 label="Frais de service"
-                sublabel={feePercentage > 0 ? fmtPct(feePercentage) : undefined}
                 value={`-${fmtAmount(serviceFee, currency)}`}
                 color="red"
               />
@@ -208,7 +205,6 @@ function FinancialBreakdown({
             {exchangeFee > 0 && (
               <FinancialRow
                 label="Frais d'échange de devise"
-                sublabel={exchangeFeePercentage > 0 ? fmtPct(exchangeFeePercentage) : undefined}
                 value={`-${fmtAmount(exchangeFee, currency)}`}
                 color="orange"
               />
