@@ -8901,7 +8901,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           payerCurrency,
           ownerCurrency,
           otpCode,
-          owner?.accountType
+          owner?.accountType,
+          customFieldResponses || undefined
         );
 
         if (result.success) {
@@ -8929,7 +8930,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           operator,
           otpCode,
           customerName || "Client",
-          customerEmail || null
+          customerEmail || null,
+          customFieldResponses || undefined
         );
 
         if (result.requiresOtp) {
@@ -8974,7 +8976,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             customerName: customerName || undefined,
             customerEmail: customerEmail || undefined,
             customerPaysFee: paymentLink.customerPaysFee ?? false,
-            extraMetadata: { paymentLinkId: paymentLink.id },
+            extraMetadata: { paymentLinkId: paymentLink.id, ...(customFieldResponses ? { customFieldResponses } : {}) },
           }
         );
         if (result.requiresOTP) {

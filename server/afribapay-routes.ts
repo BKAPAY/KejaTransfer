@@ -356,7 +356,8 @@ export async function handleAfribaPayPaymentLink(
   operator: string,
   otpCode?: string,
   customerName?: string,
-  customerEmail?: string
+  customerEmail?: string,
+  customFieldResponses?: Record<string, string>
 ): Promise<{ 
   success: boolean; 
   transactionId?: string; 
@@ -462,6 +463,7 @@ export async function handleAfribaPayPaymentLink(
         balanceAmount: netAmountForUser,
         balanceCurrency: ownerCurrency,
         ...(incomingExchangeFee > 0 ? { exchangeFee: incomingExchangeFee, exchangeFeePercentage: incomingExchangeFeePercentage } : {}),
+        ...(customFieldResponses ? { customFieldResponses } : {}),
       }),
     });
 

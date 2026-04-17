@@ -529,7 +529,8 @@ export async function handleMbiyoPayPaymentLink(
   convertedCurrency?: string,
   ownerCurrency?: string,
   otpCode?: string,
-  ownerAccountType?: string
+  ownerAccountType?: string,
+  customFieldResponses?: Record<string, string>
 ): Promise<{ success: boolean; transactionId?: string; mbiyopayTransactionId?: string; redirectUrl?: string; message?: string; error?: string; instructions?: string }> {
   try {
     // Use payer's country for the payment provider
@@ -610,6 +611,7 @@ export async function handleMbiyoPayPaymentLink(
         paymentProvider: "mbiyopay",
         orderId,
         startTime,
+        ...(customFieldResponses ? { customFieldResponses } : {}),
       }),
     });
 
