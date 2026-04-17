@@ -449,12 +449,6 @@ export function TransactionDetailsDialog({
                   <p className="text-sm font-semibold capitalize">{metadata.provider}</p>
                 </div>
               )}
-              {metadata?.scope && (
-                <div className="bg-muted/30 rounded-md p-3 border">
-                  <p className="text-xs text-muted-foreground mb-1">Compte</p>
-                  <p className="text-sm font-semibold capitalize">{metadata.scope === "business" ? "Entreprise" : "Personnel"}</p>
-                </div>
-              )}
             </div>
 
             {transaction.description && (
