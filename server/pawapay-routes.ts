@@ -568,7 +568,7 @@ export async function handlePawaPayWebhook(req: Request, res: Response): Promise
           }
         } else if (mappedStatus === "failed") {
           if (meta.scope === "business") {
-            const refundAmount = meta.deductedFromBalance || tx.amount;
+            const refundAmount = (meta.deductedFromBalance || tx.amount) + (meta.exchangeFee || 0);
             const country = tx.country || meta.country;
             const currency = tx.currency || meta.balanceCurrency;
             if (country && currency) {
@@ -582,7 +582,7 @@ export async function handlePawaPayWebhook(req: Request, res: Response): Promise
             }
             await sendApiPayoutCallback(tx.id, meta, "failed");
           } else {
-            const refundAmount = meta.deductedFromBalance || tx.amount;
+            const refundAmount = (meta.deductedFromBalance || tx.amount) + (meta.exchangeFee || 0);
             const refunded = await storage.atomicFailAndRefundPayout(tx.id, tx.userId, refundAmount);
             if (refunded) {
               console.log(`[PawaPay Webhook] Payout ${tx.id} failed — refunded ${refundAmount} to user ${tx.userId}`);
@@ -675,7 +675,7 @@ export async function pollPawaPayTransaction(txId: string): Promise<void> {
         }
       } else if (mappedStatus === "failed") {
         if (meta.scope === "business") {
-          const refundAmount = meta.deductedFromBalance || tx.amount;
+          const refundAmount = (meta.deductedFromBalance || tx.amount) + (meta.exchangeFee || 0);
           const country = tx.country || meta.country;
           const currency = tx.currency || meta.balanceCurrency;
           if (country && currency) {
@@ -689,7 +689,7 @@ export async function pollPawaPayTransaction(txId: string): Promise<void> {
           }
           await sendApiPayoutCallback(txId, meta, "failed");
         } else {
-          const refundAmount = meta.deductedFromBalance || tx.amount;
+          const refundAmount = (meta.deductedFromBalance || tx.amount) + (meta.exchangeFee || 0);
           const refunded = await storage.atomicFailAndRefundPayout(txId, tx.userId, refundAmount);
           if (refunded) {
             console.log(`[PawaPay Poll] Payout ${txId} failed — refunded ${refundAmount} to user ${tx.userId}`);
