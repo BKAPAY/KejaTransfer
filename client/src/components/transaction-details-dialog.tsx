@@ -6,11 +6,14 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import type { Transaction } from "@shared/schema";
-import { Copy, Mail, Phone, Wallet, AlertTriangle, CheckCircle, XCircle, Lock, ShieldCheck, RotateCcw, Webhook } from "lucide-react";
+import {
+  Copy, Mail, Phone, Wallet, AlertTriangle, CheckCircle, XCircle,
+  Lock, ShieldCheck, RotateCcw, Webhook, ArrowDownLeft, ArrowUpRight,
+  ArrowLeftRight, TrendingUp, Receipt, Clock,
+} from "lucide-react";
 import { CryptoIcon } from "@/components/crypto-icon";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { useMemo, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
@@ -44,7 +47,188 @@ interface TransactionMetadata {
   balanceAmount?: number;
   balanceCurrency?: string;
   conversionRate?: number;
+  exchangeFee?: number;
+  exchangeFeePercentage?: number;
+  netAmountForUser?: number;
+  scope?: string;
+  businessTokenId?: string;
+  apiKeyId?: string;
+  orderId?: string;
+  netMode?: boolean;
   [key: string]: any;
+}
+
+const OUTGOING_TYPES = ["withdrawal", "transfer"];
+const INCOMING_TYPES = ["deposit", "payment_link", "merchant_link", "api_payment"];
+
+function fmtAmount(amount: number, currency: string) {
+  return new Intl.NumberFormat("fr-FR", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: currency === "USD" || currency === "EUR" ? 2 : 0,
+  }).format(amount) + " " + currency;
+}
+
+function fmtPct(pct: number) {
+  const val = pct / 10;
+  return (Number.isInteger(val) ? val.toString() : val.toFixed(1)) + "%";
+}
+
+function FinancialRow({
+  label,
+  value,
+  sublabel,
+  color = "default",
+  bold = false,
+  size = "md",
+}: {
+  label: string;
+  value: string;
+  sublabel?: string;
+  color?: "default" | "red" | "orange" | "green" | "muted";
+  bold?: boolean;
+  size?: "sm" | "md" | "lg";
+}) {
+  const textColors = {
+    default: "text-foreground",
+    red: "text-red-500 dark:text-red-400",
+    orange: "text-orange-500 dark:text-orange-400",
+    green: "text-emerald-600 dark:text-emerald-400",
+    muted: "text-muted-foreground",
+  };
+  const sizes = { sm: "text-xs", md: "text-sm", lg: "text-base" };
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <div>
+        <span className={`${sizes[size]} ${color === "muted" ? "text-muted-foreground" : "text-foreground"}`}>{label}</span>
+        {sublabel && <span className="text-xs text-muted-foreground ml-1">({sublabel})</span>}
+      </div>
+      <span className={`${sizes[size]} ${bold ? "font-bold" : "font-medium"} ${textColors[color]} tabular-nums`}>
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function FinancialBreakdown({
+  transaction,
+  metadata,
+}: {
+  transaction: Transaction;
+  metadata: TransactionMetadata | null;
+}) {
+  const currency = transaction.currency || "XOF";
+  const totalFee = transaction.fee || 0;
+  const feePercentage = transaction.feePercentage || 0;
+  const exchangeFee = metadata?.exchangeFee || 0;
+  const exchangeFeePercentage = metadata?.exchangeFeePercentage || 0;
+  const serviceFee = totalFee - exchangeFee;
+  const isOutgoing = OUTGOING_TYPES.includes(transaction.type);
+  const isIncoming = INCOMING_TYPES.includes(transaction.type);
+
+  if (totalFee === 0 && !isOutgoing) return null;
+
+  if (isOutgoing) {
+    const gross = transaction.amount;
+    const netReceived = gross - totalFee;
+    const balanceDeducted = gross + totalFee;
+
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center gap-2 mb-3">
+          <Receipt className="w-4 h-4 text-muted-foreground" />
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Récapitulatif financier</h3>
+        </div>
+        <div className="rounded-lg border overflow-hidden">
+          <div className="p-4 space-y-3 bg-card">
+            <FinancialRow
+              label="Montant saisi"
+              value={fmtAmount(gross, currency)}
+            />
+            {serviceFee > 0 && (
+              <FinancialRow
+                label="Frais de service"
+                sublabel={feePercentage > 0 ? fmtPct(feePercentage) : undefined}
+                value={`-${fmtAmount(serviceFee, currency)}`}
+                color="red"
+              />
+            )}
+            {exchangeFee > 0 && (
+              <FinancialRow
+                label="Frais d'échange de devise"
+                sublabel={exchangeFeePercentage > 0 ? fmtPct(exchangeFeePercentage) : undefined}
+                value={`-${fmtAmount(exchangeFee, currency)}`}
+                color="orange"
+              />
+            )}
+          </div>
+          <div className="border-t px-4 py-3 bg-muted/20 space-y-2">
+            <FinancialRow
+              label="Reçu par le destinataire"
+              value={fmtAmount(Math.max(0, netReceived), currency)}
+              color="green"
+              bold
+              size="md"
+            />
+            <FinancialRow
+              label="Débité de votre solde"
+              value={fmtAmount(balanceDeducted, currency)}
+              color="muted"
+              size="sm"
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (isIncoming && totalFee > 0) {
+    const net = transaction.amount;
+    const gross = net + totalFee;
+
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center gap-2 mb-3">
+          <Receipt className="w-4 h-4 text-muted-foreground" />
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Récapitulatif financier</h3>
+        </div>
+        <div className="rounded-lg border overflow-hidden">
+          <div className="p-4 space-y-3 bg-card">
+            <FinancialRow
+              label="Montant brut envoyé"
+              value={fmtAmount(gross, currency)}
+            />
+            {serviceFee > 0 && (
+              <FinancialRow
+                label="Frais de service"
+                sublabel={feePercentage > 0 ? fmtPct(feePercentage) : undefined}
+                value={`-${fmtAmount(serviceFee, currency)}`}
+                color="red"
+              />
+            )}
+            {exchangeFee > 0 && (
+              <FinancialRow
+                label="Frais d'échange de devise"
+                sublabel={exchangeFeePercentage > 0 ? fmtPct(exchangeFeePercentage) : undefined}
+                value={`-${fmtAmount(exchangeFee, currency)}`}
+                color="orange"
+              />
+            )}
+          </div>
+          <div className="border-t px-4 py-3 bg-emerald-50 dark:bg-emerald-950/20 space-y-1">
+            <FinancialRow
+              label="Crédité sur votre compte"
+              value={fmtAmount(net, currency)}
+              color="green"
+              bold
+              size="md"
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
 }
 
 export function TransactionDetailsDialog({
@@ -139,53 +323,30 @@ export function TransactionDetailsDialog({
 
   if (!transaction) return null;
 
-  const formatAmount = (amount: number, currency?: string) => {
-    return new Intl.NumberFormat("fr-FR", {
-      style: "currency",
-      currency: currency || transaction.currency || "XOF",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: currency === "USD" ? 2 : 0,
-    }).format(amount);
-  };
+  const currency = transaction.currency || "XOF";
+  const isOutgoing = OUTGOING_TYPES.includes(transaction.type);
+  const totalFee = transaction.fee || 0;
 
-  const getStatusBadge = (status: string) => {
-    const variants: Record<string, "default" | "secondary" | "destructive"> = {
-      completed: "default",
-      pending: "secondary",
-      failed: "destructive",
-      cancelled: "destructive",
+  const getStatusConfig = (status: string) => {
+    const configs: Record<string, { label: string; icon: typeof CheckCircle; bg: string; text: string; border: string }> = {
+      completed: { label: "Complété", icon: CheckCircle, bg: "bg-emerald-50 dark:bg-emerald-950/30", text: "text-emerald-700 dark:text-emerald-400", border: "border-emerald-200 dark:border-emerald-800" },
+      pending: { label: "En attente", icon: Clock, bg: "bg-amber-50 dark:bg-amber-950/30", text: "text-amber-700 dark:text-amber-400", border: "border-amber-200 dark:border-amber-800" },
+      failed: { label: "Échoué", icon: XCircle, bg: "bg-red-50 dark:bg-red-950/30", text: "text-red-700 dark:text-red-400", border: "border-red-200 dark:border-red-800" },
+      cancelled: { label: "Annulé", icon: XCircle, bg: "bg-slate-50 dark:bg-slate-900/30", text: "text-slate-600 dark:text-slate-400", border: "border-slate-200 dark:border-slate-700" },
     };
-    return variants[status] || "secondary";
+    return configs[status] || configs.pending;
   };
 
-  const getStatusText = (status: string) => {
-    const texts: Record<string, string> = {
-      completed: "Complété",
-      pending: "En attente",
-      failed: "Échoué",
-      cancelled: "Annulé",
+  const getTypeConfig = (type: string) => {
+    const configs: Record<string, { label: string; icon: typeof ArrowDownLeft }> = {
+      deposit: { label: "Dépôt", icon: ArrowDownLeft },
+      withdrawal: { label: "Retrait", icon: ArrowUpRight },
+      transfer: { label: "Transfert", icon: ArrowLeftRight },
+      payment_link: { label: "Lien de paiement", icon: TrendingUp },
+      merchant_link: { label: "Lien marchand", icon: TrendingUp },
+      api_payment: { label: "Paiement API", icon: TrendingUp },
     };
-    return texts[status] || status;
-  };
-
-  const getTypeText = (type: string) => {
-    const types: Record<string, string> = {
-      deposit: "Dépôt",
-      withdrawal: "Retrait",
-      transfer: "Transfert",
-      payment_link: "Lien de paiement",
-      merchant_link: "Lien marchand",
-      api_payment: "Paiement API",
-    };
-    return types[type] || type;
-  };
-
-  const copyToClipboard = (text: string, label: string) => {
-    navigator.clipboard.writeText(text);
-    toast({
-      title: "Copié",
-      description: `${label} copié dans le presse-papiers`,
-    });
+    return configs[type] || { label: type, icon: ArrowLeftRight };
   };
 
   const isCryptoPayment = metadata?.payAddress || metadata?.cryptoCurrency;
@@ -200,320 +361,280 @@ export function TransactionDetailsDialog({
     || (metadata?.orderId ? String(metadata.orderId) : null)
     || transaction.id;
 
+  const statusConfig = getStatusConfig(transaction.status);
+  const typeConfig = getTypeConfig(
+    transaction.type === "withdrawal" && (metadata?.netMode === true || String(metadata?.orderId || "").startsWith("BKAPAY-API-") || !!metadata?.apiKeyId)
+      ? "api_payment"
+      : transaction.type
+  );
+  const StatusIcon = statusConfig.icon;
+  const TypeIcon = typeConfig.icon;
+
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast({ title: "Copié", description: `${label} copié dans le presse-papiers` });
+  };
+
+  const displayAmount = isOutgoing
+    ? fmtAmount(transaction.amount, currency)
+    : fmtAmount(transaction.amount, currency);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Détails de la transaction</DialogTitle>
+          <DialogTitle className="text-base">Détails de la transaction</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-6">
-          <div className="bg-muted p-3 rounded-md border border-border">
-            <label className="text-xs font-medium text-muted-foreground block mb-2">ID Transaction</label>
+        <div className="space-y-5">
+
+          {/* Status + Type + Amount Hero */}
+          <div className={`rounded-lg border p-4 ${statusConfig.bg} ${statusConfig.border}`}>
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-2">
+                <TypeIcon className={`w-5 h-5 ${statusConfig.text}`} />
+                <div>
+                  <p className={`text-sm font-semibold ${statusConfig.text}`}>{typeConfig.label}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {new Date(transaction.createdAt).toLocaleDateString("fr-FR", {
+                      day: "numeric", month: "long", year: "numeric",
+                      hour: "2-digit", minute: "2-digit",
+                    })}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <StatusIcon className={`w-4 h-4 ${statusConfig.text}`} />
+                <span className={`text-sm font-semibold ${statusConfig.text}`}>{statusConfig.label}</span>
+              </div>
+            </div>
+            <div className="mt-3 pt-3 border-t border-current/10">
+              <p className="text-xs text-muted-foreground mb-1">
+                {isOutgoing ? "Montant saisi" : totalFee > 0 ? "Montant crédité" : "Montant"}
+              </p>
+              <p className={`text-3xl font-bold tabular-nums ${statusConfig.text}`}>{displayAmount}</p>
+              {isOutgoing && totalFee > 0 && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Net destinataire : {fmtAmount(Math.max(0, transaction.amount - totalFee), currency)}
+                </p>
+              )}
+              {!isOutgoing && totalFee > 0 && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Montant brut : {fmtAmount(transaction.amount + totalFee, currency)}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Transaction ID */}
+          <div className="bg-muted/50 p-3 rounded-md border">
+            <label className="text-xs font-medium text-muted-foreground block mb-1.5">ID Transaction</label>
             <div className="flex items-center gap-2">
-              <code className="text-xs font-mono break-all flex-1">{displayTransactionId}</code>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => copyToClipboard(displayTransactionId, "ID Transaction")}
-                data-testid="button-copy-tx-id"
-              >
-                <Copy className="w-4 h-4" />
+              <code className="text-xs font-mono break-all flex-1 text-foreground">{displayTransactionId}</code>
+              <Button size="icon" variant="ghost" onClick={() => copyToClipboard(displayTransactionId, "ID Transaction")} data-testid="button-copy-tx-id">
+                <Copy className="w-3.5 h-3.5" />
               </Button>
             </div>
           </div>
 
-          <div className="space-y-4">
-            <h3 className="font-semibold text-lg">Informations de la transaction</h3>
+          {/* Financial Breakdown */}
+          <FinancialBreakdown transaction={transaction} metadata={metadata} />
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">Montant</p>
-                <p className="text-2xl font-bold">{formatAmount(transaction.amount)}</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">Statut</p>
-                <Badge variant={getStatusBadge(transaction.status)}>
-                  {getStatusText(transaction.status)}
-                </Badge>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">Type</p>
-                <p className="text-sm font-medium">
-                  {transaction.type === "withdrawal" && (
-                    metadata?.netMode === true ||
-                    String(metadata?.orderId || "").startsWith("BKAPAY-API-") ||
-                    !!metadata?.apiKeyId
-                  ) ? "Payout API"
-                    : getTypeText(transaction.type)}
-                </p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">Date</p>
-                <p className="text-sm">
-                  {new Date(transaction.createdAt).toLocaleDateString("fr-FR", {
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </p>
-              </div>
-
+          {/* Details Grid */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Informations</h3>
+            <div className="grid grid-cols-2 gap-3">
               {transaction.country && (
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">Pays</p>
-                  <p className="text-sm font-medium">{transaction.country}</p>
+                <div className="bg-muted/30 rounded-md p-3 border">
+                  <p className="text-xs text-muted-foreground mb-1">Pays</p>
+                  <p className="text-sm font-semibold">{transaction.country}</p>
                 </div>
               )}
-
               {transaction.operator && (
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">Opérateur</p>
-                  <p className="text-sm font-medium capitalize">{transaction.operator}</p>
+                <div className="bg-muted/30 rounded-md p-3 border">
+                  <p className="text-xs text-muted-foreground mb-1">Opérateur</p>
+                  <p className="text-sm font-semibold capitalize">{transaction.operator}</p>
                 </div>
               )}
-
-              {transaction.description && (
-                <div className="space-y-1 col-span-2">
-                  <p className="text-xs text-muted-foreground">Description</p>
-                  <p className="text-sm">{transaction.description}</p>
+              {metadata?.provider && (
+                <div className="bg-muted/30 rounded-md p-3 border">
+                  <p className="text-xs text-muted-foreground mb-1">Fournisseur</p>
+                  <p className="text-sm font-semibold capitalize">{metadata.provider}</p>
                 </div>
               )}
-
-              {metadata?.providerAmount && metadata?.providerCurrency && metadata.providerCurrency !== transaction.currency && (
-                <div className="space-y-1 col-span-2">
-                  <p className="text-xs text-muted-foreground">Montant envoyé</p>
-                  <p className="text-sm font-medium">
-                    {metadata.providerAmount.toLocaleString("fr-FR")} {metadata.providerCurrency}
-                    {metadata.conversionRate && (
-                      <span className="text-xs text-muted-foreground ml-2">(taux: {metadata.conversionRate})</span>
-                    )}
-                  </p>
+              {metadata?.scope && (
+                <div className="bg-muted/30 rounded-md p-3 border">
+                  <p className="text-xs text-muted-foreground mb-1">Compte</p>
+                  <p className="text-sm font-semibold capitalize">{metadata.scope === "business" ? "Entreprise" : "Personnel"}</p>
                 </div>
               )}
-
             </div>
+
+            {transaction.description && (
+              <div className="bg-muted/30 rounded-md p-3 border">
+                <p className="text-xs text-muted-foreground mb-1">Description</p>
+                <p className="text-sm">{transaction.description}</p>
+              </div>
+            )}
+
+            {/* Cross-currency info */}
+            {metadata?.providerAmount && metadata?.providerCurrency && metadata.providerCurrency !== currency && (
+              <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-md p-3">
+                <p className="text-xs font-medium text-blue-700 dark:text-blue-400 mb-2">Conversion de devises</p>
+                <div className="space-y-1.5">
+                  <FinancialRow
+                    label="Montant envoyé au réseau"
+                    value={`${metadata.providerAmount.toLocaleString("fr-FR")} ${metadata.providerCurrency}`}
+                    size="sm"
+                  />
+                  {metadata.conversionRate && (
+                    <FinancialRow
+                      label="Taux de conversion"
+                      value={`1 ${metadata.providerCurrency} = ${metadata.conversionRate} ${currency}`}
+                      size="sm"
+                      color="muted"
+                    />
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
+          {/* Crypto */}
           {isCryptoPayment && metadata && (
-            <div className="space-y-4 border-t pt-4">
-              <h3 className="font-semibold text-lg flex items-center gap-2">
-                {metadata.cryptoCurrency ? (
-                  <CryptoIcon code={metadata.cryptoCurrency} size="md" />
-                ) : (
-                  <CryptoIcon code="btc" size="md" />
-                )}
-                Informations Cryptomonnaie
+            <div className="space-y-3 border-t pt-4">
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-2">
+                {metadata.cryptoCurrency && <CryptoIcon code={metadata.cryptoCurrency} size="sm" />}
+                Cryptomonnaie
               </h3>
-
-              <div className="grid grid-cols-1 gap-3">
+              <div className="space-y-2">
                 {metadata.cryptoCurrency && (
-                  <div className="space-y-1 flex items-center gap-2">
-                    <CryptoIcon code={metadata.cryptoCurrency} size="sm" />
-                    <div>
-                      <p className="text-xs text-muted-foreground">Cryptomonnaie</p>
-                      <p className="text-sm font-medium uppercase">{metadata.cryptoCurrency}</p>
-                    </div>
+                  <div className="bg-muted/30 rounded-md p-3 border">
+                    <p className="text-xs text-muted-foreground mb-1">Devise crypto</p>
+                    <p className="text-sm font-semibold uppercase">{metadata.cryptoCurrency}</p>
                   </div>
                 )}
-
                 {metadata.cryptoAmount && (
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">Montant en crypto</p>
-                    <p className="text-sm font-medium">
-                      {metadata.cryptoAmount} {metadata.cryptoCurrency?.toUpperCase()}
-                    </p>
+                  <div className="bg-muted/30 rounded-md p-3 border">
+                    <p className="text-xs text-muted-foreground mb-1">Montant crypto</p>
+                    <p className="text-sm font-semibold">{metadata.cryptoAmount} {metadata.cryptoCurrency?.toUpperCase()}</p>
                   </div>
                 )}
-
                 {metadata.payAddress && (
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Wallet className="w-3 h-3" /> Adresse de paiement
-                    </p>
+                  <div className="bg-muted/30 rounded-md p-3 border">
+                    <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1"><Wallet className="w-3 h-3" /> Adresse</p>
                     <div className="flex items-center gap-2">
-                      <code className="text-xs font-mono bg-muted p-2 rounded flex-1 break-all">
-                        {metadata.payAddress}
-                      </code>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => copyToClipboard(metadata.payAddress!, "Adresse crypto")}
-                        data-testid="button-copy-crypto-address"
-                      >
-                        <Copy className="w-4 h-4" />
+                      <code className="text-xs font-mono flex-1 break-all">{metadata.payAddress}</code>
+                      <Button size="icon" variant="ghost" onClick={() => copyToClipboard(metadata.payAddress!, "Adresse")} data-testid="button-copy-crypto-address">
+                        <Copy className="w-3.5 h-3.5" />
                       </Button>
                     </div>
-                  </div>
-                )}
-
-                {metadata.paymentId && (
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">Référence de paiement</p>
-                    <p className="text-xs font-mono bg-muted p-2 rounded">{metadata.paymentId}</p>
                   </div>
                 )}
               </div>
             </div>
           )}
 
-
+          {/* Customer info */}
           {(transaction.customerName || transaction.customerEmail || transaction.customerPhone) && (
-            <div className="space-y-4 border-t pt-4">
-              <h3 className="font-semibold text-lg">Informations du client</h3>
-
-              <div className="grid grid-cols-1 gap-3">
+            <div className="space-y-3 border-t pt-4">
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Client</h3>
+              <div className="space-y-2">
                 {transaction.customerName && (
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">Nom complet</p>
-                    <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-between gap-2 bg-muted/30 rounded-md p-3 border">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Nom</p>
                       <p className="text-sm font-medium">{transaction.customerName}</p>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => copyToClipboard(transaction.customerName!, "Nom")}
-                        data-testid="button-copy-name"
-                      >
-                        <Copy className="w-4 h-4" />
-                      </Button>
                     </div>
+                    <Button size="icon" variant="ghost" onClick={() => copyToClipboard(transaction.customerName!, "Nom")} data-testid="button-copy-name">
+                      <Copy className="w-3.5 h-3.5" />
+                    </Button>
                   </div>
                 )}
-
                 {transaction.customerEmail && (
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Mail className="w-3 h-3" /> Email
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <a
-                        href={`mailto:${transaction.customerEmail}`}
-                        className="text-sm font-medium text-primary hover:underline"
-                        data-testid="link-customer-email"
-                      >
+                  <div className="flex items-center justify-between gap-2 bg-muted/30 rounded-md p-3 border">
+                    <div>
+                      <p className="text-xs text-muted-foreground flex items-center gap-1"><Mail className="w-3 h-3" /> Email</p>
+                      <a href={`mailto:${transaction.customerEmail}`} className="text-sm font-medium text-primary hover:underline" data-testid="link-customer-email">
                         {transaction.customerEmail}
                       </a>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => copyToClipboard(transaction.customerEmail!, "Email")}
-                        data-testid="button-copy-email"
-                      >
-                        <Copy className="w-4 h-4" />
-                      </Button>
                     </div>
+                    <Button size="icon" variant="ghost" onClick={() => copyToClipboard(transaction.customerEmail!, "Email")} data-testid="button-copy-email">
+                      <Copy className="w-3.5 h-3.5" />
+                    </Button>
                   </div>
                 )}
-
                 {transaction.customerPhone && (
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Phone className="w-3 h-3" /> Téléphone
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <a
-                        href={`tel:${transaction.customerPhone}`}
-                        className="text-sm font-medium text-primary hover:underline"
-                        data-testid="link-customer-phone"
-                      >
+                  <div className="flex items-center justify-between gap-2 bg-muted/30 rounded-md p-3 border">
+                    <div>
+                      <p className="text-xs text-muted-foreground flex items-center gap-1"><Phone className="w-3 h-3" /> Téléphone</p>
+                      <a href={`tel:${transaction.customerPhone}`} className="text-sm font-medium text-primary hover:underline" data-testid="link-customer-phone">
                         {transaction.customerPhone}
                       </a>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => copyToClipboard(transaction.customerPhone!, "Téléphone")}
-                        data-testid="button-copy-phone"
-                      >
-                        <Copy className="w-4 h-4" />
-                      </Button>
                     </div>
+                    <Button size="icon" variant="ghost" onClick={() => copyToClipboard(transaction.customerPhone!, "Téléphone")} data-testid="button-copy-phone">
+                      <Copy className="w-3.5 h-3.5" />
+                    </Button>
                   </div>
                 )}
               </div>
             </div>
           )}
 
+          {/* Custom fields */}
           {metadata?.customFieldResponses && Object.keys(metadata.customFieldResponses).length > 0 && (
-            <div className="space-y-4 border-t pt-4">
-              <h3 className="font-semibold text-lg">Champs personnalisés</h3>
-              <div className="grid grid-cols-1 gap-3">
+            <div className="space-y-3 border-t pt-4">
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Champs personnalisés</h3>
+              <div className="space-y-2">
                 {Object.entries(metadata.customFieldResponses).map(([label, value]) => (
-                  <div key={label} className="space-y-1">
-                    <p className="text-xs text-muted-foreground">{label}</p>
-                    <div className="flex items-center gap-2">
+                  <div key={label} className="flex items-center justify-between gap-2 bg-muted/30 rounded-md p-3 border">
+                    <div>
+                      <p className="text-xs text-muted-foreground">{label}</p>
                       <p className="text-sm font-medium">{String(value)}</p>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => copyToClipboard(String(value), label)}
-                        data-testid={`button-copy-custom-${label}`}
-                      >
-                        <Copy className="w-4 h-4" />
-                      </Button>
                     </div>
+                    <Button size="icon" variant="ghost" onClick={() => copyToClipboard(String(value), label)} data-testid={`button-copy-custom-${label}`}>
+                      <Copy className="w-3.5 h-3.5" />
+                    </Button>
                   </div>
                 ))}
               </div>
             </div>
           )}
 
+          {/* Webhook Payout API */}
           {!isAdmin && metadata?.apiKeyId && !metadata?.businessTokenId && (transaction.status === "completed" || transaction.status === "failed") && (
             <div className="space-y-3 border-t pt-4">
-              <h3 className="font-semibold text-base flex items-center gap-2">
-                <Webhook className="w-4 h-4 text-muted-foreground" />
+              <h3 className="text-sm font-semibold flex items-center gap-2 uppercase tracking-wide text-muted-foreground">
+                <Webhook className="w-4 h-4" />
                 Webhook Payout API
               </h3>
-              <p className="text-xs text-muted-foreground">
-                Si votre serveur n'a pas reçu la notification de statut, vous pouvez la renvoyer manuellement.
-              </p>
-              <Button
-                variant="outline"
-                onClick={() => resendWebhookMutation.mutate(transaction.id)}
-                disabled={resendWebhookMutation.isPending || webhookSent}
-                data-testid="button-resend-payout-webhook"
-              >
+              <p className="text-xs text-muted-foreground">Si votre serveur n'a pas reçu la notification, renvoyez-la manuellement.</p>
+              <Button variant="outline" onClick={() => resendWebhookMutation.mutate(transaction.id)} disabled={resendWebhookMutation.isPending || webhookSent} data-testid="button-resend-payout-webhook">
                 <RotateCcw className={`w-4 h-4 mr-2 ${resendWebhookMutation.isPending ? "animate-spin" : ""}`} />
-                {resendWebhookMutation.isPending
-                  ? "Envoi en cours..."
-                  : webhookSent
-                  ? "Webhook envoyé !"
-                  : "Renvoyer le webhook"}
+                {resendWebhookMutation.isPending ? "Envoi..." : webhookSent ? "Webhook envoyé !" : "Renvoyer le webhook"}
               </Button>
             </div>
           )}
 
+          {/* Webhook Business */}
           {!isAdmin && metadata?.scope === "business" && metadata?.businessTokenId && (transaction.status === "completed" || transaction.status === "failed") && (
             <div className="space-y-3 border-t pt-4">
-              <h3 className="font-semibold text-base flex items-center gap-2">
-                <Webhook className="w-4 h-4 text-muted-foreground" />
-                {["deposit", "payment_link", "merchant_link", "api_payment"].includes(transaction.type)
-                  ? "Webhook Payin"
-                  : "Webhook Payout"}
+              <h3 className="text-sm font-semibold flex items-center gap-2 uppercase tracking-wide text-muted-foreground">
+                <Webhook className="w-4 h-4" />
+                {["deposit", "payment_link", "merchant_link", "api_payment"].includes(transaction.type) ? "Webhook Payin" : "Webhook Payout"}
               </h3>
-              <p className="text-xs text-muted-foreground">
-                Si votre serveur n'a pas reçu la notification de statut, vous pouvez la renvoyer manuellement.
-              </p>
-              <Button
-                variant="outline"
-                onClick={() => resendBusinessWebhookMutation.mutate(transaction.id)}
-                disabled={resendBusinessWebhookMutation.isPending || businessWebhookSent}
-                data-testid="button-resend-business-webhook"
-              >
+              <p className="text-xs text-muted-foreground">Si votre serveur n'a pas reçu la notification, renvoyez-la manuellement.</p>
+              <Button variant="outline" onClick={() => resendBusinessWebhookMutation.mutate(transaction.id)} disabled={resendBusinessWebhookMutation.isPending || businessWebhookSent} data-testid="button-resend-business-webhook">
                 <RotateCcw className={`w-4 h-4 mr-2 ${resendBusinessWebhookMutation.isPending ? "animate-spin" : ""}`} />
-                {resendBusinessWebhookMutation.isPending
-                  ? "Envoi en cours..."
-                  : businessWebhookSent
-                  ? "Webhook envoyé !"
-                  : "Renvoyer le webhook"}
+                {resendBusinessWebhookMutation.isPending ? "Envoi..." : businessWebhookSent ? "Webhook envoyé !" : "Renvoyer le webhook"}
               </Button>
             </div>
           )}
 
+          {/* Admin Actions */}
           {isAdmin && (transaction.status === "completed" || transaction.status === "failed" || transaction.status === "pending") && (
             <div className="space-y-4 border-t pt-4">
-              <h3 className="font-semibold text-lg flex items-center gap-2">
+              <h3 className="font-semibold flex items-center gap-2">
                 <AlertTriangle className="w-5 h-5 text-orange-500" />
                 Actions administrateur
               </h3>
@@ -521,132 +642,69 @@ export function TransactionDetailsDialog({
               {adminStep === "idle" && (
                 <div className="flex flex-wrap gap-2">
                   {transaction.status === "completed" && (
-                    <Button
-                      variant="destructive"
-                      onClick={() => {
-                        setConfirmAction("failed");
-                        setAdminStep("code");
-                        setAdminCode("");
-                        setAdminCodeError(false);
-                      }}
-                      data-testid="button-admin-mark-failed"
-                    >
-                      <XCircle className="w-4 h-4 mr-2" />
-                      Marquer comme Echoué
+                    <Button variant="destructive" onClick={() => { setConfirmAction("failed"); setAdminStep("code"); setAdminCode(""); setAdminCodeError(false); }} data-testid="button-admin-mark-failed">
+                      <XCircle className="w-4 h-4 mr-2" />Marquer comme Échoué
                     </Button>
                   )}
                   {(transaction.status === "failed" || transaction.status === "pending") && (
-                    <Button
-                      variant="default"
-                      onClick={() => {
-                        setConfirmAction("completed");
-                        setAdminStep("code");
-                        setAdminCode("");
-                        setAdminCodeError(false);
-                      }}
-                      data-testid="button-admin-mark-completed"
-                    >
-                      <CheckCircle className="w-4 h-4 mr-2" />
-                      Marquer comme Complété
+                    <Button variant="default" onClick={() => { setConfirmAction("completed"); setAdminStep("code"); setAdminCode(""); setAdminCodeError(false); }} data-testid="button-admin-mark-completed">
+                      <CheckCircle className="w-4 h-4 mr-2" />Marquer comme Complété
                     </Button>
                   )}
                 </div>
               )}
 
               {adminStep === "code" && (
-                <div className="bg-muted/50 border border-border rounded-md p-4 space-y-3">
+                <div className="bg-muted/50 border rounded-md p-4 space-y-3">
                   <div className="flex items-center gap-2 mb-1">
                     <Lock className="w-4 h-4 text-muted-foreground" />
-                    <p className="text-sm font-medium">Entrez le code de sécurité pour continuer</p>
+                    <p className="text-sm font-medium">Code de sécurité requis</p>
                   </div>
                   <PasswordInput
                     placeholder="Code de sécurité"
                     value={adminCode}
-                    onChange={(e) => {
-                      setAdminCode(e.target.value);
-                      setAdminCodeError(false);
-                    }}
+                    onChange={(e) => { setAdminCode(e.target.value); setAdminCodeError(false); }}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
-                        if (adminCode === "19992025") {
-                          setAdminStep("confirm");
-                          setAdminCodeError(false);
-                        } else {
-                          setAdminCodeError(true);
-                        }
+                        if (adminCode === "19992025") { setAdminStep("confirm"); setAdminCodeError(false); }
+                        else { setAdminCodeError(true); }
                       }
                     }}
                     className={adminCodeError ? "border-destructive" : ""}
                     data-testid="input-admin-security-code"
                   />
-                  {adminCodeError && (
-                    <p className="text-xs text-destructive">Code de sécurité incorrect</p>
-                  )}
+                  {adminCodeError && <p className="text-xs text-destructive">Code de sécurité incorrect</p>}
                   <div className="flex gap-2">
-                    <Button
-                      variant="default"
-                      onClick={() => {
-                        if (adminCode === "19992025") {
-                          setAdminStep("confirm");
-                          setAdminCodeError(false);
-                        } else {
-                          setAdminCodeError(true);
-                        }
-                      }}
-                      data-testid="button-admin-validate-code"
-                    >
-                      Valider le code
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setAdminStep("idle");
-                        setConfirmAction(null);
-                        setAdminCode("");
-                        setAdminCodeError(false);
-                      }}
-                      data-testid="button-admin-cancel-code"
-                    >
-                      Annuler
-                    </Button>
+                    <Button variant="default" onClick={() => {
+                      if (adminCode === "19992025") { setAdminStep("confirm"); setAdminCodeError(false); }
+                      else { setAdminCodeError(true); }
+                    }} data-testid="button-admin-validate-code">Valider</Button>
+                    <Button variant="outline" onClick={() => { setAdminStep("idle"); setConfirmAction(null); setAdminCode(""); setAdminCodeError(false); }} data-testid="button-admin-cancel-code">Annuler</Button>
                   </div>
                 </div>
               )}
 
               {adminStep === "confirm" && (
                 <div className="bg-destructive/10 border border-destructive/20 rounded-md p-4 space-y-3">
-                  <div className="flex items-center gap-2 mb-1">
+                  <div className="flex items-center gap-2">
                     <ShieldCheck className="w-4 h-4 text-green-600" />
                     <p className="text-sm font-medium text-green-700 dark:text-green-400">Code vérifié</p>
                   </div>
                   <p className="text-sm font-medium">
-                    {confirmAction === "failed" 
-                      ? "Confirmer le passage en Echoué ? Le montant sera déduit du solde de l'utilisateur."
-                      : "Confirmer le passage en Complété ? Le montant sera crédité au solde de l'utilisateur."
-                    }
+                    {confirmAction === "failed"
+                      ? "Confirmer le passage en Échoué ? Le montant sera déduit du solde."
+                      : "Confirmer le passage en Complété ? Le montant sera crédité au solde."}
                   </p>
                   <div className="flex gap-2">
                     <Button
                       variant={confirmAction === "failed" ? "destructive" : "default"}
-                      onClick={() => changeStatusMutation.mutate({ 
-                        transactionId: transaction.id, 
-                        newStatus: confirmAction! 
-                      })}
+                      onClick={() => changeStatusMutation.mutate({ transactionId: transaction.id, newStatus: confirmAction! })}
                       disabled={changeStatusMutation.isPending}
                       data-testid="button-admin-confirm-status"
                     >
-                      {changeStatusMutation.isPending ? "En cours..." : "Confirmer le changement"}
+                      {changeStatusMutation.isPending ? "En cours..." : "Confirmer"}
                     </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setAdminStep("idle");
-                        setConfirmAction(null);
-                        setAdminCode("");
-                      }}
-                      disabled={changeStatusMutation.isPending}
-                      data-testid="button-admin-cancel-status"
-                    >
+                    <Button variant="outline" onClick={() => { setAdminStep("idle"); setConfirmAction(null); setAdminCode(""); }} disabled={changeStatusMutation.isPending} data-testid="button-admin-cancel-status">
                       Annuler
                     </Button>
                   </div>
@@ -654,7 +712,6 @@ export function TransactionDetailsDialog({
               )}
             </div>
           )}
-
         </div>
       </DialogContent>
     </Dialog>
