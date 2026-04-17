@@ -821,9 +821,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const query = req.query.q as string;
       if (!query || query.length === 0) return res.json([]);
-      const allResults = await storage.searchUsers(query);
-      const businessResults = allResults.filter((u: any) => u.accountType === "business");
-      res.json(businessResults);
+      const results = await storage.searchBusinessUsers(query);
+      res.json(results);
     } catch (error: any) {
       console.error("Business search error:", error);
       res.status(500).json({ error: "Une erreur est survenue" });

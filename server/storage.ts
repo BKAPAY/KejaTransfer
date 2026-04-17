@@ -241,6 +241,10 @@ export interface IStorage {
 
   // Business Users
   getBusinessUsers(): Promise<User[]>;
+
+  // Search
+  searchUsers(query: string): Promise<User[]>;
+  searchBusinessUsers(query: string): Promise<User[]>;
 }
 
 export class DbStorage implements IStorage {
@@ -1590,67 +1594,119 @@ export class DbStorage implements IStorage {
   }
 
   async searchUsers(query: string): Promise<User[]> {
-    const allUsers = await this.getAllUsers();
-    const lowerQuery = query.toLowerCase();
-    
-    // First, filter users by name/email
-    const matchedByUserInfo = allUsers.filter(
-      (u) =>
-        u.email.toLowerCase().includes(lowerQuery) ||
-        u.firstName.toLowerCase().includes(lowerQuery) ||
-        u.lastName.toLowerCase().includes(lowerQuery)
-    );
-    
-    // Also search by transaction token, ID, or any external reference in metadata
-    const allTransactions = await db.select().from(schema.transactions);
-    const matchingTransactions = allTransactions.filter(
-      (t) =>
-        (t.paydunyaToken && t.paydunyaToken.toLowerCase().includes(lowerQuery)) ||
-        t.id.toLowerCase().includes(lowerQuery) ||
-        (t.metadata && t.metadata.toLowerCase().includes(lowerQuery)) ||
-        (t.customerPhone && t.customerPhone.toLowerCase().includes(lowerQuery)) ||
-        (t.customerName && t.customerName.toLowerCase().includes(lowerQuery)) ||
-        (t.customerEmail && t.customerEmail.toLowerCase().includes(lowerQuery))
-    );
-    
-    // Get user IDs from matching transactions
-    const userIdsFromTransactions = new Set(matchingTransactions.map(t => t.userId));
-    
-    // Find users who have matching transactions
-    const matchedByTransaction = allUsers.filter(u => userIdsFromTransactions.has(u.id));
-    
-    // Also search by payment link tokens
-    const allPaymentLinks = await db.select().from(schema.paymentLinks);
-    const matchingPaymentLinks = allPaymentLinks.filter(
-      (pl) => pl.token.toLowerCase().includes(lowerQuery)
-    );
-    const userIdsFromPaymentLinks = new Set(matchingPaymentLinks.map(pl => pl.userId));
-    const matchedByPaymentLink = allUsers.filter(u => userIdsFromPaymentLinks.has(u.id));
-    
-    // Also search by merchant link tokens
-    const allMerchantLinks = await db.select().from(schema.merchantLinks);
-    const matchingMerchantLinks = allMerchantLinks.filter(
-      (ml) => ml.token.toLowerCase().includes(lowerQuery)
-    );
-    const userIdsFromMerchantLinks = new Set(matchingMerchantLinks.map(ml => ml.userId));
-    const matchedByMerchantLink = allUsers.filter(u => userIdsFromMerchantLinks.has(u.id));
-    
-    // Also search by API keys
-    const allApiKeys = await db.select().from(schema.apiKeys);
-    const matchingApiKeys = allApiKeys.filter(
-      (ak) => ak.publicKey.toLowerCase().includes(lowerQuery) || ak.privateKey.toLowerCase().includes(lowerQuery)
-    );
-    const userIdsFromApiKeys = new Set(matchingApiKeys.map(ak => ak.userId));
-    const matchedByApiKey = allUsers.filter(u => userIdsFromApiKeys.has(u.id));
-    
-    // Combine results, avoiding duplicates
-    const resultMap = new Map<string, typeof allUsers[0]>();
-    matchedByUserInfo.forEach(u => resultMap.set(u.id, u));
-    matchedByTransaction.forEach(u => resultMap.set(u.id, u));
-    matchedByPaymentLink.forEach(u => resultMap.set(u.id, u));
-    matchedByMerchantLink.forEach(u => resultMap.set(u.id, u));
-    matchedByApiKey.forEach(u => resultMap.set(u.id, u));
-    
+    const like = `%${query}%`;
+
+    const [byUserInfo, txRows, plRows, mlRows, akRows] = await Promise.all([
+      db.select().from(schema.users).where(
+        or(
+          sql`LOWER(${schema.users.email}) LIKE LOWER(${like})`,
+          sql`LOWER(${schema.users.firstName}) LIKE LOWER(${like})`,
+          sql`LOWER(${schema.users.lastName}) LIKE LOWER(${like})`
+        )
+      ),
+      db.select({ userId: schema.transactions.userId }).from(schema.transactions).where(
+        or(
+          sql`LOWER(${schema.transactions.id}) LIKE LOWER(${like})`,
+          sql`LOWER(${schema.transactions.paydunyaToken}) LIKE LOWER(${like})`,
+          sql`LOWER(${schema.transactions.customerPhone}) LIKE LOWER(${like})`,
+          sql`LOWER(${schema.transactions.customerName}) LIKE LOWER(${like})`,
+          sql`LOWER(${schema.transactions.customerEmail}) LIKE LOWER(${like})`,
+          sql`LOWER(${schema.transactions.metadata}) LIKE LOWER(${like})`
+        )
+      ),
+      db.select({ userId: schema.paymentLinks.userId }).from(schema.paymentLinks).where(
+        sql`LOWER(${schema.paymentLinks.token}) LIKE LOWER(${like})`
+      ),
+      db.select({ userId: schema.merchantLinks.userId }).from(schema.merchantLinks).where(
+        sql`LOWER(${schema.merchantLinks.token}) LIKE LOWER(${like})`
+      ),
+      db.select({ userId: schema.apiKeys.userId }).from(schema.apiKeys).where(
+        or(
+          sql`LOWER(${schema.apiKeys.publicKey}) LIKE LOWER(${like})`,
+          sql`LOWER(${schema.apiKeys.privateKey}) LIKE LOWER(${like})`
+        )
+      ),
+    ]);
+
+    const extraIds = new Set<string>([
+      ...txRows.map(r => r.userId),
+      ...plRows.map(r => r.userId),
+      ...mlRows.map(r => r.userId),
+      ...akRows.map(r => r.userId),
+    ]);
+
+    let byIds: User[] = [];
+    if (extraIds.size > 0) {
+      byIds = await db.select().from(schema.users).where(
+        inArray(schema.users.id, Array.from(extraIds))
+      );
+    }
+
+    const resultMap = new Map<string, User>();
+    byUserInfo.forEach(u => resultMap.set(u.id, u));
+    byIds.forEach(u => resultMap.set(u.id, u));
+    return Array.from(resultMap.values());
+  }
+
+  async searchBusinessUsers(query: string): Promise<User[]> {
+    const like = `%${query}%`;
+
+    const [byUserInfo, txRows, plRows, mlRows, akRows] = await Promise.all([
+      db.select().from(schema.users).where(
+        and(
+          eq(schema.users.accountType, "business"),
+          or(
+            sql`LOWER(${schema.users.email}) LIKE LOWER(${like})`,
+            sql`LOWER(${schema.users.firstName}) LIKE LOWER(${like})`,
+            sql`LOWER(${schema.users.lastName}) LIKE LOWER(${like})`,
+            sql`LOWER(${schema.users.businessName}) LIKE LOWER(${like})`
+          )
+        )
+      ),
+      db.select({ userId: schema.transactions.userId }).from(schema.transactions).where(
+        or(
+          sql`LOWER(${schema.transactions.id}) LIKE LOWER(${like})`,
+          sql`LOWER(${schema.transactions.paydunyaToken}) LIKE LOWER(${like})`,
+          sql`LOWER(${schema.transactions.customerPhone}) LIKE LOWER(${like})`,
+          sql`LOWER(${schema.transactions.customerName}) LIKE LOWER(${like})`,
+          sql`LOWER(${schema.transactions.customerEmail}) LIKE LOWER(${like})`,
+          sql`LOWER(${schema.transactions.metadata}) LIKE LOWER(${like})`
+        )
+      ),
+      db.select({ userId: schema.paymentLinks.userId }).from(schema.paymentLinks).where(
+        sql`LOWER(${schema.paymentLinks.token}) LIKE LOWER(${like})`
+      ),
+      db.select({ userId: schema.merchantLinks.userId }).from(schema.merchantLinks).where(
+        sql`LOWER(${schema.merchantLinks.token}) LIKE LOWER(${like})`
+      ),
+      db.select({ userId: schema.apiKeys.userId }).from(schema.apiKeys).where(
+        or(
+          sql`LOWER(${schema.apiKeys.publicKey}) LIKE LOWER(${like})`,
+          sql`LOWER(${schema.apiKeys.privateKey}) LIKE LOWER(${like})`
+        )
+      ),
+    ]);
+
+    const extraIds = new Set<string>([
+      ...txRows.map(r => r.userId),
+      ...plRows.map(r => r.userId),
+      ...mlRows.map(r => r.userId),
+      ...akRows.map(r => r.userId),
+    ]);
+
+    let byIds: User[] = [];
+    if (extraIds.size > 0) {
+      byIds = await db.select().from(schema.users).where(
+        and(
+          eq(schema.users.accountType, "business"),
+          inArray(schema.users.id, Array.from(extraIds))
+        )
+      );
+    }
+
+    const resultMap = new Map<string, User>();
+    byUserInfo.forEach(u => resultMap.set(u.id, u));
+    byIds.forEach(u => resultMap.set(u.id, u));
     return Array.from(resultMap.values());
   }
   
