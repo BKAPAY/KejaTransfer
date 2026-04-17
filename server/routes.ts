@@ -4724,6 +4724,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (activeProvider !== "paydunya" && apiPayoutExchangeFee > 0) {
         await storage.updateUserBalance(apiKey.userId, -apiPayoutExchangeFee);
         console.log(`[API Payout ${activeProvider}] Exchange fee deducted: ${apiPayoutExchangeFee} ${userCurrency}`);
+        // Store exchange fee in metadata so safeRefundOutgoingTransaction can include it in refund
+        if (result.transactionId) {
+          try {
+            const txForXFee = await storage.getTransaction(result.transactionId);
+            if (txForXFee) {
+              const xFeeMeta = txForXFee.metadata ? JSON.parse(txForXFee.metadata) : {};
+              xFeeMeta.exchangeFee = (xFeeMeta.exchangeFee || 0) + apiPayoutExchangeFee;
+              xFeeMeta.exchangeFeePercentage = xFeeApiPayout.feePercentage;
+              xFeeMeta.exchangeFeeFrom = userCurrency;
+              xFeeMeta.exchangeFeeTo = payoutDestCurrency;
+              await storage.updateTransactionMetadata(result.transactionId, JSON.stringify(xFeeMeta));
+            }
+          } catch (_) { /* best effort */ }
+        }
       }
 
       // 14. Send async callback webhook if configured (using payout-specific callback fields)
