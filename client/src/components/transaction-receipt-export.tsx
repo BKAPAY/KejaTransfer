@@ -244,8 +244,11 @@ const ReceiptTemplate = forwardRef<HTMLDivElement, ReceiptTemplateProps>(
                 {isIncoming && (() => {
                   const cpf = !!(metadata?.customerPaysFee);
                   const base = transaction.amount;
-                  // cpf=true : transaction.amount = montant BASE (marchand reçoit), client paie base+fee
-                  const grossFromClient = cpf ? base + serviceFee : base;
+                  // cpf=true : transaction.amount = montant BASE (marchand reçoit), client paie base+displayServiceFee
+                  // Quand cross-devise (PawaPay), transaction.fee = exchangeFee → displayServiceFee = 0 (évite double-comptage)
+                  // Quand même devise, transaction.fee = service fee → displayServiceFee = serviceFee
+                  const displayServiceFee = cpf ? Math.max(0, serviceFee - exchangeFee) : 0;
+                  const grossFromClient = cpf ? base + displayServiceFee : base;
                   const netStandard = Math.max(0, base - totalFee);
                   const creditedCpf = Math.max(0, base - exchangeFee);
                   return (
@@ -255,7 +258,7 @@ const ReceiptTemplate = forwardRef<HTMLDivElement, ReceiptTemplateProps>(
                         value={fmtAmt(cpf ? grossFromClient : base, currency)}
                       />
                       {cpf ? (
-                        serviceFee > 0 && <ReceiptRow label="Frais réglés par le client" value={`+${fmtAmt(serviceFee, currency)}`} color="#64748b" />
+                        displayServiceFee > 0 && <ReceiptRow label="Frais réglés par le client" value={`+${fmtAmt(displayServiceFee, currency)}`} color="#64748b" />
                       ) : (
                         serviceFee > 0 && <ReceiptRow label="Frais de service" value={`-${fmtAmt(serviceFee, currency)}`} color="#ef4444" />
                       )}

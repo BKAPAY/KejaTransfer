@@ -199,9 +199,11 @@ function FinancialBreakdown({
     if (customerPaysFee) {
       // Le client a payé les frais de service EN PLUS du montant de base.
       // transaction.amount = montant BASE (ce que le marchand reçoit)
-      // gross du client = transaction.amount + serviceFee
-      // Seuls les frais d'échange restent à la charge du marchand.
-      const grossFromClient = gross + serviceFee;
+      // Quand cross-devise + PawaPay : transaction.fee = exchangeFee (pas de service fee dans tx.fee)
+      // Quand même devise : transaction.fee = service fee payé par le client
+      // Pour éviter le double-comptage : displayServiceFee = max(0, tx.fee - exchangeFee)
+      const displayServiceFee = Math.max(0, serviceFee - exchangeFee);
+      const grossFromClient = gross + displayServiceFee;
       const creditedToOwner = Math.max(0, gross - exchangeFee);
 
       return (
@@ -213,10 +215,10 @@ function FinancialBreakdown({
           <div className="rounded-lg border overflow-hidden">
             <div className="p-4 space-y-3 bg-card">
               <FinancialRow label="Total payé par le client" value={fmtAmount(grossFromClient, currency)} />
-              {serviceFee > 0 && (
+              {displayServiceFee > 0 && (
                 <FinancialRow
                   label="Frais réglés par le client"
-                  value={`+${fmtAmount(serviceFee, currency)}`}
+                  value={`+${fmtAmount(displayServiceFee, currency)}`}
                   sublabel="pris en charge par le payeur"
                   color="muted"
                 />
