@@ -414,6 +414,11 @@ export default function Merchant() {
     }
   }, [needsConversion, watchedAmount, ownerCurrency, targetCurrency, fetchConversion, selectedCurrency]);
 
+  // Montant à injecter dans les codes USSD = montant converti si conversion, sinon montant saisi
+  const amountForUssd = (needsConversion && conversionData?.convertedAmount && conversionData.convertedAmount > 0)
+    ? Math.round(conversionData.convertedAmount)
+    : (watchedAmount || 0);
+
   // Fonction pour recommencer un nouveau paiement
   const handleNewPayment = () => {
     if (token) clearMerchantPaymentState(token);
@@ -1169,14 +1174,14 @@ export default function Merchant() {
                   <div className="mt-2 flex items-center gap-2">
                     <div className="flex-1 bg-white dark:bg-gray-900 border border-orange-300 dark:border-orange-700 rounded-md px-3 py-2">
                       <code className="text-base font-bold text-orange-700 dark:text-orange-400">
-                        {getOrangeUssdCode(currentCountry, watchedAmount)}
+                        {getOrangeUssdCode(currentCountry, amountForUssd)}
                       </code>
                     </div>
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() => copyUssdCode(getOrangeUssdCode(currentCountry, watchedAmount))}
+                      onClick={() => copyUssdCode(getOrangeUssdCode(currentCountry, amountForUssd))}
                       className="bg-green-600 border-green-600 text-white shrink-0"
                       data-testid="button-copy-ussd"
                     >
@@ -1532,19 +1537,19 @@ export default function Merchant() {
                 <strong>Instructions pour obtenir votre code OTP :</strong>
                 {isMbiyoOtpOperator && mbiyoOtpInfo ? (
                   <>
-                    <p className="mt-1 whitespace-pre-line">{mbiyoOtpInfo.instructions.replace(/MONTANT/g, (watchedAmount && watchedAmount > 0) ? String(Math.round(watchedAmount)) : "MONTANT")}</p>
+                    <p className="mt-1 whitespace-pre-line">{mbiyoOtpInfo.instructions.replace(/MONTANT/g, amountForUssd > 0 ? String(amountForUssd) : "MONTANT")}</p>
                     {mbiyoOtpInfo.ussdCode && (
                       <div className="mt-2 flex items-center gap-2">
                         <div className="flex-1 bg-white dark:bg-gray-900 border border-orange-300 dark:border-orange-700 rounded-md px-3 py-2 text-center">
                           <code className="text-lg font-bold text-orange-700 dark:text-orange-400">
-                            {mbiyoOtpInfo.ussdCode.replace(/MONTANT/g, (watchedAmount && watchedAmount > 0) ? String(Math.round(watchedAmount)) : "MONTANT")}
+                            {mbiyoOtpInfo.ussdCode.replace(/MONTANT/g, amountForUssd > 0 ? String(amountForUssd) : "MONTANT")}
                           </code>
                         </div>
                         <Button
                           type="button"
                           variant="outline"
                           size="sm"
-                          onClick={() => copyUssdCode(mbiyoOtpInfo!.ussdCode.replace(/MONTANT/g, (watchedAmount && watchedAmount > 0) ? String(Math.round(watchedAmount)) : "MONTANT"))}
+                          onClick={() => copyUssdCode(mbiyoOtpInfo!.ussdCode.replace(/MONTANT/g, amountForUssd > 0 ? String(amountForUssd) : "MONTANT"))}
                           className="bg-green-600 border-green-600 text-white shrink-0"
                           data-testid="button-copy-ussd-mbiyo"
                         >
@@ -1561,14 +1566,14 @@ export default function Merchant() {
                     <div className="mt-2 flex items-center gap-2">
                       <div className="flex-1 bg-white dark:bg-gray-900 border border-orange-300 dark:border-orange-700 rounded-md px-3 py-2">
                         <code className="text-base font-bold text-orange-700 dark:text-orange-400">
-                          {getOrangeUssdCode(selectedCountry, watchedAmount)}
+                          {getOrangeUssdCode(selectedCountry, amountForUssd)}
                         </code>
                       </div>
                       <Button
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={() => copyUssdCode(getOrangeUssdCode(selectedCountry, watchedAmount))}
+                        onClick={() => copyUssdCode(getOrangeUssdCode(selectedCountry, amountForUssd))}
                         className="bg-green-600 border-green-600 text-white shrink-0"
                         data-testid="button-copy-ussd-form"
                       >
