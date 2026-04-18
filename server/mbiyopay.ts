@@ -193,8 +193,9 @@ export function mbiyoPayOperatorRequiresOtp(countryCode: string, network: string
   return countriesWithOrangeOtp.includes(country);
 }
 
-export function getMbiyoPayOtpInstructions(countryCode: string): { ussdCode: string; instructions: string; hint: string } {
+export function getMbiyoPayOtpInstructions(countryCode: string, amount?: number): { ussdCode: string; instructions: string; hint: string } {
   const country = countryCode.toUpperCase();
+  const amountStr = amount && amount > 0 ? String(Math.floor(amount)) : "MONTANT";
   const codes: Record<string, { ussdCode: string; instructions: string; hint: string }> = {
     SN: {
       ussdCode: "#144#391#",
@@ -207,8 +208,8 @@ export function getMbiyoPayOtpInstructions(countryCode: string): { ussdCode: str
       hint: "Selectionnez l'option 2 dans le menu",
     },
     BF: {
-      ussdCode: "*144*4*6*100#",
-      instructions: "Composez *144*4*6*100# puis suivez les instructions pour obtenir votre code de paiement",
+      ussdCode: `*144*4*6*${amountStr}#`,
+      instructions: `Composez *144*4*6*${amountStr}# puis suivez les instructions pour obtenir votre code de paiement`,
       hint: "Entrez votre code secret Orange Money quand demande",
     },
     ML: {

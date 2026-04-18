@@ -50,7 +50,7 @@ type MerchantPaymentFormData = z.infer<typeof merchantPaymentSchema>;
 const ORANGE_INSTRUCTIONS: Record<string, string> = {
   SN: "Composez #144#391*VOTRE CODE PIN ORANGE MONEY# pour obtenir votre code de paiement",
   CI: "Composez #144*82# puis choisissez l'option 2 pour obtenir votre code de paiement",
-  BF: "Composez *144*4*6*100# pour obtenir votre code de paiement",
+  BF: "Composez *144*4*6*MONTANT# pour obtenir votre code de paiement",
   ML: "Composez #144#77# pour obtenir votre code de paiement",
   GN: "Composez #144*6# pour obtenir votre code de paiement",
   CM: "Composez #150*50# pour obtenir votre code de paiement",
@@ -64,7 +64,7 @@ const ORANGE_INSTRUCTIONS: Record<string, string> = {
 const ORANGE_USSD_CODES: Record<string, string> = {
   SN: "#144#391*PIN#",
   CI: "#144*82#",
-  BF: "*144*4*6*100#",
+  BF: "*144*4*6*MONTANT#",
   ML: "#144#77#",
   GN: "#144*6#",
   CM: "#150*50#",
@@ -89,8 +89,10 @@ const ORANGE_USSD_HINTS: Record<string, string> = {
   DEFAULT: "Suivez les instructions pour obtenir votre code",
 };
 
-function getOrangeUssdCode(country: string): string {
-  return ORANGE_USSD_CODES[country] || ORANGE_USSD_CODES.DEFAULT;
+function getOrangeUssdCode(country: string, amount?: number): string {
+  const code = ORANGE_USSD_CODES[country] || ORANGE_USSD_CODES.DEFAULT;
+  if (amount && amount > 0) return code.replace("MONTANT", String(Math.round(amount)));
+  return code;
 }
 
 function getOrangeUssdHint(country: string): string {
@@ -1173,14 +1175,14 @@ export default function Merchant() {
                   <div className="mt-2 flex items-center gap-2">
                     <div className="flex-1 bg-white dark:bg-gray-900 border border-orange-300 dark:border-orange-700 rounded-md px-3 py-2">
                       <code className="text-base font-bold text-orange-700 dark:text-orange-400">
-                        {getOrangeUssdCode(currentCountry)}
+                        {getOrangeUssdCode(currentCountry, watchedAmount)}
                       </code>
                     </div>
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() => copyUssdCode(getOrangeUssdCode(currentCountry))}
+                      onClick={() => copyUssdCode(getOrangeUssdCode(currentCountry, watchedAmount))}
                       className="border-orange-300 hover:bg-orange-100 dark:hover:bg-orange-900"
                       data-testid="button-copy-ussd"
                     >
@@ -1541,14 +1543,14 @@ export default function Merchant() {
                     <div className="mt-2 flex items-center gap-2">
                       <div className="flex-1 bg-white dark:bg-gray-900 border border-orange-300 dark:border-orange-700 rounded-md px-3 py-2">
                         <code className="text-base font-bold text-orange-700 dark:text-orange-400">
-                          {getOrangeUssdCode(selectedCountry)}
+                          {getOrangeUssdCode(selectedCountry, watchedAmount)}
                         </code>
                       </div>
                       <Button
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={() => copyUssdCode(getOrangeUssdCode(selectedCountry))}
+                        onClick={() => copyUssdCode(getOrangeUssdCode(selectedCountry, watchedAmount))}
                         className="border-orange-300 hover:bg-orange-100 dark:hover:bg-orange-900"
                         data-testid="button-copy-ussd-form"
                       >

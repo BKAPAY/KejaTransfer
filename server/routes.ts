@@ -2967,7 +2967,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         const needsOtp = mbiyoNeedsOtp(country, operator);
         if (needsOtp && !otpCode) {
-          const otpInfo = getMbiyoOtpInfo(country);
+          const otpInfo = getMbiyoOtpInfo(country, amountForProvider);
           return res.json({
             success: false,
             requiresOTP: true,
@@ -4185,7 +4185,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const needsOtp = mbiyoNeedsOtp(country, operator);
         if (needsOtp && !otpCode) {
           await storage.updatePaymentSession(session.id, { status: "pending" });
-          const otpInfo = getMbiyoOtpInfo(country);
+          const otpInfo = getMbiyoOtpInfo(country, session.amount);
           return res.json({ success: false, requiresOTP: true, otpInstructions: otpInfo.instructions, otpUssdCode: otpInfo.ussdCode, otpHint: otpInfo.hint, provider: "mbiyopay", error: "Code OTP requis" });
         }
 
@@ -7951,7 +7951,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         const needsOtp = mbiyoPayOperatorRequiresOtp(country, operator);
         if (needsOtp && !otpCode) {
-          const otpInfo = getMbiyoPayOtpInstructions(country);
+          const otpInfo = getMbiyoPayOtpInstructions(country, providerAmount);
           return res.json({
             success: false,
             requiresOTP: true,
@@ -8947,7 +8947,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         const needsOtp = mbiyoPayOperatorRequiresOtp(country, operator);
         if (needsOtp && !otpCode) {
-          const otpInfo = getMbiyoPayOtpInstructions(country);
+          const otpInfo = getMbiyoPayOtpInstructions(country, amountForProvider);
           return res.json({
             success: false,
             requiresOTP: true,
@@ -9335,7 +9335,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         const needsOtp = mbiyoPayOperatorRequiresOtp(country, operator);
         if (needsOtp && !otpCode) {
-          const otpInfo = getMbiyoPayOtpInstructions(country);
+          const otpInfo = getMbiyoPayOtpInstructions(country, amount);
           return res.json({
             success: false,
             requiresOTP: true,
@@ -9669,7 +9669,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         const needsOtp = mbiyoPayOperatorRequiresOtp(country, operator);
         if (needsOtp && !otpCode) {
-          const otpInfo = getMbiyoPayOtpInstructions(country);
+          const otpInfo = getMbiyoPayOtpInstructions(country, transaction.amount);
           return res.json({
             success: false,
             requiresOTP: true,
@@ -10472,7 +10472,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         const needsOtp = mbiyoNeedsOtp(country, operator);
         if (needsOtp && !otpCode) {
-          const otpInfo = getMbiyoOtpInfo(country);
+          const otpInfo = getMbiyoOtpInfo(country, transaction.amount);
           return res.json({
             success: false,
             requiresOTP: true,
