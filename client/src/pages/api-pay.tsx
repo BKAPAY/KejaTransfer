@@ -319,17 +319,20 @@ export default function ApiPay() {
     ? (OPERATORS[country as keyof typeof OPERATORS] || [])
     : [];
   
-  // Logique de filtrage stricte:
+  // Logique de filtrage:
   // - Pendant le chargement: montrer tous (select désactivé)
-  // - Une fois chargé: utiliser UNIQUEMENT les opérateurs retournés par l'API
-  // - Si le pays n'est pas dans la réponse ou liste vide: aucun opérateur disponible
+  // - Une fois chargé: construire depuis la réponse API (opérateurs activés en admin)
+  //   en utilisant le schéma hardcodé comme dictionnaire de noms
   const enabledOperatorsForCountry = enabledCountriesOperators && country 
     ? (enabledCountriesOperators[country] || [])
     : [];
   
   const enabledFilteredOperators = isLoadingOperators 
     ? allCountryOperators
-    : allCountryOperators.filter(op => enabledOperatorsForCountry.includes(op.code));
+    : enabledOperatorsForCountry.map(code => {
+        const known = (allCountryOperators as readonly { code: string; name: string; requiresOtp: boolean }[]).find(op => op.code === code);
+        return known ?? { code, name: code.charAt(0).toUpperCase() + code.slice(1), requiresOtp: false };
+      });
   
   const countryOperators = (country && hasMultiplePawaPayCurrencies(country))
     ? enabledFilteredOperators.filter(op => operatorSupportsCurrency(country, op.code, selectedCurrency))

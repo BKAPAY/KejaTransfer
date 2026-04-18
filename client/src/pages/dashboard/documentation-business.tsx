@@ -348,15 +348,15 @@ echo json_encode(['received' => true]);
     { code: "BJ", flag: "🇧🇯", name: "Bénin", currency: "XOF", operators: ["MTN", "Moov", "Celtiis"], otpOperators: [] as string[] },
     { code: "TG", flag: "🇹🇬", name: "Togo", currency: "XOF", operators: ["Moov", "T-Money"], otpOperators: [] as string[] },
     { code: "CI", flag: "🇨🇮", name: "Côte d'Ivoire", currency: "XOF", operators: ["MTN", "Orange", "Moov"], otpOperators: ["Orange — #144*82#"] },
-    { code: "BF", flag: "🇧🇫", name: "Burkina Faso", currency: "XOF", operators: ["Orange", "Moov", "Coris"], otpOperators: ["Orange — #144*4*6#"] },
+    { code: "BF", flag: "🇧🇫", name: "Burkina Faso", currency: "XOF", operators: ["Orange", "Moov", "Coris"], otpOperators: ["Orange — #144*4*6*100#"] },
     { code: "SN", flag: "🇸🇳", name: "Sénégal", currency: "XOF", operators: ["Orange", "Free", "Expresso", "Wizall"], otpOperators: ["Orange — #144#391#"] },
-    { code: "ML", flag: "🇲🇱", name: "Mali", currency: "XOF", operators: ["Orange", "Moov"], otpOperators: ["Orange — #144*8#"] },
+    { code: "ML", flag: "🇲🇱", name: "Mali", currency: "XOF", operators: ["Orange", "Moov"], otpOperators: ["Orange — #144#77#"] },
     { code: "NE", flag: "🇳🇪", name: "Niger", currency: "XOF", operators: ["Airtel"], otpOperators: [] as string[] },
     // Afrique de l'Ouest — autres devises
     { code: "GN", flag: "🇬🇳", name: "Guinée", currency: "GNF", operators: ["Orange", "MTN"], otpOperators: ["Orange — #144#"] },
     { code: "GM", flag: "🇬🇲", name: "Gambie", currency: "GMD", operators: ["Afrimoney", "QMoney"], otpOperators: [] as string[] },
     // Afrique Centrale — XAF
-    { code: "CM", flag: "🇨🇲", name: "Cameroun", currency: "XAF", operators: ["MTN", "Orange"], otpOperators: ["Orange — #150*50#"] },
+    { code: "CM", flag: "🇨🇲", name: "Cameroun", currency: "XAF", operators: ["MTN", "Orange"], otpOperators: [] as string[] },
     { code: "TD", flag: "🇹🇩", name: "Tchad", currency: "XAF", operators: ["Airtel", "Moov"], otpOperators: [] as string[] },
     { code: "CG", flag: "🇨🇬", name: "Congo-Brazzaville", currency: "XAF", operators: ["MTN", "Airtel"], otpOperators: [] as string[] },
     { code: "CF", flag: "🇨🇫", name: "Centrafrique", currency: "XAF", operators: ["Orange", "Telecel"], otpOperators: [] as string[] },

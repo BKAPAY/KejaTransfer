@@ -571,6 +571,7 @@ export const OPERATORS = {
     { code: "free", name: "Free Money", requiresOtp: false },
     { code: "expresso", name: "Expresso", requiresOtp: false },
     { code: "wave", name: "Wave", requiresOtp: false },
+    { code: "wizall", name: "Wizall", requiresOtp: false },
   ],
   BF: [
     { code: "orange", name: "Orange Money", requiresOtp: true },
@@ -631,6 +632,7 @@ export const OPERATORS = {
     { code: "afrimoney", name: "Afrimoney", requiresOtp: false },
     { code: "qmoney", name: "QMoney", requiresOtp: false },
     { code: "wave", name: "Wave", requiresOtp: false },
+    { code: "aps", name: "APS (Africell)", requiresOtp: false },
   ],
   // PawaPay countries (East & Southern Africa)
   GH: [
