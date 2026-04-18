@@ -36,11 +36,11 @@ export const MBIYOPAY_OPERATORS: Record<string, string[]> = {
   sn: ["orange", "free"],
   tg: ["moov", "togocom"],
   ml: ["orange", "moov"],
-  gn: ["orange"],
+  gn: ["orange", "mtn"],
   cm: ["orange", "mtn"],
   cg: ["mtn"],
-  cd: ["mpesa", "airtel", "orange", "afrimoney"],
-  gm: ["afrimoney", "qmoney", "wave"],
+  cd: ["vodacom", "airtel", "orange", "africell"],
+  gm: ["afrimoney", "qmoney", "wave", "aps"],
   ga: ["moov", "airtel"],
 };
 
@@ -92,6 +92,7 @@ export const MBIYOPAY_OPERATOR_API_CODES: Record<string, Record<string, string>>
   },
   gn: {
     orange: "orange",
+    mtn: "mtn",
   },
   cm: {
     orange: "orange",
@@ -101,15 +102,16 @@ export const MBIYOPAY_OPERATOR_API_CODES: Record<string, Record<string, string>>
     mtn: "mtn",
   },
   cd: {
-    mpesa: "mpesa",
+    vodacom: "vodacom",
     airtel: "airtel",
     orange: "orange",
-    afrimoney: "afrimoney",
+    africell: "africell",
   },
   gm: {
     afrimoney: "afrimoney",
     qmoney: "qmoney",
     wave: "wave",
+    aps: "aps",
   },
   ga: {
     moov: "moov",
@@ -187,7 +189,7 @@ export function mbiyoPayOperatorRequiresOtp(countryCode: string, network: string
   const op = network.toLowerCase();
   if (op !== "orange") return false;
   if (country === "cd") return false;
-  const countriesWithOrangeOtp = ["ci", "sn", "ml", "gn"];
+  const countriesWithOrangeOtp = ["ci", "sn", "ml", "gn", "bf"];
   return countriesWithOrangeOtp.includes(country);
 }
 
@@ -205,19 +207,19 @@ export function getMbiyoPayOtpInstructions(countryCode: string): { ussdCode: str
       hint: "Selectionnez l'option 2 dans le menu",
     },
     BF: {
-      ussdCode: "#144*4*6#",
-      instructions: "Composez #144*4*6# puis suivez les instructions pour obtenir votre code de paiement",
+      ussdCode: "*144*4*6*100#",
+      instructions: "Composez *144*4*6*100# puis suivez les instructions pour obtenir votre code de paiement",
       hint: "Entrez votre code secret Orange Money quand demande",
     },
     ML: {
-      ussdCode: "#144*8#",
-      instructions: "Composez #144*8# puis suivez les instructions pour obtenir votre code de paiement",
+      ussdCode: "#144#77#",
+      instructions: "Composez #144#77# puis suivez les instructions pour obtenir votre code de paiement",
       hint: "Entrez votre code secret Orange Money quand demande",
     },
     GN: {
       ussdCode: "#144#",
-      instructions: "Composez #144# puis selectionnez 'Paiement marchand' pour obtenir votre code de paiement",
-      hint: "Selectionnez l'option Paiement marchand dans le menu",
+      instructions: "Composez #144# puis selectionnez l'option 4 puis 2 pour obtenir votre code de paiement",
+      hint: "Selectionnez l'option 4 puis l'option 2 dans le menu",
     },
     CM: {
       ussdCode: "#150*50#",
@@ -243,6 +245,7 @@ export interface MbiyoPayPayinResult {
   fee?: number;
   chargedAmount?: number;
   instructions?: string;
+  authMode?: string | null;
 }
 
 export async function createMbiyoPayPayin(params: MbiyoPayPayinParams): Promise<MbiyoPayPayinResult> {
@@ -278,8 +281,8 @@ export async function createMbiyoPayPayin(params: MbiyoPayPayinParams): Promise<
     };
     
     if (params.otpCode) {
-      metadata.otp_code = params.otpCode;
-      console.log(`[MbiyoPay Payin] Including OTP code in request`);
+      metadata.om_otp = params.otpCode;
+      console.log(`[MbiyoPay Payin] Including OTP code in request (om_otp)`);
     }
     
     const requestBody = {
@@ -322,7 +325,7 @@ export async function createMbiyoPayPayin(params: MbiyoPayPayinParams): Promise<
 
     // Success case: status is "success" and data contains transaction info
     if (data.status === "success" && data.data) {
-      console.log(`[MbiyoPay Payin] Payment created: ${data.data.transaction_id}, redirectUrl=${data.data.redirect_url || "NONE"}`);
+      console.log(`[MbiyoPay Payin] Payment created: ${data.data.transaction_id}, redirectUrl=${data.data.redirect_url || "NONE"}, authMode=${data.data.auth_mode || "null"}`);
       const result: MbiyoPayPayinResult = {
         success: true,
         transactionId: data.data.transaction_id,
@@ -331,10 +334,11 @@ export async function createMbiyoPayPayin(params: MbiyoPayPayinParams): Promise<
         message: apiMessage || "Paiement initie avec succes",
         fee: data.data.fee,
         chargedAmount: data.data.charged_amount,
+        authMode: data.data.auth_mode ?? null,
       };
       if (data.data.instructions) {
         result.instructions = data.data.instructions;
-        console.log(`[MbiyoPay Payin] Instructions provided: ${data.data.instructions}`);
+        console.log(`[MbiyoPay Payin] Instructions provided (auth_mode=${data.data.auth_mode})`);
       }
       return result;
     }
@@ -342,7 +346,7 @@ export async function createMbiyoPayPayin(params: MbiyoPayPayinParams): Promise<
     // Some MbiyoPay responses have status != "success" but message contains "Success"
     // and data contains transaction info - handle this edge case
     if (data.data && data.data.transaction_id) {
-      console.log(`[MbiyoPay Payin] Non-standard success: status=${data.status}, but data present with transaction_id=${data.data.transaction_id}`);
+      console.log(`[MbiyoPay Payin] Non-standard success: status=${data.status}, but data present with transaction_id=${data.data.transaction_id}, authMode=${data.data.auth_mode || "null"}`);
       return {
         success: true,
         transactionId: data.data.transaction_id,
@@ -351,6 +355,7 @@ export async function createMbiyoPayPayin(params: MbiyoPayPayinParams): Promise<
         message: apiMessage || "Paiement initie avec succes",
         fee: data.data.fee,
         chargedAmount: data.data.charged_amount,
+        authMode: data.data.auth_mode ?? null,
       };
     }
 
@@ -391,6 +396,55 @@ export async function createMbiyoPayPayin(params: MbiyoPayPayinParams): Promise<
       return { success: false, error: "Paiement echoue: Le service de paiement ne repond pas. Veuillez reessayer dans quelques minutes." };
     }
     return { success: false, error: "Paiement echoue: Erreur de connexion au service de paiement." };
+  }
+}
+
+export interface MbiyoPayFinalizeResult {
+  success: boolean;
+  message?: string;
+  error?: string;
+}
+
+export async function finalizeMbiyoPayPayin(transactionId: string, otp: string): Promise<MbiyoPayFinalizeResult> {
+  try {
+    const apiKey = await getMbiyoPayApiKey();
+    if (!apiKey) {
+      return { success: false, error: "MbiyoPay non configure ou desactive" };
+    }
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), MBIYOPAY_TIMEOUT_MS);
+
+    let response: Response;
+    try {
+      response = await fetch(`${MBIYOPAY_BASE_URL}/merchant/transactions/${transactionId}/finalize`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ otp }),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    const data = await response.json();
+    const apiMessage = extractMessage(data.message);
+    console.log(`[MbiyoPay Finalize] Response: status=${data.status}, message="${apiMessage}"`);
+
+    if (data.status === "success") {
+      return { success: true, message: apiMessage || "Paiement finalise avec succes. En attente de confirmation." };
+    }
+
+    return { success: false, error: apiMessage || "Code invalide. Veuillez reessayer." };
+  } catch (error: any) {
+    console.error("[MbiyoPay Finalize] Exception:", error.name, error.message);
+    if (error.name === "AbortError") {
+      return { success: false, error: "Le service de paiement ne repond pas. Veuillez reessayer." };
+    }
+    return { success: false, error: "Erreur de connexion au service de paiement." };
   }
 }
 

@@ -44,7 +44,7 @@ export const MBIYOPAY_COUNTRIES: MbiyoPayCountry[] = [
     phoneFormat: "7XXXXXXX",
     currency: "XOF",
     operators: [
-      { code: "orange", name: "Orange Money", requiresOtp: false, requiresRedirect: false, payin: true, payout: true },
+      { code: "orange", name: "Orange Money", requiresOtp: true, requiresRedirect: false, payin: true, payout: true },
       { code: "moov", name: "Moov Money", requiresOtp: false, requiresRedirect: false, payin: true, payout: true },
       { code: "coris", name: "Coris Money", requiresOtp: false, requiresRedirect: false, payin: true, payout: true },
     ],
@@ -113,6 +113,7 @@ export const MBIYOPAY_COUNTRIES: MbiyoPayCountry[] = [
     currency: "GNF",
     operators: [
       { code: "orange", name: "Orange Money", requiresOtp: true, requiresRedirect: true, payin: true, payout: true },
+      { code: "mtn", name: "MTN Mobile Money", requiresOtp: false, requiresRedirect: false, payin: true, payout: true },
     ],
   },
   {
@@ -151,10 +152,10 @@ export const MBIYOPAY_COUNTRIES: MbiyoPayCountry[] = [
     currencies: ["CDF", "USD"],
     payoutCurrencies: ["CDF", "USD"],
     operators: [
-      { code: "mpesa", name: "M-Pesa", requiresOtp: false, requiresRedirect: false, payin: true, payout: true },
+      { code: "vodacom", name: "Vodacom M-Pesa", requiresOtp: false, requiresRedirect: false, payin: true, payout: true },
       { code: "airtel", name: "Airtel Money", requiresOtp: false, requiresRedirect: false, payin: true, payout: true },
       { code: "orange", name: "Orange Money", requiresOtp: false, requiresRedirect: false, payin: true, payout: true },
-      { code: "afrimoney", name: "Afrimoney", requiresOtp: false, requiresRedirect: false, payin: true, payout: true },
+      { code: "africell", name: "Africell", requiresOtp: false, requiresRedirect: false, payin: true, payout: true },
     ],
   },
   {
@@ -169,6 +170,7 @@ export const MBIYOPAY_COUNTRIES: MbiyoPayCountry[] = [
       { code: "afrimoney", name: "Afrimoney", requiresOtp: false, requiresRedirect: false, payin: true, payout: true },
       { code: "qmoney", name: "QMoney", requiresOtp: false, requiresRedirect: false, payin: true, payout: true },
       { code: "wave", name: "Wave", requiresOtp: false, requiresRedirect: true, payin: true, payout: true },
+      { code: "aps", name: "APS", requiresOtp: false, requiresRedirect: false, payin: true, payout: true },
     ],
   },
   {
@@ -278,19 +280,19 @@ export const getOtpInstructionsForCountry = (countryCode: string): { ussdCode: s
       hint: "Selectionnez l'option 2 dans le menu",
     },
     BF: {
-      ussdCode: "#144*4*6#",
-      instructions: "Composez #144*4*6# puis suivez les instructions pour obtenir votre code de paiement",
+      ussdCode: "*144*4*6*100#",
+      instructions: "Composez *144*4*6*100# puis suivez les instructions pour obtenir votre code de paiement",
       hint: "Entrez votre code secret Orange Money quand demande",
     },
     ML: {
-      ussdCode: "#144*8#",
-      instructions: "Composez #144*8# puis suivez les instructions pour obtenir votre code de paiement",
+      ussdCode: "#144#77#",
+      instructions: "Composez #144#77# puis suivez les instructions pour obtenir votre code de paiement",
       hint: "Entrez votre code secret Orange Money quand demande",
     },
     GN: {
       ussdCode: "#144#",
-      instructions: "Composez #144# puis selectionnez 'Paiement marchand' pour obtenir votre code de paiement",
-      hint: "Selectionnez l'option Paiement marchand dans le menu",
+      instructions: "Composez #144# puis selectionnez l'option 4 puis 2 pour obtenir votre code de paiement",
+      hint: "Selectionnez l'option 4 puis l'option 2 dans le menu",
     },
     CM: {
       ussdCode: "#150*50#",

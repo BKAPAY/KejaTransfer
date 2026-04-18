@@ -6615,6 +6615,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Admin endpoint to resend MbiyoPay webhook for stuck transactions
   app.post("/api/admin/mbiyopay/resend-webhook", handleMbiyoPayResendWebhook);
 
+  // MbiyoPay Finalize: complete a PIN-based payment (QMoney, APS in Gambia)
+  app.post("/api/mbiyopay/finalize/:mbiyopayTransactionId", async (req: Request, res: Response) => {
+    if (!req.session.userId) return res.status(401).json({ error: "Non autorise" });
+    const { mbiyopayTransactionId } = req.params;
+    const { otp, transactionId } = req.body;
+    if (!otp || !mbiyopayTransactionId) {
+      return res.status(400).json({ success: false, error: "Code OTP et identifiant de transaction requis" });
+    }
+    try {
+      const { finalizeMbiyoPayPayin } = await import("./mbiyopay");
+      const result = await finalizeMbiyoPayPayin(mbiyopayTransactionId, otp);
+      if (result.success) {
+        return res.json({ success: true, message: result.message || "Code soumis. En attente de confirmation." });
+      }
+      return res.status(400).json({ success: false, error: result.error });
+    } catch (err: any) {
+      console.error("[MbiyoPay Finalize Route] Error:", err);
+      return res.status(500).json({ success: false, error: "Erreur lors de la finalisation du paiement" });
+    }
+  });
+
   // ===== PawaPay Webhook =====
   app.post("/api/webhooks/pawapay", handlePawaPayWebhook);
 
@@ -7929,8 +7950,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.json({
             success: true,
             transactionId: result.transactionId,
+            mbiyopayTransactionId: result.mbiyopayTransactionId,
             redirectUrl: result.redirectUrl,
             instructions: result.instructions,
+            authMode: result.authMode ?? null,
             message: result.message || "Demande de paiement envoyee. Veuillez valider sur votre telephone.",
             provider: "mbiyopay",
           });

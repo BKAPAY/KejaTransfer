@@ -27,7 +27,7 @@ export async function handleMbiyoPayDeposit(
   originalAmount?: number,
   originalCurrency?: string,
   otpCode?: string
-): Promise<{ success: boolean; transactionId?: string; mbiyopayTransactionId?: string; redirectUrl?: string; message?: string; error?: string; instructions?: string }> {
+): Promise<{ success: boolean; transactionId?: string; mbiyopayTransactionId?: string; redirectUrl?: string; message?: string; error?: string; instructions?: string; authMode?: string | null }> {
   try {
     const countryLower = country.toLowerCase();
     if (!MBIYOPAY_SUPPORTED_COUNTRIES.includes(countryLower)) {
@@ -128,7 +128,7 @@ export async function handleMbiyoPayDeposit(
     });
     await storage.updateTransactionMetadata(tx.id, updatedMetadata);
 
-    console.log(`[MbiyoPay Deposit] Returning to frontend: transactionId=${tx.id}, redirectUrl=${result.redirectUrl || "NONE"}, instructions=${result.instructions || "NONE"}`);
+    console.log(`[MbiyoPay Deposit] Returning to frontend: transactionId=${tx.id}, redirectUrl=${result.redirectUrl || "NONE"}, instructions=${result.instructions ? "YES" : "NONE"}, authMode=${result.authMode ?? "null"}`);
     return {
       success: true,
       transactionId: tx.id,
@@ -136,6 +136,7 @@ export async function handleMbiyoPayDeposit(
       redirectUrl: result.redirectUrl,
       message: result.message || "Paiement initie. Veuillez valider sur votre telephone.",
       instructions: result.instructions,
+      authMode: result.authMode,
     };
   } catch (error: any) {
     console.error("[MbiyoPay Deposit] Error:", error);

@@ -61,6 +61,8 @@ export default function Deposit() {
     otpUssdCode?: string;
     otpHint?: string;
     provider?: string;
+    authMode?: string | null;
+    mbiyopayTransactionId?: string;
   }>({});
   const [otpCode, setOtpCode] = useState("");
   const [pollingStatus, setPollingStatus] = useState<string | null>(null);
@@ -352,9 +354,18 @@ export default function Deposit() {
           requiresOTP: response.requiresOTP,
           instructions: response.instructions,
           provider: response.provider,
+          authMode: response.authMode ?? null,
+          mbiyopayTransactionId: response.mbiyopayTransactionId,
         });
         
-        if (response.requiresOTP && !currentOperatorNeedsOtp) {
+        if (response.authMode === "pin") {
+          countdown.resetCountdown();
+          setPaymentStep("otp");
+          toast({
+            title: "Saisie du code PIN requise",
+            description: "Entrez votre code PIN mobile money pour confirmer le paiement",
+          });
+        } else if (response.requiresOTP && !currentOperatorNeedsOtp) {
           countdown.resetCountdown();
           setPaymentStep("otp");
           toast({
@@ -415,6 +426,14 @@ export default function Deposit() {
     mutationFn: async ({ authorizationCode }: { authorizationCode: string }) => {
       const formData = form.getValues();
       
+      if (paymentData.provider === "mbiyopay" && paymentData.authMode === "pin" && paymentData.mbiyopayTransactionId) {
+        const res = await apiRequest("POST", `/api/mbiyopay/finalize/${paymentData.mbiyopayTransactionId}`, {
+          otp: authorizationCode,
+          transactionId: paymentData.transactionId,
+        });
+        return res.json();
+      }
+      
       if (paymentData.provider === "mbiyopay") {
         const providerAmount = conversionData ? Math.floor(conversionData.convertedAmount) : depositAmount;
         const providerCurrency = conversionData ? conversionData.targetCurrency : userBalanceCurrency;
@@ -443,7 +462,7 @@ export default function Deposit() {
     },
     onSuccess: (response: any) => {
       if (response.success) {
-        if (paymentData.provider === "mbiyopay") {
+        if (paymentData.provider === "mbiyopay" && paymentData.authMode !== "pin") {
           setPaymentData(prev => ({
             ...prev,
             transactionId: response.transactionId,
@@ -756,12 +775,16 @@ export default function Deposit() {
           <CardContent className="py-8 space-y-4">
             <div className="text-center space-y-2">
               <Smartphone className="h-12 w-12 mx-auto text-primary" />
-              <p className="font-semibold text-lg">Code de confirmation requis</p>
+              <p className="font-semibold text-lg">
+                {paymentData.authMode === "pin" ? "Code PIN requis" : "Code de confirmation requis"}
+              </p>
               <p className="text-sm text-muted-foreground">
-                {paymentData.otpInstructions || paymentData.ussdInstruction || "Generez votre code de paiement et entrez-le ci-dessous"}
+                {paymentData.authMode === "pin"
+                  ? "Le paiement a ete initie. Entrez votre code PIN mobile money pour confirmer la transaction."
+                  : paymentData.otpInstructions || paymentData.ussdInstruction || "Generez votre code de paiement et entrez-le ci-dessous"}
               </p>
             </div>
-            {paymentData.otpUssdCode && (
+            {paymentData.authMode !== "pin" && paymentData.otpUssdCode && (
               <Alert className="bg-orange-50 dark:bg-orange-950 border-orange-200 dark:border-orange-800">
                 <Info className="h-4 w-4 text-orange-600" />
                 <AlertDescription className="text-sm text-orange-800 dark:text-orange-200">
@@ -785,14 +808,14 @@ export default function Deposit() {
             </div>
             <div className="space-y-2">
               <label htmlFor="otp-code" className="block text-sm font-medium">
-                Code de paiement
+                {paymentData.authMode === "pin" ? "Code PIN" : "Code de paiement"}
               </label>
               <Input
                 id="otp-code"
-                type="text"
+                type={paymentData.authMode === "pin" ? "password" : "text"}
                 value={otpCode}
                 onChange={(e) => setOtpCode(e.target.value)}
-                placeholder="Entrez le code obtenu"
+                placeholder={paymentData.authMode === "pin" ? "Entrez votre code PIN" : "Entrez le code obtenu"}
                 data-testid="input-otp-code"
               />
             </div>
@@ -808,7 +831,7 @@ export default function Deposit() {
                   Validation...
                 </>
               ) : (
-                "Valider le code"
+                paymentData.authMode === "pin" ? "Confirmer le paiement" : "Valider le code"
               )}
             </Button>
             <Button
