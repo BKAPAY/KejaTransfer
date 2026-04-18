@@ -137,13 +137,16 @@ export default function Signup() {
       });
       return response.json();
     },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+    onSuccess: (data: any) => {
+      // Injecter l'utilisateur dans le cache immédiatement → navigation sans délai
+      if (data?.user) queryClient.setQueryData(["/api/auth/me"], data.user);
       toast({
         title: "Compte créé avec succès",
         description: "Bienvenue sur BKApay",
       });
       setLocation(accountType === "business" ? "/dashboard/business" : "/dashboard");
+      // Rafraîchir en arrière-plan (pas de await)
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
     },
     onError: (error: any) => {
       toast({

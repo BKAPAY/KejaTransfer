@@ -1455,16 +1455,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       req.session.userId = user.id;
       req.session.loginVerified = true;
       
+      const { password: _pw3, ...userWithoutPassword3 } = user;
       res.json({ 
         success: true, 
         message: "Compte créé avec succès",
-        user: {
-          id: user.id,
-          email: user.email,
-          fullName: `${user.firstName} ${user.lastName}`,
-          isAdmin: user.isAdmin,
-          balance: Math.max(0, user.balance),
-        }
+        user: { ...userWithoutPassword3, balance: Math.max(0, userWithoutPassword3.balance) }
       });
     } catch (error: any) {
       console.error("[Signup] Error:", error);
@@ -1632,19 +1627,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`[Login] ${user.email} connecté directement (2FA disabled: ${!tfaEnabled}, isAdmin: ${user.isAdmin})`);
         const logId = await recordLoginLog(req, user.id);
         if (logId) req.session.loginLogId = logId;
+        const { password: _pw, ...userWithoutPassword } = user;
         return res.json({
           success: true,
           message: "Connexion réussie",
           requiresCode: false,
           loginLogId: logId,
-          user: {
-            id: user.id,
-            email: user.email,
-            fullName: `${user.firstName} ${user.lastName}`,
-            isAdmin: user.isAdmin,
-            balance: Math.max(0, user.balance),
-            accountType: user.accountType,
-          }
+          user: { ...userWithoutPassword, balance: Math.max(0, userWithoutPassword.balance) }
         });
       }
 
@@ -1729,7 +1718,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       req.session.loginVerified = true; // GPS verification disabled
       const logId = await recordLoginLog(req, user.id);
       if (logId) req.session.loginLogId = logId;
-      res.json({ success: true, loginLogId: logId, user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, accountType: user.accountType } });
+      const { password: _pw2, ...userWithoutPassword2 } = user;
+      res.json({ success: true, loginLogId: logId, user: { ...userWithoutPassword2, balance: Math.max(0, userWithoutPassword2.balance) } });
     } catch (error: any) {
       console.error("[Login] Error:", error);
       res.status(500).json({ error: "Erreur lors de la connexion" });

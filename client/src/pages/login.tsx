@@ -127,17 +127,17 @@ export default function Login() {
       const response = await apiRequest("POST", "/api/auth/login/send-code", data);
       return await response.json();
     },
-    onSuccess: async (response: any, data) => {
-      console.log("[Login] Response received:", JSON.stringify(response));
-      
+    onSuccess: (response: any, data) => {
       if (response.requiresCode === false || !response.requiresCode) {
-        console.log("[Login] Direct login - redirecting to dashboard");
-        await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+        // Injecter l'utilisateur dans le cache immédiatement → navigation sans délai
+        if (response.user) queryClient.setQueryData(["/api/auth/me"], response.user);
         if (response.user?.accountType === "business") {
           setLocation("/dashboard/business");
         } else {
           setLocation("/dashboard");
         }
+        // Rafraîchir en arrière-plan (pas de await)
+        queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
         return;
       }
       
@@ -168,16 +168,19 @@ export default function Login() {
       const response = await apiRequest("POST", "/api/auth/login", data);
       return await response.json();
     },
-    onSuccess: async (data) => {
+    onSuccess: (data) => {
       if (credentials?.email) {
         clearStorage(credentials.email);
       }
-      await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      // Injecter l'utilisateur dans le cache immédiatement → navigation sans délai
+      if (data.user) queryClient.setQueryData(["/api/auth/me"], data.user);
       if (data.user?.accountType === "business") {
         setLocation("/dashboard/business");
       } else {
         setLocation("/dashboard");
       }
+      // Rafraîchir en arrière-plan (pas de await)
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
     },
     onError: (error: any) => {
       toast({
