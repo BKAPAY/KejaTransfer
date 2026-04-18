@@ -1318,8 +1318,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         req.socket.remoteAddress ||
         "";
       
-      // List of supported country codes
-      const SUPPORTED_COUNTRIES = ["BJ", "TG", "SN", "CI", "ML", "CM", "CD", "GN", "NE"];
+      // List of supported country codes (all countries on the platform)
+      const SUPPORTED_COUNTRIES = [
+        "BJ", "CI", "SN", "BF", "TG", "ML", "GN", "NE",
+        "CM", "CD", "TD", "CG", "CF", "GA", "RW", "GM",
+        "GH", "KE", "TZ", "UG", "ZM", "MW", "MZ", "NG", "SL", "LS"
+      ];
       
       // Use ip-api.com (free, no API key required for non-commercial use)
       const response = await fetch(`https://ip-api.com/json/${clientIP}?fields=countryCode,status`);
