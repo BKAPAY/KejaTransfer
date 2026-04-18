@@ -35,41 +35,37 @@ import Terms from "@/pages/terms";
 import Privacy from "@/pages/privacy";
 import Cookies from "@/pages/cookies";
 
-// Préchargement immédiat (module level) : les chunks commencent à se télécharger dès le parsing
-// Cela garantit que les pages sont prêtes avant que le splash ne disparaisse
-const _preloadDashboard = import("@/pages/dashboard/index");
-const _preloadHistory = import("@/pages/dashboard/history");
-const _preloadAnalytics = import("@/pages/dashboard/analytics");
-const _preloadSettings = import("@/pages/dashboard/settings");
-const _preloadProfile = import("@/pages/dashboard/profile");
-const _preloadPaymentLinks = import("@/pages/dashboard/payment-links");
-const _preloadMerchantLinks = import("@/pages/dashboard/merchant-links");
-const _preloadApi = import("@/pages/dashboard/api");
-const _preloadTransfer = import("@/pages/dashboard/transfer");
-const _preloadWithdrawal = import("@/pages/dashboard/withdrawal");
-const _preloadDeposit = import("@/pages/dashboard/deposit");
-const _preloadSupport = import("@/pages/dashboard/support");
-const _preloadKyc = import("@/pages/dashboard/kyc");
-const _preloadKycHistory = import("@/pages/dashboard/kyc-history");
-const _preloadBusinessDashboard = import("@/pages/dashboard/business/index");
-const _preloadBusinessHistory = import("@/pages/dashboard/business/history");
-const _preloadBusinessSettings = import("@/pages/dashboard/business/settings");
+// Préchargement immédiat au niveau module : déclenche le téléchargement des chunks sans
+// partager les promesses avec lazy() — ce qui permet les retry en cas d'erreur réseau
+import("@/pages/dashboard/index");
+import("@/pages/dashboard/history");
+import("@/pages/dashboard/analytics");
+import("@/pages/dashboard/settings");
+import("@/pages/dashboard/profile");
+import("@/pages/dashboard/payment-links");
+import("@/pages/dashboard/transfer");
+import("@/pages/dashboard/withdrawal");
+import("@/pages/dashboard/deposit");
+import("@/pages/dashboard/support");
+import("@/pages/dashboard/kyc");
+import("@/pages/dashboard/business/index");
+import("@/pages/dashboard/business/history");
 
-// Toutes les pages restent lazy pour garder le bundle principal léger
-const Dashboard = lazy(() => _preloadDashboard);
-const Profile = lazy(() => _preloadProfile);
-const PaymentLinks = lazy(() => _preloadPaymentLinks);
-const MerchantLinks = lazy(() => _preloadMerchantLinks);
-const ApiPage = lazy(() => _preloadApi);
+// Chaque lazy() a sa propre factory indépendante pour pouvoir retry en cas d'échec réseau
+const Dashboard = lazy(() => import("@/pages/dashboard/index"));
+const Profile = lazy(() => import("@/pages/dashboard/profile"));
+const PaymentLinks = lazy(() => import("@/pages/dashboard/payment-links"));
+const MerchantLinks = lazy(() => import("@/pages/dashboard/merchant-links"));
+const ApiPage = lazy(() => import("@/pages/dashboard/api"));
 const ApiPayoutPage = lazy(() => import("@/pages/dashboard/api-payout"));
-const Analytics = lazy(() => _preloadAnalytics);
+const Analytics = lazy(() => import("@/pages/dashboard/analytics"));
 const AnalyticsBusiness = lazy(() => import("@/pages/dashboard/analytics-business"));
-const History = lazy(() => _preloadHistory);
-const Settings = lazy(() => _preloadSettings);
-const Support = lazy(() => _preloadSupport);
-const Deposit = lazy(() => _preloadDeposit);
-const Transfer = lazy(() => _preloadTransfer);
-const Withdrawal = lazy(() => _preloadWithdrawal);
+const History = lazy(() => import("@/pages/dashboard/history"));
+const Settings = lazy(() => import("@/pages/dashboard/settings"));
+const Support = lazy(() => import("@/pages/dashboard/support"));
+const Deposit = lazy(() => import("@/pages/dashboard/deposit"));
+const Transfer = lazy(() => import("@/pages/dashboard/transfer"));
+const Withdrawal = lazy(() => import("@/pages/dashboard/withdrawal"));
 const Admin = lazy(() => import("@/pages/dashboard/admin"));
 const AdminBusiness = lazy(() => import("@/pages/dashboard/admin-business"));
 const AdminBusinessManagement = lazy(() => import("@/pages/dashboard/admin-business-management"));
@@ -83,8 +79,8 @@ const AdminBusinessWallets = lazy(() => import("@/pages/dashboard/admin-business
 const ManagementWrapper = lazy(() => import("@/pages/dashboard/management-wrapper"));
 const AdminAccessCode = lazy(() => import("@/pages/dashboard/admin-access-code"));
 const KycVerification = lazy(() => import("@/pages/dashboard/kyc-verification"));
-const KycHistory = lazy(() => _preloadKycHistory);
-const KYC = lazy(() => _preloadKyc);
+const KycHistory = lazy(() => import("@/pages/dashboard/kyc-history"));
+const KYC = lazy(() => import("@/pages/dashboard/kyc"));
 const CountryOperatorConfig = lazy(() => import("@/pages/dashboard/country-operator-config"));
 const FeeConfig = lazy(() => import("@/pages/dashboard/fee-config"));
 const Diagnostic = lazy(() => import("@/pages/dashboard/diagnostic"));
@@ -105,12 +101,12 @@ const DocumentationRedirect = lazy(() => import("@/pages/documentation-redirect"
 const DocumentationInline = lazy(() => import("@/pages/documentation-inline"));
 const DocumentationPayout = lazy(() => import("@/pages/documentation-payout"));
 const DocumentationSessions = lazy(() => import("@/pages/documentation-sessions"));
-const BusinessDashboard = lazy(() => _preloadBusinessDashboard);
+const BusinessDashboard = lazy(() => import("@/pages/dashboard/business/index"));
 const BusinessProfile = lazy(() => import("@/pages/dashboard/business/profile"));
 const BusinessKyc = lazy(() => import("@/pages/dashboard/business/kyc"));
 const BusinessApi = lazy(() => import("@/pages/dashboard/business/api"));
-const BusinessHistory = lazy(() => _preloadBusinessHistory);
-const BusinessSettings = lazy(() => _preloadBusinessSettings);
+const BusinessHistory = lazy(() => import("@/pages/dashboard/business/history"));
+const BusinessSettings = lazy(() => import("@/pages/dashboard/business/settings"));
 const BusinessSettlements = lazy(() => import("@/pages/dashboard/business/settlements"));
 const BusinessFees = lazy(() => import("@/pages/dashboard/business/fees"));
 
@@ -180,9 +176,8 @@ function DashboardLayout({ children, type = "personal" }: { children: React.Reac
 
   
 
-  // Ne pas bloquer le rendu pendant la vérification auth — le splash gère déjà cet état.
-  // Afficher null de façon transparente si isLoading, la redirection useEffect prend le relais.
-  if (isLoading) return null;
+  // Ne jamais retourner null ici : cela causerait une page blanche visible quand le splash
+  // disparaît. Le splash couvre l'app pendant auth. La redirection se fait via useEffect.
 
   const style = {
     "--sidebar-width": "20rem",
@@ -421,21 +416,29 @@ function AppSplashController() {
       .catch(() => setMaintenanceChecked(true));
   }, []);
 
+  const hideSplash = () => {
+    const loader = document.getElementById("app-loading");
+    if (loader) {
+      loader.style.transition = "opacity 0.45s ease";
+      loader.style.opacity = "0";
+      setTimeout(() => loader.remove(), 500);
+    }
+  };
+
   useEffect(() => {
     if (!authLoading && maintenanceChecked) {
       const elapsed = Date.now() - startTimeRef.current;
-      const remaining = Math.max(0, 700 - elapsed); // minimum 700ms d'affichage
-      const timer = setTimeout(() => {
-        const loader = document.getElementById("app-loading");
-        if (loader) {
-          loader.style.transition = "opacity 0.45s ease";
-          loader.style.opacity = "0";
-          setTimeout(() => loader.remove(), 500);
-        }
-      }, remaining);
+      const remaining = Math.max(0, 700 - elapsed);
+      const timer = setTimeout(hideSplash, remaining);
       return () => clearTimeout(timer);
     }
   }, [authLoading, maintenanceChecked]);
+
+  // Sécurité : retirer le splash après 5s max quoi qu'il arrive
+  useEffect(() => {
+    const safetyTimer = setTimeout(hideSplash, 5000);
+    return () => clearTimeout(safetyTimer);
+  }, []);
 
   return null;
 }
