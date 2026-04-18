@@ -50,8 +50,8 @@ type MerchantPaymentFormData = z.infer<typeof merchantPaymentSchema>;
 const ORANGE_INSTRUCTIONS: Record<string, string> = {
   SN: "Composez #144#391*VOTRE CODE PIN ORANGE MONEY# pour obtenir votre code de paiement",
   CI: "Composez #144*82# puis choisissez l'option 2 pour obtenir votre code de paiement",
-  BF: "Composez *144*4*6# pour obtenir votre code de paiement",
-  ML: "Composez #144*8# pour obtenir votre code de paiement",
+  BF: "Composez *144*4*6*100# pour obtenir votre code de paiement",
+  ML: "Composez #144#77# pour obtenir votre code de paiement",
   GN: "Composez #144*6# pour obtenir votre code de paiement",
   CM: "Composez #150*50# pour obtenir votre code de paiement",
   CD: "Composez *144*1*1# pour obtenir votre code de paiement",
@@ -64,8 +64,8 @@ const ORANGE_INSTRUCTIONS: Record<string, string> = {
 const ORANGE_USSD_CODES: Record<string, string> = {
   SN: "#144#391*PIN#",
   CI: "#144*82#",
-  BF: "*144*4*6#",
-  ML: "#144*8#",
+  BF: "*144*4*6*100#",
+  ML: "#144#77#",
   GN: "#144*6#",
   CM: "#150*50#",
   CD: "*144*1*1#",
@@ -140,7 +140,7 @@ function clearMerchantPaymentState(token: string): void {
 export default function Merchant() {
   const [, params] = useRoute("/merchant/:token");
   const token = params?.token;
-  const [paymentStage, setPaymentStage] = useState<"form" | "ussd" | "otp" | "polling" | "completed" | "failed" | "redirect" | "mbiyoOtp">("form");
+  const [paymentStage, setPaymentStage] = useState<"form" | "ussd" | "otp" | "polling" | "completed" | "failed" | "redirect" | "mbiyoOtp" | "mbiyoPin">("form");
   const [invoiceToken, setInvoiceToken] = useState<string | null>(null);
   const [transactionId, setTransactionId] = useState<string | null>(null);
   const [ussdInstruction, setUssdInstruction] = useState<string | null>(null);
@@ -155,6 +155,8 @@ export default function Merchant() {
   const [mbiyoOtpHint, setMbiyoOtpHint] = useState("");
   const [mbiyoProvider, setMbiyoProvider] = useState("");
   const [mbiyoOtpCode, setMbiyoOtpCode] = useState("");
+  const [mbiyoPinCode, setMbiyoPinCode] = useState("");
+  const [mbiyoPinTransactionId, setMbiyoPinTransactionId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [paidAmount, setPaidAmount] = useState<number>(0);
   const [savedCountry, setSavedCountry] = useState<string>("");
@@ -509,6 +511,16 @@ export default function Merchant() {
         if (data.instructions) {
           setMbiyoInstructions(data.instructions);
         }
+
+        if (data.authMode === "pin" && data.mbiyopayTransactionId) {
+          setMbiyoPinTransactionId(data.mbiyopayTransactionId);
+          setPaymentStage("mbiyoPin");
+          toast({
+            title: "Code PIN requis",
+            description: "Entrez votre code PIN pour confirmer le paiement.",
+          });
+          return;
+        }
         
         if (data.redirectUrl || data.omUrl) {
           setRedirectUrl(data.redirectUrl || null);
@@ -718,6 +730,30 @@ export default function Merchant() {
       });
       setPaymentStage("form");
       if (token) clearMerchantPaymentState(token);
+    },
+  });
+
+  const pinMutation = useMutation({
+    mutationFn: async (pinCode: string) => {
+      if (!mbiyoPinTransactionId) throw new Error("Transaction ID manquant");
+      const res = await fetch(`/api/mbiyopay/finalize-public/${mbiyoPinTransactionId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pinCode }),
+      });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      if (data.success) {
+        countdown.startCountdown();
+        setPaymentStage("polling");
+        toast({ title: "Code PIN soumis", description: "En attente de confirmation du paiement." });
+      } else {
+        toast({ title: "Erreur", description: data.error || "Erreur lors de la soumission du PIN", variant: "destructive" });
+      }
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible de soumettre le code PIN", variant: "destructive" });
     },
   });
 
@@ -1263,6 +1299,57 @@ export default function Merchant() {
               variant="outline"
               className="w-full"
               data-testid="button-cancel-mbiyo-otp"
+            >
+              Annuler
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (paymentStage === "mbiyoPin") {
+    return (
+      <div className="w-full min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center p-4 overflow-hidden">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center space-y-2">
+            <img src={logoImage} alt="BKApay" className="h-10 w-auto mx-auto" />
+            <CardTitle>Code PIN requis</CardTitle>
+            <CardDescription>
+              Entrez votre code PIN mobile money pour confirmer le paiement.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <label className="block text-sm font-medium">Code PIN</label>
+              <Input
+                type="password"
+                value={mbiyoPinCode}
+                onChange={(e) => setMbiyoPinCode(e.target.value)}
+                placeholder="Entrez votre code PIN"
+                data-testid="input-mbiyo-pin"
+              />
+            </div>
+            <Button
+              onClick={() => pinMutation.mutate(mbiyoPinCode)}
+              disabled={pinMutation.isPending || !mbiyoPinCode.trim()}
+              className="w-full"
+              data-testid="button-submit-mbiyo-pin"
+            >
+              {pinMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Confirmation...
+                </>
+              ) : (
+                "Confirmer le paiement"
+              )}
+            </Button>
+            <Button
+              onClick={() => { setPaymentStage("form"); setMbiyoPinCode(""); }}
+              variant="outline"
+              className="w-full"
+              data-testid="button-cancel-mbiyo-pin"
             >
               Annuler
             </Button>

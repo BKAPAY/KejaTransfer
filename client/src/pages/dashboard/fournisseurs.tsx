@@ -70,10 +70,10 @@ const PROVIDER_INFO = {
   },
   mbiyopay: {
     name: "MbiyoPay",
-    description: "Passerelle de paiement pour 11 pays africains",
+    description: "Passerelle de paiement pour 12 pays africains",
     color: "bg-teal-500",
     fields: ["apiKey", "publicKey"],
-    countries: "11 pays (Bénin, BF, CI, Sénégal, Togo, Mali, Guinée, Cameroun, Congo, RDC, Gambie)",
+    countries: "12 pays (Bénin, BF, CI, Sénégal, Togo, Mali, Guinée, Cameroun, Congo, RDC, Gambie, Gabon)",
   },
   moneyfusion: {
     name: "MoneyFusion",

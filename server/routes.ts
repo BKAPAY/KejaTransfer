@@ -3060,8 +3060,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           transactionId: tx.id,
           token: tx.id,
           redirectUrl: result.redirectUrl,
+          instructions: result.instructions,
           message: result.message || "Paiement initie. Veuillez valider sur votre telephone.",
           provider: "mbiyopay",
+          authMode: result.authMode ?? null,
+          mbiyopayTransactionId: result.transactionId,
         });
       } else if (activeProvider === "fedapay") {
         // Use FedaPay - always uses XOF currency
@@ -6636,6 +6639,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint public (sans auth) pour finaliser un paiement MbiyoPay PIN depuis les pages publiques (pay, merchant, api-pay)
+  app.post("/api/mbiyopay/finalize-public/:mbiyopayTransactionId", async (req: Request, res: Response) => {
+    const { mbiyopayTransactionId } = req.params;
+    const { pinCode } = req.body;
+    if (!pinCode || !mbiyopayTransactionId) {
+      return res.status(400).json({ success: false, error: "Code PIN et identifiant de transaction requis" });
+    }
+    try {
+      const { finalizeMbiyoPayPayin } = await import("./mbiyopay");
+      const result = await finalizeMbiyoPayPayin(mbiyopayTransactionId, pinCode);
+      if (result.success) {
+        return res.json({ success: true, message: result.message || "Code PIN soumis. En attente de confirmation." });
+      }
+      return res.status(400).json({ success: false, error: result.error });
+    } catch (err: any) {
+      console.error("[MbiyoPay Finalize Public] Error:", err);
+      return res.status(500).json({ success: false, error: "Erreur lors de la finalisation du paiement" });
+    }
+  });
+
   // ===== PawaPay Webhook =====
   app.post("/api/webhooks/pawapay", handlePawaPayWebhook);
 
@@ -8948,10 +8971,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.json({
             success: true,
             transactionId: result.transactionId,
+            mbiyopayTransactionId: result.mbiyopayTransactionId,
             redirectUrl: result.redirectUrl,
             instructions: result.instructions,
             message: result.message || "Demande de paiement envoyee",
             provider: "mbiyopay",
+            authMode: result.authMode ?? null,
           });
         } else {
           return res.status(400).json({ success: false, error: result.error });
@@ -9334,10 +9359,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.json({
             success: true,
             transactionId: result.transactionId,
+            mbiyopayTransactionId: result.mbiyopayTransactionId,
             redirectUrl: result.redirectUrl,
             instructions: result.instructions,
             message: result.message || "Demande de paiement envoyee",
             provider: "mbiyopay",
+            authMode: result.authMode ?? null,
           });
         } else {
           return res.status(400).json({ success: false, error: result.error });

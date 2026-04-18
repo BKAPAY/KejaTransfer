@@ -532,7 +532,7 @@ export async function handleMbiyoPayPaymentLink(
   otpCode?: string,
   ownerAccountType?: string,
   customFieldResponses?: Record<string, string>
-): Promise<{ success: boolean; transactionId?: string; mbiyopayTransactionId?: string; redirectUrl?: string; message?: string; error?: string; instructions?: string }> {
+): Promise<{ success: boolean; transactionId?: string; mbiyopayTransactionId?: string; redirectUrl?: string; message?: string; error?: string; instructions?: string; authMode?: string | null }> {
   try {
     // Use payer's country for the payment provider
     const country = payerCountry || paymentLink.country || "BJ";
@@ -666,6 +666,7 @@ export async function handleMbiyoPayPaymentLink(
       redirectUrl: result.redirectUrl,
       instructions: result.instructions,
       message: result.message || "Paiement initie",
+      authMode: result.authMode ?? null,
     };
   } catch (error: any) {
     console.error("[MbiyoPay PaymentLink] Error:", error);
@@ -686,7 +687,7 @@ export async function handleMbiyoPayMerchantLink(
   payerCurrency?: string,
   otpCode?: string,
   ownerAccountType?: string
-): Promise<{ success: boolean; transactionId?: string; mbiyopayTransactionId?: string; redirectUrl?: string; message?: string; error?: string; instructions?: string }> {
+): Promise<{ success: boolean; transactionId?: string; mbiyopayTransactionId?: string; redirectUrl?: string; message?: string; error?: string; instructions?: string; authMode?: string | null }> {
   try {
     // Use payer's country for the payment provider
     const country = payerCountry || merchantLink.country || "BJ";
@@ -798,6 +799,7 @@ export async function handleMbiyoPayMerchantLink(
       redirectUrl: result.redirectUrl,
       instructions: result.instructions,
       message: result.message || "Paiement initie",
+      authMode: result.authMode ?? null,
     };
   } catch (error: any) {
     console.error("[MbiyoPay MerchantLink] Error:", error);
