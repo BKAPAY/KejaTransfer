@@ -1653,7 +1653,7 @@ export default function Merchant() {
           </div>
           <div>
             <p className="text-xs sm:text-sm text-muted-foreground mb-1">Envoyer de l'argent à</p>
-            <CardTitle className="text-sm sm:text-lg lg:text-2xl mb-1 sm:mb-2">{merchantLink.merchantName}</CardTitle>
+            <span className="merchant-name-animated">{merchantLink.merchantName}</span>
           </div>
         </CardHeader>
         <CardContent className="p-3 sm:p-4 lg:p-6">

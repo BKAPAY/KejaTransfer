@@ -1634,7 +1634,10 @@ export default function ApiPay() {
               BKApay
             </Link>
           </div>
-          <CardTitle>Payer a {apiKeyInfo.siteName}</CardTitle>
+          <div>
+            <p className="text-sm text-muted-foreground font-medium mb-1">Payer à</p>
+            <span className="merchant-name-animated">{apiKeyInfo.siteName}</span>
+          </div>
         </CardHeader>
 
         <CardContent className="space-y-6">

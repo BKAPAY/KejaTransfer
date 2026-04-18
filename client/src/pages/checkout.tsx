@@ -987,7 +987,10 @@ export default function Checkout() {
               </span>
             )}
           </div>
-          <CardTitle>Payer a {session.merchant || "BKApay"}</CardTitle>
+          <div>
+            <p className="text-sm text-muted-foreground font-medium mb-1">Payer à</p>
+            <span className="merchant-name-animated">{session.merchant || "BKApay"}</span>
+          </div>
         </CardHeader>
 
         <CardContent className="space-y-6">
