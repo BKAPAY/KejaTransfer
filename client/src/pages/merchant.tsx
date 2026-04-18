@@ -1526,12 +1526,24 @@ export default function Merchant() {
                 <strong>Instructions pour obtenir votre code OTP :</strong>
                 {isMbiyoOtpOperator && mbiyoOtpInfo ? (
                   <>
-                    <p className="mt-1 whitespace-pre-line">{mbiyoOtpInfo.instructions}</p>
+                    <p className="mt-1 whitespace-pre-line">{mbiyoOtpInfo.instructions.replace(/MONTANT/g, (watchedAmount && watchedAmount > 0) ? String(Math.round(watchedAmount)) : "MONTANT")}</p>
                     {mbiyoOtpInfo.ussdCode && (
-                      <div className="mt-2 bg-white dark:bg-gray-900 border border-orange-300 dark:border-orange-700 rounded-md px-3 py-2 text-center">
-                        <code className="text-lg font-bold text-orange-700 dark:text-orange-400">
-                          {mbiyoOtpInfo.ussdCode}
-                        </code>
+                      <div className="mt-2 flex items-center gap-2">
+                        <div className="flex-1 bg-white dark:bg-gray-900 border border-orange-300 dark:border-orange-700 rounded-md px-3 py-2 text-center">
+                          <code className="text-lg font-bold text-orange-700 dark:text-orange-400">
+                            {mbiyoOtpInfo.ussdCode.replace(/MONTANT/g, (watchedAmount && watchedAmount > 0) ? String(Math.round(watchedAmount)) : "MONTANT")}
+                          </code>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => copyUssdCode(mbiyoOtpInfo!.ussdCode.replace(/MONTANT/g, (watchedAmount && watchedAmount > 0) ? String(Math.round(watchedAmount)) : "MONTANT"))}
+                          className="bg-green-600 border-green-600 text-white shrink-0"
+                          data-testid="button-copy-ussd-mbiyo"
+                        >
+                          {copiedUssd ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                        </Button>
                       </div>
                     )}
                     {mbiyoOtpInfo.hint && (

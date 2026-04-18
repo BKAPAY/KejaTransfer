@@ -884,19 +884,19 @@ export default function Checkout() {
             <AlertCircle className="h-4 w-4 text-orange-600" />
             <AlertDescription className="text-sm text-orange-800 dark:text-orange-200">
               <strong>Instructions pour obtenir votre code OTP :</strong>
-              <p className="mt-1 whitespace-pre-line">{operatorOtpDetail?.otpInstructions || "Composez le code USSD pour obtenir votre code de paiement"}</p>
+              <p className="mt-1 whitespace-pre-line">{(operatorOtpDetail?.otpInstructions || "Composez le code USSD pour obtenir votre code de paiement").replace(/MONTANT/g, amountForDisplay > 0 ? String(Math.round(amountForDisplay)) : "MONTANT")}</p>
               {operatorOtpDetail?.otpUssdCode && (
                 <div className="mt-2 flex items-center gap-2">
                   <div className="flex-1 bg-white dark:bg-gray-900 border border-orange-300 dark:border-orange-700 rounded-md px-3 py-2">
                     <code className="text-base font-bold text-orange-700 dark:text-orange-400">
-                      {operatorOtpDetail.otpUssdCode}
+                      {operatorOtpDetail.otpUssdCode.replace(/MONTANT/g, amountForDisplay > 0 ? String(Math.round(amountForDisplay)) : "MONTANT")}
                     </code>
                   </div>
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => copyUssdCode(operatorOtpDetail.otpUssdCode!)}
+                    onClick={() => copyUssdCode(operatorOtpDetail!.otpUssdCode!.replace(/MONTANT/g, amountForDisplay > 0 ? String(Math.round(amountForDisplay)) : "MONTANT"))}
                     className="bg-green-600 border-green-600 text-white shrink-0"
                     data-testid="button-copy-ussd-form"
                   >
