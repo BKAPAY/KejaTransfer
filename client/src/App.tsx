@@ -20,7 +20,7 @@ import Signup from "@/pages/signup";
 import NotFound from "@/pages/not-found";
 import MaintenancePage from "@/pages/maintenance";
 
-// Pages de paiement public : import direct (pas lazy) pour éviter le double chargement après le splash
+// Pages publiques : import direct (pas lazy) pour éviter le double chargement après le splash
 import Pay from "@/pages/pay";
 import Merchant from "@/pages/merchant";
 import ApiPayment from "@/pages/api-payment";
@@ -34,6 +34,14 @@ import LoginVerify from "@/pages/login-verify";
 import Terms from "@/pages/terms";
 import Privacy from "@/pages/privacy";
 import Cookies from "@/pages/cookies";
+import ApiDemo from "@/pages/api-demo";
+import DocumentationVersion from "@/pages/documentation-version";
+import DocumentationRedirect from "@/pages/documentation-redirect";
+import DocumentationInline from "@/pages/documentation-inline";
+import DocumentationPayout from "@/pages/documentation-payout";
+import DocumentationSessions from "@/pages/documentation-sessions";
+import DocumentationLanding from "@/pages/dashboard/documentation-landing";
+import DocumentationBusiness from "@/pages/dashboard/documentation-business";
 
 // Préchargement immédiat au niveau module : déclenche le téléchargement des chunks sans
 // partager les promesses avec lazy() — ce qui permet les retry en cas d'erreur réseau
@@ -86,8 +94,6 @@ const FeeConfig = lazy(() => import("@/pages/dashboard/fee-config"));
 const Diagnostic = lazy(() => import("@/pages/dashboard/diagnostic"));
 const Fournisseurs = lazy(() => import("@/pages/dashboard/fournisseurs"));
 const SupportConfig = lazy(() => import("@/pages/dashboard/support-config"));
-const DocumentationBusiness = lazy(() => import("@/pages/dashboard/documentation-business"));
-const DocumentationLanding = lazy(() => import("@/pages/dashboard/documentation-landing"));
 const IpAddresses = lazy(() => import("@/pages/dashboard/ip-addresses"));
 const AdminUserProfile = lazy(() => import("@/pages/dashboard/admin-user-profile"));
 const AdminUserHistory = lazy(() => import("@/pages/dashboard/admin-user-history"));
@@ -95,12 +101,6 @@ const AdminUserLinks = lazy(() => import("@/pages/dashboard/admin-user-links"));
 const AdminUserMerchant = lazy(() => import("@/pages/dashboard/admin-user-merchant"));
 const AdminUserApi = lazy(() => import("@/pages/dashboard/admin-user-api"));
 const AdminUserConnections = lazy(() => import("@/pages/dashboard/admin-user-connections"));
-const ApiDemo = lazy(() => import("@/pages/api-demo"));
-const DocumentationVersion = lazy(() => import("@/pages/documentation-version"));
-const DocumentationRedirect = lazy(() => import("@/pages/documentation-redirect"));
-const DocumentationInline = lazy(() => import("@/pages/documentation-inline"));
-const DocumentationPayout = lazy(() => import("@/pages/documentation-payout"));
-const DocumentationSessions = lazy(() => import("@/pages/documentation-sessions"));
 const BusinessDashboard = lazy(() => import("@/pages/dashboard/business/index"));
 const BusinessProfile = lazy(() => import("@/pages/dashboard/business/profile"));
 const BusinessKyc = lazy(() => import("@/pages/dashboard/business/kyc"));
@@ -326,46 +326,44 @@ function Router() {
   }
 
   return (
-    <Suspense fallback={<PageLoader />}>
-      <Switch>
-        <Route path="/" component={Home} />
-        <Route path="/documentation/redirect/:version">
-          {(params) => <DocumentationRedirect version={params.version} />}
-        </Route>
-        <Route path="/documentation/inline/:version">
-          {(params) => <DocumentationInline version={params.version} />}
-        </Route>
-        <Route path="/documentation/payout/:version">
-          {(params) => <DocumentationPayout version={params.version} />}
-        </Route>
-        <Route path="/documentation/sessions/:version">
-          {(params) => <DocumentationSessions version={params.version} />}
-        </Route>
-        <Route path="/documentation/:version">
-          {(params) => <DocumentationVersion version={params.version} />}
-        </Route>
-        <Route path="/documentation" component={DocumentationLanding} />
-        <Route path="/docs" component={DocumentationLanding} />
-        <Route path="/documentation-business" component={DocumentationBusiness} />
-        <Route path="/signup" component={Signup} />
-        <Route path="/login" component={Login} />
-        <Route path="/login-verify" component={LoginVerify} />
-        <Route path="/forgot-password" component={ForgotPassword} />
-        <Route path="/terms" component={Terms} />
-        <Route path="/privacy" component={Privacy} />
-        <Route path="/cookies" component={Cookies} />
-        <Route path="/pay/:token" component={Pay} />
-        <Route path="/merchant/:token" component={Merchant} />
-        <Route path="/api-payment/:transactionId" component={ApiPayment} />
-        <Route path="/payment-status/:transactionId" component={PaymentStatus} />
-        <Route path="/demo/api-payment" component={ApiDemo} />
-        <Route path="/api-pay/:key" component={ApiPay} />
-        <Route path="/checkout/:sessionId" component={Checkout} />
-        <Route path="/payment-success" component={PaymentSuccessPage} />
-        <Route path="/payment-failed" component={PaymentFailedPage} />
-        <Route component={NotFound} />
-      </Switch>
-    </Suspense>
+    <Switch>
+      <Route path="/" component={Home} />
+      <Route path="/documentation/redirect/:version">
+        {(params) => <DocumentationRedirect version={params.version} />}
+      </Route>
+      <Route path="/documentation/inline/:version">
+        {(params) => <DocumentationInline version={params.version} />}
+      </Route>
+      <Route path="/documentation/payout/:version">
+        {(params) => <DocumentationPayout version={params.version} />}
+      </Route>
+      <Route path="/documentation/sessions/:version">
+        {(params) => <DocumentationSessions version={params.version} />}
+      </Route>
+      <Route path="/documentation/:version">
+        {(params) => <DocumentationVersion version={params.version} />}
+      </Route>
+      <Route path="/documentation" component={DocumentationLanding} />
+      <Route path="/docs" component={DocumentationLanding} />
+      <Route path="/documentation-business" component={DocumentationBusiness} />
+      <Route path="/signup" component={Signup} />
+      <Route path="/login" component={Login} />
+      <Route path="/login-verify" component={LoginVerify} />
+      <Route path="/forgot-password" component={ForgotPassword} />
+      <Route path="/terms" component={Terms} />
+      <Route path="/privacy" component={Privacy} />
+      <Route path="/cookies" component={Cookies} />
+      <Route path="/pay/:token" component={Pay} />
+      <Route path="/merchant/:token" component={Merchant} />
+      <Route path="/api-payment/:transactionId" component={ApiPayment} />
+      <Route path="/payment-status/:transactionId" component={PaymentStatus} />
+      <Route path="/demo/api-payment" component={ApiDemo} />
+      <Route path="/api-pay/:key" component={ApiPay} />
+      <Route path="/checkout/:sessionId" component={Checkout} />
+      <Route path="/payment-success" component={PaymentSuccessPage} />
+      <Route path="/payment-failed" component={PaymentFailedPage} />
+      <Route component={NotFound} />
+    </Switch>
   );
 }
 
@@ -457,8 +455,6 @@ function AppInitializer() {
       import("@/pages/dashboard/admin-business");
       import("@/pages/dashboard/management-wrapper");
       import("@/pages/dashboard/fee-config");
-      import("@/pages/dashboard/documentation-business");
-      import("@/pages/dashboard/documentation-landing");
       import("@/pages/dashboard/business/profile");
       import("@/pages/dashboard/business/settlements");
       import("@/pages/dashboard/business/fees");
