@@ -92,8 +92,9 @@ const BusinessFees = lazy(() => import("@/pages/dashboard/business/fees"));
 
 function PageLoader() {
   return (
-    <div className="h-full w-full flex items-center justify-center py-20">
-      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+    <div className="h-full w-full flex flex-col items-center justify-center py-20 gap-3">
+      <Loader2 className="h-7 w-7 animate-spin text-primary" />
+      <p className="text-sm text-muted-foreground">Chargement...</p>
     </div>
   );
 }
@@ -158,8 +159,9 @@ function DashboardLayout({ children, type = "personal" }: { children: React.Reac
   if (isLoading) {
     return (
       <div className="h-screen w-full flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-muted-foreground">Vérification en cours...</p>
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-7 w-7 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Vérification en cours...</p>
         </div>
       </div>
     );
