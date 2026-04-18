@@ -423,16 +423,34 @@ export default function Checkout() {
   useEffect(() => {
     if ((session?.status === "completed" || stage === "completed") && successUrlRef.current) {
       const timer = setTimeout(() => {
-        window.location.href = successUrlRef.current!;
+        try {
+          const url = new URL(successUrlRef.current!);
+          url.searchParams.set("status", "success");
+          if (transactionId) url.searchParams.set("transactionId", transactionId);
+          if (sessionId) url.searchParams.set("sessionId", sessionId);
+          if (session?.amount) url.searchParams.set("amount", String(session.amount));
+          if (session?.currency) url.searchParams.set("currency", session.currency);
+          window.location.href = url.toString();
+        } catch {
+          window.location.href = successUrlRef.current!;
+        }
       }, 3000);
       return () => clearTimeout(timer);
     }
-  }, [session?.status, stage]);
+  }, [session?.status, stage, transactionId]);
 
   useEffect(() => {
     if (stage === "failed" && cancelUrlRef.current) {
       const timer = setTimeout(() => {
-        window.location.href = cancelUrlRef.current!;
+        try {
+          const url = new URL(cancelUrlRef.current!);
+          url.searchParams.set("status", "cancelled");
+          if (transactionId) url.searchParams.set("transactionId", transactionId);
+          if (sessionId) url.searchParams.set("sessionId", sessionId);
+          window.location.href = url.toString();
+        } catch {
+          window.location.href = cancelUrlRef.current!;
+        }
       }, 5000);
       return () => clearTimeout(timer);
     }
@@ -441,7 +459,14 @@ export default function Checkout() {
   useEffect(() => {
     if (stage === "expired" && cancelUrlRef.current) {
       const timer = setTimeout(() => {
-        window.location.href = cancelUrlRef.current!;
+        try {
+          const url = new URL(cancelUrlRef.current!);
+          url.searchParams.set("status", "expired");
+          if (sessionId) url.searchParams.set("sessionId", sessionId);
+          window.location.href = url.toString();
+        } catch {
+          window.location.href = cancelUrlRef.current!;
+        }
       }, 5000);
       return () => clearTimeout(timer);
     }

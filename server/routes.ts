@@ -3576,7 +3576,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const feexResult = await createFeeXPayPayin(feexConfig, {
           networkKey: feexNetKey, shopId: feexConfig.shopId,
           amount: feexConvertedAmount, phoneNumber: feexPhone, otpCode: fxOtpCode,
-          callbackUrl: process.env.BASE_URL ? `${process.env.BASE_URL}/api/webhooks/feexpay` : undefined,
+          callbackUrl: `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/feexpay`,
         });
 
         if (!feexResult.success) {
@@ -4323,7 +4323,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const sessFeexRes = await feexPayin(feexConf, {
           networkKey: sessFeexNetKey, shopId: feexConf.shopId,
           amount: sessFeexAmount, phoneNumber: sessFeexPhone(customerPhone, country.toUpperCase()), otpCode,
-          callbackUrl: process.env.BASE_URL ? `${process.env.BASE_URL}/api/webhooks/feexpay` : undefined,
+          callbackUrl: `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/feexpay`,
         });
 
         if (!sessFeexRes.success) {

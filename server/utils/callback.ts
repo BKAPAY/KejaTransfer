@@ -4,32 +4,34 @@ import { storage } from '../storage';
 
 export async function resolveApiKeyForCallback(transaction: Transaction): Promise<ApiKey | null> {
   if (transaction.type !== "api_payment") return null;
-  
+
   let apiKeyPublicKey: string | undefined;
   let apiKeyId: string | undefined;
-  
+  let sessionCallbackUrl: string | undefined;
+
   if (transaction.metadata) {
     try {
       const meta = JSON.parse(transaction.metadata);
       apiKeyPublicKey = meta.apiKeyPublicKey;
       apiKeyId = meta.api_key_id || meta.apiKeyId;
+      sessionCallbackUrl = meta.callbackUrl;
     } catch (e) {}
   }
-  
+
   let apiKey: ApiKey | undefined;
-  
+
   if (apiKeyPublicKey) {
     apiKey = await storage.getApiKeyByPublicKey(apiKeyPublicKey);
   }
-  
+
   if (!apiKey && apiKeyId) {
     apiKey = await storage.getApiKeyById(apiKeyId);
   }
-  
-  if (apiKey && apiKey.callbackUrl) {
+
+  if (apiKey && (apiKey.callbackUrl || sessionCallbackUrl)) {
     return apiKey;
   }
-  
+
   return null;
 }
 
@@ -90,21 +92,26 @@ export async function sendPaymentCallback(
   apiKey: ApiKey,
   event: 'payment.completed' | 'payment.failed' = 'payment.completed'
 ): Promise<{ success: boolean; error?: string }> {
-  if (!apiKey.callbackUrl || !apiKey.callbackSecret) {
-    console.log(`[Callback] No callback URL configured for API key ${apiKey.id}`);
-    return { success: false, error: 'No callback URL configured' };
-  }
-
   let externalReference: string | undefined;
   let successUrl: string | undefined;
   let cancelUrl: string | undefined;
+  let sessionCallbackUrl: string | undefined;
+
   if (transaction.metadata) {
     try {
       const metadata = JSON.parse(transaction.metadata);
       externalReference = metadata.externalReference || metadata.reference || metadata.orderId;
       successUrl = metadata.successUrl || undefined;
       cancelUrl = metadata.cancelUrl || undefined;
+      sessionCallbackUrl = metadata.callbackUrl || undefined;
     } catch (e) {}
+  }
+
+  const effectiveCallbackUrl = sessionCallbackUrl || apiKey.callbackUrl;
+
+  if (!effectiveCallbackUrl || !apiKey.callbackSecret) {
+    console.log(`[Callback] Aucune callbackUrl ou secret configure pour la cle API ${apiKey.id}`);
+    return { success: false, error: 'No callback URL configured' };
   }
 
   const netAmount = transaction.amount - (transaction.fee || 0);
@@ -139,7 +146,7 @@ export async function sendPaymentCallback(
   const attempt_send = async () => {
     attempt++;
     const success = await tryDeliverPayinWebhook(
-      apiKey.callbackUrl!,
+      effectiveCallbackUrl!,
       apiKey.callbackSecret!,
       payloadJson,
       event,
@@ -147,16 +154,16 @@ export async function sendPaymentCallback(
     );
 
     if (success) {
-      console.log(`[Callback] ✅ Webhook ${event} delivre a ${apiKey.callbackUrl} pour tx ${transaction.id} — tentative ${attempt}`);
+      console.log(`[Callback] Webhook ${event} delivre a ${effectiveCallbackUrl} pour tx ${transaction.id} — tentative ${attempt}`);
       return;
     }
 
-    console.warn(`[Callback] ⚠️ Tentative ${attempt}/${MAX_ATTEMPTS} echouee pour tx ${transaction.id} — nouvel essai dans ${RETRY_INTERVAL_MS / 1000}s`);
+    console.warn(`[Callback] Tentative ${attempt}/${MAX_ATTEMPTS} echouee pour tx ${transaction.id} — nouvel essai dans ${RETRY_INTERVAL_MS / 1000}s`);
 
     if (attempt < MAX_ATTEMPTS) {
       setTimeout(attempt_send, RETRY_INTERVAL_MS);
     } else {
-      console.error(`[Callback] ❌ Abandon apres ${MAX_ATTEMPTS} tentatives pour tx ${transaction.id} (${event})`);
+      console.error(`[Callback] Abandon apres ${MAX_ATTEMPTS} tentatives pour tx ${transaction.id} (${event})`);
     }
   };
 
@@ -176,6 +183,6 @@ export async function trySendPaymentCallback(
       console.log(`${logPrefix} Developer callback ${event} initie avec retry pour tx ${transaction.id}`);
     }
   } catch (error) {
-    console.error(`${logPrefix} Error sending developer callback:`, error);
+    console.error(`${logPrefix} Erreur envoi developer callback:`, error);
   }
 }

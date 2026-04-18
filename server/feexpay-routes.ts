@@ -66,9 +66,7 @@ export async function handleFeeXPayDeposit(
       return { success: false, error: "Reseau non supporte" };
     }
 
-    const webhookUrl = process.env.BASE_URL
-      ? `${process.env.BASE_URL}/api/webhooks/feexpay`
-      : undefined;
+    const webhookUrl = `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/feexpay`;
 
     if (operatorConfig.requiresOtp && !otpCode) {
       const formattedPhone = formatPhoneForFeeXPay(phone, countryCode);
