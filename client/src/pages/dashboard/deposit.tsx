@@ -272,13 +272,17 @@ export default function Deposit() {
 
   // Fetch exchange fee when payment currency differs from user's balance currency
   useEffect(() => {
+    let cancelled = false;
     if (paymentCurrency && userBalanceCurrency && paymentCurrency !== userBalanceCurrency) {
       fetchExchangeFee(paymentCurrency, userBalanceCurrency).then(data => {
-        setExchangeFeePercentage(data.isActive === 1 ? data.feePercentage : 0);
+        if (!cancelled) {
+          setExchangeFeePercentage(data.isActive === 1 ? data.feePercentage : 0);
+        }
       });
     } else {
       setExchangeFeePercentage(0);
     }
+    return () => { cancelled = true; };
   }, [paymentCurrency, userBalanceCurrency]);
 
   // Fee calculations

@@ -125,8 +125,8 @@ export default function Withdrawal() {
         ? selectedCurrency
         : (COUNTRIES.find(c => c.code === userCountry)?.currency || userBalanceCurrency))
     : userBalanceCurrency;
-  // Only need conversion if user country is loaded AND currencies differ
-  const needsConversion = userCountry && withdrawalCurrency !== userBalanceCurrency;
+  // Only need conversion if user country is loaded AND currencies differ AND withdrawal currency is determined
+  const needsConversion = !!userCountry && !!withdrawalCurrency && withdrawalCurrency !== userBalanceCurrency;
 
   const fetchConversion = useCallback(async (amountToConvert: number, fromCurrency: string, toCurrency: string) => {
     if (!amountToConvert || amountToConvert <= 0 || fromCurrency === toCurrency) {
@@ -173,13 +173,17 @@ export default function Withdrawal() {
 
   // Frais d'échange sortant pour comptes personnels inter-devises
   useEffect(() => {
-    if (needsConversion && user?.accountType === "personal") {
+    let cancelled = false;
+    if (needsConversion && withdrawalCurrency && userBalanceCurrency && user?.accountType === "personal") {
       fetchExchangeFee(userBalanceCurrency, withdrawalCurrency).then(result => {
-        setOutgoingExchangeFeePercentage(result.isActive ? result.feePercentage : 0);
+        if (!cancelled) {
+          setOutgoingExchangeFeePercentage(result.isActive ? result.feePercentage : 0);
+        }
       });
     } else {
       setOutgoingExchangeFeePercentage(0);
     }
+    return () => { cancelled = true; };
   }, [needsConversion, userBalanceCurrency, withdrawalCurrency, user?.accountType]);
 
   const outgoingExchangeFeeAmount = (amount && outgoingExchangeFeePercentage > 0)
