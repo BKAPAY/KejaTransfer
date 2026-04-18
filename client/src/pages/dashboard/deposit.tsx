@@ -265,6 +265,10 @@ export default function Deposit() {
     : userBalanceCurrency;
   // Only need conversion if a country is selected AND its currency differs from user's currency
   const needsConversion = selectedCountry && paymentCurrency !== userBalanceCurrency;
+  // Montant à injecter dans les codes USSD = montant converti en devise de l'opérateur si conversion, sinon montant saisi
+  const amountForUssd = (needsConversion && conversionData?.convertedAmount && conversionData.convertedAmount > 0)
+    ? Math.round(conversionData.convertedAmount)
+    : (amount || 0);
 
   // Fetch exchange fee when payment currency differs from user's balance currency
   useEffect(() => {
@@ -1065,19 +1069,19 @@ export default function Deposit() {
                           <Info className="h-4 w-4 text-orange-600" />
                           <AlertDescription className="text-sm text-orange-800 dark:text-orange-200">
                             <p className="font-semibold mb-1">Instructions pour obtenir votre code OTP :</p>
-                            <p className="whitespace-pre-line">{injectUssdAmount(currentOtpInstructions.instructions, amount)}</p>
+                            <p className="whitespace-pre-line">{injectUssdAmount(currentOtpInstructions.instructions, amountForUssd)}</p>
                             {currentOtpInstructions.ussdCode && (
                               <div className="mt-2 flex items-center gap-2">
                                 <div className="flex-1 bg-white dark:bg-gray-900 border border-orange-300 dark:border-orange-700 rounded-md px-3 py-2 text-center">
                                   <code className="text-lg font-bold text-orange-700 dark:text-orange-400">
-                                    {injectUssdAmount(currentOtpInstructions.ussdCode, amount)}
+                                    {injectUssdAmount(currentOtpInstructions.ussdCode, amountForUssd)}
                                   </code>
                                 </div>
                                 <Button
                                   type="button"
                                   variant="outline"
                                   size="icon"
-                                  onClick={() => copyUssdCode(injectUssdAmount(currentOtpInstructions!.ussdCode, amount))}
+                                  onClick={() => copyUssdCode(injectUssdAmount(currentOtpInstructions!.ussdCode, amountForUssd))}
                                   className="bg-green-600 border-green-600 text-white shrink-0"
                                   data-testid="button-copy-ussd-inline"
                                 >
