@@ -1271,10 +1271,22 @@ export default function ApiPay() {
                 <AlertCircle className="h-4 w-4 text-orange-600" />
                 <AlertDescription className="text-sm text-orange-800 dark:text-orange-200">
                   <p className="font-semibold mb-1">Composez ce code USSD sur votre telephone :</p>
-                  <div className="bg-white dark:bg-gray-900 border border-orange-300 dark:border-orange-700 rounded-md px-3 py-2 my-2 text-center">
-                    <code className="text-lg font-bold text-orange-700 dark:text-orange-400">
-                      {mbiyoOtpUssdCode}
-                    </code>
+                  <div className="flex items-center gap-2 my-2">
+                    <div className="flex-1 bg-white dark:bg-gray-900 border border-orange-300 dark:border-orange-700 rounded-md px-3 py-2 text-center">
+                      <code className="text-lg font-bold text-orange-700 dark:text-orange-400">
+                        {mbiyoOtpUssdCode}
+                      </code>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => copyUssdCode(mbiyoOtpUssdCode)}
+                      className="bg-green-600 border-green-600 text-white shrink-0"
+                      data-testid="button-copy-ussd-mbiyo-otp"
+                    >
+                      {copiedUssd ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                    </Button>
                   </div>
                   {mbiyoOtpHint && (
                     <p className="text-xs text-orange-600 dark:text-orange-400">{mbiyoOtpHint}</p>
