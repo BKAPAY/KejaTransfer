@@ -813,10 +813,10 @@ export default function Deposit() {
                       variant="outline"
                       size="icon"
                       onClick={() => copyUssdCode(injectUssdAmount(paymentData.otpUssdCode!, amount))}
-                      className="border-orange-300 shrink-0"
+                      className="bg-green-600 border-green-600 text-white shrink-0"
                       data-testid="button-copy-ussd-otp"
                     >
-                      {copiedUssd ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                      {copiedUssd ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                     </Button>
                   </div>
                   {paymentData.otpHint && (
@@ -1084,10 +1084,10 @@ export default function Deposit() {
                                   variant="outline"
                                   size="icon"
                                   onClick={() => copyUssdCode(injectUssdAmount(currentOtpInstructions!.ussdCode, amount))}
-                                  className="border-orange-300 shrink-0"
+                                  className="bg-green-600 border-green-600 text-white shrink-0"
                                   data-testid="button-copy-ussd-inline"
                                 >
-                                  {copiedUssd ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                                  {copiedUssd ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                                 </Button>
                               </div>
                             )}

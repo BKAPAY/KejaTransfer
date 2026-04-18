@@ -749,10 +749,10 @@ export default function Checkout() {
                       variant="outline"
                       size="sm"
                       onClick={() => copyUssdCode(otpUssdCode)}
-                      className="border-orange-300"
+                      className="bg-green-600 border-green-600 text-white shrink-0"
                       data-testid="button-copy-ussd"
                     >
-                      {copiedUssd ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                      {copiedUssd ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                     </Button>
                   </div>
                 </AlertDescription>
@@ -897,10 +897,10 @@ export default function Checkout() {
                     variant="outline"
                     size="sm"
                     onClick={() => copyUssdCode(operatorOtpDetail.otpUssdCode!)}
-                    className="border-orange-300"
+                    className="bg-green-600 border-green-600 text-white shrink-0"
                     data-testid="button-copy-ussd-form"
                   >
-                    {copiedUssd ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                    {copiedUssd ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                   </Button>
                 </div>
               )}
