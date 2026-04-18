@@ -72,7 +72,7 @@ async function getGeoFromIp(ip: string): Promise<{ city: string; region: string;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 3000);
     
-    const response = await fetch(`http://ip-api.com/json/${ip}?fields=city,regionName,country,isp&lang=fr`, {
+    const response = await fetch(`https://ip-api.com/json/${ip}?fields=city,regionName,country,isp&lang=fr`, {
       signal: controller.signal,
     });
     clearTimeout(timeout);

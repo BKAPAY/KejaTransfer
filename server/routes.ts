@@ -1322,7 +1322,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const SUPPORTED_COUNTRIES = ["BJ", "TG", "SN", "CI", "ML", "CM", "CD", "GN", "NE"];
       
       // Use ip-api.com (free, no API key required for non-commercial use)
-      const response = await fetch(`http://ip-api.com/json/${clientIP}?fields=countryCode,status`);
+      const response = await fetch(`https://ip-api.com/json/${clientIP}?fields=countryCode,status`);
       
       if (!response.ok) {
         return res.json({ country: null, detected: false });
@@ -5344,7 +5344,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           customerPaysFee: paymentLink.customerPaysFee,
         },
         actions: {
-          callback_url: `${process.env.BASE_URL || 'http://localhost:5000'}/api/webhooks/paydunya`,
+          callback_url: `${process.env.BASE_URL || 'https://bkapay.com'}/api/webhooks/paydunya`,
         },
       };
 
@@ -5478,7 +5478,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           operator,
         },
         actions: {
-          callback_url: `${process.env.BASE_URL || 'http://localhost:5000'}/api/webhooks/paydunya`,
+          callback_url: `${process.env.BASE_URL || 'https://bkapay.com'}/api/webhooks/paydunya`,
         },
       };
 
@@ -7287,14 +7287,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      return res.json({
+      const responsePayload: Record<string, unknown> = {
         success: true,
         transactionId: result.transactionId,
         status: "pending",
         message: result.message || "Payin initié avec succès. Le client doit valider sur son téléphone.",
         amount: requestedAmount,
         currency: requestedCurrency,
-      });
+      };
+
+      // Expose redirectUrl and authMode for providers that require a redirect (e.g. MbiyoPay PIN)
+      if ((result as any).redirectUrl) responsePayload.redirectUrl = (result as any).redirectUrl;
+      if ((result as any).authMode) responsePayload.authMode = (result as any).authMode;
+      if ((result as any).instructions) responsePayload.instructions = (result as any).instructions;
+
+      return res.json(responsePayload);
     } catch (error: any) {
       console.error("[Business Payin] Error:", error);
       res.status(500).json({ success: false, error: { code: "INTERNAL_ERROR", message: "Une erreur interne est survenue" } });
