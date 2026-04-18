@@ -1,5 +1,48 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
+// Clés dont les données sont persistées dans localStorage pour un affichage immédiat au rechargement
+const PERSIST_KEYS = ["/api/auth/me"];
+const STORAGE_PREFIX = "bkapay_cache_";
+
+function getStorageKey(queryKey: string): string {
+  return STORAGE_PREFIX + queryKey.replace(/[^a-zA-Z0-9_-]/g, "_");
+}
+
+export function loadCachedQueryData(queryKey: string): unknown | null {
+  try {
+    const raw = localStorage.getItem(getStorageKey(queryKey));
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function saveCachedQueryData(queryKey: string, data: unknown): void {
+  try {
+    localStorage.setItem(getStorageKey(queryKey), JSON.stringify(data));
+  } catch {
+    // Ignore les erreurs de quota localStorage
+  }
+}
+
+/** Précharge le cache React Query depuis localStorage avant les requêtes réseau */
+export function preloadCacheFromStorage(client: QueryClient): void {
+  for (const key of PERSIST_KEYS) {
+    const cached = loadCachedQueryData(key);
+    if (cached !== null) {
+      client.setQueryData([key], cached);
+    }
+  }
+}
+
+/** Efface toutes les données persistées (à appeler lors de la déconnexion) */
+export function clearPersistedCache(): void {
+  for (const key of PERSIST_KEYS) {
+    try { localStorage.removeItem(getStorageKey(key)); } catch {}
+  }
+}
+
 // Sanitize error messages - remove technical codes and special chars ()/:{}\ 
 function sanitizeErrorMessage(message: string): string {
   if (!message) return "Une erreur est survenue";
@@ -76,16 +119,28 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
+    const keyStr = queryKey[0] as string;
     const res = await fetch(queryKey.join("/") as string, {
       credentials: "include",
     });
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {
+      // Effacer le cache localStorage si la session a expiré
+      if (PERSIST_KEYS.includes(keyStr)) {
+        try { localStorage.removeItem(getStorageKey(keyStr)); } catch {}
+      }
       return null;
     }
 
     await throwIfResNotOk(res);
-    return await res.json();
+    const data = await res.json();
+
+    // Persister dans localStorage pour affichage immédiat au prochain rechargement
+    if (PERSIST_KEYS.includes(keyStr)) {
+      saveCachedQueryData(keyStr, data);
+    }
+
+    return data;
   };
 
 export const queryClient = new QueryClient({

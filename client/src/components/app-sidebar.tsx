@@ -32,7 +32,7 @@ import type { User as UserType } from "@shared/schema";
 import logoImage from "@assets/bkapay-logo.png";
 import { Button } from "@/components/ui/button";
 import { useMutation } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, clearPersistedCache } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
 const generalItems = [
@@ -174,6 +174,7 @@ export function AppSidebar() {
     },
     onSuccess: () => {
       localStorage.removeItem("adminAccessCode");
+      clearPersistedCache();
       toast({
         title: "Déconnexion réussie",
         description: "À bientôt sur BKApay",

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, clearPersistedCache } from "@/lib/queryClient";
 import { ShieldCheck, AlertTriangle, Loader2, MapPin } from "lucide-react";
 import logoImage from "@assets/bkapay-logo.png";
 
@@ -191,6 +191,7 @@ export default function LoginVerify() {
     try {
       await apiRequest("POST", "/api/auth/logout");
     } catch (e) {}
+    clearPersistedCache();
     queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
     setLocation("/login");
   };

@@ -1,5 +1,5 @@
 import { Switch, Route, useLocation } from "wouter";
-import { queryClient, getQueryFn } from "./lib/queryClient";
+import { queryClient, getQueryFn, preloadCacheFromStorage } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -109,6 +109,10 @@ const BusinessHistory = lazy(() => import("@/pages/dashboard/business/history"))
 const BusinessSettings = lazy(() => import("@/pages/dashboard/business/settings"));
 const BusinessSettlements = lazy(() => import("@/pages/dashboard/business/settlements"));
 const BusinessFees = lazy(() => import("@/pages/dashboard/business/fees"));
+
+// Précharger le cache React Query depuis localStorage AVANT le premier rendu
+// → les infos utilisateur (nom, solde...) s'affichent instantanément au rechargement de page
+preloadCacheFromStorage(queryClient);
 
 function PageLoader() {
   return (
