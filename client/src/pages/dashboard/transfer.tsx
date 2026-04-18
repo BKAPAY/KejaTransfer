@@ -49,7 +49,7 @@ export default function Transfer() {
   const [securityCode, setSecurityCode] = useState("");
   const [securityError, setSecurityError] = useState("");
   const [pendingData, setPendingData] = useState<TransferFormData | null>(null);
-  const [selectedCurrency, setSelectedCurrency] = useState<string>("XOF");
+  const [selectedCurrency, setSelectedCurrency] = useState<string>("");
   const [feePercentage, setFeePercentage] = useState<number>(60);
   const [outgoingExchangeFeePercentage, setOutgoingExchangeFeePercentage] = useState<number>(0);
   const [conversionData, setConversionData] = useState<{
@@ -63,9 +63,9 @@ export default function Transfer() {
     queryKey: ["/api/auth/me"],
   });
   
-  const userBalanceCurrency = user?.country 
+  const userBalanceCurrency = user?.currency || (user?.country 
     ? COUNTRIES.find(c => c.code === user.country)?.currency || "XOF"
-    : "XOF";
+    : "XOF");
 
   const { transferMin, cryptoTransferMin } = useConvertedMinimums(userBalanceCurrency);
 
@@ -131,8 +131,8 @@ export default function Transfer() {
         ? selectedCurrency 
         : (COUNTRIES.find(c => c.code === selectedCountry)?.currency || userBalanceCurrency))
     : userBalanceCurrency; // Default to user's currency when no country selected
-  // Only need conversion if a country is selected AND its currency differs from user's currency
-  const needsConversion = selectedCountry && targetCurrency !== userBalanceCurrency;
+  // Only need conversion if a country is selected AND target currency is determined AND currencies differ
+  const needsConversion = !!selectedCountry && !!targetCurrency && targetCurrency !== userBalanceCurrency;
 
   const fetchConversion = useCallback(async (amountToConvert: number, fromCurrency: string, toCurrency: string) => {
     if (!amountToConvert || amountToConvert <= 0 || toCurrency === fromCurrency) {
@@ -179,13 +179,17 @@ export default function Transfer() {
 
   // Fetch outgoing exchange fee for personal accounts when currencies differ
   useEffect(() => {
-    if (needsConversion && user?.accountType === "personal") {
+    let cancelled = false;
+    if (needsConversion && targetCurrency && userBalanceCurrency && user?.accountType === "personal") {
       fetchExchangeFee(userBalanceCurrency, targetCurrency).then(result => {
-        setOutgoingExchangeFeePercentage(result.isActive ? result.feePercentage : 0);
+        if (!cancelled) {
+          setOutgoingExchangeFeePercentage(result.isActive ? result.feePercentage : 0);
+        }
       });
     } else {
       setOutgoingExchangeFeePercentage(0);
     }
+    return () => { cancelled = true; };
   }, [needsConversion, userBalanceCurrency, targetCurrency, user?.accountType]);
 
   const outgoingExchangeFeeAmount = (amount && outgoingExchangeFeePercentage > 0)

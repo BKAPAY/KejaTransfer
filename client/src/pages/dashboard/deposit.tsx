@@ -128,9 +128,9 @@ export default function Deposit() {
     queryKey: ["/api/auth/me"],
   });
   
-  const userBalanceCurrency = user?.country 
+  const userBalanceCurrency = user?.currency || (user?.country 
     ? COUNTRIES.find(c => c.code === user.country)?.currency || "XOF"
-    : "XOF";
+    : "XOF");
 
   const { depositMin, cryptoMin } = useConvertedMinimums(userBalanceCurrency);
 
