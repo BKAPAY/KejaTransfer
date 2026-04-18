@@ -19,6 +19,23 @@ import Login from "@/pages/login";
 import Signup from "@/pages/signup";
 import NotFound from "@/pages/not-found";
 import MaintenancePage from "@/pages/maintenance";
+
+// Pages de paiement public : import direct (pas lazy) pour éviter le double chargement après le splash
+import Pay from "@/pages/pay";
+import Merchant from "@/pages/merchant";
+import ApiPayment from "@/pages/api-payment";
+import PaymentStatus from "@/pages/payment-status";
+import ApiPay from "@/pages/api-pay";
+import Checkout from "@/pages/checkout";
+import PaymentSuccessPage from "@/pages/payment-success";
+import PaymentFailedPage from "@/pages/payment-failed";
+import ForgotPassword from "@/pages/forgot-password";
+import LoginVerify from "@/pages/login-verify";
+import Terms from "@/pages/terms";
+import Privacy from "@/pages/privacy";
+import Cookies from "@/pages/cookies";
+
+// Pages dashboard et admin : lazy car accédées après authentification
 const Dashboard = lazy(() => import("@/pages/dashboard/index"));
 const Profile = lazy(() => import("@/pages/dashboard/profile"));
 const PaymentLinks = lazy(() => import("@/pages/dashboard/payment-links"));
@@ -62,25 +79,12 @@ const AdminUserLinks = lazy(() => import("@/pages/dashboard/admin-user-links"));
 const AdminUserMerchant = lazy(() => import("@/pages/dashboard/admin-user-merchant"));
 const AdminUserApi = lazy(() => import("@/pages/dashboard/admin-user-api"));
 const AdminUserConnections = lazy(() => import("@/pages/dashboard/admin-user-connections"));
-const Pay = lazy(() => import("@/pages/pay"));
-const Merchant = lazy(() => import("@/pages/merchant"));
-const PaymentSuccessPage = lazy(() => import("@/pages/payment-success"));
-const PaymentFailedPage = lazy(() => import("@/pages/payment-failed"));
-const ApiPayment = lazy(() => import("@/pages/api-payment"));
-const PaymentStatus = lazy(() => import("@/pages/payment-status"));
 const ApiDemo = lazy(() => import("@/pages/api-demo"));
-const ApiPay = lazy(() => import("@/pages/api-pay"));
-const Checkout = lazy(() => import("@/pages/checkout"));
-const Terms = lazy(() => import("@/pages/terms"));
-const Privacy = lazy(() => import("@/pages/privacy"));
-const Cookies = lazy(() => import("@/pages/cookies"));
 const DocumentationVersion = lazy(() => import("@/pages/documentation-version"));
 const DocumentationRedirect = lazy(() => import("@/pages/documentation-redirect"));
 const DocumentationInline = lazy(() => import("@/pages/documentation-inline"));
 const DocumentationPayout = lazy(() => import("@/pages/documentation-payout"));
 const DocumentationSessions = lazy(() => import("@/pages/documentation-sessions"));
-const ForgotPassword = lazy(() => import("@/pages/forgot-password"));
-const LoginVerify = lazy(() => import("@/pages/login-verify"));
 const BusinessDashboard = lazy(() => import("@/pages/dashboard/business/index"));
 const BusinessProfile = lazy(() => import("@/pages/dashboard/business/profile"));
 const BusinessKyc = lazy(() => import("@/pages/dashboard/business/kyc"));
@@ -431,6 +435,9 @@ function AppInitializer() {
       queryClient.prefetchQuery({
         queryKey: ["/api/auth/me"],
       });
+      // Précharger les chunks dashboard pendant le splash pour éviter le 2ème loader après connexion
+      import("@/pages/dashboard/index");
+      import("@/pages/dashboard/business/index");
       initRef.current = true;
     }
   }, []);
