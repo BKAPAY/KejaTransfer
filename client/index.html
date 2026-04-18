@@ -76,26 +76,188 @@
     </script>
   </head>
   <body>
-    <div id="root">
-      <div id="app-loading" style="
-        position:fixed;inset:0;background:#000;
-        display:flex;flex-direction:column;align-items:center;justify-content:center;
-        z-index:9999;transition:opacity 0.3s ease;
-      ">
-        <img src="/bkapay-logo.png" alt="BKApay" style="height:56px;width:auto;margin-bottom:24px;" />
-        <div style="display:flex;gap:8px;">
-          <span style="width:8px;height:8px;background:#fff;border-radius:50%;animation:bka-dot 1.2s infinite ease-in-out;animation-delay:0s;"></span>
-          <span style="width:8px;height:8px;background:#fff;border-radius:50%;animation:bka-dot 1.2s infinite ease-in-out;animation-delay:0.2s;"></span>
-          <span style="width:8px;height:8px;background:#fff;border-radius:50%;animation:bka-dot 1.2s infinite ease-in-out;animation-delay:0.4s;"></span>
-        </div>
-      </div>
-    </div>
     <style>
-      @keyframes bka-dot {
-        0%,80%,100%{opacity:0.2;transform:scale(0.8);}
-        40%{opacity:1;transform:scale(1);}
+      #app-loading {
+        position:fixed;inset:0;
+        background: radial-gradient(ellipse at 40% 40%, #1a2468 0%, #0c1133 55%, #060d24 100%);
+        display:flex;flex-direction:column;align-items:center;justify-content:center;
+        z-index:9999;transition:opacity 0.5s ease;overflow:hidden;
+      }
+      /* Floating background orbs */
+      .bka-orb {
+        position:absolute;border-radius:50%;filter:blur(60px);pointer-events:none;
+      }
+      /* Logo glow pulse */
+      @keyframes bka-glow {
+        0%,100%{filter:drop-shadow(0 0 10px rgba(38,196,176,0.25)) drop-shadow(0 0 30px rgba(38,196,176,0.1));}
+        50%{filter:drop-shadow(0 0 22px rgba(38,196,176,0.55)) drop-shadow(0 0 50px rgba(38,196,176,0.2));}
+      }
+      /* Orb float */
+      @keyframes bka-orb1 {
+        0%,100%{transform:translate(0,0) scale(1);}
+        50%{transform:translate(30px,-20px) scale(1.1);}
+      }
+      @keyframes bka-orb2 {
+        0%{transform:translate(0,0) scale(1);}
+        33%{transform:translate(-25px,15px) scale(0.95);}
+        66%{transform:translate(20px,25px) scale(1.05);}
+        100%{transform:translate(0,0) scale(1);}
+      }
+      /* Character sway */
+      @keyframes bka-sway {
+        0%,100%{transform:rotate(-2deg);}
+        50%{transform:rotate(2deg);}
+      }
+      /* Broom sweep */
+      @keyframes bka-broom {
+        0%,100%{transform:rotate(0deg);}
+        45%{transform:rotate(22deg);}
+        55%{transform:rotate(22deg);}
+      }
+      /* Dust puffs */
+      @keyframes bka-dust-a {
+        0%{opacity:0;transform:translate(0,0) scale(0);}
+        20%{opacity:0.7;transform:translate(-8px,-6px) scale(1);}
+        100%{opacity:0;transform:translate(-22px,-4px) scale(0.4);}
+      }
+      @keyframes bka-dust-b {
+        0%{opacity:0;transform:translate(0,0) scale(0);}
+        25%{opacity:0.5;transform:translate(-14px,-12px) scale(1);}
+        100%{opacity:0;transform:translate(-28px,-2px) scale(0.3);}
+      }
+      @keyframes bka-dust-c {
+        0%{opacity:0;transform:translate(0,0) scale(0);}
+        30%{opacity:0.6;transform:translate(-5px,-18px) scale(1);}
+        100%{opacity:0;transform:translate(-12px,0px) scale(0.3);}
+      }
+      /* Sparkle stars */
+      @keyframes bka-star {
+        0%,100%{opacity:0;transform:scale(0) rotate(0deg);}
+        40%,60%{opacity:1;transform:scale(1) rotate(180deg);}
+      }
+      /* Progress bar fill */
+      @keyframes bka-progress {
+        0%{width:0%;}
+        15%{width:18%;}
+        40%{width:45%;}
+        65%{width:68%;}
+        85%{width:82%;}
+        100%{width:91%;}
+      }
+      /* Text fade cycle */
+      @keyframes bka-label {
+        0%,20%{opacity:1;}
+        25%,45%{opacity:0.4;}
+        50%,70%{opacity:1;}
+        75%,95%{opacity:0.4;}
+        100%{opacity:1;}
+      }
+      /* Step dots */
+      @keyframes bka-step {
+        0%,30%{opacity:0.25;}
+        35%,65%{opacity:1;transform:scale(1.3);}
+        70%,100%{opacity:0.25;transform:scale(1);}
       }
     </style>
+
+    <div id="root">
+      <div id="app-loading">
+
+        <!-- Background ambient orbs -->
+        <div class="bka-orb" style="width:350px;height:350px;background:rgba(38,196,176,0.06);top:-60px;left:-80px;animation:bka-orb1 7s ease-in-out infinite;"></div>
+        <div class="bka-orb" style="width:280px;height:280px;background:rgba(60,80,200,0.08);bottom:-40px;right:-60px;animation:bka-orb2 9s ease-in-out infinite;"></div>
+        <div class="bka-orb" style="width:180px;height:180px;background:rgba(38,196,176,0.05);top:30%;right:10%;animation:bka-orb1 11s ease-in-out infinite reverse;"></div>
+
+        <!-- Logo -->
+        <img src="/bkapay-logo.png" alt="BKApay" style="height:64px;width:auto;margin-bottom:32px;animation:bka-glow 2.5s ease-in-out infinite;" />
+
+        <!-- Cleaner character + scene -->
+        <div style="position:relative;width:200px;height:130px;margin-bottom:28px;">
+
+          <!-- Floor line -->
+          <div style="position:absolute;bottom:8px;left:10px;right:10px;height:1px;background:linear-gradient(90deg,transparent,rgba(38,196,176,0.25),transparent);"></div>
+
+          <!-- Sweeping trail / glow on floor -->
+          <div style="position:absolute;bottom:9px;left:10px;width:80px;height:3px;background:radial-gradient(ellipse,rgba(38,196,176,0.35),transparent 80%);border-radius:50%;animation:bka-broom 2s ease-in-out infinite;transform-origin:left center;"></div>
+
+          <!-- Dust particles (appear near broom head) -->
+          <div style="position:absolute;bottom:14px;left:52px;width:6px;height:6px;border-radius:50%;background:rgba(38,196,176,0.6);animation:bka-dust-a 2s ease-out infinite;"></div>
+          <div style="position:absolute;bottom:14px;left:56px;width:4px;height:4px;border-radius:50%;background:rgba(180,210,255,0.5);animation:bka-dust-b 2s 0.2s ease-out infinite;"></div>
+          <div style="position:absolute;bottom:14px;left:60px;width:5px;height:5px;border-radius:50%;background:rgba(38,196,176,0.4);animation:bka-dust-c 2s 0.05s ease-out infinite;"></div>
+
+          <!-- Sparkle stars -->
+          <div style="position:absolute;top:24px;left:130px;width:8px;height:8px;animation:bka-star 3s 0.5s ease-in-out infinite;">
+            <svg viewBox="0 0 10 10" width="10" height="10"><polygon points="5,0 6,4 10,4 7,6.5 8,10 5,7.5 2,10 3,6.5 0,4 4,4" fill="rgba(38,196,176,0.7)"/></svg>
+          </div>
+          <div style="position:absolute;top:10px;left:148px;width:6px;height:6px;animation:bka-star 3s 1.2s ease-in-out infinite;">
+            <svg viewBox="0 0 10 10" width="7" height="7"><polygon points="5,0 6,4 10,4 7,6.5 8,10 5,7.5 2,10 3,6.5 0,4 4,4" fill="rgba(180,210,255,0.6)"/></svg>
+          </div>
+          <div style="position:absolute;top:36px;left:155px;width:5px;height:5px;animation:bka-star 3s 0.8s ease-in-out infinite;">
+            <svg viewBox="0 0 10 10" width="6" height="6"><polygon points="5,0 6,4 10,4 7,6.5 8,10 5,7.5 2,10 3,6.5 0,4 4,4" fill="rgba(38,196,176,0.5)"/></svg>
+          </div>
+
+          <!-- Stick figure cleaner (SVG) -->
+          <svg viewBox="0 0 90 120" width="90" height="120"
+               style="position:absolute;bottom:8px;left:55px;animation:bka-sway 2s ease-in-out infinite;transform-origin:bottom center;">
+
+            <!-- Head -->
+            <circle cx="45" cy="12" r="9" fill="none" stroke="#e8edf8" stroke-width="2.2" stroke-linecap="round"/>
+            <!-- Hair hint -->
+            <path d="M37,8 Q45,2 53,8" fill="none" stroke="#e8edf8" stroke-width="1.8" stroke-linecap="round"/>
+
+            <!-- Body torso -->
+            <line x1="45" y1="21" x2="45" y2="58" stroke="#e8edf8" stroke-width="2.2" stroke-linecap="round"/>
+
+            <!-- Left arm: down toward broom handle (animated sweep) -->
+            <g style="transform-origin:45px 32px;animation:bka-broom 2s ease-in-out infinite;">
+              <line x1="45" y1="32" x2="24" y2="62" stroke="#e8edf8" stroke-width="2.2" stroke-linecap="round"/>
+              <!-- Broom handle -->
+              <line x1="24" y1="62" x2="8" y2="100" stroke="#a0b4d4" stroke-width="2" stroke-linecap="round"/>
+              <!-- Broom head bristles -->
+              <line x1="2" y1="100" x2="22" y2="100" stroke="#26c4b0" stroke-width="3" stroke-linecap="round"/>
+              <line x1="4" y1="103" x2="20" y2="103" stroke="#26c4b0" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
+              <!-- Broom tufts -->
+              <line x1="5" y1="97" x2="3" y2="104" stroke="#26c4b0" stroke-width="1.5" stroke-linecap="round"/>
+              <line x1="10" y1="97" x2="9" y2="104" stroke="#26c4b0" stroke-width="1.5" stroke-linecap="round"/>
+              <line x1="15" y1="97" x2="15" y2="104" stroke="#26c4b0" stroke-width="1.5" stroke-linecap="round"/>
+              <line x1="20" y1="97" x2="21" y2="104" stroke="#26c4b0" stroke-width="1.5" stroke-linecap="round"/>
+            </g>
+
+            <!-- Right arm: slightly raised (balancing) -->
+            <line x1="45" y1="32" x2="66" y2="46" stroke="#e8edf8" stroke-width="2.2" stroke-linecap="round"/>
+
+            <!-- Legs: slight walking stance -->
+            <line x1="45" y1="58" x2="36" y2="90" stroke="#e8edf8" stroke-width="2.2" stroke-linecap="round"/>
+            <line x1="45" y1="58" x2="56" y2="90" stroke="#e8edf8" stroke-width="2.2" stroke-linecap="round"/>
+            <!-- Feet -->
+            <line x1="36" y1="90" x2="30" y2="93" stroke="#e8edf8" stroke-width="2" stroke-linecap="round"/>
+            <line x1="56" y1="90" x2="63" y2="93" stroke="#e8edf8" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+
+        </div>
+
+        <!-- Progress bar container -->
+        <div style="width:220px;margin-bottom:16px;">
+          <div style="height:3px;background:rgba(255,255,255,0.08);border-radius:2px;overflow:hidden;">
+            <div style="height:100%;background:linear-gradient(90deg,#26c4b0,#4f8ef7);border-radius:2px;animation:bka-progress 4s ease-in-out infinite;"></div>
+          </div>
+        </div>
+
+        <!-- Status text -->
+        <p style="color:rgba(255,255,255,0.45);font-family:Inter,sans-serif;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;margin:0;animation:bka-label 4s ease-in-out infinite;">
+          Initialisation en cours
+        </p>
+
+        <!-- Step indicator dots -->
+        <div style="display:flex;gap:6px;margin-top:14px;">
+          <span style="width:5px;height:5px;border-radius:50%;background:#26c4b0;display:block;animation:bka-step 4s 0s ease-in-out infinite;"></span>
+          <span style="width:5px;height:5px;border-radius:50%;background:#26c4b0;display:block;animation:bka-step 4s 0.4s ease-in-out infinite;"></span>
+          <span style="width:5px;height:5px;border-radius:50%;background:#26c4b0;display:block;animation:bka-step 4s 0.8s ease-in-out infinite;"></span>
+        </div>
+
+      </div>
+    </div>
+
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
