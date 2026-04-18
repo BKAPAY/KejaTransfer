@@ -378,9 +378,9 @@ function MaintenanceGuard({ children }: { children: React.ReactNode }) {
     return () => clearInterval(interval);
   }, []);
 
-  if (!checked || authLoading) return null;
-
-  if (maintenanceEnabled && !(user?.isAdmin === true)) {
+  // Ne jamais renvoyer null : le contenu doit se charger dessous pendant que le splash est visible.
+  // Quand la vérification est terminée, on affiche la page maintenance si besoin.
+  if (checked && !authLoading && maintenanceEnabled && !(user?.isAdmin === true)) {
     if (location !== "/") {
       return <MaintenancePage />;
     }
@@ -389,8 +389,39 @@ function MaintenanceGuard({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+// Retire le splash HTML (index.html #app-loading) seulement quand auth + maintenance sont prêts.
+// Cela évite la page blanche : le contenu charge dessous, le splash part en fondu quand tout est prêt.
+function AppSplashController() {
+  const { isLoading: authLoading } = useAuth();
+  const [maintenanceChecked, setMaintenanceChecked] = useState(false);
+  const startTimeRef = useRef(Date.now());
+
+  useEffect(() => {
+    fetch("/api/platform-settings/maintenance")
+      .then(() => setMaintenanceChecked(true))
+      .catch(() => setMaintenanceChecked(true));
+  }, []);
+
+  useEffect(() => {
+    if (!authLoading && maintenanceChecked) {
+      const elapsed = Date.now() - startTimeRef.current;
+      const remaining = Math.max(0, 700 - elapsed); // minimum 700ms d'affichage
+      const timer = setTimeout(() => {
+        const loader = document.getElementById("app-loading");
+        if (loader) {
+          loader.style.transition = "opacity 0.45s ease";
+          loader.style.opacity = "0";
+          setTimeout(() => loader.remove(), 500);
+        }
+      }, remaining);
+      return () => clearTimeout(timer);
+    }
+  }, [authLoading, maintenanceChecked]);
+
+  return null;
+}
+
 function AppInitializer() {
-  const { isLoading } = useAuth();
   const initRef = useRef(false);
 
   useEffect(() => {
@@ -403,9 +434,12 @@ function AppInitializer() {
   }, []);
 
   return (
-    <MaintenanceGuard>
-      <Router />
-    </MaintenanceGuard>
+    <>
+      <AppSplashController />
+      <MaintenanceGuard>
+        <Router />
+      </MaintenanceGuard>
+    </>
   );
 }
 
