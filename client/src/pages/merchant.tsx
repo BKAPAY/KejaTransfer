@@ -91,7 +91,7 @@ const ORANGE_USSD_HINTS: Record<string, string> = {
 
 function getOrangeUssdCode(country: string, amount?: number): string {
   const code = ORANGE_USSD_CODES[country] || ORANGE_USSD_CODES.DEFAULT;
-  if (amount && amount > 0) return code.replace("MONTANT", String(Math.round(amount)));
+  if (amount && amount > 0) return code.replace(/MONTANT/g, String(Math.round(amount)));
   return code;
 }
 

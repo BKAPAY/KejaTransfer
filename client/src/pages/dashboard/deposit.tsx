@@ -13,7 +13,7 @@ import { COUNTRIES, OPERATORS } from "@shared/schema";
 import type { User } from "@shared/schema";
 import { PhoneInputWithPrefix } from "@/components/phone-input-with-prefix";
 import { CountryFlag } from "@/components/country-flag";
-import { ArrowDownToLine, CheckCircle2, Clock, ExternalLink, Info, Loader2, Smartphone } from "lucide-react";
+import { ArrowDownToLine, Check, CheckCircle2, Clock, Copy, ExternalLink, Info, Loader2, Smartphone } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { calculateIncomingFee, calculateExchangeFee, fetchFeeConfig, fetchExchangeFee, formatFeePercentage } from "@/lib/fees";
 import { useState, useEffect, useCallback } from "react";
@@ -65,7 +65,20 @@ export default function Deposit() {
     mbiyopayTransactionId?: string;
   }>({});
   const [otpCode, setOtpCode] = useState("");
+  const [copiedUssd, setCopiedUssd] = useState(false);
   const [pollingStatus, setPollingStatus] = useState<string | null>(null);
+
+  const copyUssdCode = (code: string) => {
+    navigator.clipboard.writeText(code);
+    setCopiedUssd(true);
+    setTimeout(() => setCopiedUssd(false), 2000);
+  };
+
+  const injectUssdAmount = (code: string, amt?: number): string => {
+    if (!code) return code;
+    if (amt && amt > 0) return code.replace(/MONTANT/g, String(Math.round(amt)));
+    return code;
+  };
   const [conversionData, setConversionData] = useState<ConversionData | null>(null);
 
   const countdown = usePaymentCountdown({
@@ -789,13 +802,25 @@ export default function Deposit() {
                 <Info className="h-4 w-4 text-orange-600" />
                 <AlertDescription className="text-sm text-orange-800 dark:text-orange-200">
                   <p className="font-semibold mb-1">Composez ce code USSD sur votre telephone :</p>
-                  <div className="bg-white dark:bg-gray-900 border border-orange-300 dark:border-orange-700 rounded-md px-3 py-2 my-2 text-center">
-                    <code className="text-lg font-bold text-orange-700 dark:text-orange-400">
-                      {paymentData.otpUssdCode}
-                    </code>
+                  <div className="mt-1 flex items-center gap-2">
+                    <div className="flex-1 bg-white dark:bg-gray-900 border border-orange-300 dark:border-orange-700 rounded-md px-3 py-2 text-center">
+                      <code className="text-lg font-bold text-orange-700 dark:text-orange-400">
+                        {injectUssdAmount(paymentData.otpUssdCode, amount)}
+                      </code>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={() => copyUssdCode(injectUssdAmount(paymentData.otpUssdCode!, amount))}
+                      className="border-orange-300 shrink-0"
+                      data-testid="button-copy-ussd-otp"
+                    >
+                      {copiedUssd ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                    </Button>
                   </div>
                   {paymentData.otpHint && (
-                    <p className="text-xs text-orange-600 dark:text-orange-400">{paymentData.otpHint}</p>
+                    <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">{paymentData.otpHint}</p>
                   )}
                 </AlertDescription>
               </Alert>
@@ -1046,12 +1071,24 @@ export default function Deposit() {
                           <Info className="h-4 w-4 text-orange-600" />
                           <AlertDescription className="text-sm text-orange-800 dark:text-orange-200">
                             <p className="font-semibold mb-1">Instructions pour obtenir votre code OTP :</p>
-                            <p className="whitespace-pre-line">{currentOtpInstructions.instructions}</p>
+                            <p className="whitespace-pre-line">{injectUssdAmount(currentOtpInstructions.instructions, amount)}</p>
                             {currentOtpInstructions.ussdCode && (
-                              <div className="bg-white dark:bg-gray-900 border border-orange-300 dark:border-orange-700 rounded-md px-3 py-2 my-2 text-center">
-                                <code className="text-lg font-bold text-orange-700 dark:text-orange-400">
-                                  {currentOtpInstructions.ussdCode}
-                                </code>
+                              <div className="mt-2 flex items-center gap-2">
+                                <div className="flex-1 bg-white dark:bg-gray-900 border border-orange-300 dark:border-orange-700 rounded-md px-3 py-2 text-center">
+                                  <code className="text-lg font-bold text-orange-700 dark:text-orange-400">
+                                    {injectUssdAmount(currentOtpInstructions.ussdCode, amount)}
+                                  </code>
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="icon"
+                                  onClick={() => copyUssdCode(injectUssdAmount(currentOtpInstructions!.ussdCode, amount))}
+                                  className="border-orange-300 shrink-0"
+                                  data-testid="button-copy-ussd-inline"
+                                >
+                                  {copiedUssd ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                                </Button>
                               </div>
                             )}
                             {currentOtpInstructions.hint && (

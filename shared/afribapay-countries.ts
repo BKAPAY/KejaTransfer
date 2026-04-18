@@ -10,7 +10,7 @@ export interface AfribaPayOperator {
 
 export const OTP_USSD_CODES: Record<string, Record<string, string>> = {
   CI: { orange: "#144*82#" },
-  BF: { orange: "*144*4*6*montant#" },
+  BF: { orange: "*144*4*6*MONTANT#" },
   SN: { orange: "#144*391#" },
   GN: { orange: "*144*4*2*1#" },
 };
@@ -20,7 +20,7 @@ export const OTP_INSTRUCTIONS: Record<string, Record<string, string>> = {
     orange: "Composez le code USSD ci-dessous sur votre telephone Orange Money, generez un code OTP, puis entrez-le ici.\n1. Composez #144*82# sur votre telephone\n2. Choisissez 'Paiement marchand'\n3. Selectionnez 'Generer un code'\n4. Entrez votre code secret Orange Money\n5. Copiez le code OTP recu par SMS et entrez-le ci-dessous",
   },
   BF: {
-    orange: "Composez le code USSD ci-dessous sur votre telephone Orange Money, generez un code OTP, puis entrez-le ici.\n1. Composez *144*4*6*montant# sur votre telephone (remplacez 'montant' par le montant)\n2. Entrez votre code secret Orange Money\n3. Copiez le code OTP recu par SMS et entrez-le ci-dessous",
+    orange: "Composez le code USSD ci-dessous sur votre telephone Orange Money, generez un code OTP, puis entrez-le ici.\n1. Composez *144*4*6*MONTANT# sur votre telephone\n2. Entrez votre code secret Orange Money\n3. Copiez le code OTP recu par SMS et entrez-le ci-dessous",
   },
   SN: {
     orange: "Composez le code USSD ci-dessous sur votre telephone Orange Money, generez un code OTP, puis entrez-le ici.\n1. Composez #144*391# sur votre telephone\n2. Entrez votre code PIN Orange Money\n3. Copiez le code OTP recu par SMS et entrez-le ci-dessous",
