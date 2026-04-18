@@ -35,21 +35,41 @@ import Terms from "@/pages/terms";
 import Privacy from "@/pages/privacy";
 import Cookies from "@/pages/cookies";
 
-// Pages dashboard et admin : lazy car accédées après authentification
-const Dashboard = lazy(() => import("@/pages/dashboard/index"));
-const Profile = lazy(() => import("@/pages/dashboard/profile"));
-const PaymentLinks = lazy(() => import("@/pages/dashboard/payment-links"));
-const MerchantLinks = lazy(() => import("@/pages/dashboard/merchant-links"));
-const ApiPage = lazy(() => import("@/pages/dashboard/api"));
+// Préchargement immédiat (module level) : les chunks commencent à se télécharger dès le parsing
+// Cela garantit que les pages sont prêtes avant que le splash ne disparaisse
+const _preloadDashboard = import("@/pages/dashboard/index");
+const _preloadHistory = import("@/pages/dashboard/history");
+const _preloadAnalytics = import("@/pages/dashboard/analytics");
+const _preloadSettings = import("@/pages/dashboard/settings");
+const _preloadProfile = import("@/pages/dashboard/profile");
+const _preloadPaymentLinks = import("@/pages/dashboard/payment-links");
+const _preloadMerchantLinks = import("@/pages/dashboard/merchant-links");
+const _preloadApi = import("@/pages/dashboard/api");
+const _preloadTransfer = import("@/pages/dashboard/transfer");
+const _preloadWithdrawal = import("@/pages/dashboard/withdrawal");
+const _preloadDeposit = import("@/pages/dashboard/deposit");
+const _preloadSupport = import("@/pages/dashboard/support");
+const _preloadKyc = import("@/pages/dashboard/kyc");
+const _preloadKycHistory = import("@/pages/dashboard/kyc-history");
+const _preloadBusinessDashboard = import("@/pages/dashboard/business/index");
+const _preloadBusinessHistory = import("@/pages/dashboard/business/history");
+const _preloadBusinessSettings = import("@/pages/dashboard/business/settings");
+
+// Toutes les pages restent lazy pour garder le bundle principal léger
+const Dashboard = lazy(() => _preloadDashboard);
+const Profile = lazy(() => _preloadProfile);
+const PaymentLinks = lazy(() => _preloadPaymentLinks);
+const MerchantLinks = lazy(() => _preloadMerchantLinks);
+const ApiPage = lazy(() => _preloadApi);
 const ApiPayoutPage = lazy(() => import("@/pages/dashboard/api-payout"));
-const Analytics = lazy(() => import("@/pages/dashboard/analytics"));
+const Analytics = lazy(() => _preloadAnalytics);
 const AnalyticsBusiness = lazy(() => import("@/pages/dashboard/analytics-business"));
-const History = lazy(() => import("@/pages/dashboard/history"));
-const Settings = lazy(() => import("@/pages/dashboard/settings"));
-const Support = lazy(() => import("@/pages/dashboard/support"));
-const Deposit = lazy(() => import("@/pages/dashboard/deposit"));
-const Transfer = lazy(() => import("@/pages/dashboard/transfer"));
-const Withdrawal = lazy(() => import("@/pages/dashboard/withdrawal"));
+const History = lazy(() => _preloadHistory);
+const Settings = lazy(() => _preloadSettings);
+const Support = lazy(() => _preloadSupport);
+const Deposit = lazy(() => _preloadDeposit);
+const Transfer = lazy(() => _preloadTransfer);
+const Withdrawal = lazy(() => _preloadWithdrawal);
 const Admin = lazy(() => import("@/pages/dashboard/admin"));
 const AdminBusiness = lazy(() => import("@/pages/dashboard/admin-business"));
 const AdminBusinessManagement = lazy(() => import("@/pages/dashboard/admin-business-management"));
@@ -63,8 +83,8 @@ const AdminBusinessWallets = lazy(() => import("@/pages/dashboard/admin-business
 const ManagementWrapper = lazy(() => import("@/pages/dashboard/management-wrapper"));
 const AdminAccessCode = lazy(() => import("@/pages/dashboard/admin-access-code"));
 const KycVerification = lazy(() => import("@/pages/dashboard/kyc-verification"));
-const KycHistory = lazy(() => import("@/pages/dashboard/kyc-history"));
-const KYC = lazy(() => import("@/pages/dashboard/kyc"));
+const KycHistory = lazy(() => _preloadKycHistory);
+const KYC = lazy(() => _preloadKyc);
 const CountryOperatorConfig = lazy(() => import("@/pages/dashboard/country-operator-config"));
 const FeeConfig = lazy(() => import("@/pages/dashboard/fee-config"));
 const Diagnostic = lazy(() => import("@/pages/dashboard/diagnostic"));
@@ -85,12 +105,12 @@ const DocumentationRedirect = lazy(() => import("@/pages/documentation-redirect"
 const DocumentationInline = lazy(() => import("@/pages/documentation-inline"));
 const DocumentationPayout = lazy(() => import("@/pages/documentation-payout"));
 const DocumentationSessions = lazy(() => import("@/pages/documentation-sessions"));
-const BusinessDashboard = lazy(() => import("@/pages/dashboard/business/index"));
+const BusinessDashboard = lazy(() => _preloadBusinessDashboard);
 const BusinessProfile = lazy(() => import("@/pages/dashboard/business/profile"));
 const BusinessKyc = lazy(() => import("@/pages/dashboard/business/kyc"));
 const BusinessApi = lazy(() => import("@/pages/dashboard/business/api"));
-const BusinessHistory = lazy(() => import("@/pages/dashboard/business/history"));
-const BusinessSettings = lazy(() => import("@/pages/dashboard/business/settings"));
+const BusinessHistory = lazy(() => _preloadBusinessHistory);
+const BusinessSettings = lazy(() => _preloadBusinessSettings);
 const BusinessSettlements = lazy(() => import("@/pages/dashboard/business/settlements"));
 const BusinessFees = lazy(() => import("@/pages/dashboard/business/fees"));
 
@@ -160,16 +180,9 @@ function DashboardLayout({ children, type = "personal" }: { children: React.Reac
 
   
 
-  if (isLoading) {
-    return (
-      <div className="h-screen w-full flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="h-7 w-7 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">Vérification en cours...</p>
-        </div>
-      </div>
-    );
-  }
+  // Ne pas bloquer le rendu pendant la vérification auth — le splash gère déjà cet état.
+  // Afficher null de façon transparente si isLoading, la redirection useEffect prend le relais.
+  if (isLoading) return null;
 
   const style = {
     "--sidebar-width": "20rem",
@@ -435,9 +448,17 @@ function AppInitializer() {
       queryClient.prefetchQuery({
         queryKey: ["/api/auth/me"],
       });
-      // Précharger les chunks dashboard pendant le splash pour éviter le 2ème loader après connexion
-      import("@/pages/dashboard/index");
-      import("@/pages/dashboard/business/index");
+      // Les pages communes sont déjà préchargées au niveau module (module-level preloads).
+      // Précharger ici les pages admin et documentation pendant le splash.
+      import("@/pages/dashboard/admin");
+      import("@/pages/dashboard/admin-business");
+      import("@/pages/dashboard/management-wrapper");
+      import("@/pages/dashboard/fee-config");
+      import("@/pages/dashboard/documentation-business");
+      import("@/pages/dashboard/documentation-landing");
+      import("@/pages/dashboard/business/profile");
+      import("@/pages/dashboard/business/settlements");
+      import("@/pages/dashboard/business/fees");
       initRef.current = true;
     }
   }, []);

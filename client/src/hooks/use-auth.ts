@@ -10,6 +10,7 @@ export function useAuth() {
       if (!res.ok) throw new Error(`Server error: ${res.status}`);
       return await res.json();
     },
+    staleTime: 60000,
     retry: (count, error) => {
       if (error?.message?.includes("401")) return false;
       return count < 2;
