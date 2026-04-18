@@ -177,29 +177,23 @@ export default function Deposit() {
       }
     : null;
 
-  // Auto-detect country from IP address
+  // Auto-detect country from browser IP (client-side)
   useEffect(() => {
     const detectCountry = async () => {
-      // Only auto-detect if no country is selected yet
       if (selectedCountry) return;
-      
       try {
-        const response = await fetch("/api/detect-country");
-        if (response.ok) {
-          const data = await response.json();
-          if (data.detected && data.country && enabledCountriesOperators) {
-            // Only set if the detected country is enabled
-            if (Object.keys(enabledCountriesOperators).includes(data.country)) {
-              form.setValue("country", data.country);
-              console.log(`[GeoIP] Auto-selected country: ${data.country}`);
-            }
+        const { detectCountryClient } = await import("@/lib/detect-country");
+        const data = await detectCountryClient();
+        if (data.detected && data.country && enabledCountriesOperators) {
+          if (Object.keys(enabledCountriesOperators).includes(data.country)) {
+            form.setValue("country", data.country);
+            console.log(`[GeoIP] Auto-selected country: ${data.country}`);
           }
         }
       } catch (error) {
         console.error("[GeoIP] Failed to detect country:", error);
       }
     };
-    
     if (enabledCountriesOperators && !selectedCountry) {
       detectCountry();
     }

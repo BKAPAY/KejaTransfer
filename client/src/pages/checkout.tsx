@@ -293,17 +293,17 @@ export default function Checkout() {
     }
   }, [country]);
 
+  // Auto-detect country from browser IP (client-side)
   useEffect(() => {
     const detectCountry = async () => {
       if (country) return;
       try {
-        const response = await fetch("/api/detect-country");
-        if (response.ok) {
-          const data = await response.json();
-          if (data.detected && data.country && enabledCountriesOperators) {
-            if (Object.keys(enabledCountriesOperators).includes(data.country)) {
-              setCountry(data.country);
-            }
+        const { detectCountryClient } = await import("@/lib/detect-country");
+        const data = await detectCountryClient();
+        if (data.detected && data.country && enabledCountriesOperators) {
+          if (Object.keys(enabledCountriesOperators).includes(data.country)) {
+            setCountry(data.country);
+            console.log(`[GeoIP] Auto-selected country: ${data.country}`);
           }
         }
       } catch {}
