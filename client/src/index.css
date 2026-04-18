@@ -386,10 +386,10 @@
 
   .merchant-name-animated {
     display: block;
-    font-size: 2rem;
-    font-weight: 800;
-    line-height: 1.15;
-    letter-spacing: 0.04em;
+    font-size: 1.35rem;
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: 0.03em;
     text-transform: uppercase;
     background: linear-gradient(
       270deg,
