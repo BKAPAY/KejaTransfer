@@ -345,38 +345,38 @@ echo json_encode(['received' => true]);
 
   const businessCountries = [
     // Afrique de l'Ouest — XOF
-    { code: "BJ", flag: "🇧🇯", name: "Bénin", currency: "XOF", operators: ["MTN", "Moov", "Celtiis"], otpOperators: [] as string[] },
-    { code: "TG", flag: "🇹🇬", name: "Togo", currency: "XOF", operators: ["Moov", "T-Money"], otpOperators: [] as string[] },
-    { code: "CI", flag: "🇨🇮", name: "Côte d'Ivoire", currency: "XOF", operators: ["MTN", "Orange", "Moov"], otpOperators: ["Orange — #144*82#"] },
-    { code: "BF", flag: "🇧🇫", name: "Burkina Faso", currency: "XOF", operators: ["Orange", "Moov", "Coris"], otpOperators: ["Orange — #144*4*6*100#"] },
-    { code: "SN", flag: "🇸🇳", name: "Sénégal", currency: "XOF", operators: ["Orange", "Free", "Expresso", "Wizall"], otpOperators: ["Orange — #144#391#"] },
-    { code: "ML", flag: "🇲🇱", name: "Mali", currency: "XOF", operators: ["Orange", "Moov"], otpOperators: ["Orange — #144#77#"] },
-    { code: "NE", flag: "🇳🇪", name: "Niger", currency: "XOF", operators: ["Airtel"], otpOperators: [] as string[] },
+    { code: "BJ", flag: "🇧🇯", name: "Bénin", currency: "XOF", operators: ["MTN", "Moov", "Celtiis"], otpOperators: [] as string[], pinOperators: [] as string[] },
+    { code: "TG", flag: "🇹🇬", name: "Togo", currency: "XOF", operators: ["Moov", "T-Money"], otpOperators: [] as string[], pinOperators: [] as string[] },
+    { code: "CI", flag: "🇨🇮", name: "Côte d'Ivoire", currency: "XOF", operators: ["MTN", "Orange", "Moov"], otpOperators: ["Orange — #144*82#"], pinOperators: [] as string[] },
+    { code: "BF", flag: "🇧🇫", name: "Burkina Faso", currency: "XOF", operators: ["Orange", "Moov", "Coris"], otpOperators: ["Orange — #144*4*6*100#"], pinOperators: [] as string[] },
+    { code: "SN", flag: "🇸🇳", name: "Sénégal", currency: "XOF", operators: ["Orange", "Free", "Expresso", "Wizall"], otpOperators: ["Orange — #144#391#"], pinOperators: [] as string[] },
+    { code: "ML", flag: "🇲🇱", name: "Mali", currency: "XOF", operators: ["Orange", "Moov"], otpOperators: ["Orange — #144#77#"], pinOperators: [] as string[] },
+    { code: "NE", flag: "🇳🇪", name: "Niger", currency: "XOF", operators: ["Airtel"], otpOperators: [] as string[], pinOperators: [] as string[] },
     // Afrique de l'Ouest — autres devises
-    { code: "GN", flag: "🇬🇳", name: "Guinée", currency: "GNF", operators: ["Orange", "MTN"], otpOperators: ["Orange — #144#"] },
-    { code: "GM", flag: "🇬🇲", name: "Gambie", currency: "GMD", operators: ["Afrimoney", "QMoney"], otpOperators: [] as string[] },
+    { code: "GN", flag: "🇬🇳", name: "Guinée", currency: "GNF", operators: ["Orange", "MTN"], otpOperators: ["Orange — #144#"], pinOperators: [] as string[] },
+    { code: "GM", flag: "🇬🇲", name: "Gambie", currency: "GMD", operators: ["Afrimoney", "QMoney", "Wave", "APS (Africell)"], otpOperators: [] as string[], pinOperators: ["QMoney", "APS (Africell)"] },
     // Afrique Centrale — XAF
-    { code: "CM", flag: "🇨🇲", name: "Cameroun", currency: "XAF", operators: ["MTN", "Orange"], otpOperators: [] as string[] },
-    { code: "TD", flag: "🇹🇩", name: "Tchad", currency: "XAF", operators: ["Airtel", "Moov"], otpOperators: [] as string[] },
-    { code: "CG", flag: "🇨🇬", name: "Congo-Brazzaville", currency: "XAF", operators: ["MTN", "Airtel"], otpOperators: [] as string[] },
-    { code: "CF", flag: "🇨🇫", name: "Centrafrique", currency: "XAF", operators: ["Orange", "Telecel"], otpOperators: [] as string[] },
-    { code: "GA", flag: "🇬🇦", name: "Gabon", currency: "XAF", operators: ["Airtel", "Moov"], otpOperators: [] as string[] },
+    { code: "CM", flag: "🇨🇲", name: "Cameroun", currency: "XAF", operators: ["MTN", "Orange"], otpOperators: [] as string[], pinOperators: [] as string[] },
+    { code: "TD", flag: "🇹🇩", name: "Tchad", currency: "XAF", operators: ["Airtel", "Moov"], otpOperators: [] as string[], pinOperators: [] as string[] },
+    { code: "CG", flag: "🇨🇬", name: "Congo-Brazzaville", currency: "XAF", operators: ["MTN", "Airtel"], otpOperators: [] as string[], pinOperators: [] as string[] },
+    { code: "CF", flag: "🇨🇫", name: "Centrafrique", currency: "XAF", operators: ["Orange", "Telecel"], otpOperators: [] as string[], pinOperators: [] as string[] },
+    { code: "GA", flag: "🇬🇦", name: "Gabon", currency: "XAF", operators: ["Airtel", "Moov"], otpOperators: [] as string[], pinOperators: [] as string[] },
     // Afrique Centrale — autres devises
-    { code: "CD", flag: "🇨🇩", name: "RD Congo", currency: "CDF / USD", operators: ["Orange", "Airtel", "M-Pesa", "Vodacom", "Afrimoney"], otpOperators: [] as string[] },
+    { code: "CD", flag: "🇨🇩", name: "RD Congo", currency: "CDF / USD", operators: ["Orange", "Airtel", "M-Pesa", "Vodacom", "Afrimoney"], otpOperators: [] as string[], pinOperators: [] as string[] },
     // Afrique de l'Est & des Grands Lacs
-    { code: "RW", flag: "🇷🇼", name: "Rwanda", currency: "RWF", operators: ["MTN", "Airtel"], otpOperators: [] as string[] },
-    { code: "KE", flag: "🇰🇪", name: "Kenya", currency: "KES", operators: ["M-Pesa"], otpOperators: [] as string[] },
-    { code: "TZ", flag: "🇹🇿", name: "Tanzanie", currency: "TZS", operators: ["Airtel", "Tigo", "Halotel"], otpOperators: [] as string[] },
-    { code: "UG", flag: "🇺🇬", name: "Ouganda", currency: "UGX", operators: ["MTN", "Airtel"], otpOperators: [] as string[] },
+    { code: "RW", flag: "🇷🇼", name: "Rwanda", currency: "RWF", operators: ["MTN", "Airtel"], otpOperators: [] as string[], pinOperators: [] as string[] },
+    { code: "KE", flag: "🇰🇪", name: "Kenya", currency: "KES", operators: ["M-Pesa"], otpOperators: [] as string[], pinOperators: [] as string[] },
+    { code: "TZ", flag: "🇹🇿", name: "Tanzanie", currency: "TZS", operators: ["Airtel", "Tigo", "Halotel"], otpOperators: [] as string[], pinOperators: [] as string[] },
+    { code: "UG", flag: "🇺🇬", name: "Ouganda", currency: "UGX", operators: ["MTN", "Airtel"], otpOperators: [] as string[], pinOperators: [] as string[] },
     // Afrique Australe
-    { code: "ZM", flag: "🇿🇲", name: "Zambie", currency: "ZMW", operators: ["Airtel", "MTN", "Zamtel"], otpOperators: [] as string[] },
-    { code: "MW", flag: "🇲🇼", name: "Malawi", currency: "MWK", operators: ["Airtel", "TNM"], otpOperators: [] as string[] },
-    { code: "MZ", flag: "🇲🇿", name: "Mozambique", currency: "MZN", operators: ["M-Pesa", "Movitel"], otpOperators: [] as string[] },
-    { code: "LS", flag: "🇱🇸", name: "Lesotho", currency: "LSL", operators: ["M-Pesa"], otpOperators: [] as string[] },
+    { code: "ZM", flag: "🇿🇲", name: "Zambie", currency: "ZMW", operators: ["Airtel", "MTN", "Zamtel"], otpOperators: [] as string[], pinOperators: [] as string[] },
+    { code: "MW", flag: "🇲🇼", name: "Malawi", currency: "MWK", operators: ["Airtel", "TNM"], otpOperators: [] as string[], pinOperators: [] as string[] },
+    { code: "MZ", flag: "🇲🇿", name: "Mozambique", currency: "MZN", operators: ["M-Pesa", "Movitel"], otpOperators: [] as string[], pinOperators: [] as string[] },
+    { code: "LS", flag: "🇱🇸", name: "Lesotho", currency: "LSL", operators: ["M-Pesa"], otpOperators: [] as string[], pinOperators: [] as string[] },
     // Afrique de l'Ouest — Anglophone
-    { code: "GH", flag: "🇬🇭", name: "Ghana", currency: "GHS", operators: ["MTN", "Vodafone", "AirtelTigo"], otpOperators: [] as string[] },
-    { code: "NG", flag: "🇳🇬", name: "Nigeria", currency: "NGN", operators: ["MTN", "Airtel"], otpOperators: [] as string[] },
-    { code: "SL", flag: "🇸🇱", name: "Sierra Leone", currency: "SLE", operators: ["Orange"], otpOperators: [] as string[] },
+    { code: "GH", flag: "🇬🇭", name: "Ghana", currency: "GHS", operators: ["MTN", "Vodafone", "AirtelTigo"], otpOperators: [] as string[], pinOperators: [] as string[] },
+    { code: "NG", flag: "🇳🇬", name: "Nigeria", currency: "NGN", operators: ["MTN", "Airtel"], otpOperators: [] as string[], pinOperators: [] as string[] },
+    { code: "SL", flag: "🇸🇱", name: "Sierra Leone", currency: "SLE", operators: ["Orange"], otpOperators: [] as string[], pinOperators: [] as string[] },
   ];
 
   return (
@@ -829,7 +829,7 @@ echo json_encode(['received' => true]);
                       </div>
                     </td>
                     <td className="p-2 border border-border text-xs">
-                      {c.otpOperators.length > 0 ? (
+                      {(c.otpOperators.length > 0 || c.pinOperators.length > 0) ? (
                         <div className="space-y-1">
                           {c.otpOperators.map((otp) => (
                             <div key={otp} className="flex items-center gap-1">
@@ -837,6 +837,12 @@ echo json_encode(['received' => true]);
                               <code className="text-xs font-mono text-muted-foreground">{otp}</code>
                             </div>
                           ))}
+                          {c.pinOperators.length > 0 && (
+                            <div className="flex items-center gap-1">
+                              <Badge className="text-xs shrink-0 bg-blue-600 text-white">PIN</Badge>
+                              <span className="text-xs text-muted-foreground">{c.pinOperators.join(", ")}</span>
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <span className="text-muted-foreground text-xs">—</span>
@@ -884,13 +890,53 @@ echo json_encode(['received' => true]);
             </div>
           </div>
 
+          <div className="border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 rounded-md p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <Badge className="text-xs bg-blue-600 text-white">PIN</Badge>
+              <p className="font-semibold text-sm">Operateurs necessitant un code PIN</p>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Certains operateurs requierent que le client saisisse son code PIN mobile money pour confirmer le paiement. 
+              Le flux PIN est gere automatiquement par la plateforme — aucun parametre supplementaire n'est requis dans votre requete payin. 
+              Apres initiation, la plateforme demande le PIN directement au client via l'interface de paiement.
+            </p>
+            <div className="space-y-2">
+              {businessCountries.filter(c => c.pinOperators.length > 0).map(c => (
+                <div key={c.code} className="flex items-start gap-3 bg-background rounded-md p-2 border border-border">
+                  <CountryFlag code={c.code} size="sm" />
+                  <div>
+                    <p className="text-xs font-semibold">{c.name}</p>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {c.pinOperators.map(op => (
+                        <span key={op} className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-0.5 rounded">{op}</span>
+                      ))}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">Code PIN requis pour confirmer le paiement</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="bg-muted rounded-md p-3 font-mono text-xs space-y-1">
+              <p className="text-muted-foreground">// Exemple avec PIN (QMoney ou APS — Gambie)</p>
+              <p>{"{"}</p>
+              <p className="pl-4"><span className="text-foreground">"country"</span>: <span className="text-green-600">"GM"</span>,</p>
+              <p className="pl-4"><span className="text-foreground">"operator"</span>: <span className="text-green-600">"qmoney"</span>,</p>
+              <p className="pl-4"><span className="text-foreground">"phone"</span>: <span className="text-green-600">"+2201234567"</span>,</p>
+              <p className="pl-4"><span className="text-foreground">"amount"</span>: <span className="text-blue-500">500</span>,</p>
+              <p className="pl-4"><span className="text-foreground">"currency"</span>: <span className="text-green-600">"GMD"</span></p>
+              <p className="pl-4 text-muted-foreground">// Pas de parametre "otp" — le PIN est saisi par le client sur la page de paiement</p>
+              <p>{"}"}</p>
+            </div>
+          </div>
+
           <div className="bg-muted/50 rounded-md p-4 text-sm space-y-2">
             <p className="font-semibold">Comment utiliser les codes dans vos requetes</p>
             <div className="font-mono text-xs space-y-1 text-muted-foreground">
-              <p><span className="text-foreground">country:</span> Code ISO a 2 lettres (ex: "BJ", "CI", "CM")</p>
-              <p><span className="text-foreground">currency:</span> Code devise du pays (ex: "XOF", "XAF", "CDF")</p>
-              <p><span className="text-foreground">operator:</span> Nom en minuscules (ex: "mtn", "orange", "moov", "airtel", "tmoney", "mpesa", "free")</p>
-              <p><span className="text-foreground">otp:</span> Code genere par USSD (uniquement pour Orange CI, BF, SN, ML, GN, CM)</p>
+              <p><span className="text-foreground">country:</span> Code ISO a 2 lettres (ex: "BJ", "CI", "GM")</p>
+              <p><span className="text-foreground">currency:</span> Code devise du pays (ex: "XOF", "XAF", "GMD")</p>
+              <p><span className="text-foreground">operator:</span> Nom en minuscules (ex: "mtn", "orange", "moov", "airtel", "tmoney", "mpesa", "free", "qmoney", "aps")</p>
+              <p><span className="text-foreground">otp:</span> Code genere par USSD (uniquement pour Orange CI, BF, SN, ML, GN)</p>
+              <p><span className="text-foreground">pin:</span> Gere automatiquement par la plateforme (QMoney et APS en Gambie)</p>
             </div>
           </div>
         </CardContent>
