@@ -830,6 +830,14 @@ export const CURRENCY_EXCHANGE_PAIRS = [
   { from: "XOF", to: "USD" },
   { from: "XAF", to: "USD" },
   { from: "CDF", to: "USD" },
+  // USD vers XOF, XAF, CDF (dépôts entrants en USD)
+  { from: "USD", to: "XOF" },
+  { from: "USD", to: "XAF" },
+  { from: "USD", to: "CDF" },
+  // EUR vers XOF, XAF, CDF (dépôts entrants en EUR)
+  { from: "EUR", to: "XOF" },
+  { from: "EUR", to: "XAF" },
+  { from: "EUR", to: "CDF" },
 ] as const;
 
 // Chat schema for EMALI
