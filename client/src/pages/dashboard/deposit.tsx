@@ -120,7 +120,7 @@ export default function Deposit() {
       });
     },
   });
-  const [selectedCurrency, setSelectedCurrency] = useState<string>("XOF");
+  const [selectedCurrency, setSelectedCurrency] = useState<string>("");
   const [feePercentage, setFeePercentage] = useState<number>(60);
   const [exchangeFeePercentage, setExchangeFeePercentage] = useState<number>(0);
 
@@ -263,8 +263,8 @@ export default function Deposit() {
         ? selectedCurrency
         : (COUNTRIES.find(c => c.code === selectedCountry)?.currency || userBalanceCurrency))
     : userBalanceCurrency;
-  // Only need conversion if a country is selected AND its currency differs from user's currency
-  const needsConversion = selectedCountry && paymentCurrency !== userBalanceCurrency;
+  // Only need conversion if a country is selected AND payment currency is determined AND currencies differ
+  const needsConversion = !!selectedCountry && !!paymentCurrency && paymentCurrency !== userBalanceCurrency;
   // Montant à injecter dans les codes USSD = montant converti en devise de l'opérateur si conversion, sinon montant saisi
   const amountForUssd = (needsConversion && conversionData?.convertedAmount && conversionData.convertedAmount > 0)
     ? Math.round(conversionData.convertedAmount)
