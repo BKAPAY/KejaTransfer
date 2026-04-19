@@ -6,6 +6,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useLocation } from "wouter";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { CountryFlag } from "@/components/country-flag";
 import {
   DOC_VERSIONS,
   getDocVersion,
@@ -224,6 +225,42 @@ app.post('/api/webhook/bkapay-payout', express.raw({ type: 'application/json' })
   const codeExamples = { js: jsExample, php: phpExample, python: pythonExample };
   const tabLabels = { js: "JavaScript", php: "PHP", python: "Python" };
 
+  const payoutCountries = [
+    // Afrique de l'Ouest — XOF
+    { code: "BJ", name: "Benin",          currency: "XOF", operators: ["mtn", "moov", "celtiis"] },
+    { code: "TG", name: "Togo",           currency: "XOF", operators: ["moov", "tmoney"] },
+    { code: "CI", name: "Cote d'Ivoire",  currency: "XOF", operators: ["mtn", "orange", "moov", "wave"] },
+    { code: "BF", name: "Burkina Faso",   currency: "XOF", operators: ["orange", "moov"] },
+    { code: "SN", name: "Senegal",        currency: "XOF", operators: ["orange", "free", "expresso", "wizall", "wave"] },
+    { code: "ML", name: "Mali",           currency: "XOF", operators: ["orange", "moov"] },
+    { code: "NE", name: "Niger",          currency: "XOF", operators: ["airtel"] },
+    // Afrique de l'Ouest — autres devises
+    { code: "GN", name: "Guinee",         currency: "GNF", operators: ["orange", "mtn"] },
+    { code: "GM", name: "Gambie",         currency: "GMD", operators: ["afrimoney", "wave"] },
+    // Afrique Centrale — XAF
+    { code: "CM", name: "Cameroun",       currency: "XAF", operators: ["mtn", "orange"] },
+    { code: "TD", name: "Tchad",          currency: "XAF", operators: ["airtel", "moov"] },
+    { code: "CG", name: "Congo-Brazza",   currency: "XAF", operators: ["mtn", "airtel"] },
+    { code: "CF", name: "Centrafrique",   currency: "XAF", operators: ["orange", "telecel"] },
+    { code: "GA", name: "Gabon",          currency: "XAF", operators: ["airtel", "moov"] },
+    // Afrique Centrale — autres devises
+    { code: "CD", name: "RD Congo",       currency: "CDF / USD", operators: ["orange", "airtel", "mpesa", "vodacom", "afrimoney"] },
+    // Afrique de l'Est
+    { code: "RW", name: "Rwanda",         currency: "RWF", operators: ["mtn", "airtel"] },
+    { code: "KE", name: "Kenya",          currency: "KES", operators: ["mpesa"] },
+    { code: "TZ", name: "Tanzanie",       currency: "TZS", operators: ["airtel", "tigo", "halotel"] },
+    { code: "UG", name: "Ouganda",        currency: "UGX", operators: ["mtn", "airtel"] },
+    // Afrique Australe
+    { code: "ZM", name: "Zambie",         currency: "ZMW", operators: ["airtel", "mtn", "zamtel"] },
+    { code: "MW", name: "Malawi",         currency: "MWK", operators: ["airtel", "tnm"] },
+    { code: "MZ", name: "Mozambique",     currency: "MZN", operators: ["mpesa", "movitel"] },
+    { code: "LS", name: "Lesotho",        currency: "LSL", operators: ["mpesa"] },
+    // Afrique de l'Ouest — Anglophone
+    { code: "GH", name: "Ghana",          currency: "GHS", operators: ["mtn", "vodafone", "airteltigo"] },
+    { code: "NG", name: "Nigeria",        currency: "NGN", operators: ["mtn", "airtel"] },
+    { code: "SL", name: "Sierra Leone",   currency: "SLE", operators: ["orange"] },
+  ];
+
   return (
     <div className="space-y-6 max-w-4xl mx-auto px-4 py-8">
       {/* Header */}
@@ -387,6 +424,62 @@ app.post('/api/webhook/bkapay-payout', express.raw({ type: 'application/json' })
               <div><span className="text-green-600">+22960000000</span> <span className="text-muted-foreground">→ Benin (BJ), operateur MTN</span></div>
               <div><span className="text-green-600">+243812345678</span> <span className="text-muted-foreground">→ Congo RDC (CD)</span></div>
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Pays et operateurs supportes */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Globe className="w-4 h-4" />
+            Pays et operateurs supportes
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Voici tous les pays et operateurs disponibles pour le payout. Utilisez les codes en minuscules dans le champ <code className="font-mono bg-muted px-1 rounded text-xs">operator</code> et le code ISO 2 lettres dans <code className="font-mono bg-muted px-1 rounded text-xs">country</code>.
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border-collapse" data-testid="table-payout-countries">
+              <thead>
+                <tr className="bg-muted">
+                  <th className="text-left p-2 font-semibold border border-border">Pays</th>
+                  <th className="text-left p-2 font-semibold border border-border">Code</th>
+                  <th className="text-left p-2 font-semibold border border-border">Devise</th>
+                  <th className="text-left p-2 font-semibold border border-border">Operateurs (valeur API)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {payoutCountries.map((c) => (
+                  <tr key={c.code} className="border-b border-border" data-testid={`row-payout-country-${c.code}`}>
+                    <td className="p-2 border border-border">
+                      <span className="inline-flex items-center gap-1.5">
+                        <CountryFlag code={c.code} size="xs" />
+                        <span>{c.name}</span>
+                      </span>
+                    </td>
+                    <td className="p-2 border border-border">
+                      <Badge variant="outline" className="font-mono text-xs">{c.code}</Badge>
+                    </td>
+                    <td className="p-2 border border-border font-mono text-xs">{c.currency}</td>
+                    <td className="p-2 border border-border">
+                      <div className="flex flex-wrap gap-1">
+                        {c.operators.map((op) => (
+                          <Badge key={op} variant="secondary" className="font-mono text-xs">{op}</Badge>
+                        ))}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="bg-muted/50 rounded-md p-3 text-xs space-y-1.5">
+            <p className="font-semibold text-foreground">Conventions de nommage</p>
+            <p className="text-muted-foreground"><span className="font-mono text-foreground">country</span> : Code ISO 2 lettres en majuscules. Ex : <span className="font-mono">"SN"</span>, <span className="font-mono">"CD"</span>, <span className="font-mono">"CM"</span></p>
+            <p className="text-muted-foreground"><span className="font-mono text-foreground">operator</span> : Nom en minuscules, sans espace. Ex : <span className="font-mono">"orange"</span>, <span className="font-mono">"mtn"</span>, <span className="font-mono">"airtel"</span>, <span className="font-mono">"mpesa"</span>, <span className="font-mono">"moov"</span>, <span className="font-mono">"tmoney"</span></p>
+            <p className="text-muted-foreground"><span className="font-mono text-foreground">currency</span> : Optionnel — si absent, la devise par defaut du pays est utilisee. Pour la RDC, specifiez <span className="font-mono">"CDF"</span> ou <span className="font-mono">"USD"</span> selon l'operateur cible.</p>
           </div>
         </CardContent>
       </Card>
