@@ -508,7 +508,8 @@ export async function handlePawaPayWebhook(req: Request, res: Response): Promise
           const result = await storage.finalizeIncomingTransaction(tx.id);
           if (result && result.credited) {
             console.log(`[PawaPay Webhook] Deposit ${tx.id} finalized and credited to user ${tx.userId}`);
-            await trySendPaymentCallback(tx, "payment.completed", "[PawaPay Webhook]");
+            // Use result.transaction (status=completed) instead of stale tx (status=pending)
+            await trySendPaymentCallback(result.transaction, "payment.completed", "[PawaPay Webhook]");
             if (tx.type === "payment_link" && tx.customerEmail) {
               try {
                 const txMeta = JSON.parse(tx.metadata as string || "{}");
@@ -528,6 +529,7 @@ export async function handlePawaPayWebhook(req: Request, res: Response): Promise
           const failed = await storage.atomicFailTransaction(tx.id);
           if (failed) {
             console.log(`[PawaPay Webhook] Deposit ${tx.id} marked failed (verified via API)`);
+            await trySendPaymentCallback(tx, "payment.failed", "[PawaPay Webhook]");
           }
         }
         // If status is still "pending" from API, do nothing — let polling handle it
@@ -635,7 +637,8 @@ export async function pollPawaPayTransaction(txId: string): Promise<void> {
         const result = await storage.finalizeIncomingTransaction(txId);
         if (result && result.credited) {
           console.log(`[PawaPay Poll] Deposit ${txId} finalized and credited to user ${tx.userId}`);
-          await trySendPaymentCallback(tx, "payment.completed", "[PawaPay Poll]");
+          // Use result.transaction (status=completed) instead of stale tx (status=pending)
+          await trySendPaymentCallback(result.transaction, "payment.completed", "[PawaPay Poll]");
           if (tx.type === "payment_link" && tx.customerEmail) {
             try {
               const txMeta = JSON.parse(tx.metadata as string || "{}");
@@ -654,6 +657,7 @@ export async function pollPawaPayTransaction(txId: string): Promise<void> {
         const failed = await storage.atomicFailTransaction(txId);
         if (failed) {
           console.log(`[PawaPay Poll] Deposit ${txId} marked failed`);
+          await trySendPaymentCallback(tx, "payment.failed", "[PawaPay Poll]");
         }
       }
     }
