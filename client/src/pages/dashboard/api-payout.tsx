@@ -38,6 +38,12 @@ export default function ApiPayoutPage() {
 
   const { data: user } = useQuery<User>({
     queryKey: ["/api/auth/me"],
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+    refetchInterval: (query) => {
+      const u = query.state.data as User | undefined;
+      return u?.payoutApiEnabled ? false : 8000;
+    },
   });
 
   const { data: apiKeys, isLoading } = useQuery<ApiKey[]>({
