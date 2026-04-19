@@ -5024,6 +5024,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   await safeRefundOutgoingTransaction(transaction.id, transaction.userId, metadata, "status-check-afribapay-failed");
                 }
                 await storage.updateTransactionStatus(transaction.id, "failed");
+                if (!isOutgoing) {
+                  const failedTx = await storage.getTransaction(transaction.id);
+                  if (failedTx) trySendPaymentCallback(failedTx, 'payment.failed', '[TransactionStatus/AfribaPay]');
+                }
                 return res.json({ status: "failed", message: "Paiement echoue ou annule" });
               }
               // Still pending - continue
@@ -5071,6 +5075,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   await safeRefundOutgoingTransaction(transaction.id, transaction.userId, metadata, "status-check-feexpay-failed");
                 }
                 await storage.updateTransactionStatus(transaction.id, "failed");
+                if (!isOutgoing) {
+                  const failedTx = await storage.getTransaction(transaction.id);
+                  if (failedTx) trySendPaymentCallback(failedTx, 'payment.failed', '[TransactionStatus/FeeXPay]');
+                }
                 return res.json({ status: "failed", message: "Paiement echoue ou annule" });
               }
             }

@@ -120,48 +120,55 @@ if (status === "success") {
   console.log("Paiement echoue");
 }`;
 
-  const webhookExample = `// Webhook BKApay - Activation automatique d'abonnement
-// Ce code recoit les notifications de paiement reussi
-
-// Node.js / Express
+  const webhookExample = `// Webhook BKApay — Payin (Node.js / Express)
+// Secret : valeur "cs_..." visible dans Cles API > Configurer callback
 const crypto = require('crypto');
 
-app.post('/api/webhook/bkapay', express.json(), (req, res) => {
+// IMPORTANT : utilisez express.raw() pour lire le corps brut avant tout parsing
+app.post('/api/webhook/bkapay', express.raw({ type: 'application/json' }), (req, res) => {
+  const rawBody = req.body.toString('utf8');
   const signature = req.headers['x-bkapay-signature'];
-  const secret = process.env.BKAPAY_CALLBACK_SECRET; // Votre secret de callback
-  
-  // Verifier la signature
+  const event    = req.headers['x-bkapay-event'];
+  const secret   = process.env.BKAPAY_CALLBACK_SECRET; // "cs_..." depuis Cles API
+
+  // Verifier la signature HMAC-SHA256 sur le corps BRUT
   const expectedSignature = crypto
     .createHmac('sha256', secret)
-    .update(JSON.stringify(req.body))
+    .update(rawBody)
     .digest('hex');
-  
+
   if (signature !== expectedSignature) {
     return res.status(401).json({ error: 'Signature invalide' });
   }
-  
-  const { event, transactionId, amount, status, customerEmail } = req.body;
-  
-  if (event === 'payment.completed' && status === 'completed') {
-    // Activer l'abonnement de l'utilisateur
+
+  const payload = JSON.parse(rawBody);
+  const { transactionId, amount, netAmount, currency, customerEmail } = payload;
+
+  if (event === 'payment.completed') {
+    // Paiement reussi : crediter le compte, activer l'abonnement, etc.
     activerAbonnement(customerEmail, transactionId);
-    console.log('Abonnement active pour:', customerEmail);
+    console.log('Paiement reussi:', transactionId, netAmount, currency);
+  } else if (event === 'payment.failed') {
+    // Paiement echoue
+    console.log('Paiement echoue:', transactionId);
   }
-  
+
+  // Repondre 200 immediatement (BKApay reessaie jusqu'a 10 min si pas de 2xx)
   res.json({ received: true });
 });`;
 
   const webhookPhpExample = `<?php
-// Webhook BKApay - PHP
-// Recevoir les notifications de paiement
+// Webhook BKApay — Payin (PHP)
+// Secret : BKAPAY_CALLBACK_SECRET = valeur "cs_..." depuis Cles API
 
-$payload = file_get_contents('php://input');
+// Lire le corps brut (important pour la verification de signature)
+$payload   = file_get_contents('php://input');
 $signature = $_SERVER['HTTP_X_BKAPAY_SIGNATURE'] ?? '';
-$secret = getenv('BKAPAY_CALLBACK_SECRET');
+$event     = $_SERVER['HTTP_X_BKAPAY_EVENT'] ?? '';
+$secret    = getenv('BKAPAY_CALLBACK_SECRET');
 
-// Verifier la signature
+// Verifier la signature HMAC-SHA256
 $expectedSignature = hash_hmac('sha256', $payload, $secret);
-
 if (!hash_equals($expectedSignature, $signature)) {
     http_response_code(401);
     echo json_encode(['error' => 'Signature invalide']);
@@ -170,13 +177,15 @@ if (!hash_equals($expectedSignature, $signature)) {
 
 $data = json_decode($payload, true);
 
-if ($data['event'] === 'payment.completed' && $data['status'] === 'completed') {
-    // Activer l'abonnement
-    $userId = $data['customerEmail'];
-    $transactionId = $data['transactionId'];
-    activerAbonnement($userId, $transactionId);
+if ($event === 'payment.completed') {
+    // Paiement reussi
+    activerAbonnement($data['customerEmail'], $data['transactionId']);
+} elseif ($event === 'payment.failed') {
+    // Paiement echoue
+    error_log('Paiement echoue: ' . $data['transactionId']);
 }
 
+// Repondre 200 immediatement
 echo json_encode(['received' => true]);
 ?>`;
 
@@ -433,17 +442,17 @@ data = response.json()
         </CardHeader>
         <CardContent className="space-y-6">
           <p className="text-sm text-muted-foreground">
-            Configurez un webhook pour recevoir une notification automatique quand un paiement est complete.
-            Ideal pour activer automatiquement les abonnements ou comptes utilisateurs.
+            Configurez un webhook pour recevoir une notification automatique lorsqu'un paiement est complete ou echoue.
+            Ideal pour activer automatiquement des abonnements, crediter un compte ou journaliser les echecs.
           </p>
 
           <div className="space-y-4">
             <h4 className="font-semibold">Configuration</h4>
             <div className="space-y-2 text-sm">
-              <p><span className="font-semibold">1.</span> Allez dans "Cles API" de votre tableau de bord</p>
-              <p><span className="font-semibold">2.</span> Cliquez sur "Configurer un callback" sur votre cle API</p>
-              <p><span className="font-semibold">3.</span> Entrez l'URL de votre endpoint webhook</p>
-              <p><span className="font-semibold">4.</span> Copiez le secret genere pour verifier les signatures</p>
+              <p><span className="font-semibold">1.</span> Allez dans <strong>Cles API</strong> de votre tableau de bord</p>
+              <p><span className="font-semibold">2.</span> Cliquez sur <strong>Configurer un callback</strong> sur la cle API souhaitee</p>
+              <p><span className="font-semibold">3.</span> Entrez l'URL HTTPS de votre endpoint</p>
+              <p><span className="font-semibold">4.</span> Copiez le secret <code className="bg-muted px-1 rounded text-xs">cs_...</code> genere — c'est votre <code className="bg-muted px-1 rounded text-xs">BKAPAY_CALLBACK_SECRET</code></p>
             </div>
           </div>
 
@@ -486,9 +495,14 @@ data = response.json()
           <CodeBlock label="PHP" description="Verification et activation" code={webhookPhpExample} copyCode={copyCode} testId="button-copy-webhook-php" />
 
           <Alert className="border-amber-200 bg-amber-50 dark:bg-amber-950 dark:border-amber-800">
-            <AlertDescription className="text-amber-800 dark:text-amber-200 text-sm">
-              <strong>Securite:</strong> Verifiez toujours la signature avant de traiter le webhook.
-              Ne faites jamais confiance aux donnees sans verification.
+            <AlertDescription className="text-amber-800 dark:text-amber-200 text-sm space-y-2">
+              <p><strong>Secrets distincts selon le flux :</strong></p>
+              <ul className="list-disc list-inside space-y-1 ml-1">
+                <li>Webhook <strong>payin</strong> (collecte) : secret <code>cs_...</code> visible dans <em>Cles API &gt; Configurer callback</em> — variable <code>BKAPAY_CALLBACK_SECRET</code></li>
+                <li>Webhook <strong>payout</strong> (envoi) : secret <code>cs_payout_...</code> visible dans <em>API Payout &gt; Configurer callback</em> — variable <code>BKAPAY_PAYOUT_CALLBACK_SECRET</code></li>
+              </ul>
+              <p className="mt-1"><strong>Verification de signature :</strong> fortement recommandee mais non obligatoire cote BKApay. Lisez toujours le corps brut (<code>express.raw()</code> en Node.js) avant de calculer le HMAC-SHA256 pour garantir la coherence de la signature. Si vous ne verifiez pas, assurez-vous de ne traiter que des evenements provenant d'une source de confiance.</p>
+              <p><strong>Retry automatique :</strong> BKApay reessaie le webhook toutes les 5 secondes pendant 10 minutes si votre serveur ne repond pas avec un code 2xx. Repondez immediatement avec <code>200 OK</code> avant tout traitement long.</p>
             </AlertDescription>
           </Alert>
         </CardContent>

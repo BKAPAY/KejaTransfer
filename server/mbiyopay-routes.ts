@@ -1098,6 +1098,7 @@ export async function handleMbiyoPayWebhook(req: Request, res: Response) {
       } else {
         await storage.updateTransactionStatus(tx.id, "failed");
         console.log(`[MbiyoPay Webhook] Transaction failed: ${tx.id}`);
+        trySendPaymentCallback(tx, 'payment.failed', '[MbiyoPay Webhook]');
       }
     }
 
