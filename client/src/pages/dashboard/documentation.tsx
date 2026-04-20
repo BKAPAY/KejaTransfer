@@ -204,7 +204,10 @@ echo json_encode(['received' => true]);
   "country": "SN",
   "operator": "orange",
   "description": "Abonnement Premium",
-  "timestamp": "2024-01-15T10:30:00.000Z"
+  "timestamp": "2024-01-15T10:30:00.000Z",
+  // Presents uniquement si le developpeur avait fourni un parametre currency different de la devise du compte
+  "original_amount": 5,
+  "original_currency": "USD"
 }`;
 
   const payoutJsExample = `const response = await fetch("${baseUrl}/api/v1/payout", {

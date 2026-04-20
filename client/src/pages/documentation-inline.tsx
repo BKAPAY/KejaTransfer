@@ -73,6 +73,9 @@ function payerBKApay() {
     key: "pk_live_VOTRE_CLE_PUBLIQUE",
     amount: 5000,
     description: "Achat produit",
+    // Optionnel : si votre site gere les prix dans une autre devise (ex: USD, EUR)
+    // BKApay convertit automatiquement en XOF pour le traitement. Ex: amount: 5, currency: "USD"
+    // currency: "USD",
     // Reference unique de votre commande (pour le suivi et le webhook)
     orderId: "CMD-2024-001",
     // Informations client (optionnelles - si non fournies, le formulaire les demandera)
@@ -145,6 +148,9 @@ function BoutonPaiement({ montant, description, orderId, onPaymentComplete }) {
     window.BKApay.checkout({
       key: "pk_live_VOTRE_CLE_PUBLIQUE",
       amount: montant,
+      // Optionnel : devise dans laquelle montant est exprime (ex: "USD", "EUR")
+      // Si absent, la devise de votre compte est supposee. Conversion automatique.
+      // currency: devise,
       description: description,
       orderId: orderId,
       onSuccess: (response) => {

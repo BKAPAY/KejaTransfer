@@ -195,7 +195,6 @@ export default function ApiPay() {
     customerPhone: string;
   } | null>(null);
   const [conversionData, setConversionData] = useState<ConversionData | null>(null);
-  const [pricingConversionData, setPricingConversionData] = useState<ConversionData | null>(null);
   const [selectedCurrency, setSelectedCurrency] = useState<string>("XOF");
   const [dynamicFee, setDynamicFee] = useState<{ feePercentage: number; feeAmount: number } | null>(null);
   const [isLoadingFees, setIsLoadingFees] = useState(false);
@@ -814,7 +813,11 @@ export default function ApiPay() {
     );
   }
 
-  if (!amount || amount < 200) {
+  // Si le développeur a fourni une devise différente de celle du compte (ex: amount=5, currency=USD),
+  // la conversion vers ownerCurrency se fait côté serveur — ne pas bloquer ici.
+  const isDeveloperCurrencyDifferent = !!(requestedCurrency && requestedCurrency.toUpperCase() !== ownerCurrency);
+
+  if (!amount || amount <= 0 || (amount < 200 && !isDeveloperCurrencyDifferent)) {
     return (
       <div className="w-full min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-accent/5 p-4">
         <Card className="w-full max-w-md">

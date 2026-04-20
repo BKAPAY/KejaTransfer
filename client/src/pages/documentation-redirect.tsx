@@ -64,36 +64,59 @@ export default function DocumentationRedirect({ version }: Props) {
   const redirectUrl = `${baseUrl}/api-pay/VOTRE_CLE_PUBLIQUE?amount=MONTANT&description=DESCRIPTION&callback=URL_RETOUR`;
 
   const htmlExample = `<!-- Bouton de paiement BKApay -->
+<!-- Si votre site affiche les prix en XOF (devise par defaut de votre compte) -->
 <a href="${baseUrl}/api-pay/pk_live_VOTRE_CLE?amount=5000&description=Achat%20produit&callback=https://votresite.com/success">
-  <button>Payer 5 000</button>
+  <button>Payer 5 000 XOF</button>
+</a>
+
+<!-- Si votre site affiche les prix dans une autre devise (ex: USD) -->
+<!-- BKApay convertit automatiquement en XOF pour le traitement du paiement -->
+<a href="${baseUrl}/api-pay/pk_live_VOTRE_CLE?amount=5&currency=USD&description=Achat%20produit&callback=https://votresite.com/success">
+  <button>Payer 5 USD</button>
 </a>`;
 
   const jsExample = `// Rediriger vers la page de paiement BKApay
-function payerAvecBKApay(montant, description) {
+function payerAvecBKApay(montant, description, devise) {
   const clePublique = "pk_live_VOTRE_CLE_PUBLIQUE";
   const callbackUrl = encodeURIComponent("https://votresite.com/success");
   const desc = encodeURIComponent(description);
   
+  // Si devise est different de la devise de votre compte, BKApay convertit automatiquement
+  const currencyParam = devise ? "&currency=" + devise : "";
+
   const url = "${baseUrl}/api-pay/" + clePublique + 
     "?amount=" + montant + 
+    currencyParam +
     "&description=" + desc + 
     "&callback=" + callbackUrl;
   
   window.location.href = url;
 }
 
-// Utilisation
-payerAvecBKApay(5000, "Achat produit");`;
+// Utilisation avec devise du compte (ex: XOF)
+payerAvecBKApay(5000, "Achat produit");
+
+// Utilisation avec devise personnalisee — conversion automatique en XOF
+payerAvecBKApay(5, "Achat produit", "USD");`;
 
   const phpExample = `<?php
 // Redirection vers la page de paiement BKApay
 
 $clePublique = "pk_live_VOTRE_CLE_PUBLIQUE";
+
+// Option 1 — Montant dans la devise de votre compte (ex: XOF)
 $montant = 5000;
+$devise   = null; // pas besoin de currency
+
+// Option 2 — Montant dans une autre devise (conversion automatique)
+// $montant = 5;
+// $devise  = "USD"; // BKApay convertit en XOF cote serveur
+
 $description = urlencode("Achat produit");
 $callbackUrl = urlencode("https://votresite.com/success");
 
-$url = "${baseUrl}/api-pay/{$clePublique}?amount={$montant}&description={$description}&callback={$callbackUrl}";
+$currencyParam = $devise ? "&currency={$devise}" : "";
+$url = "${baseUrl}/api-pay/{$clePublique}?amount={$montant}{$currencyParam}&description={$description}&callback={$callbackUrl}";
 
 header("Location: {$url}");
 exit;
@@ -110,7 +133,9 @@ def payer():
     params = {
         "amount": 5000,
         "description": "Achat produit",
-        "callback": "https://votresite.com/success"
+        "callback": "https://votresite.com/success",
+        # Optionnel : si votre site affiche les prix en USD, EUR, etc.
+        # "currency": "USD",  # BKApay convertit automatiquement en XOF
     }
     url = f"${baseUrl}/api-pay/{CLE_PUBLIQUE}?" + urlencode(params)
     return redirect(url)`;
