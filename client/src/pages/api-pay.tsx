@@ -195,6 +195,7 @@ export default function ApiPay() {
     customerPhone: string;
   } | null>(null);
   const [conversionData, setConversionData] = useState<ConversionData | null>(null);
+  const [pricingConversionData, setPricingConversionData] = useState<ConversionData | null>(null);
   const [selectedCurrency, setSelectedCurrency] = useState<string>("XOF");
   const [dynamicFee, setDynamicFee] = useState<{ feePercentage: number; feeAmount: number } | null>(null);
   const [isLoadingFees, setIsLoadingFees] = useState(false);
