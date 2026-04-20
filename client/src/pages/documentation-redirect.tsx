@@ -647,10 +647,21 @@ def webhook_bkapay():
                 <Badge variant="outline" className="w-fit">amount</Badge>
                 <Badge variant="default" className="w-fit text-xs">Oui</Badge>
                 <div>
-                  <p className="text-muted-foreground">Montant a payer en unite monetaire entiere (pas de decimales). Minimum : 200.</p>
+                  <p className="text-muted-foreground">Montant a payer en nombre entier (pas de decimales). Minimum : 200 dans la devise de votre compte.</p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    La devise depend de votre pays d'inscription : XOF (Afrique francophone zone UEMOA), XAF (Afrique Centrale), CDF (RD Congo).
-                    Consultez votre tableau de bord pour connaitre votre devise.
+                    Par defaut, la devise est celle de votre compte (XOF, XAF, CDF, GNF selon votre pays d'inscription).
+                    Si vous fournissez le parametre <code className="bg-muted px-1 rounded font-mono">currency</code>, le montant sera automatiquement converti vers la devise de votre compte.
+                  </p>
+                </div>
+              </div>
+              <div className="grid grid-cols-[120px_80px_1fr] gap-2 p-3 border-b text-sm items-start">
+                <Badge variant="outline" className="w-fit">currency</Badge>
+                <Badge variant="secondary" className="w-fit text-xs">Non</Badge>
+                <div>
+                  <p className="text-muted-foreground">Devise dans laquelle le montant est exprime. Si absente, la devise de votre compte est utilisee.</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Permet de facturer en USD, EUR ou toute autre devise : BKApay convertit automatiquement vers votre devise de compte avant de calculer les frais.
+                    Exemples : <code className="bg-muted px-1 rounded font-mono">XOF</code>, <code className="bg-muted px-1 rounded font-mono">XAF</code>, <code className="bg-muted px-1 rounded font-mono">USD</code>, <code className="bg-muted px-1 rounded font-mono">EUR</code>, <code className="bg-muted px-1 rounded font-mono">GNF</code>.
                   </p>
                 </div>
               </div>

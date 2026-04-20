@@ -142,6 +142,8 @@ export default function ApiPay() {
   const prefilledName = urlParams.get("customerName") || "";
   const prefilledEmail = urlParams.get("customerEmail") || "";
   const rawPrefilledPhone = urlParams.get("customerPhone") || "";
+  // Devise de pricing du développeur (optionnel — si absent, on suppose la devise du compte)
+  const requestedCurrency = urlParams.get("currency") || null;
 
   const stripCountryCode = (phone: string): string => {
     let cleaned = phone.replace(/[^0-9+]/g, "");
@@ -534,8 +536,9 @@ export default function ApiPay() {
         customerPhone,
         country,
         operator,
-        currency: selectedCurrency,
         callbackUrl: callbackUrl || null,
+        // Devise de pricing du développeur (URL param ?currency=) — si absent, pas de conversion
+        ...(requestedCurrency ? { currency: requestedCurrency } : {}),
       };
       if (mbiyoOtpCode || authCode) {
         bodyData.otpCode = mbiyoOtpCode || authCode;

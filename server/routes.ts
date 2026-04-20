@@ -2924,8 +2924,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get owner's currency (the API key owner's currency)
       const owner = await storage.getUser(apiKey.userId);
       const ownerCurrency = owner?.country ? getCurrencyForCountry(owner.country) : "XOF";
-      
-      const baseAmount = Math.floor(Number(amount));
+
+      // Conversion devise : si le développeur envoie un montant dans une devise différente de celle du compte,
+      // on convertit automatiquement vers la devise du propriétaire de la clé API
+      const requestedAmountRaw = Math.floor(Number(amount));
+      const normalizedRequestCurrency = requestCurrency ? String(requestCurrency).toUpperCase() : null;
+      let baseAmount = requestedAmountRaw;
+      let originalAmount: number | null = null;
+      let originalCurrency: string | null = null;
+
+      if (normalizedRequestCurrency && normalizedRequestCurrency !== ownerCurrency) {
+        const conv = await convertCurrency(requestedAmountRaw, normalizedRequestCurrency, ownerCurrency);
+        if (!conv.success) {
+          return res.status(400).json({
+            error: `Impossible de convertir ${normalizedRequestCurrency} vers ${ownerCurrency}: ${conv.error}`
+          });
+        }
+        originalAmount = requestedAmountRaw;
+        originalCurrency = normalizedRequestCurrency;
+        baseAmount = Math.floor(conv.convertedAmount);
+        console.log(`[API-PAY INIT] Conversion devise: ${requestedAmountRaw} ${normalizedRequestCurrency} → ${baseAmount} ${ownerCurrency}`);
+      }
+
       if (baseAmount < 200) {
         return res.status(400).json({ error: "Montant minimum: 200" });
       }
@@ -2966,8 +2986,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Use MbiyoPay
         const { createMbiyoPayPayin, getCurrencyForCountry: getMbiyoCurrency, mbiyoPayOperatorRequiresOtp: mbiyoNeedsOtp, getMbiyoPayOtpInstructions: getMbiyoOtpInfo } = await import("./mbiyopay");
         const { otpCode } = req.body;
-        // Provider currency is based on the payer's country
-        const providerCurrency = requestCurrency || getMbiyoCurrency(country);
+        // Provider currency is based on the payer's country (not the developer's pricing currency)
+        const providerCurrency = getMbiyoCurrency(country);
         
         const needsOtp = mbiyoNeedsOtp(country, operator);
         if (needsOtp && !otpCode) {
@@ -3056,6 +3076,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             customerPaysFee: apiKey.customerPaysFee,
             feeAmount: apiMbiyoTotalFee,
             ...(apiMbiyoXFee > 0 ? { exchangeFee: apiMbiyoXFee, exchangeFeePercentage: apiMbiyoXFeePct } : {}),
+            ...(originalAmount !== null ? { originalAmount, originalCurrency } : {}),
           }),
         });
 
@@ -3069,6 +3090,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           provider: "mbiyopay",
           authMode: result.authMode ?? null,
           mbiyopayTransactionId: result.transactionId,
+          ...(originalAmount !== null ? { originalAmount, originalCurrency, convertedCurrency: ownerCurrency } : {}),
         });
       } else if (activeProvider === "fedapay") {
         // Use FedaPay - always uses XOF currency
@@ -3148,6 +3170,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             customerPaysFee: apiKey.customerPaysFee,
             feeAmount: fedaTotalFee,
             ...(fedaXFee > 0 ? { exchangeFee: fedaXFee, exchangeFeePercentage: fedaXFeePct } : {}),
+            ...(originalAmount !== null ? { originalAmount, originalCurrency } : {}),
           }),
         });
 
@@ -3157,6 +3180,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           token: tx.id,
           message: result.message || "Paiement initie. Veuillez valider sur votre telephone.",
           provider: "fedapay",
+          ...(originalAmount !== null ? { originalAmount, originalCurrency, convertedCurrency: ownerCurrency } : {}),
         });
       } else if (activeProvider === "paydunya") {
         // Use Paydunya
@@ -3256,6 +3280,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             customerPaysFee: apiKey.customerPaysFee,
             feeAmount: pdTotalFee,
             ...(pdXFee > 0 ? { exchangeFee: pdXFee, exchangeFeePercentage: pdXFeePct } : {}),
+            ...(originalAmount !== null ? { originalAmount, originalCurrency } : {}),
           }),
         });
 
@@ -3315,6 +3340,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`[API-PAY INIT] Operator ${operatorKey} requires two-step`);
         }
 
+        if (originalAmount !== null) {
+          response.originalAmount = originalAmount;
+          response.originalCurrency = originalCurrency;
+          response.convertedCurrency = ownerCurrency;
+        }
         return res.json(response);
       } else if (activeProvider === "afribapay") {
         // Use AfribaPay for API payments
@@ -3322,7 +3352,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const { getCurrencyForCountry: getAfribaCurrency, getPaymentInstructions, operatorRequiresOtpForCountry, getOtpUssdCode } = await import("@shared/afribapay-countries");
         const { otpCode } = req.body;
 
-        const providerCurrency = requestCurrency || getAfribaCurrency(country.toUpperCase());
+        const providerCurrency = getAfribaCurrency(country.toUpperCase());
 
         // Convert amount from owner's currency to provider currency if different
         let convertedAmountForProvider = amountForProvider;
@@ -3424,6 +3454,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             customerPaysFee: apiKey.customerPaysFee,
             feeAmount: afribaTotalFee,
             ...(afribaXFee > 0 ? { exchangeFee: afribaXFee, exchangeFeePercentage: afribaXFeePct } : {}),
+            ...(originalAmount !== null ? { originalAmount, originalCurrency } : {}),
           }),
         });
 
@@ -3433,6 +3464,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           token: tx.id,
           message: afribaResult.message || "Paiement initie. Veuillez valider sur votre telephone.",
           provider: "afribapay",
+          ...(originalAmount !== null ? { originalAmount, originalCurrency, convertedCurrency: ownerCurrency } : {}),
         };
 
         // Wave redirect URL
@@ -3462,8 +3494,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
 
-        // Use client-selected currency if provided, otherwise fallback to operator default
-        const providerCurrency = requestCurrency || getPawaPayCurrencyForOp(country.toUpperCase(), operator);
+        const providerCurrency = getPawaPayCurrencyForOp(country.toUpperCase(), operator);
 
         let convertedAmountForProvider = amountForProvider;
         if (ownerCurrency !== providerCurrency) {
@@ -3534,6 +3565,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             customerPaysFee: apiKey.customerPaysFee,
             feeAmount: pawaTotalFee,
             ...(pawaXFee > 0 ? { exchangeFee: pawaXFee, exchangeFeePercentage: pawaXFeePct } : {}),
+            ...(originalAmount !== null ? { originalAmount, originalCurrency } : {}),
           }),
         });
 
@@ -3543,6 +3575,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           token: tx.id,
           message: pawaResult.message || "Paiement initie. Veuillez valider sur votre telephone.",
           provider: "pawapay",
+          ...(originalAmount !== null ? { originalAmount, originalCurrency, convertedCurrency: ownerCurrency } : {}),
         });
       } else if (activeProvider === "feexpay") {
         // Use FeeXPay for API payments
@@ -3560,7 +3593,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.json({ success: false, requiresOTP: true, otpInstructions: "Composez le code USSD pour obtenir votre OTP puis entrez-le ici.", provider: "feexpay", error: "Code OTP requis pour ce paiement" });
         }
 
-        const feexProviderCurrency = requestCurrency || feexCurrency(country.toUpperCase());
+        const feexProviderCurrency = feexCurrency(country.toUpperCase());
         let feexConvertedAmount = amountForProvider;
         if (ownerCurrency !== feexProviderCurrency) {
           const { convertCurrency } = await import("./currency-converter");
@@ -3607,6 +3640,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             providerCurrency: feexProviderCurrency, balanceAmount: feexNet,
             balanceCurrency: ownerCurrency, customerPaysFee: apiKey.customerPaysFee, feeAmount: feexTotalFee,
             ...(feexXFee > 0 ? { exchangeFee: feexXFee, exchangeFeePercentage: feexXFeePct } : {}),
+            ...(originalAmount !== null ? { originalAmount, originalCurrency } : {}),
           }),
         });
 
@@ -3614,6 +3648,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           success: true, transactionId: tx.id, token: tx.id,
           message: feexResult.message || "Paiement initie. Validez sur votre telephone.", provider: "feexpay",
           ...(feexResult.redirectUrl ? { redirectUrl: feexResult.redirectUrl } : {}),
+          ...(originalAmount !== null ? { originalAmount, originalCurrency, convertedCurrency: ownerCurrency } : {}),
         });
       } else {
         return res.status(503).json({ 
@@ -3808,22 +3843,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { amount, currency, description, success_url, cancel_url, callback_url, order_id, expires_in } = req.body;
 
-      if (!amount || isNaN(Number(amount)) || Number(amount) < 200) {
+      if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
         return res.status(400).json({
           success: false,
-          error: { code: "INVALID_AMOUNT", message: "Montant invalide. Minimum: 200" }
+          error: { code: "INVALID_AMOUNT", message: "Montant invalide (doit être un nombre positif)" }
         });
       }
 
-      const sessionCurrency = currency || "XOF";
+      // Devise du compte propriétaire de la clé API
+      const ownerCurrency = owner.country ? getCurrencyForCountry(owner.country) : "XOF";
+      const requestedAmountRaw = Math.floor(Number(amount));
+      const normalizedSessionCurrency = currency ? String(currency).toUpperCase() : ownerCurrency;
+
+      // Convertir vers la devise du compte si la devise du développeur diffère
+      let sessionAmount = requestedAmountRaw;
+      let sessionMetadataExtra: string | null = null;
+
+      if (normalizedSessionCurrency !== ownerCurrency) {
+        const { convertCurrency: convertForSession } = await import("./currency-converter");
+        const conv = await convertForSession(requestedAmountRaw, normalizedSessionCurrency, ownerCurrency);
+        if (!conv.success) {
+          return res.status(400).json({
+            success: false,
+            error: { code: "CURRENCY_CONVERSION_FAILED", message: `Impossible de convertir ${normalizedSessionCurrency} vers ${ownerCurrency}: ${conv.error}` }
+          });
+        }
+        sessionAmount = Math.floor(conv.convertedAmount);
+        sessionMetadataExtra = JSON.stringify({ originalAmount: requestedAmountRaw, originalCurrency: normalizedSessionCurrency });
+        console.log(`[SESSIONS CREATE] Conversion devise: ${requestedAmountRaw} ${normalizedSessionCurrency} → ${sessionAmount} ${ownerCurrency}`);
+      }
+
+      if (sessionAmount < 200) {
+        return res.status(400).json({
+          success: false,
+          error: { code: "INVALID_AMOUNT", message: "Montant invalide. Minimum équivalent à 200 dans la devise du compte" }
+        });
+      }
+
       const expiresInSeconds = Math.max(1800, Math.min(Number(expires_in) || 3600, 86400));
       const expiresAt = new Date(Date.now() + expiresInSeconds * 1000);
 
       const session = await storage.createPaymentSession({
         apiKeyId: apiKey.id,
         userId: apiKey.userId,
-        amount: Math.floor(Number(amount)),
-        currency: sessionCurrency,
+        amount: sessionAmount,
+        currency: ownerCurrency,
         description: description || null,
         successUrl: success_url || null,
         cancelUrl: cancel_url || null,
@@ -3831,7 +3895,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         orderId: order_id || null,
         status: "pending",
         transactionId: null,
-        metadata: null,
+        metadata: sessionMetadataExtra,
         expiresAt,
       });
 
@@ -3844,6 +3908,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         expires_at: expiresAt.toISOString(),
         amount: session.amount,
         currency: session.currency,
+        ...(normalizedSessionCurrency !== ownerCurrency ? {
+          original_amount: requestedAmountRaw,
+          original_currency: normalizedSessionCurrency,
+        } : {}),
       });
     } catch (error: any) {
       console.error("[Payment Session Create] Error:", error);
@@ -3925,7 +3993,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ success: false, error: "Service temporairement indisponible" });
       }
 
-      const { country, operator, customerPhone, customerName, customerEmail, otpCode, currency: requestCurrency } = req.body;
+      const { country, operator, customerPhone, customerName, customerEmail, otpCode } = req.body;
 
       if (!country || !operator || !customerPhone) {
         return res.status(400).json({ success: false, error: "Pays, opérateur et téléphone requis" });
@@ -3991,7 +4059,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
 
-        const providerCurrency = requestCurrency || getPawaPayCurrencyForOp(country.toUpperCase(), operator);
+        const providerCurrency = getPawaPayCurrencyForOp(country.toUpperCase(), operator);
 
         // Frais d'échange entrant pour comptes personnels si la devise du payeur diffère de celle du marchand
         const { feeAmount: sessXFeePawa, feePercentage: sessXFeePawaPct } =
@@ -4185,7 +4253,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       } else if (activeProvider === "mbiyopay") {
         const { createMbiyoPayPayin, getCurrencyForCountry: getMbiyoCurrency, mbiyoPayOperatorRequiresOtp: mbiyoNeedsOtp, getMbiyoPayOtpInstructions: getMbiyoOtpInfo } = await import("./mbiyopay");
-        const providerCurrency = requestCurrency || getMbiyoCurrency(country);
+        const providerCurrency = getMbiyoCurrency(country);
         const needsOtp = mbiyoNeedsOtp(country, operator);
         if (needsOtp && !otpCode) {
           await storage.updatePaymentSession(session.id, { status: "pending" });

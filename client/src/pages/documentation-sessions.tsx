@@ -387,7 +387,7 @@ app.post("/webhook/bkapay", express.raw({ type: "application/json" }), (req, res
               { param: "cancel_url", type: "string", required: false, desc: "URL de redirection si le client abandonne." },
               { param: "callback_url", type: "string", required: false, desc: "URL de notification webhook POST (fortement recommande)." },
               { param: "order_id", type: "string", required: false, desc: "Votre reference de commande interne, incluse dans le webhook." },
-              { param: "currency", type: "string", required: false, desc: "Devise du paiement (ex: XOF, XAF, CDF, GNF). Defaut : la devise de votre compte selon votre pays d'inscription." },
+              { param: "currency", type: "string", required: false, desc: "Devise dans laquelle est exprime le montant (ex: USD, EUR, XOF, XAF, GNF). Si differente de la devise de votre compte, BKApay convertit automatiquement avant le calcul des frais. Defaut : devise de votre compte." },
               { param: "expires_in", type: "number", required: false, desc: "Duree de validite de la session en minutes. Defaut : 60." },
             ].map(({ param, type, required, desc }) => (
               <div key={param} className="flex gap-3 items-start py-2 border-b last:border-0">

@@ -863,7 +863,7 @@ def webhook_bkapay():
                   <Badge variant="secondary" className="text-xs">requis</Badge>
                   <span className="text-xs text-muted-foreground font-mono">number</span>
                 </div>
-                <p className="text-muted-foreground mt-1">Montant a payer en unite monetaire (pas de centimes). Minimum 200. La devise est determinee par la configuration de votre compte marchand (XOF, XAF ou CDF).</p>
+                <p className="text-muted-foreground mt-1">Montant a payer en nombre entier (pas de centimes). Minimum 200 dans la devise de votre compte. Si le parametre <code className="bg-muted px-1 rounded font-mono text-xs">currency</code> est fourni, la conversion est automatique vers la devise de votre compte.</p>
               </div>
             </div>
 
@@ -875,6 +875,14 @@ def webhook_bkapay():
                   <span className="text-xs text-muted-foreground font-mono">string</span>
                 </div>
                 <p className="text-muted-foreground mt-1">Description du paiement affichee au client dans la fenetre de paiement. Exemple : "Abonnement Premium", "Commande #12345".</p>
+              </div>
+              <div className="flex flex-col gap-1 p-3 rounded-lg bg-muted/50">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge variant="outline">currency</Badge>
+                  <span className="text-xs text-muted-foreground font-mono">string</span>
+                </div>
+                <p className="text-muted-foreground mt-1">Devise dans laquelle est exprime <code className="bg-muted px-1 rounded font-mono text-xs">amount</code>. Si absente, la devise de votre compte est supposee (aucune conversion).</p>
+                <p className="text-xs text-muted-foreground mt-1">Permet de facturer en USD, EUR ou toute autre devise : BKApay convertit automatiquement vers votre devise de compte avant de calculer les frais. La reponse inclura <code className="bg-muted px-1 rounded font-mono">original_amount</code> et <code className="bg-muted px-1 rounded font-mono">original_currency</code> si une conversion a eu lieu.</p>
               </div>
               <div className="flex flex-col gap-1 p-3 rounded-lg bg-muted/50">
                 <div className="flex items-center gap-2 flex-wrap">
