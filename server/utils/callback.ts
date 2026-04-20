@@ -85,6 +85,8 @@ interface CallbackPayload {
   successUrl?: string;
   cancelUrl?: string;
   timestamp: string;
+  original_amount?: number;
+  original_currency?: string;
 }
 
 export async function sendPaymentCallback(
@@ -96,6 +98,9 @@ export async function sendPaymentCallback(
   let successUrl: string | undefined;
   let cancelUrl: string | undefined;
   let sessionCallbackUrl: string | undefined;
+  let netAmountFromMeta: number | null = null;
+  let originalAmountFromMeta: number | undefined;
+  let originalCurrencyFromMeta: string | undefined;
 
   if (transaction.metadata) {
     try {
@@ -104,6 +109,13 @@ export async function sendPaymentCallback(
       successUrl = metadata.successUrl || undefined;
       cancelUrl = metadata.cancelUrl || undefined;
       sessionCallbackUrl = metadata.callbackUrl || undefined;
+      if (typeof metadata.netAmountForUser === 'number') {
+        netAmountFromMeta = metadata.netAmountForUser;
+      }
+      if (typeof metadata.originalAmount === 'number') {
+        originalAmountFromMeta = metadata.originalAmount;
+        originalCurrencyFromMeta = metadata.originalCurrency || undefined;
+      }
     } catch (e) {}
   }
 
@@ -114,7 +126,9 @@ export async function sendPaymentCallback(
     return { success: false, error: 'No callback URL configured' };
   }
 
-  const netAmount = transaction.amount - (transaction.fee || 0);
+  const netAmount = netAmountFromMeta !== null
+    ? netAmountFromMeta
+    : transaction.amount - (transaction.fee || 0);
 
   const payload: CallbackPayload = {
     event,
@@ -134,6 +148,10 @@ export async function sendPaymentCallback(
     successUrl,
     cancelUrl,
     timestamp: new Date().toISOString(),
+    ...(originalAmountFromMeta !== undefined ? {
+      original_amount: originalAmountFromMeta,
+      original_currency: originalCurrencyFromMeta,
+    } : {}),
   };
 
   const payloadJson = JSON.stringify(payload);
