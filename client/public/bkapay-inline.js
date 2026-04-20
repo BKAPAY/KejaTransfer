@@ -95,6 +95,7 @@
     var params = new URLSearchParams();
     params.set("amount", options.amount);
     params.set("mode", "inline");
+    if (options.currency) params.set("currency", options.currency);
     if (options.description) params.set("description", options.description);
     if (options.orderId) params.set("orderId", options.orderId);
     if (options.customer) {
