@@ -278,26 +278,6 @@ export default function ApiPay() {
     return () => clearTimeout(debounceTimer);
   }, [country, operator, amount]);
 
-  // Conversion de la devise du développeur vers la devise du compte (en arrière-plan, au chargement)
-  // Ex: développeur envoie amount=5, currency=USD → on calcule 5 USD → ~3000 XOF pour l'affichage
-  useEffect(() => {
-    if (!requestedCurrency || !ownerCurrency || !amount || amount <= 0) return;
-    const normalized = requestedCurrency.toUpperCase();
-    if (normalized === ownerCurrency) return;
-    fetch("/api/convert-currency", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ amount, fromCurrency: normalized, toCurrency: ownerCurrency }),
-    })
-      .then(r => r.json())
-      .then(data => {
-        if (data.convertedAmount && data.convertedAmount > 0) {
-          setConvertedBaseAmount(Math.floor(data.convertedAmount));
-        }
-      })
-      .catch(() => {});
-  }, [amount, requestedCurrency, ownerCurrency]);
-
   // Handle currency selection when country changes
   useEffect(() => {
     if (country && hasMultiplePawaPayCurrencies(country)) {
@@ -323,6 +303,26 @@ export default function ApiPay() {
         : (COUNTRIES.find(c => c.code === country)?.currency || ownerCurrency))
     : ownerCurrency;
   const needsConversion = country && targetCurrency !== ownerCurrency;
+
+  // Conversion de la devise du développeur vers la devise du compte (en arrière-plan, au chargement)
+  // Ex: développeur envoie amount=5, currency=USD → on calcule 5 USD → ~3000 XOF pour l'affichage
+  useEffect(() => {
+    if (!requestedCurrency || !ownerCurrency || !amount || amount <= 0) return;
+    const normalized = requestedCurrency.toUpperCase();
+    if (normalized === ownerCurrency) return;
+    fetch("/api/convert-currency", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ amount, fromCurrency: normalized, toCurrency: ownerCurrency }),
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data.convertedAmount && data.convertedAmount > 0) {
+          setConvertedBaseAmount(Math.floor(data.convertedAmount));
+        }
+      })
+      .catch(() => {});
+  }, [amount, requestedCurrency, ownerCurrency]);
 
   const copyUssdCode = (code: string) => {
     navigator.clipboard.writeText(code);
