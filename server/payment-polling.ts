@@ -1153,6 +1153,7 @@ async function processFeeXPayTransaction(transaction: Transaction & { user?: Use
           await safeRefundOutgoingTransaction(transaction.id, transaction.userId, metadata, "polling-feexpay-timeout");
         }
         await storage.updateTransactionStatus(transaction.id, "failed");
+        if (isOutgoing) setImmediate(() => sendApiPayoutCallback(transaction.id, metadata, "failed"));
         setImmediate(() => sendBusinessWebhookCallback(transaction.id, "failed", isOutgoing ? "payout" : "payin"));
         return true;
       }
@@ -1204,6 +1205,7 @@ async function processFeeXPayTransaction(transaction: Transaction & { user?: Use
       } else {
         await storage.updateTransactionStatus(transaction.id, "failed");
       }
+      if (isOutgoing) setImmediate(() => sendApiPayoutCallback(transaction.id, metadata, "failed"));
       setImmediate(() => sendBusinessWebhookCallback(transaction.id, "failed", isOutgoing ? "payout" : "payin"));
       return true;
     }
@@ -1221,6 +1223,7 @@ async function processFeeXPayTransaction(transaction: Transaction & { user?: Use
       } else {
         await storage.updateTransactionStatus(transaction.id, "failed");
       }
+      if (isOutgoing) setImmediate(() => sendApiPayoutCallback(transaction.id, metadata, "failed"));
       setImmediate(() => sendBusinessWebhookCallback(transaction.id, "failed", isOutgoing ? "payout" : "payin"));
       return true;
     }
