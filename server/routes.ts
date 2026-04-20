@@ -1991,16 +1991,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const urlFields = [kycUrlWebsite, kycUrlInstagram, kycUrlFacebook, kycUrlTiktok, kycUrlWhatsappGroup, kycUrlWhatsappChannel].filter(u => u && typeof u === "string" && u.trim());
-      if (urlFields.length < 2) {
-        return res.status(400).json({ error: "Vous devez renseigner au moins 2 liens d'activite" });
-      }
-
-      const waPersonalPattern = /wa\.me\//i;
-      if (kycUrlWhatsappGroup && waPersonalPattern.test(kycUrlWhatsappGroup)) {
-        return res.status(400).json({ error: "Le lien WhatsApp groupe doit etre un lien de groupe (chat.whatsapp.com/...), pas un lien personnel (wa.me/...)" });
-      }
-      if (kycUrlWhatsappChannel && waPersonalPattern.test(kycUrlWhatsappChannel)) {
-        return res.status(400).json({ error: "Le lien WhatsApp chaine doit etre un lien de chaine (whatsapp.com/channel/...), pas un lien personnel (wa.me/...)" });
+      if (urlFields.length < 1) {
+        return res.status(400).json({ error: "Vous devez renseigner au moins 1 lien d'activite" });
       }
 
       const user = await storage.submitKyc(req.session.userId!, {
@@ -11435,7 +11427,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (newBalance < 0) {
         return res.status(400).json({ error: `Solde insuffisant. Solde actuel: ${user.balance}. Ajustement: ${amount}.` });
       }
-      await db.update(schema.users).set({ balance: newBalance }).where(eq(schema.users.id, userId));
+      await storage.updateUserBalance(userId, amount);
       const adminEmail = (req as any).user?.email || "admin";
       console.log(`[Admin Balance Adjust] ${adminEmail} adjusted balance of user ${userId} (${user.email}): ${user.balance} → ${newBalance} (${amount > 0 ? "+" : ""}${amount}). Reason: ${reason || "non précisé"}`);
       res.json({ success: true, previousBalance: user.balance, newBalance, adjustment: amount });
