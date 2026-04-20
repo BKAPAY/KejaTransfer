@@ -4679,7 +4679,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // pass the original requestedAmount directly to the provider to avoid double-conversion rounding
       const crossCurrencyOverride = requestedCurrency !== userCurrency ? requestedAmount : undefined;
 
-      let result: { success: boolean; transactionId?: string; error?: string; message?: string };
+      let result: { success: boolean; transactionId?: string; error?: string; message?: string; status?: string };
 
       if (activeProvider === "fedapay") {
         // FedaPay is XOF-only; cross-currency handled by conversion upstream
@@ -4742,12 +4742,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             description: `Payout API ${amountInUserCurrency} ${userCurrency}`,
             metadata: JSON.stringify({
               provider: "paydunya", apiKeyId: apiKey.id, reference,
+              phone: localPhone,
               paydunyaTransactionId: submitResp.transaction_id,
               providerAmount: amountForProvider, providerCurrency,
               netMode: true,
             }),
           });
-          return { success: true, transactionId: tx.id, message: "Payout effectué avec succès" };
+          return { success: true, transactionId: tx.id, status: "completed", message: "Payout effectué avec succès" };
         })();
       } else {
         return res.status(400).json({
@@ -4797,53 +4798,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // 14. Send async callback webhook if configured (using payout-specific callback fields)
-      const payoutCbUrlInitial = (apiKey as any).payoutCallbackUrl;
-      const payoutCbSecretInitial = (apiKey as any).payoutCallbackSecret;
-      if (result.transactionId && payoutCbUrlInitial && payoutCbSecretInitial) {
+      // 14. Send async callback webhook with retry logic for final statuses.
+      // For synchronous providers (Paydunya) that complete immediately, we call
+      // sendApiPayoutCallback directly — it retries up to 10 minutes if needed.
+      // For async providers (PawaPay, MbiyoPay, MoneyFusion, FedaPay), the polling
+      // loop / provider webhook handler will call sendApiPayoutCallback when finalized.
+      if (result.transactionId) {
         setImmediate(async () => {
           try {
             const tx = await storage.getTransaction(result.transactionId!);
             if (!tx) return;
-            const event = tx.status === "completed" ? "payout.completed" : tx.status === "failed" ? "payout.failed" : "payout.pending";
-            const payoutPayload = {
-              event,
-              transactionId: tx.id,
-              reference: reference || undefined,
-              recipientAmount: tx.amount,
-              currency: tx.currency || userCurrency,
-              status: tx.status,
-              country: tx.country || countryCode,
-              operator: tx.operator || normalizedOperator,
-              recipientPhone: phone,
-              timestamp: new Date().toISOString(),
-            };
-            const payloadStr = JSON.stringify(payoutPayload);
-            const signature = require("crypto").createHmac("sha256", payoutCbSecretInitial).update(payloadStr).digest("hex");
-            const controller = new AbortController();
-            const tid = setTimeout(() => controller.abort(), 10000);
-            await fetch(payoutCbUrlInitial, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "X-BKApay-Signature": signature,
-                "X-BKApay-Event": event,
-                "X-BKApay-Timestamp": payoutPayload.timestamp,
-              },
-              body: payloadStr,
-              signal: controller.signal,
-            }).finally(() => clearTimeout(tid));
+            const meta = JSON.parse(tx.metadata || "{}");
+            if (tx.status === "completed") {
+              await sendApiPayoutCallback(tx.id, meta, "completed");
+            } else if (tx.status === "failed") {
+              await sendApiPayoutCallback(tx.id, meta, "failed");
+            }
+            // For "pending" status: sendApiPayoutCallback will be called later
+            // by the polling loop or provider webhook handler when finalized.
           } catch (e) {
             console.error("[API Payout] Callback error:", e);
           }
         });
       }
 
+      const finalStatus = (result as any).status || "pending";
       return res.json({
         success: true,
         transactionId: result.transactionId,
-        status: "pending",
-        message: result.message || "Payout initié avec succès",
+        status: finalStatus,
+        message: result.message || (finalStatus === "completed" ? "Payout effectué avec succès" : "Payout initié avec succès"),
         recipientAmount: amountInUserCurrency,
         currency: userCurrency,
       });
