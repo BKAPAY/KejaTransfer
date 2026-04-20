@@ -195,6 +195,7 @@ export default function ApiPay() {
     customerPhone: string;
   } | null>(null);
   const [conversionData, setConversionData] = useState<ConversionData | null>(null);
+  const [convertedBaseAmount, setConvertedBaseAmount] = useState<number | null>(null);
   const [selectedCurrency, setSelectedCurrency] = useState<string>("XOF");
   const [dynamicFee, setDynamicFee] = useState<{ feePercentage: number; feeAmount: number } | null>(null);
   const [isLoadingFees, setIsLoadingFees] = useState(false);
@@ -276,6 +277,26 @@ export default function ApiPay() {
     const debounceTimer = setTimeout(fetchDynamicFee, 300);
     return () => clearTimeout(debounceTimer);
   }, [country, operator, amount]);
+
+  // Conversion de la devise du développeur vers la devise du compte (en arrière-plan, au chargement)
+  // Ex: développeur envoie amount=5, currency=USD → on calcule 5 USD → ~3000 XOF pour l'affichage
+  useEffect(() => {
+    if (!requestedCurrency || !ownerCurrency || !amount || amount <= 0) return;
+    const normalized = requestedCurrency.toUpperCase();
+    if (normalized === ownerCurrency) return;
+    fetch("/api/convert-currency", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ amount, fromCurrency: normalized, toCurrency: ownerCurrency }),
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data.convertedAmount && data.convertedAmount > 0) {
+          setConvertedBaseAmount(Math.floor(data.convertedAmount));
+        }
+      })
+      .catch(() => {});
+  }, [amount, requestedCurrency, ownerCurrency]);
 
   // Handle currency selection when country changes
   useEffect(() => {
@@ -379,12 +400,15 @@ export default function ApiPay() {
     }
   }, []);
 
+  // Montant de base en devise du compte (converti si le développeur a envoyé une devise différente)
+  const baseAmount = convertedBaseAmount ?? amount;
+
   // Calcul du montant total à convertir (avec frais dynamiques si customerPaysFee est activé)
   // Les frais ne s'affichent que lorsque le pays ET l'opérateur sont sélectionnés
   const hasOperatorSelected = country && operator;
-  const totalWithFees = (hasOperatorSelected && dynamicFee) ? amount + dynamicFee.feeAmount : amount;
-  const displayAmount = (apiKeyInfo?.customerPaysFee && hasOperatorSelected && dynamicFee) ? totalWithFees : amount;
-  const amountToConvert = apiKeyInfo?.customerPaysFee ? totalWithFees : amount;
+  const totalWithFees = (hasOperatorSelected && dynamicFee) ? baseAmount + dynamicFee.feeAmount : baseAmount;
+  const displayAmount = (apiKeyInfo?.customerPaysFee && hasOperatorSelected && dynamicFee) ? totalWithFees : baseAmount;
+  const amountToConvert = apiKeyInfo?.customerPaysFee ? totalWithFees : baseAmount;
   // Montant à injecter dans les codes USSD = montant converti si conversion, sinon montant original
   const amountForUssd = (needsConversion && conversionData?.convertedAmount && conversionData.convertedAmount > 0)
     ? Math.round(conversionData.convertedAmount)
