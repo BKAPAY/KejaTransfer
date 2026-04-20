@@ -274,16 +274,40 @@ data = response.json()
   "success": true,
   "transactionId": "txn_abc123",
   "status": "pending",
-  "message": "Payout initie avec succes"
+  "message": "Payout initie avec succes",
+  "recipientAmount": 10000,
+  "currency": "XOF"
+}`;
+
+  const payoutStatusExample = `// GET /api/v1/payout/:transactionId/status
+const txId = "txn_abc123"; // transactionId recu a l'initiation
+const resp = await fetch(\`${baseUrl}/api/v1/payout/\${txId}/status\`, {
+  headers: { "Authorization": "Bearer sk_live_VOTRE_CLE_PRIVEE" }
+});
+const data = await resp.json();
+// data.status => "pending" | "completed" | "failed"
+// data.completedAt => date de finalisation ou null si encore en cours`;
+
+  const payoutStatusResponseExample = `{
+  "success": true,
+  "transactionId": "txn_abc123",
+  "status": "completed",
+  "amount": 10000,
+  "currency": "XOF",
+  "country": "SN",
+  "operator": "orange",
+  "recipientPhone": "+221771234567",
+  "reference": "order_789",
+  "provider": "pawapay",
+  "createdAt": "2024-01-15T10:28:00.000Z",
+  "completedAt": "2024-01-15T10:30:00.000Z"
 }`;
 
   const payoutWebhookExample = `{
   "event": "payout.completed",
   "transactionId": "txn_abc123",
   "reference": "order_789",
-  "amount": 10000,
-  "fee": 600,
-  "netAmount": 9400,
+  "recipientAmount": 10000,
   "currency": "XOF",
   "status": "completed",
   "country": "SN",
@@ -291,6 +315,37 @@ data = response.json()
   "recipientPhone": "+221771234567",
   "timestamp": "2024-01-15T10:30:00.000Z"
 }`;
+
+  const payoutWebhookVerifyExample = `// Verification de signature du webhook payout (Node.js / Express)
+const crypto = require("crypto");
+
+app.post("/api/webhook/bkapay-payout", express.raw({ type: "*/*" }), (req, res) => {
+  const signature = req.headers["x-bkapay-signature"];
+  const event     = req.headers["x-bkapay-event"];      // "payout.completed" ou "payout.failed"
+  const timestamp = req.headers["x-bkapay-timestamp"];
+  const secret    = process.env.BKAPAY_PAYOUT_WEBHOOK_SECRET; // cs_payout_... depuis votre tableau de bord
+
+  const expected = crypto
+    .createHmac("sha256", secret)
+    .update(req.body)
+    .digest("hex");
+
+  if (signature !== expected) {
+    return res.status(401).json({ error: "Signature invalide" });
+  }
+
+  const payload = JSON.parse(req.body);
+  // payload.event => "payout.completed" | "payout.failed"
+  // payload.transactionId, payload.status, payload.reference, ...
+
+  if (payload.event === "payout.completed") {
+    // Mettre a jour la commande en base de donnees
+  } else if (payload.event === "payout.failed") {
+    // Annuler / notifier l'echec
+  }
+
+  res.json({ received: true });
+});`;
 
   return (
     <>
@@ -630,6 +685,36 @@ data = response.json()
             <pre className="bg-muted rounded-md p-3 text-xs overflow-x-auto">{payoutSuccessExample}</pre>
           </div>
 
+          <div className="space-y-3">
+            <h3 className="font-semibold">Verifier le statut d'un payout</h3>
+            <p className="text-sm text-muted-foreground">
+              Apres initiation, le payout peut rester en statut <code className="font-mono text-xs bg-muted px-1 rounded">pending</code> quelques minutes pendant que le fournisseur traite la transaction.
+              Utilisez l'endpoint ci-dessous pour interroger le statut a tout moment, en complement des webhooks.
+            </p>
+            <div className="bg-muted rounded-md p-2 text-xs font-mono flex items-center gap-2">
+              <Badge variant="outline" className="text-xs shrink-0">GET</Badge>
+              <span>/api/v1/payout/:transactionId/status</span>
+            </div>
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-sm font-medium text-muted-foreground">Exemple de requete</span>
+                <Button size="sm" variant="ghost" onClick={() => copyCode(payoutStatusExample)} data-testid="button-copy-payout-status">
+                  <Copy className="w-3 h-3 mr-1" /> Copier
+                </Button>
+              </div>
+              <pre className="bg-muted rounded-md p-3 text-xs overflow-x-auto whitespace-pre-wrap">{payoutStatusExample}</pre>
+            </div>
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-sm font-medium text-muted-foreground">Reponse</span>
+                <Button size="sm" variant="ghost" onClick={() => copyCode(payoutStatusResponseExample)} data-testid="button-copy-payout-status-response">
+                  <Copy className="w-3 h-3 mr-1" /> Copier
+                </Button>
+              </div>
+              <pre className="bg-muted rounded-md p-3 text-xs overflow-x-auto whitespace-pre-wrap">{payoutStatusResponseExample}</pre>
+            </div>
+          </div>
+
           <div>
             <h3 className="font-semibold mb-3">Codes d'erreur</h3>
             <div className="space-y-2">
@@ -658,14 +743,36 @@ data = response.json()
             </p>
           </div>
 
-          <div>
-            <h3 className="font-semibold mb-2">Webhook de statut (optionnel)</h3>
-            <p className="text-sm text-muted-foreground mb-2">
-              Si vous avez configure un webhook dans vos cles API, vous recevrez une notification automatique avec le statut final du payout.
-              Les evenements possibles sont: <code className="font-mono text-xs">payout.completed</code>, <code className="font-mono text-xs">payout.failed</code>, <code className="font-mono text-xs">payout.pending</code>.
-              Le header <code className="font-mono text-xs">X-BKApay-Signature</code> permet de verifier l'authenticite.
+          <div className="space-y-3">
+            <h3 className="font-semibold">Webhook de statut (optionnel)</h3>
+            <p className="text-sm text-muted-foreground">
+              Si vous avez configure un webhook dans vos cles API payout, BKApay envoie une notification HTTP POST automatique au statut final.
+              Les evenements possibles sont: <code className="font-mono text-xs bg-muted px-1 rounded">payout.completed</code> et <code className="font-mono text-xs bg-muted px-1 rounded">payout.failed</code>.
             </p>
-            <pre className="bg-muted rounded-md p-3 text-xs overflow-x-auto">{payoutWebhookExample}</pre>
+            <div className="space-y-1 text-xs text-muted-foreground border border-border rounded-md p-3">
+              <p><span className="font-semibold text-foreground">Headers envoyes par BKApay:</span></p>
+              <p><code className="font-mono">X-BKApay-Signature</code> — HMAC SHA-256 du corps brut JSON signe avec votre secret payout (<code className="font-mono">cs_payout_...</code>)</p>
+              <p><code className="font-mono">X-BKApay-Event</code> — <code className="font-mono">payout.completed</code> | <code className="font-mono">payout.failed</code></p>
+              <p><code className="font-mono">X-BKApay-Timestamp</code> — Horodatage ISO 8601 de l'envoi</p>
+            </div>
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-sm font-medium text-muted-foreground">Corps du webhook (payload)</span>
+                <Button size="sm" variant="ghost" onClick={() => copyCode(payoutWebhookExample)} data-testid="button-copy-payout-webhook">
+                  <Copy className="w-3 h-3 mr-1" /> Copier
+                </Button>
+              </div>
+              <pre className="bg-muted rounded-md p-3 text-xs overflow-x-auto">{payoutWebhookExample}</pre>
+            </div>
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-sm font-medium text-muted-foreground">Verification de signature (Node.js)</span>
+                <Button size="sm" variant="ghost" onClick={() => copyCode(payoutWebhookVerifyExample)} data-testid="button-copy-payout-webhook-verify">
+                  <Copy className="w-3 h-3 mr-1" /> Copier
+                </Button>
+              </div>
+              <pre className="bg-muted rounded-md p-3 text-xs overflow-x-auto whitespace-pre-wrap">{payoutWebhookVerifyExample}</pre>
+            </div>
           </div>
 
           <Alert className="border-amber-200 bg-amber-50 dark:bg-amber-950 dark:border-amber-800">

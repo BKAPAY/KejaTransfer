@@ -4857,6 +4857,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== API Payout Status — for developers using /api/v1/payout =====
+  app.get("/api/v1/payout/:id/status", async (req: Request, res: Response) => {
+    try {
+      let privateKey = req.headers.authorization?.replace(/^Bearer\s+/i, "").trim();
+      if (!privateKey || !privateKey.startsWith("sk_")) {
+        return res.status(401).json({
+          success: false,
+          error: { code: "INVALID_API_KEY", message: "Clé API privée invalide ou manquante. Utilisez: Authorization: Bearer sk_live_..." }
+        });
+      }
+      const apiKey = await storage.getApiKeyByPrivateKey(privateKey);
+      if (!apiKey || !apiKey.isActive) {
+        return res.status(401).json({
+          success: false,
+          error: { code: "INVALID_API_KEY", message: "Clé API invalide ou désactivée" }
+        });
+      }
+      const tx = await storage.getTransaction(req.params.id);
+      if (!tx || tx.userId !== apiKey.userId) {
+        return res.status(404).json({
+          success: false,
+          error: { code: "TRANSACTION_NOT_FOUND", message: "Transaction introuvable ou accès refusé" }
+        });
+      }
+      const meta = JSON.parse(tx.metadata || "{}");
+      return res.json({
+        success: true,
+        transactionId: tx.id,
+        status: tx.status,
+        amount: tx.amount,
+        currency: tx.currency,
+        country: tx.country,
+        operator: tx.operator,
+        recipientPhone: meta.phone || tx.customerPhone,
+        reference: meta.reference || null,
+        provider: meta.provider || meta.paymentProvider || null,
+        createdAt: tx.createdAt,
+        completedAt: tx.status !== "pending" ? tx.updatedAt : null,
+      });
+    } catch (error: any) {
+      console.error("[API Payout Status] Error:", error);
+      res.status(500).json({
+        success: false,
+        error: { code: "INTERNAL_ERROR", message: "Erreur interne du serveur" }
+      });
+    }
+  });
+
   // ===== Inline Payment Status (public, safe for external callers) =====
   app.get("/api/inline-pay/status/:id", async (req: Request, res: Response) => {
     try {
