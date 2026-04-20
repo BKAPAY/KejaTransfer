@@ -11420,6 +11420,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/admin/user/:userId/balance-adjust", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { userId } = req.params;
+      const { amount, reason } = req.body;
+      if (typeof amount !== "number" || amount === 0) {
+        return res.status(400).json({ error: "Montant invalide. Fournissez un nombre non nul (positif pour créditer, négatif pour débiter)." });
+      }
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "Utilisateur non trouvé" });
+      }
+      const newBalance = user.balance + amount;
+      if (newBalance < 0) {
+        return res.status(400).json({ error: `Solde insuffisant. Solde actuel: ${user.balance}. Ajustement: ${amount}.` });
+      }
+      await db.update(schema.users).set({ balance: newBalance }).where(eq(schema.users.id, userId));
+      const adminEmail = (req as any).user?.email || "admin";
+      console.log(`[Admin Balance Adjust] ${adminEmail} adjusted balance of user ${userId} (${user.email}): ${user.balance} → ${newBalance} (${amount > 0 ? "+" : ""}${amount}). Reason: ${reason || "non précisé"}`);
+      res.json({ success: true, previousBalance: user.balance, newBalance, adjustment: amount });
+    } catch (error: any) {
+      console.error("Balance adjust error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
   app.post("/api/admin/transaction/:transactionId/change-status", requireAdmin, async (req: Request, res: Response) => {
     try {
       const { transactionId } = req.params;

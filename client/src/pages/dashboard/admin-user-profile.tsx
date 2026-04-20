@@ -1,12 +1,17 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, useParams } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, User, Mail, Phone, MapPin, Calendar, Shield, CheckCircle, XCircle } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { ArrowLeft, User, Mail, Phone, MapPin, Calendar, Shield, CheckCircle, XCircle, PlusCircle, MinusCircle } from "lucide-react";
 import type { User as UserType } from "@shared/schema";
 import { COUNTRIES } from "@shared/schema";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 const COUNTRY_NAMES: Record<string, string> = {
   BJ: "Bénin",
@@ -33,10 +38,44 @@ export default function AdminUserProfile() {
   const userId = params.userId;
   const isBusinessContext = location.includes("/admin/business/");
   const backUrl = isBusinessContext ? "/dashboard/admin/business/management" : "/dashboard/management";
+  const { toast } = useToast();
+
+  const [adjustAmount, setAdjustAmount] = useState("");
+  const [adjustReason, setAdjustReason] = useState("");
+  const [adjustDir, setAdjustDir] = useState<"credit" | "debit">("credit");
 
   const { data: user, isLoading } = useQuery<UserType>({
     queryKey: [`/api/admin/user/${userId}/profile`],
     enabled: !!userId,
+  });
+
+  const balanceAdjustMutation = useMutation({
+    mutationFn: async () => {
+      const parsed = parseInt(adjustAmount, 10);
+      if (isNaN(parsed) || parsed <= 0) throw new Error("Montant invalide");
+      const finalAmount = adjustDir === "credit" ? parsed : -parsed;
+      const res = await apiRequest("POST", `/api/admin/user/${userId}/balance-adjust`, {
+        amount: finalAmount,
+        reason: adjustReason || "Ajustement manuel admin",
+      });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Solde ajusté",
+        description: `Solde mis à jour : ${data.previousBalance.toLocaleString("fr-FR")} → ${data.newBalance.toLocaleString("fr-FR")} ${userCurrency}`,
+      });
+      setAdjustAmount("");
+      setAdjustReason("");
+      queryClient.invalidateQueries({ queryKey: [`/api/admin/user/${userId}/profile`] });
+    },
+    onError: (err: any) => {
+      toast({
+        title: "Erreur",
+        description: err.message || "Impossible d'ajuster le solde",
+        variant: "destructive",
+      });
+    },
   });
 
   const formatDate = (date: string | Date) => {
@@ -79,8 +118,8 @@ export default function AdminUserProfile() {
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-4xl">
-      <Button variant="ghost" onClick={() => setLocation(backUrl)} className="mb-6" data-testid="button-back">
+    <div className="container mx-auto p-6 max-w-4xl space-y-4">
+      <Button variant="ghost" onClick={() => setLocation(backUrl)} className="mb-2" data-testid="button-back">
         <ArrowLeft className="w-4 h-4 mr-2" />
         Retour à la gestion
       </Button>
@@ -153,6 +192,65 @@ export default function AdminUserProfile() {
             <Badge variant={user.kycStatus === "verified" ? "default" : user.kycStatus === "pending" ? "secondary" : "outline"}>
               {user.kycStatus === "verified" ? "Vérifié" : user.kycStatus === "pending" ? "En attente" : "Non vérifié"}
             </Badge>
+          </div>
+
+          <div className="pt-4 border-t space-y-3">
+            <p className="text-sm font-medium">Ajustement manuel du solde</p>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant={adjustDir === "credit" ? "default" : "outline"}
+                onClick={() => setAdjustDir("credit")}
+                data-testid="button-adjust-credit"
+              >
+                <PlusCircle className="w-3 h-3 mr-1" /> Créditer
+              </Button>
+              <Button
+                size="sm"
+                variant={adjustDir === "debit" ? "destructive" : "outline"}
+                onClick={() => setAdjustDir("debit")}
+                data-testid="button-adjust-debit"
+              >
+                <MinusCircle className="w-3 h-3 mr-1" /> Débiter
+              </Button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="adjust-amount">Montant ({userCurrency})</Label>
+                <Input
+                  id="adjust-amount"
+                  type="number"
+                  min="1"
+                  placeholder="ex: 1238"
+                  value={adjustAmount}
+                  onChange={e => setAdjustAmount(e.target.value)}
+                  data-testid="input-adjust-amount"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="adjust-reason">Motif</Label>
+                <Input
+                  id="adjust-reason"
+                  placeholder="ex: Correction double frais échange"
+                  value={adjustReason}
+                  onChange={e => setAdjustReason(e.target.value)}
+                  data-testid="input-adjust-reason"
+                />
+              </div>
+            </div>
+            <Button
+              size="sm"
+              variant={adjustDir === "debit" ? "destructive" : "default"}
+              disabled={!adjustAmount || balanceAdjustMutation.isPending}
+              onClick={() => balanceAdjustMutation.mutate()}
+              data-testid="button-confirm-adjust"
+            >
+              {balanceAdjustMutation.isPending
+                ? "En cours..."
+                : adjustDir === "credit"
+                  ? `Créditer ${adjustAmount ? parseInt(adjustAmount).toLocaleString("fr-FR") : "..."} ${userCurrency}`
+                  : `Débiter ${adjustAmount ? parseInt(adjustAmount).toLocaleString("fr-FR") : "..."} ${userCurrency}`}
+            </Button>
           </div>
         </CardContent>
       </Card>

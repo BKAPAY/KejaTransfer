@@ -1123,7 +1123,8 @@ export class DbStorage implements IStorage {
     // deduct the exchange fee silently before crediting the balance.
     // IMPORTANT: Use providerCurrency from metadata (the payer's actual currency, e.g. XAF),
     // NOT pendingTx.currency which is stored in the owner's balance currency (e.g. XOF).
-    if (!isBusiness) {
+    // SKIP if netAmountFromMetadata is set: the exchange fee was already deducted at initiation.
+    if (!isBusiness && netAmountFromMetadata === null) {
       try {
         const { COUNTRIES } = await import("@shared/schema");
         const userRows = await db.select({ country: schema.users.country }).from(schema.users).where(eq(schema.users.id, pendingTx.userId)).limit(1);
