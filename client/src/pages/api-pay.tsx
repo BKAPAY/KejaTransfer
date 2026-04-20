@@ -401,9 +401,10 @@ export default function ApiPay() {
   }, []);
 
   // Montant de base en devise du compte (converti si le développeur a envoyé une devise différente)
+  // Utilisé uniquement pour l'affichage — les frais sont calculés indépendamment lors du choix pays/opérateur
   const baseAmount = convertedBaseAmount ?? amount;
 
-  // Calcul du montant total à convertir (avec frais dynamiques si customerPaysFee est activé)
+  // Calcul du montant total à afficher (avec frais dynamiques si customerPaysFee est activé)
   // Les frais ne s'affichent que lorsque le pays ET l'opérateur sont sélectionnés
   const hasOperatorSelected = country && operator;
   const totalWithFees = (hasOperatorSelected && dynamicFee) ? baseAmount + dynamicFee.feeAmount : baseAmount;
