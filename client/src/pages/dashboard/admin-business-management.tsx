@@ -114,12 +114,14 @@ export default function AdminBusinessManagement() {
     queryKey: ["/api/admin/business/users"],
   });
 
-  const { data: countryStats = [] } = useQuery<CountryStat[]>({
+  const { data: countryStats = [], isLoading: countryStatsLoading } = useQuery<CountryStat[]>({
     queryKey: ["/api/admin/business/country-stats"],
+    enabled: activeTab === "countries",
   });
 
-  const { data: settlements = [] } = useQuery<SettlementAdmin[]>({
+  const { data: settlements = [], isLoading: settlementsLoading } = useQuery<SettlementAdmin[]>({
     queryKey: ["/api/admin/settlements"],
+    enabled: activeTab === "settlements",
   });
 
   const { data: pendingSettlementCount } = useQuery<{ count: number }>({
@@ -127,8 +129,9 @@ export default function AdminBusinessManagement() {
     refetchInterval: 30000,
   });
 
-  const { data: walletCountrySettings } = useQuery<{ disabled: string[] }>({
+  const { data: walletCountrySettings, isLoading: walletSettingsLoading } = useQuery<{ disabled: string[] }>({
     queryKey: ["/api/admin/business/disabled-wallet-countries"],
+    enabled: activeTab === "wallets",
   });
   const disabledWalletCountries: string[] = walletCountrySettings?.disabled ?? [];
 
@@ -644,6 +647,25 @@ export default function AdminBusinessManagement() {
               </CardTitle>
             </CardHeader>
             <CardContent>
+              {countryStatsLoading ? (
+                <div className="space-y-3">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <div key={i} className="border rounded-md p-4">
+                      <div className="flex items-center gap-3 mb-3">
+                        <Skeleton className="h-8 w-8 rounded-full" />
+                        <div className="space-y-1">
+                          <Skeleton className="h-4 w-24" />
+                          <Skeleton className="h-3 w-12" />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <Skeleton className="h-14 w-full rounded-md" />
+                        <Skeleton className="h-14 w-full rounded-md" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
               <div className="space-y-3">
                 {BUSINESS_COUNTRIES.map((code) => {
                   const cd = COUNTRIES.find(c => c.code === code);
@@ -682,6 +704,7 @@ export default function AdminBusinessManagement() {
                   );
                 })}
               </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -698,6 +721,23 @@ export default function AdminBusinessManagement() {
               </p>
             </CardHeader>
             <CardContent>
+              {walletSettingsLoading ? (
+                <div className="space-y-2">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <div key={i} className="flex items-center justify-between p-3 border rounded-md">
+                      <div className="flex items-center gap-3">
+                        <Skeleton className="h-8 w-8 rounded-full" />
+                        <div className="space-y-1">
+                          <Skeleton className="h-4 w-24" />
+                          <Skeleton className="h-3 w-12" />
+                        </div>
+                      </div>
+                      <Skeleton className="h-9 w-28 rounded-md" />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+              <>
               <div className="mb-4 flex items-center gap-3 p-3 bg-muted rounded-md">
                 <div className="flex items-center gap-2 text-sm">
                   <span className="inline-flex items-center gap-1 text-muted-foreground">
@@ -751,11 +791,34 @@ export default function AdminBusinessManagement() {
                   );
                 })}
               </div>
+              </>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="settlements" className="mt-4 space-y-4">
+          {settlementsLoading ? (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="border rounded-md p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 space-y-2">
+                          <Skeleton className="h-4 w-40" />
+                          <Skeleton className="h-3 w-32" />
+                          <Skeleton className="h-4 w-24" />
+                        </div>
+                        <Skeleton className="h-9 w-28 rounded-md" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+          <>
           {pendingSettlements.length > 0 && (
             <Card>
               <CardHeader>
@@ -847,6 +910,8 @@ export default function AdminBusinessManagement() {
               )}
             </CardContent>
           </Card>
+          </>
+          )}
         </TabsContent>
       </Tabs>
 
