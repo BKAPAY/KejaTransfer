@@ -2724,6 +2724,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // API Payin webhook resend (api_payment type with apiKeyId)
+  app.post("/api/payin-transactions/:txId/resend-webhook", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session.userId!;
+      const { txId } = req.params;
+      const tx = await storage.getTransaction(txId);
+      if (!tx || tx.userId !== userId) {
+        return res.status(404).json({ error: "Transaction introuvable" });
+      }
+      if (tx.type !== "api_payment") {
+        return res.status(400).json({ error: "Cette transaction n'est pas un paiement API entrant" });
+      }
+      let meta: any = {};
+      try { meta = JSON.parse(tx.metadata || "{}"); } catch {}
+      const apiKeyId = meta.apiKeyId || meta.api_key_id;
+      if (!apiKeyId) {
+        return res.status(400).json({ error: "Cette transaction n'est pas liée à une clé API" });
+      }
+      const apiKey = await storage.getApiKeyById(apiKeyId);
+      if (!apiKey || !(apiKey as any).callbackUrl) {
+        return res.status(400).json({ error: "Aucun webhook payin configuré pour cette clé API. Configurez une URL de callback dans la section API." });
+      }
+      const event = tx.status === "completed" ? "payment.completed" : "payment.failed";
+      await trySendPaymentCallback(tx, event, "[Manual Resend/Payin]");
+      return res.json({ success: true, message: "Webhook payin renvoyé avec succès" });
+    } catch (error) {
+      console.error("Error resending payin webhook:", error);
+      res.status(500).json({ error: "Erreur lors du renvoi du webhook" });
+    }
+  });
+
   app.post("/api/payout-transactions/:txId/resend-webhook", requireAuth, async (req: Request, res: Response) => {
     try {
       const userId = req.session.userId!;

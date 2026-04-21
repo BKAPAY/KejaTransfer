@@ -59,7 +59,7 @@ interface TransactionMetadata {
   [key: string]: any;
 }
 
-const OUTGOING_TYPES = ["withdrawal", "transfer"];
+const OUTGOING_TYPES = ["withdrawal", "transfer", "api_payout"];
 const INCOMING_TYPES = ["deposit", "payment_link", "merchant_link", "api_payment"];
 
 function fmtAmount(amount: number, currency: string) {
@@ -284,6 +284,7 @@ export function TransactionDetailsDialog({
   const [adminCode, setAdminCode] = useState("");
   const [adminCodeError, setAdminCodeError] = useState(false);
   const [webhookSent, setWebhookSent] = useState(false);
+  const [payinWebhookSent, setPayinWebhookSent] = useState(false);
   const [businessWebhookSent, setBusinessWebhookSent] = useState(false);
 
   const metadata = useMemo<TransactionMetadata | null>(() => {
@@ -331,8 +332,27 @@ export function TransactionDetailsDialog({
     onSuccess: (data) => {
       if (data.success) {
         setWebhookSent(true);
-        toast({ title: "Webhook renvoyé", description: "Le statut a été renvoyé à votre URL de callback." });
+        toast({ title: "Webhook renvoyé", description: "Le statut payout a été renvoyé à votre URL de callback." });
         setTimeout(() => setWebhookSent(false), 3000);
+      } else {
+        toast({ title: "Erreur", description: data.error || "Echec du renvoi", variant: "destructive" });
+      }
+    },
+    onError: (error: any) => {
+      toast({ title: "Erreur", description: error.message || "Echec du renvoi du webhook", variant: "destructive" });
+    },
+  });
+
+  const resendPayinWebhookMutation = useMutation({
+    mutationFn: async (txId: string) => {
+      const res = await apiRequest("POST", `/api/payin-transactions/${txId}/resend-webhook`, {});
+      return res.json();
+    },
+    onSuccess: (data) => {
+      if (data.success) {
+        setPayinWebhookSent(true);
+        toast({ title: "Webhook renvoyé", description: "La notification payin a été renvoyée à votre URL de callback." });
+        setTimeout(() => setPayinWebhookSent(false), 3000);
       } else {
         toast({ title: "Erreur", description: data.error || "Echec du renvoi", variant: "destructive" });
       }
@@ -664,17 +684,32 @@ export function TransactionDetailsDialog({
             </div>
           )}
 
-          {/* Webhook Payout API */}
-          {!isAdmin && metadata?.apiKeyId && !metadata?.businessTokenId && (transaction.status === "completed" || transaction.status === "failed") && (
+          {/* Webhook Payout API - uniquement pour les transactions sortantes (withdrawal, transfer, api_payout) */}
+          {!isAdmin && metadata?.apiKeyId && !metadata?.businessTokenId && (transaction.status === "completed" || transaction.status === "failed") && OUTGOING_TYPES.includes(transaction.type) && (
             <div className="space-y-3 border-t pt-4">
               <h3 className="text-sm font-semibold flex items-center gap-2 uppercase tracking-wide text-muted-foreground">
                 <Webhook className="w-4 h-4" />
                 Webhook Payout API
               </h3>
-              <p className="text-xs text-muted-foreground">Si votre serveur n'a pas reçu la notification, renvoyez-la manuellement.</p>
+              <p className="text-xs text-muted-foreground">Si votre serveur n'a pas reçu la notification de payout, renvoyez-la manuellement.</p>
               <Button variant="outline" onClick={() => resendWebhookMutation.mutate(transaction.id)} disabled={resendWebhookMutation.isPending || webhookSent} data-testid="button-resend-payout-webhook">
                 <RotateCcw className={`w-4 h-4 mr-2 ${resendWebhookMutation.isPending ? "animate-spin" : ""}`} />
-                {resendWebhookMutation.isPending ? "Envoi..." : webhookSent ? "Webhook envoyé !" : "Renvoyer le webhook"}
+                {resendWebhookMutation.isPending ? "Envoi..." : webhookSent ? "Webhook envoyé !" : "Renvoyer le webhook payout"}
+              </Button>
+            </div>
+          )}
+
+          {/* Webhook Payin API - uniquement pour les paiements entrants via API (api_payment) */}
+          {!isAdmin && metadata?.apiKeyId && !metadata?.businessTokenId && (transaction.status === "completed" || transaction.status === "failed") && transaction.type === "api_payment" && (
+            <div className="space-y-3 border-t pt-4">
+              <h3 className="text-sm font-semibold flex items-center gap-2 uppercase tracking-wide text-muted-foreground">
+                <Webhook className="w-4 h-4" />
+                Webhook Payin API
+              </h3>
+              <p className="text-xs text-muted-foreground">Si votre serveur n'a pas reçu la notification de paiement entrant, renvoyez-la manuellement.</p>
+              <Button variant="outline" onClick={() => resendPayinWebhookMutation.mutate(transaction.id)} disabled={resendPayinWebhookMutation.isPending || payinWebhookSent} data-testid="button-resend-payin-webhook">
+                <RotateCcw className={`w-4 h-4 mr-2 ${resendPayinWebhookMutation.isPending ? "animate-spin" : ""}`} />
+                {resendPayinWebhookMutation.isPending ? "Envoi..." : payinWebhookSent ? "Webhook envoyé !" : "Renvoyer le webhook payin"}
               </Button>
             </div>
           )}
