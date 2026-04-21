@@ -112,9 +112,6 @@ export default function AdminBusinessManagement() {
 
   const { data: users = [], isLoading } = useQuery<User[]>({
     queryKey: ["/api/admin/business/users"],
-    enabled: activeTab === "users",
-    staleTime: 30000,
-    retry: 2,
   });
 
   const { data: countryStats = [], isLoading: countryStatsLoading } = useQuery<CountryStat[]>({
