@@ -1605,7 +1605,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Rate limiting for code requests (1 minute cooldown between resends)
 
-      const user = await storage.getUserByEmail(email);
+      const user = await storage.getUserByEmailLight(email);
       console.log(`[Login] send-code: email=${email}, userFound=${!!user}, isAdmin=${user?.isAdmin}`);
       if (!user) {
         return res.status(401).json({ error: "Email ou mot de passe incorrect" });
@@ -1820,7 +1820,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(401).json({ error: "Non authentifié" });
     }
     try {
-      const user = await storage.getUser(req.session.userId!);
+      const user = await storage.getUserLight(req.session.userId!);
       if (!user) {
         return res.status(404).json({ error: "Utilisateur non trouvé" });
       }

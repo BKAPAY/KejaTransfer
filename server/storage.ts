@@ -242,6 +242,10 @@ export interface IStorage {
   // Business Users
   getBusinessUsers(): Promise<User[]>;
 
+  // Light user (no KYC images) for auth/me and login
+  getUserLight(id: string): Promise<User | undefined>;
+  getUserByEmailLight(email: string): Promise<User | undefined>;
+
   // Search
   searchUsers(query: string): Promise<User[]>;
   searchBusinessUsers(query: string): Promise<User[]>;
@@ -261,6 +265,90 @@ export class DbStorage implements IStorage {
   async getUserByEmail(email: string): Promise<User | undefined> {
     const results = await db.select().from(schema.users).where(eq(schema.users.email, email)).limit(1);
     return results[0];
+  }
+
+  private lightUserSelect() {
+    return {
+      id: schema.users.id,
+      email: schema.users.email,
+      password: schema.users.password,
+      firstName: schema.users.firstName,
+      lastName: schema.users.lastName,
+      accountType: schema.users.accountType,
+      businessName: schema.users.businessName,
+      businessRegistrationNumber: schema.users.businessRegistrationNumber,
+      businessCountry: schema.users.businessCountry,
+      businessPhone: schema.users.businessPhone,
+      businessEnterprisePhone: schema.users.businessEnterprisePhone,
+      businessEmail: schema.users.businessEmail,
+      country: schema.users.country,
+      balance: schema.users.balance,
+      kycStatus: schema.users.kycStatus,
+      kycPhone: schema.users.kycPhone,
+      kycWhatsapp: schema.users.kycWhatsapp,
+      kycActivityUrl: schema.users.kycActivityUrl,
+      kycUrlWebsite: schema.users.kycUrlWebsite,
+      kycUrlInstagram: schema.users.kycUrlInstagram,
+      kycUrlFacebook: schema.users.kycUrlFacebook,
+      kycUrlTiktok: schema.users.kycUrlTiktok,
+      kycUrlWhatsappGroup: schema.users.kycUrlWhatsappGroup,
+      kycUrlWhatsappChannel: schema.users.kycUrlWhatsappChannel,
+      kycRejectionReason: schema.users.kycRejectionReason,
+      kycRejectionCount: schema.users.kycRejectionCount,
+      kycBusinessAccountNumber: schema.users.kycBusinessAccountNumber,
+      kycTaxId: schema.users.kycTaxId,
+      kycBusinessAddress: schema.users.kycBusinessAddress,
+      kycBusinessCity: schema.users.kycBusinessCity,
+      kycBusinessDepartment: schema.users.kycBusinessDepartment,
+      kycDirectorIdNumber: schema.users.kycDirectorIdNumber,
+      kycDirectorCountry: schema.users.kycDirectorCountry,
+      kycDirectorDob: schema.users.kycDirectorDob,
+      kycIdIssueDate: schema.users.kycIdIssueDate,
+      kycIdExpiryDate: schema.users.kycIdExpiryDate,
+      kycAddress: schema.users.kycAddress,
+      kycLatitude: schema.users.kycLatitude,
+      kycLongitude: schema.users.kycLongitude,
+      kycActivityDescription: schema.users.kycActivityDescription,
+      kycAcceptedTerms: schema.users.kycAcceptedTerms,
+      withdrawalPhones: schema.users.withdrawalPhones,
+      securityCode: schema.users.securityCode,
+      isAdmin: schema.users.isAdmin,
+      isPrimaryAdmin: schema.users.isPrimaryAdmin,
+      suspended: schema.users.suspended,
+      transfersEnabled: schema.users.transfersEnabled,
+      withdrawalsEnabled: schema.users.withdrawalsEnabled,
+      payoutApiEnabled: schema.users.payoutApiEnabled,
+      wavePayinEnabled: schema.users.wavePayinEnabled,
+      depositOverrideEnabled: schema.users.depositOverrideEnabled,
+      bankAccountHolder: schema.users.bankAccountHolder,
+      bankAccountNumber: schema.users.bankAccountNumber,
+      bankName: schema.users.bankName,
+      bankSwiftBic: schema.users.bankSwiftBic,
+      bankBranchAddress: schema.users.bankBranchAddress,
+      bankBranchName: schema.users.bankBranchName,
+      bankBranchSortCode: schema.users.bankBranchSortCode,
+      bankCountry: schema.users.bankCountry,
+      bankCurrency: schema.users.bankCurrency,
+      createdAt: schema.users.createdAt,
+      // Large KYC image/document fields replaced with NULL to avoid large data transfer
+      kycIdFront: sql<string | null>`NULL`.as('kycIdFront'),
+      kycIdBack: sql<string | null>`NULL`.as('kycIdBack'),
+      kycSelfie: sql<string | null>`NULL`.as('kycSelfie'),
+      kycSignature: sql<string | null>`NULL`.as('kycSignature'),
+      kycBusinessDocuments: sql<string | null>`NULL`.as('kycBusinessDocuments'),
+      kycTaxDocument: sql<string | null>`NULL`.as('kycTaxDocument'),
+      kycAddressDocument: sql<string | null>`NULL`.as('kycAddressDocument'),
+    };
+  }
+
+  async getUserLight(id: string): Promise<User | undefined> {
+    const results = await db.select(this.lightUserSelect()).from(schema.users).where(eq(schema.users.id, id)).limit(1);
+    return results[0] as User | undefined;
+  }
+
+  async getUserByEmailLight(email: string): Promise<User | undefined> {
+    const results = await db.select(this.lightUserSelect()).from(schema.users).where(eq(schema.users.email, email)).limit(1);
+    return results[0] as User | undefined;
   }
 
   async createUser(user: InsertUser): Promise<User> {
