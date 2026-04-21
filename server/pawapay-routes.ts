@@ -3,7 +3,7 @@ import { storage } from "./storage";
 import { randomUUID } from "crypto";
 import { calculateIncomingFee, calculateOutgoingFee, calculateOutgoingFeeFromNet, getFeeFromDatabase } from "./utils/fees";
 import { trySendPaymentCallback } from "./utils/callback";
-import { safeRefundOutgoingTransaction, sendApiPayoutCallback } from "./payment-polling";
+import { safeRefundOutgoingTransaction, sendApiPayoutCallback, sendBusinessWebhookCallback } from "./payment-polling";
 import { sendPaymentDocumentsEmail } from "./email-service";
 import {
   createPawaPayDeposit,
@@ -325,6 +325,8 @@ export async function handlePawaPayWithdrawal(
           netMode: netMode || false,
         }));
         console.log(`[PawaPay Withdrawal] Dispatched tx ${txId}, pawaPayPayoutId: ${result.payoutId}`);
+        // Immediately poll to handle race condition where webhook arrived before payoutId was stored
+        setImmediate(() => pollPawaPayTransaction(txId));
       } catch (dispatchErr) {
         console.error(`[PawaPay Withdrawal] Dispatch error for ${txId}:`, dispatchErr);
         await safeRefundOutgoingTransaction(txId, userId, { deductedFromBalance: feeInfo.totalDeductedFromBalance }, "pawapay-dispatch-error");
@@ -453,6 +455,8 @@ export async function handlePawaPayTransfer(
           startTime,
         }));
         console.log(`[PawaPay Transfer] Dispatched tx ${pawaTxId}, payoutId: ${result.payoutId}`);
+        // Immediately poll to handle race condition where webhook arrived before payoutId was stored
+        setImmediate(() => pollPawaPayTransaction(pawaTxId));
       } catch (dispatchErr) {
         console.error(`[PawaPay Transfer] Dispatch error for ${pawaTxId}:`, dispatchErr);
         await safeRefundOutgoingTransaction(pawaTxId, userId, { deductedFromBalance: feeInfo.totalDeductedFromBalance }, "pawapay-transfer-dispatch-error");
@@ -587,7 +591,8 @@ export async function handlePawaPayWebhook(req: Request, res: Response): Promise
           const completed = await storage.atomicCompleteTransaction(tx.id);
           if (completed) {
             console.log(`[PawaPay Webhook] Payout ${tx.id} completed`);
-            await sendApiPayoutCallback(tx.id, meta, "completed");
+            setImmediate(() => sendApiPayoutCallback(tx.id, meta, "completed"));
+            setImmediate(() => sendBusinessWebhookCallback(tx.id, "completed", "payout"));
           } else {
             console.log(`[PawaPay Webhook] Payout ${tx.id} already processed by another process`);
           }
@@ -600,7 +605,8 @@ export async function handlePawaPayWebhook(req: Request, res: Response): Promise
               const refunded = await storage.atomicFailAndRefundBusinessWallet(tx.id, tx.userId, country, currency, refundAmount, "pawapay-webhook");
               if (refunded) {
                 console.log(`[PawaPay Webhook] Business payout ${tx.id} failed — refunded ${refundAmount} ${currency} to business wallet ${country}`);
-                await sendApiPayoutCallback(tx.id, meta, "failed");
+                setImmediate(() => sendApiPayoutCallback(tx.id, meta, "failed"));
+                setImmediate(() => sendBusinessWebhookCallback(tx.id, "failed", "payout"));
               } else {
                 console.log(`[PawaPay Webhook] Business payout ${tx.id} already processed by another process`);
               }
@@ -610,7 +616,8 @@ export async function handlePawaPayWebhook(req: Request, res: Response): Promise
             const refunded = await storage.atomicFailAndRefundPayout(tx.id, tx.userId, refundAmount);
             if (refunded) {
               console.log(`[PawaPay Webhook] Payout ${tx.id} failed — refunded ${refundAmount} to user ${tx.userId}`);
-              await sendApiPayoutCallback(tx.id, meta, "failed");
+              setImmediate(() => sendApiPayoutCallback(tx.id, meta, "failed"));
+              setImmediate(() => sendBusinessWebhookCallback(tx.id, "failed", "payout"));
             } else {
               console.log(`[PawaPay Webhook] Payout ${tx.id} already processed by another process`);
             }
@@ -695,7 +702,8 @@ export async function pollPawaPayTransaction(txId: string): Promise<void> {
         const completed = await storage.atomicCompleteTransaction(txId);
         if (completed) {
           console.log(`[PawaPay Poll] Payout ${txId} completed`);
-          await sendApiPayoutCallback(txId, meta, "completed");
+          setImmediate(() => sendApiPayoutCallback(txId, meta, "completed"));
+          setImmediate(() => sendBusinessWebhookCallback(txId, "completed", "payout"));
         } else {
           console.log(`[PawaPay Poll] Payout ${txId} already processed by another process`);
         }
@@ -708,7 +716,8 @@ export async function pollPawaPayTransaction(txId: string): Promise<void> {
             const refunded = await storage.atomicFailAndRefundBusinessWallet(txId, tx.userId, country, currency, refundAmount, "pawapay-poll");
             if (refunded) {
               console.log(`[PawaPay Poll] Business payout ${txId} failed — refunded ${refundAmount} ${currency} to business wallet ${country}`);
-              await sendApiPayoutCallback(txId, meta, "failed");
+              setImmediate(() => sendApiPayoutCallback(txId, meta, "failed"));
+              setImmediate(() => sendBusinessWebhookCallback(txId, "failed", "payout"));
             } else {
               console.log(`[PawaPay Poll] Business payout ${txId} already processed by another process`);
             }
@@ -718,7 +727,8 @@ export async function pollPawaPayTransaction(txId: string): Promise<void> {
           const refunded = await storage.atomicFailAndRefundPayout(txId, tx.userId, refundAmount);
           if (refunded) {
             console.log(`[PawaPay Poll] Payout ${txId} failed — refunded ${refundAmount} to user ${tx.userId}`);
-            await sendApiPayoutCallback(txId, meta, "failed");
+            setImmediate(() => sendApiPayoutCallback(txId, meta, "failed"));
+            setImmediate(() => sendBusinessWebhookCallback(txId, "failed", "payout"));
           } else {
             console.log(`[PawaPay Poll] Payout ${txId} already processed by another process`);
           }
