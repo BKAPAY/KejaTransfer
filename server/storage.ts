@@ -2935,7 +2935,45 @@ export class DbStorage implements IStorage {
   }
 
   async getBusinessUsers(): Promise<User[]> {
-    return db.select().from(schema.users).where(eq(schema.users.accountType, "business"));
+    return db.select({
+      id: schema.users.id,
+      email: schema.users.email,
+      password: schema.users.password,
+      firstName: schema.users.firstName,
+      lastName: schema.users.lastName,
+      balance: schema.users.balance,
+      kycStatus: schema.users.kycStatus,
+      kycRejectionReason: schema.users.kycRejectionReason,
+      kycRejectionCount: schema.users.kycRejectionCount,
+      isAdmin: schema.users.isAdmin,
+      isPrimaryAdmin: schema.users.isPrimaryAdmin,
+      suspended: schema.users.suspended,
+      transfersEnabled: schema.users.transfersEnabled,
+      withdrawalsEnabled: schema.users.withdrawalsEnabled,
+      payoutApiEnabled: schema.users.payoutApiEnabled,
+      wavePayinEnabled: schema.users.wavePayinEnabled,
+      depositOverrideEnabled: schema.users.depositOverrideEnabled,
+      createdAt: schema.users.createdAt,
+      country: schema.users.country,
+      withdrawalPhones: schema.users.withdrawalPhones,
+      securityCode: schema.users.securityCode,
+      accountType: schema.users.accountType,
+      businessName: schema.users.businessName,
+      businessWebsite: schema.users.businessWebsite,
+      businessDescription: schema.users.businessDescription,
+      webhookUrl: schema.users.webhookUrl,
+      kycIdFront: sql<string | null>`NULL`.as('kycIdFront'),
+      kycIdBack: sql<string | null>`NULL`.as('kycIdBack'),
+      kycSelfie: sql<string | null>`NULL`.as('kycSelfie'),
+      kycSignature: sql<string | null>`NULL`.as('kycSignature'),
+      kycActivityDescription: sql<string | null>`NULL`.as('kycActivityDescription'),
+      kycLatitude: sql<string | null>`NULL`.as('kycLatitude'),
+      kycLongitude: sql<string | null>`NULL`.as('kycLongitude'),
+      kycAddress: sql<string | null>`NULL`.as('kycAddress'),
+      kycAcceptedTerms: sql<string | null>`NULL`.as('kycAcceptedTerms'),
+    }).from(schema.users)
+      .where(eq(schema.users.accountType, "business"))
+      .orderBy(desc(schema.users.createdAt));
   }
 
   // ===== Currency Exchange Fees =====
