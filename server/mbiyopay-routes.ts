@@ -268,7 +268,10 @@ export async function handleMbiyoPayWithdrawal(
         }
 
         // Update metadata with provider transaction ID (even if result.success=false but has ID)
+        const existingTxMW = await storage.getTransaction(mbiyoTxId);
+        const existingMetaMW = existingTxMW?.metadata ? (() => { try { return JSON.parse(existingTxMW.metadata); } catch { return {}; } })() : {};
         const updatedMetadata = JSON.stringify({
+          ...existingMetaMW,
           mbiyopayTransactionId: result.transactionId,
           phone,
           deductedFromBalance: feeInfo.totalDeductedFromBalance,
@@ -411,7 +414,10 @@ export async function handleMbiyoPayTransfer(
           return;
         }
 
+        const existingTxMT = await storage.getTransaction(mbiyoTransferTxId);
+        const existingMetaMT = existingTxMT?.metadata ? (() => { try { return JSON.parse(existingTxMT.metadata); } catch { return {}; } })() : {};
         const updatedMetadata = JSON.stringify({
+          ...existingMetaMT,
           mbiyopayTransactionId: result.transactionId,
           phone,
           totalDebited: totalToDebit,

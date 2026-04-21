@@ -309,7 +309,10 @@ export async function handlePawaPayWithdrawal(
           return;
         }
 
+        const existingTxW = await storage.getTransaction(txId);
+        const existingMetaW = existingTxW?.metadata ? (() => { try { return JSON.parse(existingTxW.metadata); } catch { return {}; } })() : {};
         await storage.updateTransactionMetadata(txId, JSON.stringify({
+          ...existingMetaW,
           pawaPayPayoutId: result.payoutId,
           phone,
           deductedFromBalance: feeInfo.totalDeductedFromBalance,
@@ -441,7 +444,10 @@ export async function handlePawaPayTransfer(
           return;
         }
 
+        const existingTxT = await storage.getTransaction(pawaTxId);
+        const existingMetaT = existingTxT?.metadata ? (() => { try { return JSON.parse(existingTxT.metadata); } catch { return {}; } })() : {};
         await storage.updateTransactionMetadata(pawaTxId, JSON.stringify({
+          ...existingMetaT,
           pawaPayPayoutId: result.payoutId,
           phone,
           totalDebited: feeInfo.totalDeductedFromBalance,

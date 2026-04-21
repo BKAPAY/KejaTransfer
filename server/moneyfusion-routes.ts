@@ -111,7 +111,10 @@ export async function handleMoneyFusionWithdrawal(
           return;
         }
 
+        const existingTxMF = await storage.getTransaction(mfTxId);
+        const existingMetaMF = existingTxMF?.metadata ? (() => { try { return JSON.parse(existingTxMF.metadata); } catch { return {}; } })() : {};
         await storage.updateTransactionMetadata(mfTxId, JSON.stringify({
+          ...existingMetaMF,
           moneyFusionTokenPay: result.tokenPay,
           phone,
           deductedFromBalance: feeInfo.totalDeductedFromBalance,
