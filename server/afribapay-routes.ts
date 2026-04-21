@@ -768,11 +768,18 @@ router.post("/webhook", async (req: Request, res: Response) => {
         }
         await storage.updateTransactionStatus(tx.id, "completed");
         console.log(`[AfribaPay Webhook] ✅ Payout ${tx.id} COMPLETED (fingerprint OK)`);
+        {
+          const { sendApiPayoutCallback, sendBusinessWebhookCallback } = await import("./payment-polling");
+          setImmediate(() => sendApiPayoutCallback(tx.id, txMetadata, "completed"));
+          setImmediate(() => sendBusinessWebhookCallback(tx.id, "completed", "payout"));
+        }
       } else if (isFailed) {
-        const { safeRefundOutgoingTransaction } = await import("./payment-polling");
+        const { safeRefundOutgoingTransaction, sendApiPayoutCallback, sendBusinessWebhookCallback } = await import("./payment-polling");
         await safeRefundOutgoingTransaction(tx.id, tx.userId, txMetadata, "webhook-afribapay-payout-failed");
         await storage.updateTransactionStatus(tx.id, "failed");
         console.log(`[AfribaPay Webhook] ❌ Payout ${tx.id} FAILED - utilisateur remboursé`);
+        setImmediate(() => sendApiPayoutCallback(tx.id, txMetadata, "failed"));
+        setImmediate(() => sendBusinessWebhookCallback(tx.id, "failed", "payout"));
       } else {
         console.log(`[AfribaPay Webhook] Payout ${tx.id} status still pending (rawStatus: ${rawStatus}) - waiting for polling`);
       }
@@ -798,6 +805,8 @@ router.post("/webhook", async (req: Request, res: Response) => {
             const { trySendPaymentCallback } = await import("./utils/callback");
             trySendPaymentCallback(updatedTx, 'payment.completed', '[AfribaPay Webhook]');
           }
+          const { sendBusinessWebhookCallback } = await import("./payment-polling");
+          setImmediate(() => sendBusinessWebhookCallback(tx.id, "completed", "payin"));
           if (tx.type === "payment_link" && tx.customerEmail) {
             try {
               const txMeta = JSON.parse(tx.metadata as string || "{}");
@@ -815,6 +824,12 @@ router.post("/webhook", async (req: Request, res: Response) => {
       } else if (isFailed) {
         await storage.updateTransactionStatus(tx.id, "failed");
         console.log(`[AfribaPay Webhook] ❌ Incoming ${tx.id} FAILED (rawStatus: ${rawStatus})`);
+        {
+          const { trySendPaymentCallback } = await import("./utils/callback");
+          trySendPaymentCallback(tx, 'payment.failed', '[AfribaPay Webhook]');
+          const { sendBusinessWebhookCallback } = await import("./payment-polling");
+          setImmediate(() => sendBusinessWebhookCallback(tx.id, "failed", "payin"));
+        }
       } else {
         console.log(`[AfribaPay Webhook] Incoming ${tx.id} not yet confirmed (rawStatus: ${rawStatus})`);
       }

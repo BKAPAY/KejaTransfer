@@ -2,7 +2,7 @@ import type { Request, Response } from "express";
 import { storage } from "./storage";
 
 import { calculateIncomingFee, calculateOutgoingFee, calculateOutgoingFeeFromNet, getFeeFromDatabase, getIncomingExchangeFee } from "./utils/fees";
-import { safeRefundOutgoingTransaction, sendApiPayoutCallback } from "./payment-polling";
+import { safeRefundOutgoingTransaction, sendApiPayoutCallback, sendBusinessWebhookCallback } from "./payment-polling";
 import { trySendPaymentCallback } from "./utils/callback";
 import { sendPaymentDocumentsEmail } from "./email-service";
 import { 
@@ -983,6 +983,7 @@ export async function handleMbiyoPayWebhook(req: Request, res: Response) {
           if (updatedTx) {
             trySendPaymentCallback(updatedTx, 'payment.completed', '[MbiyoPay Webhook]');
           }
+          setImmediate(() => sendBusinessWebhookCallback(tx.id, "completed", "payin"));
           if (tx.type === "payment_link" && tx.customerEmail) {
             try {
               const txMeta = JSON.parse(tx.metadata as string || "{}");
@@ -1011,6 +1012,7 @@ export async function handleMbiyoPayWebhook(req: Request, res: Response) {
         console.log(`[MbiyoPay Webhook] Withdrawal/Transfer completed: ${tx.id}`);
         const outMeta = JSON.parse(tx.metadata || "{}");
         setImmediate(() => sendApiPayoutCallback(tx.id, outMeta, "completed"));
+        setImmediate(() => sendBusinessWebhookCallback(tx.id, "completed", "payout"));
       }
     } else if (status === "failed" || status === "cancelled" || status === "expired" || status === "rejected" || status === "error") {
       if (tx.type === "withdrawal" || tx.type === "transfer") {
@@ -1019,10 +1021,12 @@ export async function handleMbiyoPayWebhook(req: Request, res: Response) {
         await storage.updateTransactionStatus(tx.id, "failed");
         console.log(`[MbiyoPay Webhook] Transaction failed: ${tx.id}`);
         setImmediate(() => sendApiPayoutCallback(tx.id, metadata, "failed"));
+        setImmediate(() => sendBusinessWebhookCallback(tx.id, "failed", "payout"));
       } else {
         await storage.updateTransactionStatus(tx.id, "failed");
         console.log(`[MbiyoPay Webhook] Transaction failed: ${tx.id}`);
         trySendPaymentCallback(tx, 'payment.failed', '[MbiyoPay Webhook]');
+        setImmediate(() => sendBusinessWebhookCallback(tx.id, "failed", "payin"));
       }
     }
 

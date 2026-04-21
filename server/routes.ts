@@ -6705,6 +6705,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
           
           trySendPaymentCallback(result.transaction, 'payment.completed', '[WEBHOOK/Paydunya]');
+          setImmediate(() => sendBusinessWebhookCallback(transaction.id, "completed", "payin"));
           
           if (transaction.type === "payment_link" && transaction.customerEmail) {
             try {
@@ -6728,6 +6729,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (failedTx) {
           trySendPaymentCallback(failedTx, 'payment.failed', '[WEBHOOK/Paydunya]');
         }
+        setImmediate(() => sendBusinessWebhookCallback(transaction.id, "failed", "payin"));
       }
 
       res.json({ success: true, message: "Webhook traité" });
@@ -6833,12 +6835,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (updatedTx) {
               trySendPaymentCallback(updatedTx, 'payment.completed', '[FeeXPay Webhook]');
             }
+            setImmediate(() => sendBusinessWebhookCallback(tx.id, "completed", "payin"));
           } else {
             console.log(`[FeeXPay Webhook] Transaction ${tx.id} already finalized (race condition) - skipping`);
           }
         } else {
           await storage.updateTransactionStatus(tx.id, "completed");
           console.log(`[FeeXPay Webhook] ✅ ${tx.type} ${tx.id} COMPLETED`);
+          const outMeta = tx.metadata ? JSON.parse(tx.metadata) : {};
+          setImmediate(() => sendApiPayoutCallback(tx.id, outMeta, "completed"));
+          setImmediate(() => sendBusinessWebhookCallback(tx.id, "completed", "payout"));
         }
       } else if (mappedStatus === "failed") {
         const isOutgoing = tx.type === "withdrawal" || tx.type === "transfer";
@@ -6847,9 +6853,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const { safeRefundOutgoingTransaction } = await import("./payment-polling");
           const refunded = await safeRefundOutgoingTransaction(tx.id, tx.userId, meta, "webhook-feexpay-failed");
           console.log(`[FeeXPay Webhook] ❌ ${tx.type} ${tx.id} FAILED - refund ${refunded ? 'processed' : 'skipped (already handled)'}`);
+          setImmediate(() => sendApiPayoutCallback(tx.id, meta, "failed"));
+          setImmediate(() => sendBusinessWebhookCallback(tx.id, "failed", "payout"));
         } else {
           await storage.updateTransactionStatus(tx.id, "failed");
           console.log(`[FeeXPay Webhook] ❌ Deposit ${tx.id} FAILED`);
+          const failedTx = await storage.getTransaction(tx.id);
+          if (failedTx) trySendPaymentCallback(failedTx, 'payment.failed', '[FeeXPay Webhook]');
+          setImmediate(() => sendBusinessWebhookCallback(tx.id, "failed", "payin"));
         }
       } else {
         console.log(`[FeeXPay Webhook] Transaction ${tx.id} status: ${status} -> mapped: ${mappedStatus} (still pending)`);
@@ -6939,11 +6950,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.updateTransactionStatus(matchedTx.id, "completed");
         console.log(`[MoneyFusion Webhook] Transaction ${matchedTx.id} marked as COMPLETED`);
         setImmediate(() => sendApiPayoutCallback(matchedTx.id, meta, "completed"));
+        setImmediate(() => sendBusinessWebhookCallback(matchedTx.id, "completed", "payout"));
       } else if (isMoneyFusionPayoutFailed(event)) {
         await safeRefundOutgoingTransaction(matchedTx.id, matchedTx.userId, meta, "webhook-moneyfusion-failed");
         await storage.updateTransactionStatus(matchedTx.id, "failed");
         console.log(`[MoneyFusion Webhook] Transaction ${matchedTx.id} marked as FAILED`);
         setImmediate(() => sendApiPayoutCallback(matchedTx.id, meta, "failed"));
+        setImmediate(() => sendBusinessWebhookCallback(matchedTx.id, "failed", "payout"));
       }
 
       return res.json({ received: true, matched: true, processed: true });
