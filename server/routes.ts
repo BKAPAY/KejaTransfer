@@ -1948,6 +1948,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // KYC documents (images) for current user — endpoint léger séparé de /api/auth/me
+  app.get("/api/kyc/my-documents", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const docs = await storage.getUserKycDocuments(req.session.userId!);
+      if (!docs) return res.status(404).json({ error: "Utilisateur introuvable" });
+      res.json(docs);
+    } catch (error) {
+      res.status(500).json({ error: "Erreur serveur" });
+    }
+  });
+
   // KYC Upload single document
   app.post("/api/kyc/upload", requireAuth, async (req: Request, res: Response) => {
     try {

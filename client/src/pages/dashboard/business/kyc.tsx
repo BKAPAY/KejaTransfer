@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -190,6 +190,19 @@ export default function BusinessKyc() {
   });
   const u = user as any;
 
+  // Documents KYC (images lourdes) — endpoint séparé de /api/auth/me
+  const { data: kycDocs } = useQuery<{
+    kycIdFront: string | null;
+    kycIdBack: string | null;
+    kycSelfie: string | null;
+    kycSignature: string | null;
+    kycBusinessDocuments: string | null;
+    kycTaxDocument: string | null;
+    kycAddressDocument: string | null;
+  }>({
+    queryKey: ["/api/kyc/my-documents"],
+  });
+
   // Step 1 inline edit state
   const [editingProfile, setEditingProfile] = useState(false);
   const [profileForm, setProfileForm] = useState({
@@ -222,12 +235,24 @@ export default function BusinessKyc() {
     idFront: string | null;
     idBack: string | null;
   }>({
-    businessDocuments: u?.kycBusinessDocuments ? JSON.parse(u.kycBusinessDocuments) : [],
-    taxDocument: u?.kycTaxDocument || null,
-    addressDocument: u?.kycAddressDocument || null,
-    idFront: u?.kycIdFront || null,
-    idBack: u?.kycIdBack || null,
+    businessDocuments: [],
+    taxDocument: null,
+    addressDocument: null,
+    idFront: null,
+    idBack: null,
   });
+
+  // Synchroniser les previews de documents quand la query kycDocs est chargée
+  useEffect(() => {
+    if (!kycDocs) return;
+    setDocs(prev => ({
+      businessDocuments: kycDocs.kycBusinessDocuments ? (() => { try { return JSON.parse(kycDocs.kycBusinessDocuments!); } catch { return []; } })() : prev.businessDocuments,
+      taxDocument: kycDocs.kycTaxDocument ?? prev.taxDocument,
+      addressDocument: kycDocs.kycAddressDocument ?? prev.addressDocument,
+      idFront: kycDocs.kycIdFront ?? prev.idFront,
+      idBack: kycDocs.kycIdBack ?? prev.idBack,
+    }));
+  }, [kycDocs]);
 
   // Step 4
   const [description, setDescription] = useState(u?.kycActivityDescription || "");
@@ -256,14 +281,20 @@ export default function BusinessKyc() {
   const uploadDocMutation = useMutation({
     mutationFn: ({ type, data }: { type: string; data: string }) =>
       apiRequest("POST", "/api/kyc/business/upload", { type, data }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/kyc/my-documents"] });
+    },
     onError: (e: any) => toast({ title: "Erreur upload", description: e.message, variant: "destructive" }),
   });
 
   const removeDocMutation = useMutation({
     mutationFn: ({ type, index }: { type: string; index: number }) =>
       apiRequest("DELETE", `/api/kyc/business/document/${type}/${index}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/kyc/my-documents"] });
+    },
   });
 
   const submitMutation = useMutation({
@@ -351,11 +382,11 @@ export default function BusinessKyc() {
       kycIdExpiryDate: u?.kycIdExpiryDate || "",
     });
     setDocs({
-      businessDocuments: u?.kycBusinessDocuments ? JSON.parse(u.kycBusinessDocuments) : [],
-      taxDocument: u?.kycTaxDocument || null,
-      addressDocument: u?.kycAddressDocument || null,
-      idFront: u?.kycIdFront || null,
-      idBack: u?.kycIdBack || null,
+      businessDocuments: kycDocs?.kycBusinessDocuments ? (() => { try { return JSON.parse(kycDocs.kycBusinessDocuments!); } catch { return []; } })() : [],
+      taxDocument: kycDocs?.kycTaxDocument || null,
+      addressDocument: kycDocs?.kycAddressDocument || null,
+      idFront: kycDocs?.kycIdFront || null,
+      idBack: kycDocs?.kycIdBack || null,
     });
     setDescription(u?.kycActivityDescription || "");
   };

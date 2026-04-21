@@ -245,6 +245,15 @@ export interface IStorage {
   // Light user (no KYC images) for auth/me and login
   getUserLight(id: string): Promise<User | undefined>;
   getUserByEmailLight(email: string): Promise<User | undefined>;
+  getUserKycDocuments(id: string): Promise<{
+    kycIdFront: string | null;
+    kycIdBack: string | null;
+    kycSelfie: string | null;
+    kycSignature: string | null;
+    kycBusinessDocuments: string | null;
+    kycTaxDocument: string | null;
+    kycAddressDocument: string | null;
+  } | undefined>;
 
   // Search
   searchUsers(query: string): Promise<User[]>;
@@ -349,6 +358,27 @@ export class DbStorage implements IStorage {
   async getUserByEmailLight(email: string): Promise<User | undefined> {
     const results = await db.select(this.lightUserSelect()).from(schema.users).where(eq(schema.users.email, email)).limit(1);
     return results[0] as User | undefined;
+  }
+
+  async getUserKycDocuments(id: string): Promise<{
+    kycIdFront: string | null;
+    kycIdBack: string | null;
+    kycSelfie: string | null;
+    kycSignature: string | null;
+    kycBusinessDocuments: string | null;
+    kycTaxDocument: string | null;
+    kycAddressDocument: string | null;
+  } | undefined> {
+    const results = await db.select({
+      kycIdFront: schema.users.kycIdFront,
+      kycIdBack: schema.users.kycIdBack,
+      kycSelfie: schema.users.kycSelfie,
+      kycSignature: schema.users.kycSignature,
+      kycBusinessDocuments: schema.users.kycBusinessDocuments,
+      kycTaxDocument: schema.users.kycTaxDocument,
+      kycAddressDocument: schema.users.kycAddressDocument,
+    }).from(schema.users).where(eq(schema.users.id, id)).limit(1);
+    return results[0];
   }
 
   async createUser(user: InsertUser): Promise<User> {
