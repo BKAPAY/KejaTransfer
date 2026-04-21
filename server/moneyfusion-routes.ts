@@ -3,6 +3,7 @@ import { storage } from "./storage";
 import { calculateOutgoingFee, calculateOutgoingFeeFromNet, getFeeFromDatabase } from "./utils/fees";
 import { createMoneyFusionPayout } from "./moneyfusion";
 import { getMoneyFusionCurrency, isMoneyFusionSupported } from "@shared/moneyfusion-countries";
+import { safeRefundOutgoingTransaction } from "./payment-polling";
 
 export async function handleMoneyFusionWithdrawal(
   userId: string,
@@ -93,44 +94,49 @@ export async function handleMoneyFusionWithdrawal(
       }),
     });
 
-    const result = await createMoneyFusionPayout({
-      amount: amountForProvider,
-      phone: phone,
-      countryCode: country,
-      operatorCode: operator,
-    });
+    // Dispatch to MoneyFusion 5s after securing the funds
+    const mfTxId = tx.id;
+    setTimeout(async () => {
+      try {
+        const result = await createMoneyFusionPayout({
+          amount: amountForProvider,
+          phone: phone,
+          countryCode: country,
+          operatorCode: operator,
+        });
 
-    if (!result.success) {
-      if (!skipBalanceOps) {
-        await storage.updateUserBalance(userId, feeInfo.totalDeductedFromBalance);
+        if (!result.success) {
+          console.error(`[MoneyFusion Withdrawal] Dispatch failed for ${mfTxId} - refunding:`, result.error);
+          await safeRefundOutgoingTransaction(mfTxId, userId, { deductedFromBalance: feeInfo.totalDeductedFromBalance, scope: skipBalanceOps ? "business" : undefined }, "moneyfusion-dispatch-failed");
+          return;
+        }
+
+        await storage.updateTransactionMetadata(mfTxId, JSON.stringify({
+          moneyFusionTokenPay: result.tokenPay,
+          phone,
+          deductedFromBalance: feeInfo.totalDeductedFromBalance,
+          amountReceived: feeInfo.amountReceived,
+          providerAmount: amountForProvider,
+          providerCurrency: providerCurrency,
+          balanceAmount: grossAmount,
+          balanceCurrency: balanceCurrency,
+          provider: "moneyfusion",
+          paymentProvider: "moneyfusion",
+          orderId,
+          startTime,
+        }));
+        await storage.updateTransactionStatus(mfTxId, "completed");
+        console.log(`[MoneyFusion Withdrawal] ✅ tx ${mfTxId} COMPLETED, tokenPay: ${result.tokenPay}`);
+      } catch (dispatchErr) {
+        console.error(`[MoneyFusion Withdrawal] Dispatch error for ${mfTxId}:`, dispatchErr);
+        await safeRefundOutgoingTransaction(mfTxId, userId, { deductedFromBalance: feeInfo.totalDeductedFromBalance }, "moneyfusion-dispatch-error");
       }
-      await storage.updateTransactionStatus(tx.id, "failed");
-      return { success: false, transactionId: tx.id, error: result.error || "L'operation a echoue." };
-    }
-
-    const updatedMetadata = JSON.stringify({
-      moneyFusionTokenPay: result.tokenPay,
-      phone,
-      deductedFromBalance: feeInfo.totalDeductedFromBalance,
-      amountReceived: feeInfo.amountReceived,
-      providerAmount: amountForProvider,
-      providerCurrency: providerCurrency,
-      balanceAmount: grossAmount,
-      balanceCurrency: balanceCurrency,
-      provider: "moneyfusion",
-      paymentProvider: "moneyfusion",
-      orderId,
-      startTime,
-    });
-    await storage.updateTransactionMetadata(tx.id, updatedMetadata);
-
-    await storage.updateTransactionStatus(tx.id, "completed");
-    console.log(`[MoneyFusion Withdrawal] Transaction ${tx.id} marked as COMPLETED (provider accepted with tokenPay: ${result.tokenPay})`);
+    }, 5000);
 
     return {
       success: true,
       transactionId: tx.id,
-      message: "Operation effectuee avec succes.",
+      message: "Operation initiee avec succes.",
     };
   } catch (error: any) {
     console.error("[MoneyFusion Withdrawal] Error:", error);

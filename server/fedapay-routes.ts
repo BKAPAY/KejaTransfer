@@ -169,20 +169,7 @@ export async function handleFedaPayWithdrawal(
     const firstName = nameParts[0] || "Client";
     const lastName = nameParts.slice(1).join(" ") || "BKApay";
 
-    const result = await createPayout({
-      amount: amountForProvider,
-      customerFirstName: firstName,
-      customerLastName: lastName,
-      customerEmail: "noreply@bkapay.com",
-      customerPhone: phone,
-      country: country,
-      operator: operator,
-    });
-
-    if (!result.success) {
-      return { success: false, error: "Retrait echoue" };
-    }
-
+    // Debit balance and create pending transaction immediately
     if (!skipBalanceOps) {
       await storage.updateUserBalance(userId, -feeInfo.totalDeductedFromBalance);
     }
@@ -190,18 +177,16 @@ export async function handleFedaPayWithdrawal(
     const tx = await storage.createTransaction({
       userId: userId,
       type: "withdrawal",
-      amount: grossAmount, // Montant saisi par l'utilisateur dans sa devise
+      amount: grossAmount,
       fee: feeInfo.feeAmount,
       feePercentage: feeInfo.feePercentage,
-      currency: balanceCurrency, // Store in user's currency
+      currency: balanceCurrency,
       status: "pending",
       country: country.toUpperCase(),
       operator: operator,
       description: `Retrait de ${grossAmount} ${balanceCurrency} (recu: ${amountForProvider} ${providerCurrency})`,
       customerPhone: phone,
       metadata: JSON.stringify({
-        fedapayPayoutId: result.payoutId,
-        fedapayReference: result.reference,
         phone,
         deductedFromBalance: feeInfo.totalDeductedFromBalance,
         amountReceived: feeInfo.amountReceived,
@@ -212,10 +197,48 @@ export async function handleFedaPayWithdrawal(
       }),
     });
 
+    // Dispatch to FedaPay 5s after securing the funds
+    const fedaTxId = tx.id;
+    setTimeout(async () => {
+      try {
+        const result = await createPayout({
+          amount: amountForProvider,
+          customerFirstName: firstName,
+          customerLastName: lastName,
+          customerEmail: "noreply@bkapay.com",
+          customerPhone: phone,
+          country: country,
+          operator: operator,
+        });
+
+        if (!result.success) {
+          console.error(`[FedaPay Withdrawal] Dispatch failed for ${fedaTxId} - refunding`);
+          await safeRefundOutgoingTransaction(fedaTxId, userId, { deductedFromBalance: feeInfo.totalDeductedFromBalance, scope: skipBalanceOps ? "business" : undefined }, "fedapay-dispatch-failed");
+          return;
+        }
+
+        await storage.updateTransactionMetadata(fedaTxId, JSON.stringify({
+          fedapayPayoutId: result.payoutId,
+          fedapayReference: result.reference,
+          phone,
+          deductedFromBalance: feeInfo.totalDeductedFromBalance,
+          amountReceived: feeInfo.amountReceived,
+          providerAmount: amountForProvider,
+          providerCurrency: providerCurrency,
+          balanceAmount: grossAmount,
+          balanceCurrency: balanceCurrency,
+        }));
+        console.log(`[FedaPay Withdrawal] Dispatched tx ${fedaTxId}, payoutId: ${result.payoutId}`);
+      } catch (dispatchErr) {
+        console.error(`[FedaPay Withdrawal] Dispatch error for ${fedaTxId}:`, dispatchErr);
+        await safeRefundOutgoingTransaction(fedaTxId, userId, { deductedFromBalance: feeInfo.totalDeductedFromBalance }, "fedapay-dispatch-error");
+      }
+    }, 5000);
+
     return {
       success: true,
       transactionId: tx.id,
-      message: result.message || "Retrait initie avec succes",
+      message: "Retrait initie avec succes",
     };
   } catch (error: any) {
     console.error("[FedaPay Withdrawal] Error:", error);
@@ -281,22 +304,7 @@ export async function handleFedaPayTransfer(
     const firstName = nameParts[0] || "Client";
     const lastName = nameParts.slice(1).join(" ") || "BKApay";
 
-    // ALWAYS send converted amount to provider
-    const result = await createPayout({
-      amount: amountForProvider,
-      customerFirstName: firstName,
-      customerLastName: lastName,
-      customerEmail: "noreply@bkapay.com",
-      customerPhone: phone,
-      country: country,
-      operator: operator,
-    });
-
-    if (!result.success) {
-      return { success: false, error: "Transfert echoue" };
-    }
-
-    // Debiter montant + frais
+    // Debit balance and create pending transaction immediately
     await storage.updateUserBalance(userId, -totalDeductedFromBalance);
 
     const tx = await storage.createTransaction({
@@ -305,15 +313,13 @@ export async function handleFedaPayTransfer(
       amount: netAmount,
       fee: feeAmount,
       feePercentage: feePercentage,
-      currency: balanceCurrency, // Store in user's currency
+      currency: balanceCurrency,
       status: "pending",
       country: country.toUpperCase(),
       operator: operator,
       description: `Transfert de ${netAmount} ${balanceCurrency} (envoye: ${amountForProvider} ${providerCurrency})`,
       customerPhone: phone,
       metadata: JSON.stringify({
-        fedapayPayoutId: result.payoutId,
-        fedapayReference: result.reference,
         phone,
         deductedFromBalance: totalDeductedFromBalance,
         providerAmount: amountForProvider,
@@ -323,10 +329,47 @@ export async function handleFedaPayTransfer(
       }),
     });
 
+    // Dispatch to FedaPay 5s after securing the funds
+    const fedaTransferTxId = tx.id;
+    setTimeout(async () => {
+      try {
+        const result = await createPayout({
+          amount: amountForProvider,
+          customerFirstName: firstName,
+          customerLastName: lastName,
+          customerEmail: "noreply@bkapay.com",
+          customerPhone: phone,
+          country: country,
+          operator: operator,
+        });
+
+        if (!result.success) {
+          console.error(`[FedaPay Transfer] Dispatch failed for ${fedaTransferTxId} - refunding`);
+          await safeRefundOutgoingTransaction(fedaTransferTxId, userId, { deductedFromBalance: totalDeductedFromBalance }, "fedapay-transfer-dispatch-failed");
+          return;
+        }
+
+        await storage.updateTransactionMetadata(fedaTransferTxId, JSON.stringify({
+          fedapayPayoutId: result.payoutId,
+          fedapayReference: result.reference,
+          phone,
+          deductedFromBalance: totalDeductedFromBalance,
+          providerAmount: amountForProvider,
+          providerCurrency: providerCurrency,
+          balanceAmount: netAmount,
+          balanceCurrency: balanceCurrency,
+        }));
+        console.log(`[FedaPay Transfer] Dispatched tx ${fedaTransferTxId}, payoutId: ${result.payoutId}`);
+      } catch (dispatchErr) {
+        console.error(`[FedaPay Transfer] Dispatch error for ${fedaTransferTxId}:`, dispatchErr);
+        await safeRefundOutgoingTransaction(fedaTransferTxId, userId, { deductedFromBalance: totalDeductedFromBalance }, "fedapay-transfer-dispatch-error");
+      }
+    }, 5000);
+
     return {
       success: true,
       transactionId: tx.id,
-      message: result.message || "Transfert initie avec succes",
+      message: "Transfert initie avec succes",
     };
   } catch (error: any) {
     console.error("[FedaPay Transfer] Error:", error);

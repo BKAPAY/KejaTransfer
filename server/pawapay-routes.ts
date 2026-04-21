@@ -284,45 +284,57 @@ export async function handlePawaPayWithdrawal(
       }),
     });
 
-    const result = await createPawaPayPayout({
-      amount: amountForProvider,
-      currency: providerCurrency,
-      country: countryUpper,
-      operator,
-      phone,
-      description: netMode ? "Payout API BKApay" : "Retrait BKApay",
-      externalId: randomUUID(),
-    });
+    // Respond immediately — dispatch to PawaPay 5s later to ensure funds are secured
+    const pawaPayExternalId = randomUUID();
+    const txId = tx.id;
+    setTimeout(async () => {
+      try {
+        const result = await createPawaPayPayout({
+          amount: amountForProvider,
+          currency: providerCurrency,
+          country: countryUpper,
+          operator,
+          phone,
+          description: netMode ? "Payout API BKApay" : "Retrait BKApay",
+          externalId: pawaPayExternalId,
+        });
 
-    if (!result.success) {
-      if (!skipBalanceOps) {
-        await storage.updateUserBalance(userId, feeInfo.totalDeductedFromBalance);
+        if (!result.success) {
+          console.error(`[PawaPay Withdrawal] Dispatch failed for ${txId} - refunding:`, result.error);
+          if (!skipBalanceOps) {
+            await safeRefundOutgoingTransaction(txId, userId, { deductedFromBalance: feeInfo.totalDeductedFromBalance }, "pawapay-dispatch-failed");
+          } else {
+            await safeRefundOutgoingTransaction(txId, userId, { deductedFromBalance: feeInfo.totalDeductedFromBalance, scope: "business" }, "pawapay-dispatch-failed-biz");
+          }
+          return;
+        }
+
+        await storage.updateTransactionMetadata(txId, JSON.stringify({
+          pawaPayPayoutId: result.payoutId,
+          phone,
+          deductedFromBalance: feeInfo.totalDeductedFromBalance,
+          amountReceived: feeInfo.amountReceived,
+          providerAmount: amountForProvider,
+          providerCurrency,
+          balanceAmount: grossAmount,
+          balanceCurrency,
+          provider: "pawapay",
+          paymentProvider: "pawapay",
+          orderId,
+          startTime,
+          netMode: netMode || false,
+        }));
+        console.log(`[PawaPay Withdrawal] Dispatched tx ${txId}, pawaPayPayoutId: ${result.payoutId}`);
+      } catch (dispatchErr) {
+        console.error(`[PawaPay Withdrawal] Dispatch error for ${txId}:`, dispatchErr);
+        await safeRefundOutgoingTransaction(txId, userId, { deductedFromBalance: feeInfo.totalDeductedFromBalance }, "pawapay-dispatch-error");
       }
-      await storage.updateTransactionStatus(tx.id, "failed");
-      return { success: false, transactionId: tx.id, error: result.error || "Retrait échoué" };
-    }
-
-    const updatedMetadata = JSON.stringify({
-      pawaPayPayoutId: result.payoutId,
-      phone,
-      deductedFromBalance: feeInfo.totalDeductedFromBalance,
-      amountReceived: feeInfo.amountReceived,
-      providerAmount: amountForProvider,
-      providerCurrency,
-      balanceAmount: grossAmount,
-      balanceCurrency,
-      provider: "pawapay",
-      paymentProvider: "pawapay",
-      orderId,
-      startTime,
-      netMode: netMode || false,
-    });
-    await storage.updateTransactionMetadata(tx.id, updatedMetadata);
+    }, 5000);
 
     return {
       success: true,
       transactionId: tx.id,
-      message: result.message || "Retrait initié avec succès",
+      message: "Retrait initié avec succès",
     };
   } catch (error: any) {
     console.error("[PawaPay Withdrawal Handler] Error:", error);
@@ -406,41 +418,51 @@ export async function handlePawaPayTransfer(
       }),
     });
 
-    const result = await createPawaPayPayout({
-      amount: amountForProvider,
-      currency: providerCurrency,
-      country: countryUpper,
-      operator,
-      phone,
-      description: "Transfert BKApay",
-      externalId: randomUUID(),
-    });
+    // Dispatch to PawaPay 5s after securing the funds
+    const pawaTransferExternalId = randomUUID();
+    const pawaTxId = tx.id;
+    setTimeout(async () => {
+      try {
+        const result = await createPawaPayPayout({
+          amount: amountForProvider,
+          currency: providerCurrency,
+          country: countryUpper,
+          operator,
+          phone,
+          description: "Transfert BKApay",
+          externalId: pawaTransferExternalId,
+        });
 
-    if (!result.success) {
-      await storage.updateUserBalance(userId, feeInfo.totalDeductedFromBalance);
-      await storage.updateTransactionStatus(tx.id, "failed");
-      return { success: false, transactionId: tx.id, error: result.error || "Transfert échoué" };
-    }
+        if (!result.success) {
+          console.error(`[PawaPay Transfer] Dispatch failed for ${pawaTxId} - refunding:`, result.error);
+          await safeRefundOutgoingTransaction(pawaTxId, userId, { deductedFromBalance: feeInfo.totalDeductedFromBalance }, "pawapay-transfer-dispatch-failed");
+          return;
+        }
 
-    const updatedMetadata = JSON.stringify({
-      pawaPayPayoutId: result.payoutId,
-      phone,
-      totalDebited: feeInfo.totalDeductedFromBalance,
-      providerAmount: amountForProvider,
-      providerCurrency,
-      balanceAmount: netAmount,
-      balanceCurrency,
-      provider: "pawapay",
-      paymentProvider: "pawapay",
-      orderId,
-      startTime,
-    });
-    await storage.updateTransactionMetadata(tx.id, updatedMetadata);
+        await storage.updateTransactionMetadata(pawaTxId, JSON.stringify({
+          pawaPayPayoutId: result.payoutId,
+          phone,
+          totalDebited: feeInfo.totalDeductedFromBalance,
+          providerAmount: amountForProvider,
+          providerCurrency,
+          balanceAmount: netAmount,
+          balanceCurrency,
+          provider: "pawapay",
+          paymentProvider: "pawapay",
+          orderId,
+          startTime,
+        }));
+        console.log(`[PawaPay Transfer] Dispatched tx ${pawaTxId}, payoutId: ${result.payoutId}`);
+      } catch (dispatchErr) {
+        console.error(`[PawaPay Transfer] Dispatch error for ${pawaTxId}:`, dispatchErr);
+        await safeRefundOutgoingTransaction(pawaTxId, userId, { deductedFromBalance: feeInfo.totalDeductedFromBalance }, "pawapay-transfer-dispatch-error");
+      }
+    }, 5000);
 
     return {
       success: true,
       transactionId: tx.id,
-      message: result.message || "Transfert initié avec succès",
+      message: "Transfert initié avec succès",
     };
   } catch (error: any) {
     console.error("[PawaPay Transfer Handler] Error:", error);

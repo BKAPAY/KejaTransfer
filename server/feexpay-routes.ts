@@ -1,5 +1,6 @@
 import { storage } from "./storage";
 import { calculateIncomingFee, calculateOutgoingFee, getFeeFromDatabase } from "./utils/fees";
+import { safeRefundOutgoingTransaction } from "./payment-polling";
 import {
   getFeeXPayConfig,
   createFeeXPayPayin,
@@ -252,17 +253,7 @@ export async function handleFeeXPayWithdrawal(
 
     const formattedPhone = formatPhoneForFeeXPay(phone, countryCode);
 
-    const result = await createFeeXPayPayout(config, {
-      networkKey,
-      shopId: config.shopId,
-      amount: amountForProvider,
-      phoneNumber: formattedPhone,
-    });
-
-    if (!result.success) {
-      return { success: false, error: translateFeeXPayError(result.error, "withdrawal") };
-    }
-
+    // Debit balance and create pending transaction immediately
     if (!skipBalanceOps) {
       await storage.updateUserBalance(userId, -feeInfo.totalDeductedFromBalance);
     }
@@ -280,7 +271,6 @@ export async function handleFeeXPayWithdrawal(
       description: `Retrait de ${grossAmount} ${balanceCurrency}`,
       customerPhone: phone,
       metadata: JSON.stringify({
-        feeXPayReference: result.reference,
         phone,
         provider: "feexpay",
         networkKey,
@@ -292,6 +282,42 @@ export async function handleFeeXPayWithdrawal(
         totalDebited: feeInfo.totalDeductedFromBalance,
       }),
     });
+
+    // Dispatch to FeeXPay 5s after securing the funds
+    const feeXTxId = tx.id;
+    setTimeout(async () => {
+      try {
+        const result = await createFeeXPayPayout(config, {
+          networkKey,
+          shopId: config.shopId,
+          amount: amountForProvider,
+          phoneNumber: formattedPhone,
+        });
+
+        if (!result.success) {
+          console.error(`[FeeXPay Withdrawal] Dispatch failed for ${feeXTxId} - refunding:`, result.error);
+          await safeRefundOutgoingTransaction(feeXTxId, userId, { deductedFromBalance: feeInfo.totalDeductedFromBalance, scope: skipBalanceOps ? "business" : undefined }, "feexpay-dispatch-failed");
+          return;
+        }
+
+        await storage.updateTransactionMetadata(feeXTxId, JSON.stringify({
+          feeXPayReference: result.reference,
+          phone,
+          provider: "feexpay",
+          networkKey,
+          providerAmount: amountForProvider,
+          providerCurrency,
+          balanceAmount: grossAmount,
+          balanceCurrency,
+          deductedFromBalance: feeInfo.totalDeductedFromBalance,
+          totalDebited: feeInfo.totalDeductedFromBalance,
+        }));
+        console.log(`[FeeXPay Withdrawal] Dispatched tx ${feeXTxId}, reference: ${result.reference}`);
+      } catch (dispatchErr) {
+        console.error(`[FeeXPay Withdrawal] Dispatch error for ${feeXTxId}:`, dispatchErr);
+        await safeRefundOutgoingTransaction(feeXTxId, userId, { deductedFromBalance: feeInfo.totalDeductedFromBalance }, "feexpay-dispatch-error");
+      }
+    }, 5000);
 
     return {
       success: true,
@@ -364,17 +390,7 @@ export async function handleFeeXPayTransfer(
 
     const formattedPhone = formatPhoneForFeeXPay(phone, countryCode);
 
-    const result = await createFeeXPayPayout(config, {
-      networkKey,
-      shopId: config.shopId,
-      amount: amountForProvider,
-      phoneNumber: formattedPhone,
-    });
-
-    if (!result.success) {
-      return { success: false, error: translateFeeXPayError(result.error, "transfer") };
-    }
-
+    // Debit balance and create pending transaction immediately
     await storage.updateUserBalance(userId, -feeInfo.totalDeductedFromBalance);
 
     const tx = await storage.createTransaction({
@@ -390,7 +406,6 @@ export async function handleFeeXPayTransfer(
       description: `Transfert de ${netAmount} ${balanceCurrency}`,
       customerPhone: phone,
       metadata: JSON.stringify({
-        feeXPayReference: result.reference,
         phone,
         provider: "feexpay",
         networkKey,
@@ -402,6 +417,42 @@ export async function handleFeeXPayTransfer(
         totalDebited: feeInfo.totalDeductedFromBalance,
       }),
     });
+
+    // Dispatch to FeeXPay 5s after securing the funds
+    const feeXTransferTxId = tx.id;
+    setTimeout(async () => {
+      try {
+        const result = await createFeeXPayPayout(config, {
+          networkKey,
+          shopId: config.shopId,
+          amount: amountForProvider,
+          phoneNumber: formattedPhone,
+        });
+
+        if (!result.success) {
+          console.error(`[FeeXPay Transfer] Dispatch failed for ${feeXTransferTxId} - refunding:`, result.error);
+          await safeRefundOutgoingTransaction(feeXTransferTxId, userId, { deductedFromBalance: feeInfo.totalDeductedFromBalance }, "feexpay-transfer-dispatch-failed");
+          return;
+        }
+
+        await storage.updateTransactionMetadata(feeXTransferTxId, JSON.stringify({
+          feeXPayReference: result.reference,
+          phone,
+          provider: "feexpay",
+          networkKey,
+          providerAmount: amountForProvider,
+          providerCurrency,
+          balanceAmount: netAmount,
+          balanceCurrency,
+          deductedFromBalance: feeInfo.totalDeductedFromBalance,
+          totalDebited: feeInfo.totalDeductedFromBalance,
+        }));
+        console.log(`[FeeXPay Transfer] Dispatched tx ${feeXTransferTxId}, reference: ${result.reference}`);
+      } catch (dispatchErr) {
+        console.error(`[FeeXPay Transfer] Dispatch error for ${feeXTransferTxId}:`, dispatchErr);
+        await safeRefundOutgoingTransaction(feeXTransferTxId, userId, { deductedFromBalance: feeInfo.totalDeductedFromBalance }, "feexpay-transfer-dispatch-error");
+      }
+    }, 5000);
 
     return {
       success: true,

@@ -4716,39 +4716,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const conv = await convertCurrency(amountInUserCurrency, userCurrency, providerCurrency);
             if (conv.success) amountForProvider = Math.floor(conv.convertedAmount);
           }
-          const callbackBaseUrl = process.env.BASE_URL || "https://bkapay.com";
-          const getInvoiceResp = await callPaydunyaAPIv2("/disburse/get-invoice", {
-            account_alias: localPhone, amount: amountForProvider,
-            withdraw_mode: withdrawMode, callback_url: `${callbackBaseUrl}/api/webhooks/paydunya-disburse`,
-          });
-          if (getInvoiceResp.response_code !== "00" || !getInvoiceResp.disburse_token) {
-            return { success: false, error: "Échec de l'initialisation du payout" };
-          }
-          const submitResp = await callPaydunyaAPIv2("/disburse/submit-invoice", {
-            disburse_invoice: getInvoiceResp.disburse_token,
-            disburse_id: `apipayout-${apiKey.userId.substring(0, 8)}-${Date.now()}`,
-          });
-          if (submitResp.response_code !== "00") {
-            return { success: false, error: "Échec de l'envoi du payout" };
-          }
-          // Debit: exact amount + fees + exchange fee (if applicable) from user balance
+          // Debit immediately and create pending transaction — dispatch to provider in 5s
           await storage.updateUserBalance(apiKey.userId, -(feeInfo.totalDeductedFromBalance + apiPayoutExchangeFee));
           const tx = await storage.createTransaction({
             userId: apiKey.userId, type: "withdrawal",
             amount: amountInUserCurrency, fee: feeInfo.feeAmount,
             feePercentage: feeInfo.feePercentage, currency: userCurrency,
-            status: "completed", country: countryCode, operator: normalizedOperator,
+            status: "pending", country: countryCode, operator: normalizedOperator,
             customerPhone: localPhone,
             description: `Payout API ${amountInUserCurrency} ${userCurrency}`,
             metadata: JSON.stringify({
               provider: "paydunya", apiKeyId: apiKey.id, reference,
               phone: localPhone,
-              paydunyaTransactionId: submitResp.transaction_id,
+              deductedFromBalance: feeInfo.totalDeductedFromBalance + apiPayoutExchangeFee,
               providerAmount: amountForProvider, providerCurrency,
               netMode: true,
             }),
           });
-          return { success: true, transactionId: tx.id, status: "completed", message: "Payout effectué avec succès" };
+          const callbackBaseUrl = process.env.BASE_URL || "https://bkapay.com";
+          const txId = tx.id;
+          const userId = apiKey.userId;
+          setTimeout(async () => {
+            try {
+              const getInvoiceResp = await callPaydunyaAPIv2("/disburse/get-invoice", {
+                account_alias: localPhone, amount: amountForProvider,
+                withdraw_mode: withdrawMode, callback_url: `${callbackBaseUrl}/api/webhooks/paydunya-disburse`,
+              });
+              if (getInvoiceResp.response_code !== "00" || !getInvoiceResp.disburse_token) {
+                console.error(`[API Payout PAYDUNYA] Get-invoice failed for ${txId} - refunding`);
+                await safeRefundOutgoingTransaction(txId, userId, {}, "apipayout-paydunya-get-invoice-failed");
+                const meta = JSON.parse((await storage.getTransaction(txId))?.metadata || "{}");
+                await sendApiPayoutCallback(txId, meta, "failed");
+                return;
+              }
+              const disburseId = `apipayout-${userId.substring(0, 8)}-${Date.now()}`;
+              const submitResp = await callPaydunyaAPIv2("/disburse/submit-invoice", {
+                disburse_invoice: getInvoiceResp.disburse_token, disburse_id: disburseId,
+              });
+              if (submitResp.response_code !== "00") {
+                console.error(`[API Payout PAYDUNYA] Submit-invoice failed for ${txId} - refunding`);
+                await safeRefundOutgoingTransaction(txId, userId, {}, "apipayout-paydunya-submit-failed");
+                const meta = JSON.parse((await storage.getTransaction(txId))?.metadata || "{}");
+                await sendApiPayoutCallback(txId, meta, "failed");
+                return;
+              }
+              await storage.updateTransactionMetadata(txId, JSON.stringify({
+                provider: "paydunya", apiKeyId: apiKey.id, reference, phone: localPhone,
+                paydunyaTransactionId: submitResp.transaction_id, disburseId,
+                deductedFromBalance: feeInfo.totalDeductedFromBalance + apiPayoutExchangeFee,
+                providerAmount: amountForProvider, providerCurrency, netMode: true,
+              }));
+              await storage.updateTransaction(txId, { paydunyaToken: getInvoiceResp.disburse_token });
+              await storage.updateTransactionStatus(txId, "completed");
+              console.log(`[API Payout PAYDUNYA] ✅ tx ${txId} COMPLETED`);
+              const meta = JSON.parse((await storage.getTransaction(txId))?.metadata || "{}");
+              await sendApiPayoutCallback(txId, meta, "completed");
+            } catch (dispatchErr) {
+              console.error(`[API Payout PAYDUNYA] Dispatch error for ${txId}:`, dispatchErr);
+              await safeRefundOutgoingTransaction(txId, userId, {}, "apipayout-paydunya-dispatch-error");
+              const meta = JSON.parse((await storage.getTransaction(txId))?.metadata || "{}");
+              await sendApiPayoutCallback(txId, meta, "failed");
+            }
+          }, 5000);
+          return { success: true, transactionId: tx.id, status: "pending", message: "Payout initié avec succès" };
         })();
       } else {
         return res.status(400).json({
@@ -7538,33 +7568,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!withdrawMode) {
           result = { success: false, error: "Cet opérateur n'est pas disponible pour le payout dans ce pays" };
         } else {
-          const callbackBaseUrl = process.env.BASE_URL || "https://bkapay.com";
-          const getInvoiceResp = await callPaydunyaAPIv2("/disburse/get-invoice", {
-            account_alias: localPhone, amount: requestedAmount,
-            withdraw_mode: withdrawMode, callback_url: `${callbackBaseUrl}/api/webhooks/paydunya-disburse`,
+          // Create transaction in pending state and dispatch to provider in 5s
+          const bizTx = await storage.createTransaction({
+            userId: user.id, type: "withdrawal",
+            amount: requestedAmount, fee: feeInfo.feeAmount,
+            feePercentage: feeInfo.feePercentage, currency: requestedCurrency,
+            status: "pending", country: countryCode, operator: normalizedOperator,
+            customerPhone: localPhone,
+            description: description || `Business Payout ${requestedAmount} ${requestedCurrency}`,
+            metadata: JSON.stringify({
+              provider: "paydunya", businessTokenId: businessToken.id, reference,
+              scope: "business", netMode: true,
+              deductedFromBalance: feeInfo.totalDeductedFromBalance,
+            }),
           });
-          if (getInvoiceResp.response_code !== "00" || !getInvoiceResp.disburse_token) {
-            result = { success: false, error: "Impossible d'initier le payout" };
-          } else {
-            const submitResp = await callPaydunyaAPIv2("/disburse/submit-invoice", {
-              disburse_invoice: getInvoiceResp.disburse_token,
-              disburse_id: `biz-payout-${user.id.substring(0, 8)}-${Date.now()}`,
-            });
-            if (submitResp.response_code !== "00") {
-              result = { success: false, error: "Le payout n'a pas pu être traité" };
-            } else {
-              const tx = await storage.createTransaction({
-                userId: user.id, type: "withdrawal",
-                amount: requestedAmount, fee: feeInfo.feeAmount,
-                feePercentage: feeInfo.feePercentage, currency: requestedCurrency,
-                status: "completed", country: countryCode, operator: normalizedOperator,
-                customerPhone: localPhone,
-                description: description || `Business Payout ${requestedAmount} ${requestedCurrency}`,
-                metadata: JSON.stringify({ provider: "paydunya", businessTokenId: businessToken.id, reference, scope: "business", netMode: true }),
+          const bizTxId = bizTx.id;
+          const bizUserId = user.id;
+          const callbackBaseUrl = process.env.BASE_URL || "https://bkapay.com";
+          setTimeout(async () => {
+            try {
+              const getInvoiceResp = await callPaydunyaAPIv2("/disburse/get-invoice", {
+                account_alias: localPhone, amount: requestedAmount,
+                withdraw_mode: withdrawMode, callback_url: `${callbackBaseUrl}/api/webhooks/paydunya-disburse`,
               });
-              result = { success: true, transactionId: tx.id, message: "Payout effectué avec succès" };
+              if (getInvoiceResp.response_code !== "00" || !getInvoiceResp.disburse_token) {
+                console.error(`[BIZ Payout PAYDUNYA] Get-invoice failed for ${bizTxId} - refunding business wallet`);
+                await storage.atomicFailAndRefundBusinessWallet(bizTxId, bizUserId, countryCode, requestedCurrency, feeInfo.totalDeductedFromBalance, "biz-paydunya-get-invoice-failed");
+                return;
+              }
+              const disburseId = `biz-payout-${bizUserId.substring(0, 8)}-${Date.now()}`;
+              const submitResp = await callPaydunyaAPIv2("/disburse/submit-invoice", {
+                disburse_invoice: getInvoiceResp.disburse_token, disburse_id: disburseId,
+              });
+              if (submitResp.response_code !== "00") {
+                console.error(`[BIZ Payout PAYDUNYA] Submit-invoice failed for ${bizTxId} - refunding business wallet`);
+                await storage.atomicFailAndRefundBusinessWallet(bizTxId, bizUserId, countryCode, requestedCurrency, feeInfo.totalDeductedFromBalance, "biz-paydunya-submit-failed");
+                return;
+              }
+              await storage.updateTransactionMetadata(bizTxId, JSON.stringify({
+                provider: "paydunya", businessTokenId: businessToken.id, reference, scope: "business",
+                paydunyaTransactionId: submitResp.transaction_id, disburseId, netMode: true,
+                deductedFromBalance: feeInfo.totalDeductedFromBalance,
+              }));
+              await storage.updateTransaction(bizTxId, { paydunyaToken: getInvoiceResp.disburse_token });
+              await storage.updateTransactionStatus(bizTxId, "completed");
+              console.log(`[BIZ Payout PAYDUNYA] ✅ tx ${bizTxId} COMPLETED`);
+            } catch (dispatchErr) {
+              console.error(`[BIZ Payout PAYDUNYA] Dispatch error for ${bizTxId}:`, dispatchErr);
+              await storage.atomicFailAndRefundBusinessWallet(bizTxId, bizUserId, countryCode, requestedCurrency, feeInfo.totalDeductedFromBalance, "biz-paydunya-dispatch-error");
             }
-          }
+          }, 5000);
+          result = { success: true, transactionId: bizTxId, message: "Payout initié avec succès" };
         }
       } else {
         result = { success: false, error: "Service de payout temporairement indisponible" };
@@ -8482,80 +8536,99 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
 
-        // Step 1: Get disburse invoice - ALWAYS send converted amount to provider
-        const getInvoiceData = {
-          account_alias: cleanPhone,
-          amount: amountForProvider,
-          withdraw_mode: withdrawMode,
-          callback_url: callbackUrl,
-        };
+        // Step 1: Deduct balance and create transaction in pending state immediately
+        await storage.updateUserBalance(req.session.userId!, -amountToDebit);
+        const tx = await storage.createTransaction({
+          userId: req.session.userId!,
+          type: isTransfer ? "transfer" : "withdrawal",
+          amount: Math.floor(amount),
+          fee: feeInfo.feeAmount,
+          feePercentage: feeInfo.feePercentage,
+          currency: userCurrency,
+          status: "pending",
+          country,
+          operator,
+          customerPhone: cleanPhone,
+          description: isTransfer
+            ? `Transfert de ${Math.floor(amount)} ${userCurrency} (envoye: ${amountForProvider} ${providerCurrency})`
+            : `Retrait de ${Math.floor(amount)} ${userCurrency} (recu: ${amountForProvider} ${providerCurrency})`,
+          metadata: JSON.stringify({
+            provider: "paydunya",
+            providerAmount: amountForProvider,
+            providerCurrency: providerCurrency,
+            balanceAmount: Math.floor(amount),
+            balanceCurrency: userCurrency,
+            amountDebitedFromBalance: amountToDebit,
+            deductedFromBalance: amountToDebit,
+            ...(outgoingExchangeFeeForFedapay > 0 ? { outgoingExchangeFee: outgoingExchangeFeeForFedapay, outgoingExchangeFeeCurrency: userCurrency } : {}),
+          }),
+        });
 
-        console.log("[WITHDRAWAL PAYDUNYA] Creating disburse invoice:", getInvoiceData);
-        const getInvoiceResponse = await callPaydunyaAPIv2("/disburse/get-invoice", getInvoiceData);
-        console.log("[WITHDRAWAL PAYDUNYA] Get-invoice response:", getInvoiceResponse);
+        console.log(`[${isTransfer ? 'TRANSFER' : 'WITHDRAWAL'} PAYDUNYA] Pending tx ${tx.id} created, balance deducted: ${amountToDebit} ${userCurrency} - dispatching to provider in 5s`);
 
-        if (getInvoiceResponse.response_code !== "00" || !getInvoiceResponse.disburse_token) {
-          console.error("[WITHDRAWAL PAYDUNYA] Get-invoice failed:", getInvoiceResponse);
-          const errorMsg = type === "transfer" ? "Transfert echoue" : "Retrait echoue";
-          return res.status(400).json({ success: false, error: errorMsg });
-        }
+        // Step 2: Send to Paydunya 5s after debit (ensures funds are secured before dispatch)
+        setTimeout(async () => {
+          try {
+            const getInvoiceData = {
+              account_alias: cleanPhone,
+              amount: amountForProvider,
+              withdraw_mode: withdrawMode,
+              callback_url: callbackUrl,
+            };
+            console.log(`[${isTransfer ? 'TRANSFER' : 'WITHDRAWAL'} PAYDUNYA] Dispatching to provider for tx ${tx.id}:`, getInvoiceData);
+            const getInvoiceResponse = await callPaydunyaAPIv2("/disburse/get-invoice", getInvoiceData);
+            console.log(`[${isTransfer ? 'TRANSFER' : 'WITHDRAWAL'} PAYDUNYA] Get-invoice response for ${tx.id}:`, getInvoiceResponse);
 
-        // Step 2: Submit disburse invoice
-        const submitData = {
-          disburse_invoice: getInvoiceResponse.disburse_token,
-          disburse_id: `${type || 'withdrawal'}-${user.id.substring(0, 8)}-${Date.now()}`,
-        };
+            if (getInvoiceResponse.response_code !== "00" || !getInvoiceResponse.disburse_token) {
+              console.error(`[${isTransfer ? 'TRANSFER' : 'WITHDRAWAL'} PAYDUNYA] Get-invoice failed for ${tx.id} - refunding`);
+              await safeRefundOutgoingTransaction(tx.id, req.session.userId!, {}, "paydunya-get-invoice-failed");
+              await sendBusinessWebhookCallback(tx.id, "failed", "payout");
+              return;
+            }
 
-        console.log("[WITHDRAWAL PAYDUNYA] Submitting disburse invoice:", submitData);
-        const submitResponse = await callPaydunyaAPIv2("/disburse/submit-invoice", submitData);
-        console.log("[WITHDRAWAL PAYDUNYA] Submit-invoice response:", submitResponse);
+            const disburseId = `${type || 'withdrawal'}-${user.id.substring(0, 8)}-${Date.now()}`;
+            const submitData = { disburse_invoice: getInvoiceResponse.disburse_token, disburse_id: disburseId };
+            console.log(`[${isTransfer ? 'TRANSFER' : 'WITHDRAWAL'} PAYDUNYA] Submitting invoice for ${tx.id}:`, submitData);
+            const submitResponse = await callPaydunyaAPIv2("/disburse/submit-invoice", submitData);
+            console.log(`[${isTransfer ? 'TRANSFER' : 'WITHDRAWAL'} PAYDUNYA] Submit response for ${tx.id}:`, submitResponse);
 
-        if (submitResponse.response_code === "00") {
-          // Success - Deduct balance (montant différent pour transfert vs retrait)
-          await storage.updateUserBalance(req.session.userId!, -amountToDebit);
-          
-          // Create transaction record - store in user's currency for balance
-          const tx = await storage.createTransaction({
-            userId: req.session.userId!,
-            type: isTransfer ? "transfer" : "withdrawal",
-            amount: Math.floor(amount), // Store in user's currency
-            fee: feeInfo.feeAmount,
-            feePercentage: feeInfo.feePercentage,
-            currency: userCurrency, // Store in user's currency
-            status: "completed",
-            country,
-            operator,
-            customerPhone: cleanPhone,
-            description: isTransfer 
-              ? `Transfert de ${Math.floor(amount)} ${userCurrency} (envoye: ${amountForProvider} ${providerCurrency})` 
-              : `Retrait de ${Math.floor(amount)} ${userCurrency} (recu: ${amountForProvider} ${providerCurrency})`,
-            paydunyaToken: getInvoiceResponse.disburse_token,
-            metadata: JSON.stringify({
-              paydunyaTransactionId: submitResponse.transaction_id,
-              disburseId: submitData.disburse_id,
-              provider: "paydunya",
-              providerAmount: amountForProvider,
-              providerCurrency: providerCurrency,
-              balanceAmount: Math.floor(amount),
-              balanceCurrency: userCurrency,
-              amountDebitedFromBalance: amountToDebit,
-              ...(outgoingExchangeFeeForFedapay > 0 ? { outgoingExchangeFee: outgoingExchangeFeeForFedapay, outgoingExchangeFeeCurrency: userCurrency } : {}),
-            }),
-          });
+            if (submitResponse.response_code === "00") {
+              // Update transaction with provider token + mark completed (Paydunya is synchronous)
+              await storage.updateTransactionMetadata(tx.id, JSON.stringify({
+                provider: "paydunya",
+                paydunyaTransactionId: submitResponse.transaction_id,
+                disburseId,
+                providerAmount: amountForProvider,
+                providerCurrency,
+                balanceAmount: Math.floor(amount),
+                balanceCurrency: userCurrency,
+                amountDebitedFromBalance: amountToDebit,
+                deductedFromBalance: amountToDebit,
+                ...(outgoingExchangeFeeForFedapay > 0 ? { outgoingExchangeFee: outgoingExchangeFeeForFedapay, outgoingExchangeFeeCurrency: userCurrency } : {}),
+              }));
+              await storage.updateTransaction(tx.id, { paydunyaToken: getInvoiceResponse.disburse_token });
+              await storage.updateTransactionStatus(tx.id, "completed");
+              console.log(`[${isTransfer ? 'TRANSFER' : 'WITHDRAWAL'} PAYDUNYA] ✅ tx ${tx.id} COMPLETED`);
+              await sendBusinessWebhookCallback(tx.id, "completed", "payout");
+            } else {
+              console.error(`[${isTransfer ? 'TRANSFER' : 'WITHDRAWAL'} PAYDUNYA] Submit-invoice failed for ${tx.id} - refunding:`, submitResponse);
+              await safeRefundOutgoingTransaction(tx.id, req.session.userId!, {}, "paydunya-submit-failed");
+              await sendBusinessWebhookCallback(tx.id, "failed", "payout");
+            }
+          } catch (dispatchErr) {
+            console.error(`[${isTransfer ? 'TRANSFER' : 'WITHDRAWAL'} PAYDUNYA] Dispatch error for ${tx.id}:`, dispatchErr);
+            await safeRefundOutgoingTransaction(tx.id, req.session.userId!, {}, "paydunya-dispatch-error");
+            await sendBusinessWebhookCallback(tx.id, "failed", "payout");
+          }
+        }, 5000);
 
-          console.log(`[${isTransfer ? 'TRANSFER' : 'WITHDRAWAL'} PAYDUNYA] Success - Balance deducted: ${amountToDebit} ${userCurrency}, Sent to provider: ${amountForProvider} ${providerCurrency}`);
-
-          return res.json({
-            success: true,
-            transactionId: tx.id,
-            message: isTransfer ? "Transfert effectue avec succes" : "Retrait effectue avec succes",
-            totalDeducted: amountToDebit,
-          });
-        } else {
-          console.error("[WITHDRAWAL PAYDUNYA] Submit-invoice failed:", submitResponse);
-          const errorMsg = type === "transfer" ? "Transfert echoue" : "Retrait echoue";
-          return res.status(400).json({ success: false, error: errorMsg });
-        }
+        return res.json({
+          success: true,
+          transactionId: tx.id,
+          message: isTransfer ? "Transfert initié avec succès" : "Retrait initié avec succès",
+          totalDeducted: amountToDebit,
+          status: "pending",
+        });
       } else if (activeProvider === "mbiyopay") {
         // Use MbiyoPay for withdrawals/transfers - pass user's balance currency and target currency
         console.log(`[WITHDRAWAL] Using MbiyoPay for ${country}/${operator}, userCurrency=${userCurrency}, targetCurrency=${targetCurrency}`);
@@ -10170,83 +10243,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`[Withdrawal] Original phone: ${phone}, Cleaned phone: ${cleanPhone}, Country: ${country}, Operator: ${operator}`);
 
-      // Callback URL for Paydunya notifications
-      const callbackUrl = process.env.BASE_URL 
+      const callbackUrl = process.env.BASE_URL
         ? `${process.env.BASE_URL}/api/webhooks/paydunya-disburse`
         : "https://bkapay.com/api/webhooks/paydunya-disburse";
-      
-      // Step 1: Create disbursement invoice (get-invoice)
-      const getInvoiceData = {
-        account_alias: cleanPhone, // Phone WITHOUT country code
-        amount: Math.floor(amount), // Integer, no decimals
-        withdraw_mode: withdrawMode,
-        callback_url: callbackUrl,
-      };
 
-      console.log("[Withdrawal] Creating disburse invoice:", getInvoiceData);
-      const getInvoiceResponse = await callPaydunyaAPIv2("/disburse/get-invoice", getInvoiceData);
-      console.log("[Withdrawal] Get-invoice response:", getInvoiceResponse);
+      const txCurrency = ({ "CM": "XAF" } as Record<string,string>)[country?.toUpperCase()] || "XOF";
 
-      if (getInvoiceResponse.response_code !== "00") {
-        console.error("[Withdrawal] Get-invoice failed:", getInvoiceResponse);
-        return res.status(400).json({ error: "Retrait échoué" });
-      }
+      // Step 1: Deduct balance and create pending transaction immediately
+      await storage.updateUserBalance(req.session.userId!, -totalToDeduct);
+      const legacyTx = await storage.createTransaction({
+        userId: req.session.userId!,
+        type: "withdrawal",
+        amount: Math.floor(amount),
+        fee: feeInfo.feeAmount,
+        feePercentage: feeInfo.feePercentage,
+        currency: txCurrency,
+        status: "pending",
+        country,
+        operator,
+        customerPhone: cleanPhone,
+        description: `Retrait de ${amount} ${txCurrency} vers ${cleanPhone}`,
+        metadata: JSON.stringify({
+          provider: "paydunya",
+          deductedFromBalance: totalToDeduct,
+          ...(outgoingExchangeFeeAmount > 0 ? { outgoingExchangeFee: outgoingExchangeFeeAmount, outgoingExchangeFeeCurrency: userCurrencyForTransfer } : {}),
+        }),
+      });
 
-      const disburseToken = getInvoiceResponse.disburse_token;
-      if (!disburseToken) {
-        console.error("[Withdrawal] No disburse_token in response:", getInvoiceResponse);
-        return res.status(400).json({ error: "Retrait échoué" });
-      }
+      console.log(`[Withdrawal] Pending tx ${legacyTx.id} created, balance deducted: ${totalToDeduct} - dispatching to Paydunya in 5s`);
 
-      // Step 2: Submit disbursement invoice (submit-invoice)
-      const submitData = {
-        disburse_invoice: disburseToken,
-        disburse_id: `withdrawal-${user.id.substring(0, 8)}-${Date.now()}`,
-      };
+      res.json({
+        success: true,
+        message: "Retrait initié avec succès",
+        totalDeducted: totalToDeduct,
+        amountSent: Math.floor(amount),
+        fee: feeInfo.feeAmount,
+      });
 
-      console.log("[Withdrawal] Submitting disburse invoice:", submitData);
-      const submitResponse = await callPaydunyaAPIv2("/disburse/submit-invoice", submitData);
-      console.log("[Withdrawal] Submit-invoice response:", submitResponse);
+      // Step 2: Dispatch to Paydunya 5s after securing the funds
+      setTimeout(async () => {
+        try {
+          const getInvoiceData = { account_alias: cleanPhone, amount: Math.floor(amount), withdraw_mode: withdrawMode, callback_url: callbackUrl };
+          console.log(`[Withdrawal] Dispatching to Paydunya for tx ${legacyTx.id}:`, getInvoiceData);
+          const getInvoiceResponse = await callPaydunyaAPIv2("/disburse/get-invoice", getInvoiceData);
+          console.log(`[Withdrawal] Get-invoice response for ${legacyTx.id}:`, getInvoiceResponse);
 
-      if (submitResponse.response_code === "00") {
-        // Success - Deduct balance (transaction fee + exchange fee if applicable)
-        await storage.updateUserBalance(req.session.userId!, -totalToDeduct);
-        
-        // Create transaction record
-        await storage.createTransaction({
-          userId: req.session.userId!,
-          type: "withdrawal",
-          amount: Math.floor(amount),
-          fee: feeInfo.feeAmount,
-          feePercentage: feeInfo.feePercentage,
-          currency: ({ "CM": "XAF" } as Record<string,string>)[country?.toUpperCase()] || "XOF",
-          status: "completed",
-          country,
-          operator,
-          customerPhone: cleanPhone,
-          description: `Retrait de ${amount} ${({ "CM": "XAF" } as Record<string,string>)[country?.toUpperCase()] || "XOF"} vers ${cleanPhone}`,
-          paydunyaToken: disburseToken,
-          metadata: JSON.stringify({
-            paydunyaTransactionId: submitResponse.transaction_id,
-            disburseId: submitData.disburse_id,
-            ...(outgoingExchangeFeeAmount > 0 ? { outgoingExchangeFee: outgoingExchangeFeeAmount, outgoingExchangeFeeCurrency: userCurrencyForTransfer } : {}),
-          }),
-        });
+          if (getInvoiceResponse.response_code !== "00" || !getInvoiceResponse.disburse_token) {
+            console.error(`[Withdrawal] Get-invoice failed for ${legacyTx.id} - refunding`);
+            await safeRefundOutgoingTransaction(legacyTx.id, req.session.userId!, {}, "legacy-paydunya-get-invoice-failed");
+            return;
+          }
 
-        console.log(`[Withdrawal] Success - Balance deducted: ${totalToDeduct} (transfer: ${feeInfo.totalDeductedFromBalance} + exchange: ${outgoingExchangeFeeAmount})`);
+          const legacyDisburseId = `withdrawal-${user.id.substring(0, 8)}-${Date.now()}`;
+          const submitResponse = await callPaydunyaAPIv2("/disburse/submit-invoice", {
+            disburse_invoice: getInvoiceResponse.disburse_token, disburse_id: legacyDisburseId,
+          });
+          console.log(`[Withdrawal] Submit response for ${legacyTx.id}:`, submitResponse);
 
-        res.json({
-          success: true,
-          message: "Retrait effectué avec succès",
-          totalDeducted: totalToDeduct,
-          amountSent: Math.floor(amount),
-          fee: feeInfo.feeAmount,
-        });
-      } else {
-        // Submission failed
-        console.error("[Withdrawal] Submit-invoice failed:", submitResponse);
-        return res.status(400).json({ error: "Retrait échoué" });
-      }
+          if (submitResponse.response_code === "00") {
+            await storage.updateTransactionMetadata(legacyTx.id, JSON.stringify({
+              provider: "paydunya",
+              paydunyaTransactionId: submitResponse.transaction_id,
+              disburseId: legacyDisburseId,
+              deductedFromBalance: totalToDeduct,
+              ...(outgoingExchangeFeeAmount > 0 ? { outgoingExchangeFee: outgoingExchangeFeeAmount, outgoingExchangeFeeCurrency: userCurrencyForTransfer } : {}),
+            }));
+            await storage.updateTransaction(legacyTx.id, { paydunyaToken: getInvoiceResponse.disburse_token });
+            await storage.updateTransactionStatus(legacyTx.id, "completed");
+            console.log(`[Withdrawal] ✅ tx ${legacyTx.id} COMPLETED`);
+          } else {
+            console.error(`[Withdrawal] Submit-invoice failed for ${legacyTx.id} - refunding`);
+            await safeRefundOutgoingTransaction(legacyTx.id, req.session.userId!, {}, "legacy-paydunya-submit-failed");
+          }
+        } catch (dispatchErr) {
+          console.error(`[Withdrawal] Dispatch error for ${legacyTx.id}:`, dispatchErr);
+          await safeRefundOutgoingTransaction(legacyTx.id, req.session.userId!, {}, "legacy-paydunya-dispatch-error");
+        }
+      }, 5000);
     } catch (error: any) {
       console.error("[Withdrawal] Error:", error);
       res.status(500).json({ error: "Retrait échoué" });

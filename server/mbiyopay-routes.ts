@@ -246,93 +246,54 @@ export async function handleMbiyoPayWithdrawal(
       }),
     });
 
-    const result = await createMbiyoPayPayout({
-      amount: amountForProvider,
-      currency: providerCurrency,
-      phone: phone,
-      countryCode: country,
-      network: operator,
-      orderId,
-      callbackUrl: `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/mbiyopay`,
-      beneficiaryName,
-    });
+    // Respond immediately — dispatch to MbiyoPay 5s later to ensure funds are secured
+    const mbiyoTxId = tx.id;
+    setTimeout(async () => {
+      try {
+        const result = await createMbiyoPayPayout({
+          amount: amountForProvider,
+          currency: providerCurrency,
+          phone: phone,
+          countryCode: country,
+          network: operator,
+          orderId,
+          callbackUrl: `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/mbiyopay`,
+          beneficiaryName,
+        });
 
-    if (!result.success && !result.transactionId) {
-      if (!skipBalanceOps) {
-        await storage.updateUserBalance(userId, feeInfo.totalDeductedFromBalance);
+        if (!result.success && !result.transactionId) {
+          console.error(`[MbiyoPay Withdrawal] Dispatch failed for ${mbiyoTxId} - refunding:`, result.error);
+          await safeRefundOutgoingTransaction(mbiyoTxId, userId, { deductedFromBalance: feeInfo.totalDeductedFromBalance, scope: skipBalanceOps ? "business" : undefined }, "mbiyopay-dispatch-failed");
+          return;
+        }
+
+        // Update metadata with provider transaction ID (even if result.success=false but has ID)
+        const updatedMetadata = JSON.stringify({
+          mbiyopayTransactionId: result.transactionId,
+          phone,
+          deductedFromBalance: feeInfo.totalDeductedFromBalance,
+          amountReceived: feeInfo.amountReceived,
+          providerAmount: amountForProvider,
+          providerCurrency: providerCurrency,
+          balanceAmount: grossAmount,
+          balanceCurrency: balanceCurrency,
+          provider: "mbiyopay",
+          paymentProvider: "mbiyopay",
+          orderId,
+          startTime,
+        });
+        await storage.updateTransactionMetadata(mbiyoTxId, updatedMetadata);
+        console.log(`[MbiyoPay Withdrawal] Dispatched tx ${mbiyoTxId}, mbiyopayTransactionId: ${result.transactionId}`);
+      } catch (dispatchErr) {
+        console.error(`[MbiyoPay Withdrawal] Dispatch error for ${mbiyoTxId}:`, dispatchErr);
+        await safeRefundOutgoingTransaction(mbiyoTxId, userId, { deductedFromBalance: feeInfo.totalDeductedFromBalance }, "mbiyopay-dispatch-error");
       }
-      await storage.updateTransactionStatus(tx.id, "failed");
-      return { success: false, transactionId: tx.id, error: result.error || "Retrait echoue" };
-    }
-
-    if (!result.success && result.transactionId) {
-      console.log(`[MbiyoPay Withdrawal] API returned transactionId ${result.transactionId} but success=false - keeping pending for admin review`);
-      const updatedMetadata = JSON.stringify({
-        mbiyopayTransactionId: result.transactionId,
-        phone,
-        deductedFromBalance: feeInfo.totalDeductedFromBalance,
-        amountReceived: feeInfo.amountReceived,
-        providerAmount: amountForProvider,
-        providerCurrency: providerCurrency,
-        balanceAmount: grossAmount,
-        balanceCurrency: balanceCurrency,
-        provider: "mbiyopay",
-        paymentProvider: "mbiyopay",
-        orderId,
-        startTime,
-      });
-      await storage.updateTransactionMetadata(tx.id, updatedMetadata);
-      return {
-        success: true,
-        transactionId: tx.id,
-        message: "Retrait en cours de traitement. Veuillez patienter.",
-      };
-    }
-
-    if (result.pending) {
-      console.log(`[MbiyoPay Withdrawal] Ambiguous API response - transaction ${tx.id} stays pending, waiting for webhook`);
-      const updatedMetadata = JSON.stringify({
-        mbiyopayTransactionId: result.transactionId,
-        phone,
-        deductedFromBalance: feeInfo.totalDeductedFromBalance,
-        amountReceived: feeInfo.amountReceived,
-        providerAmount: amountForProvider,
-        providerCurrency: providerCurrency,
-        balanceAmount: grossAmount,
-        balanceCurrency: balanceCurrency,
-        provider: "mbiyopay",
-        paymentProvider: "mbiyopay",
-        orderId,
-        startTime,
-      });
-      await storage.updateTransactionMetadata(tx.id, updatedMetadata);
-      return {
-        success: true,
-        transactionId: tx.id,
-        message: result.message || "Retrait en cours de traitement. Veuillez patienter.",
-      };
-    }
-
-    const updatedMetadata = JSON.stringify({
-      mbiyopayTransactionId: result.transactionId,
-      phone,
-      deductedFromBalance: feeInfo.totalDeductedFromBalance,
-      amountReceived: feeInfo.amountReceived,
-      providerAmount: amountForProvider,
-      providerCurrency: providerCurrency,
-      balanceAmount: grossAmount,
-      balanceCurrency: balanceCurrency,
-      provider: "mbiyopay",
-      paymentProvider: "mbiyopay",
-      orderId,
-      startTime,
-    });
-    await storage.updateTransactionMetadata(tx.id, updatedMetadata);
+    }, 5000);
 
     return {
       success: true,
       transactionId: tx.id,
-      message: result.message || "Retrait initie avec succes",
+      message: "Retrait initie avec succes",
     };
   } catch (error: any) {
     console.error("[MbiyoPay Withdrawal] Error:", error);
@@ -429,89 +390,52 @@ export async function handleMbiyoPayTransfer(
       }),
     });
 
-    const result = await createMbiyoPayPayout({
-      amount: amountForProvider,
-      currency: providerCurrency,
-      phone: phone,
-      countryCode: country,
-      network: operator,
-      orderId,
-      callbackUrl: `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/mbiyopay`,
-      beneficiaryName,
-    });
+    // Dispatch to MbiyoPay 5s after securing the funds
+    const mbiyoTransferTxId = tx.id;
+    setTimeout(async () => {
+      try {
+        const result = await createMbiyoPayPayout({
+          amount: amountForProvider,
+          currency: providerCurrency,
+          phone: phone,
+          countryCode: country,
+          network: operator,
+          orderId,
+          callbackUrl: `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/mbiyopay`,
+          beneficiaryName,
+        });
 
-    if (!result.success && !result.transactionId) {
-      await storage.updateUserBalance(userId, totalToDebit);
-      await storage.updateTransactionStatus(tx.id, "failed");
-      const errorMsg = result.error ? result.error.replace("Retrait", "Transfert") : "Transfert echoue";
-      return { success: false, transactionId: tx.id, error: errorMsg };
-    }
+        if (!result.success && !result.transactionId) {
+          console.error(`[MbiyoPay Transfer] Dispatch failed for ${mbiyoTransferTxId} - refunding:`, result.error);
+          await safeRefundOutgoingTransaction(mbiyoTransferTxId, userId, { deductedFromBalance: totalToDebit }, "mbiyopay-transfer-dispatch-failed");
+          return;
+        }
 
-    if (!result.success && result.transactionId) {
-      console.log(`[MbiyoPay Transfer] API returned transactionId ${result.transactionId} but success=false - keeping pending for admin review`);
-      const updatedMetadata = JSON.stringify({
-        mbiyopayTransactionId: result.transactionId,
-        phone,
-        totalDebited: totalToDebit,
-        providerAmount: amountForProvider,
-        providerCurrency: providerCurrency,
-        balanceAmount: netAmount,
-        balanceCurrency: balanceCurrency,
-        provider: "mbiyopay",
-        paymentProvider: "mbiyopay",
-        orderId,
-        startTime,
-      });
-      await storage.updateTransactionMetadata(tx.id, updatedMetadata);
-      return {
-        success: true,
-        transactionId: tx.id,
-        message: "Transfert en cours de traitement. Veuillez patienter.",
-      };
-    }
-
-    if (result.pending) {
-      console.log(`[MbiyoPay Transfer] Ambiguous API response - transaction ${tx.id} stays pending, waiting for webhook`);
-      const updatedMetadata = JSON.stringify({
-        mbiyopayTransactionId: result.transactionId,
-        phone,
-        totalDebited: totalToDebit,
-        providerAmount: amountForProvider,
-        providerCurrency: providerCurrency,
-        balanceAmount: netAmount,
-        balanceCurrency: balanceCurrency,
-        provider: "mbiyopay",
-        paymentProvider: "mbiyopay",
-        orderId,
-        startTime,
-      });
-      await storage.updateTransactionMetadata(tx.id, updatedMetadata);
-      return {
-        success: true,
-        transactionId: tx.id,
-        message: result.message || "Transfert en cours de traitement. Veuillez patienter.",
-      };
-    }
-
-    const updatedMetadata = JSON.stringify({
-      mbiyopayTransactionId: result.transactionId,
-      phone,
-      totalDebited: totalToDebit,
-      providerAmount: amountForProvider,
-      providerCurrency: providerCurrency,
-      balanceAmount: netAmount,
-      balanceCurrency: balanceCurrency,
-      provider: "mbiyopay",
-      paymentProvider: "mbiyopay",
-      orderId,
-      startTime,
-    });
-    await storage.updateTransactionMetadata(tx.id, updatedMetadata);
+        const updatedMetadata = JSON.stringify({
+          mbiyopayTransactionId: result.transactionId,
+          phone,
+          totalDebited: totalToDebit,
+          providerAmount: amountForProvider,
+          providerCurrency: providerCurrency,
+          balanceAmount: netAmount,
+          balanceCurrency: balanceCurrency,
+          provider: "mbiyopay",
+          paymentProvider: "mbiyopay",
+          orderId,
+          startTime,
+        });
+        await storage.updateTransactionMetadata(mbiyoTransferTxId, updatedMetadata);
+        console.log(`[MbiyoPay Transfer] Dispatched tx ${mbiyoTransferTxId}, mbiyopayTransactionId: ${result.transactionId}`);
+      } catch (dispatchErr) {
+        console.error(`[MbiyoPay Transfer] Dispatch error for ${mbiyoTransferTxId}:`, dispatchErr);
+        await safeRefundOutgoingTransaction(mbiyoTransferTxId, userId, { deductedFromBalance: totalToDebit }, "mbiyopay-transfer-dispatch-error");
+      }
+    }, 5000);
 
     return {
       success: true,
       transactionId: tx.id,
-      message: result.message || "Transfert initie avec succes",
+      message: "Transfert initie avec succes",
     };
   } catch (error: any) {
     console.error("[MbiyoPay Transfer] Error:", error);
