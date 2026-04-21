@@ -13106,18 +13106,20 @@ SUPPORT ET CONTACT:
           switch (toolName) {
             case "calculate_fees": {
               const { amount, type, country, operator } = args;
-              const feeData = await getDynamicOutgoingFees(storage, country, operator);
+              // Normalize operator: strip country suffix if present (e.g. "moov-tg" → "moov")
+              const normalizedOperatorC = operator ? operator.replace(/-[a-z]{2}$/i, '') : operator;
+              const feeData = await getDynamicOutgoingFees(storage, country, normalizedOperatorC);
               const feeInfo = calculateOutgoingFee(Math.floor(amount), feeData.outgoing);
               const feePct = (feeData.outgoing / 10).toFixed(1);
 
               const calcUser = await storage.getUser(userId);
               const calcUserCurrency = calcUser?.country ? getCurrencyForCountry(calcUser.country) : "XOF";
               let calcDestCurrency = getCurrencyForCountry(country?.toUpperCase() || "");
-              const calcProvider = await getActiveProviderForWithdrawal(country, operator);
+              const calcProvider = await getActiveProviderForWithdrawal(country, normalizedOperatorC);
               if (calcProvider === "pawapay") {
                 try {
                   const { getCurrencyForOperator: getOpCurr } = await import("@shared/pawapay-countries");
-                  const opCurr = getOpCurr(country?.toUpperCase() || "", operator);
+                  const opCurr = getOpCurr(country?.toUpperCase() || "", normalizedOperatorC);
                   if (opCurr) calcDestCurrency = opCurr;
                 } catch (_) {}
               }
@@ -13184,10 +13186,13 @@ SUPPORT ET CONTACT:
               const minAmountW = user.country === "CD" ? 1000 : 1000;
               if (amount < minAmountW) return JSON.stringify({ success: false, error: `Montant minimum: ${minAmountW.toLocaleString("fr-FR")} ${userCurrencyW}` });
 
-              const activeProviderW = await getActiveProviderForWithdrawal(country, operator);
+              // Normalize operator: strip country suffix if present (e.g. "moov-tg" → "moov", "tmoney-tg" → "tmoney")
+              const normalizedOperatorW = operator.replace(/-[a-z]{2}$/i, '');
+
+              const activeProviderW = await getActiveProviderForWithdrawal(country, normalizedOperatorW);
               if (!activeProviderW) return JSON.stringify({ success: false, error: "Cet opérateur n'est pas disponible pour les retraits dans ce pays actuellement." });
 
-              const feeConfigW = await getFeeFromDatabase(storage, activeProviderW, country, operator);
+              const feeConfigW = await getFeeFromDatabase(storage, activeProviderW, country, normalizedOperatorW);
               const feeInfoW = calculateOutgoingFee(Math.floor(amount), feeConfigW.outgoing);
 
               if (user.balance < feeInfoW.totalDeductedFromBalance) {
@@ -13204,7 +13209,7 @@ SUPPORT ET CONTACT:
               }
 
               if (activeProviderW === "fedapay") {
-                const result = await handleFedaPayWithdrawal(userId, user, Math.floor(amount), country, operator, sanitizedPhone, userCurrencyW);
+                const result = await handleFedaPayWithdrawal(userId, user, Math.floor(amount), country, normalizedOperatorW, sanitizedPhone, userCurrencyW);
                 if (result.success) {
                   return JSON.stringify({ success: true, message: `Retrait de ${feeInfoW.amountReceived.toLocaleString("fr-FR")} ${userCurrencyW} envoyé avec succès vers ${phone}. Frais: ${feeInfoW.feeAmount.toLocaleString("fr-FR")} ${userCurrencyW}. Transaction ID: ${result.transactionId}` });
                 } else {
@@ -13217,11 +13222,11 @@ SUPPORT ET CONTACT:
                   "orange-ci": "orange-money-ci", "mtn-ci": "mtn-ci", "moov-ci": "moov-ci", "wave-ci": "wave-ci",
                   "orange-bf": "orange-money-burkina", "moov-bf": "moov-burkina-faso",
                   "moov-bj": "moov-benin", "mtn-bj": "mtn-benin",
-                  "tmoney-tg": "t-money-togo", "moov-tg": "moov-togo",
+                  "tmoney-tg": "t-money-togo", "togocom-tg": "t-money-togo", "moov-tg": "moov-togo",
                   "orange-ml": "orange-money-mali", "moov-ml": "moov-mali",
                   "mtn-cm": "mtn-cameroun",
                 };
-                const withdrawModeW = withdrawModeMapW[`${operator}-${country.toLowerCase()}`];
+                const withdrawModeW = withdrawModeMapW[`${normalizedOperatorW}-${country.toLowerCase()}`];
                 if (!withdrawModeW) return JSON.stringify({ success: false, error: "Cet opérateur n'est pas disponible pour les retraits dans ce pays." });
 
                 let cleanPhoneW = sanitizedPhone.replace(/[\s\-\.]+/g, "");
@@ -13259,20 +13264,24 @@ SUPPORT ET CONTACT:
                 const submitW = await callPaydunyaAPIv2("/disburse/submit-invoice", { disburse_invoice: getInvoiceW.disburse_token, disburse_id: `withdrawal-${user.id.substring(0, 8)}-${Date.now()}` });
                 if (submitW.response_code === "00") {
                   await storage.updateUserBalance(userId, -feeInfoW.totalDeductedFromBalance);
-                  const txW = await storage.createTransaction({ userId, type: "withdrawal", amount: Math.floor(amount), fee: feeInfoW.feeAmount, feePercentage: feeInfoW.feePercentage, currency: userCurrencyW, status: "completed", country, operator, customerPhone: cleanPhoneW, description: `Retrait de ${Math.floor(amount)} ${userCurrencyW}`, paydunyaToken: getInvoiceW.disburse_token, metadata: JSON.stringify({ provider: "paydunya", providerAmount: providerAmountW, providerCurrency: chatbotWProviderCurrency }) });
+                  const txW = await storage.createTransaction({ userId, type: "withdrawal", amount: Math.floor(amount), fee: feeInfoW.feeAmount, feePercentage: feeInfoW.feePercentage, currency: userCurrencyW, status: "completed", country, operator: normalizedOperatorW, customerPhone: cleanPhoneW, description: `Retrait de ${Math.floor(amount)} ${userCurrencyW}`, paydunyaToken: getInvoiceW.disburse_token, metadata: JSON.stringify({ provider: "paydunya", providerAmount: providerAmountW, providerCurrency: chatbotWProviderCurrency }) });
                   return JSON.stringify({ success: true, message: `Retrait de ${feeInfoW.amountReceived.toLocaleString("fr-FR")} ${userCurrencyW} envoyé avec succès. Frais: ${feeInfoW.feeAmount.toLocaleString("fr-FR")} ${userCurrencyW}. Transaction ID: ${txW.id}` });
                 }
                 return JSON.stringify({ success: false, error: "Retrait échoué" });
               } else if (activeProviderW === "mbiyopay") {
-                const result = await handleMbiyoPayWithdrawal(userId, user, Math.floor(amount), country, operator, sanitizedPhone, userCurrencyW);
+                const result = await handleMbiyoPayWithdrawal(userId, user, Math.floor(amount), country, normalizedOperatorW, sanitizedPhone, userCurrencyW);
                 if (result.success) return JSON.stringify({ success: true, message: `Retrait envoyé avec succès. Transaction ID: ${result.transactionId}` });
                 return JSON.stringify({ success: false, error: result.error || "Erreur lors du retrait" });
               } else if (activeProviderW === "afribapay") {
-                const result = await handleAfribaPayWithdrawal(userId, user, Math.floor(amount), country, operator, sanitizedPhone, userCurrencyW);
+                const result = await handleAfribaPayWithdrawal(userId, user, Math.floor(amount), country, normalizedOperatorW, sanitizedPhone, userCurrencyW);
                 if (result.success) return JSON.stringify({ success: true, message: `Retrait envoyé avec succès. Transaction ID: ${result.transactionId}` });
                 return JSON.stringify({ success: false, error: result.error || "Erreur lors du retrait" });
               } else if (activeProviderW === "moneyfusion") {
-                const result = await handleMoneyFusionWithdrawal(userId, user, Math.floor(amount), country, operator, sanitizedPhone, userCurrencyW);
+                const result = await handleMoneyFusionWithdrawal(userId, user, Math.floor(amount), country, normalizedOperatorW, sanitizedPhone, userCurrencyW);
+                if (result.success) return JSON.stringify({ success: true, message: `Retrait envoyé avec succès. Transaction ID: ${result.transactionId}` });
+                return JSON.stringify({ success: false, error: result.error || "Erreur lors du retrait" });
+              } else if (activeProviderW === "pawapay") {
+                const result = await handlePawaPayWithdrawal(userId, user, Math.floor(amount), country, normalizedOperatorW, sanitizedPhone, userCurrencyW, userCurrencyW);
                 if (result.success) return JSON.stringify({ success: true, message: `Retrait envoyé avec succès. Transaction ID: ${result.transactionId}` });
                 return JSON.stringify({ success: false, error: result.error || "Erreur lors du retrait" });
               }
@@ -13300,17 +13309,20 @@ SUPPORT ET CONTACT:
               const minAmountT = user.country === "CD" ? 2000 : 500;
               if (amount < minAmountT) return JSON.stringify({ success: false, error: `Montant minimum: ${minAmountT.toLocaleString("fr-FR")} ${userCurrencyT}` });
 
-              const activeProviderT = await getActiveProviderForWithdrawal(country, operator);
+              // Normalize operator: strip country suffix if present (e.g. "moov-tg" → "moov", "orange-ci" → "orange")
+              const normalizedOperatorT = operator.replace(/-[a-z]{2}$/i, '');
+
+              const activeProviderT = await getActiveProviderForWithdrawal(country, normalizedOperatorT);
               if (!activeProviderT) return JSON.stringify({ success: false, error: "Cet opérateur n'est pas disponible pour les transferts dans ce pays actuellement." });
 
-              const feeConfigT = await getFeeFromDatabase(storage, activeProviderT, country, operator);
+              const feeConfigT = await getFeeFromDatabase(storage, activeProviderT, country, normalizedOperatorT);
               const feeInfoT = calculateOutgoingFee(Math.floor(amount), feeConfigT.outgoing);
 
               let destCurrencyT = getCurrencyForCountry(country?.toUpperCase() || "");
               if (activeProviderT === "pawapay") {
                 try {
                   const { getCurrencyForOperator: getOpCurrT } = await import("@shared/pawapay-countries");
-                  const opCurrT = getOpCurrT(country?.toUpperCase() || "", operator);
+                  const opCurrT = getOpCurrT(country?.toUpperCase() || "", normalizedOperatorT);
                   if (opCurrT) destCurrencyT = opCurrT;
                 } catch (_) {}
               }
@@ -13331,7 +13343,7 @@ SUPPORT ET CONTACT:
               }
 
               if (activeProviderT === "fedapay") {
-                const result = await handleFedaPayTransfer(userId, user, Math.floor(amount), country, operator, sanitizedPhoneT, userCurrencyT);
+                const result = await handleFedaPayTransfer(userId, user, Math.floor(amount), country, normalizedOperatorT, sanitizedPhoneT, userCurrencyT);
                 if (result.success) {
                   return JSON.stringify({ success: true, message: `Transfert de ${Math.floor(amount).toLocaleString("fr-FR")} ${userCurrencyT} envoyé avec succès vers ${phone}. Frais: ${feeInfoT.feeAmount.toLocaleString("fr-FR")} ${userCurrencyT}. Total débité: ${requiredBalanceT.toLocaleString("fr-FR")} ${userCurrencyT}. Transaction ID: ${result.transactionId}` });
                 } else {
@@ -13344,11 +13356,11 @@ SUPPORT ET CONTACT:
                   "orange-ci": "orange-money-ci", "mtn-ci": "mtn-ci", "moov-ci": "moov-ci", "wave-ci": "wave-ci",
                   "orange-bf": "orange-money-burkina", "moov-bf": "moov-burkina-faso",
                   "moov-bj": "moov-benin", "mtn-bj": "mtn-benin",
-                  "tmoney-tg": "t-money-togo", "moov-tg": "moov-togo",
+                  "tmoney-tg": "t-money-togo", "togocom-tg": "t-money-togo", "moov-tg": "moov-togo",
                   "orange-ml": "orange-money-mali", "moov-ml": "moov-mali",
                   "mtn-cm": "mtn-cameroun",
                 };
-                const withdrawModeT = withdrawModeMapT[`${operator}-${country.toLowerCase()}`];
+                const withdrawModeT = withdrawModeMapT[`${normalizedOperatorT}-${country.toLowerCase()}`];
                 if (!withdrawModeT) return JSON.stringify({ success: false, error: "Cet opérateur n'est pas disponible pour les transferts dans ce pays." });
 
                 let cleanPhoneT = sanitizedPhoneT.replace(/[\s\-\.]+/g, "");
@@ -13385,12 +13397,12 @@ SUPPORT ET CONTACT:
                 const submitT = await callPaydunyaAPIv2("/disburse/submit-invoice", { disburse_invoice: getInvoiceT.disburse_token, disburse_id: `transfer-${user.id.substring(0, 8)}-${Date.now()}` });
                 if (submitT.response_code === "00") {
                   await storage.updateUserBalance(userId, -requiredBalanceT);
-                  const txT = await storage.createTransaction({ userId, type: "transfer", amount: Math.floor(amount), fee: feeInfoT.feeAmount, feePercentage: feeInfoT.feePercentage, currency: userCurrencyT, status: "completed", country, operator, customerPhone: cleanPhoneT, description: `Transfert de ${Math.floor(amount)} ${userCurrencyT}`, paydunyaToken: getInvoiceT.disburse_token, metadata: JSON.stringify({ provider: "paydunya", providerAmount: providerAmountT, providerCurrency: chatbotTProviderCurrency }) });
+                  const txT = await storage.createTransaction({ userId, type: "transfer", amount: Math.floor(amount), fee: feeInfoT.feeAmount, feePercentage: feeInfoT.feePercentage, currency: userCurrencyT, status: "completed", country, operator: normalizedOperatorT, customerPhone: cleanPhoneT, description: `Transfert de ${Math.floor(amount)} ${userCurrencyT}`, paydunyaToken: getInvoiceT.disburse_token, metadata: JSON.stringify({ provider: "paydunya", providerAmount: providerAmountT, providerCurrency: chatbotTProviderCurrency }) });
                   return JSON.stringify({ success: true, message: `Transfert de ${Math.floor(amount).toLocaleString("fr-FR")} ${userCurrencyT} envoyé avec succès. Frais: ${feeInfoT.feeAmount.toLocaleString("fr-FR")} ${userCurrencyT}. Total débité: ${requiredBalanceT.toLocaleString("fr-FR")} ${userCurrencyT}. Transaction ID: ${txT.id}` });
                 }
                 return JSON.stringify({ success: false, error: "Transfert échoué" });
               } else if (activeProviderT === "pawapay") {
-                const result = await handlePawaPayTransfer(userId, user, Math.floor(amount), country, operator, sanitizedPhoneT, userCurrencyT, destCurrencyT);
+                const result = await handlePawaPayTransfer(userId, user, Math.floor(amount), country, normalizedOperatorT, sanitizedPhoneT, userCurrencyT, destCurrencyT);
                 if (result.success) {
                   if (xFeeT.feeAmount > 0) {
                     await storage.updateUserBalance(userId, -xFeeT.feeAmount);
@@ -13400,7 +13412,7 @@ SUPPORT ET CONTACT:
                 }
                 return JSON.stringify({ success: false, error: result.error || "Erreur lors du transfert" });
               } else if (activeProviderT === "mbiyopay") {
-                const result = await handleMbiyoPayTransfer(userId, user, Math.floor(amount), country, operator, sanitizedPhoneT, userCurrencyT);
+                const result = await handleMbiyoPayTransfer(userId, user, Math.floor(amount), country, normalizedOperatorT, sanitizedPhoneT, userCurrencyT);
                 if (result.success) {
                   if (xFeeT.feeAmount > 0) {
                     await storage.updateUserBalance(userId, -xFeeT.feeAmount);
@@ -13410,7 +13422,7 @@ SUPPORT ET CONTACT:
                 }
                 return JSON.stringify({ success: false, error: result.error || "Erreur lors du transfert" });
               } else if (activeProviderT === "afribapay") {
-                const result = await handleAfribaPayTransfer(userId, user, Math.floor(amount), country, operator, sanitizedPhoneT, userCurrencyT);
+                const result = await handleAfribaPayTransfer(userId, user, Math.floor(amount), country, normalizedOperatorT, sanitizedPhoneT, userCurrencyT);
                 if (result.success) {
                   if (xFeeT.feeAmount > 0) {
                     await storage.updateUserBalance(userId, -xFeeT.feeAmount);
@@ -13420,7 +13432,7 @@ SUPPORT ET CONTACT:
                 }
                 return JSON.stringify({ success: false, error: result.error || "Erreur lors du transfert" });
               } else if (activeProviderT === "moneyfusion") {
-                const result = await handleMoneyFusionTransfer(userId, user, Math.floor(amount), country, operator, sanitizedPhoneT, userCurrencyT);
+                const result = await handleMoneyFusionTransfer(userId, user, Math.floor(amount), country, normalizedOperatorT, sanitizedPhoneT, userCurrencyT);
                 if (result.success) {
                   if (xFeeT.feeAmount > 0) {
                     await storage.updateUserBalance(userId, -xFeeT.feeAmount);
@@ -13638,7 +13650,8 @@ SUPPORT ET CONTACT:
 
   app.get("/api/admin/pending-broadcast", requireAdmin, async (req: Request, res: Response) => {
     try {
-      const setting = await storage.getPlatformSetting("pending_broadcast");
+      const result = await pgPool.query("SELECT value FROM platform_settings WHERE key = 'pending_broadcast'");
+      const setting = result.rows[0]?.value;
       if (setting) {
         res.json(JSON.parse(setting));
       } else {
@@ -13652,13 +13665,14 @@ SUPPORT ET CONTACT:
   app.post("/api/admin/save-pending-broadcast", requireAdmin, async (req: Request, res: Response) => {
     try {
       const { data } = req.body;
-      if (data) {
-        await storage.setPlatformSetting("pending_broadcast", JSON.stringify(data));
-      } else {
-        await storage.setPlatformSetting("pending_broadcast", "");
-      }
+      const value = data ? JSON.stringify(data) : "";
+      await pgPool.query(
+        "INSERT INTO platform_settings (key, value, updated_at) VALUES ('pending_broadcast', $1, NOW()) ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = NOW()",
+        [value]
+      );
       res.json({ ok: true });
-    } catch {
+    } catch (err: any) {
+      console.error("[Admin] save-pending-broadcast error:", err);
       res.status(500).json({ error: "Erreur" });
     }
   });
