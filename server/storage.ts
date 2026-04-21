@@ -633,11 +633,16 @@ export class DbStorage implements IStorage {
   }
 
   async deleteApiKey(id: string, userId: string): Promise<boolean> {
-    const results = await db
-      .delete(schema.apiKeys)
-      .where(eq(schema.apiKeys.id, id))
-      .returning();
-    return results.length > 0 && results[0].userId === userId;
+    // Verify ownership before deleting
+    const existing = await db.select({ id: schema.apiKeys.id })
+      .from(schema.apiKeys)
+      .where(and(eq(schema.apiKeys.id, id), eq(schema.apiKeys.userId, userId)))
+      .limit(1);
+    if (existing.length === 0) return false;
+    // Delete dependent payment sessions first to avoid FK constraint violation
+    await db.delete(schema.paymentSessions).where(eq(schema.paymentSessions.apiKeyId, id));
+    await db.delete(schema.apiKeys).where(eq(schema.apiKeys.id, id));
+    return true;
   }
 
   async updateApiKeyCallback(id: string, userId: string, callbackUrl: string | null): Promise<ApiKey | undefined> {
