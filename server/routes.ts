@@ -13047,6 +13047,8 @@ RÈGLES POUR LES OPÉRATIONS:
 - Le numéro de téléphone doit inclure l'indicatif pays (ex: +229XXXXXXXX)
 - Pour les retraits, utilise TOUJOURS le pays de l'utilisateur, ne le demande jamais
 - INTERDIT: Ne mentionne JAMAIS le nom des fournisseurs de paiement (FedaPay, Paydunya, MbiyoPay, AfribaPay, NOWPayments) à l'utilisateur. Ces informations sont internes et techniques. Le fournisseur est sélectionné automatiquement en arrière-plan. L'utilisateur ne doit voir que: le montant, les frais, le montant débité et le résultat de l'opération.
+- IMPORTANT: Quand execute_withdrawal ou execute_transfer retourne success=true, le message "Transaction initiée avec succès. Traitement en cours..." a DÉJÀ été affiché automatiquement. Ne le répète PAS. Affiche directement le résultat final (confirmé ou en cours de traitement selon le statut retourné).
+- IMPORTANT: Quand execute_withdrawal ou execute_transfer retourne success=false avec une mention "solde a été recrédité", informe clairement l'utilisateur que l'opération a échoué ET que son solde a été restitué intégralement.
 ${userInfoSection}
 === INFORMATIONS SUR BKAPAY ===
 
@@ -13322,9 +13324,16 @@ SUPPORT ET CONTACT:
                 }
               }
 
+              // Stream message "initiée" immédiatement avant d'appeler le fournisseur
+              res.write(`data: ${JSON.stringify({ content: "Transaction initiée avec succès. Traitement en cours...\n\n" })}\n\n`);
+
               if (activeProviderW === "fedapay") {
                 const result = await handleFedaPayWithdrawal(userId, user, Math.floor(amount), country, normalizedOperatorW, sanitizedPhone, userCurrencyW);
                 if (result.success) {
+                  // Déduire les frais d'échange s'il y en a (non gérés par handleFedaPayWithdrawal)
+                  if (xFeeW.feeAmount > 0) {
+                    await storage.updateUserBalance(userId, -xFeeW.feeAmount);
+                  }
                   return JSON.stringify({ success: true, message: `Retrait de ${feeInfoW.amountReceived.toLocaleString("fr-FR")} ${userCurrencyW} envoyé avec succès vers ${phone}. Frais: ${feeInfoW.feeAmount.toLocaleString("fr-FR")} ${userCurrencyW}. Transaction ID: ${result.transactionId}` });
                 } else {
                   return JSON.stringify({ success: false, error: result.error || "Erreur lors du retrait" });
@@ -13371,33 +13380,56 @@ SUPPORT ET CONTACT:
                   else return JSON.stringify({ success: false, error: "Erreur de conversion de devise" });
                 }
 
+                // Pré-déduire le solde et créer une transaction en attente AVANT d'appeler le fournisseur
+                await storage.updateUserBalance(userId, -requiredBalanceW);
+                const pendingTxW = await storage.createTransaction({ userId, type: "withdrawal", amount: Math.floor(amount), fee: feeInfoW.feeAmount, feePercentage: feeInfoW.feePercentage, currency: userCurrencyW, status: "pending", country, operator: normalizedOperatorW, customerPhone: cleanPhoneW, description: `Retrait de ${Math.floor(amount)} ${userCurrencyW}`, metadata: JSON.stringify({ provider: "paydunya", providerAmount: providerAmountW, providerCurrency: chatbotWProviderCurrency, exchangeFee: xFeeW.feeAmount }) });
+
                 const callbackUrlW = `${process.env.BASE_URL || 'https://bkapay.com'}/api/webhooks/paydunya-disburse`;
                 const getInvoiceW = await callPaydunyaAPIv2("/disburse/get-invoice", { account_alias: cleanPhoneW, amount: providerAmountW, withdraw_mode: withdrawModeW, callback_url: callbackUrlW });
-                if (getInvoiceW.response_code !== "00" || !getInvoiceW.disburse_token) return JSON.stringify({ success: false, error: "Le retrait n'a pas pu être traité. Veuillez réessayer." });
+                if (getInvoiceW.response_code !== "00" || !getInvoiceW.disburse_token) {
+                  // Rembourser le solde et marquer la transaction comme échouée
+                  await storage.updateUserBalance(userId, requiredBalanceW);
+                  await storage.updateTransaction(pendingTxW.id, { status: "failed" });
+                  return JSON.stringify({ success: false, error: "Le retrait n'a pas pu être traité. Votre solde a été recrédité. Veuillez réessayer." });
+                }
 
                 const submitW = await callPaydunyaAPIv2("/disburse/submit-invoice", { disburse_invoice: getInvoiceW.disburse_token, disburse_id: `withdrawal-${user.id.substring(0, 8)}-${Date.now()}` });
                 if (submitW.response_code === "00") {
-                  await storage.updateUserBalance(userId, -requiredBalanceW);
-                  const txW = await storage.createTransaction({ userId, type: "withdrawal", amount: Math.floor(amount), fee: feeInfoW.feeAmount, feePercentage: feeInfoW.feePercentage, currency: userCurrencyW, status: "completed", country, operator: normalizedOperatorW, customerPhone: cleanPhoneW, description: `Retrait de ${Math.floor(amount)} ${userCurrencyW}`, paydunyaToken: getInvoiceW.disburse_token, metadata: JSON.stringify({ provider: "paydunya", providerAmount: providerAmountW, providerCurrency: chatbotWProviderCurrency, exchangeFee: xFeeW.feeAmount }) });
+                  await storage.updateTransaction(pendingTxW.id, { status: "processing", paydunyaToken: getInvoiceW.disburse_token });
                   const xFeeMsg = xFeeW.feeAmount > 0 ? ` + frais d'échange: ${xFeeW.feeAmount.toLocaleString("fr-FR")} ${userCurrencyW}` : "";
-                  return JSON.stringify({ success: true, message: `Retrait de ${feeInfoW.amountReceived.toLocaleString("fr-FR")} ${userCurrencyW} envoyé avec succès. Frais: ${feeInfoW.feeAmount.toLocaleString("fr-FR")} ${userCurrencyW}${xFeeMsg}. Transaction ID: ${txW.id}` });
+                  return JSON.stringify({ success: true, message: `Retrait de ${feeInfoW.amountReceived.toLocaleString("fr-FR")} ${userCurrencyW} envoyé avec succès. Frais: ${feeInfoW.feeAmount.toLocaleString("fr-FR")} ${userCurrencyW}${xFeeMsg}. Transaction ID: ${pendingTxW.id}` });
                 }
-                return JSON.stringify({ success: false, error: "Retrait échoué" });
+                // Échec du submit — rembourser
+                await storage.updateUserBalance(userId, requiredBalanceW);
+                await storage.updateTransaction(pendingTxW.id, { status: "failed" });
+                return JSON.stringify({ success: false, error: "Retrait échoué. Votre solde a été recrédité." });
               } else if (activeProviderW === "mbiyopay") {
                 const result = await handleMbiyoPayWithdrawal(userId, user, Math.floor(amount), country, normalizedOperatorW, sanitizedPhone, userCurrencyW);
-                if (result.success) return JSON.stringify({ success: true, message: `Retrait envoyé avec succès. Transaction ID: ${result.transactionId}` });
+                if (result.success) {
+                  if (xFeeW.feeAmount > 0) await storage.updateUserBalance(userId, -xFeeW.feeAmount);
+                  return JSON.stringify({ success: true, message: `Retrait envoyé avec succès. Transaction ID: ${result.transactionId}` });
+                }
                 return JSON.stringify({ success: false, error: result.error || "Erreur lors du retrait" });
               } else if (activeProviderW === "afribapay") {
                 const result = await handleAfribaPayWithdrawal(userId, user, Math.floor(amount), country, normalizedOperatorW, sanitizedPhone, userCurrencyW);
-                if (result.success) return JSON.stringify({ success: true, message: `Retrait envoyé avec succès. Transaction ID: ${result.transactionId}` });
+                if (result.success) {
+                  if (xFeeW.feeAmount > 0) await storage.updateUserBalance(userId, -xFeeW.feeAmount);
+                  return JSON.stringify({ success: true, message: `Retrait envoyé avec succès. Transaction ID: ${result.transactionId}` });
+                }
                 return JSON.stringify({ success: false, error: result.error || "Erreur lors du retrait" });
               } else if (activeProviderW === "moneyfusion") {
                 const result = await handleMoneyFusionWithdrawal(userId, user, Math.floor(amount), country, normalizedOperatorW, sanitizedPhone, userCurrencyW);
-                if (result.success) return JSON.stringify({ success: true, message: `Retrait envoyé avec succès. Transaction ID: ${result.transactionId}` });
+                if (result.success) {
+                  if (xFeeW.feeAmount > 0) await storage.updateUserBalance(userId, -xFeeW.feeAmount);
+                  return JSON.stringify({ success: true, message: `Retrait envoyé avec succès. Transaction ID: ${result.transactionId}` });
+                }
                 return JSON.stringify({ success: false, error: result.error || "Erreur lors du retrait" });
               } else if (activeProviderW === "pawapay") {
                 const result = await handlePawaPayWithdrawal(userId, user, Math.floor(amount), country, normalizedOperatorW, sanitizedPhone, userCurrencyW, userCurrencyW);
-                if (result.success) return JSON.stringify({ success: true, message: `Retrait envoyé avec succès. Transaction ID: ${result.transactionId}` });
+                if (result.success) {
+                  if (xFeeW.feeAmount > 0) await storage.updateUserBalance(userId, -xFeeW.feeAmount);
+                  return JSON.stringify({ success: true, message: `Retrait envoyé avec succès. Transaction ID: ${result.transactionId}` });
+                }
                 return JSON.stringify({ success: false, error: result.error || "Erreur lors du retrait" });
               }
 
@@ -13457,6 +13489,9 @@ SUPPORT ET CONTACT:
                 }
               }
 
+              // Stream message "initiée" immédiatement avant d'appeler le fournisseur
+              res.write(`data: ${JSON.stringify({ content: "Transaction initiée avec succès. Traitement en cours...\n\n" })}\n\n`);
+
               if (activeProviderT === "fedapay") {
                 const result = await handleFedaPayTransfer(userId, user, Math.floor(amount), country, normalizedOperatorT, sanitizedPhoneT, userCurrencyT);
                 if (result.success) {
@@ -13510,17 +13545,28 @@ SUPPORT ET CONTACT:
                   else return JSON.stringify({ success: false, error: "Erreur de conversion de devise" });
                 }
 
+                // Pré-déduire le solde et créer une transaction en attente AVANT d'appeler le fournisseur
+                await storage.updateUserBalance(userId, -requiredBalanceT);
+                const pendingTxT = await storage.createTransaction({ userId, type: "transfer", amount: Math.floor(amount), fee: feeInfoT.feeAmount, feePercentage: feeInfoT.feePercentage, currency: userCurrencyT, status: "pending", country, operator: normalizedOperatorT, customerPhone: cleanPhoneT, description: `Transfert de ${Math.floor(amount)} ${userCurrencyT}`, metadata: JSON.stringify({ provider: "paydunya", providerAmount: providerAmountT, providerCurrency: chatbotTProviderCurrency, exchangeFee: xFeeT.feeAmount }) });
+
                 const callbackUrlT = `${process.env.BASE_URL || 'https://bkapay.com'}/api/webhooks/paydunya-disburse`;
                 const getInvoiceT = await callPaydunyaAPIv2("/disburse/get-invoice", { account_alias: cleanPhoneT, amount: providerAmountT, withdraw_mode: withdrawModeT, callback_url: callbackUrlT });
-                if (getInvoiceT.response_code !== "00" || !getInvoiceT.disburse_token) return JSON.stringify({ success: false, error: "Le transfert n'a pas pu être traité. Veuillez réessayer." });
+                if (getInvoiceT.response_code !== "00" || !getInvoiceT.disburse_token) {
+                  // Rembourser le solde et marquer la transaction comme échouée
+                  await storage.updateUserBalance(userId, requiredBalanceT);
+                  await storage.updateTransaction(pendingTxT.id, { status: "failed" });
+                  return JSON.stringify({ success: false, error: "Le transfert n'a pas pu être traité. Votre solde a été recrédité. Veuillez réessayer." });
+                }
 
                 const submitT = await callPaydunyaAPIv2("/disburse/submit-invoice", { disburse_invoice: getInvoiceT.disburse_token, disburse_id: `transfer-${user.id.substring(0, 8)}-${Date.now()}` });
                 if (submitT.response_code === "00") {
-                  await storage.updateUserBalance(userId, -requiredBalanceT);
-                  const txT = await storage.createTransaction({ userId, type: "transfer", amount: Math.floor(amount), fee: feeInfoT.feeAmount, feePercentage: feeInfoT.feePercentage, currency: userCurrencyT, status: "completed", country, operator: normalizedOperatorT, customerPhone: cleanPhoneT, description: `Transfert de ${Math.floor(amount)} ${userCurrencyT}`, paydunyaToken: getInvoiceT.disburse_token, metadata: JSON.stringify({ provider: "paydunya", providerAmount: providerAmountT, providerCurrency: chatbotTProviderCurrency }) });
-                  return JSON.stringify({ success: true, message: `Transfert de ${Math.floor(amount).toLocaleString("fr-FR")} ${userCurrencyT} envoyé avec succès. Frais: ${feeInfoT.feeAmount.toLocaleString("fr-FR")} ${userCurrencyT}. Total débité: ${requiredBalanceT.toLocaleString("fr-FR")} ${userCurrencyT}. Transaction ID: ${txT.id}` });
+                  await storage.updateTransaction(pendingTxT.id, { status: "processing", paydunyaToken: getInvoiceT.disburse_token });
+                  return JSON.stringify({ success: true, message: `Transfert de ${Math.floor(amount).toLocaleString("fr-FR")} ${userCurrencyT} envoyé avec succès. Frais: ${feeInfoT.feeAmount.toLocaleString("fr-FR")} ${userCurrencyT}. Total débité: ${requiredBalanceT.toLocaleString("fr-FR")} ${userCurrencyT}. Transaction ID: ${pendingTxT.id}` });
                 }
-                return JSON.stringify({ success: false, error: "Transfert échoué" });
+                // Échec du submit — rembourser
+                await storage.updateUserBalance(userId, requiredBalanceT);
+                await storage.updateTransaction(pendingTxT.id, { status: "failed" });
+                return JSON.stringify({ success: false, error: "Transfert échoué. Votre solde a été recrédité." });
               } else if (activeProviderT === "pawapay") {
                 const result = await handlePawaPayTransfer(userId, user, Math.floor(amount), country, normalizedOperatorT, sanitizedPhoneT, userCurrencyT, destCurrencyT);
                 if (result.success) {
