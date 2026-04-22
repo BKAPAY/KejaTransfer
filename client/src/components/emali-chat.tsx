@@ -225,14 +225,25 @@ export function EmaliChatButton() {
   const renderMarkdown = (text: string) => {
     const safe = escapeHtml(text);
     return safe
-      .replace(/### (.*?)(\n|$)/g, '<strong class="text-sm block mt-2 mb-1">$1</strong>')
-      .replace(/## (.*?)(\n|$)/g, '<strong class="text-sm block mt-2 mb-1">$1</strong>')
+      // Section headers ## / ###
+      .replace(/^#{2,3} (.*?)$/gm, '<div style="font-weight:600;font-size:0.82rem;margin-top:10px;margin-bottom:4px;padding-left:8px;border-left:3px solid hsl(var(--primary));color:hsl(var(--foreground))">$1</div>')
+      // Status badges
+      .replace(/\[SUCCÈS\]/g, '<span style="display:inline-flex;align-items:center;padding:1px 7px;border-radius:4px;background:rgba(34,197,94,0.15);color:#16a34a;font-size:0.72rem;font-weight:700;letter-spacing:0.03em">SUCCÈS</span>')
+      .replace(/\[ERREUR\]/g, '<span style="display:inline-flex;align-items:center;padding:1px 7px;border-radius:4px;background:rgba(239,68,68,0.15);color:#dc2626;font-size:0.72rem;font-weight:700;letter-spacing:0.03em">ERREUR</span>')
+      .replace(/\[EN COURS\]/g, '<span style="display:inline-flex;align-items:center;padding:1px 7px;border-radius:4px;background:rgba(234,179,8,0.15);color:#ca8a04;font-size:0.72rem;font-weight:700;letter-spacing:0.03em">EN COURS</span>')
+      .replace(/\[INFO\]/g, '<span style="display:inline-flex;align-items:center;padding:1px 7px;border-radius:4px;background:rgba(59,130,246,0.15);color:#2563eb;font-size:0.72rem;font-weight:700;letter-spacing:0.03em">INFO</span>')
+      // Separator line ─────
+      .replace(/─{3,}/g, '<hr style="margin:8px 0;border:none;border-top:1px solid hsl(var(--border))" />')
+      // Markdown links
       .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
-        '<a href="$2" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 px-2 py-1 mt-1 mb-1 rounded-md bg-primary/10 text-primary text-xs font-medium hover:bg-primary/20 transition-colors" style="text-decoration:none">$1</a>')
+        '<a href="$2" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:4px;background:hsl(var(--primary)/0.1);color:hsl(var(--primary));font-size:0.75rem;font-weight:500;text-decoration:none">$1</a>')
       .replace(/(?<!["\w])(https?:\/\/[^\s&lt;)]+)/g,
-        '<a href="$1" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 px-2 py-1 mt-1 mb-1 rounded-md bg-primary/10 text-primary text-xs font-medium hover:bg-primary/20 transition-colors" style="text-decoration:none">$1</a>')
-      .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-      .replace(/\*(.*?)\*/g, "<em>$1</em>")
+        '<a href="$1" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:4px;background:hsl(var(--primary)/0.1);color:hsl(var(--primary));font-size:0.75rem;font-weight:500;text-decoration:none">$1</a>')
+      // Bold → primary-colored
+      .replace(/\*\*(.*?)\*\*/g, '<strong style="font-weight:600;color:hsl(var(--foreground))">$1</strong>')
+      // Italic
+      .replace(/\*(.*?)\*/g, '<em style="color:hsl(var(--muted-foreground))">$1</em>')
+      // Newlines
       .replace(/\n/g, "<br />");
   };
 
