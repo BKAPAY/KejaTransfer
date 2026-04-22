@@ -13341,13 +13341,13 @@ SUPPORT ET CONTACT:
               // Stream message "initiée" immédiatement avant d'appeler le fournisseur
               res.write(`data: ${JSON.stringify({ content: "Transaction initiée avec succès. Traitement en cours...\n\n" })}\n\n`);
 
+              const emaliBalanceUpdateEvt = `data: ${JSON.stringify({ type: "balance_update" })}\n\n`;
+
               if (activeProviderW === "fedapay") {
                 const result = await handleFedaPayWithdrawal(userId, user, Math.floor(amount), country, normalizedOperatorW, sanitizedPhone, userCurrencyW);
                 if (result.success) {
-                  // Déduire les frais d'échange s'il y en a (non gérés par handleFedaPayWithdrawal)
-                  if (xFeeW.feeAmount > 0) {
-                    await storage.updateUserBalance(userId, -xFeeW.feeAmount);
-                  }
+                  if (xFeeW.feeAmount > 0) await storage.updateUserBalance(userId, -xFeeW.feeAmount);
+                  res.write(emaliBalanceUpdateEvt);
                   return JSON.stringify({ success: true, message: `Retrait de ${feeInfoW.amountReceived.toLocaleString("fr-FR")} ${userCurrencyW} envoyé avec succès vers ${phone}. Frais: ${feeInfoW.feeAmount.toLocaleString("fr-FR")} ${userCurrencyW}. Transaction ID: ${result.transactionId}` });
                 } else {
                   return JSON.stringify({ success: false, error: result.error || "Erreur lors du retrait" });
@@ -13396,14 +13396,15 @@ SUPPORT ET CONTACT:
 
                 // Pré-déduire le solde et créer une transaction en attente AVANT d'appeler le fournisseur
                 await storage.updateUserBalance(userId, -requiredBalanceW);
+                res.write(emaliBalanceUpdateEvt);
                 const pendingTxW = await storage.createTransaction({ userId, type: "withdrawal", amount: Math.floor(amount), fee: feeInfoW.feeAmount, feePercentage: feeInfoW.feePercentage, currency: userCurrencyW, status: "pending", country, operator: normalizedOperatorW, customerPhone: cleanPhoneW, description: `Retrait de ${Math.floor(amount)} ${userCurrencyW}`, metadata: JSON.stringify({ provider: "paydunya", providerAmount: providerAmountW, providerCurrency: chatbotWProviderCurrency, exchangeFee: xFeeW.feeAmount }) });
 
                 const callbackUrlW = `${process.env.BASE_URL || 'https://bkapay.com'}/api/webhooks/paydunya-disburse`;
                 const getInvoiceW = await callPaydunyaAPIv2("/disburse/get-invoice", { account_alias: cleanPhoneW, amount: providerAmountW, withdraw_mode: withdrawModeW, callback_url: callbackUrlW });
                 if (getInvoiceW.response_code !== "00" || !getInvoiceW.disburse_token) {
-                  // Rembourser le solde et marquer la transaction comme échouée
                   await storage.updateUserBalance(userId, requiredBalanceW);
                   await storage.updateTransaction(pendingTxW.id, { status: "failed" });
+                  res.write(emaliBalanceUpdateEvt);
                   return JSON.stringify({ success: false, error: "Le retrait n'a pas pu être traité. Votre solde a été recrédité. Veuillez réessayer." });
                 }
 
@@ -13413,37 +13414,45 @@ SUPPORT ET CONTACT:
                   const xFeeMsg = xFeeW.feeAmount > 0 ? ` + frais d'échange: ${xFeeW.feeAmount.toLocaleString("fr-FR")} ${userCurrencyW}` : "";
                   return JSON.stringify({ success: true, message: `Retrait de ${feeInfoW.amountReceived.toLocaleString("fr-FR")} ${userCurrencyW} envoyé avec succès. Frais: ${feeInfoW.feeAmount.toLocaleString("fr-FR")} ${userCurrencyW}${xFeeMsg}. Transaction ID: ${pendingTxW.id}` });
                 }
-                // Échec du submit — rembourser
                 await storage.updateUserBalance(userId, requiredBalanceW);
                 await storage.updateTransaction(pendingTxW.id, { status: "failed" });
+                res.write(emaliBalanceUpdateEvt);
                 return JSON.stringify({ success: false, error: "Retrait échoué. Votre solde a été recrédité." });
               } else if (activeProviderW === "mbiyopay") {
                 const result = await handleMbiyoPayWithdrawal(userId, user, Math.floor(amount), country, normalizedOperatorW, sanitizedPhone, userCurrencyW);
                 if (result.success) {
                   if (xFeeW.feeAmount > 0) await storage.updateUserBalance(userId, -xFeeW.feeAmount);
+                  res.write(emaliBalanceUpdateEvt);
                   return JSON.stringify({ success: true, message: `Retrait envoyé avec succès. Transaction ID: ${result.transactionId}` });
                 }
+                res.write(emaliBalanceUpdateEvt);
                 return JSON.stringify({ success: false, error: result.error || "Erreur lors du retrait" });
               } else if (activeProviderW === "afribapay") {
                 const result = await handleAfribaPayWithdrawal(userId, user, Math.floor(amount), country, normalizedOperatorW, sanitizedPhone, userCurrencyW);
                 if (result.success) {
                   if (xFeeW.feeAmount > 0) await storage.updateUserBalance(userId, -xFeeW.feeAmount);
+                  res.write(emaliBalanceUpdateEvt);
                   return JSON.stringify({ success: true, message: `Retrait envoyé avec succès. Transaction ID: ${result.transactionId}` });
                 }
+                res.write(emaliBalanceUpdateEvt);
                 return JSON.stringify({ success: false, error: result.error || "Erreur lors du retrait" });
               } else if (activeProviderW === "moneyfusion") {
                 const result = await handleMoneyFusionWithdrawal(userId, user, Math.floor(amount), country, normalizedOperatorW, sanitizedPhone, userCurrencyW);
                 if (result.success) {
                   if (xFeeW.feeAmount > 0) await storage.updateUserBalance(userId, -xFeeW.feeAmount);
+                  res.write(emaliBalanceUpdateEvt);
                   return JSON.stringify({ success: true, message: `Retrait envoyé avec succès. Transaction ID: ${result.transactionId}` });
                 }
+                res.write(emaliBalanceUpdateEvt);
                 return JSON.stringify({ success: false, error: result.error || "Erreur lors du retrait" });
               } else if (activeProviderW === "pawapay") {
                 const result = await handlePawaPayWithdrawal(userId, user, Math.floor(amount), country, normalizedOperatorW, sanitizedPhone, userCurrencyW, userCurrencyW);
                 if (result.success) {
                   if (xFeeW.feeAmount > 0) await storage.updateUserBalance(userId, -xFeeW.feeAmount);
+                  res.write(emaliBalanceUpdateEvt);
                   return JSON.stringify({ success: true, message: `Retrait envoyé avec succès. Transaction ID: ${result.transactionId}` });
                 }
+                res.write(emaliBalanceUpdateEvt);
                 return JSON.stringify({ success: false, error: result.error || "Erreur lors du retrait" });
               } else if (activeProviderW === "feexpay") {
                 const result = await handleFeeXPayWithdrawal(userId, user, Math.floor(amount), country, normalizedOperatorW, sanitizedPhone, userCurrencyW);
@@ -13452,9 +13461,11 @@ SUPPORT ET CONTACT:
                     await storage.updateUserBalance(userId, -xFeeW.feeAmount);
                     console.log(`[EMALI Withdrawal feexpay] Exchange fee deducted: ${xFeeW.feeAmount} ${userCurrencyW}`);
                   }
+                  res.write(emaliBalanceUpdateEvt);
                   const xFeeMsg = xFeeW.feeAmount > 0 ? ` Frais de change: ${xFeeW.feeAmount.toLocaleString("fr-FR")} ${userCurrencyW}.` : "";
                   return JSON.stringify({ success: true, message: `Retrait envoyé avec succès.${xFeeMsg} Transaction ID: ${result.transactionId}` });
                 }
+                res.write(emaliBalanceUpdateEvt);
                 return JSON.stringify({ success: false, error: result.error || "Erreur lors du retrait" });
               }
 
@@ -13517,6 +13528,8 @@ SUPPORT ET CONTACT:
               // Stream message "initiée" immédiatement avant d'appeler le fournisseur
               res.write(`data: ${JSON.stringify({ content: "Transaction initiée avec succès. Traitement en cours...\n\n" })}\n\n`);
 
+              const emaliBalanceUpdateEvtT = `data: ${JSON.stringify({ type: "balance_update" })}\n\n`;
+
               if (activeProviderT === "fedapay") {
                 const result = await handleFedaPayTransfer(userId, user, Math.floor(amount), country, normalizedOperatorT, sanitizedPhoneT, userCurrencyT);
                 if (result.success) {
@@ -13524,6 +13537,7 @@ SUPPORT ET CONTACT:
                     await storage.updateUserBalance(userId, -xFeeT.feeAmount);
                     console.log(`[EMALI Transfer fedapay] Exchange fee deducted: ${xFeeT.feeAmount} ${userCurrencyT}`);
                   }
+                  res.write(emaliBalanceUpdateEvtT);
                   const xFeeMsgT = xFeeT.feeAmount > 0 ? ` Frais de change: ${xFeeT.feeAmount.toLocaleString("fr-FR")} ${userCurrencyT}.` : "";
                   return JSON.stringify({ success: true, message: `Transfert de ${Math.floor(amount).toLocaleString("fr-FR")} ${userCurrencyT} envoyé avec succès vers ${phone}. Frais: ${feeInfoT.feeAmount.toLocaleString("fr-FR")} ${userCurrencyT}.${xFeeMsgT} Total débité: ${requiredBalanceT.toLocaleString("fr-FR")} ${userCurrencyT}. Transaction ID: ${result.transactionId}` });
                 } else {
@@ -13570,16 +13584,16 @@ SUPPORT ET CONTACT:
                   else return JSON.stringify({ success: false, error: "Erreur de conversion de devise" });
                 }
 
-                // Pré-déduire le solde et créer une transaction en attente AVANT d'appeler le fournisseur
                 await storage.updateUserBalance(userId, -requiredBalanceT);
+                res.write(emaliBalanceUpdateEvtT);
                 const pendingTxT = await storage.createTransaction({ userId, type: "transfer", amount: Math.floor(amount), fee: feeInfoT.feeAmount, feePercentage: feeInfoT.feePercentage, currency: userCurrencyT, status: "pending", country, operator: normalizedOperatorT, customerPhone: cleanPhoneT, description: `Transfert de ${Math.floor(amount)} ${userCurrencyT}`, metadata: JSON.stringify({ provider: "paydunya", providerAmount: providerAmountT, providerCurrency: chatbotTProviderCurrency, exchangeFee: xFeeT.feeAmount }) });
 
                 const callbackUrlT = `${process.env.BASE_URL || 'https://bkapay.com'}/api/webhooks/paydunya-disburse`;
                 const getInvoiceT = await callPaydunyaAPIv2("/disburse/get-invoice", { account_alias: cleanPhoneT, amount: providerAmountT, withdraw_mode: withdrawModeT, callback_url: callbackUrlT });
                 if (getInvoiceT.response_code !== "00" || !getInvoiceT.disburse_token) {
-                  // Rembourser le solde et marquer la transaction comme échouée
                   await storage.updateUserBalance(userId, requiredBalanceT);
                   await storage.updateTransaction(pendingTxT.id, { status: "failed" });
+                  res.write(emaliBalanceUpdateEvtT);
                   return JSON.stringify({ success: false, error: "Le transfert n'a pas pu être traité. Votre solde a été recrédité. Veuillez réessayer." });
                 }
 
@@ -13588,9 +13602,9 @@ SUPPORT ET CONTACT:
                   await storage.updateTransaction(pendingTxT.id, { status: "processing", paydunyaToken: getInvoiceT.disburse_token });
                   return JSON.stringify({ success: true, message: `Transfert de ${Math.floor(amount).toLocaleString("fr-FR")} ${userCurrencyT} envoyé avec succès. Frais: ${feeInfoT.feeAmount.toLocaleString("fr-FR")} ${userCurrencyT}. Total débité: ${requiredBalanceT.toLocaleString("fr-FR")} ${userCurrencyT}. Transaction ID: ${pendingTxT.id}` });
                 }
-                // Échec du submit — rembourser
                 await storage.updateUserBalance(userId, requiredBalanceT);
                 await storage.updateTransaction(pendingTxT.id, { status: "failed" });
+                res.write(emaliBalanceUpdateEvtT);
                 return JSON.stringify({ success: false, error: "Transfert échoué. Votre solde a été recrédité." });
               } else if (activeProviderT === "pawapay") {
                 const result = await handlePawaPayTransfer(userId, user, Math.floor(amount), country, normalizedOperatorT, sanitizedPhoneT, userCurrencyT, destCurrencyT);
@@ -13599,8 +13613,10 @@ SUPPORT ET CONTACT:
                     await storage.updateUserBalance(userId, -xFeeT.feeAmount);
                     console.log(`[EMALI Transfer pawapay] Exchange fee deducted: ${xFeeT.feeAmount} ${userCurrencyT}`);
                   }
+                  res.write(emaliBalanceUpdateEvtT);
                   return JSON.stringify({ success: true, message: `Transfert de ${Math.floor(amount).toLocaleString("fr-FR")} ${userCurrencyT} envoyé avec succès vers ${phone}. Frais: ${feeInfoT.feeAmount.toLocaleString("fr-FR")} ${userCurrencyT}.${xFeeT.feeAmount > 0 ? ` Frais de change: ${xFeeT.feeAmount.toLocaleString("fr-FR")} ${userCurrencyT}.` : ""} Total débité: ${requiredBalanceT.toLocaleString("fr-FR")} ${userCurrencyT}. Transaction ID: ${result.transactionId}` });
                 }
+                res.write(emaliBalanceUpdateEvtT);
                 return JSON.stringify({ success: false, error: result.error || "Erreur lors du transfert" });
               } else if (activeProviderT === "mbiyopay") {
                 const result = await handleMbiyoPayTransfer(userId, user, Math.floor(amount), country, normalizedOperatorT, sanitizedPhoneT, userCurrencyT);
@@ -13609,8 +13625,10 @@ SUPPORT ET CONTACT:
                     await storage.updateUserBalance(userId, -xFeeT.feeAmount);
                     console.log(`[EMALI Transfer mbiyopay] Exchange fee deducted: ${xFeeT.feeAmount} ${userCurrencyT}`);
                   }
+                  res.write(emaliBalanceUpdateEvtT);
                   return JSON.stringify({ success: true, message: `Transfert envoyé avec succès.${xFeeT.feeAmount > 0 ? ` Frais de change: ${xFeeT.feeAmount.toLocaleString("fr-FR")} ${userCurrencyT}.` : ""} Total débité: ${requiredBalanceT.toLocaleString("fr-FR")} ${userCurrencyT}. Transaction ID: ${result.transactionId}` });
                 }
+                res.write(emaliBalanceUpdateEvtT);
                 return JSON.stringify({ success: false, error: result.error || "Erreur lors du transfert" });
               } else if (activeProviderT === "afribapay") {
                 const result = await handleAfribaPayTransfer(userId, user, Math.floor(amount), country, normalizedOperatorT, sanitizedPhoneT, userCurrencyT);
@@ -13619,8 +13637,10 @@ SUPPORT ET CONTACT:
                     await storage.updateUserBalance(userId, -xFeeT.feeAmount);
                     console.log(`[EMALI Transfer afribapay] Exchange fee deducted: ${xFeeT.feeAmount} ${userCurrencyT}`);
                   }
+                  res.write(emaliBalanceUpdateEvtT);
                   return JSON.stringify({ success: true, message: `Transfert envoyé avec succès.${xFeeT.feeAmount > 0 ? ` Frais de change: ${xFeeT.feeAmount.toLocaleString("fr-FR")} ${userCurrencyT}.` : ""} Total débité: ${requiredBalanceT.toLocaleString("fr-FR")} ${userCurrencyT}. Transaction ID: ${result.transactionId}` });
                 }
+                res.write(emaliBalanceUpdateEvtT);
                 return JSON.stringify({ success: false, error: result.error || "Erreur lors du transfert" });
               } else if (activeProviderT === "moneyfusion") {
                 const result = await handleMoneyFusionTransfer(userId, user, Math.floor(amount), country, normalizedOperatorT, sanitizedPhoneT, userCurrencyT);
@@ -13629,8 +13649,10 @@ SUPPORT ET CONTACT:
                     await storage.updateUserBalance(userId, -xFeeT.feeAmount);
                     console.log(`[EMALI Transfer moneyfusion] Exchange fee deducted: ${xFeeT.feeAmount} ${userCurrencyT}`);
                   }
+                  res.write(emaliBalanceUpdateEvtT);
                   return JSON.stringify({ success: true, message: `Transfert envoyé avec succès.${xFeeT.feeAmount > 0 ? ` Frais de change: ${xFeeT.feeAmount.toLocaleString("fr-FR")} ${userCurrencyT}.` : ""} Total débité: ${requiredBalanceT.toLocaleString("fr-FR")} ${userCurrencyT}. Transaction ID: ${result.transactionId}` });
                 }
+                res.write(emaliBalanceUpdateEvtT);
                 return JSON.stringify({ success: false, error: result.error || "Erreur lors du transfert" });
               } else if (activeProviderT === "feexpay") {
                 const result = await handleFeeXPayTransfer(userId, user, Math.floor(amount), country, normalizedOperatorT, sanitizedPhoneT, userCurrencyT);
@@ -13639,8 +13661,10 @@ SUPPORT ET CONTACT:
                     await storage.updateUserBalance(userId, -xFeeT.feeAmount);
                     console.log(`[EMALI Transfer feexpay] Exchange fee deducted: ${xFeeT.feeAmount} ${userCurrencyT}`);
                   }
+                  res.write(emaliBalanceUpdateEvtT);
                   return JSON.stringify({ success: true, message: `Transfert envoyé avec succès.${xFeeT.feeAmount > 0 ? ` Frais de change: ${xFeeT.feeAmount.toLocaleString("fr-FR")} ${userCurrencyT}.` : ""} Total débité: ${requiredBalanceT.toLocaleString("fr-FR")} ${userCurrencyT}. Transaction ID: ${result.transactionId}` });
                 }
+                res.write(emaliBalanceUpdateEvtT);
                 return JSON.stringify({ success: false, error: result.error || "Erreur lors du transfert" });
               }
 

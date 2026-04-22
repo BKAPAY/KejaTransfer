@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useQuery } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { X, Send, Loader2 } from "lucide-react";
@@ -165,6 +166,11 @@ export function EmaliChatButton() {
           if (!line.startsWith("data: ")) continue;
           try {
             const data = JSON.parse(line.slice(6));
+            if (data.type === "balance_update") {
+              queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+              queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+              continue;
+            }
             if (data.content) {
               assistantContent += data.content;
               setMessages((prev) => {
@@ -175,6 +181,15 @@ export function EmaliChatButton() {
                 };
                 return updated;
               });
+              if (
+                data.content.includes("Transaction ID:") ||
+                data.content.includes("recrédité") ||
+                data.content.includes("Retrait") ||
+                data.content.includes("Transfert envoyé")
+              ) {
+                queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+                queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+              }
             }
             if (data.done) break;
             if (data.error) throw new Error(data.error);
@@ -193,6 +208,7 @@ export function EmaliChatButton() {
       ]);
     } finally {
       setIsLoading(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
     }
   }, []);
 
