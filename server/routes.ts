@@ -13338,10 +13338,11 @@ SUPPORT ET CONTACT:
                 }
               }
 
-              // Stream message "initiée" immédiatement avant d'appeler le fournisseur
-              res.write(`data: ${JSON.stringify({ content: "Transaction initiée avec succès. Traitement en cours...\n\n" })}\n\n`);
-
+              // Streaming progressif : 3 étapes visibles
+              res.write(`data: ${JSON.stringify({ content: "Transaction initiée avec succès.\n" })}\n\n`);
               const emaliBalanceUpdateEvt = `data: ${JSON.stringify({ type: "balance_update" })}\n\n`;
+              res.write(emaliBalanceUpdateEvt);
+              res.write(`data: ${JSON.stringify({ content: "Traitement en cours...\n\n" })}\n\n`);
 
               if (activeProviderW === "fedapay") {
                 const result = await handleFedaPayWithdrawal(userId, user, Math.floor(amount), country, normalizedOperatorW, sanitizedPhone, userCurrencyW);
@@ -13525,10 +13526,11 @@ SUPPORT ET CONTACT:
                 }
               }
 
-              // Stream message "initiée" immédiatement avant d'appeler le fournisseur
-              res.write(`data: ${JSON.stringify({ content: "Transaction initiée avec succès. Traitement en cours...\n\n" })}\n\n`);
-
+              // Streaming progressif : 3 étapes visibles
+              res.write(`data: ${JSON.stringify({ content: "Transaction initiée avec succès.\n" })}\n\n`);
               const emaliBalanceUpdateEvtT = `data: ${JSON.stringify({ type: "balance_update" })}\n\n`;
+              res.write(emaliBalanceUpdateEvtT);
+              res.write(`data: ${JSON.stringify({ content: "Traitement en cours...\n\n" })}\n\n`);
 
               if (activeProviderT === "fedapay") {
                 const result = await handleFedaPayTransfer(userId, user, Math.floor(amount), country, normalizedOperatorT, sanitizedPhoneT, userCurrencyT);
