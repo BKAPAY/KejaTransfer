@@ -12692,15 +12692,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Si country_status est vide, se baser sur provider_configs (clé API présente) pour déterminer les providers actifs
       const noStatusData = countryStatusData.length === 0;
       const noOpConfigData = countryOperatorConfigsData.length === 0;
-      // Providers considérés comme actifs (payin ET payout) : ceux qui ont une clé API configurée
+      // Providers considérés comme actifs : ceux qui ont une clé API/token/secretKey configurée OU isActive = true
+      // Peuplé TOUJOURS (pas seulement quand noStatusData) pour servir de fallback robuste
       const activeProvidersByKey = new Set<string>();
-      if (noStatusData) {
-        for (const pc of providerConfigsData) {
-          if (pc.apiKey && pc.apiKey.trim() !== "") {
-            activeProvidersByKey.add(pc.provider);
-          }
+      for (const pc of providerConfigsData) {
+        const hasAnyKey = (pc.apiKey && pc.apiKey.trim() !== "") ||
+                          (pc.secretKey && (pc.secretKey as any)?.trim() !== "") ||
+                          (pc.masterKey && (pc.masterKey as any)?.trim() !== "") ||
+                          (pc.token && (pc.token as any)?.trim() !== "");
+        if (hasAnyKey || pc.isActive) {
+          activeProvidersByKey.add(pc.provider);
         }
       }
+
+      const countryFlagMap: Record<string, string> = {
+        "BJ": "🇧🇯", "CI": "🇨🇮", "SN": "🇸🇳", "TG": "🇹🇬", "BF": "🇧🇫",
+        "CM": "🇨🇲", "CD": "🇨🇩", "CG": "🇨🇬", "ML": "🇲🇱", "GN": "🇬🇳",
+        "NE": "🇳🇪", "RW": "🇷🇼", "GA": "🇬🇦", "ZM": "🇿🇲", "UG": "🇺🇬", "GH": "🇬🇭",
+      };
 
       for (const country of COUNTRIES) {
         const countryCode = country.code as keyof typeof OPERATORS;
@@ -12749,6 +12758,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (payoutEntry) activeFeeOut = payoutEntry;
             hasPayin = !!payinEntry;
             hasPayout = !!payoutEntry;
+
+            // Fallback robuste : si aucun opérateur trouvé via les statuts DB mais qu'un provider
+            // actif (clé API ou isActive) gère cet opérateur, on le considère disponible
+            if (!hasPayin && !hasPayout && opProviders.some((fc: any) => activeProvidersByKey.has(fc.provider))) {
+              const fallbackEntry = opProviders.find((fc: any) => activeProvidersByKey.has(fc.provider));
+              if (fallbackEntry) { activeFeeIn = fallbackEntry; activeFeeOut = fallbackEntry; }
+              hasPayin = true;
+              hasPayout = true;
+            }
           }
 
           const inPct = activeFeeIn ? (activeFeeIn.incomingFeePercentage / 10).toFixed(1) : "N/A";
@@ -12764,11 +12782,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           payoutLines.push(`    - ${op.name} (code: ${op.code}): Frais ${outPct}% → ${payoutStatus}`);
         }
 
-        // Simple availability line for transfer/withdrawal lists
+        // Simple availability line for transfer/withdrawal lists (avec drapeaux)
         if (payoutActiveOps.length > 0) {
-          transferCountryLines.push(`- ${country.name} (${country.code}): ${payoutActiveOps.join(", ")}`);
+          const ctryFlag = countryFlagMap[country.code] || "🌍";
+          transferCountryLines.push(`${ctryFlag} ${country.name} (${country.code}): ${payoutActiveOps.join(", ")}`);
           if (currentUser && currentUser.country === country.code) {
-            withdrawalCountryLines.push(`- ${country.name} (${country.code}): ${payoutActiveOps.join(", ")}`);
+            withdrawalCountryLines.push(`${ctryFlag} ${country.name} (${country.code}): ${payoutActiveOps.join(", ")}`);
           }
         }
 
@@ -12782,12 +12801,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         countryInfoLines.push(`- ${country.name} (${country.code}): Devise ${country.currency}, Indicatif ${country.phoneCode}\n    ${payinText}\n    ${payoutText}`);
 
         // Detailed fee block per country — structured for EMALI display
-        const countryFlags: Record<string, string> = {
-          "BJ": "🇧🇯", "CI": "🇨🇮", "SN": "🇸🇳", "TG": "🇹🇬", "BF": "🇧🇫",
-          "CM": "🇨🇲", "CD": "🇨🇩", "CG": "🇨🇬", "ML": "🇲🇱", "GN": "🇬🇳",
-          "NE": "🇳🇪", "RW": "🇷🇼", "GA": "🇬🇦", "ZM": "🇿🇲", "UG": "🇺🇬", "GH": "🇬🇭",
-        };
-        const flag = countryFlags[country.code] || "🌍";
+        const flag = countryFlagMap[country.code] || "🌍";
         const opCount = operators.length;
         if (opCount > 0) {
           // Build operator lines first — only add country if at least one operator is active
@@ -13250,8 +13264,20 @@ SUPPORT ET CONTACT:
               const feeConfigW = await getFeeFromDatabase(storage, activeProviderW, country, normalizedOperatorW);
               const feeInfoW = calculateOutgoingFee(Math.floor(amount), feeConfigW.outgoing);
 
-              if (user.balance < feeInfoW.totalDeductedFromBalance) {
-                return JSON.stringify({ success: false, error: `Solde insuffisant. Solde: ${user.balance.toLocaleString("fr-FR")} ${userCurrencyW}, Requis: ${feeInfoW.totalDeductedFromBalance.toLocaleString("fr-FR")} ${userCurrencyW}` });
+              // Calcul des frais d'échange de devise (s'appliquent si devise source ≠ devise destination)
+              let destCurrencyW = getCurrencyForCountry(country?.toUpperCase() || "");
+              if (activeProviderW === "pawapay") {
+                try {
+                  const { getCurrencyForOperator: getOpCurrW } = await import("@shared/pawapay-countries");
+                  const opCurrW = getOpCurrW(country?.toUpperCase() || "", normalizedOperatorW);
+                  if (opCurrW) destCurrencyW = opCurrW;
+                } catch (_) {}
+              }
+              const xFeeW = await getOutgoingExchangeFee(storage, userCurrencyW, destCurrencyW, Math.floor(amount), user.accountType || "personal");
+              const requiredBalanceW = feeInfoW.totalDeductedFromBalance + xFeeW.feeAmount;
+
+              if (user.balance < requiredBalanceW) {
+                return JSON.stringify({ success: false, error: `Solde insuffisant. Solde: ${user.balance.toLocaleString("fr-FR")} ${userCurrencyW}, Requis: ${requiredBalanceW.toLocaleString("fr-FR")} ${userCurrencyW}` });
               }
 
               let sanitizedPhone = phone.replace(/\s+/g, "").replace(/^(\+|00)/, "");
@@ -13318,9 +13344,10 @@ SUPPORT ET CONTACT:
 
                 const submitW = await callPaydunyaAPIv2("/disburse/submit-invoice", { disburse_invoice: getInvoiceW.disburse_token, disburse_id: `withdrawal-${user.id.substring(0, 8)}-${Date.now()}` });
                 if (submitW.response_code === "00") {
-                  await storage.updateUserBalance(userId, -feeInfoW.totalDeductedFromBalance);
-                  const txW = await storage.createTransaction({ userId, type: "withdrawal", amount: Math.floor(amount), fee: feeInfoW.feeAmount, feePercentage: feeInfoW.feePercentage, currency: userCurrencyW, status: "completed", country, operator: normalizedOperatorW, customerPhone: cleanPhoneW, description: `Retrait de ${Math.floor(amount)} ${userCurrencyW}`, paydunyaToken: getInvoiceW.disburse_token, metadata: JSON.stringify({ provider: "paydunya", providerAmount: providerAmountW, providerCurrency: chatbotWProviderCurrency }) });
-                  return JSON.stringify({ success: true, message: `Retrait de ${feeInfoW.amountReceived.toLocaleString("fr-FR")} ${userCurrencyW} envoyé avec succès. Frais: ${feeInfoW.feeAmount.toLocaleString("fr-FR")} ${userCurrencyW}. Transaction ID: ${txW.id}` });
+                  await storage.updateUserBalance(userId, -requiredBalanceW);
+                  const txW = await storage.createTransaction({ userId, type: "withdrawal", amount: Math.floor(amount), fee: feeInfoW.feeAmount, feePercentage: feeInfoW.feePercentage, currency: userCurrencyW, status: "completed", country, operator: normalizedOperatorW, customerPhone: cleanPhoneW, description: `Retrait de ${Math.floor(amount)} ${userCurrencyW}`, paydunyaToken: getInvoiceW.disburse_token, metadata: JSON.stringify({ provider: "paydunya", providerAmount: providerAmountW, providerCurrency: chatbotWProviderCurrency, exchangeFee: xFeeW.feeAmount }) });
+                  const xFeeMsg = xFeeW.feeAmount > 0 ? ` + frais d'échange: ${xFeeW.feeAmount.toLocaleString("fr-FR")} ${userCurrencyW}` : "";
+                  return JSON.stringify({ success: true, message: `Retrait de ${feeInfoW.amountReceived.toLocaleString("fr-FR")} ${userCurrencyW} envoyé avec succès. Frais: ${feeInfoW.feeAmount.toLocaleString("fr-FR")} ${userCurrencyW}${xFeeMsg}. Transaction ID: ${txW.id}` });
                 }
                 return JSON.stringify({ success: false, error: "Retrait échoué" });
               } else if (activeProviderW === "mbiyopay") {
@@ -13400,7 +13427,12 @@ SUPPORT ET CONTACT:
               if (activeProviderT === "fedapay") {
                 const result = await handleFedaPayTransfer(userId, user, Math.floor(amount), country, normalizedOperatorT, sanitizedPhoneT, userCurrencyT);
                 if (result.success) {
-                  return JSON.stringify({ success: true, message: `Transfert de ${Math.floor(amount).toLocaleString("fr-FR")} ${userCurrencyT} envoyé avec succès vers ${phone}. Frais: ${feeInfoT.feeAmount.toLocaleString("fr-FR")} ${userCurrencyT}. Total débité: ${requiredBalanceT.toLocaleString("fr-FR")} ${userCurrencyT}. Transaction ID: ${result.transactionId}` });
+                  if (xFeeT.feeAmount > 0) {
+                    await storage.updateUserBalance(userId, -xFeeT.feeAmount);
+                    console.log(`[EMALI Transfer fedapay] Exchange fee deducted: ${xFeeT.feeAmount} ${userCurrencyT}`);
+                  }
+                  const xFeeMsgT = xFeeT.feeAmount > 0 ? ` Frais de change: ${xFeeT.feeAmount.toLocaleString("fr-FR")} ${userCurrencyT}.` : "";
+                  return JSON.stringify({ success: true, message: `Transfert de ${Math.floor(amount).toLocaleString("fr-FR")} ${userCurrencyT} envoyé avec succès vers ${phone}. Frais: ${feeInfoT.feeAmount.toLocaleString("fr-FR")} ${userCurrencyT}.${xFeeMsgT} Total débité: ${requiredBalanceT.toLocaleString("fr-FR")} ${userCurrencyT}. Transaction ID: ${result.transactionId}` });
                 } else {
                   return JSON.stringify({ success: false, error: result.error || "Erreur lors du transfert" });
                 }
