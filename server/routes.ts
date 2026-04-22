@@ -13445,6 +13445,17 @@ SUPPORT ET CONTACT:
                   return JSON.stringify({ success: true, message: `Retrait envoyé avec succès. Transaction ID: ${result.transactionId}` });
                 }
                 return JSON.stringify({ success: false, error: result.error || "Erreur lors du retrait" });
+              } else if (activeProviderW === "feexpay") {
+                const result = await handleFeeXPayWithdrawal(userId, user, Math.floor(amount), country, normalizedOperatorW, sanitizedPhone, userCurrencyW);
+                if (result.success) {
+                  if (xFeeW.feeAmount > 0) {
+                    await storage.updateUserBalance(userId, -xFeeW.feeAmount);
+                    console.log(`[EMALI Withdrawal feexpay] Exchange fee deducted: ${xFeeW.feeAmount} ${userCurrencyW}`);
+                  }
+                  const xFeeMsg = xFeeW.feeAmount > 0 ? ` Frais de change: ${xFeeW.feeAmount.toLocaleString("fr-FR")} ${userCurrencyW}.` : "";
+                  return JSON.stringify({ success: true, message: `Retrait envoyé avec succès.${xFeeMsg} Transaction ID: ${result.transactionId}` });
+                }
+                return JSON.stringify({ success: false, error: result.error || "Erreur lors du retrait" });
               }
 
               return JSON.stringify({ success: false, error: "Cette opération n'est pas disponible actuellement. Veuillez réessayer plus tard." });
@@ -13617,6 +13628,16 @@ SUPPORT ET CONTACT:
                   if (xFeeT.feeAmount > 0) {
                     await storage.updateUserBalance(userId, -xFeeT.feeAmount);
                     console.log(`[EMALI Transfer moneyfusion] Exchange fee deducted: ${xFeeT.feeAmount} ${userCurrencyT}`);
+                  }
+                  return JSON.stringify({ success: true, message: `Transfert envoyé avec succès.${xFeeT.feeAmount > 0 ? ` Frais de change: ${xFeeT.feeAmount.toLocaleString("fr-FR")} ${userCurrencyT}.` : ""} Total débité: ${requiredBalanceT.toLocaleString("fr-FR")} ${userCurrencyT}. Transaction ID: ${result.transactionId}` });
+                }
+                return JSON.stringify({ success: false, error: result.error || "Erreur lors du transfert" });
+              } else if (activeProviderT === "feexpay") {
+                const result = await handleFeeXPayTransfer(userId, user, Math.floor(amount), country, normalizedOperatorT, sanitizedPhoneT, userCurrencyT);
+                if (result.success) {
+                  if (xFeeT.feeAmount > 0) {
+                    await storage.updateUserBalance(userId, -xFeeT.feeAmount);
+                    console.log(`[EMALI Transfer feexpay] Exchange fee deducted: ${xFeeT.feeAmount} ${userCurrencyT}`);
                   }
                   return JSON.stringify({ success: true, message: `Transfert envoyé avec succès.${xFeeT.feeAmount > 0 ? ` Frais de change: ${xFeeT.feeAmount.toLocaleString("fr-FR")} ${userCurrencyT}.` : ""} Total débité: ${requiredBalanceT.toLocaleString("fr-FR")} ${userCurrencyT}. Transaction ID: ${result.transactionId}` });
                 }
