@@ -12981,27 +12981,51 @@ MONTANTS MINIMUM PAR DEVISE:
 - Retrait: XOF = 1 000, XAF = 1 000, CDF = 4 000
 - Transfert: XOF = 500, XAF = 500, CDF = 2 000
 
+FORMAT DU RÉCAPITULATIF (RÈGLE ABSOLUE — à appliquer pour TOUT retrait ET transfert):
+Ne jamais afficher les pourcentages dans les récapitulatifs. Afficher uniquement les montants.
+Utiliser EXACTEMENT les valeurs retournées par calculate_fees. Ne JAMAIS recalculer les montants toi-même.
+Le montant total débité est TOUJOURS le champ "montantTotalDebite" (transfert) ou "montantDebiteDuSolde" (retrait) retourné par calculate_fees.
+
+FORMAT RÉCAPITULATIF RETRAIT:
+Récapitulatif du retrait
+Montant du retrait       : [montantBrut] [devise]
+Frais de service         : [fraisService] [devise]
+[si fraisEchangeDevise > 0: Frais de change          : [fraisEchangeDevise] [devise]]
+─────────────────────────────────────
+Destinataire recevra     : [montantRecuParDestinataire] [devise]
+Total débité du solde    : [montantDebiteDuSolde] [devise]
+
+FORMAT RÉCAPITULATIF TRANSFERT:
+Récapitulatif du transfert
+[si deviseSource = deviseDest:]
+  Destinataire recevra   : [montantNet] [deviseSource]
+[si deviseSource ≠ deviseDest:]
+  Destinataire recevra   : [montantNet] [deviseSource] ≈ [montantDestination] [deviseDest]
+Frais de service         : [fraisService] [deviseSource]
+[si fraisEchangeDevise > 0: Frais de change          : [fraisEchangeDevise] [deviseSource]]
+─────────────────────────────────────
+Total débité du solde    : [montantTotalDebite] [deviseSource]
+
 RETRAIT (envoyer de l'argent vers son propre numéro mobile money):
 IMPORTANT: Pour un retrait, le pays est TOUJOURS le pays de l'utilisateur (fourni dans ses infos). Ne demande JAMAIS le pays.
 Étape 1: Affiche les numéros de retrait configurés en LISTE NUMÉROTÉE et demande de choisir
 Étape 2: Affiche UNIQUEMENT les opérateurs de la section "OPÉRATEURS ACTIFS POUR LES RETRAITS" en LISTE NUMÉROTÉE. Si aucun opérateur n'est actif, informe l'utilisateur qu'aucun retrait n'est possible actuellement.
 Étape 3: Demande le montant souhaité en PRÉCISANT le montant minimum autorisé selon la devise de l'utilisateur (ex: "Quel montant souhaitez-vous retirer ? (minimum: 1 000 FCFA)")
 Étape 4: Utilise calculate_fees pour calculer les frais (utilise le pays de l'utilisateur comme country)
-Étape 5: Affiche un récapitulatif SIMPLE: "Montant débité de votre solde: X, Le destinataire recevra: Y" puis demande IMMÉDIATEMENT le code de sécurité à 6 chiffres dans le MÊME message. Ne propose PAS de confirmer ou annuler.
+Étape 5: Affiche le RÉCAPITULATIF RETRAIT (format ci-dessus) puis demande IMMÉDIATEMENT le code de sécurité à 6 chiffres dans le MÊME message. Ne propose PAS de confirmer ou annuler.
 Étape 6: Utilise execute_withdrawal pour exécuter (utilise le pays de l'utilisateur comme country)
-Étape 7: Affiche le résultat
+Étape 7: Affiche le résultat de façon professionnelle (succès ou erreur)
 
 TRANSFERT (envoyer de l'argent vers un autre numéro):
 IMPORTANT: Ne demande PAS le pays en texte libre. Utilise EXCLUSIVEMENT la section "PAYS ACTIFS POUR LES TRANSFERTS" ci-dessous. N'affiche QUE les pays présents dans cette section. Si aucun pays n'est actif, informe l'utilisateur qu'aucun transfert n'est possible actuellement.
 Étape 1: Affiche UNIQUEMENT les pays de la section "PAYS ACTIFS POUR LES TRANSFERTS" en LISTE NUMÉROTÉE et demande de choisir
 Étape 2: Après le choix du pays, affiche les opérateurs disponibles pour CE pays en LISTE NUMÉROTÉE
 Étape 3: Demande le numéro de téléphone du destinataire SANS indicatif (le pays est déjà sélectionné, l'indicatif sera ajouté automatiquement). L'utilisateur saisit uniquement son numéro local (ex: 97000000)
-Étape 4: Demande le montant net que le destinataire doit recevoir en PRÉCISANT le montant minimum autorisé selon la devise de l'utilisateur (ex: "Quel montant le destinataire doit-il recevoir ? (minimum: 500 FCFA)")
-Étape 5: Si la devise du pays destinataire est différente de celle de l'utilisateur, utilise convert_currency pour convertir
-Étape 6: Utilise calculate_fees pour calculer les frais
-Étape 7: Affiche un récapitulatif SIMPLE: "Montant débité de votre solde: X, Le destinataire recevra: Y" puis demande IMMÉDIATEMENT le code de sécurité à 6 chiffres dans le MÊME message. Ne propose PAS de confirmer ou annuler.
-Étape 8: Utilise execute_transfer pour exécuter
-Étape 9: Affiche le résultat
+Étape 4: Demande le montant que le destinataire doit recevoir en précisant la devise de l'utilisateur et le minimum (ex: "Quel montant le destinataire doit-il recevoir ? (minimum: 500 FCFA, en FCFA)")
+Étape 5: Utilise calculate_fees pour calculer les frais — cet outil calcule automatiquement la conversion et les frais d'échange si les devises sont différentes. Ne pas appeler convert_currency séparément.
+Étape 6: Affiche le RÉCAPITULATIF TRANSFERT (format ci-dessus, avec le montant en devise destination si différente) puis demande IMMÉDIATEMENT le code de sécurité à 6 chiffres dans le MÊME message. Ne propose PAS de confirmer ou annuler.
+Étape 7: Utilise execute_transfer pour exécuter
+Étape 8: Affiche le résultat de façon professionnelle (succès ou erreur)
 
 MODE AUTOMATIQUE (message complet en une seule fois):
 Si l'utilisateur fournit TOUTES les informations dans un seul message (numéro, opérateur, montant, code de sécurité), tu dois:
@@ -13009,7 +13033,7 @@ Si l'utilisateur fournit TOUTES les informations dans un seul message (numéro, 
 2. Pour un retrait: utiliser le pays de l'utilisateur automatiquement
 3. Utiliser calculate_fees pour calculer les frais
 4. Exécuter immédiatement l'opération sans demander de confirmation
-5. Afficher le résultat avec récapitulatif simple
+5. Afficher le résultat avec le format récapitulatif professionnel défini ci-dessus (sans pourcentages)
 
 RÈGLES POUR LES OPÉRATIONS:
 - Vérifie TOUJOURS que le KYC est vérifié avant de proposer un retrait/transfert
@@ -13199,31 +13223,40 @@ SUPPORT ET CONTACT:
                 const result: any = {
                   success: true,
                   type: "transfer",
+                  deviseSource: calcUserCurrency,
+                  deviseDest: calcDestCurrency,
                   montantNet: Math.floor(amount),
-                  frais: feeInfo.feeAmount,
-                  pourcentageFrais: feePct + "%",
+                  fraisService: feeInfo.feeAmount,
                   montantTotalDebite: totalDebited,
                 };
                 if (xFeeCalc.feeAmount > 0) {
                   result.fraisEchangeDevise = xFeeCalc.feeAmount;
-                  result.pourcentageEchangeDevise = (xFeeCalc.feePercentage / 10).toFixed(1) + "%";
-                  result.deviseSource = calcUserCurrency;
-                  result.deviseDest = calcDestCurrency;
+                }
+                // Montant que recevra le destinataire dans sa propre devise (conversion si nécessaire)
+                if (calcDestCurrency !== calcUserCurrency) {
+                  try {
+                    const { convertCurrency } = await import("./currency-converter");
+                    const convRes = await convertCurrency(Math.floor(amount), calcUserCurrency, calcDestCurrency);
+                    if (convRes.success) {
+                      result.montantDestination = Math.floor(convRes.convertedAmount);
+                    }
+                  } catch (_) {}
+                } else {
+                  result.montantDestination = Math.floor(amount);
                 }
                 return JSON.stringify(result);
               } else {
                 const result: any = {
                   success: true,
                   type: "withdrawal",
+                  devise: calcUserCurrency,
                   montantBrut: Math.floor(amount),
-                  frais: feeInfo.feeAmount,
-                  pourcentageFrais: feePct + "%",
+                  fraisService: feeInfo.feeAmount,
                   montantRecuParDestinataire: feeInfo.amountReceived,
                   montantDebiteDuSolde: feeInfo.totalDeductedFromBalance + xFeeCalc.feeAmount,
                 };
                 if (xFeeCalc.feeAmount > 0) {
                   result.fraisEchangeDevise = xFeeCalc.feeAmount;
-                  result.pourcentageEchangeDevise = (xFeeCalc.feePercentage / 10).toFixed(1) + "%";
                 }
                 return JSON.stringify(result);
               }
