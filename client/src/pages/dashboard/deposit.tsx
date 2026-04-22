@@ -126,6 +126,8 @@ export default function Deposit() {
 
   const { data: user } = useQuery<User>({
     queryKey: ["/api/auth/me"],
+    staleTime: 0,
+    refetchOnMount: "always",
   });
   
   const userBalanceCurrency = user?.currency || (user?.country 
