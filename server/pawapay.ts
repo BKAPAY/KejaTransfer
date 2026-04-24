@@ -65,10 +65,21 @@ function sanitizePhoneForPawaPay(phone: string, country: string): string {
   }
 
   // --- Country-specific local number normalisation ---
-  if (countryUpper === "BJ" || countryUpper === "CI") {
-    // BJ: numbers are now 10 digits starting with "0" (e.g. 0146500275 → 2290146500275)
-    // CI: numbers start with "0" — keep as-is
-    // No stripping of leading zeros for these countries.
+  if (countryUpper === "BJ") {
+    // BJ numbers are now 10 digits starting with "0" (new format since Nov 2024).
+    // Target MSISDN: 229 + 0XXXXXXXXX = 13 digits.
+    //
+    // Input variants we must handle:
+    //   "0146500275"  (10 digits) → keep as-is     → "2290146500275" ✓
+    //   "146500275"   (9 digits)  → restore "0"    → "2290146500275" ✓
+    //   "46500275"    (8 digits, old format)        → keep as-is → "22946500275"
+    if (local.length === 9 && local.startsWith("1")) {
+      // The leading "0" from "0146..." was stripped somewhere — restore it
+      local = "0" + local;
+    }
+    // Otherwise keep local as-is (already "0146..." or old 8-digit)
+  } else if (countryUpper === "CI") {
+    // CI: numbers start with "0" — keep as-is, no stripping
   } else {
     // All other countries: remove a single leading "0" before prepending country code
     if (local.startsWith("0")) {
