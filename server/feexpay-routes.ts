@@ -1,5 +1,5 @@
 import { storage } from "./storage";
-import { calculateIncomingFee, calculateOutgoingFee, getFeeFromDatabase } from "./utils/fees";
+import { calculateIncomingFee, calculateCustomerPaysFee, calculateOutgoingFee, getFeeFromDatabase } from "./utils/fees";
 import { safeRefundOutgoingTransaction } from "./payment-polling";
 import {
   getFeeXPayConfig,
@@ -96,9 +96,17 @@ export async function handleFeeXPayDeposit(
     const providerCurrency = currency || getCurrencyForCountry(countryCode);
     const balanceAmount = originalAmount ? Math.floor(originalAmount) : Math.floor(amount);
     const userCurrency = originalCurrency || providerCurrency;
-    const providerAmount = Math.floor(amount);
+    let providerAmount = Math.floor(amount);
+    const customerPaysFee = options?.customerPaysFee ?? false;
 
     const feeConfig = await getFeeFromDatabase(storage, "feexpay", country, operator);
+
+    // If customer pays fee, add service fee to the amount sent to provider
+    if (customerPaysFee) {
+      const cpfInfo = calculateCustomerPaysFee(providerAmount, feeConfig.incoming);
+      providerAmount = Math.floor(cpfInfo.totalForProvider);
+    }
+
     const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming);
 
     // Calculate exchange fee if payer currency differs from merchant currency (personal accounts only)
@@ -116,9 +124,15 @@ export async function handleFeeXPayDeposit(
         }
       } catch (_) { /* ignore */ }
     }
-    const netAmountForUser = Math.max(0, feeInfo.netAmount - incomingExchangeFee);
-    const totalFeeAmount = feeInfo.feeAmount + incomingExchangeFee;
-    const totalFeePercentage = feeInfo.feePercentage + incomingExchangeFeePercentage;
+    const netAmountForUser = customerPaysFee
+      ? Math.max(0, balanceAmount - incomingExchangeFee)
+      : Math.max(0, feeInfo.netAmount - incomingExchangeFee);
+    const totalFeeAmount = customerPaysFee
+      ? incomingExchangeFee
+      : feeInfo.feeAmount + incomingExchangeFee;
+    const totalFeePercentage = customerPaysFee
+      ? incomingExchangeFeePercentage
+      : feeInfo.feePercentage + incomingExchangeFeePercentage;
 
     const formattedPhone = formatPhoneForFeeXPay(phone, countryCode);
 

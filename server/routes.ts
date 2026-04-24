@@ -9307,7 +9307,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           otpCode,
           customerName || "Client",
           customerEmail || null,
-          customFieldResponses || undefined
+          customFieldResponses || undefined,
+          paymentLink.customerPaysFee ?? false
         );
 
         if (result.requiresOtp) {

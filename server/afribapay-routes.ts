@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import { storage } from "./storage";
 import { randomUUID } from "crypto";
-import { calculateIncomingFee, calculateOutgoingFee, getFeeFromDatabase, getIncomingExchangeFee } from "./utils/fees";
+import { calculateIncomingFee, calculateCustomerPaysFee, calculateOutgoingFee, getFeeFromDatabase, getIncomingExchangeFee } from "./utils/fees";
 import { sendPaymentDocumentsEmail } from "./email-service";
 import {
   createAfribaPayPayin,
@@ -357,7 +357,8 @@ export async function handleAfribaPayPaymentLink(
   otpCode?: string,
   customerName?: string,
   customerEmail?: string,
-  customFieldResponses?: Record<string, string>
+  customFieldResponses?: Record<string, string>,
+  customerPaysFee?: boolean
 ): Promise<{ 
   success: boolean; 
   transactionId?: string; 
@@ -397,6 +398,15 @@ export async function handleAfribaPayPaymentLink(
     }
 
     const feeConfig = await getFeeFromDatabase(storage, "afribapay", country, operator);
+    const cpf = customerPaysFee ?? false;
+
+    // If customer pays fee, add service fee to the amount sent to provider
+    let providerAmountForAfribaPay = Math.floor(amount);
+    if (cpf) {
+      const cpfInfo = calculateCustomerPaysFee(providerAmountForAfribaPay, feeConfig.incoming);
+      providerAmountForAfribaPay = Math.floor(cpfInfo.totalForProvider);
+    }
+
     const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming);
 
     // Calculate exchange fee if payer currency differs from merchant currency (personal accounts only)
@@ -414,13 +424,17 @@ export async function handleAfribaPayPaymentLink(
         }
       } catch (_) { /* ignore */ }
     }
-    const netAmountForUser = Math.max(0, feeInfo.netAmount - incomingExchangeFee);
+    const netAmountForUser = cpf
+      ? Math.max(0, balanceAmount - incomingExchangeFee)
+      : Math.max(0, feeInfo.netAmount - incomingExchangeFee);
+    const totalAfribaFeeAmount = cpf ? incomingExchangeFee : (feeInfo.feeAmount + incomingExchangeFee);
+    const totalAfribaFeePercentage = cpf ? incomingExchangeFeePercentage : (feeInfo.feePercentage + incomingExchangeFeePercentage);
 
     const baseUrl = process.env.BASE_URL || "https://bkapay.com";
     const orderId = `BKAPAY-PL-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
     const result = await createAfribaPayPayin({
-      amount: Math.floor(amount),
+      amount: providerAmountForAfribaPay,
       currency: providerCurrency,
       phone: phone,
       countryCode: countryCode,
@@ -441,8 +455,8 @@ export async function handleAfribaPayPaymentLink(
       userId: paymentLink.userId,
       type: "payment_link",
       amount: balanceAmount,
-      fee: feeInfo.feeAmount + incomingExchangeFee,
-      feePercentage: feeInfo.feePercentage + incomingExchangeFeePercentage,
+      fee: totalAfribaFeeAmount,
+      feePercentage: totalAfribaFeePercentage,
       currency: ownerCurrency,
       status: "pending",
       country: countryCode,
@@ -457,8 +471,9 @@ export async function handleAfribaPayPaymentLink(
         providerLink: result.providerLink,
         paymentLinkId: paymentLink.id,
         provider: "afribapay",
+        customerPaysFee: cpf,
         netAmountForUser,
-        providerAmount: amount,
+        providerAmount: providerAmountForAfribaPay,
         providerCurrency,
         balanceAmount: netAmountForUser,
         balanceCurrency: ownerCurrency,

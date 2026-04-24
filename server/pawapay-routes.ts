@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
 import { storage } from "./storage";
 import { randomUUID } from "crypto";
-import { calculateIncomingFee, calculateOutgoingFee, calculateOutgoingFeeFromNet, getFeeFromDatabase } from "./utils/fees";
+import { calculateIncomingFee, calculateCustomerPaysFee, calculateOutgoingFee, calculateOutgoingFeeFromNet, getFeeFromDatabase } from "./utils/fees";
 import { trySendPaymentCallback } from "./utils/callback";
 import { safeRefundOutgoingTransaction, sendApiPayoutCallback, sendBusinessWebhookCallback } from "./payment-polling";
 import { sendPaymentDocumentsEmail } from "./email-service";
@@ -81,12 +81,19 @@ export async function handlePawaPayDeposit(
     }
 
     const providerCurrency = currency || getCurrencyForOperator(countryUpper, operator);
-    const providerAmount = roundForCurrency(amount, providerCurrency);
+    let providerAmount = roundForCurrency(amount, providerCurrency);
     const userCurrency = originalCurrency || providerCurrency;
-    const balanceAmount = originalAmount ? roundForCurrency(originalAmount, userCurrency) : providerAmount;
+    const balanceAmount = originalAmount ? roundForCurrency(originalAmount, userCurrency) : roundForCurrency(amount, providerCurrency);
 
     const feeConfig = await getFeeFromDatabase(storage, "pawapay", country, operator);
     const customerPaysFee = options?.customerPaysFee ?? false;
+
+    // If customer pays fee, add service fee to the amount sent to provider
+    if (customerPaysFee) {
+      const cpfInfo = calculateCustomerPaysFee(providerAmount, feeConfig.incoming);
+      providerAmount = roundForCurrency(cpfInfo.totalForProvider, providerCurrency);
+    }
+
     const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming);
 
     // Calculate exchange fee if payer currency differs from merchant currency (personal accounts only)
