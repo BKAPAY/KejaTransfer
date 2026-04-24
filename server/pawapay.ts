@@ -39,27 +39,57 @@ const COUNTRY_DIAL_CODES: Record<string, string> = {
 /**
  * Sanitize phone number to PawaPay MSISDN format.
  * Rules: digits only, no leading +, country code prepended if missing.
- * The local number is kept intact (including any "01" prefix in Benin, etc.)
- * Example: "0146447319" + country "BJ" → "2290146447319"
- * Example: "+2290146447319" → "2290146447319"
+ *
+ * BENIN (BJ) special rule: PawaPay expects the old 8-digit format (without "01").
+ *   "0146447319" → "22946447319"   (strip local "01", prepend 229)
+ *   "2290146447319" → "22946447319" (strip "01" after country code)
+ *
+ * Other countries: Remove leading "0" before prepending country code.
+ *   CI is kept as-is (leading 0 is part of the number).
+ *
+ * Example: "0656..." + country "CM" → "237656..."
+ * Example: "+22946447319" → "22946447319"
  */
 function sanitizePhoneForPawaPay(phone: string, country: string): string {
   let n = phone.replace(/\s+/g, "").replace(/[^0-9+]/g, "");
   if (n.startsWith("+")) n = n.substring(1);
 
   const dialCode = COUNTRY_DIAL_CODES[country.toUpperCase()] || "";
-  console.log(`[PawaPay Phone] Raw="${n}" country=${country} dialCode=${dialCode}`);
+  const countryUpper = country.toUpperCase();
+  console.log(`[PawaPay Phone] Raw="${n}" country=${countryUpper} dialCode=${dialCode}`);
 
-  if (!dialCode || n.startsWith(dialCode)) {
-    // Already has country code or unknown country — keep as is
-    console.log(`[PawaPay Phone] Final MSISDN: "${n}" (len=${n.length})`);
-    return n;
+  // Strip country code prefix if already present, then re-apply after normalisation
+  let local = n;
+  if (dialCode && n.startsWith(dialCode)) {
+    local = n.substring(dialCode.length);
   }
 
-  // No country code yet — prepend it (keep full local number including leading digits)
-  n = dialCode + n;
-  console.log(`[PawaPay Phone] Added dial code → Final MSISDN: "${n}" (len=${n.length})`);
-  return n;
+  // --- Country-specific local number normalisation ---
+  if (countryUpper === "BJ") {
+    // PawaPay still expects the old 8-digit Beninese format (no "01" prefix).
+    // Strip "01" if present.
+    if (local.startsWith("01")) {
+      local = local.substring(2);
+    } else if (local.startsWith("0")) {
+      local = local.substring(1);
+    }
+  } else if (countryUpper !== "CI") {
+    // All other countries (not Ivory Coast): remove a single leading "0"
+    if (local.startsWith("0")) {
+      local = local.substring(1);
+    }
+  }
+  // CI: keep local as-is (leading 0 is part of the number)
+
+  if (!dialCode) {
+    // Unknown country — return what we have without country code
+    console.log(`[PawaPay Phone] No dialCode, Final MSISDN: "${local}" (len=${local.length})`);
+    return local;
+  }
+
+  const msisdn = dialCode + local;
+  console.log(`[PawaPay Phone] Final MSISDN: "${msisdn}" (len=${msisdn.length})`);
+  return msisdn;
 }
 
 export interface PawaPayConfig {
