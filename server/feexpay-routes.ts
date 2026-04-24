@@ -102,8 +102,10 @@ export async function handleFeeXPayDeposit(
     const feeConfig = await getFeeFromDatabase(storage, "feexpay", country, operator);
 
     // If customer pays fee, add service fee to the amount sent to provider
+    let customerServiceFeeAmount = 0;
     if (customerPaysFee) {
       const cpfInfo = calculateCustomerPaysFee(providerAmount, feeConfig.incoming);
+      customerServiceFeeAmount = cpfInfo.feeAmount;
       providerAmount = Math.floor(cpfInfo.totalForProvider);
     }
 
@@ -182,6 +184,7 @@ export async function handleFeeXPayDeposit(
         balanceCurrency: userCurrency,
         ...(incomingExchangeFee > 0 ? { exchangeFee: incomingExchangeFee, exchangeFeePercentage: incomingExchangeFeePercentage } : {}),
         ...(options?.customerPaysFee !== undefined ? { customerPaysFee: options.customerPaysFee } : {}),
+        ...(customerServiceFeeAmount > 0 ? { customerServiceFee: customerServiceFeeAmount } : {}),
         ...(result.redirectUrl ? { redirectUrl: result.redirectUrl } : {}),
         ...(options?.extraMetadata || {}),
       }),

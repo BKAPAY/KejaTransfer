@@ -89,8 +89,10 @@ export async function handlePawaPayDeposit(
     const customerPaysFee = options?.customerPaysFee ?? false;
 
     // If customer pays fee, add service fee to the amount sent to provider
+    let customerServiceFeeAmount = 0;
     if (customerPaysFee) {
       const cpfInfo = calculateCustomerPaysFee(providerAmount, feeConfig.incoming);
+      customerServiceFeeAmount = cpfInfo.feeAmount;
       providerAmount = roundForCurrency(cpfInfo.totalForProvider, providerCurrency);
     }
 
@@ -148,6 +150,7 @@ export async function handlePawaPayDeposit(
         balanceAmount: netAmountForUser,
         balanceCurrency: userCurrency,
         customerPaysFee,
+        ...(customerPaysFee && customerServiceFeeAmount > 0 ? { customerServiceFee: customerServiceFeeAmount } : {}),
         orderId,
         startTime,
         ...(options?.extraMetadata || {}),

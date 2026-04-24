@@ -402,8 +402,10 @@ export async function handleAfribaPayPaymentLink(
 
     // If customer pays fee, add service fee to the amount sent to provider
     let providerAmountForAfribaPay = Math.floor(amount);
+    let customerServiceFeeAmountAfrica = 0;
     if (cpf) {
       const cpfInfo = calculateCustomerPaysFee(providerAmountForAfribaPay, feeConfig.incoming);
+      customerServiceFeeAmountAfrica = cpfInfo.feeAmount;
       providerAmountForAfribaPay = Math.floor(cpfInfo.totalForProvider);
     }
 
@@ -477,6 +479,7 @@ export async function handleAfribaPayPaymentLink(
         providerCurrency,
         balanceAmount: netAmountForUser,
         balanceCurrency: ownerCurrency,
+        ...(customerServiceFeeAmountAfrica > 0 ? { customerServiceFee: customerServiceFeeAmountAfrica } : {}),
         ...(incomingExchangeFee > 0 ? { exchangeFee: incomingExchangeFee, exchangeFeePercentage: incomingExchangeFeePercentage } : {}),
         ...(customFieldResponses ? { customFieldResponses } : {}),
       }),
