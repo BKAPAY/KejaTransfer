@@ -12,7 +12,6 @@ import {
   AlertCircle, Unlock, Check, X, RotateCcw, Monitor, Key, Globe, Banknote,
   CheckCircle2, Clock, Building2, Eye, ToggleLeft, ToggleRight, Percent,
 } from "lucide-react";
-import { UserFeesDialog } from "./admin-user-fees-dialog";
 import { useState, useEffect } from "react";
 import { useLocation, useSearch } from "wouter";
 import { useToast } from "@/hooks/use-toast";
@@ -98,8 +97,7 @@ export default function AdminBusinessManagement() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [depositDialogOpen, setDepositDialogOpen] = useState(false);
   const [withdrawDialogOpen, setWithdrawDialogOpen] = useState(false);
-  const [feeDialogUser, setFeeDialogUser] = useState<User | null>(null);
-  const [feeDialogOpen, setFeeDialogOpen] = useState(false);
+
   const [amount, setAmount] = useState("");
   const [selectedCountry, setSelectedCountry] = useState("");
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; userId?: string; userName?: string }>({ open: false });
@@ -544,7 +542,7 @@ export default function AdminBusinessManagement() {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => { setFeeDialogUser(user); setFeeDialogOpen(true); }}
+                            onClick={() => setLocation(`/dashboard/admin/business/users/${user.id}/fees`)}
                             data-testid={`button-fees-${user.id}`}
                           >
                             <Percent className="w-4 h-4 mr-1" />
@@ -1183,11 +1181,6 @@ export default function AdminBusinessManagement() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <UserFeesDialog
-        open={feeDialogOpen}
-        onClose={() => { setFeeDialogOpen(false); setFeeDialogUser(null); }}
-        user={feeDialogUser}
-      />
 
     </div>
   );

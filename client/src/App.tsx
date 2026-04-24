@@ -101,6 +101,7 @@ const AdminUserLinks = lazy(() => import("@/pages/dashboard/admin-user-links"));
 const AdminUserMerchant = lazy(() => import("@/pages/dashboard/admin-user-merchant"));
 const AdminUserApi = lazy(() => import("@/pages/dashboard/admin-user-api"));
 const AdminUserConnections = lazy(() => import("@/pages/dashboard/admin-user-connections"));
+const AdminUserFeesPage = lazy(() => import("@/pages/dashboard/admin-user-fees-page"));
 const BusinessDashboard = lazy(() => import("@/pages/dashboard/business/index"));
 const BusinessProfile = lazy(() => import("@/pages/dashboard/business/profile"));
 const BusinessKyc = lazy(() => import("@/pages/dashboard/business/kyc"));
@@ -323,6 +324,7 @@ function Router() {
           <Route path="/dashboard/admin/business/users/:userId/api" component={AdminUserApi} />
           <Route path="/dashboard/admin/business/users/:userId/wallets" component={AdminBusinessWallets} />
           <Route path="/dashboard/admin/business/users/:userId/connections" component={AdminUserConnections} />
+          <Route path="/dashboard/admin/business/users/:userId/fees" component={AdminUserFeesPage} />
           <Route component={NotFound} />
         </Switch>
       </DashboardLayout>
