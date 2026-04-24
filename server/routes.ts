@@ -1142,12 +1142,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/business/fee-rates", requireAuth, async (req: Request, res: Response) => {
     try {
-      const authUser = (req as any).user;
+      const sessionUserId = req.session?.userId;
       const operatorConfigs = await storage.getCountryOperatorConfigs("business");
       const activeConfigs = operatorConfigs.filter(c => c.incomingEnabled || c.outgoingEnabled);
       const allFeeConfigs = await storage.getAllFeeConfigs();
-      // Load user-specific overrides if authenticated
-      const userFeeConfigs = authUser ? await storage.getUserFeeConfigs(authUser.id) : [];
+      // Load user-specific overrides for the authenticated user
+      const userFeeConfigs = sessionUserId ? await storage.getUserFeeConfigs(sessionUserId) : [];
       const DEFAULT_FEE = 60;
 
       const result = activeConfigs.map(cfg => {
