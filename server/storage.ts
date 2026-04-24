@@ -222,6 +222,11 @@ export interface IStorage {
   ensurePawaPayFeeConfigs(): Promise<void>;
   ensureFeeXPayFeeConfigs(): Promise<void>;
   ensureMoneyFusionFeeConfigs(): Promise<void>;
+  // User-specific fee configs
+  getUserFeeConfigs(userId: string): Promise<FeeConfig[]>;
+  getUserFeeConfig(userId: string, provider: string, country: string, operator: string): Promise<FeeConfig | undefined>;
+  upsertUserFeeConfig(userId: string, provider: string, country: string, operator: string, incomingFeePercentage: number, outgoingFeePercentage: number): Promise<FeeConfig>;
+  deleteUserFeeConfig(userId: string, provider: string, country: string, operator: string): Promise<void>;
 
   // Currency Exchange Fees
   getAllCurrencyExchangeFees(): Promise<schema.CurrencyExchangeFee[]>;
@@ -2758,6 +2763,49 @@ export class DbStorage implements IStorage {
       ))
       .returning();
     return results[0];
+  }
+
+  async getUserFeeConfigs(userId: string): Promise<FeeConfig[]> {
+    return db.select().from(schema.feeConfigs).where(eq(schema.feeConfigs.userId, userId));
+  }
+
+  async getUserFeeConfig(userId: string, provider: string, country: string, operator: string): Promise<FeeConfig | undefined> {
+    const results = await db.select().from(schema.feeConfigs).where(and(
+      eq(schema.feeConfigs.userId, userId),
+      eq(schema.feeConfigs.provider, provider),
+      eq(schema.feeConfigs.country, country),
+      eq(schema.feeConfigs.operator, operator),
+    )).limit(1);
+    return results[0];
+  }
+
+  async upsertUserFeeConfig(userId: string, provider: string, country: string, operator: string, incomingFeePercentage: number, outgoingFeePercentage: number): Promise<FeeConfig> {
+    const existing = await this.getUserFeeConfig(userId, provider, country, operator);
+    if (existing) {
+      const results = await db.update(schema.feeConfigs)
+        .set({ incomingFeePercentage, outgoingFeePercentage, updatedAt: new Date() })
+        .where(and(
+          eq(schema.feeConfigs.userId, userId),
+          eq(schema.feeConfigs.provider, provider),
+          eq(schema.feeConfigs.country, country),
+          eq(schema.feeConfigs.operator, operator),
+        ))
+        .returning();
+      return results[0];
+    }
+    const results = await db.insert(schema.feeConfigs).values({
+      userId, provider, country, operator, incomingFeePercentage, outgoingFeePercentage, scope: "business",
+    }).returning();
+    return results[0];
+  }
+
+  async deleteUserFeeConfig(userId: string, provider: string, country: string, operator: string): Promise<void> {
+    await db.delete(schema.feeConfigs).where(and(
+      eq(schema.feeConfigs.userId, userId),
+      eq(schema.feeConfigs.provider, provider),
+      eq(schema.feeConfigs.country, country),
+      eq(schema.feeConfigs.operator, operator),
+    ));
   }
 
   async initializeFeeConfigs(): Promise<void> {

@@ -251,6 +251,7 @@ export type InsertCryptoCurrency = z.infer<typeof insertCryptoCurrencySchema>;
 // Fee configuration per provider/country/operator
 export const feeConfigs = pgTable("fee_configs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id), // null = global fee, set = user-specific fee
   provider: text("provider").notNull().default("default"), // "mbiyopay", "fedapay", "afribapay", "paydunya", "default"
   country: text("country").notNull(), // "BJ", "TG", "CI", "SN", "BF", etc.
   operator: text("operator").notNull(), // "orange", "mtn", "moov", "wave", etc.

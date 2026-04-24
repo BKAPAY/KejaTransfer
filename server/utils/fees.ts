@@ -161,14 +161,16 @@ export async function getActivePayoutProviderForCountry(storage: any, country: s
 /**
  * Get fees for INCOMING payments (deposits, payment links, merchant links, API)
  * Automatically detects the active payin provider using operator-level config
+ * If userId is provided, checks user-specific fees first.
  */
 export async function getDynamicFees(
   storage: any,
   country: string,
-  operator: string
+  operator: string,
+  userId?: string
 ): Promise<{ incoming: number; outgoing: number; provider: string }> {
   const provider = await getActiveProviderForCountry(storage, country, operator);
-  const fees = await getFeeFromDatabase(storage, provider, country, operator);
+  const fees = await getFeeFromDatabase(storage, provider, country, operator, "personal", userId);
   return {
     ...fees,
     provider,
@@ -178,14 +180,16 @@ export async function getDynamicFees(
 /**
  * Get fees for OUTGOING payments (withdrawals, transfers)
  * Automatically detects the active payout provider using operator-level config
+ * If userId is provided, checks user-specific fees first.
  */
 export async function getDynamicOutgoingFees(
   storage: any,
   country: string,
-  operator: string
+  operator: string,
+  userId?: string
 ): Promise<{ incoming: number; outgoing: number; provider: string }> {
   const provider = await getActivePayoutProviderForCountry(storage, country, operator);
-  const fees = await getFeeFromDatabase(storage, provider, country, operator);
+  const fees = await getFeeFromDatabase(storage, provider, country, operator, "personal", userId);
   return {
     ...fees,
     provider,
@@ -194,6 +198,7 @@ export async function getDynamicOutgoingFees(
 
 /**
  * Get fee percentages from database for a specific provider/country/operator
+ * If userId is provided, checks user-specific fees first, then falls back to global fees.
  * Returns incoming and outgoing fee percentages
  */
 export async function getFeeFromDatabase(
@@ -201,9 +206,19 @@ export async function getFeeFromDatabase(
   provider: string,
   country: string, 
   operator: string,
-  scope: string = "personal"
+  scope: string = "personal",
+  userId?: string
 ): Promise<{ incoming: number; outgoing: number }> {
   try {
+    if (userId) {
+      const userConfig = await storage.getUserFeeConfig(userId, provider.toLowerCase(), country.toUpperCase(), operator.toLowerCase());
+      if (userConfig) {
+        return {
+          incoming: userConfig.incomingFeePercentage ?? DEFAULT_FEE_PERCENTAGE,
+          outgoing: userConfig.outgoingFeePercentage ?? DEFAULT_FEE_PERCENTAGE,
+        };
+      }
+    }
     const config = await storage.getFeeConfig(provider.toLowerCase(), country.toUpperCase(), operator.toLowerCase(), scope);
     if (config) {
       return {

@@ -73,6 +73,7 @@ type FeeRate = {
   outgoingEnabled: boolean;
   incomingFeePercentage: number;
   outgoingFeePercentage: number;
+  isCustom?: boolean;
 };
 
 function fmtFee(val: number): string {
@@ -343,7 +344,12 @@ function OperatorRow({ rate, type }: { rate: FeeRate; type: "payin" | "payout" }
           <p className="text-xs text-muted-foreground">{getCountryName(rate.country)}</p>
         </div>
       </div>
-      <Badge variant="secondary" className="text-sm font-semibold flex-shrink-0">{fmtFee(fee)}</Badge>
+      <div className="flex items-center gap-2 flex-shrink-0">
+        {rate.isCustom && (
+          <Badge className="text-xs bg-amber-500 text-white">Personnalise</Badge>
+        )}
+        <Badge variant="secondary" className="text-sm font-semibold">{fmtFee(fee)}</Badge>
+      </div>
     </div>
   );
 }

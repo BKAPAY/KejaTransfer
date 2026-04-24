@@ -984,6 +984,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== User-specific fee configs (admin) =====
+  app.get("/api/admin/users/:userId/fee-configs", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { userId: targetUserId } = req.params;
+      const configs = await storage.getUserFeeConfigs(targetUserId);
+      res.json(configs);
+    } catch (error: any) {
+      console.error("Get user fee configs error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
+  app.put("/api/admin/users/:userId/fee-configs/:provider/:country/:operator", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { userId: targetUserId, provider, country, operator } = req.params;
+      const { incomingFeePercentage, outgoingFeePercentage } = req.body;
+
+      if (incomingFeePercentage !== undefined && (incomingFeePercentage < 0 || incomingFeePercentage > 1000)) {
+        return res.status(400).json({ error: "Pourcentage invalide (0-100)" });
+      }
+      if (outgoingFeePercentage !== undefined && (outgoingFeePercentage < 0 || outgoingFeePercentage > 1000)) {
+        return res.status(400).json({ error: "Pourcentage invalide (0-100)" });
+      }
+
+      const existing = await storage.getUserFeeConfig(targetUserId, provider, country, operator);
+      const currentIn = existing?.incomingFeePercentage ?? 60;
+      const currentOut = existing?.outgoingFeePercentage ?? 60;
+
+      const config = await storage.upsertUserFeeConfig(
+        targetUserId, provider, country, operator,
+        incomingFeePercentage ?? currentIn,
+        outgoingFeePercentage ?? currentOut
+      );
+      res.json(config);
+    } catch (error: any) {
+      console.error("Upsert user fee config error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
+  app.delete("/api/admin/users/:userId/fee-configs/:provider/:country/:operator", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { userId: targetUserId, provider, country, operator } = req.params;
+      await storage.deleteUserFeeConfig(targetUserId, provider, country, operator);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Delete user fee config error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
   app.get("/api/admin/business/country-operator", requireAdmin, async (req: Request, res: Response) => {
     try {
       const configs = await storage.getCountryOperatorConfigs("business");
@@ -1091,21 +1142,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/business/fee-rates", requireAuth, async (req: Request, res: Response) => {
     try {
+      const authUser = (req as any).user;
       const operatorConfigs = await storage.getCountryOperatorConfigs("business");
       const activeConfigs = operatorConfigs.filter(c => c.incomingEnabled || c.outgoingEnabled);
       const allFeeConfigs = await storage.getAllFeeConfigs();
+      // Load user-specific overrides if authenticated
+      const userFeeConfigs = authUser ? await storage.getUserFeeConfigs(authUser.id) : [];
       const DEFAULT_FEE = 60;
 
       const result = activeConfigs.map(cfg => {
-        // Priority: business scope + exact provider match, then business any provider, then personal exact provider, then personal any
+        // 1. Check user-specific fee first
+        const userMatch = userFeeConfigs.find(
+          f => f.provider === cfg.provider && f.country === cfg.country && f.operator === cfg.operator
+        ) || userFeeConfigs.find(
+          f => f.country === cfg.country && f.operator === cfg.operator
+        );
+        if (userMatch) {
+          return {
+            country: cfg.country,
+            operator: cfg.operator,
+            provider: cfg.provider,
+            incomingEnabled: cfg.incomingEnabled,
+            outgoingEnabled: cfg.outgoingEnabled,
+            incomingFeePercentage: userMatch.incomingFeePercentage,
+            outgoingFeePercentage: userMatch.outgoingFeePercentage,
+            isCustom: true,
+          };
+        }
+        // 2. Fall back to global fee — priority: business scope > personal scope
         const feeMatch = allFeeConfigs.find(
-          f => f.provider === cfg.provider && f.country === cfg.country && f.operator === cfg.operator && f.scope === "business"
+          f => f.provider === cfg.provider && f.country === cfg.country && f.operator === cfg.operator && f.scope === "business" && !f.userId
         ) || allFeeConfigs.find(
-          f => f.country === cfg.country && f.operator === cfg.operator && f.scope === "business"
+          f => f.country === cfg.country && f.operator === cfg.operator && f.scope === "business" && !f.userId
         ) || allFeeConfigs.find(
-          f => f.provider === cfg.provider && f.country === cfg.country && f.operator === cfg.operator && f.scope === "personal"
+          f => f.provider === cfg.provider && f.country === cfg.country && f.operator === cfg.operator && f.scope === "personal" && !f.userId
         ) || allFeeConfigs.find(
-          f => f.country === cfg.country && f.operator === cfg.operator && f.scope === "personal"
+          f => f.country === cfg.country && f.operator === cfg.operator && f.scope === "personal" && !f.userId
         );
         return {
           country: cfg.country,
@@ -1115,6 +1187,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           outgoingEnabled: cfg.outgoingEnabled,
           incomingFeePercentage: feeMatch ? feeMatch.incomingFeePercentage : DEFAULT_FEE,
           outgoingFeePercentage: feeMatch ? feeMatch.outgoingFeePercentage : DEFAULT_FEE,
+          isCustom: false,
         };
       });
 
@@ -7261,7 +7334,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       const requestedCurrency = currency ? String(currency).toUpperCase() : (COUNTRY_CURRENCIES[countryCode] || "XOF");
 
-      const feeConfig = await getFeeFromDatabase(storage, activeProvider, countryCode, normalizedOperator, "business");
+      const feeConfig = await getFeeFromDatabase(storage, activeProvider, countryCode, normalizedOperator, "business", user.id);
       const customerPaysFee = businessToken.customerPaysFee ?? false;
       const feeInfo = calculateIncomingFee(requestedAmount, feeConfig.incoming);
       const netAmountForUser = customerPaysFee ? requestedAmount : feeInfo.netAmount;
@@ -7588,7 +7661,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const wallet = await storage.getBusinessWallet(user.id, countryCode, requestedCurrency);
       const walletBalance = wallet?.balance || 0;
 
-      const feeConfig = await getFeeFromDatabase(storage, activeProvider, countryCode, normalizedOperator, "business");
+      const feeConfig = await getFeeFromDatabase(storage, activeProvider, countryCode, normalizedOperator, "business", user.id);
       const feeInfo = calculateOutgoingFeeFromNet(requestedAmount, feeConfig.outgoing);
 
       if (walletBalance < feeInfo.totalDeductedFromBalance) {
@@ -12491,6 +12564,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // DB migration: add user_id column to fee_configs if missing
+  try {
+    const pgMig = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+    await pgMig.query(`ALTER TABLE fee_configs ADD COLUMN IF NOT EXISTS user_id VARCHAR REFERENCES users(id)`);
+    await pgMig.end();
+    console.log("[Migration] fee_configs.user_id column ensured");
+  } catch (migErr) {
+    console.warn("[Migration] Could not add user_id to fee_configs:", migErr);
+  }
+
   // Initialize fee configs
   await storage.initializeFeeConfigs();
   await storage.ensurePaydunyaFeeConfigs();
@@ -13223,7 +13306,7 @@ SUPPORT ET CONTACT:
               const { amount, type, country, operator } = args;
               // Normalize operator: strip country suffix if present (e.g. "moov-tg" → "moov")
               const normalizedOperatorC = operator ? operator.replace(/-[a-z]{2}$/i, '') : operator;
-              const feeData = await getDynamicOutgoingFees(storage, country, normalizedOperatorC);
+              const feeData = await getDynamicOutgoingFees(storage, country, normalizedOperatorC, userId);
               const feeInfo = calculateOutgoingFee(Math.floor(amount), feeData.outgoing);
               const feePct = (feeData.outgoing / 10).toFixed(1);
 
@@ -13316,7 +13399,7 @@ SUPPORT ET CONTACT:
               const activeProviderW = await getActiveProviderForWithdrawal(country, normalizedOperatorW);
               if (!activeProviderW) return JSON.stringify({ success: false, error: "Cet opérateur n'est pas disponible pour les retraits dans ce pays actuellement." });
 
-              const feeConfigW = await getFeeFromDatabase(storage, activeProviderW, country, normalizedOperatorW);
+              const feeConfigW = await getFeeFromDatabase(storage, activeProviderW, country, normalizedOperatorW, "personal", userId);
               const feeInfoW = calculateOutgoingFee(Math.floor(amount), feeConfigW.outgoing);
 
               // Calcul des frais d'échange de devise (s'appliquent si devise source ≠ devise destination)
@@ -13505,7 +13588,7 @@ SUPPORT ET CONTACT:
               const activeProviderT = await getActiveProviderForWithdrawal(country, normalizedOperatorT);
               if (!activeProviderT) return JSON.stringify({ success: false, error: "Cet opérateur n'est pas disponible pour les transferts dans ce pays actuellement." });
 
-              const feeConfigT = await getFeeFromDatabase(storage, activeProviderT, country, normalizedOperatorT);
+              const feeConfigT = await getFeeFromDatabase(storage, activeProviderT, country, normalizedOperatorT, "personal", userId);
               const feeInfoT = calculateOutgoingFee(Math.floor(amount), feeConfigT.outgoing);
 
               let destCurrencyT = getCurrencyForCountry(country?.toUpperCase() || "");
