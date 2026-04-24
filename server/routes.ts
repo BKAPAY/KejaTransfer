@@ -4696,6 +4696,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .replace(/[-_]money$/i, "")       // orange-money → orange
         .replace(/[-_]mobile$/i, "")      // mtn-mobile → mtn
         .replace(/[-_]cash$/i, "");       // moov-cash → moov
+      if (normalizedOperator === "t-money" || normalizedOperator === "tmoney") normalizedOperator = "tmoney";
+      if (normalizedOperator === "m-pesa" || normalizedOperator === "mpesa") normalizedOperator = "vodacom";
 
       // 7. Strip international prefix from phone number
       const countryPhoneMap: Record<string, { code: string; digits: number[] }> = {
