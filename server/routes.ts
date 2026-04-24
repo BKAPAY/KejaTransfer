@@ -13028,7 +13028,10 @@ IMPORTANT: Pour un retrait, le pays est TOUJOURS le pays de l'utilisateur (fourn
 Étape 4: Utilise calculate_fees pour calculer les frais (utilise le pays de l'utilisateur comme country)
 Étape 5: Affiche le RÉCAPITULATIF RETRAIT (format ci-dessus) puis demande IMMÉDIATEMENT le code de sécurité à 6 chiffres dans le MÊME message. Ne propose PAS de confirmer ou annuler.
 Étape 6: Utilise execute_withdrawal pour exécuter (utilise le pays de l'utilisateur comme country)
-Étape 7: Affiche le résultat: [SUCCÈS] si l'opération a réussi (avec le montant reçu et la référence en gras), [ERREUR] si elle a échoué (avec l'explication et mention du remboursement si applicable)
+Étape 7: Affiche le résultat selon le statut retourné par l'outil:
+- Si "pending: true" (traitement en cours): affiche [EN COURS] avec le montant et la référence en gras, indique que la transaction est en cours de traitement chez le fournisseur et que le résultat sera disponible dans les transactions d'ici quelques secondes. NE DIS PAS que le retrait a réussi.
+- Si "success: true" SANS "pending": affiche [SUCCÈS] avec montant reçu et référence en gras
+- Si "success: false": affiche [ERREUR] avec explication et mention du remboursement si applicable
 
 TRANSFERT (envoyer de l'argent vers un autre numéro):
 IMPORTANT: Ne demande PAS le pays en texte libre. Utilise EXCLUSIVEMENT la section "PAYS ACTIFS POUR LES TRANSFERTS" ci-dessous. N'affiche QUE les pays présents dans cette section. Si aucun pays n'est actif, informe l'utilisateur qu'aucun transfert n'est possible actuellement.
@@ -13039,7 +13042,10 @@ IMPORTANT: Ne demande PAS le pays en texte libre. Utilise EXCLUSIVEMENT la secti
 Étape 5: Utilise calculate_fees pour calculer les frais — cet outil calcule automatiquement la conversion et les frais d'échange si les devises sont différentes. Ne pas appeler convert_currency séparément.
 Étape 6: Affiche le RÉCAPITULATIF TRANSFERT (format ci-dessus, avec le montant en devise destination si différente) puis demande IMMÉDIATEMENT le code de sécurité à 6 chiffres dans le MÊME message. Ne propose PAS de confirmer ou annuler.
 Étape 7: Utilise execute_transfer pour exécuter
-Étape 8: Affiche le résultat: [SUCCÈS] si l'opération a réussi (avec le montant, le numéro destinataire et la référence en gras), [ERREUR] si elle a échoué (avec l'explication et mention du remboursement si applicable)
+Étape 8: Affiche le résultat selon le statut retourné par l'outil:
+- Si "pending: true" (traitement en cours): affiche [EN COURS] avec le montant, le numéro destinataire et la référence en gras, indique que la transaction est en cours de traitement chez le fournisseur et que le résultat sera disponible dans les transactions d'ici quelques secondes. NE DIS PAS que le transfert a réussi.
+- Si "success: true" SANS "pending": affiche [SUCCÈS] avec montant, numéro destinataire et référence en gras
+- Si "success: false": affiche [ERREUR] avec explication et mention du remboursement si applicable
 
 MODE AUTOMATIQUE (message complet en une seule fois):
 Si l'utilisateur fournit TOUTES les informations dans un seul message (numéro, opérateur, montant, code de sécurité), tu dois:
@@ -13349,7 +13355,7 @@ SUPPORT ET CONTACT:
                 if (result.success) {
                   if (xFeeW.feeAmount > 0) await storage.updateUserBalance(userId, -xFeeW.feeAmount);
                   res.write(emaliBalanceUpdateEvt);
-                  return JSON.stringify({ success: true, message: `Retrait de ${feeInfoW.amountReceived.toLocaleString("fr-FR")} ${userCurrencyW} envoyé avec succès vers ${phone}. Frais: ${feeInfoW.feeAmount.toLocaleString("fr-FR")} ${userCurrencyW}. Transaction ID: ${result.transactionId}` });
+                  return JSON.stringify({ success: true, pending: true, montant: feeInfoW.amountReceived, devise: userCurrencyW, frais: feeInfoW.feeAmount, transactionId: result.transactionId, message: `Retrait soumis avec succès. Montant: ${feeInfoW.amountReceived.toLocaleString("fr-FR")} ${userCurrencyW}. Frais: ${feeInfoW.feeAmount.toLocaleString("fr-FR")} ${userCurrencyW}. Transaction ID: ${result.transactionId}. Traitement en cours chez le fournisseur.` });
                 } else {
                   return JSON.stringify({ success: false, error: result.error || "Erreur lors du retrait" });
                 }
@@ -13412,8 +13418,8 @@ SUPPORT ET CONTACT:
                 const submitW = await callPaydunyaAPIv2("/disburse/submit-invoice", { disburse_invoice: getInvoiceW.disburse_token, disburse_id: `withdrawal-${user.id.substring(0, 8)}-${Date.now()}` });
                 if (submitW.response_code === "00") {
                   await storage.updateTransaction(pendingTxW.id, { status: "processing", paydunyaToken: getInvoiceW.disburse_token });
-                  const xFeeMsg = xFeeW.feeAmount > 0 ? ` + frais d'échange: ${xFeeW.feeAmount.toLocaleString("fr-FR")} ${userCurrencyW}` : "";
-                  return JSON.stringify({ success: true, message: `Retrait de ${feeInfoW.amountReceived.toLocaleString("fr-FR")} ${userCurrencyW} envoyé avec succès. Frais: ${feeInfoW.feeAmount.toLocaleString("fr-FR")} ${userCurrencyW}${xFeeMsg}. Transaction ID: ${pendingTxW.id}` });
+                  const xFeeMsg = xFeeW.feeAmount > 0 ? ` Frais d'échange: ${xFeeW.feeAmount.toLocaleString("fr-FR")} ${userCurrencyW}.` : "";
+                  return JSON.stringify({ success: true, pending: true, montant: feeInfoW.amountReceived, devise: userCurrencyW, frais: feeInfoW.feeAmount, transactionId: pendingTxW.id, message: `Retrait soumis avec succès. Montant: ${feeInfoW.amountReceived.toLocaleString("fr-FR")} ${userCurrencyW}. Frais: ${feeInfoW.feeAmount.toLocaleString("fr-FR")} ${userCurrencyW}.${xFeeMsg} Transaction ID: ${pendingTxW.id}. Traitement en cours chez le fournisseur.` });
                 }
                 await storage.updateUserBalance(userId, requiredBalanceW);
                 await storage.updateTransaction(pendingTxW.id, { status: "failed" });
@@ -13424,7 +13430,7 @@ SUPPORT ET CONTACT:
                 if (result.success) {
                   if (xFeeW.feeAmount > 0) await storage.updateUserBalance(userId, -xFeeW.feeAmount);
                   res.write(emaliBalanceUpdateEvt);
-                  return JSON.stringify({ success: true, message: `Retrait envoyé avec succès. Transaction ID: ${result.transactionId}` });
+                  return JSON.stringify({ success: true, pending: true, montant: feeInfoW.amountReceived, devise: userCurrencyW, frais: feeInfoW.feeAmount, transactionId: result.transactionId, message: `Retrait soumis avec succès. Montant: ${feeInfoW.amountReceived.toLocaleString("fr-FR")} ${userCurrencyW}. Frais: ${feeInfoW.feeAmount.toLocaleString("fr-FR")} ${userCurrencyW}. Transaction ID: ${result.transactionId}. Traitement en cours chez le fournisseur.` });
                 }
                 res.write(emaliBalanceUpdateEvt);
                 return JSON.stringify({ success: false, error: result.error || "Erreur lors du retrait" });
@@ -13433,7 +13439,7 @@ SUPPORT ET CONTACT:
                 if (result.success) {
                   if (xFeeW.feeAmount > 0) await storage.updateUserBalance(userId, -xFeeW.feeAmount);
                   res.write(emaliBalanceUpdateEvt);
-                  return JSON.stringify({ success: true, message: `Retrait envoyé avec succès. Transaction ID: ${result.transactionId}` });
+                  return JSON.stringify({ success: true, pending: true, montant: feeInfoW.amountReceived, devise: userCurrencyW, frais: feeInfoW.feeAmount, transactionId: result.transactionId, message: `Retrait soumis avec succès. Montant: ${feeInfoW.amountReceived.toLocaleString("fr-FR")} ${userCurrencyW}. Frais: ${feeInfoW.feeAmount.toLocaleString("fr-FR")} ${userCurrencyW}. Transaction ID: ${result.transactionId}. Traitement en cours chez le fournisseur.` });
                 }
                 res.write(emaliBalanceUpdateEvt);
                 return JSON.stringify({ success: false, error: result.error || "Erreur lors du retrait" });
@@ -13442,7 +13448,7 @@ SUPPORT ET CONTACT:
                 if (result.success) {
                   if (xFeeW.feeAmount > 0) await storage.updateUserBalance(userId, -xFeeW.feeAmount);
                   res.write(emaliBalanceUpdateEvt);
-                  return JSON.stringify({ success: true, message: `Retrait envoyé avec succès. Transaction ID: ${result.transactionId}` });
+                  return JSON.stringify({ success: true, pending: true, montant: feeInfoW.amountReceived, devise: userCurrencyW, frais: feeInfoW.feeAmount, transactionId: result.transactionId, message: `Retrait soumis avec succès. Montant: ${feeInfoW.amountReceived.toLocaleString("fr-FR")} ${userCurrencyW}. Frais: ${feeInfoW.feeAmount.toLocaleString("fr-FR")} ${userCurrencyW}. Transaction ID: ${result.transactionId}. Traitement en cours chez le fournisseur.` });
                 }
                 res.write(emaliBalanceUpdateEvt);
                 return JSON.stringify({ success: false, error: result.error || "Erreur lors du retrait" });
@@ -13451,7 +13457,7 @@ SUPPORT ET CONTACT:
                 if (result.success) {
                   if (xFeeW.feeAmount > 0) await storage.updateUserBalance(userId, -xFeeW.feeAmount);
                   res.write(emaliBalanceUpdateEvt);
-                  return JSON.stringify({ success: true, message: `Retrait envoyé avec succès. Transaction ID: ${result.transactionId}` });
+                  return JSON.stringify({ success: true, pending: true, montant: feeInfoW.amountReceived, devise: userCurrencyW, frais: feeInfoW.feeAmount, transactionId: result.transactionId, message: `Retrait soumis avec succès. Montant: ${feeInfoW.amountReceived.toLocaleString("fr-FR")} ${userCurrencyW}. Frais: ${feeInfoW.feeAmount.toLocaleString("fr-FR")} ${userCurrencyW}. Transaction ID: ${result.transactionId}. Traitement en cours chez le fournisseur.` });
                 }
                 res.write(emaliBalanceUpdateEvt);
                 return JSON.stringify({ success: false, error: result.error || "Erreur lors du retrait" });
@@ -13464,7 +13470,7 @@ SUPPORT ET CONTACT:
                   }
                   res.write(emaliBalanceUpdateEvt);
                   const xFeeMsg = xFeeW.feeAmount > 0 ? ` Frais de change: ${xFeeW.feeAmount.toLocaleString("fr-FR")} ${userCurrencyW}.` : "";
-                  return JSON.stringify({ success: true, message: `Retrait envoyé avec succès.${xFeeMsg} Transaction ID: ${result.transactionId}` });
+                  return JSON.stringify({ success: true, pending: true, montant: feeInfoW.amountReceived, devise: userCurrencyW, frais: feeInfoW.feeAmount, transactionId: result.transactionId, message: `Retrait soumis avec succès.${xFeeMsg} Montant: ${feeInfoW.amountReceived.toLocaleString("fr-FR")} ${userCurrencyW}. Transaction ID: ${result.transactionId}. Traitement en cours chez le fournisseur.` });
                 }
                 res.write(emaliBalanceUpdateEvt);
                 return JSON.stringify({ success: false, error: result.error || "Erreur lors du retrait" });
@@ -13541,7 +13547,7 @@ SUPPORT ET CONTACT:
                   }
                   res.write(emaliBalanceUpdateEvtT);
                   const xFeeMsgT = xFeeT.feeAmount > 0 ? ` Frais de change: ${xFeeT.feeAmount.toLocaleString("fr-FR")} ${userCurrencyT}.` : "";
-                  return JSON.stringify({ success: true, message: `Transfert de ${Math.floor(amount).toLocaleString("fr-FR")} ${userCurrencyT} envoyé avec succès vers ${phone}. Frais: ${feeInfoT.feeAmount.toLocaleString("fr-FR")} ${userCurrencyT}.${xFeeMsgT} Total débité: ${requiredBalanceT.toLocaleString("fr-FR")} ${userCurrencyT}. Transaction ID: ${result.transactionId}` });
+                  return JSON.stringify({ success: true, pending: true, montant: Math.floor(amount), destinataire: phone, devise: userCurrencyT, frais: feeInfoT.feeAmount, transactionId: result.transactionId, message: `Transfert soumis avec succès. Montant: ${Math.floor(amount).toLocaleString("fr-FR")} ${userCurrencyT} vers ${phone}. Frais: ${feeInfoT.feeAmount.toLocaleString("fr-FR")} ${userCurrencyT}.${xFeeMsgT} Total débité: ${requiredBalanceT.toLocaleString("fr-FR")} ${userCurrencyT}. Transaction ID: ${result.transactionId}. Traitement en cours chez le fournisseur.` });
                 } else {
                   return JSON.stringify({ success: false, error: result.error || "Erreur lors du transfert" });
                 }
@@ -13602,7 +13608,7 @@ SUPPORT ET CONTACT:
                 const submitT = await callPaydunyaAPIv2("/disburse/submit-invoice", { disburse_invoice: getInvoiceT.disburse_token, disburse_id: `transfer-${user.id.substring(0, 8)}-${Date.now()}` });
                 if (submitT.response_code === "00") {
                   await storage.updateTransaction(pendingTxT.id, { status: "processing", paydunyaToken: getInvoiceT.disburse_token });
-                  return JSON.stringify({ success: true, message: `Transfert de ${Math.floor(amount).toLocaleString("fr-FR")} ${userCurrencyT} envoyé avec succès. Frais: ${feeInfoT.feeAmount.toLocaleString("fr-FR")} ${userCurrencyT}. Total débité: ${requiredBalanceT.toLocaleString("fr-FR")} ${userCurrencyT}. Transaction ID: ${pendingTxT.id}` });
+                  return JSON.stringify({ success: true, pending: true, montant: Math.floor(amount), destinataire: cleanPhoneT, devise: userCurrencyT, frais: feeInfoT.feeAmount, transactionId: pendingTxT.id, message: `Transfert soumis avec succès. Montant: ${Math.floor(amount).toLocaleString("fr-FR")} ${userCurrencyT}. Frais: ${feeInfoT.feeAmount.toLocaleString("fr-FR")} ${userCurrencyT}. Total débité: ${requiredBalanceT.toLocaleString("fr-FR")} ${userCurrencyT}. Transaction ID: ${pendingTxT.id}. Traitement en cours chez le fournisseur.` });
                 }
                 await storage.updateUserBalance(userId, requiredBalanceT);
                 await storage.updateTransaction(pendingTxT.id, { status: "failed" });
@@ -13616,7 +13622,8 @@ SUPPORT ET CONTACT:
                     console.log(`[EMALI Transfer pawapay] Exchange fee deducted: ${xFeeT.feeAmount} ${userCurrencyT}`);
                   }
                   res.write(emaliBalanceUpdateEvtT);
-                  return JSON.stringify({ success: true, message: `Transfert de ${Math.floor(amount).toLocaleString("fr-FR")} ${userCurrencyT} envoyé avec succès vers ${phone}. Frais: ${feeInfoT.feeAmount.toLocaleString("fr-FR")} ${userCurrencyT}.${xFeeT.feeAmount > 0 ? ` Frais de change: ${xFeeT.feeAmount.toLocaleString("fr-FR")} ${userCurrencyT}.` : ""} Total débité: ${requiredBalanceT.toLocaleString("fr-FR")} ${userCurrencyT}. Transaction ID: ${result.transactionId}` });
+                  const xFeeMsgTP = xFeeT.feeAmount > 0 ? ` Frais de change: ${xFeeT.feeAmount.toLocaleString("fr-FR")} ${userCurrencyT}.` : "";
+                  return JSON.stringify({ success: true, pending: true, montant: Math.floor(amount), destinataire: phone, devise: userCurrencyT, frais: feeInfoT.feeAmount, transactionId: result.transactionId, message: `Transfert soumis avec succès. Montant: ${Math.floor(amount).toLocaleString("fr-FR")} ${userCurrencyT} vers ${phone}. Frais: ${feeInfoT.feeAmount.toLocaleString("fr-FR")} ${userCurrencyT}.${xFeeMsgTP} Total débité: ${requiredBalanceT.toLocaleString("fr-FR")} ${userCurrencyT}. Transaction ID: ${result.transactionId}. Traitement en cours chez le fournisseur.` });
                 }
                 res.write(emaliBalanceUpdateEvtT);
                 return JSON.stringify({ success: false, error: result.error || "Erreur lors du transfert" });
@@ -13628,7 +13635,8 @@ SUPPORT ET CONTACT:
                     console.log(`[EMALI Transfer mbiyopay] Exchange fee deducted: ${xFeeT.feeAmount} ${userCurrencyT}`);
                   }
                   res.write(emaliBalanceUpdateEvtT);
-                  return JSON.stringify({ success: true, message: `Transfert envoyé avec succès.${xFeeT.feeAmount > 0 ? ` Frais de change: ${xFeeT.feeAmount.toLocaleString("fr-FR")} ${userCurrencyT}.` : ""} Total débité: ${requiredBalanceT.toLocaleString("fr-FR")} ${userCurrencyT}. Transaction ID: ${result.transactionId}` });
+                  const xFeeMsgTM = xFeeT.feeAmount > 0 ? ` Frais de change: ${xFeeT.feeAmount.toLocaleString("fr-FR")} ${userCurrencyT}.` : "";
+                  return JSON.stringify({ success: true, pending: true, montant: Math.floor(amount), destinataire: phone, devise: userCurrencyT, frais: feeInfoT.feeAmount, transactionId: result.transactionId, message: `Transfert soumis avec succès.${xFeeMsgTM} Total débité: ${requiredBalanceT.toLocaleString("fr-FR")} ${userCurrencyT}. Transaction ID: ${result.transactionId}. Traitement en cours chez le fournisseur.` });
                 }
                 res.write(emaliBalanceUpdateEvtT);
                 return JSON.stringify({ success: false, error: result.error || "Erreur lors du transfert" });
@@ -13640,7 +13648,8 @@ SUPPORT ET CONTACT:
                     console.log(`[EMALI Transfer afribapay] Exchange fee deducted: ${xFeeT.feeAmount} ${userCurrencyT}`);
                   }
                   res.write(emaliBalanceUpdateEvtT);
-                  return JSON.stringify({ success: true, message: `Transfert envoyé avec succès.${xFeeT.feeAmount > 0 ? ` Frais de change: ${xFeeT.feeAmount.toLocaleString("fr-FR")} ${userCurrencyT}.` : ""} Total débité: ${requiredBalanceT.toLocaleString("fr-FR")} ${userCurrencyT}. Transaction ID: ${result.transactionId}` });
+                  const xFeeMsgTA = xFeeT.feeAmount > 0 ? ` Frais de change: ${xFeeT.feeAmount.toLocaleString("fr-FR")} ${userCurrencyT}.` : "";
+                  return JSON.stringify({ success: true, pending: true, montant: Math.floor(amount), destinataire: phone, devise: userCurrencyT, frais: feeInfoT.feeAmount, transactionId: result.transactionId, message: `Transfert soumis avec succès.${xFeeMsgTA} Total débité: ${requiredBalanceT.toLocaleString("fr-FR")} ${userCurrencyT}. Transaction ID: ${result.transactionId}. Traitement en cours chez le fournisseur.` });
                 }
                 res.write(emaliBalanceUpdateEvtT);
                 return JSON.stringify({ success: false, error: result.error || "Erreur lors du transfert" });
@@ -13652,7 +13661,8 @@ SUPPORT ET CONTACT:
                     console.log(`[EMALI Transfer moneyfusion] Exchange fee deducted: ${xFeeT.feeAmount} ${userCurrencyT}`);
                   }
                   res.write(emaliBalanceUpdateEvtT);
-                  return JSON.stringify({ success: true, message: `Transfert envoyé avec succès.${xFeeT.feeAmount > 0 ? ` Frais de change: ${xFeeT.feeAmount.toLocaleString("fr-FR")} ${userCurrencyT}.` : ""} Total débité: ${requiredBalanceT.toLocaleString("fr-FR")} ${userCurrencyT}. Transaction ID: ${result.transactionId}` });
+                  const xFeeMsgTF = xFeeT.feeAmount > 0 ? ` Frais de change: ${xFeeT.feeAmount.toLocaleString("fr-FR")} ${userCurrencyT}.` : "";
+                  return JSON.stringify({ success: true, pending: true, montant: Math.floor(amount), destinataire: phone, devise: userCurrencyT, frais: feeInfoT.feeAmount, transactionId: result.transactionId, message: `Transfert soumis avec succès.${xFeeMsgTF} Total débité: ${requiredBalanceT.toLocaleString("fr-FR")} ${userCurrencyT}. Transaction ID: ${result.transactionId}. Traitement en cours chez le fournisseur.` });
                 }
                 res.write(emaliBalanceUpdateEvtT);
                 return JSON.stringify({ success: false, error: result.error || "Erreur lors du transfert" });
@@ -13664,7 +13674,8 @@ SUPPORT ET CONTACT:
                     console.log(`[EMALI Transfer feexpay] Exchange fee deducted: ${xFeeT.feeAmount} ${userCurrencyT}`);
                   }
                   res.write(emaliBalanceUpdateEvtT);
-                  return JSON.stringify({ success: true, message: `Transfert envoyé avec succès.${xFeeT.feeAmount > 0 ? ` Frais de change: ${xFeeT.feeAmount.toLocaleString("fr-FR")} ${userCurrencyT}.` : ""} Total débité: ${requiredBalanceT.toLocaleString("fr-FR")} ${userCurrencyT}. Transaction ID: ${result.transactionId}` });
+                  const xFeeMsgTX = xFeeT.feeAmount > 0 ? ` Frais de change: ${xFeeT.feeAmount.toLocaleString("fr-FR")} ${userCurrencyT}.` : "";
+                  return JSON.stringify({ success: true, pending: true, montant: Math.floor(amount), destinataire: phone, devise: userCurrencyT, frais: feeInfoT.feeAmount, transactionId: result.transactionId, message: `Transfert soumis avec succès.${xFeeMsgTX} Total débité: ${requiredBalanceT.toLocaleString("fr-FR")} ${userCurrencyT}. Transaction ID: ${result.transactionId}. Traitement en cours chez le fournisseur.` });
                 }
                 res.write(emaliBalanceUpdateEvtT);
                 return JSON.stringify({ success: false, error: result.error || "Erreur lors du transfert" });
