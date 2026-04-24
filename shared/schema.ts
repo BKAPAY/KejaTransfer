@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, boolean, json } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, real, timestamp, boolean, json } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -149,7 +149,7 @@ export const transactions = pgTable("transactions", {
   userId: varchar("user_id").notNull().references(() => users.id),
   type: text("type").notNull(), // "deposit", "transfer", "payment_link", "merchant_link", "api_payment"
   amount: integer("amount").notNull(), // Amount in XOF (net amount after fees for incoming, gross for outgoing)
-  fee: integer("fee").notNull().default(0), // Fee amount deducted in XOF
+  fee: real("fee").notNull().default(0), // Fee amount deducted (can be decimal for USD)
   feePercentage: integer("fee_percentage").notNull().default(0), // Fee percentage (30 = 3%, 60 = 6%)
   currency: text("currency").notNull().default("XOF"),
   status: text("status").notNull(), // "completed", "pending", "failed", "cancelled"
@@ -268,7 +268,7 @@ export const businessWallets = pgTable("business_wallets", {
   userId: varchar("user_id").notNull().references(() => users.id),
   country: text("country").notNull(), // "BJ", "TG", "CI", "CD", etc.
   currency: text("currency").notNull(), // "XOF", "XAF", "CDF", "USD", etc.
-  balance: integer("balance").notNull().default(0),
+  balance: real("balance").notNull().default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

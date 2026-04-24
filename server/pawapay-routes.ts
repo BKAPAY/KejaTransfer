@@ -96,7 +96,14 @@ export async function handlePawaPayDeposit(
       providerAmount = roundForCurrency(cpfInfo.totalForProvider, providerCurrency);
     }
 
-    const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming);
+    let feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming);
+    // For business accounts, recalculate with decimal precision (e.g. 0.06 USD instead of 0)
+    if (user.accountType === "business") {
+      const rawFee = (balanceAmount * feeInfo.feePercentage) / 1000;
+      const precisionFee = Math.round(rawFee * 100) / 100;
+      const precisionNet = Math.round((balanceAmount - precisionFee) * 100) / 100;
+      feeInfo = { ...feeInfo, feeAmount: precisionFee, netAmount: Math.max(0, precisionNet) };
+    }
 
     // Calculate exchange fee if payer currency differs from merchant currency (personal accounts only)
     let incomingExchangeFee = 0;
