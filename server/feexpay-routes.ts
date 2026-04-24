@@ -99,7 +99,8 @@ export async function handleFeeXPayDeposit(
     let providerAmount = Math.floor(amount);
     const customerPaysFee = options?.customerPaysFee ?? false;
 
-    const feeConfig = await getFeeFromDatabase(storage, "feexpay", country, operator);
+    const feeScope = user.accountType === "business" ? "business" : "personal";
+    const feeConfig = await getFeeFromDatabase(storage, "feexpay", country, operator, feeScope, feeScope === "business" ? userId : undefined);
 
     // If customer pays fee, add service fee to the amount sent to provider
     let customerServiceFeeAmount = 0;
@@ -250,7 +251,8 @@ export async function handleFeeXPayWithdrawal(
     const providerCurrency = getCurrencyForCountry(countryCode);
     const balanceCurrency = userCurrency || providerCurrency;
 
-    const feeConfig = await getFeeFromDatabase(storage, "feexpay", country, operator);
+    const feeScope = user.accountType === "business" ? "business" : "personal";
+    const feeConfig = await getFeeFromDatabase(storage, "feexpay", country, operator, feeScope, feeScope === "business" ? userId : undefined);
     const feeInfo = calculateOutgoingFee(grossAmount, feeConfig.outgoing);
 
     if (!skipBalanceOps && user.balance < feeInfo.totalDeductedFromBalance) {
@@ -386,7 +388,8 @@ export async function handleFeeXPayTransfer(
     const providerCurrency = getCurrencyForCountry(countryCode);
     const balanceCurrency = userCurrency || providerCurrency;
 
-    const feeConfig = await getFeeFromDatabase(storage, "feexpay", country, operator);
+    const feeScope = user.accountType === "business" ? "business" : "personal";
+    const feeConfig = await getFeeFromDatabase(storage, "feexpay", country, operator, feeScope, feeScope === "business" ? userId : undefined);
     const { calculateOutgoingFeeFromNet } = await import("./utils/fees");
     const feeInfo = calculateOutgoingFeeFromNet(netAmount, feeConfig.outgoing);
 

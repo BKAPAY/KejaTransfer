@@ -66,7 +66,8 @@ export async function handleAfribaPayDeposit(
     const balanceAmount = originalAmount ? Math.floor(originalAmount) : providerAmount;
     const userCurrency = originalCurrency || providerCurrency;
 
-    const feeConfig = await getFeeFromDatabase(storage, "afribapay", country, operator);
+    const feeScope = user.accountType === "business" ? "business" : "personal";
+    const feeConfig = await getFeeFromDatabase(storage, "afribapay", country, operator, feeScope, feeScope === "business" ? userId : undefined);
     const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming);
 
     // Exchange fee when payer's currency differs from user's balance currency (personal accounts only)
@@ -166,7 +167,8 @@ export async function handleAfribaPayWithdrawal(
     const providerCurrency = getCurrencyForCountry(countryCode);
     const balanceCurrency = userCurrency || providerCurrency;
 
-    const feeConfig = await getFeeFromDatabase(storage, "afribapay", country, operator);
+    const feeScope = user.accountType === "business" ? "business" : "personal";
+    const feeConfig = await getFeeFromDatabase(storage, "afribapay", country, operator, feeScope, feeScope === "business" ? userId : undefined);
     const feeInfo = calculateOutgoingFee(grossAmount, feeConfig.outgoing);
 
     if (user.balance < feeInfo.totalDeductedFromBalance) {
@@ -270,7 +272,8 @@ export async function handleAfribaPayTransfer(
     const providerCurrency = getCurrencyForCountry(countryCode);
     const balanceCurrency = userCurrency || providerCurrency;
 
-    const feeConfig = await getFeeFromDatabase(storage, "afribapay", country, operator);
+    const feeScope = user.accountType === "business" ? "business" : "personal";
+    const feeConfig = await getFeeFromDatabase(storage, "afribapay", country, operator, feeScope, feeScope === "business" ? userId : undefined);
     const feeInfo = calculateOutgoingFee(netAmount, feeConfig.outgoing);
     const feePercentage = feeInfo.feePercentage;
     const feeAmount = feeInfo.feeAmount;
@@ -397,7 +400,8 @@ export async function handleAfribaPayPaymentLink(
       }
     }
 
-    const feeConfig = await getFeeFromDatabase(storage, "afribapay", country, operator);
+    const feeScope = user.accountType === "business" ? "business" : "personal";
+    const feeConfig = await getFeeFromDatabase(storage, "afribapay", country, operator, feeScope, feeScope === "business" ? userId : undefined);
     const cpf = customerPaysFee ?? false;
 
     // If customer pays fee, add service fee to the amount sent to provider
@@ -544,7 +548,8 @@ export async function handleAfribaPayMerchantLink(
       }
     }
 
-    const feeConfig = await getFeeFromDatabase(storage, "afribapay", country, operator);
+    const feeScope = user.accountType === "business" ? "business" : "personal";
+    const feeConfig = await getFeeFromDatabase(storage, "afribapay", country, operator, feeScope, feeScope === "business" ? userId : undefined);
     const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming);
 
     // Exchange fee when payer's currency differs from merchant's balance currency
@@ -665,7 +670,8 @@ export async function handleAfribaPayApiPayment(
       }
     }
 
-    const feeConfig = await getFeeFromDatabase(storage, "afribapay", country, operator);
+    const feeScope = user.accountType === "business" ? "business" : "personal";
+    const feeConfig = await getFeeFromDatabase(storage, "afribapay", country, operator, feeScope, feeScope === "business" ? userId : undefined);
     const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming);
 
     // Exchange fee when payer's currency differs from merchant's balance currency (personal accounts only)

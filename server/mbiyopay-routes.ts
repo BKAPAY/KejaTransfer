@@ -44,7 +44,8 @@ export async function handleMbiyoPayDeposit(
     const balanceAmount = originalAmount ? Math.floor(originalAmount) : providerAmount;
     const userCurrency = originalCurrency || providerCurrency;
     
-    const feeConfig = await getFeeFromDatabase(storage, "mbiyopay", country, operator);
+    const feeScope = user.accountType === "business" ? "business" : "personal";
+    const feeConfig = await getFeeFromDatabase(storage, "mbiyopay", country, operator, feeScope, feeScope === "business" ? userId : undefined);
     const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming);
 
     // Exchange fee when payer's currency differs from user's balance currency (personal accounts only)
@@ -179,7 +180,8 @@ export async function handleMbiyoPayWithdrawal(
     
     console.log(`[MbiyoPay Withdrawal] Currency selection: userCurrency=${userCurrency}, targetCurrency=${targetCurrency}, defaultCurrency=${defaultCurrency}, supportedCurrencies=${supportedCurrencies.join(",")}, providerCurrency=${providerCurrency}, balanceCurrency=${balanceCurrency}`);
     
-    const feeConfig = await getFeeFromDatabase(storage, "mbiyopay", country, operator);
+    const feeScope = user.accountType === "business" ? "business" : "personal";
+    const feeConfig = await getFeeFromDatabase(storage, "mbiyopay", country, operator, feeScope, feeScope === "business" ? userId : undefined);
     const feeInfo = netMode
       ? calculateOutgoingFeeFromNet(grossAmount, feeConfig.outgoing)
       : calculateOutgoingFee(grossAmount, feeConfig.outgoing);
@@ -335,7 +337,8 @@ export async function handleMbiyoPayTransfer(
     
     console.log(`[MbiyoPay Transfer] Currency selection: userCurrency=${userCurrency}, targetCurrency=${targetCurrency}, defaultCurrency=${defaultCurrency}, supportedCurrencies=${supportedCurrencies.join(",")}, providerCurrency=${providerCurrency}, balanceCurrency=${balanceCurrency}`);
     
-    const feeConfig = await getFeeFromDatabase(storage, "mbiyopay", country, operator);
+    const feeScope = user.accountType === "business" ? "business" : "personal";
+    const feeConfig = await getFeeFromDatabase(storage, "mbiyopay", country, operator, feeScope, feeScope === "business" ? userId : undefined);
     const feeInfo = calculateOutgoingFee(netAmount, feeConfig.outgoing);
     const totalToDebit = netAmount + feeInfo.feeAmount;
 
@@ -477,7 +480,8 @@ export async function handleMbiyoPayPaymentLink(
     const balanceCurrency = ownerCurrency || "XOF";
     
     // Get dynamic fees from database for mbiyopay - calculate on base amount
-    const feeConfig = await getFeeFromDatabase(storage, "mbiyopay", country, operator);
+    const feeScope = user.accountType === "business" ? "business" : "personal";
+    const feeConfig = await getFeeFromDatabase(storage, "mbiyopay", country, operator, feeScope, feeScope === "business" ? userId : undefined);
     const feeInfo = calculateIncomingFee(baseAmount, feeConfig.incoming);
     
     // Use converted amount for provider if available, otherwise use base amount
@@ -641,7 +645,8 @@ export async function handleMbiyoPayMerchantLink(
     const balanceCurrency = originalCurrency || providerCurrency;
     
     // Get dynamic fees for mbiyopay - calculate on balance amount
-    const feeConfig = await getFeeFromDatabase(storage, "mbiyopay", country, operator);
+    const feeScope = user.accountType === "business" ? "business" : "personal";
+    const feeConfig = await getFeeFromDatabase(storage, "mbiyopay", country, operator, feeScope, feeScope === "business" ? userId : undefined);
     const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming);
 
     // Exchange fee when payer's currency differs from merchant's balance currency (personal accounts only)
@@ -764,7 +769,8 @@ export async function handleMbiyoPayApiPayment(
     const currency = getCurrencyForCountry(country);
     
     // Get dynamic fees from database for mbiyopay
-    const feeConfig = await getFeeFromDatabase(storage, "mbiyopay", country, operator);
+    const feeScope = user.accountType === "business" ? "business" : "personal";
+    const feeConfig = await getFeeFromDatabase(storage, "mbiyopay", country, operator, feeScope, feeScope === "business" ? userId : undefined);
     const feeInfo = calculateIncomingFee(grossAmount, feeConfig.incoming);
 
     const orderId = `BKAPAY-API-${apiKey.id}-${Date.now()}`;

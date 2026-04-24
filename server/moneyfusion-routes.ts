@@ -32,7 +32,8 @@ export async function handleMoneyFusionWithdrawal(
     const providerCurrency = getMoneyFusionCurrency(country);
     const balanceCurrency = userCurrency || providerCurrency;
 
-    const feeConfig = await getFeeFromDatabase(storage, "moneyfusion", country, operator);
+    const feeScope = user.accountType === "business" ? "business" : "personal";
+    const feeConfig = await getFeeFromDatabase(storage, "moneyfusion", country, operator, feeScope, feeScope === "business" ? userId : undefined);
     const feeInfo = netMode
       ? calculateOutgoingFeeFromNet(grossAmount, feeConfig.outgoing)
       : calculateOutgoingFee(grossAmount, feeConfig.outgoing);
@@ -170,7 +171,8 @@ export async function handleMoneyFusionTransfer(
     const providerCurrency = getMoneyFusionCurrency(country);
     const balanceCurrency = userCurrency || providerCurrency;
 
-    const feeConfig = await getFeeFromDatabase(storage, "moneyfusion", country, operator);
+    const feeScope = user.accountType === "business" ? "business" : "personal";
+    const feeConfig = await getFeeFromDatabase(storage, "moneyfusion", country, operator, feeScope, feeScope === "business" ? userId : undefined);
     const feeInfo = calculateOutgoingFee(netAmount, feeConfig.outgoing);
     const totalToDebit = netAmount + feeInfo.feeAmount;
 

@@ -85,7 +85,8 @@ export async function handlePawaPayDeposit(
     const userCurrency = originalCurrency || providerCurrency;
     const balanceAmount = originalAmount ? roundForCurrency(originalAmount, userCurrency) : roundForCurrency(amount, providerCurrency);
 
-    const feeConfig = await getFeeFromDatabase(storage, "pawapay", country, operator);
+    const feeScope = user.accountType === "business" ? "business" : "personal";
+    const feeConfig = await getFeeFromDatabase(storage, "pawapay", country, operator, feeScope, feeScope === "business" ? userId : undefined);
     const customerPaysFee = options?.customerPaysFee ?? false;
 
     // If customer pays fee, add service fee to the amount sent to provider
@@ -238,7 +239,8 @@ export async function handlePawaPayWithdrawal(
     const balanceCurrency = userCurrency || providerCurrency;
     const grossAmount = roundForCurrency(amount, balanceCurrency);
 
-    const feeConfig = await getFeeFromDatabase(storage, "pawapay", country, operator);
+    const feeScope = user.accountType === "business" ? "business" : "personal";
+    const feeConfig = await getFeeFromDatabase(storage, "pawapay", country, operator, feeScope, feeScope === "business" ? userId : undefined);
     const feeInfo = netMode
       ? calculateOutgoingFeeFromNet(grossAmount, feeConfig.outgoing)
       : calculateOutgoingFee(grossAmount, feeConfig.outgoing);
@@ -389,7 +391,8 @@ export async function handlePawaPayTransfer(
     const balanceCurrency = userCurrency || providerCurrency;
     const netAmount = roundForCurrency(amount, balanceCurrency);
 
-    const feeConfig = await getFeeFromDatabase(storage, "pawapay", country, operator);
+    const feeScope = user.accountType === "business" ? "business" : "personal";
+    const feeConfig = await getFeeFromDatabase(storage, "pawapay", country, operator, feeScope, feeScope === "business" ? userId : undefined);
     // Transfer: recipient gets full amount, fee is added ON TOP of balance deduction
     const feeInfo = calculateOutgoingFeeFromNet(netAmount, feeConfig.outgoing);
 
