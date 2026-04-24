@@ -7294,6 +7294,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .replace(/[-_]money$/i, "").replace(/[-_]mobile$/i, "").replace(/[-_]cash$/i, "");
 
       if (normalizedOperator === "t-money" || normalizedOperator === "tmoney") normalizedOperator = "tmoney";
+      if (normalizedOperator === "m-pesa" || normalizedOperator === "mpesa") normalizedOperator = "vodacom";
 
       const countryPhoneMap: Record<string, { code: string; digits: number[] }> = {
         "SN": { code: "221", digits: [9] }, "CI": { code: "225", digits: [10] },
@@ -7618,6 +7619,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .replace(/\s+/g, "-").replace(/-[a-z]{2}$/i, "")
         .replace(/[-_]money$/i, "").replace(/[-_]mobile$/i, "").replace(/[-_]cash$/i, "");
       if (normalizedOperator === "t-money" || normalizedOperator === "tmoney") normalizedOperator = "tmoney";
+      if (normalizedOperator === "m-pesa" || normalizedOperator === "mpesa") normalizedOperator = "vodacom";
 
       const countryPhoneMap: Record<string, { code: string; digits: number[] }> = {
         "SN": { code: "221", digits: [9] }, "CI": { code: "225", digits: [10] },
