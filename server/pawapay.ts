@@ -65,27 +65,16 @@ function sanitizePhoneForPawaPay(phone: string, country: string): string {
   }
 
   // --- Country-specific local number normalisation ---
-  if (countryUpper === "BJ") {
-    // PawaPay still expects the old 8-digit Beninese format (no "01" prefix).
-    // Handles all input variants:
-    //   "0146500275" (full new local)  → strip "01" → "46500275"
-    //   "146500275"  (0 was stripped)  → strip "1"  → "46500275"
-    //   "46500275"   (already correct) → keep as-is
-    if (local.startsWith("01") && local.length === 10) {
-      local = local.substring(2);
-    } else if (local.startsWith("0") && local.length === 9) {
-      local = local.substring(1);
-    } else if (local.startsWith("1") && local.length === 9) {
-      // "1" is the residual digit when "0146..." had only its "0" stripped
-      local = local.substring(1);
-    }
-  } else if (countryUpper !== "CI") {
-    // All other countries (not Ivory Coast): remove a single leading "0"
+  if (countryUpper === "BJ" || countryUpper === "CI") {
+    // BJ: numbers are now 10 digits starting with "0" (e.g. 0146500275 → 2290146500275)
+    // CI: numbers start with "0" — keep as-is
+    // No stripping of leading zeros for these countries.
+  } else {
+    // All other countries: remove a single leading "0" before prepending country code
     if (local.startsWith("0")) {
       local = local.substring(1);
     }
   }
-  // CI: keep local as-is (leading 0 is part of the number)
 
   if (!dialCode) {
     // Unknown country — return what we have without country code
