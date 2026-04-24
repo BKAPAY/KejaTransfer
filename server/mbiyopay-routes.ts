@@ -485,9 +485,12 @@ export async function handleMbiyoPayPaymentLink(
     let providerAmount = convertedAmount ? Math.floor(convertedAmount) : baseAmount;
     
     // Apply customer pays fee on provider amount if needed
+    let customerServiceFeeAmount = 0;
     if (customerPaysFee) {
       const feePercentage = feeConfig.incoming / 10; // Convert from decimal (60 = 6%)
-      providerAmount = Math.ceil(providerAmount * (1 + feePercentage / 100));
+      const newProviderAmount = Math.ceil(providerAmount * (1 + feePercentage / 100));
+      customerServiceFeeAmount = newProviderAmount - providerAmount;
+      providerAmount = newProviderAmount;
     }
 
     // Calculate exchange fee if payer currency differs from merchant currency (personal accounts only)
@@ -537,6 +540,7 @@ export async function handleMbiyoPayPaymentLink(
         providerCurrency,
         balanceAmount: netAmountForUser,
         balanceCurrency,
+        ...(customerServiceFeeAmount > 0 ? { customerServiceFee: customerServiceFeeAmount } : {}),
         ...(incomingExchangeFee > 0 ? { exchangeFee: incomingExchangeFee, exchangeFeePercentage: incomingExchangeFeePercentage } : {}),
         provider: "mbiyopay",
         paymentProvider: "mbiyopay",

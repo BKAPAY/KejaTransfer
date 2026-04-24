@@ -140,7 +140,17 @@ function FinancialBreakdown({
     || (transaction.type === "withdrawal" && exchangeFee > 0)
     || isNetMode;
 
-  if (totalFee === 0) return null;
+  const isCustomerPaysFee = !!(metadata?.customerPaysFee);
+  // customerServiceFee : frais de service payés par le client (stocké en metadata depuis le fix)
+  // Fallback : calculer depuis providerAmount - transaction.amount (même devise uniquement)
+  const storedCustomerServiceFee = metadata?.customerServiceFee || 0;
+  const inferredCustomerServiceFee = (isCustomerPaysFee && storedCustomerServiceFee === 0 && metadata?.providerAmount && metadata.providerAmount > transaction.amount && (metadata.providerCurrency === (transaction.currency || "XOF")))
+    ? (metadata.providerAmount - transaction.amount)
+    : 0;
+  const effectiveCustomerServiceFee = storedCustomerServiceFee || inferredCustomerServiceFee;
+
+  // Ne rien afficher si aucuns frais connus — sauf si le client paie des frais
+  if (totalFee === 0 && !(isCustomerPaysFee && effectiveCustomerServiceFee > 0)) return null;
 
   if (isOutgoing) {
     if (isFeeOnTop) {
@@ -203,11 +213,9 @@ function FinancialBreakdown({
 
     if (customerPaysFee) {
       // Le client a payé les frais de service EN PLUS du montant de base.
-      // transaction.amount = montant BASE (ce que le marchand reçoit)
-      // Quand cross-devise + PawaPay : transaction.fee = exchangeFee (pas de service fee dans tx.fee)
-      // Quand même devise : transaction.fee = service fee payé par le client
-      // Pour éviter le double-comptage : displayServiceFee = max(0, tx.fee - exchangeFee)
-      const displayServiceFee = Math.max(0, serviceFee - exchangeFee);
+      // effectiveCustomerServiceFee provient de metadata.customerServiceFee (stocké par le backend)
+      // ou est inféré depuis providerAmount - transaction.amount pour les anciennes transactions.
+      const displayServiceFee = effectiveCustomerServiceFee || Math.max(0, serviceFee - exchangeFee);
       const grossFromClient = gross + displayServiceFee;
       const creditedToOwner = Math.max(0, gross - exchangeFee);
 
