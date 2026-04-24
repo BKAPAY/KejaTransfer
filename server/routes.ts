@@ -7339,7 +7339,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const feeConfig = await getFeeFromDatabase(storage, activeProvider, countryCode, normalizedOperator, "business", user.id);
       const customerPaysFee = businessToken.customerPaysFee ?? false;
-      const feeInfo = calculateIncomingFee(requestedAmount, feeConfig.incoming);
+      let feeInfo = calculateIncomingFee(requestedAmount, feeConfig.incoming);
+      // Decimal precision for currencies like USD (floor(1*0.06)=0, should be 0.06)
+      if (!customerPaysFee) {
+        const rawFee = (requestedAmount * feeInfo.feePercentage) / 1000;
+        const precisionFee = Math.round(rawFee * 100) / 100;
+        const precisionNet = Math.round((requestedAmount - precisionFee) * 100) / 100;
+        feeInfo = { ...feeInfo, feeAmount: precisionFee, netAmount: Math.max(0, precisionNet) };
+      }
       const netAmountForUser = customerPaysFee ? requestedAmount : feeInfo.netAmount;
       const txFeeAmount = customerPaysFee ? 0 : feeInfo.feeAmount;
       const txFeePercentage = customerPaysFee ? 0 : feeInfo.feePercentage;
@@ -7666,7 +7673,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const walletBalance = wallet?.balance || 0;
 
       const feeConfig = await getFeeFromDatabase(storage, activeProvider, countryCode, normalizedOperator, "business", user.id);
-      const feeInfo = calculateOutgoingFeeFromNet(requestedAmount, feeConfig.outgoing);
+      let feeInfo = calculateOutgoingFeeFromNet(requestedAmount, feeConfig.outgoing);
+      // Decimal precision for currencies like USD (floor(1*0.06)=0, should be 0.06)
+      {
+        const rawFee = (requestedAmount * feeInfo.feePercentage) / 1000;
+        const precisionFee = Math.round(rawFee * 100) / 100;
+        const precisionTotal = Math.round((requestedAmount + precisionFee) * 100) / 100;
+        feeInfo = { ...feeInfo, feeAmount: precisionFee, totalDeductedFromBalance: precisionTotal };
+      }
 
       if (walletBalance < feeInfo.totalDeductedFromBalance) {
         return res.status(400).json({ success: false, error: { code: "INSUFFICIENT_FUNDS", message: `Solde insuffisant dans le wallet ${countryCode} (${requestedCurrency})` } });
