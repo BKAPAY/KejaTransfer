@@ -213,10 +213,22 @@ function FinancialBreakdown({
 
     if (customerPaysFee) {
       // Le client a payé les frais de service EN PLUS du montant de base.
-      // effectiveCustomerServiceFee provient de metadata.customerServiceFee (stocké par le backend)
-      // ou est inféré depuis providerAmount - transaction.amount pour les anciennes transactions.
-      const displayServiceFee = effectiveCustomerServiceFee || Math.max(0, serviceFee - exchangeFee);
-      const grossFromClient = gross + displayServiceFee;
+      // Cross-devise : frais de service en devise fournisseur (ex: XAF), frais change en devise marchand (ex: XOF)
+      // Même devise  : tout en devise marchand
+      const isCrossCurrency = !!(metadata?.providerCurrency && metadata.providerCurrency !== currency);
+      const providerCcy = metadata?.providerCurrency || currency;
+
+      // Frais de service payés par le client (dans la devise du fournisseur)
+      const displayServiceFee = storedCustomerServiceFee || Math.max(0, serviceFee - exchangeFee);
+      const serviceFeeCcy = isCrossCurrency ? providerCcy : currency;
+
+      // Total payé par le client :
+      // cross-devise → providerAmount (ex: 212 XAF) ; même devise → gross + service fee
+      const grossFromClientAmount = isCrossCurrency
+        ? (metadata?.providerAmount || gross)
+        : gross + displayServiceFee;
+      const grossFromClientCcy = isCrossCurrency ? providerCcy : currency;
+
       const creditedToOwner = Math.max(0, gross - exchangeFee);
 
       return (
@@ -227,11 +239,11 @@ function FinancialBreakdown({
           </div>
           <div className="rounded-lg border overflow-hidden">
             <div className="p-4 space-y-3 bg-card">
-              <FinancialRow label="Total payé par le client" value={fmtAmount(grossFromClient, currency)} />
+              <FinancialRow label="Total payé par le client" value={fmtAmount(grossFromClientAmount, grossFromClientCcy)} />
               {displayServiceFee > 0 && (
                 <FinancialRow
                   label="Frais réglés par le client"
-                  value={`+${fmtAmount(displayServiceFee, currency)}`}
+                  value={`+${fmtAmount(displayServiceFee, serviceFeeCcy)}`}
                   sublabel="pris en charge par le payeur"
                   color="muted"
                 />
