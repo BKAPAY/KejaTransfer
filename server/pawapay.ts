@@ -67,10 +67,16 @@ function sanitizePhoneForPawaPay(phone: string, country: string): string {
   // --- Country-specific local number normalisation ---
   if (countryUpper === "BJ") {
     // PawaPay still expects the old 8-digit Beninese format (no "01" prefix).
-    // Strip "01" if present.
-    if (local.startsWith("01")) {
+    // Handles all input variants:
+    //   "0146500275" (full new local)  → strip "01" → "46500275"
+    //   "146500275"  (0 was stripped)  → strip "1"  → "46500275"
+    //   "46500275"   (already correct) → keep as-is
+    if (local.startsWith("01") && local.length === 10) {
       local = local.substring(2);
-    } else if (local.startsWith("0")) {
+    } else if (local.startsWith("0") && local.length === 9) {
+      local = local.substring(1);
+    } else if (local.startsWith("1") && local.length === 9) {
+      // "1" is the residual digit when "0146..." had only its "0" stripped
       local = local.substring(1);
     }
   } else if (countryUpper !== "CI") {

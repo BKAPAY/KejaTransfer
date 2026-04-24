@@ -4700,7 +4700,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 7. Strip international prefix from phone number
       const countryPhoneMap: Record<string, { code: string; digits: number[] }> = {
         "SN": { code: "221", digits: [9] }, "CI": { code: "225", digits: [10] },
-        "BF": { code: "226", digits: [8] }, "BJ": { code: "229", digits: [8, 10] },
+        "BF": { code: "226", digits: [8] }, "BJ": { code: "229", digits: [8, 9, 10] },
         "TG": { code: "228", digits: [8] }, "ML": { code: "223", digits: [8] },
         "GN": { code: "224", digits: [9] }, "CM": { code: "237", digits: [9] },
         "CD": { code: "243", digits: [9] }, "CG": { code: "242", digits: [9] },
@@ -7297,7 +7297,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const countryPhoneMap: Record<string, { code: string; digits: number[] }> = {
         "SN": { code: "221", digits: [9] }, "CI": { code: "225", digits: [10] },
-        "BF": { code: "226", digits: [8] }, "BJ": { code: "229", digits: [8, 10] },
+        "BF": { code: "226", digits: [8] }, "BJ": { code: "229", digits: [8, 9, 10] },
         "TG": { code: "228", digits: [8] }, "CM": { code: "237", digits: [9] },
         "CD": { code: "243", digits: [9] }, "CG": { code: "242", digits: [9] },
         "GA": { code: "241", digits: [8] }, "ZM": { code: "260", digits: [9] },
@@ -7621,7 +7621,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const countryPhoneMap: Record<string, { code: string; digits: number[] }> = {
         "SN": { code: "221", digits: [9] }, "CI": { code: "225", digits: [10] },
-        "BF": { code: "226", digits: [8] }, "BJ": { code: "229", digits: [8, 10] },
+        "BF": { code: "226", digits: [8] }, "BJ": { code: "229", digits: [8, 9, 10] },
         "TG": { code: "228", digits: [8] }, "CM": { code: "237", digits: [9] },
         "CD": { code: "243", digits: [9] }, "CG": { code: "242", digits: [9] },
         "GA": { code: "241", digits: [8] }, "ZM": { code: "260", digits: [9] },
