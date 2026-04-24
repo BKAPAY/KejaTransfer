@@ -4696,7 +4696,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .replace(/[-_]money$/i, "")       // orange-money → orange
         .replace(/[-_]mobile$/i, "")      // mtn-mobile → mtn
         .replace(/[-_]cash$/i, "");       // moov-cash → moov
-      if (normalizedOperator === "t-money" || normalizedOperator === "tmoney") normalizedOperator = "tmoney";
+      if (normalizedOperator === "t-money" || normalizedOperator === "tmoney" || normalizedOperator === "togocel") normalizedOperator = "tmoney";
       if (normalizedOperator === "m-pesa" || normalizedOperator === "mpesa") normalizedOperator = "vodacom";
 
       // 7. Strip international prefix from phone number
@@ -7295,7 +7295,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .replace(/\s+/g, "-").replace(/-[a-z]{2}$/i, "")
         .replace(/[-_]money$/i, "").replace(/[-_]mobile$/i, "").replace(/[-_]cash$/i, "");
 
-      if (normalizedOperator === "t-money" || normalizedOperator === "tmoney") normalizedOperator = "tmoney";
+      if (normalizedOperator === "t-money" || normalizedOperator === "tmoney" || normalizedOperator === "togocel") normalizedOperator = "tmoney";
       if (normalizedOperator === "m-pesa" || normalizedOperator === "mpesa") normalizedOperator = "vodacom";
 
       const countryPhoneMap: Record<string, { code: string; digits: number[] }> = {
@@ -7620,7 +7620,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let normalizedOperator = String(operator).toLowerCase()
         .replace(/\s+/g, "-").replace(/-[a-z]{2}$/i, "")
         .replace(/[-_]money$/i, "").replace(/[-_]mobile$/i, "").replace(/[-_]cash$/i, "");
-      if (normalizedOperator === "t-money" || normalizedOperator === "tmoney") normalizedOperator = "tmoney";
+      if (normalizedOperator === "t-money" || normalizedOperator === "tmoney" || normalizedOperator === "togocel") normalizedOperator = "tmoney";
       if (normalizedOperator === "m-pesa" || normalizedOperator === "mpesa") normalizedOperator = "vodacom";
 
       const countryPhoneMap: Record<string, { code: string; digits: number[] }> = {
