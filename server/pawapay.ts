@@ -66,20 +66,26 @@ function sanitizePhoneForPawaPay(phone: string, country: string): string {
 
   // --- Country-specific local number normalisation ---
   if (countryUpper === "BJ") {
-    // BJ numbers are now 10 digits starting with "0" (new format since Nov 2024).
-    // Target MSISDN: 229 + 0XXXXXXXXX = 13 digits.
+    // BJ numbers: two valid formats
+    //   New (since Nov 2024): 10 digits starting "0" → MSISDN 229+10d = 13 digits
+    //   Old: 8 digits → MSISDN 229+8d = 11 digits
     //
     // Input variants we must handle:
-    //   "0146500275"  (10 digits) → keep as-is     → "2290146500275" ✓
-    //   "146500275"   (9 digits)  → restore "0"    → "2290146500275" ✓
-    //   "46500275"    (8 digits, old format)        → keep as-is → "22946500275"
+    //   "0146500275"  (10 digits, new) → keep as-is          → "2290146500275" ✓
+    //   "146500275"   (9 digits)       → restore "0"          → "2290146500275" ✓
+    //   "066006965"   (9 digits, "0"+old) → strip leading "0" → "22966006965"   ✓
+    //   "66006965"    (8 digits, old)  → keep as-is           → "22966006965"   ✓
     if (local.length === 9 && local.startsWith("1")) {
-      // The leading "0" from "0146..." was stripped somewhere — restore it
+      // New format with the "0" trunk prefix stripped — restore it
       local = "0" + local;
+    } else if (local.length === 9 && local.startsWith("0")) {
+      // Old 8-digit number with an accidental leading "0" — strip it
+      local = local.substring(1);
     }
-    // Otherwise keep local as-is (already "0146..." or old 8-digit)
-  } else if (countryUpper === "CI") {
-    // CI: numbers start with "0" — keep as-is, no stripping
+    // Otherwise keep local as-is (already 10-digit new or 8-digit old)
+  } else if (countryUpper === "CI" || countryUpper === "CG") {
+    // CI, CG: numbers start with "0" — keep as-is, no stripping
+    // CG MTN: 06XXXXXXX (9 digits) → MSISDN 24206XXXXXXX (12 digits)
   } else {
     // All other countries: remove a single leading "0" before prepending country code
     if (local.startsWith("0")) {
