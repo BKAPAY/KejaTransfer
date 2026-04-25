@@ -71,18 +71,14 @@ function sanitizePhoneForPawaPay(phone: string, country: string): string {
     //   Old: 8 digits → MSISDN 229+8d = 11 digits
     //
     // Input variants we must handle:
-    //   "0146500275"  (10 digits, new) → keep as-is          → "2290146500275" ✓
-    //   "146500275"   (9 digits)       → restore "0"          → "2290146500275" ✓
-    //   "066006965"   (9 digits, "0"+old) → strip leading "0" → "22966006965"   ✓
-    //   "66006965"    (8 digits, old)  → keep as-is           → "22966006965"   ✓
+    //   "0146500275"  (10 digits, new) → keep as-is  → "2290146500275" ✓
+    //   "146500275"   (9 digits)       → restore "0" → "2290146500275" ✓
+    //   "66006965"    (8 digits, old)  → keep as-is  → "22966006965"   ✓
     if (local.length === 9 && local.startsWith("1")) {
       // New format with the "0" trunk prefix stripped — restore it
       local = "0" + local;
-    } else if (local.length === 9 && local.startsWith("0")) {
-      // Old 8-digit number with an accidental leading "0" — strip it
-      local = local.substring(1);
     }
-    // Otherwise keep local as-is (already 10-digit new or 8-digit old)
+    // Otherwise keep local as-is (10-digit new with "0", or 8-digit old)
   } else if (countryUpper === "CI" || countryUpper === "CG") {
     // CI, CG: numbers start with "0" — keep as-is, no stripping
     // CG MTN: 06XXXXXXX (9 digits) → MSISDN 24206XXXXXXX (12 digits)
