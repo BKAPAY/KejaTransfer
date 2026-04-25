@@ -282,7 +282,7 @@ export default function BusinessApiPage() {
                       Recevez les notifications payin et payout sur une seule URL. Configurez votre endpoint : <code className="bg-muted px-1 rounded">https://votre-site.com/api/webhook/bkapay</code>
                     </p>
 
-                    {editingCallbackId === token.id ? (
+                    {(editingCallbackId === token.id || !token.callbackUrl) ? (
                       <div className="space-y-3">
                         <Input
                           placeholder="https://votre-site.com/api/webhook/bkapay"
@@ -296,9 +296,11 @@ export default function BusinessApiPage() {
                             <Check className="w-4 h-4 mr-1" />
                             {updateMutation.isPending ? "..." : "Enregistrer"}
                           </Button>
-                          <Button size="sm" variant="ghost" onClick={() => { setEditingCallbackId(null); setCallbackUrls(prev => { const c = { ...prev }; delete c[token.id]; return c; }); }} data-testid={`button-cancel-callback-${token.id}`}>
-                            <X className="w-4 h-4 mr-1" /> Annuler
-                          </Button>
+                          {editingCallbackId === token.id && (
+                            <Button size="sm" variant="ghost" onClick={() => { setEditingCallbackId(null); setCallbackUrls(prev => { const c = { ...prev }; delete c[token.id]; return c; }); }} data-testid={`button-cancel-callback-${token.id}`}>
+                              <X className="w-4 h-4 mr-1" /> Annuler
+                            </Button>
+                          )}
                         </div>
                       </div>
                     ) : (
@@ -322,25 +324,16 @@ export default function BusinessApiPage() {
                             </div>
                           </div>
                         )}
-                        {token.callbackUrl ? (
-                          <>
-                            <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-md">
-                              <code className="flex-1 text-xs font-mono truncate text-green-700 dark:text-green-300" data-testid={`text-callback-url-${token.id}`}>{token.callbackUrl}</code>
-                              <Button variant="ghost" size="sm" onClick={() => copyToClipboard(token.callbackUrl!, "URL webhook")} data-testid={`button-copy-callback-${token.id}`}>
-                                <Copy className="w-4 h-4" />
-                              </Button>
-                            </div>
-                            <div className="flex gap-2">
-                              <Button size="sm" variant="outline" onClick={() => { setCallbackUrls(prev => ({ ...prev, [token.id]: token.callbackUrl || "" })); setEditingCallbackId(token.id); }} data-testid={`button-edit-callback-${token.id}`}>Modifier l'URL</Button>
-                              <Button size="sm" variant="ghost" onClick={() => { if (confirm("Supprimer ce webhook ?")) updateMutation.mutate({ id: token.id, data: { callbackUrl: "" } }); }} disabled={updateMutation.isPending} data-testid={`button-remove-callback-${token.id}`}>Supprimer</Button>
-                            </div>
-                          </>
-                        ) : (
-                          <Button size="sm" variant="outline" onClick={() => setEditingCallbackId(token.id)} data-testid={`button-add-callback-${token.id}`}>
-                            <Webhook className="w-4 h-4 mr-2" />
-                            Configurer le webhook
+                        <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-md">
+                          <code className="flex-1 text-xs font-mono truncate text-green-700 dark:text-green-300" data-testid={`text-callback-url-${token.id}`}>{token.callbackUrl}</code>
+                          <Button variant="ghost" size="sm" onClick={() => copyToClipboard(token.callbackUrl!, "URL webhook")} data-testid={`button-copy-callback-${token.id}`}>
+                            <Copy className="w-4 h-4" />
                           </Button>
-                        )}
+                        </div>
+                        <div className="flex gap-2">
+                          <Button size="sm" variant="outline" onClick={() => { setCallbackUrls(prev => ({ ...prev, [token.id]: token.callbackUrl || "" })); setEditingCallbackId(token.id); }} data-testid={`button-edit-callback-${token.id}`}>Modifier</Button>
+                          <Button size="sm" variant="ghost" onClick={() => { if (confirm("Supprimer ce webhook ?")) updateMutation.mutate({ id: token.id, data: { callbackUrl: "" } }); }} disabled={updateMutation.isPending} data-testid={`button-remove-callback-${token.id}`}>Supprimer</Button>
+                        </div>
                       </div>
                     )}
                   </div>

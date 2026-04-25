@@ -504,7 +504,7 @@ export default function ApiPage() {
                     Recevez une notification automatique quand un paiement est complete. Ideal pour activer automatiquement les abonnements.
                   </p>
                   
-                  {editingCallback === apiKey.id ? (
+                  {(editingCallback === apiKey.id || !(apiKey as any).callbackUrl) ? (
                     <div className="space-y-3">
                       <Input
                         placeholder="https://votre-site.com/api/webhook/bkapay"
@@ -528,22 +528,24 @@ export default function ApiPage() {
                           <Check className="w-4 h-4 mr-1" />
                           {callbackMutation.isPending ? "..." : "Enregistrer"}
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => {
-                            setEditingCallback(null);
-                            setCallbackUrls(prev => {
-                              const copy = { ...prev };
-                              delete copy[apiKey.id];
-                              return copy;
-                            });
-                          }}
-                          data-testid={`button-cancel-callback-${apiKey.id}`}
-                        >
-                          <X className="w-4 h-4 mr-1" />
-                          Annuler
-                        </Button>
+                        {editingCallback === apiKey.id && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              setEditingCallback(null);
+                              setCallbackUrls(prev => {
+                                const copy = { ...prev };
+                                delete copy[apiKey.id];
+                                return copy;
+                              });
+                            }}
+                            data-testid={`button-cancel-callback-${apiKey.id}`}
+                          >
+                            <X className="w-4 h-4 mr-1" />
+                            Annuler
+                          </Button>
+                        )}
                       </div>
                     </div>
                   ) : (
@@ -571,31 +573,22 @@ export default function ApiPage() {
                           </div>
                         </div>
                       )}
-                      {(apiKey as any).callbackUrl ? (
-                        <>
-                          <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-md">
-                            <code className="flex-1 text-xs font-mono truncate text-green-700 dark:text-green-300">
-                              {(apiKey as any).callbackUrl}
-                            </code>
-                            <Button variant="ghost" size="sm" onClick={() => copyToClipboard((apiKey as any).callbackUrl, "URL de callback")} data-testid={`button-copy-callback-${apiKey.id}`}>
-                              <Copy className="w-4 h-4" />
-                            </Button>
-                          </div>
-                          <div className="flex gap-2">
-                            <Button size="sm" variant="outline" onClick={() => { setCallbackUrls(prev => ({ ...prev, [apiKey.id]: (apiKey as any).callbackUrl || "" })); setEditingCallback(apiKey.id); }} data-testid={`button-edit-callback-${apiKey.id}`}>
-                              Modifier l'URL
-                            </Button>
-                            <Button size="sm" variant="ghost" onClick={() => { if (confirm("Supprimer cette URL de callback ?")) { callbackMutation.mutate({ id: apiKey.id, callbackUrl: "" }); } }} disabled={callbackMutation.isPending} data-testid={`button-remove-callback-${apiKey.id}`}>
-                              Supprimer
-                            </Button>
-                          </div>
-                        </>
-                      ) : (
-                        <Button size="sm" variant="outline" onClick={() => setEditingCallback(apiKey.id)} data-testid={`button-add-callback-${apiKey.id}`}>
-                          <Webhook className="w-4 h-4 mr-2" />
-                          Configurer l'URL de callback
+                      <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-md">
+                        <code className="flex-1 text-xs font-mono truncate text-green-700 dark:text-green-300">
+                          {(apiKey as any).callbackUrl}
+                        </code>
+                        <Button variant="ghost" size="sm" onClick={() => copyToClipboard((apiKey as any).callbackUrl, "URL de callback")} data-testid={`button-copy-callback-${apiKey.id}`}>
+                          <Copy className="w-4 h-4" />
                         </Button>
-                      )}
+                      </div>
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="outline" onClick={() => { setCallbackUrls(prev => ({ ...prev, [apiKey.id]: (apiKey as any).callbackUrl || "" })); setEditingCallback(apiKey.id); }} data-testid={`button-edit-callback-${apiKey.id}`}>
+                          Modifier
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => { if (confirm("Supprimer cette URL de callback ?")) { callbackMutation.mutate({ id: apiKey.id, callbackUrl: "" }); } }} disabled={callbackMutation.isPending} data-testid={`button-remove-callback-${apiKey.id}`}>
+                          Supprimer
+                        </Button>
+                      </div>
                     </div>
                   )}
                 </div>
