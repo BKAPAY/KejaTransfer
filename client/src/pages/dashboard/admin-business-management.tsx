@@ -1004,8 +1004,8 @@ export default function AdminBusinessManagement() {
                               </span>
                             </div>
                             {first.rejectionReason && (
-                              <p className="text-xs text-red-600 dark:text-red-400">
-                                Motif : {first.rejectionReason}
+                              <p className="text-xs text-red-600 dark:text-red-400 whitespace-pre-wrap">
+                                {first.rejectionReason}
                               </p>
                             )}
                           </div>
