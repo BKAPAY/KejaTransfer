@@ -540,7 +540,7 @@ echo json_encode(['received' => true]);
                 { code: "INVALID_PHONE", http: "400", desc: "Numero de telephone invalide" },
                 { code: "INVALID_PARAMETERS", http: "400", desc: "Parametres manquants ou incorrects" },
                 { code: "TRANSACTION_FAILED", http: "400", desc: "Transaction echouee cote fournisseur" },
-                { code: "INTERNAL_ERROR", http: "500", desc: "Erreur interne cote BKApay (pas votre faute) — reessayez dans quelques secondes. Si l'erreur persiste, contactez le support." },
+                { code: "INTERNAL_ERROR", http: "500", desc: "Erreur interne — reessayez plus tard" },
               ].map(({ code, http, desc }) => (
                 <div key={code} className="flex items-start gap-3 text-sm border border-border rounded-md p-2">
                   <Badge variant="outline" className="font-mono text-xs shrink-0">{http}</Badge>
@@ -638,7 +638,7 @@ echo json_encode(['received' => true]);
                 { code: "INVALID_PHONE", http: "400", desc: "Numero de telephone invalide" },
                 { code: "INVALID_PARAMETERS", http: "400", desc: "Parametres manquants ou incorrects" },
                 { code: "TRANSACTION_FAILED", http: "400", desc: "Transaction echouee cote fournisseur" },
-                { code: "INTERNAL_ERROR", http: "500", desc: "Erreur interne cote BKApay (pas votre faute) — reessayez dans quelques secondes. Si l'erreur persiste, contactez le support." },
+                { code: "INTERNAL_ERROR", http: "500", desc: "Erreur interne — reessayez plus tard" },
               ].map(({ code, http, desc }) => (
                 <div key={code} className="flex items-start gap-3 text-sm border border-border rounded-md p-2">
                   <Badge variant="outline" className="font-mono text-xs shrink-0">{http}</Badge>
