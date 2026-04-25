@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   ArrowLeft, Clock, CheckCircle2, X, Loader2, Building2, Banknote,
-  User as UserIcon, Calendar, XCircle,
+  User as UserIcon, Calendar, XCircle, Smartphone,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -30,6 +30,10 @@ interface SettlementAdmin {
   bankSwiftBic: string | null;
   bankCountry: string | null;
   bankCurrency: string | null;
+  settlementMethod: string | null;
+  momoCountry: string | null;
+  momoOperator: string | null;
+  momoPhone: string | null;
   createdAt: string;
   userName: string;
   userEmail: string;
@@ -198,37 +202,65 @@ export default function AdminSettlementBatchDetail() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <Building2 className="w-4 h-4" />
-            Compte bancaire de destination
+            {first.settlementMethod === "momo" ? (
+              <><Smartphone className="w-4 h-4" />Compte Mobile Money de destination</>
+            ) : (
+              <><Building2 className="w-4 h-4" />Compte bancaire de destination</>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <div>
-              <p className="text-xs text-muted-foreground">Titulaire</p>
-              <p className="font-medium">{first.bankAccountHolder}</p>
+          {first.settlementMethod === "momo" ? (
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {first.momoCountry && (
+                <div>
+                  <p className="text-xs text-muted-foreground">Pays</p>
+                  <p className="font-medium flex items-center gap-1">
+                    {(() => { const cd = COUNTRIES.find(c => c.code === first.momoCountry); return cd ? <><CountryFlag code={cd.code} size="xs" /> {cd.name}</> : first.momoCountry; })()}
+                  </p>
+                </div>
+              )}
+              {first.momoOperator && (
+                <div>
+                  <p className="text-xs text-muted-foreground">Opérateur</p>
+                  <p className="font-medium">{first.momoOperator}</p>
+                </div>
+              )}
+              {first.momoPhone && (
+                <div>
+                  <p className="text-xs text-muted-foreground">Numéro</p>
+                  <p className="font-mono">{first.momoPhone}</p>
+                </div>
+              )}
             </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Banque</p>
-              <p>{first.bankName}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Numéro de compte</p>
-              <p className="font-mono">{first.bankAccountNumber}</p>
-            </div>
-            {first.bankSwiftBic && (
+          ) : (
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <div>
-                <p className="text-xs text-muted-foreground">SWIFT / BIC</p>
-                <p className="font-mono">{first.bankSwiftBic}</p>
+                <p className="text-xs text-muted-foreground">Titulaire</p>
+                <p className="font-medium">{first.bankAccountHolder}</p>
               </div>
-            )}
-            {first.bankCountry && (
               <div>
-                <p className="text-xs text-muted-foreground">Pays de la banque</p>
-                <p>{first.bankCountry}</p>
+                <p className="text-xs text-muted-foreground">Banque</p>
+                <p>{first.bankName}</p>
               </div>
-            )}
-          </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Numéro de compte</p>
+                <p className="font-mono">{first.bankAccountNumber}</p>
+              </div>
+              {first.bankSwiftBic && (
+                <div>
+                  <p className="text-xs text-muted-foreground">SWIFT / BIC</p>
+                  <p className="font-mono">{first.bankSwiftBic}</p>
+                </div>
+              )}
+              {first.bankCountry && (
+                <div>
+                  <p className="text-xs text-muted-foreground">Pays de la banque</p>
+                  <p>{first.bankCountry}</p>
+                </div>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 
