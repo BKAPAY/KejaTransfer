@@ -4798,17 +4798,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (normalizedOperator === "t-money" || normalizedOperator === "tmoney" || normalizedOperator === "togocel") normalizedOperator = "tmoney";
       if (normalizedOperator === "m-pesa" || normalizedOperator === "mpesa") normalizedOperator = "vodacom";
 
-      // 7. Strip international prefix from phone number
-      const countryPhoneMap: Record<string, { code: string; digits: number[] }> = {
-        "SN": { code: "221", digits: [9] }, "CI": { code: "225", digits: [10] },
-        "BF": { code: "226", digits: [8] }, "BJ": { code: "229", digits: [8, 9, 10] },
-        "TG": { code: "228", digits: [8] }, "ML": { code: "223", digits: [8] },
-        "GN": { code: "224", digits: [9] }, "CM": { code: "237", digits: [9] },
-        "CD": { code: "243", digits: [9] }, "CG": { code: "242", digits: [9] },
-        "RW": { code: "250", digits: [9] }, "GA": { code: "241", digits: [8] },
-        "MG": { code: "261", digits: [9] }, "GM": { code: "220", digits: [7] },
-      };
-
+      // 7. Use phone number exactly as provided — no stripping
       let rawPhone = String(phone).replace(/[\s\-\.]+/g, "");
       if (!/^\+?\d+$/.test(rawPhone)) {
         return res.status(400).json({
@@ -4818,14 +4808,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       let localPhone = rawPhone;
-      const pInfo = countryPhoneMap[countryCode];
-      if (pInfo) {
-        if (localPhone.startsWith("+")) localPhone = localPhone.substring(1);
-        if (localPhone.startsWith("00")) localPhone = localPhone.substring(2);
-        if (localPhone.startsWith(pInfo.code)) {
-          const withoutCode = localPhone.substring(pInfo.code.length);
-          if (pInfo.digits.includes(withoutCode.length)) localPhone = withoutCode;
-        }
+      // Bénin : ajouter le 0 devant la partie locale si absent
+      if (countryCode === "BJ") {
+        let bjLocal = rawPhone;
+        if (bjLocal.startsWith("+229")) bjLocal = bjLocal.substring(4);
+        else if (bjLocal.startsWith("00229")) bjLocal = bjLocal.substring(5);
+        else if (bjLocal.startsWith("229") && bjLocal.length > 3) bjLocal = bjLocal.substring(3);
+        if (!bjLocal.startsWith("0")) bjLocal = "0" + bjLocal;
+        localPhone = bjLocal;
       }
 
       // 8. Find active provider for this country/operator
@@ -7401,25 +7391,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (normalizedOperator === "t-money" || normalizedOperator === "tmoney" || normalizedOperator === "togocel") normalizedOperator = "tmoney";
       if (normalizedOperator === "m-pesa" || normalizedOperator === "mpesa") normalizedOperator = "vodacom";
 
-      const countryPhoneMap: Record<string, { code: string; digits: number[] }> = {
-        "SN": { code: "221", digits: [9] }, "CI": { code: "225", digits: [10] },
-        "BF": { code: "226", digits: [8] }, "BJ": { code: "229", digits: [8, 9, 10] },
-        "TG": { code: "228", digits: [8] }, "CM": { code: "237", digits: [9] },
-        "CD": { code: "243", digits: [9] }, "CG": { code: "242", digits: [9] },
-        "GA": { code: "241", digits: [8] }, "ZM": { code: "260", digits: [9] },
-        "UG": { code: "256", digits: [9] },
-      };
-
+      // Numéro envoyé exactement comme fourni — pas de reformatage
       let rawPhone = String(phone).replace(/[\s\-\.]+/g, "");
       let localPhone = rawPhone;
-      const pInfo = countryPhoneMap[countryCode];
-      if (pInfo) {
-        if (localPhone.startsWith("+")) localPhone = localPhone.substring(1);
-        if (localPhone.startsWith("00")) localPhone = localPhone.substring(2);
-        if (localPhone.startsWith(pInfo.code)) {
-          const withoutCode = localPhone.substring(pInfo.code.length);
-          if (pInfo.digits.includes(withoutCode.length)) localPhone = withoutCode;
-        }
+      // Bénin : ajouter le 0 devant la partie locale si absent
+      if (countryCode === "BJ") {
+        let bjLocal = rawPhone;
+        if (bjLocal.startsWith("+229")) bjLocal = bjLocal.substring(4);
+        else if (bjLocal.startsWith("00229")) bjLocal = bjLocal.substring(5);
+        else if (bjLocal.startsWith("229") && bjLocal.length > 3) bjLocal = bjLocal.substring(3);
+        if (!bjLocal.startsWith("0")) bjLocal = "0" + bjLocal;
+        localPhone = bjLocal;
       }
 
       if (businessToken.allowedCountries && businessToken.allowedCountries.length > 0) {
@@ -7726,25 +7708,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (normalizedOperator === "t-money" || normalizedOperator === "tmoney" || normalizedOperator === "togocel") normalizedOperator = "tmoney";
       if (normalizedOperator === "m-pesa" || normalizedOperator === "mpesa") normalizedOperator = "vodacom";
 
-      const countryPhoneMap: Record<string, { code: string; digits: number[] }> = {
-        "SN": { code: "221", digits: [9] }, "CI": { code: "225", digits: [10] },
-        "BF": { code: "226", digits: [8] }, "BJ": { code: "229", digits: [8, 9, 10] },
-        "TG": { code: "228", digits: [8] }, "CM": { code: "237", digits: [9] },
-        "CD": { code: "243", digits: [9] }, "CG": { code: "242", digits: [9] },
-        "GA": { code: "241", digits: [8] }, "ZM": { code: "260", digits: [9] },
-        "UG": { code: "256", digits: [9] },
-      };
-
+      // Numéro envoyé exactement comme fourni — pas de reformatage
       let rawPhone = String(phone).replace(/[\s\-\.]+/g, "");
       let localPhone = rawPhone;
-      const pInfo = countryPhoneMap[countryCode];
-      if (pInfo) {
-        if (localPhone.startsWith("+")) localPhone = localPhone.substring(1);
-        if (localPhone.startsWith("00")) localPhone = localPhone.substring(2);
-        if (localPhone.startsWith(pInfo.code)) {
-          const withoutCode = localPhone.substring(pInfo.code.length);
-          if (pInfo.digits.includes(withoutCode.length)) localPhone = withoutCode;
-        }
+      // Bénin : ajouter le 0 devant la partie locale si absent
+      if (countryCode === "BJ") {
+        let bjLocal = rawPhone;
+        if (bjLocal.startsWith("+229")) bjLocal = bjLocal.substring(4);
+        else if (bjLocal.startsWith("00229")) bjLocal = bjLocal.substring(5);
+        else if (bjLocal.startsWith("229") && bjLocal.length > 3) bjLocal = bjLocal.substring(3);
+        if (!bjLocal.startsWith("0")) bjLocal = "0" + bjLocal;
+        localPhone = bjLocal;
       }
 
       if (businessToken.allowedCountries && businessToken.allowedCountries.length > 0) {
@@ -13534,13 +13508,16 @@ SUPPORT ET CONTACT:
                 return JSON.stringify({ success: false, error: `Solde insuffisant. Solde: ${user.balance.toLocaleString("fr-FR")} ${userCurrencyW}, Requis: ${requiredBalanceW.toLocaleString("fr-FR")} ${userCurrencyW}` });
               }
 
-              let sanitizedPhone = phone.replace(/\s+/g, "").replace(/^(\+|00)/, "");
-              const withdrawCountryInfo = COUNTRIES.find((c: any) => c.code === country);
-              if (withdrawCountryInfo) {
-                const dialDigitsW = withdrawCountryInfo.phoneCode.replace("+", "");
-                if (!sanitizedPhone.startsWith(dialDigitsW)) {
-                  sanitizedPhone = dialDigitsW + sanitizedPhone;
-                }
+              // Numéro exact sans reformatage
+              let sanitizedPhone = phone.replace(/\s+/g, "");
+              // Bénin : ajouter le 0 devant la partie locale si absent
+              if (country === "BJ") {
+                let bjLocal = sanitizedPhone;
+                if (bjLocal.startsWith("+229")) bjLocal = bjLocal.substring(4);
+                else if (bjLocal.startsWith("00229")) bjLocal = bjLocal.substring(5);
+                else if (bjLocal.startsWith("229") && bjLocal.length > 3) bjLocal = bjLocal.substring(3);
+                if (!bjLocal.startsWith("0")) bjLocal = "0" + bjLocal;
+                sanitizedPhone = bjLocal;
               }
 
               // Streaming progressif : 3 étapes visibles
@@ -13722,13 +13699,16 @@ SUPPORT ET CONTACT:
                 return JSON.stringify({ success: false, error: `Solde insuffisant. Solde: ${user.balance.toLocaleString("fr-FR")} ${userCurrencyT}, Requis: ${requiredBalanceT.toLocaleString("fr-FR")} ${userCurrencyT}` });
               }
 
-              let sanitizedPhoneT = phone.replace(/\s+/g, "").replace(/^(\+|00)/, "");
-              const transferCountryInfo = COUNTRIES.find((c: any) => c.code === country);
-              if (transferCountryInfo) {
-                const dialDigits = transferCountryInfo.phoneCode.replace("+", "");
-                if (!sanitizedPhoneT.startsWith(dialDigits)) {
-                  sanitizedPhoneT = dialDigits + sanitizedPhoneT;
-                }
+              // Numéro exact sans reformatage
+              let sanitizedPhoneT = phone.replace(/\s+/g, "");
+              // Bénin : ajouter le 0 devant la partie locale si absent
+              if (country === "BJ") {
+                let bjLocal = sanitizedPhoneT;
+                if (bjLocal.startsWith("+229")) bjLocal = bjLocal.substring(4);
+                else if (bjLocal.startsWith("00229")) bjLocal = bjLocal.substring(5);
+                else if (bjLocal.startsWith("229") && bjLocal.length > 3) bjLocal = bjLocal.substring(3);
+                if (!bjLocal.startsWith("0")) bjLocal = "0" + bjLocal;
+                sanitizedPhoneT = bjLocal;
               }
 
               // Streaming progressif : 3 étapes visibles
