@@ -109,6 +109,7 @@ const BusinessApi = lazy(() => import("@/pages/dashboard/business/api"));
 const BusinessHistory = lazy(() => import("@/pages/dashboard/business/history"));
 const BusinessSettings = lazy(() => import("@/pages/dashboard/business/settings"));
 const BusinessSettlements = lazy(() => import("@/pages/dashboard/business/settlements"));
+const BusinessSettlementScan = lazy(() => import("@/pages/dashboard/business/settlement-scan"));
 const BusinessFees = lazy(() => import("@/pages/dashboard/business/fees"));
 
 // Précharger le cache React Query depuis localStorage AVANT le premier rendu
@@ -246,6 +247,7 @@ function Router() {
           <Route path="/dashboard/business/history/outgoing" component={BusinessHistory} />
           <Route path="/dashboard/business/settings" component={BusinessSettings} />
           <Route path="/dashboard/business/settlements" component={BusinessSettlements} />
+          <Route path="/dashboard/business/settlements/new" component={BusinessSettlementScan} />
           <Route path="/dashboard/business/fees" component={BusinessFees} />
           <Route path="/dashboard/business/documentation" component={DocumentationBusiness} />
           <Route path="/dashboard/business/support" component={Support} />
