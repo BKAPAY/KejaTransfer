@@ -135,7 +135,7 @@ export default function AdminSettlementBatchDetail() {
   if (!first) {
     return (
       <div className="space-y-4 max-w-2xl">
-        <Button variant="ghost" onClick={() => navigate("/dashboard/admin-business-management?tab=settlements")}>
+        <Button variant="ghost" onClick={() => navigate("/dashboard/admin/business/management?tab=settlements")}>
           <ArrowLeft className="w-4 h-4 mr-2" />Retour
         </Button>
         <p className="text-muted-foreground">Lot de règlements introuvable.</p>
@@ -157,7 +157,7 @@ export default function AdminSettlementBatchDetail() {
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => navigate("/dashboard/admin-business-management?tab=settlements")}
+          onClick={() => navigate("/dashboard/admin/business/management?tab=settlements")}
           data-testid="button-back-batch"
         >
           <ArrowLeft className="w-4 h-4" />
