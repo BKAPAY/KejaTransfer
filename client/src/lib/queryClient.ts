@@ -36,11 +36,12 @@ export function preloadCacheFromStorage(client: QueryClient): void {
   }
 }
 
-/** Efface toutes les données persistées (à appeler lors de la déconnexion) */
+/** Efface toutes les données persistées et le cache mémoire (à appeler lors de la déconnexion) */
 export function clearPersistedCache(): void {
   for (const key of PERSIST_KEYS) {
     try { localStorage.removeItem(getStorageKey(key)); } catch {}
   }
+  queryClient.clear();
 }
 
 // Sanitize error messages - remove technical codes and special chars ()/:{}\ 
