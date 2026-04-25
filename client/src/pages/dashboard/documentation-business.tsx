@@ -631,6 +631,7 @@ echo json_encode(['received' => true]);
                 { code: "TOKEN_INACTIVE", http: "403", desc: "Token desactive" },
                 { code: "ACCOUNT_SUSPENDED", http: "403", desc: "Compte entreprise suspendu" },
                 { code: "ACCOUNT_NOT_VERIFIED", http: "403", desc: "KYC entreprise non verifie" },
+                { code: "PAYOUT_NOT_ACTIVATED", http: "403", desc: "Payout API non active — contactez le support pour l'activer" },
                 { code: "INSUFFICIENT_FUNDS", http: "400", desc: "Solde insuffisant dans le wallet du pays" },
                 { code: "COUNTRY_UNAVAILABLE", http: "400", desc: "Pays non disponible pour le payout" },
                 { code: "OPERATOR_UNAVAILABLE", http: "400", desc: "Operateur non supporte dans ce pays" },
