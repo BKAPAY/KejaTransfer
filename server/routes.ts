@@ -11,7 +11,7 @@ import fs from "fs";
 import path from "path";
 import { insertUserSchema, insertPaymentLinkSchema, insertMerchantLinkSchema, insertApiKeySchema } from "@shared/schema";
 import { validatePhoneOperator } from "@shared/phone-utils";
-import { randomUUID } from "crypto";
+import { randomUUID, createHmac } from "crypto";
 import { calculateIncomingFee, calculateOutgoingFee, calculateOutgoingFeeFromNet, calculateCustomerPaysFee, getFeeFromDatabase, getDynamicFees, getDynamicOutgoingFees, getActiveProviderForCountry, getActivePayoutProviderForCountry, getIncomingExchangeFee, getOutgoingExchangeFee } from "./utils/fees";
 import { trySendPaymentCallback } from "./utils/callback";
 import { recordLoginLog } from "./utils/login-tracker";
@@ -7542,7 +7542,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               timestamp: new Date().toISOString(),
             };
             const payloadStr = JSON.stringify(payload);
-            const signature = require("crypto").createHmac("sha256", cbSecret).update(payloadStr).digest("hex");
+            const signature = createHmac("sha256", cbSecret).update(payloadStr).digest("hex");
             const controller = new AbortController();
             const tid = setTimeout(() => controller.abort(), 10000);
             await fetch(cbUrl, {
@@ -7811,7 +7811,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               timestamp: new Date().toISOString(),
             };
             const payloadStr = JSON.stringify(payload);
-            const signature = require("crypto").createHmac("sha256", payoutCbSecret).update(payloadStr).digest("hex");
+            const signature = createHmac("sha256", payoutCbSecret).update(payloadStr).digest("hex");
             const controller = new AbortController();
             const tid = setTimeout(() => controller.abort(), 10000);
             await fetch(payoutCbUrl, {
