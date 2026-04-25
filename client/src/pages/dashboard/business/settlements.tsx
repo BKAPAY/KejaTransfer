@@ -65,6 +65,8 @@ export default function BusinessSettlements() {
   });
 
   const hasBankAccount = user?.bankAccountNumber && user?.bankName;
+  const hasMomo = user?.momoPhone && user?.momoOperator;
+  const hasPaymentMethod = hasBankAccount || hasMomo;
   const batches = groupSettlements(settlements);
 
   return (
@@ -72,11 +74,11 @@ export default function BusinessSettlements() {
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold tracking-tight" data-testid="text-settlements-title">Règlement</h1>
-          <p className="text-sm text-muted-foreground">Demandez le transfert de vos fonds vers votre compte bancaire</p>
+          <p className="text-sm text-muted-foreground">Demandez le transfert de vos fonds vers votre compte bancaire ou Mobile Money</p>
         </div>
         <Button
           onClick={() => navigate("/dashboard/business/settlements/new")}
-          disabled={!hasBankAccount}
+          disabled={!hasPaymentMethod}
           data-testid="button-new-settlement"
         >
           <Banknote className="w-4 h-4 mr-2" />
@@ -84,14 +86,14 @@ export default function BusinessSettlements() {
         </Button>
       </div>
 
-      {!hasBankAccount && (
+      {!hasPaymentMethod && (
         <Card>
           <CardContent className="flex items-center gap-3 py-4">
             <AlertCircle className="h-5 w-5 text-orange-500 shrink-0" />
             <div>
-              <p className="text-sm font-medium">Compte bancaire non configuré</p>
+              <p className="text-sm font-medium">Aucun moyen de paiement configuré</p>
               <p className="text-xs text-muted-foreground">
-                Configurez votre compte bancaire dans les Paramètres avant de demander un règlement.
+                Configurez votre compte bancaire ou Mobile Money dans les Paramètres avant de demander un règlement.
               </p>
             </div>
           </CardContent>

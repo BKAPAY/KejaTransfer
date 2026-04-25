@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Save, Building2, CheckCircle2, Pencil } from "lucide-react";
+import { Loader2, Save, Building2, CheckCircle2, Pencil, Smartphone } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -12,13 +12,18 @@ import { CountryFlag } from "@/components/country-flag";
 
 export default function BusinessSettings() {
   const { toast } = useToast();
-  const [editing, setEditing] = useState(false);
+  const [editingBank, setEditingBank] = useState(false);
+  const [editingMomo, setEditingMomo] = useState(false);
 
   const { data: user, isLoading } = useQuery<any>({
     queryKey: ["/api/auth/me"],
   });
 
-  const [form, setForm] = useState({
+  const { data: withdrawalCountries = {} } = useQuery<Record<string, string[]>>({
+    queryKey: ["/api/countries-operators/withdrawals"],
+  });
+
+  const [bankForm, setBankForm] = useState({
     bankAccountHolder: "",
     bankAccountNumber: "",
     bankName: "",
@@ -30,9 +35,15 @@ export default function BusinessSettings() {
     bankCurrency: "",
   });
 
+  const [momoForm, setMomoForm] = useState({
+    momoCountry: "",
+    momoOperator: "",
+    momoPhone: "",
+  });
+
   useEffect(() => {
     if (user) {
-      setForm({
+      setBankForm({
         bankAccountHolder: user.bankAccountHolder || "",
         bankAccountNumber: user.bankAccountNumber || "",
         bankName: user.bankName || "",
@@ -43,30 +54,49 @@ export default function BusinessSettings() {
         bankCountry: user.bankCountry || "",
         bankCurrency: user.bankCurrency || "",
       });
+      setMomoForm({
+        momoCountry: user.momoCountry || "",
+        momoOperator: user.momoOperator || "",
+        momoPhone: user.momoPhone || "",
+      });
     }
   }, [user]);
 
-  const saveMutation = useMutation({
-    mutationFn: async (data: typeof form) => {
+  const saveBankMutation = useMutation({
+    mutationFn: async (data: typeof bankForm) => {
       const res = await apiRequest("POST", "/api/business/bank-account", data);
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
-      setEditing(false);
-      toast({ title: "Enregistre", description: "Vos informations bancaires ont ete mises a jour." });
+      setEditingBank(false);
+      toast({ title: "Enregistré", description: "Vos informations bancaires ont été mises à jour." });
     },
     onError: (error: Error) => {
       toast({ title: "Erreur", description: error.message, variant: "destructive" });
     },
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    saveMutation.mutate(form);
-  };
+  const saveMomoMutation = useMutation({
+    mutationFn: async (data: typeof momoForm) => {
+      const res = await apiRequest("POST", "/api/business/momo-account", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      setEditingMomo(false);
+      toast({ title: "Enregistré", description: "Votre compte Mobile Money a été mis à jour." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erreur", description: error.message, variant: "destructive" });
+    },
+  });
 
-  const isConfigured = user?.bankAccountNumber && user?.bankName;
+  const isBankConfigured = user?.bankAccountNumber && user?.bankName;
+  const isMomoConfigured = user?.momoPhone && user?.momoOperator && user?.momoCountry;
+
+  const activeCountries = Object.keys(withdrawalCountries);
+  const momoOperators = momoForm.momoCountry ? (withdrawalCountries[momoForm.momoCountry] || []) : [];
 
   if (isLoading) {
     return (
@@ -77,12 +107,13 @@ export default function BusinessSettings() {
   }
 
   const bankCountryData = COUNTRIES.find(c => c.code === user?.bankCountry);
+  const momoCountryData = COUNTRIES.find(c => c.code === user?.momoCountry);
 
   return (
     <div className="space-y-6 max-w-2xl">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight" data-testid="text-settings-title">Parametres</h1>
-        <p className="text-sm text-muted-foreground">Configurez votre compte bancaire pour recevoir vos reglements</p>
+        <h1 className="text-2xl font-bold tracking-tight" data-testid="text-settings-title">Paramètres</h1>
+        <p className="text-sm text-muted-foreground">Configurez vos modes de réception pour vos règlements</p>
       </div>
 
       <Card>
@@ -90,13 +121,13 @@ export default function BusinessSettings() {
           <CardTitle className="flex items-center gap-2 text-base">
             <Building2 className="w-5 h-5" />
             Compte bancaire
-            {isConfigured && !editing && (
+            {isBankConfigured && !editingBank && (
               <CheckCircle2 className="w-4 h-4 text-green-600 ml-auto" />
             )}
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {isConfigured && !editing ? (
+          {isBankConfigured && !editingBank ? (
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
@@ -104,7 +135,7 @@ export default function BusinessSettings() {
                   <p className="text-sm font-medium" data-testid="text-bank-holder">{user.bankAccountHolder}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">Numero de compte / IBAN</p>
+                  <p className="text-xs text-muted-foreground">Numéro de compte / IBAN</p>
                   <p className="text-sm font-medium" data-testid="text-bank-number">{user.bankAccountNumber}</p>
                 </div>
                 <div>
@@ -150,7 +181,7 @@ export default function BusinessSettings() {
               </div>
               <Button
                 variant="outline"
-                onClick={() => setEditing(true)}
+                onClick={() => setEditingBank(true)}
                 data-testid="button-edit-bank"
               >
                 <Pencil className="w-4 h-4 mr-2" />
@@ -158,24 +189,24 @@ export default function BusinessSettings() {
               </Button>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={(e) => { e.preventDefault(); saveBankMutation.mutate(bankForm); }} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2 sm:col-span-2">
                   <label className="text-sm font-medium">Titulaire du compte *</label>
                   <Input
-                    value={form.bankAccountHolder}
-                    onChange={(e) => setForm({ ...form, bankAccountHolder: e.target.value })}
+                    value={bankForm.bankAccountHolder}
+                    onChange={(e) => setBankForm({ ...bankForm, bankAccountHolder: e.target.value })}
                     placeholder="Nom du titulaire"
                     required
                     data-testid="input-bank-holder"
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Numero de compte / IBAN *</label>
+                  <label className="text-sm font-medium">Numéro de compte / IBAN *</label>
                   <Input
-                    value={form.bankAccountNumber}
-                    onChange={(e) => setForm({ ...form, bankAccountNumber: e.target.value })}
-                    placeholder="Numero de compte"
+                    value={bankForm.bankAccountNumber}
+                    onChange={(e) => setBankForm({ ...bankForm, bankAccountNumber: e.target.value })}
+                    placeholder="Numéro de compte"
                     required
                     data-testid="input-bank-number"
                   />
@@ -183,8 +214,8 @@ export default function BusinessSettings() {
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Nom de la banque *</label>
                   <Input
-                    value={form.bankName}
-                    onChange={(e) => setForm({ ...form, bankName: e.target.value })}
+                    value={bankForm.bankName}
+                    onChange={(e) => setBankForm({ ...bankForm, bankName: e.target.value })}
                     placeholder="Ex: BOAD, Ecobank..."
                     required
                     data-testid="input-bank-name"
@@ -193,8 +224,8 @@ export default function BusinessSettings() {
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Code SWIFT / BIC</label>
                   <Input
-                    value={form.bankSwiftBic}
-                    onChange={(e) => setForm({ ...form, bankSwiftBic: e.target.value })}
+                    value={bankForm.bankSwiftBic}
+                    onChange={(e) => setBankForm({ ...bankForm, bankSwiftBic: e.target.value })}
                     placeholder="Code SWIFT"
                     data-testid="input-bank-swift"
                   />
@@ -202,8 +233,8 @@ export default function BusinessSettings() {
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Nom de l'agence</label>
                   <Input
-                    value={form.bankBranchName}
-                    onChange={(e) => setForm({ ...form, bankBranchName: e.target.value })}
+                    value={bankForm.bankBranchName}
+                    onChange={(e) => setBankForm({ ...bankForm, bankBranchName: e.target.value })}
                     placeholder="Agence"
                     data-testid="input-bank-branch-name"
                   />
@@ -211,17 +242,17 @@ export default function BusinessSettings() {
                 <div className="space-y-2 sm:col-span-2">
                   <label className="text-sm font-medium">Adresse de l'agence</label>
                   <Input
-                    value={form.bankBranchAddress}
-                    onChange={(e) => setForm({ ...form, bankBranchAddress: e.target.value })}
-                    placeholder="Adresse complete de l'agence"
+                    value={bankForm.bankBranchAddress}
+                    onChange={(e) => setBankForm({ ...bankForm, bankBranchAddress: e.target.value })}
+                    placeholder="Adresse complète de l'agence"
                     data-testid="input-bank-branch-address"
                   />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Code guichet / Sort code</label>
                   <Input
-                    value={form.bankBranchSortCode}
-                    onChange={(e) => setForm({ ...form, bankBranchSortCode: e.target.value })}
+                    value={bankForm.bankBranchSortCode}
+                    onChange={(e) => setBankForm({ ...bankForm, bankBranchSortCode: e.target.value })}
                     placeholder="Code guichet"
                     data-testid="input-bank-sort-code"
                   />
@@ -229,10 +260,10 @@ export default function BusinessSettings() {
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Pays de la banque</label>
                   <Select
-                    value={form.bankCountry}
+                    value={bankForm.bankCountry}
                     onValueChange={(val) => {
                       const cd = COUNTRIES.find(c => c.code === val);
-                      setForm({ ...form, bankCountry: val, bankCurrency: cd?.currency || form.bankCurrency });
+                      setBankForm({ ...bankForm, bankCountry: val, bankCurrency: cd?.currency || bankForm.bankCurrency });
                     }}
                   >
                     <SelectTrigger data-testid="select-bank-country">
@@ -250,30 +281,145 @@ export default function BusinessSettings() {
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Devise du compte</label>
                   <Input
-                    value={form.bankCurrency}
-                    onChange={(e) => setForm({ ...form, bankCurrency: e.target.value })}
+                    value={bankForm.bankCurrency}
+                    onChange={(e) => setBankForm({ ...bankForm, bankCurrency: e.target.value })}
                     placeholder="Ex: XOF, EUR, USD"
                     data-testid="input-bank-currency"
                   />
                 </div>
               </div>
               <div className="flex gap-2 flex-wrap">
-                {isConfigured && (
+                {isBankConfigured && (
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => setEditing(false)}
-                    data-testid="button-cancel-edit"
+                    onClick={() => setEditingBank(false)}
+                    data-testid="button-cancel-edit-bank"
                   >
                     Annuler
                   </Button>
                 )}
                 <Button
                   type="submit"
-                  disabled={saveMutation.isPending || !form.bankAccountHolder || !form.bankAccountNumber || !form.bankName}
+                  disabled={saveBankMutation.isPending || !bankForm.bankAccountHolder || !bankForm.bankAccountNumber || !bankForm.bankName}
                   data-testid="button-save-bank"
                 >
-                  {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                  {saveBankMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                  Enregistrer
+                </Button>
+              </div>
+            </form>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Smartphone className="w-5 h-5" />
+            Mobile Money
+            {isMomoConfigured && !editingMomo && (
+              <CheckCircle2 className="w-4 h-4 text-green-600 ml-auto" />
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isMomoConfigured && !editingMomo ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-muted-foreground">Pays</p>
+                  <p className="text-sm font-medium flex items-center gap-1" data-testid="text-momo-country">
+                    {momoCountryData ? <><CountryFlag code={momoCountryData.code} size="xs" /> {momoCountryData.name}</> : user.momoCountry}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Opérateur</p>
+                  <p className="text-sm font-medium" data-testid="text-momo-operator">{user.momoOperator}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Numéro</p>
+                  <p className="text-sm font-medium" data-testid="text-momo-phone">{user.momoPhone}</p>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                onClick={() => setEditingMomo(true)}
+                data-testid="button-edit-momo"
+              >
+                <Pencil className="w-4 h-4 mr-2" />
+                Modifier
+              </Button>
+            </div>
+          ) : (
+            <form onSubmit={(e) => { e.preventDefault(); saveMomoMutation.mutate(momoForm); }} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Pays *</label>
+                  <Select
+                    value={momoForm.momoCountry}
+                    onValueChange={(val) => setMomoForm({ ...momoForm, momoCountry: val, momoOperator: "" })}
+                  >
+                    <SelectTrigger data-testid="select-momo-country">
+                      <SelectValue placeholder="Choisir un pays" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {activeCountries.map((code) => {
+                        const cd = COUNTRIES.find(c => c.code === code);
+                        return (
+                          <SelectItem key={code} value={code}>
+                            <span className="flex items-center gap-1"><CountryFlag code={code} size="xs" /> {cd?.name ?? code}</span>
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Opérateur *</label>
+                  <Select
+                    value={momoForm.momoOperator}
+                    onValueChange={(val) => setMomoForm({ ...momoForm, momoOperator: val })}
+                    disabled={!momoForm.momoCountry || momoOperators.length === 0}
+                  >
+                    <SelectTrigger data-testid="select-momo-operator">
+                      <SelectValue placeholder={momoForm.momoCountry ? "Choisir un opérateur" : "Sélectionnez un pays"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {momoOperators.map((op) => (
+                        <SelectItem key={op} value={op}>{op}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2 sm:col-span-2">
+                  <label className="text-sm font-medium">Numéro Mobile Money *</label>
+                  <Input
+                    value={momoForm.momoPhone}
+                    onChange={(e) => setMomoForm({ ...momoForm, momoPhone: e.target.value })}
+                    placeholder="Ex: 0712345678"
+                    required
+                    data-testid="input-momo-phone"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                {isMomoConfigured && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setEditingMomo(false)}
+                    data-testid="button-cancel-edit-momo"
+                  >
+                    Annuler
+                  </Button>
+                )}
+                <Button
+                  type="submit"
+                  disabled={saveMomoMutation.isPending || !momoForm.momoCountry || !momoForm.momoOperator || !momoForm.momoPhone}
+                  data-testid="button-save-momo"
+                >
+                  {saveMomoMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
                   Enregistrer
                 </Button>
               </div>

@@ -419,10 +419,26 @@ async function bootstrapDatabase() {
       console.log("✅ Settlements table ready");
       await settlClient`ALTER TABLE settlements ADD COLUMN IF NOT EXISTS admin_notes TEXT`;
       await settlClient`ALTER TABLE settlements ADD COLUMN IF NOT EXISTS rejection_reason TEXT`;
+      await settlClient`ALTER TABLE settlements ADD COLUMN IF NOT EXISTS settlement_method TEXT DEFAULT 'bank'`;
+      await settlClient`ALTER TABLE settlements ADD COLUMN IF NOT EXISTS momo_country TEXT`;
+      await settlClient`ALTER TABLE settlements ADD COLUMN IF NOT EXISTS momo_operator TEXT`;
+      await settlClient`ALTER TABLE settlements ADD COLUMN IF NOT EXISTS momo_phone TEXT`;
     } catch (e) {
       console.error("⚠️ Settlements table setup error:", e);
     }
     await settlClient.end();
+
+    // Add MOMO columns to users table (must run before Step 7 admin seeding which uses Drizzle ORM)
+    const momoUsersClient = postgres(DATABASE_URL);
+    try {
+      await momoUsersClient`ALTER TABLE users ADD COLUMN IF NOT EXISTS momo_country TEXT`;
+      await momoUsersClient`ALTER TABLE users ADD COLUMN IF NOT EXISTS momo_operator TEXT`;
+      await momoUsersClient`ALTER TABLE users ADD COLUMN IF NOT EXISTS momo_phone TEXT`;
+      console.log("✅ users.momo_country/operator/phone columns ready");
+    } catch (e) {
+      console.error("⚠️ users MOMO columns setup error:", e);
+    }
+    await momoUsersClient.end();
 
     // Step 6b: Add custom_fields, document_urls, document_names columns to payment_links
     const plClient = postgres(DATABASE_URL);
@@ -480,6 +496,27 @@ async function bootstrapDatabase() {
             .where(eq(users.email, "kpetekoussojuste1@gmail.com"));
           console.log("✅ Primary admin flags updated!");
         }
+      }
+
+      // Add MOMO columns to users table
+      try {
+        await seedClient`ALTER TABLE users ADD COLUMN IF NOT EXISTS momo_country TEXT`;
+        await seedClient`ALTER TABLE users ADD COLUMN IF NOT EXISTS momo_operator TEXT`;
+        await seedClient`ALTER TABLE users ADD COLUMN IF NOT EXISTS momo_phone TEXT`;
+        console.log("✅ users.momo_country/operator/phone columns ready");
+      } catch (e) {
+        console.error("⚠️ users MOMO columns setup error:", e);
+      }
+
+      // Add MOMO columns to settlements table
+      try {
+        await seedClient`ALTER TABLE settlements ADD COLUMN IF NOT EXISTS settlement_method TEXT DEFAULT 'bank'`;
+        await seedClient`ALTER TABLE settlements ADD COLUMN IF NOT EXISTS momo_country TEXT`;
+        await seedClient`ALTER TABLE settlements ADD COLUMN IF NOT EXISTS momo_operator TEXT`;
+        await seedClient`ALTER TABLE settlements ADD COLUMN IF NOT EXISTS momo_phone TEXT`;
+        console.log("✅ settlements MOMO columns ready");
+      } catch (e) {
+        console.error("⚠️ settlements MOMO columns setup error:", e);
       }
 
       console.log("⚙️ Ensuring database indexes exist...");

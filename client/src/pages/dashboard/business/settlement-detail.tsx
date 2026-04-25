@@ -7,7 +7,7 @@ import { CountryFlag } from "@/components/country-flag";
 import { COUNTRIES } from "@shared/schema";
 import {
   ArrowLeft, Banknote, CheckCircle2, Clock, XCircle,
-  Building2, FileText, MessageSquare,
+  Building2, FileText, MessageSquare, Smartphone,
 } from "lucide-react";
 
 interface SettlementDetail {
@@ -26,6 +26,10 @@ interface SettlementDetail {
   bankBranchSortCode: string | null;
   bankCountry: string | null;
   bankCurrency: string | null;
+  settlementMethod: string | null;
+  momoCountry: string | null;
+  momoOperator: string | null;
+  momoPhone: string | null;
   createdAt: string;
   adminNotes: string | null;
   rejectionReason: string | null;
@@ -160,40 +164,70 @@ export default function SettlementDetail() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <Building2 className="w-4 h-4" />
-            Compte bancaire de destination
+            {settlement.settlementMethod === "momo" ? (
+              <><Smartphone className="w-4 h-4" />Compte Mobile Money de destination</>
+            ) : (
+              <><Building2 className="w-4 h-4" />Compte bancaire de destination</>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
-          {settlement.bankAccountHolder && (
-            <div>
-              <p className="text-xs text-muted-foreground">Titulaire</p>
-              <p className="text-sm font-medium">{settlement.bankAccountHolder}</p>
-            </div>
-          )}
-          {settlement.bankName && (
-            <div>
-              <p className="text-xs text-muted-foreground">Banque</p>
-              <p className="text-sm">{settlement.bankName}</p>
-            </div>
-          )}
-          {settlement.bankAccountNumber && (
-            <div>
-              <p className="text-xs text-muted-foreground">Numéro de compte</p>
-              <p className="text-sm font-mono">****{settlement.bankAccountNumber.slice(-4)}</p>
-            </div>
-          )}
-          {settlement.bankSwiftBic && (
-            <div>
-              <p className="text-xs text-muted-foreground">SWIFT / BIC</p>
-              <p className="text-sm font-mono">{settlement.bankSwiftBic}</p>
-            </div>
-          )}
-          {settlement.bankCountry && (
-            <div>
-              <p className="text-xs text-muted-foreground">Pays de la banque</p>
-              <p className="text-sm">{settlement.bankCountry}</p>
-            </div>
+          {settlement.settlementMethod === "momo" ? (
+            <>
+              {settlement.momoCountry && (
+                <div>
+                  <p className="text-xs text-muted-foreground">Pays</p>
+                  <p className="text-sm font-medium flex items-center gap-1">
+                    {(() => { const cd = COUNTRIES.find(c => c.code === settlement.momoCountry); return cd ? <><CountryFlag code={cd.code} size="xs" /> {cd.name}</> : settlement.momoCountry; })()}
+                  </p>
+                </div>
+              )}
+              {settlement.momoOperator && (
+                <div>
+                  <p className="text-xs text-muted-foreground">Opérateur</p>
+                  <p className="text-sm">{settlement.momoOperator}</p>
+                </div>
+              )}
+              {settlement.momoPhone && (
+                <div>
+                  <p className="text-xs text-muted-foreground">Numéro</p>
+                  <p className="text-sm font-mono">{settlement.momoPhone}</p>
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              {settlement.bankAccountHolder && (
+                <div>
+                  <p className="text-xs text-muted-foreground">Titulaire</p>
+                  <p className="text-sm font-medium">{settlement.bankAccountHolder}</p>
+                </div>
+              )}
+              {settlement.bankName && (
+                <div>
+                  <p className="text-xs text-muted-foreground">Banque</p>
+                  <p className="text-sm">{settlement.bankName}</p>
+                </div>
+              )}
+              {settlement.bankAccountNumber && (
+                <div>
+                  <p className="text-xs text-muted-foreground">Numéro de compte</p>
+                  <p className="text-sm font-mono">****{settlement.bankAccountNumber.slice(-4)}</p>
+                </div>
+              )}
+              {settlement.bankSwiftBic && (
+                <div>
+                  <p className="text-xs text-muted-foreground">SWIFT / BIC</p>
+                  <p className="text-sm font-mono">{settlement.bankSwiftBic}</p>
+                </div>
+              )}
+              {settlement.bankCountry && (
+                <div>
+                  <p className="text-xs text-muted-foreground">Pays de la banque</p>
+                  <p className="text-sm">{settlement.bankCountry}</p>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>

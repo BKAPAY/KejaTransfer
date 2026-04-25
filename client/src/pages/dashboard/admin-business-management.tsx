@@ -10,7 +10,7 @@ import {
   Search, Wallet, History, Trash2, Power, ArrowUpCircle, ArrowDownCircle,
   ChevronLeft, ChevronRight, User as UserIcon, Users, UserCheck, TrendingDown, TrendingUp,
   AlertCircle, Unlock, Check, X, RotateCcw, Monitor, Key, Globe, Banknote,
-  CheckCircle2, Clock, Building2, Eye, ToggleLeft, ToggleRight, Percent, Loader2,
+  CheckCircle2, Clock, Building2, Eye, ToggleLeft, ToggleRight, Percent, Loader2, Smartphone,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useLocation, useSearch } from "wouter";
@@ -90,6 +90,10 @@ interface SettlementAdmin {
   bankSwiftBic: string;
   bankCountry: string;
   bankCurrency: string;
+  settlementMethod: string | null;
+  momoCountry: string | null;
+  momoOperator: string | null;
+  momoPhone: string | null;
   createdAt: string;
   userName: string;
   userEmail: string;
@@ -121,6 +125,7 @@ export default function AdminBusinessManagement() {
   const [suspendDialog, setSuspendDialog] = useState<{ open: boolean; userId?: string; userName?: string }>({ open: false });
   const [unsuspendDialog, setUnsuspendDialog] = useState<{ open: boolean; userId?: string; userName?: string }>({ open: false });
   const [bankDetailDialog, setBankDetailDialog] = useState<{ open: boolean; user?: User }>({ open: false });
+  const [momoDetailDialog, setMomoDetailDialog] = useState<{ open: boolean; user?: User }>({ open: false });
   const [validateDialog, setValidateDialog] = useState<{ open: boolean; settlement?: SettlementAdmin }>({ open: false });
   const [rejectDialog, setRejectDialog] = useState<{ open: boolean; settlement?: SettlementAdmin }>({ open: false });
   const [validateBatchDialog, setValidateBatchDialog] = useState<{ open: boolean; settlements?: SettlementAdmin[] }>({ open: false });
@@ -518,6 +523,12 @@ export default function AdminBusinessManagement() {
                                   Banque
                                 </Badge>
                               )}
+                              {(user as any).momoPhone && (
+                                <Badge variant="outline" className="text-xs">
+                                  <Smartphone className="w-3 h-3 mr-1" />
+                                  MOMO
+                                </Badge>
+                              )}
                             </div>
                             <p className="text-sm text-muted-foreground truncate" data-testid={`text-email-${user.id}`}>
                               {user.email}
@@ -583,6 +594,17 @@ export default function AdminBusinessManagement() {
                             >
                               <Building2 className="w-4 h-4 mr-1" />
                               Banque
+                            </Button>
+                          )}
+                          {(user as any).momoPhone && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setMomoDetailDialog({ open: true, user })}
+                              data-testid={`button-view-momo-${user.id}`}
+                            >
+                              <Smartphone className="w-4 h-4 mr-1" />
+                              MOMO
                             </Button>
                           )}
                         </div>
@@ -1470,6 +1492,41 @@ export default function AdminBusinessManagement() {
                 <div>
                   <p className="text-xs text-muted-foreground">Devise</p>
                   <p className="font-medium">{(bankDetailDialog.user as any).bankCurrency || "-"}</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={momoDetailDialog.open} onOpenChange={(open) => setMomoDetailDialog({ ...momoDetailDialog, open })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              <Smartphone className="w-5 h-5 inline mr-2" />
+              Mobile Money - {momoDetailDialog.user?.businessName || `${momoDetailDialog.user?.firstName} ${momoDetailDialog.user?.lastName}`}
+            </DialogTitle>
+          </DialogHeader>
+          {momoDetailDialog.user && (
+            <div className="space-y-3 py-2">
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <p className="text-xs text-muted-foreground">Pays</p>
+                  <p className="font-medium flex items-center gap-1">
+                    {(() => {
+                      const mc = (momoDetailDialog.user as any).momoCountry;
+                      const cd = COUNTRIES.find(c => c.code === mc);
+                      return cd ? <><CountryFlag code={cd.code} size="xs" /> {cd.name}</> : (mc || "-");
+                    })()}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Opérateur</p>
+                  <p className="font-medium">{(momoDetailDialog.user as any).momoOperator || "-"}</p>
+                </div>
+                <div className="col-span-2">
+                  <p className="text-xs text-muted-foreground">Numéro</p>
+                  <p className="font-medium text-base">{(momoDetailDialog.user as any).momoPhone || "-"}</p>
                 </div>
               </div>
             </div>

@@ -81,6 +81,9 @@ export const users = pgTable("users", {
   bankBranchSortCode: text("bank_branch_sort_code"),
   bankCountry: text("bank_country"),
   bankCurrency: text("bank_currency"),
+  momoCountry: text("momo_country"),
+  momoOperator: text("momo_operator"),
+  momoPhone: text("momo_phone"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -318,6 +321,10 @@ export const settlements = pgTable("settlements", {
   bankBranchSortCode: text("bank_branch_sort_code"),
   bankCountry: text("bank_country"),
   bankCurrency: text("bank_currency"),
+  settlementMethod: text("settlement_method").default("bank"),
+  momoCountry: text("momo_country"),
+  momoOperator: text("momo_operator"),
+  momoPhone: text("momo_phone"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

@@ -644,6 +644,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/business/momo-account", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const schema = z.object({
+        momoCountry: z.string().min(1),
+        momoOperator: z.string().min(1),
+        momoPhone: z.string().min(1),
+      });
+      const data = schema.parse(req.body);
+      const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+      await pool.query(`
+        UPDATE users SET momo_country = $1, momo_operator = $2, momo_phone = $3 WHERE id = $4
+      `, [data.momoCountry, data.momoOperator, data.momoPhone, req.session.userId]);
+      await pool.end();
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Save momo account error:", error);
+      res.status(400).json({ error: error.message || "Erreur lors de la sauvegarde" });
+    }
+  });
+
   // ===== Settlement Routes =====
   app.get("/api/business/settlements", requireAuth, async (req: Request, res: Response) => {
     try {
@@ -705,6 +725,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         bankBranchSortCode: r.bank_branch_sort_code,
         bankCountry: r.bank_country,
         bankCurrency: r.bank_currency,
+        settlementMethod: r.settlement_method ?? "bank",
+        momoCountry: r.momo_country ?? null,
+        momoOperator: r.momo_operator ?? null,
+        momoPhone: r.momo_phone ?? null,
         createdAt: r.created_at,
         adminNotes: r.admin_notes ?? null,
         rejectionReason: r.rejection_reason ?? null,
@@ -721,6 +745,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         walletCountry: z.string().min(1),
         walletCurrency: z.string().min(1),
         amount: z.number().min(1),
+        settlementMethod: z.enum(["bank", "momo"]).default("bank"),
       });
       const data = schema.parse(req.body);
 
@@ -732,9 +757,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const userResult = await client.query(`SELECT * FROM users WHERE id = $1`, [req.session.userId]);
         const user = userResult.rows[0];
         if (!user) { await client.query('ROLLBACK'); client.release(); await pool.end(); return res.status(404).json({ error: "Utilisateur non trouvé" }); }
-        if (!user.bank_account_number || !user.bank_name) {
-          await client.query('ROLLBACK'); client.release(); await pool.end();
-          return res.status(400).json({ error: "Veuillez d'abord configurer votre compte bancaire" });
+
+        if (data.settlementMethod === "momo") {
+          if (!user.momo_phone || !user.momo_operator || !user.momo_country) {
+            await client.query('ROLLBACK'); client.release(); await pool.end();
+            return res.status(400).json({ error: "Veuillez d'abord configurer votre compte Mobile Money" });
+          }
+        } else {
+          if (!user.bank_account_number || !user.bank_name) {
+            await client.query('ROLLBACK'); client.release(); await pool.end();
+            return res.status(400).json({ error: "Veuillez d'abord configurer votre compte bancaire" });
+          }
         }
 
         const walletResult = await client.query(
@@ -752,18 +785,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
           [data.amount, wallet.id]
         );
 
-        await client.query(
-          `INSERT INTO settlements (user_id, wallet_country, wallet_currency, amount, status,
-           bank_account_holder, bank_account_number, bank_name, bank_swift_bic,
-           bank_branch_address, bank_branch_name, bank_branch_sort_code, bank_country, bank_currency)
-           VALUES ($1, $2, $3, $4, 'pending', $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
-          [
-            req.session.userId, data.walletCountry, data.walletCurrency, data.amount,
-            user.bank_account_holder, user.bank_account_number, user.bank_name,
-            user.bank_swift_bic, user.bank_branch_address, user.bank_branch_name,
-            user.bank_branch_sort_code, user.bank_country, user.bank_currency
-          ]
-        );
+        if (data.settlementMethod === "momo") {
+          await client.query(
+            `INSERT INTO settlements (user_id, wallet_country, wallet_currency, amount, status,
+             settlement_method, momo_country, momo_operator, momo_phone)
+             VALUES ($1, $2, $3, $4, 'pending', 'momo', $5, $6, $7)`,
+            [
+              req.session.userId, data.walletCountry, data.walletCurrency, data.amount,
+              user.momo_country, user.momo_operator, user.momo_phone
+            ]
+          );
+        } else {
+          await client.query(
+            `INSERT INTO settlements (user_id, wallet_country, wallet_currency, amount, status,
+             settlement_method, bank_account_holder, bank_account_number, bank_name, bank_swift_bic,
+             bank_branch_address, bank_branch_name, bank_branch_sort_code, bank_country, bank_currency)
+             VALUES ($1, $2, $3, $4, 'pending', 'bank', $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+            [
+              req.session.userId, data.walletCountry, data.walletCurrency, data.amount,
+              user.bank_account_holder, user.bank_account_number, user.bank_name,
+              user.bank_swift_bic, user.bank_branch_address, user.bank_branch_name,
+              user.bank_branch_sort_code, user.bank_country, user.bank_currency
+            ]
+          );
+        }
 
         await client.query('COMMIT');
         client.release();
@@ -808,6 +853,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         bankBranchSortCode: r.bank_branch_sort_code,
         bankCountry: r.bank_country,
         bankCurrency: r.bank_currency,
+        settlementMethod: r.settlement_method ?? "bank",
+        momoCountry: r.momo_country ?? null,
+        momoOperator: r.momo_operator ?? null,
+        momoPhone: r.momo_phone ?? null,
         createdAt: r.created_at,
         userName: r.business_name || `${r.first_name} ${r.last_name}`,
         userEmail: r.email,

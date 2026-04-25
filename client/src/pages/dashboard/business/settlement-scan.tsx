@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { CountryFlag } from "@/components/country-flag";
 import { COUNTRIES, CURRENCY_CONVERSION_RATES } from "@shared/schema";
 import {
-  CheckCircle2, XCircle, ArrowLeft, ShieldCheck, Send, Loader2,
+  CheckCircle2, XCircle, ArrowLeft, ShieldCheck, Send, Loader2, Building2, Smartphone,
 } from "lucide-react";
 
 interface BusinessWallet {
@@ -113,10 +113,18 @@ export default function SettlementScan() {
   const [logLines, setLogLines] = useState<{ text: string; ok: boolean }[]>([]);
   const [totalUSD, setTotalUSD] = useState(0);
   const [submitting, setSubmitting] = useState(false);
+  const [settlementMethod, setSettlementMethod] = useState<"bank" | "momo" | null>(null);
 
   const { data: wallets = [] } = useQuery<BusinessWallet[]>({
     queryKey: ["/api/business/wallets"],
   });
+
+  const { data: currentUser } = useQuery<any>({
+    queryKey: ["/api/auth/me"],
+  });
+
+  const hasBankAccount = currentUser?.bankAccountNumber && currentUser?.bankName;
+  const hasMomo = currentUser?.momoPhone && currentUser?.momoOperator;
 
   const walletsWithBalance = useMemo(
     () => wallets.filter((w) => w.balance > 0),
@@ -126,7 +134,7 @@ export default function SettlementScan() {
   const MIN_USD = 30;
 
   const createSettlement = useMutation({
-    mutationFn: async (data: { walletCountry: string; walletCurrency: string; amount: number }) => {
+    mutationFn: async (data: { walletCountry: string; walletCurrency: string; amount: number; settlementMethod: string }) => {
       const res = await apiRequest("POST", "/api/business/settlements", data);
       return res.json();
     },
@@ -195,6 +203,7 @@ export default function SettlementScan() {
   }, [wallets.length]);
 
   const handleSubmit = async () => {
+    if (!settlementMethod) return;
     setSubmitting(true);
     try {
       for (const w of walletsWithBalance) {
@@ -202,6 +211,7 @@ export default function SettlementScan() {
           walletCountry: w.country,
           walletCurrency: w.currency,
           amount: Math.floor(w.balance),
+          settlementMethod,
         });
       }
       queryClient.invalidateQueries({ queryKey: ["/api/business/settlements"] });
@@ -360,6 +370,56 @@ export default function SettlementScan() {
                     {fmtUSD(totalUSD)}
                   </span>
                 </div>
+
+                <div className="pt-3 border-t border-green-900/40 space-y-2">
+                  <p className="text-green-500 font-mono text-xs uppercase tracking-widest">
+                    Mode de réception
+                  </p>
+                  <div className="flex gap-2 flex-wrap">
+                    {hasBankAccount && (
+                      <button
+                        type="button"
+                        onClick={() => setSettlementMethod("bank")}
+                        data-testid="button-method-bank"
+                        className="flex items-center gap-2 px-3 py-2 rounded text-sm font-medium transition-colors"
+                        style={{
+                          background: settlementMethod === "bank" ? "rgba(0,255,100,0.15)" : "rgba(0,255,100,0.04)",
+                          border: `1px solid ${settlementMethod === "bank" ? "#00ff88" : "#003311"}`,
+                          color: settlementMethod === "bank" ? "#00ff88" : "#00aa55",
+                        }}
+                      >
+                        <Building2 className="w-4 h-4" />
+                        Virement bancaire
+                      </button>
+                    )}
+                    {hasMomo && (
+                      <button
+                        type="button"
+                        onClick={() => setSettlementMethod("momo")}
+                        data-testid="button-method-momo"
+                        className="flex items-center gap-2 px-3 py-2 rounded text-sm font-medium transition-colors"
+                        style={{
+                          background: settlementMethod === "momo" ? "rgba(0,255,100,0.15)" : "rgba(0,255,100,0.04)",
+                          border: `1px solid ${settlementMethod === "momo" ? "#00ff88" : "#003311"}`,
+                          color: settlementMethod === "momo" ? "#00ff88" : "#00aa55",
+                        }}
+                      >
+                        <Smartphone className="w-4 h-4" />
+                        Mobile Money
+                      </button>
+                    )}
+                  </div>
+                  {settlementMethod === "bank" && currentUser?.bankName && (
+                    <p className="text-green-600 font-mono text-xs">
+                      {currentUser.bankName} — {currentUser.bankAccountNumber}
+                    </p>
+                  )}
+                  {settlementMethod === "momo" && currentUser?.momoPhone && (
+                    <p className="text-green-600 font-mono text-xs">
+                      {currentUser.momoOperator} — {currentUser.momoPhone}
+                    </p>
+                  )}
+                </div>
               </div>
 
               <div className="flex gap-3">
@@ -374,9 +434,9 @@ export default function SettlementScan() {
                 </Button>
                 <Button
                   className="flex-1 font-semibold"
-                  style={{ background: "#00cc55", color: "#000" }}
+                  style={{ background: settlementMethod ? "#00cc55" : "#003311", color: settlementMethod ? "#000" : "#005522" }}
                   onClick={handleSubmit}
-                  disabled={submitting}
+                  disabled={submitting || !settlementMethod}
                   data-testid="button-submit-settlement"
                 >
                   {submitting ? (
@@ -384,7 +444,7 @@ export default function SettlementScan() {
                   ) : (
                     <Send className="w-4 h-4 mr-2" />
                   )}
-                  Soumettre le règlement
+                  {settlementMethod ? "Soumettre le règlement" : "Choisissez un mode"}
                 </Button>
               </div>
             </div>
