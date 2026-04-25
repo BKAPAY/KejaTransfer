@@ -292,17 +292,6 @@ export default function AdminSettlementBatchDetail() {
             <DialogTitle>Valider le règlement</DialogTitle>
             <DialogDescription>{first.userName} — {pendingItems.length} pays</DialogDescription>
           </DialogHeader>
-          <div className="space-y-1 bg-muted rounded-md p-3 my-1">
-            {pendingItems.map(s => {
-              const cd = COUNTRIES.find(c => c.code === s.walletCountry);
-              return (
-                <div key={s.id} className="flex items-center justify-between text-sm">
-                  <span className="flex items-center gap-2">{cd && <CountryFlag code={cd.code} size="xs" />}{cd?.name}</span>
-                  <span className="font-bold">{formatAmount(s.amount, s.walletCurrency)}</span>
-                </div>
-              );
-            })}
-          </div>
           <div className="space-y-2">
             <label className="text-sm font-medium">Notes de validation <span className="text-destructive">*</span></label>
             <Textarea
@@ -336,17 +325,6 @@ export default function AdminSettlementBatchDetail() {
             <DialogTitle>Rejeter le règlement</DialogTitle>
             <DialogDescription>{first.userName} — {pendingItems.length} pays</DialogDescription>
           </DialogHeader>
-          <div className="space-y-1 bg-muted rounded-md p-3 my-1">
-            {pendingItems.map(s => {
-              const cd = COUNTRIES.find(c => c.code === s.walletCountry);
-              return (
-                <div key={s.id} className="flex items-center justify-between text-sm">
-                  <span className="flex items-center gap-2">{cd && <CountryFlag code={cd.code} size="xs" />}{cd?.name}</span>
-                  <span className="font-bold">{formatAmount(s.amount, s.walletCurrency)}</span>
-                </div>
-              );
-            })}
-          </div>
           <div className="space-y-2">
             <label className="text-sm font-medium">Motif de rejet <span className="text-destructive">*</span></label>
             <Textarea

@@ -760,21 +760,21 @@ export default function AdminBusinessManagement() {
                 </div>
               ) : (
               <div className="space-y-3">
-                {BUSINESS_COUNTRIES.map((code) => {
-                  const cd = COUNTRIES.find(c => c.code === code);
+                {WALLET_OPTIONS.map((w) => {
+                  const cd = COUNTRIES.find(c => c.code === w.code);
                   if (!cd) return null;
-                  const cs = countryStats.find(s => s.country === code);
+                  const cs = countryStats.find(s => s.country === w.code && s.currency === w.currency);
                   const incomingTotal = cs?.incomingTotal || 0;
                   const outgoingTotal = cs?.outgoingTotal || 0;
-                  const currency = cs?.currency || cd.currency;
-                  const isDisabled = disabledWalletCountries.includes(code);
+                  const toggleKey = w.code === "CD" && w.currency === "USD" ? "CD:USD" : w.code;
+                  const isDisabled = disabledWalletCountries.includes(toggleKey);
                   return (
-                    <div key={code} className={`border rounded-md p-4 transition-opacity ${isDisabled ? "opacity-60" : ""}`} data-testid={`country-stat-${code}`}>
+                    <div key={`${w.code}-${w.currency}`} className={`border rounded-md p-4 transition-opacity ${isDisabled ? "opacity-60" : ""}`} data-testid={`country-stat-${w.code}-${w.currency}`}>
                       <div className="flex items-center gap-3 mb-3">
-                        <CountryFlag code={cd.code} size="md" />
+                        <CountryFlag code={w.code} size="md" />
                         <div>
-                          <h4 className="font-semibold text-sm">{cd.name}</h4>
-                          <p className="text-xs text-muted-foreground">{currency}</p>
+                          <h4 className="font-semibold text-sm">{w.name}</h4>
+                          <p className="text-xs text-muted-foreground">{w.currency}</p>
                         </div>
                       </div>
                       <div className="grid grid-cols-2 gap-4">
@@ -783,14 +783,14 @@ export default function AdminBusinessManagement() {
                             <TrendingDown className="w-3 h-3 text-blue-600" />
                             <span className="text-xs font-medium">Fonds entrants</span>
                           </div>
-                          <p className="text-sm font-bold">{formatAmount(incomingTotal, currency)}</p>
+                          <p className="text-sm font-bold">{formatAmount(incomingTotal, w.currency)}</p>
                         </div>
                         <div className="p-2 bg-muted rounded-md">
                           <div className="flex items-center gap-1 mb-1">
                             <TrendingUp className="w-3 h-3 text-orange-600" />
                             <span className="text-xs font-medium">Fonds sortants</span>
                           </div>
-                          <p className="text-sm font-bold">{formatAmount(outgoingTotal, currency)}</p>
+                          <p className="text-sm font-bold">{formatAmount(outgoingTotal, w.currency)}</p>
                         </div>
                       </div>
                     </div>
@@ -846,21 +846,22 @@ export default function AdminBusinessManagement() {
                 </Badge>
               </div>
               <div className="grid grid-cols-1 gap-2">
-                {BUSINESS_COUNTRIES.map((code) => {
-                  const cd = COUNTRIES.find(c => c.code === code);
+                {WALLET_OPTIONS.map((w) => {
+                  const cd = COUNTRIES.find(c => c.code === w.code);
                   if (!cd) return null;
-                  const isDisabled = disabledWalletCountries.includes(code);
+                  const toggleKey = w.code === "CD" && w.currency === "USD" ? "CD:USD" : w.code;
+                  const isDisabled = disabledWalletCountries.includes(toggleKey);
                   return (
                     <div
-                      key={code}
+                      key={`${w.code}-${w.currency}`}
                       className={`flex items-center justify-between gap-3 p-3 rounded-md border transition-opacity ${isDisabled ? "opacity-60" : ""}`}
-                      data-testid={`wallet-manage-row-${code}`}
+                      data-testid={`wallet-manage-row-${w.code}-${w.currency}`}
                     >
                       <div className="flex items-center gap-3">
-                        <CountryFlag code={cd.code} size="md" />
+                        <CountryFlag code={w.code} size="md" />
                         <div>
-                          <p className="text-sm font-medium leading-tight">{cd.name}</p>
-                          <p className="text-xs text-muted-foreground">{cd.currency}</p>
+                          <p className="text-sm font-medium leading-tight">{w.name}</p>
+                          <p className="text-xs text-muted-foreground">{w.currency}</p>
                         </div>
                         {isDisabled && (
                           <Badge variant="destructive" className="text-xs">Désactivé</Badge>
@@ -869,9 +870,9 @@ export default function AdminBusinessManagement() {
                       <Button
                         size="sm"
                         variant={isDisabled ? "outline" : "default"}
-                        onClick={() => toggleWalletCountryMutation.mutate(code)}
+                        onClick={() => toggleWalletCountryMutation.mutate(toggleKey)}
                         disabled={toggleWalletCountryMutation.isPending}
-                        data-testid={`button-wallet-toggle-${code}`}
+                        data-testid={`button-wallet-toggle-${w.code}-${w.currency}`}
                         className="gap-1.5 min-w-[110px] justify-center"
                       >
                         {isDisabled ? (
