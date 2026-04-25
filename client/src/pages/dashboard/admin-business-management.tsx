@@ -10,7 +10,7 @@ import {
   Search, Wallet, History, Trash2, Power, ArrowUpCircle, ArrowDownCircle,
   ChevronLeft, User as UserIcon, Users, UserCheck, TrendingDown, TrendingUp,
   AlertCircle, Unlock, Check, X, RotateCcw, Monitor, Key, Globe, Banknote,
-  CheckCircle2, Clock, Building2, Eye, ToggleLeft, ToggleRight, Percent,
+  CheckCircle2, Clock, Building2, Eye, ToggleLeft, ToggleRight, Percent, Loader2,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useLocation, useSearch } from "wouter";
@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 
 const BUSINESS_COUNTRIES = [
   "BJ", "CI", "SN", "TG", "BF", "ML", "GN", "NE", "CM", "CD",
@@ -78,6 +79,8 @@ interface SettlementAdmin {
   createdAt: string;
   userName: string;
   userEmail: string;
+  adminNotes: string | null;
+  rejectionReason: string | null;
 }
 
 export default function AdminBusinessManagement() {
@@ -104,6 +107,9 @@ export default function AdminBusinessManagement() {
   const [suspendDialog, setSuspendDialog] = useState<{ open: boolean; userId?: string; userName?: string }>({ open: false });
   const [unsuspendDialog, setUnsuspendDialog] = useState<{ open: boolean; userId?: string; userName?: string }>({ open: false });
   const [bankDetailDialog, setBankDetailDialog] = useState<{ open: boolean; user?: User }>({ open: false });
+  const [validateDialog, setValidateDialog] = useState<{ open: boolean; settlement?: SettlementAdmin }>({ open: false });
+  const [rejectDialog, setRejectDialog] = useState<{ open: boolean; settlement?: SettlementAdmin }>({ open: false });
+  const [settlementNotes, setSettlementNotes] = useState("");
 
   const { data: stats, isLoading: statsLoading } = useQuery<BusinessStats>({
     queryKey: ["/api/admin/business/stats"],
@@ -216,15 +222,37 @@ export default function AdminBusinessManagement() {
     },
   });
 
-  const completeSettlementMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const res = await apiRequest("POST", `/api/admin/settlements/${id}/complete`);
+  const validateSettlementMutation = useMutation({
+    mutationFn: async ({ id, adminNotes }: { id: string; adminNotes: string }) => {
+      const res = await apiRequest("POST", `/api/admin/settlements/${id}/validate`, { adminNotes });
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settlements"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settlements/pending-count"] });
-      toast({ title: "Succes", description: "Reglement marque comme complete" });
+      setValidateDialog({ open: false });
+      setSettlementNotes("");
+      toast({ title: "Validé", description: "Le règlement a été validé avec succès." });
+    },
+    onError: (e: Error) => {
+      toast({ title: "Erreur", description: e.message, variant: "destructive" });
+    },
+  });
+
+  const rejectSettlementMutation = useMutation({
+    mutationFn: async ({ id, rejectionReason }: { id: string; rejectionReason: string }) => {
+      const res = await apiRequest("POST", `/api/admin/settlements/${id}/reject`, { rejectionReason });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settlements"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settlements/pending-count"] });
+      setRejectDialog({ open: false });
+      setSettlementNotes("");
+      toast({ title: "Rejeté", description: "Le règlement a été rejeté. Le solde a été recrédité." });
+    },
+    onError: (e: Error) => {
+      toast({ title: "Erreur", description: e.message, variant: "destructive" });
     },
   });
 
@@ -264,6 +292,7 @@ export default function AdminBusinessManagement() {
 
   const pendingSettlements = settlements.filter(s => s.status === "pending");
   const completedSettlements = settlements.filter(s => s.status === "completed");
+  const rejectedSettlements = settlements.filter(s => s.status === "rejected");
 
   return (
     <div className="space-y-6">
@@ -862,16 +891,61 @@ export default function AdminBusinessManagement() {
                               {s.bankSwiftBic && <p>SWIFT: {s.bankSwiftBic}</p>}
                             </div>
                           </div>
-                          <Button
-                            size="sm"
-                            onClick={() => completeSettlementMutation.mutate(s.id)}
-                            disabled={completeSettlementMutation.isPending}
-                            data-testid={`button-complete-settlement-${s.id}`}
-                          >
-                            <CheckCircle2 className="w-4 h-4 mr-1" />
-                            Marquer complete
-                          </Button>
+                          <div className="flex gap-2 flex-wrap">
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => { setRejectDialog({ open: true, settlement: s }); setSettlementNotes(""); }}
+                              data-testid={`button-reject-settlement-${s.id}`}
+                            >
+                              <X className="w-4 h-4 mr-1" />
+                              Rejeter
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={() => { setValidateDialog({ open: true, settlement: s }); setSettlementNotes(""); }}
+                              data-testid={`button-validate-settlement-${s.id}`}
+                            >
+                              <CheckCircle2 className="w-4 h-4 mr-1" />
+                              Valider
+                            </Button>
+                          </div>
                         </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {rejectedSettlements.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <X className="w-5 h-5 text-red-500" />
+                  Règlements rejetés
+                  <Badge variant="destructive" className="ml-2">{rejectedSettlements.length}</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {rejectedSettlements.map((s) => {
+                    const cd = COUNTRIES.find(c => c.code === s.walletCountry);
+                    return (
+                      <div key={s.id} className="p-3 border border-red-200 dark:border-red-900 rounded-md" data-testid={`settlement-rejected-${s.id}`}>
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <span className="font-semibold text-sm">{s.userName}</span>
+                          <Badge variant="destructive" className="text-xs"><X className="w-3 h-3 mr-1" />Rejeté</Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground flex items-center gap-1 flex-wrap mb-1">
+                          {formatAmount(s.amount, s.walletCurrency)} - {cd && <CountryFlag code={cd.code} size="xs" />} {cd?.name} - {new Date(s.createdAt).toLocaleDateString("fr-FR")}
+                        </p>
+                        {s.rejectionReason && (
+                          <p className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 rounded px-2 py-1">
+                            Motif : {s.rejectionReason}
+                          </p>
+                        )}
                       </div>
                     );
                   })}
@@ -884,35 +958,38 @@ export default function AdminBusinessManagement() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
                 <CheckCircle2 className="w-5 h-5 text-green-600" />
-                Historique des reglements
+                Historique des règlements validés
               </CardTitle>
             </CardHeader>
             <CardContent>
               {completedSettlements.length === 0 && pendingSettlements.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
-                  Aucun reglement pour le moment
+                  Aucun règlement pour le moment
                 </div>
               ) : completedSettlements.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
-                  Aucun reglement complete
+                  Aucun règlement validé
                 </div>
               ) : (
                 <div className="space-y-2">
                   {completedSettlements.map((s) => {
                     const cd = COUNTRIES.find(c => c.code === s.walletCountry);
                     return (
-                      <div key={s.id} className="flex items-center justify-between gap-4 p-3 border rounded-md" data-testid={`settlement-completed-${s.id}`}>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-semibold text-sm">{s.userName}</span>
-                            <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs">
-                              <CheckCircle2 className="w-3 h-3 mr-1" />Complete
-                            </Badge>
-                          </div>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            <span className="flex items-center gap-1 flex-wrap">{formatAmount(s.amount, s.walletCurrency)} - {cd && <CountryFlag code={cd.code} size="xs" />} {cd?.name} - {new Date(s.createdAt).toLocaleDateString("fr-FR")}</span>
-                          </p>
+                      <div key={s.id} className="p-3 border rounded-md" data-testid={`settlement-completed-${s.id}`}>
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <span className="font-semibold text-sm">{s.userName}</span>
+                          <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs">
+                            <CheckCircle2 className="w-3 h-3 mr-1" />Validé
+                          </Badge>
                         </div>
+                        <p className="text-xs text-muted-foreground flex items-center gap-1 flex-wrap mb-1">
+                          {formatAmount(s.amount, s.walletCurrency)} - {cd && <CountryFlag code={cd.code} size="xs" />} {cd?.name} - {new Date(s.createdAt).toLocaleDateString("fr-FR")}
+                        </p>
+                        {s.adminNotes && (
+                          <p className="text-xs text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/30 rounded px-2 py-1">
+                            Note : {s.adminNotes}
+                          </p>
+                        )}
                       </div>
                     );
                   })}
@@ -924,6 +1001,87 @@ export default function AdminBusinessManagement() {
           )}
         </TabsContent>
       </Tabs>
+
+      <Dialog open={validateDialog.open} onOpenChange={(open) => { if (!open) { setValidateDialog({ open: false }); setSettlementNotes(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Valider le règlement</DialogTitle>
+            <DialogDescription>
+              {validateDialog.settlement && (
+                <span>
+                  {validateDialog.settlement.userName} — {formatAmount(validateDialog.settlement.amount, validateDialog.settlement.walletCurrency)}
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-3">
+            <label className="text-sm font-medium">Notes de validation <span className="text-destructive">*</span></label>
+            <Textarea
+              placeholder="Ex : Virement effectué le 25/04/2026, référence TXN-XXXX..."
+              value={settlementNotes}
+              onChange={(e) => setSettlementNotes(e.target.value)}
+              rows={4}
+              data-testid="textarea-validate-notes"
+            />
+            <p className="text-xs text-muted-foreground">Ces notes seront visibles par l'utilisateur dans son historique de règlement.</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setValidateDialog({ open: false }); setSettlementNotes(""); }}>Annuler</Button>
+            <Button
+              onClick={() => {
+                if (!validateDialog.settlement || !settlementNotes.trim()) return;
+                validateSettlementMutation.mutate({ id: validateDialog.settlement.id, adminNotes: settlementNotes.trim() });
+              }}
+              disabled={!settlementNotes.trim() || validateSettlementMutation.isPending}
+              data-testid="button-confirm-validate"
+            >
+              {validateSettlementMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
+              Confirmer la validation
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={rejectDialog.open} onOpenChange={(open) => { if (!open) { setRejectDialog({ open: false }); setSettlementNotes(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rejeter le règlement</DialogTitle>
+            <DialogDescription>
+              {rejectDialog.settlement && (
+                <span>
+                  {rejectDialog.settlement.userName} — {formatAmount(rejectDialog.settlement.amount, rejectDialog.settlement.walletCurrency)}
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-3">
+            <label className="text-sm font-medium">Motif de rejet <span className="text-destructive">*</span></label>
+            <Textarea
+              placeholder="Ex : Documents manquants, informations bancaires incorrectes..."
+              value={settlementNotes}
+              onChange={(e) => setSettlementNotes(e.target.value)}
+              rows={4}
+              data-testid="textarea-reject-reason"
+            />
+            <p className="text-xs text-muted-foreground">Le solde sera recrédité automatiquement sur le wallet de l'utilisateur. Ce motif sera visible dans son historique.</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setRejectDialog({ open: false }); setSettlementNotes(""); }}>Annuler</Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (!rejectDialog.settlement || !settlementNotes.trim()) return;
+                rejectSettlementMutation.mutate({ id: rejectDialog.settlement.id, rejectionReason: settlementNotes.trim() });
+              }}
+              disabled={!settlementNotes.trim() || rejectSettlementMutation.isPending}
+              data-testid="button-confirm-reject"
+            >
+              {rejectSettlementMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <X className="w-4 h-4 mr-2" />}
+              Confirmer le rejet
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={depositDialogOpen} onOpenChange={(open) => {
         setDepositDialogOpen(open);

@@ -670,9 +670,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
         bankCountry: r.bank_country,
         bankCurrency: r.bank_currency,
         createdAt: r.created_at,
+        adminNotes: r.admin_notes ?? null,
+        rejectionReason: r.rejection_reason ?? null,
       })));
     } catch (error: any) {
       console.error("Get settlements error:", error);
+      res.status(500).json({ error: "Erreur" });
+    }
+  });
+
+  app.get("/api/business/settlements/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+      const result = await pool.query(
+        `SELECT * FROM settlements WHERE id = $1 AND user_id = $2`,
+        [req.params.id, req.session.userId]
+      );
+      await pool.end();
+      if (result.rows.length === 0) return res.status(404).json({ error: "Règlement non trouvé" });
+      const r = result.rows[0];
+      res.json({
+        id: r.id,
+        userId: r.user_id,
+        walletCountry: r.wallet_country,
+        walletCurrency: r.wallet_currency,
+        amount: r.amount,
+        status: r.status,
+        bankAccountHolder: r.bank_account_holder,
+        bankAccountNumber: r.bank_account_number,
+        bankName: r.bank_name,
+        bankSwiftBic: r.bank_swift_bic,
+        bankBranchAddress: r.bank_branch_address,
+        bankBranchName: r.bank_branch_name,
+        bankBranchSortCode: r.bank_branch_sort_code,
+        bankCountry: r.bank_country,
+        bankCurrency: r.bank_currency,
+        createdAt: r.created_at,
+        adminNotes: r.admin_notes ?? null,
+        rejectionReason: r.rejection_reason ?? null,
+      });
+    } catch (error: any) {
+      console.error("Get settlement detail error:", error);
       res.status(500).json({ error: "Erreur" });
     }
   });
@@ -773,10 +811,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
         createdAt: r.created_at,
         userName: r.business_name || `${r.first_name} ${r.last_name}`,
         userEmail: r.email,
+        adminNotes: r.admin_notes ?? null,
+        rejectionReason: r.rejection_reason ?? null,
       })));
     } catch (error: any) {
       console.error("Admin get settlements error:", error);
       res.status(500).json({ error: "Erreur" });
+    }
+  });
+
+  app.post("/api/admin/settlements/:id/validate", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const schema = z.object({ adminNotes: z.string().min(1, "Les notes sont requises") });
+      const { adminNotes } = schema.parse(req.body);
+      const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+      const result = await pool.query(
+        `UPDATE settlements SET status = 'completed', admin_notes = $1 WHERE id = $2`,
+        [adminNotes, req.params.id]
+      );
+      await pool.end();
+      if (result.rowCount === 0) return res.status(404).json({ error: "Règlement non trouvé" });
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Validate settlement error:", error);
+      res.status(400).json({ error: error.message || "Erreur" });
+    }
+  });
+
+  app.post("/api/admin/settlements/:id/reject", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const schema = z.object({ rejectionReason: z.string().min(1, "Le motif de rejet est requis") });
+      const { rejectionReason } = schema.parse(req.body);
+      const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        const sResult = await client.query(`SELECT * FROM settlements WHERE id = $1 FOR UPDATE`, [req.params.id]);
+        if (sResult.rows.length === 0) { await client.query('ROLLBACK'); client.release(); await pool.end(); return res.status(404).json({ error: "Règlement non trouvé" }); }
+        const s = sResult.rows[0];
+        await client.query(
+          `UPDATE settlements SET status = 'rejected', rejection_reason = $1 WHERE id = $2`,
+          [rejectionReason, req.params.id]
+        );
+        await client.query(
+          `UPDATE business_wallets SET balance = balance + $1 WHERE user_id = $2 AND country = $3 AND currency = $4`,
+          [s.amount, s.user_id, s.wallet_country, s.wallet_currency]
+        );
+        await client.query('COMMIT');
+        client.release();
+        await pool.end();
+        res.json({ success: true });
+      } catch (txError) {
+        await client.query('ROLLBACK');
+        client.release();
+        await pool.end();
+        throw txError;
+      }
+    } catch (error: any) {
+      console.error("Reject settlement error:", error);
+      res.status(400).json({ error: error.message || "Erreur" });
     }
   });
 

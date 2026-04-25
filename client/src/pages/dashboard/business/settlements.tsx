@@ -2,16 +2,16 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Banknote, Loader2, Inbox, AlertCircle, Clock, CheckCircle2 } from "lucide-react";
+import { Banknote, Loader2, Inbox, AlertCircle, Clock, CheckCircle2, XCircle, ChevronRight } from "lucide-react";
 import { useLocation } from "wouter";
 import { CountryFlag } from "@/components/country-flag";
 import { COUNTRIES } from "@shared/schema";
 import type { Settlement } from "@shared/schema";
 
 function StatusBadge({ status }: { status: string }) {
-  if (status === "completed") return <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"><CheckCircle2 className="w-3 h-3 mr-1" />Complété</Badge>;
+  if (status === "completed") return <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"><CheckCircle2 className="w-3 h-3 mr-1" />Validé</Badge>;
   if (status === "pending") return <Badge variant="secondary"><Clock className="w-3 h-3 mr-1" />En attente</Badge>;
-  if (status === "rejected") return <Badge variant="destructive">Rejeté</Badge>;
+  if (status === "rejected") return <Badge variant="destructive"><XCircle className="w-3 h-3 mr-1" />Rejeté</Badge>;
   return <Badge variant="secondary">{status}</Badge>;
 }
 
@@ -87,7 +87,8 @@ export default function BusinessSettlements() {
                 return (
                   <div
                     key={s.id}
-                    className="flex items-center justify-between gap-4 p-3 border rounded-md"
+                    className="flex items-center justify-between gap-4 p-3 border rounded-md cursor-pointer hover-elevate"
+                    onClick={() => navigate(`/dashboard/business/settlements/${s.id}`)}
                     data-testid={`settlement-row-${s.id}`}
                   >
                     <div className="flex-1 min-w-0">
@@ -108,6 +109,7 @@ export default function BusinessSettlements() {
                         </p>
                       )}
                     </div>
+                    <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
                   </div>
                 );
               })}

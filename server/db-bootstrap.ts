@@ -417,6 +417,8 @@ async function bootstrapDatabase() {
         )
       `;
       console.log("✅ Settlements table ready");
+      await settlClient`ALTER TABLE settlements ADD COLUMN IF NOT EXISTS admin_notes TEXT`;
+      await settlClient`ALTER TABLE settlements ADD COLUMN IF NOT EXISTS rejection_reason TEXT`;
     } catch (e) {
       console.error("⚠️ Settlements table setup error:", e);
     }
