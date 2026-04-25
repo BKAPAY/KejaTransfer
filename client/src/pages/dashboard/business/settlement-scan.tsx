@@ -322,31 +322,33 @@ export default function SettlementScan() {
                   </div>
                 </div>
 
-                <div className="border-t border-green-900/40 pt-3 space-y-2">
+                <div className="border-t border-green-900/40 pt-3">
                   <p className="text-green-500 font-mono text-xs uppercase tracking-widest mb-3">
                     Portefeuilles inclus dans le règlement
                   </p>
-                  {walletsWithBalance.map((w) => {
-                    const cd = COUNTRIES.find((c) => c.code === w.country);
-                    return (
-                      <div
-                        key={`${w.country}-${w.currency}`}
-                        className="flex items-center justify-between gap-3 py-2 px-3 rounded"
-                        style={{ background: "rgba(0,255,100,0.04)", border: "1px solid #003311" }}
-                      >
-                        <div className="flex items-center gap-2">
-                          <CountryFlag code={w.country} size="sm" />
-                          <div>
-                            <p className="text-green-200 text-sm font-medium">{cd?.name ?? w.country}</p>
-                            <p className="text-green-600 font-mono text-xs">≈ {fmtUSD(toUSD(w.balance, w.currency))}</p>
+                  <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                    {walletsWithBalance.map((w) => {
+                      const cd = COUNTRIES.find((c) => c.code === w.country);
+                      return (
+                        <div
+                          key={`${w.country}-${w.currency}`}
+                          className="flex items-center justify-between gap-3 py-2 px-3 rounded"
+                          style={{ background: "rgba(0,255,100,0.04)", border: "1px solid #003311" }}
+                        >
+                          <div className="flex items-center gap-2">
+                            <CountryFlag code={w.country} size="sm" />
+                            <div>
+                              <p className="text-green-200 text-sm font-medium">{cd?.name ?? w.country}</p>
+                              <p className="text-green-600 font-mono text-xs">≈ {fmtUSD(toUSD(w.balance, w.currency))}</p>
+                            </div>
                           </div>
+                          <span className="text-green-300 font-mono font-semibold text-sm tabular-nums">
+                            {fmtNative(w.balance, w.currency)}
+                          </span>
                         </div>
-                        <span className="text-green-300 font-mono font-semibold text-sm tabular-nums">
-                          {fmtNative(w.balance, w.currency)}
-                        </span>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
 
                 <div
