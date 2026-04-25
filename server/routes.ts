@@ -4808,14 +4808,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       let localPhone = rawPhone;
-      // Bénin : ajouter le 0 devant la partie locale si absent
-      if (countryCode === "BJ") {
-        let bjLocal = rawPhone;
-        if (bjLocal.startsWith("+229")) bjLocal = bjLocal.substring(4);
-        else if (bjLocal.startsWith("00229")) bjLocal = bjLocal.substring(5);
-        else if (bjLocal.startsWith("229") && bjLocal.length > 3) bjLocal = bjLocal.substring(3);
-        if (!bjLocal.startsWith("0")) bjLocal = "0" + bjLocal;
-        localPhone = bjLocal;
+      // BJ, CG, CI : ajouter le 0 devant la partie locale si absent
+      { const _dialMap: Record<string, string> = { "BJ": "229", "CG": "242", "CI": "225" };
+        const _dial = _dialMap[countryCode];
+        if (_dial) {
+          let _local = rawPhone;
+          if (_local.startsWith("+" + _dial)) _local = _local.substring(_dial.length + 1);
+          else if (_local.startsWith("00" + _dial)) _local = _local.substring(_dial.length + 2);
+          else if (_local.startsWith(_dial) && _local.length > _dial.length) _local = _local.substring(_dial.length);
+          if (!_local.startsWith("0")) _local = "0" + _local;
+          localPhone = _local;
+        }
       }
 
       // 8. Find active provider for this country/operator
@@ -7394,14 +7397,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Numéro envoyé exactement comme fourni — pas de reformatage
       let rawPhone = String(phone).replace(/[\s\-\.]+/g, "");
       let localPhone = rawPhone;
-      // Bénin : ajouter le 0 devant la partie locale si absent
-      if (countryCode === "BJ") {
-        let bjLocal = rawPhone;
-        if (bjLocal.startsWith("+229")) bjLocal = bjLocal.substring(4);
-        else if (bjLocal.startsWith("00229")) bjLocal = bjLocal.substring(5);
-        else if (bjLocal.startsWith("229") && bjLocal.length > 3) bjLocal = bjLocal.substring(3);
-        if (!bjLocal.startsWith("0")) bjLocal = "0" + bjLocal;
-        localPhone = bjLocal;
+      // BJ, CG, CI : ajouter le 0 devant la partie locale si absent
+      { const _dialMap: Record<string, string> = { "BJ": "229", "CG": "242", "CI": "225" };
+        const _dial = _dialMap[countryCode];
+        if (_dial) {
+          let _local = rawPhone;
+          if (_local.startsWith("+" + _dial)) _local = _local.substring(_dial.length + 1);
+          else if (_local.startsWith("00" + _dial)) _local = _local.substring(_dial.length + 2);
+          else if (_local.startsWith(_dial) && _local.length > _dial.length) _local = _local.substring(_dial.length);
+          if (!_local.startsWith("0")) _local = "0" + _local;
+          localPhone = _local;
+        }
       }
 
       if (businessToken.allowedCountries && businessToken.allowedCountries.length > 0) {
@@ -7711,14 +7717,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Numéro envoyé exactement comme fourni — pas de reformatage
       let rawPhone = String(phone).replace(/[\s\-\.]+/g, "");
       let localPhone = rawPhone;
-      // Bénin : ajouter le 0 devant la partie locale si absent
-      if (countryCode === "BJ") {
-        let bjLocal = rawPhone;
-        if (bjLocal.startsWith("+229")) bjLocal = bjLocal.substring(4);
-        else if (bjLocal.startsWith("00229")) bjLocal = bjLocal.substring(5);
-        else if (bjLocal.startsWith("229") && bjLocal.length > 3) bjLocal = bjLocal.substring(3);
-        if (!bjLocal.startsWith("0")) bjLocal = "0" + bjLocal;
-        localPhone = bjLocal;
+      // BJ, CG, CI : ajouter le 0 devant la partie locale si absent
+      { const _dialMap: Record<string, string> = { "BJ": "229", "CG": "242", "CI": "225" };
+        const _dial = _dialMap[countryCode];
+        if (_dial) {
+          let _local = rawPhone;
+          if (_local.startsWith("+" + _dial)) _local = _local.substring(_dial.length + 1);
+          else if (_local.startsWith("00" + _dial)) _local = _local.substring(_dial.length + 2);
+          else if (_local.startsWith(_dial) && _local.length > _dial.length) _local = _local.substring(_dial.length);
+          if (!_local.startsWith("0")) _local = "0" + _local;
+          localPhone = _local;
+        }
       }
 
       if (businessToken.allowedCountries && businessToken.allowedCountries.length > 0) {
@@ -13510,14 +13519,17 @@ SUPPORT ET CONTACT:
 
               // Numéro exact sans reformatage
               let sanitizedPhone = phone.replace(/\s+/g, "");
-              // Bénin : ajouter le 0 devant la partie locale si absent
-              if (country === "BJ") {
-                let bjLocal = sanitizedPhone;
-                if (bjLocal.startsWith("+229")) bjLocal = bjLocal.substring(4);
-                else if (bjLocal.startsWith("00229")) bjLocal = bjLocal.substring(5);
-                else if (bjLocal.startsWith("229") && bjLocal.length > 3) bjLocal = bjLocal.substring(3);
-                if (!bjLocal.startsWith("0")) bjLocal = "0" + bjLocal;
-                sanitizedPhone = bjLocal;
+              // BJ, CG, CI : ajouter le 0 devant la partie locale si absent
+              { const _dialMap2: Record<string, string> = { "BJ": "229", "CG": "242", "CI": "225" };
+                const _dial2 = _dialMap2[country];
+                if (_dial2) {
+                  let _loc2 = sanitizedPhone;
+                  if (_loc2.startsWith("+" + _dial2)) _loc2 = _loc2.substring(_dial2.length + 1);
+                  else if (_loc2.startsWith("00" + _dial2)) _loc2 = _loc2.substring(_dial2.length + 2);
+                  else if (_loc2.startsWith(_dial2) && _loc2.length > _dial2.length) _loc2 = _loc2.substring(_dial2.length);
+                  if (!_loc2.startsWith("0")) _loc2 = "0" + _loc2;
+                  sanitizedPhone = _loc2;
+                }
               }
 
               // Streaming progressif : 3 étapes visibles
@@ -13701,14 +13713,17 @@ SUPPORT ET CONTACT:
 
               // Numéro exact sans reformatage
               let sanitizedPhoneT = phone.replace(/\s+/g, "");
-              // Bénin : ajouter le 0 devant la partie locale si absent
-              if (country === "BJ") {
-                let bjLocal = sanitizedPhoneT;
-                if (bjLocal.startsWith("+229")) bjLocal = bjLocal.substring(4);
-                else if (bjLocal.startsWith("00229")) bjLocal = bjLocal.substring(5);
-                else if (bjLocal.startsWith("229") && bjLocal.length > 3) bjLocal = bjLocal.substring(3);
-                if (!bjLocal.startsWith("0")) bjLocal = "0" + bjLocal;
-                sanitizedPhoneT = bjLocal;
+              // BJ, CG, CI : ajouter le 0 devant la partie locale si absent
+              { const _dialMap3: Record<string, string> = { "BJ": "229", "CG": "242", "CI": "225" };
+                const _dial3 = _dialMap3[country];
+                if (_dial3) {
+                  let _loc3 = sanitizedPhoneT;
+                  if (_loc3.startsWith("+" + _dial3)) _loc3 = _loc3.substring(_dial3.length + 1);
+                  else if (_loc3.startsWith("00" + _dial3)) _loc3 = _loc3.substring(_dial3.length + 2);
+                  else if (_loc3.startsWith(_dial3) && _loc3.length > _dial3.length) _loc3 = _loc3.substring(_dial3.length);
+                  if (!_loc3.startsWith("0")) _loc3 = "0" + _loc3;
+                  sanitizedPhoneT = _loc3;
+                }
               }
 
               // Streaming progressif : 3 étapes visibles
