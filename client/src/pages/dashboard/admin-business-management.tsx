@@ -986,29 +986,39 @@ export default function AdminBusinessManagement() {
                       .sort((a, b) => new Date(b[1][0].createdAt).getTime() - new Date(a[1][0].createdAt).getTime())
                       .map(([batchKey, items]) => {
                         const first = items[0];
-                        const dateLabel = new Date(first.createdAt).toLocaleDateString("fr-FR");
+                        const batchDate = new Date(first.createdAt);
+                        const dateLabel = batchDate.toLocaleDateString("fr-FR");
+                        const ts = batchDate.getTime();
                         return (
-                          <div key={batchKey} className="py-3" data-testid={`batch-rejected-${batchKey}`}>
-                            <div className="flex items-center gap-2 flex-wrap mb-1">
-                              <span className="font-semibold text-sm">{first.userName}</span>
-                              <Badge variant="destructive" className="text-xs"><X className="w-3 h-3 mr-1" />Rejeté</Badge>
-                              <span className="text-xs text-muted-foreground">{dateLabel}</span>
+                          <button
+                            key={batchKey}
+                            className="w-full text-left py-3 flex items-center justify-between gap-4 hover-elevate"
+                            onClick={() => setLocation(`/dashboard/admin/settlement-batch/${first.userId}/${ts}`)}
+                            data-testid={`batch-rejected-${batchKey}`}
+                          >
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap mb-1">
+                                <span className="font-semibold text-sm">{first.userName}</span>
+                                <Badge variant="destructive" className="text-xs"><X className="w-3 h-3 mr-1" />Rejeté</Badge>
+                                <span className="text-xs text-muted-foreground">{dateLabel}</span>
+                              </div>
+                              <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                                {items.map(s => {
+                                  const cd = COUNTRIES.find(c => c.code === s.walletCountry);
+                                  return cd ? <CountryFlag key={s.id} code={cd.code} size="xs" /> : null;
+                                })}
+                                <span className="text-xs text-muted-foreground">
+                                  {items.map(s => COUNTRIES.find(c => c.code === s.walletCountry)?.name).filter(Boolean).join(" · ")}
+                                </span>
+                              </div>
+                              {first.rejectionReason && (
+                                <p className="text-xs text-red-600 dark:text-red-400 whitespace-pre-wrap">
+                                  {first.rejectionReason}
+                                </p>
+                              )}
                             </div>
-                            <div className="flex items-center gap-1.5 flex-wrap mb-1">
-                              {items.map(s => {
-                                const cd = COUNTRIES.find(c => c.code === s.walletCountry);
-                                return cd ? <CountryFlag key={s.id} code={cd.code} size="xs" /> : null;
-                              })}
-                              <span className="text-xs text-muted-foreground">
-                                {items.map(s => COUNTRIES.find(c => c.code === s.walletCountry)?.name).filter(Boolean).join(" · ")}
-                              </span>
-                            </div>
-                            {first.rejectionReason && (
-                              <p className="text-xs text-red-600 dark:text-red-400 whitespace-pre-wrap">
-                                {first.rejectionReason}
-                              </p>
-                            )}
-                          </div>
+                            <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+                          </button>
                         );
                       });
                   })()}
@@ -1047,31 +1057,41 @@ export default function AdminBusinessManagement() {
                       .sort((a, b) => new Date(b[1][0].createdAt).getTime() - new Date(a[1][0].createdAt).getTime())
                       .map(([batchKey, items]) => {
                         const first = items[0];
-                        const dateLabel = new Date(first.createdAt).toLocaleDateString("fr-FR");
+                        const batchDate = new Date(first.createdAt);
+                        const dateLabel = batchDate.toLocaleDateString("fr-FR");
+                        const ts = batchDate.getTime();
                         return (
-                          <div key={batchKey} className="py-3" data-testid={`batch-completed-${batchKey}`}>
-                            <div className="flex items-center gap-2 flex-wrap mb-1">
-                              <span className="font-semibold text-sm">{first.userName}</span>
-                              <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs">
-                                <CheckCircle2 className="w-3 h-3 mr-1" />Validé
-                              </Badge>
-                              <span className="text-xs text-muted-foreground">{dateLabel}</span>
+                          <button
+                            key={batchKey}
+                            className="w-full text-left py-3 flex items-center justify-between gap-4 hover-elevate"
+                            onClick={() => setLocation(`/dashboard/admin/settlement-batch/${first.userId}/${ts}`)}
+                            data-testid={`batch-completed-${batchKey}`}
+                          >
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap mb-1">
+                                <span className="font-semibold text-sm">{first.userName}</span>
+                                <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs">
+                                  <CheckCircle2 className="w-3 h-3 mr-1" />Validé
+                                </Badge>
+                                <span className="text-xs text-muted-foreground">{dateLabel}</span>
+                              </div>
+                              <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                                {items.map(s => {
+                                  const cd = COUNTRIES.find(c => c.code === s.walletCountry);
+                                  return cd ? <CountryFlag key={s.id} code={cd.code} size="xs" /> : null;
+                                })}
+                                <span className="text-xs text-muted-foreground">
+                                  {items.map(s => COUNTRIES.find(c => c.code === s.walletCountry)?.name).filter(Boolean).join(" · ")}
+                                </span>
+                              </div>
+                              {first.adminNotes && (
+                                <p className="text-xs text-green-700 dark:text-green-400 whitespace-pre-wrap">
+                                  {first.adminNotes}
+                                </p>
+                              )}
                             </div>
-                            <div className="flex items-center gap-1.5 flex-wrap mb-1">
-                              {items.map(s => {
-                                const cd = COUNTRIES.find(c => c.code === s.walletCountry);
-                                return cd ? <CountryFlag key={s.id} code={cd.code} size="xs" /> : null;
-                              })}
-                              <span className="text-xs text-muted-foreground">
-                                {items.map(s => COUNTRIES.find(c => c.code === s.walletCountry)?.name).filter(Boolean).join(" · ")}
-                              </span>
-                            </div>
-                            {first.adminNotes && (
-                              <p className="text-xs text-green-700 dark:text-green-400">
-                                Note : {first.adminNotes}
-                              </p>
-                            )}
-                          </div>
+                            <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+                          </button>
                         );
                       });
                   })()}

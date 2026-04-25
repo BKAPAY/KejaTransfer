@@ -891,7 +891,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/admin/settlements/pending-count", requireAdmin, async (req: Request, res: Response) => {
     try {
       const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
-      const result = await pool.query(`SELECT COUNT(*) as count FROM settlements WHERE status = 'pending'`);
+      const result = await pool.query(
+        `SELECT COUNT(DISTINCT CONCAT(user_id::text, '-', TO_CHAR(DATE_TRUNC('minute', created_at), 'YYYY-MM-DD-HH24-MI'))) as count
+         FROM settlements WHERE status = 'pending'`
+      );
       await pool.end();
       res.json({ count: parseInt(result.rows[0].count) });
     } catch (error: any) {
