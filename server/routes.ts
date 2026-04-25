@@ -12311,37 +12311,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Countries appear even if no operators are enabled (empty array) - UI shows "no operators" message
   app.get("/api/countries-operators/withdrawals", async (req: Request, res: Response) => {
     try {
-      const [configs, countryStatuses] = await Promise.all([
-        storage.getCountryOperatorConfigs(),
-        storage.getCountryStatuses(),
-      ]);
-      
-      // First: get all countries where payout is enabled at country-level
-      const payoutEnabledCountries = new Set<string>();
-      const payoutEnabledMap = new Map<string, boolean>();
-      for (const cs of countryStatuses) {
-        if (cs.payoutEnabled) {
-          payoutEnabledCountries.add(cs.country);
-          payoutEnabledMap.set(`${cs.provider}-${cs.country}`, true);
-        }
-      }
-      
-      // Initialize result with all payout-enabled countries (empty arrays)
+      const configs = await storage.getCountryOperatorConfigs("business");
+      const activeOutgoing = configs.filter(c => c.outgoingEnabled);
+
       const result: Record<string, string[]> = {};
-      Array.from(payoutEnabledCountries).forEach(country => {
-        result[country] = [];
-      });
-      
-      // Add operators that are enabled at operator-level
-      const enabledConfigs = configs.filter(
-        (c) => c.outgoingEnabled && payoutEnabledMap.has(`${c.provider}-${c.country}`)
-      );
-      
-      for (const config of enabledConfigs) {
-        if (!result[config.country]) {
-          result[config.country] = [];
-        }
-        // Avoid duplicates if same operator enabled for multiple providers
+      for (const config of activeOutgoing) {
+        if (!result[config.country]) result[config.country] = [];
         if (!result[config.country].includes(config.operator)) {
           result[config.country].push(config.operator);
         }
