@@ -117,7 +117,11 @@ const itemVariants = {
 };
 
 function fmt(amount: number, currency: string) {
-  return new Intl.NumberFormat("fr-FR").format(amount) + " " + currency;
+  const hasDecimals = amount % 1 !== 0;
+  return new Intl.NumberFormat("fr-FR", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: hasDecimals ? 2 : 0,
+  }).format(amount) + " " + currency;
 }
 
 function WalletRevenueCard({

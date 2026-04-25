@@ -63,9 +63,10 @@ const OUTGOING_TYPES = ["withdrawal", "transfer", "api_payout"];
 const INCOMING_TYPES = ["deposit", "payment_link", "merchant_link", "api_payment"];
 
 function fmtAmount(amount: number, currency: string) {
+  const hasDecimals = amount % 1 !== 0;
   return new Intl.NumberFormat("fr-FR", {
     minimumFractionDigits: 0,
-    maximumFractionDigits: currency === "USD" || currency === "EUR" ? 2 : 0,
+    maximumFractionDigits: hasDecimals ? 2 : (currency === "USD" || currency === "EUR" ? 2 : 0),
   }).format(amount) + " " + currency;
 }
 

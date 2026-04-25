@@ -67,12 +67,12 @@ const WALLET_ORDER = [
 
 function formatCurrency(amount: number, currency: string): string {
   try {
+    const hasDecimals = amount % 1 !== 0;
+    const decimals = hasDecimals ? 2 : (currency === "USD" ? 2 : 0);
     return new Intl.NumberFormat("fr-FR", {
-      style: "currency",
-      currency,
-      minimumFractionDigits: currency === "USD" ? 2 : 0,
-      maximumFractionDigits: currency === "USD" ? 2 : 0,
-    }).format(amount);
+      minimumFractionDigits: 0,
+      maximumFractionDigits: decimals,
+    }).format(amount) + " " + currency;
   } catch {
     return `${amount.toLocaleString("fr-FR")} ${currency}`;
   }
