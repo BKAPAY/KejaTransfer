@@ -95,7 +95,7 @@ export default function BusinessSettings() {
   const isBankConfigured = user?.bankAccountNumber && user?.bankName;
   const isMomoConfigured = user?.momoPhone && user?.momoOperator && user?.momoCountry;
 
-  const activeCountries = Object.keys(withdrawalCountries);
+  const activeCountries = Object.keys(withdrawalCountries).filter(code => withdrawalCountries[code].length > 0);
   const momoOperators = momoForm.momoCountry ? (withdrawalCountries[momoForm.momoCountry] || []) : [];
 
   if (isLoading) {
