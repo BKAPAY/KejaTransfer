@@ -43,6 +43,20 @@ const BUSINESS_COUNTRIES = [
   "ZM", "MW", "MZ", "NG", "SL", "LS",
 ];
 
+const WALLET_OPTIONS: { code: string; currency: string; name: string }[] = [
+  ...BUSINESS_COUNTRIES.flatMap(code => {
+    const c = COUNTRIES.find(cc => cc.code === code);
+    if (!c) return [];
+    const entries: { code: string; currency: string; name: string }[] = [
+      { code, currency: c.currency, name: `${c.name} (${c.currency})` },
+    ];
+    if (code === "CD") {
+      entries.push({ code: "CD", currency: "USD", name: "RD Congo (USD)" });
+    }
+    return entries;
+  }),
+];
+
 interface BusinessStats {
   totalUsers: number;
   verifiedUsers: number;
@@ -1309,9 +1323,9 @@ export default function AdminBusinessManagement() {
                   <SelectValue placeholder="Choisir un pays" />
                 </SelectTrigger>
                 <SelectContent>
-                  {COUNTRIES.filter(c => BUSINESS_COUNTRIES.includes(c.code)).map((c) => (
-                    <SelectItem key={c.code} value={c.code}>
-                      <span className="flex items-center gap-1"><CountryFlag code={c.code} size="xs" /> {c.name} ({c.currency})</span>
+                  {WALLET_OPTIONS.map((w) => (
+                    <SelectItem key={`${w.code}:${w.currency}`} value={`${w.code}:${w.currency}`}>
+                      <span className="flex items-center gap-1"><CountryFlag code={w.code} size="xs" /> {w.name}</span>
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -1332,12 +1346,12 @@ export default function AdminBusinessManagement() {
             <Button variant="outline" onClick={() => setDepositDialogOpen(false)} data-testid="button-cancel-deposit">Annuler</Button>
             <Button
               onClick={() => {
-                const countryData = COUNTRIES.find(c => c.code === selectedCountry);
+                const [country, currency] = selectedCountry.split(":");
                 depositMutation.mutate({
                   userId: selectedUser!.id,
                   amount: parseInt(amount),
-                  country: selectedCountry,
-                  currency: countryData?.currency || "XOF"
+                  country,
+                  currency
                 });
               }}
               disabled={!amount || !selectedCountry || depositMutation.isPending}
@@ -1366,9 +1380,9 @@ export default function AdminBusinessManagement() {
                   <SelectValue placeholder="Choisir un pays" />
                 </SelectTrigger>
                 <SelectContent>
-                  {COUNTRIES.filter(c => BUSINESS_COUNTRIES.includes(c.code)).map((c) => (
-                    <SelectItem key={c.code} value={c.code}>
-                      <span className="flex items-center gap-1"><CountryFlag code={c.code} size="xs" /> {c.name} ({c.currency})</span>
+                  {WALLET_OPTIONS.map((w) => (
+                    <SelectItem key={`${w.code}:${w.currency}`} value={`${w.code}:${w.currency}`}>
+                      <span className="flex items-center gap-1"><CountryFlag code={w.code} size="xs" /> {w.name}</span>
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -1390,12 +1404,12 @@ export default function AdminBusinessManagement() {
             <Button
               variant="destructive"
               onClick={() => {
-                const countryData = COUNTRIES.find(c => c.code === selectedCountry);
+                const [country, currency] = selectedCountry.split(":");
                 withdrawMutation.mutate({
                   userId: selectedUser!.id,
                   amount: parseInt(amount),
-                  country: selectedCountry,
-                  currency: countryData?.currency || "XOF"
+                  country,
+                  currency
                 });
               }}
               disabled={!amount || !selectedCountry || withdrawMutation.isPending}
