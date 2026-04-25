@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Search, Wallet, History, Trash2, Power, ArrowUpCircle, ArrowDownCircle,
-  ChevronLeft, User as UserIcon, Users, UserCheck, TrendingDown, TrendingUp,
+  ChevronLeft, ChevronRight, User as UserIcon, Users, UserCheck, TrendingDown, TrendingUp,
   AlertCircle, Unlock, Check, X, RotateCcw, Monitor, Key, Globe, Banknote,
   CheckCircle2, Clock, Building2, Eye, ToggleLeft, ToggleRight, Percent, Loader2,
 } from "lucide-react";
@@ -908,9 +908,8 @@ export default function AdminBusinessManagement() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
+                <div className="divide-y">
                   {(() => {
-                    // Group pending settlements by userId + minute bucket
                     const buckets = new Map<string, SettlementAdmin[]>();
                     for (const s of pendingSettlements) {
                       const d = new Date(s.createdAt);
@@ -918,88 +917,47 @@ export default function AdminBusinessManagement() {
                       if (!buckets.has(key)) buckets.set(key, []);
                       buckets.get(key)!.push(s);
                     }
-                    const batches = Array.from(buckets.entries())
-                      .sort((a, b) => new Date(b[1][0].createdAt).getTime() - new Date(a[1][0].createdAt).getTime());
+                    return Array.from(buckets.entries())
+                      .sort((a, b) => new Date(b[1][0].createdAt).getTime() - new Date(a[1][0].createdAt).getTime())
+                      .map(([batchKey, items]) => {
+                        const first = items[0];
+                        const batchDate = new Date(first.createdAt);
+                        const dateLabel = batchDate.toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" });
+                        const timeLabel = batchDate.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+                        const ts = batchDate.getTime();
 
-                    return batches.map(([batchKey, items]) => {
-                      const first = items[0];
-                      const batchDate = new Date(first.createdAt);
-                      const dateLabel = batchDate.toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" });
-                      const timeLabel = batchDate.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
-                      const isBatch = items.length > 1;
-
-                      return (
-                        <div key={batchKey} className="border rounded-md overflow-hidden" data-testid={`batch-pending-${batchKey}`}>
-                          <div className="p-4 bg-muted/20">
-                            <div className="flex items-start justify-between gap-4 flex-wrap">
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 flex-wrap mb-1">
-                                  <span className="font-semibold text-sm">{first.userName}</span>
-                                  {isBatch && (
-                                    <Badge variant="outline" className="text-xs">Lot de {items.length} pays</Badge>
-                                  )}
-                                </div>
-                                <p className="text-xs text-muted-foreground mb-2">{first.userEmail}</p>
-                                <p className="text-xs text-muted-foreground mb-3">
-                                  Règlement du {dateLabel} à {timeLabel}
-                                </p>
-                                <div className="p-2 bg-muted rounded-md text-xs space-y-0.5">
-                                  <p className="font-medium mb-1">Compte bancaire :</p>
-                                  <p>{first.bankAccountHolder}</p>
-                                  <p>{first.bankName} — {first.bankAccountNumber}</p>
-                                  {first.bankSwiftBic && <p>SWIFT : {first.bankSwiftBic}</p>}
-                                </div>
+                        return (
+                          <button
+                            key={batchKey}
+                            className="w-full text-left py-4 flex items-center justify-between gap-4 hover-elevate"
+                            onClick={() => setLocation(`/dashboard/admin/settlement-batch/${first.userId}/${ts}`)}
+                            data-testid={`batch-pending-${batchKey}`}
+                          >
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap mb-1">
+                                <span className="font-semibold text-sm">{first.userName}</span>
+                                {items.length > 1 && (
+                                  <Badge variant="outline" className="text-xs">{items.length} pays</Badge>
+                                )}
+                                <Badge variant="secondary" className="text-xs">
+                                  <Clock className="w-3 h-3 mr-1" />En attente
+                                </Badge>
                               </div>
-                              <div className="flex gap-2 flex-wrap">
-                                <Button
-                                  size="sm"
-                                  variant="destructive"
-                                  onClick={() => {
-                                    if (isBatch) { setRejectBatchDialog({ open: true, settlements: items }); }
-                                    else { setRejectDialog({ open: true, settlement: first }); }
-                                    setSettlementNotes("");
-                                  }}
-                                  data-testid={`button-reject-batch-${batchKey}`}
-                                >
-                                  <X className="w-4 h-4 mr-1" />
-                                  Rejeter{isBatch ? " tout" : ""}
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  onClick={() => {
-                                    if (isBatch) { setValidateBatchDialog({ open: true, settlements: items }); }
-                                    else { setValidateDialog({ open: true, settlement: first }); }
-                                    setSettlementNotes("");
-                                  }}
-                                  data-testid={`button-validate-batch-${batchKey}`}
-                                >
-                                  <CheckCircle2 className="w-4 h-4 mr-1" />
-                                  Valider{isBatch ? " tout" : ""}
-                                </Button>
+                              <p className="text-xs text-muted-foreground mb-1">{first.userEmail}</p>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                {items.map(s => {
+                                  const cd = COUNTRIES.find(c => c.code === s.walletCountry);
+                                  return cd ? <CountryFlag key={s.id} code={cd.code} size="xs" /> : null;
+                                })}
+                                <span className="text-xs text-muted-foreground">
+                                  {dateLabel} à {timeLabel}
+                                </span>
                               </div>
                             </div>
-                          </div>
-
-                          <div className="divide-y">
-                            {items.map((s) => {
-                              const cd = COUNTRIES.find(c => c.code === s.walletCountry);
-                              return (
-                                <div key={s.id} className="flex items-center justify-between gap-4 px-4 py-3" data-testid={`settlement-pending-${s.id}`}>
-                                  <div className="flex items-center gap-3">
-                                    {cd && <CountryFlag code={cd.code} size="sm" />}
-                                    <div>
-                                      <p className="text-sm font-medium">{cd?.name ?? s.walletCountry}</p>
-                                      <p className="text-xs text-muted-foreground">{s.walletCurrency}</p>
-                                    </div>
-                                  </div>
-                                  <span className="font-bold text-sm">{formatAmount(s.amount, s.walletCurrency)}</span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      );
-                    });
+                            <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+                          </button>
+                        );
+                      });
                   })()}
                 </div>
               </CardContent>

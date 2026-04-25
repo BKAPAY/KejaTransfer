@@ -2,16 +2,11 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Banknote, Loader2, Inbox, AlertCircle, Clock, CheckCircle2, XCircle, ChevronDown, ChevronRight } from "lucide-react";
+import { Banknote, Loader2, Inbox, AlertCircle, Clock, CheckCircle2, XCircle, ChevronRight } from "lucide-react";
 import { useLocation } from "wouter";
 import { CountryFlag } from "@/components/country-flag";
 import { COUNTRIES } from "@shared/schema";
 import type { Settlement } from "@shared/schema";
-import { useState } from "react";
-
-function formatAmount(val: number, currency: string = "XOF") {
-  return new Intl.NumberFormat("fr-FR").format(val) + " " + currency;
-}
 
 function minuteBucket(dateStr: string) {
   const d = new Date(dateStr);
@@ -62,11 +57,8 @@ function groupSettlements(settlements: Settlement[]) {
 
 export default function BusinessSettlements() {
   const [, navigate] = useLocation();
-  const [openBatches, setOpenBatches] = useState<Set<string>>(new Set());
 
-  const { data: user } = useQuery<any>({
-    queryKey: ["/api/auth/me"],
-  });
+  const { data: user } = useQuery<any>({ queryKey: ["/api/auth/me"] });
 
   const { data: settlements = [], isLoading } = useQuery<Settlement[]>({
     queryKey: ["/api/business/settlements"],
@@ -74,15 +66,6 @@ export default function BusinessSettlements() {
 
   const hasBankAccount = user?.bankAccountNumber && user?.bankName;
   const batches = groupSettlements(settlements);
-
-  function toggleBatch(key: string) {
-    setOpenBatches(prev => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  }
 
   return (
     <div className="space-y-6 max-w-3xl">
@@ -133,109 +116,46 @@ export default function BusinessSettlements() {
               <p className="text-sm text-muted-foreground">Aucun règlement pour le moment</p>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="divide-y">
               {batches.map(({ key, items }) => {
                 const status = batchStatus(items);
-                const isOpen = openBatches.has(key);
                 const date = new Date(items[0].createdAt);
                 const dateLabel = date.toLocaleDateString("fr-FR", {
                   day: "2-digit", month: "long", year: "numeric",
                 });
                 const timeLabel = date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
-                const totalCurrencies = [...new Set(items.map(s => s.walletCurrency))];
-                const isSingleCurrency = totalCurrencies.length === 1;
-                const total = isSingleCurrency
-                  ? items.reduce((sum, s) => sum + s.amount, 0)
-                  : null;
+                const ts = date.getTime();
 
                 return (
-                  <div key={key} className="border rounded-md overflow-hidden" data-testid={`batch-${key}`}>
-                    <button
-                      className="w-full text-left p-4 flex items-start justify-between gap-3 hover-elevate"
-                      onClick={() => {
-                        if (items.length === 1) {
-                          navigate(`/dashboard/business/settlements/${items[0].id}`);
-                        } else {
-                          toggleBatch(key);
-                        }
-                      }}
-                      data-testid={`button-batch-${key}`}
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap mb-1">
-                          <span className="text-xs text-muted-foreground">Règlement créé le</span>
-                          <span className="text-xs font-medium">{dateLabel} à {timeLabel}</span>
-                        </div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          {total !== null ? (
-                            <span className="font-bold text-sm">{formatAmount(total, totalCurrencies[0])}</span>
-                          ) : (
-                            <span className="font-bold text-sm">{items.length} pays</span>
-                          )}
-                          <BatchStatusBadge status={status} />
-                        </div>
-                        {items.length > 1 && (
-                          <div className="flex items-center gap-1 flex-wrap mt-2">
+                  <button
+                    key={key}
+                    className="w-full text-left py-4 flex items-center justify-between gap-4 hover-elevate"
+                    onClick={() => navigate(`/dashboard/business/settlement-batch/${ts}`)}
+                    data-testid={`batch-${key}`}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap mb-1.5">
+                        <span className="text-xs text-muted-foreground">Règlement créé le</span>
+                        <span className="text-xs font-semibold">{dateLabel} à {timeLabel}</span>
+                      </div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <BatchStatusBadge status={status} />
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {items.map(s => {
+                            const cd = COUNTRIES.find(c => c.code === s.walletCountry);
+                            return cd ? <CountryFlag key={s.id} code={cd.code} size="xs" /> : null;
+                          })}
+                          <span className="text-xs text-muted-foreground">
                             {items.map(s => {
                               const cd = COUNTRIES.find(c => c.code === s.walletCountry);
-                              return cd ? (
-                                <span key={s.id} className="flex items-center gap-1 text-xs text-muted-foreground">
-                                  <CountryFlag code={cd.code} size="xs" /> {cd.name}
-                                </span>
-                              ) : null;
-                            }).reduce((acc: any[], el, i) => {
-                              if (i > 0) acc.push(<span key={`sep-${i}`} className="text-muted-foreground text-xs">·</span>);
-                              acc.push(el);
-                              return acc;
-                            }, [])}
-                          </div>
-                        )}
-                        {items.length === 1 && (
-                          <div className="flex items-center gap-1 mt-1">
-                            {(() => {
-                              const cd = COUNTRIES.find(c => c.code === items[0].walletCountry);
-                              return cd ? <span className="flex items-center gap-1 text-xs text-muted-foreground"><CountryFlag code={cd.code} size="xs" /> {cd.name}</span> : null;
-                            })()}
-                          </div>
-                        )}
+                              return cd?.name;
+                            }).filter(Boolean).join(" · ")}
+                          </span>
+                        </div>
                       </div>
-                      {items.length > 1 ? (
-                        isOpen
-                          ? <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0 mt-1" />
-                          : <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0 mt-1" />
-                      ) : (
-                        <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0 mt-1" />
-                      )}
-                    </button>
-
-                    {items.length > 1 && isOpen && (
-                      <div className="border-t divide-y">
-                        {items.map(s => {
-                          const cd = COUNTRIES.find(c => c.code === s.walletCountry);
-                          return (
-                            <button
-                              key={s.id}
-                              className="w-full text-left px-4 py-3 flex items-center justify-between gap-3 hover-elevate bg-muted/30"
-                              onClick={() => navigate(`/dashboard/business/settlements/${s.id}`)}
-                              data-testid={`settlement-row-${s.id}`}
-                            >
-                              <div className="flex items-center gap-3 flex-1 min-w-0">
-                                {cd && <CountryFlag code={cd.code} size="sm" />}
-                                <div>
-                                  <p className="text-sm font-medium">{cd?.name ?? s.walletCountry}</p>
-                                  <p className="text-xs text-muted-foreground">{formatAmount(s.amount, s.walletCurrency)}</p>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2 shrink-0">
-                                <BatchStatusBadge status={s.status} />
-                                <ChevronRight className="w-3 h-3 text-muted-foreground" />
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+                  </button>
                 );
               })}
             </div>

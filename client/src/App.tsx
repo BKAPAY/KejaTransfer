@@ -111,6 +111,7 @@ const BusinessSettings = lazy(() => import("@/pages/dashboard/business/settings"
 const BusinessSettlements = lazy(() => import("@/pages/dashboard/business/settlements"));
 const BusinessSettlementScan = lazy(() => import("@/pages/dashboard/business/settlement-scan"));
 const BusinessSettlementDetail = lazy(() => import("@/pages/dashboard/business/settlement-detail"));
+const BusinessSettlementBatch = lazy(() => import("@/pages/dashboard/business/settlement-batch"));
 const AdminSettlementBatchDetail = lazy(() => import("@/pages/dashboard/admin-settlement-batch-detail"));
 const BusinessFees = lazy(() => import("@/pages/dashboard/business/fees"));
 
@@ -250,6 +251,7 @@ function Router() {
           <Route path="/dashboard/business/settings" component={BusinessSettings} />
           <Route path="/dashboard/business/settlements" component={BusinessSettlements} />
           <Route path="/dashboard/business/settlements/new" component={BusinessSettlementScan} />
+          <Route path="/dashboard/business/settlement-batch/:ts" component={BusinessSettlementBatch} />
           <Route path="/dashboard/business/settlements/:id" component={BusinessSettlementDetail} />
           <Route path="/dashboard/business/fees" component={BusinessFees} />
           <Route path="/dashboard/business/documentation" component={DocumentationBusiness} />
