@@ -825,12 +825,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const schema = z.object({ adminNotes: z.string().min(1, "Les notes sont requises") });
       const { adminNotes } = schema.parse(req.body);
       const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
-      const result = await pool.query(
+      const check = await pool.query(`SELECT status FROM settlements WHERE id = $1`, [req.params.id]);
+      if (check.rows.length === 0) { await pool.end(); return res.status(404).json({ error: "Règlement non trouvé" }); }
+      if (check.rows[0].status !== 'pending') { await pool.end(); return res.status(400).json({ error: "Ce règlement a déjà été traité" }); }
+      await pool.query(
         `UPDATE settlements SET status = 'completed', admin_notes = $1 WHERE id = $2`,
         [adminNotes, req.params.id]
       );
       await pool.end();
-      if (result.rowCount === 0) return res.status(404).json({ error: "Règlement non trouvé" });
       res.json({ success: true });
     } catch (error: any) {
       console.error("Validate settlement error:", error);
@@ -849,6 +851,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const sResult = await client.query(`SELECT * FROM settlements WHERE id = $1 FOR UPDATE`, [req.params.id]);
         if (sResult.rows.length === 0) { await client.query('ROLLBACK'); client.release(); await pool.end(); return res.status(404).json({ error: "Règlement non trouvé" }); }
         const s = sResult.rows[0];
+        if (s.status !== 'pending') { await client.query('ROLLBACK'); client.release(); await pool.end(); return res.status(400).json({ error: "Ce règlement a déjà été traité" }); }
         await client.query(
           `UPDATE settlements SET status = 'rejected', rejection_reason = $1 WHERE id = $2`,
           [rejectionReason, req.params.id]
