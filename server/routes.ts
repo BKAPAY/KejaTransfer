@@ -4808,8 +4808,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       let localPhone = rawPhone;
-      // BJ, CG, CI : ajouter le 0 devant la partie locale si absent
-      { const _dialMap: Record<string, string> = { "BJ": "229", "CG": "242", "CI": "225" };
+      // BJ, CI : ajouter le 0 devant la partie locale si absent
+      { const _dialMap: Record<string, string> = { "BJ": "229", "CI": "225" };
         const _dial = _dialMap[countryCode];
         if (_dial) {
           let _local = rawPhone;
@@ -7397,8 +7397,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Numéro envoyé exactement comme fourni — pas de reformatage
       let rawPhone = String(phone).replace(/[\s\-\.]+/g, "");
       let localPhone = rawPhone;
-      // BJ, CG, CI : ajouter le 0 devant la partie locale si absent
-      { const _dialMap: Record<string, string> = { "BJ": "229", "CG": "242", "CI": "225" };
+      // BJ, CI : ajouter le 0 devant la partie locale si absent
+      { const _dialMap: Record<string, string> = { "BJ": "229", "CI": "225" };
         const _dial = _dialMap[countryCode];
         if (_dial) {
           let _local = rawPhone;
@@ -7717,8 +7717,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Numéro envoyé exactement comme fourni — pas de reformatage
       let rawPhone = String(phone).replace(/[\s\-\.]+/g, "");
       let localPhone = rawPhone;
-      // BJ, CG, CI : ajouter le 0 devant la partie locale si absent
-      { const _dialMap: Record<string, string> = { "BJ": "229", "CG": "242", "CI": "225" };
+      // BJ, CI : ajouter le 0 devant la partie locale si absent
+      { const _dialMap: Record<string, string> = { "BJ": "229", "CI": "225" };
         const _dial = _dialMap[countryCode];
         if (_dial) {
           let _local = rawPhone;
@@ -13520,7 +13520,7 @@ SUPPORT ET CONTACT:
               // Numéro exact sans reformatage
               let sanitizedPhone = phone.replace(/\s+/g, "");
               // BJ, CG, CI : ajouter le 0 devant la partie locale si absent
-              { const _dialMap2: Record<string, string> = { "BJ": "229", "CG": "242", "CI": "225" };
+              { const _dialMap2: Record<string, string> = { "BJ": "229", "CI": "225" };
                 const _dial2 = _dialMap2[country];
                 if (_dial2) {
                   let _loc2 = sanitizedPhone;
@@ -13714,7 +13714,7 @@ SUPPORT ET CONTACT:
               // Numéro exact sans reformatage
               let sanitizedPhoneT = phone.replace(/\s+/g, "");
               // BJ, CG, CI : ajouter le 0 devant la partie locale si absent
-              { const _dialMap3: Record<string, string> = { "BJ": "229", "CG": "242", "CI": "225" };
+              { const _dialMap3: Record<string, string> = { "BJ": "229", "CI": "225" };
                 const _dial3 = _dialMap3[country];
                 if (_dial3) {
                   let _loc3 = sanitizedPhoneT;

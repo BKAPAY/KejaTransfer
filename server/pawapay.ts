@@ -79,9 +79,8 @@ function sanitizePhoneForPawaPay(phone: string, country: string): string {
       local = "0" + local;
     }
     // Otherwise keep local as-is (10-digit new with "0", or 8-digit old)
-  } else if (countryUpper === "CI" || countryUpper === "CG") {
-    // CI, CG: numbers start with "0" — keep as-is, no stripping
-    // CG MTN: 06XXXXXXX (9 digits) → MSISDN 24206XXXXXXX (12 digits)
+  } else if (countryUpper === "CI") {
+    // CI: numbers start with "0" — keep as-is, no stripping
   } else {
     // All other countries: remove a single leading "0" before prepending country code
     if (local.startsWith("0")) {
