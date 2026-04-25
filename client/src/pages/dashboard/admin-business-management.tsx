@@ -109,6 +109,8 @@ export default function AdminBusinessManagement() {
   const [bankDetailDialog, setBankDetailDialog] = useState<{ open: boolean; user?: User }>({ open: false });
   const [validateDialog, setValidateDialog] = useState<{ open: boolean; settlement?: SettlementAdmin }>({ open: false });
   const [rejectDialog, setRejectDialog] = useState<{ open: boolean; settlement?: SettlementAdmin }>({ open: false });
+  const [validateBatchDialog, setValidateBatchDialog] = useState<{ open: boolean; settlements?: SettlementAdmin[] }>({ open: false });
+  const [rejectBatchDialog, setRejectBatchDialog] = useState<{ open: boolean; settlements?: SettlementAdmin[] }>({ open: false });
   const [settlementNotes, setSettlementNotes] = useState("");
 
   const { data: stats, isLoading: statsLoading } = useQuery<BusinessStats>({
@@ -250,6 +252,44 @@ export default function AdminBusinessManagement() {
       setRejectDialog({ open: false });
       setSettlementNotes("");
       toast({ title: "Rejeté", description: "Le règlement a été rejeté. Le solde a été recrédité." });
+    },
+    onError: (e: Error) => {
+      toast({ title: "Erreur", description: e.message, variant: "destructive" });
+    },
+  });
+
+  const validateBatchMutation = useMutation({
+    mutationFn: async ({ settlements, adminNotes }: { settlements: SettlementAdmin[]; adminNotes: string }) => {
+      for (const s of settlements) {
+        const res = await apiRequest("POST", `/api/admin/settlements/${s.id}/validate`, { adminNotes });
+        if (!res.ok) throw new Error(`Erreur sur ${s.walletCountry}`);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settlements"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settlements/pending-count"] });
+      setValidateBatchDialog({ open: false });
+      setSettlementNotes("");
+      toast({ title: "Lot validé", description: "Tous les règlements du lot ont été validés." });
+    },
+    onError: (e: Error) => {
+      toast({ title: "Erreur", description: e.message, variant: "destructive" });
+    },
+  });
+
+  const rejectBatchMutation = useMutation({
+    mutationFn: async ({ settlements, rejectionReason }: { settlements: SettlementAdmin[]; rejectionReason: string }) => {
+      for (const s of settlements) {
+        const res = await apiRequest("POST", `/api/admin/settlements/${s.id}/reject`, { rejectionReason });
+        if (!res.ok) throw new Error(`Erreur sur ${s.walletCountry}`);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settlements"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settlements/pending-count"] });
+      setRejectBatchDialog({ open: false });
+      setSettlementNotes("");
+      toast({ title: "Lot rejeté", description: "Tous les règlements du lot ont été rejetés. Les soldes ont été recrédités." });
     },
     onError: (e: Error) => {
       toast({ title: "Erreur", description: e.message, variant: "destructive" });
@@ -863,57 +903,104 @@ export default function AdminBusinessManagement() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">
                   <Clock className="w-5 h-5 text-orange-500" />
-                  Reglements en attente
+                  Règlements en attente
                   <Badge variant="destructive" className="ml-2">{pendingSettlements.length}</Badge>
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  {pendingSettlements.map((s) => {
-                    const cd = COUNTRIES.find(c => c.code === s.walletCountry);
-                    return (
-                      <div key={s.id} className="border rounded-md p-4" data-testid={`settlement-pending-${s.id}`}>
-                        <div className="flex items-start justify-between gap-4 flex-wrap">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap mb-1">
-                              <span className="font-semibold text-sm">{s.userName}</span>
-                              <Badge variant="secondary"><Clock className="w-3 h-3 mr-1" />En attente</Badge>
-                            </div>
-                            <p className="text-xs text-muted-foreground">{s.userEmail}</p>
-                            <div className="mt-2 space-y-1">
-                              <p className="text-sm font-bold">{formatAmount(s.amount, s.walletCurrency)}</p>
-                              <p className="text-xs text-muted-foreground flex items-center gap-1 flex-wrap">{cd && <CountryFlag code={cd.code} size="xs" />} {cd?.name} - {new Date(s.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
-                            </div>
-                            <div className="mt-2 p-2 bg-muted rounded-md text-xs space-y-1">
-                              <p className="font-medium">Compte bancaire :</p>
-                              <p>{s.bankAccountHolder}</p>
-                              <p>{s.bankName} - {s.bankAccountNumber}</p>
-                              {s.bankSwiftBic && <p>SWIFT: {s.bankSwiftBic}</p>}
+                <div className="space-y-4">
+                  {(() => {
+                    // Group pending settlements by userId + minute bucket
+                    const buckets = new Map<string, SettlementAdmin[]>();
+                    for (const s of pendingSettlements) {
+                      const d = new Date(s.createdAt);
+                      const key = `${s.userId}-${d.getFullYear()}-${d.getMonth()}-${d.getDate()}-${d.getHours()}-${d.getMinutes()}`;
+                      if (!buckets.has(key)) buckets.set(key, []);
+                      buckets.get(key)!.push(s);
+                    }
+                    const batches = Array.from(buckets.entries())
+                      .sort((a, b) => new Date(b[1][0].createdAt).getTime() - new Date(a[1][0].createdAt).getTime());
+
+                    return batches.map(([batchKey, items]) => {
+                      const first = items[0];
+                      const batchDate = new Date(first.createdAt);
+                      const dateLabel = batchDate.toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" });
+                      const timeLabel = batchDate.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+                      const isBatch = items.length > 1;
+
+                      return (
+                        <div key={batchKey} className="border rounded-md overflow-hidden" data-testid={`batch-pending-${batchKey}`}>
+                          <div className="p-4 bg-muted/20">
+                            <div className="flex items-start justify-between gap-4 flex-wrap">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap mb-1">
+                                  <span className="font-semibold text-sm">{first.userName}</span>
+                                  {isBatch && (
+                                    <Badge variant="outline" className="text-xs">Lot de {items.length} pays</Badge>
+                                  )}
+                                </div>
+                                <p className="text-xs text-muted-foreground mb-2">{first.userEmail}</p>
+                                <p className="text-xs text-muted-foreground mb-3">
+                                  Règlement du {dateLabel} à {timeLabel}
+                                </p>
+                                <div className="p-2 bg-muted rounded-md text-xs space-y-0.5">
+                                  <p className="font-medium mb-1">Compte bancaire :</p>
+                                  <p>{first.bankAccountHolder}</p>
+                                  <p>{first.bankName} — {first.bankAccountNumber}</p>
+                                  {first.bankSwiftBic && <p>SWIFT : {first.bankSwiftBic}</p>}
+                                </div>
+                              </div>
+                              <div className="flex gap-2 flex-wrap">
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={() => {
+                                    if (isBatch) { setRejectBatchDialog({ open: true, settlements: items }); }
+                                    else { setRejectDialog({ open: true, settlement: first }); }
+                                    setSettlementNotes("");
+                                  }}
+                                  data-testid={`button-reject-batch-${batchKey}`}
+                                >
+                                  <X className="w-4 h-4 mr-1" />
+                                  Rejeter{isBatch ? " tout" : ""}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  onClick={() => {
+                                    if (isBatch) { setValidateBatchDialog({ open: true, settlements: items }); }
+                                    else { setValidateDialog({ open: true, settlement: first }); }
+                                    setSettlementNotes("");
+                                  }}
+                                  data-testid={`button-validate-batch-${batchKey}`}
+                                >
+                                  <CheckCircle2 className="w-4 h-4 mr-1" />
+                                  Valider{isBatch ? " tout" : ""}
+                                </Button>
+                              </div>
                             </div>
                           </div>
-                          <div className="flex gap-2 flex-wrap">
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => { setRejectDialog({ open: true, settlement: s }); setSettlementNotes(""); }}
-                              data-testid={`button-reject-settlement-${s.id}`}
-                            >
-                              <X className="w-4 h-4 mr-1" />
-                              Rejeter
-                            </Button>
-                            <Button
-                              size="sm"
-                              onClick={() => { setValidateDialog({ open: true, settlement: s }); setSettlementNotes(""); }}
-                              data-testid={`button-validate-settlement-${s.id}`}
-                            >
-                              <CheckCircle2 className="w-4 h-4 mr-1" />
-                              Valider
-                            </Button>
+
+                          <div className="divide-y">
+                            {items.map((s) => {
+                              const cd = COUNTRIES.find(c => c.code === s.walletCountry);
+                              return (
+                                <div key={s.id} className="flex items-center justify-between gap-4 px-4 py-3" data-testid={`settlement-pending-${s.id}`}>
+                                  <div className="flex items-center gap-3">
+                                    {cd && <CountryFlag code={cd.code} size="sm" />}
+                                    <div>
+                                      <p className="text-sm font-medium">{cd?.name ?? s.walletCountry}</p>
+                                      <p className="text-xs text-muted-foreground">{s.walletCurrency}</p>
+                                    </div>
+                                  </div>
+                                  <span className="font-bold text-sm">{formatAmount(s.amount, s.walletCurrency)}</span>
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    });
+                  })()}
                 </div>
               </CardContent>
             </Card>
@@ -1078,6 +1165,113 @@ export default function AdminBusinessManagement() {
             >
               {rejectSettlementMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <X className="w-4 h-4 mr-2" />}
               Confirmer le rejet
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={validateBatchDialog.open} onOpenChange={(open) => { if (!open) { setValidateBatchDialog({ open: false }); setSettlementNotes(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Valider le lot de règlements</DialogTitle>
+            <DialogDescription>
+              {validateBatchDialog.settlements && (
+                <span>{validateBatchDialog.settlements[0].userName} — {validateBatchDialog.settlements.length} pays</span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          {validateBatchDialog.settlements && (
+            <div className="py-2">
+              <div className="space-y-1 mb-3 bg-muted rounded-md p-3">
+                {validateBatchDialog.settlements.map(s => {
+                  const cd = COUNTRIES.find(c => c.code === s.walletCountry);
+                  return (
+                    <div key={s.id} className="flex items-center justify-between text-sm">
+                      <span className="flex items-center gap-2">{cd && <CountryFlag code={cd.code} size="xs" />}{cd?.name}</span>
+                      <span className="font-bold">{formatAmount(s.amount, s.walletCurrency)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Notes de validation <span className="text-destructive">*</span></label>
+            <Textarea
+              placeholder="Ex : Virement effectué le 25/04/2026, référence TXN-XXXX..."
+              value={settlementNotes}
+              onChange={(e) => setSettlementNotes(e.target.value)}
+              rows={3}
+              data-testid="textarea-validate-batch-notes"
+            />
+            <p className="text-xs text-muted-foreground">Ces notes seront visibles pour chaque règlement du lot.</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setValidateBatchDialog({ open: false }); setSettlementNotes(""); }}>Annuler</Button>
+            <Button
+              onClick={() => {
+                if (!validateBatchDialog.settlements || !settlementNotes.trim()) return;
+                validateBatchMutation.mutate({ settlements: validateBatchDialog.settlements, adminNotes: settlementNotes.trim() });
+              }}
+              disabled={!settlementNotes.trim() || validateBatchMutation.isPending}
+              data-testid="button-confirm-validate-batch"
+            >
+              {validateBatchMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
+              Valider tout le lot
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={rejectBatchDialog.open} onOpenChange={(open) => { if (!open) { setRejectBatchDialog({ open: false }); setSettlementNotes(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rejeter le lot de règlements</DialogTitle>
+            <DialogDescription>
+              {rejectBatchDialog.settlements && (
+                <span>{rejectBatchDialog.settlements[0].userName} — {rejectBatchDialog.settlements.length} pays</span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          {rejectBatchDialog.settlements && (
+            <div className="py-2">
+              <div className="space-y-1 mb-3 bg-muted rounded-md p-3">
+                {rejectBatchDialog.settlements.map(s => {
+                  const cd = COUNTRIES.find(c => c.code === s.walletCountry);
+                  return (
+                    <div key={s.id} className="flex items-center justify-between text-sm">
+                      <span className="flex items-center gap-2">{cd && <CountryFlag code={cd.code} size="xs" />}{cd?.name}</span>
+                      <span className="font-bold">{formatAmount(s.amount, s.walletCurrency)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Motif de rejet <span className="text-destructive">*</span></label>
+            <Textarea
+              placeholder="Ex : Documents manquants, informations bancaires incorrectes..."
+              value={settlementNotes}
+              onChange={(e) => setSettlementNotes(e.target.value)}
+              rows={3}
+              data-testid="textarea-reject-batch-reason"
+            />
+            <p className="text-xs text-muted-foreground">Tous les soldes seront recrédités automatiquement. Le motif sera visible pour chaque règlement.</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setRejectBatchDialog({ open: false }); setSettlementNotes(""); }}>Annuler</Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (!rejectBatchDialog.settlements || !settlementNotes.trim()) return;
+                rejectBatchMutation.mutate({ settlements: rejectBatchDialog.settlements, rejectionReason: settlementNotes.trim() });
+              }}
+              disabled={!settlementNotes.trim() || rejectBatchMutation.isPending}
+              data-testid="button-confirm-reject-batch"
+            >
+              {rejectBatchMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <X className="w-4 h-4 mr-2" />}
+              Rejeter tout le lot
             </Button>
           </DialogFooter>
         </DialogContent>
