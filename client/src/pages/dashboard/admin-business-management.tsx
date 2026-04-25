@@ -970,30 +970,48 @@ export default function AdminBusinessManagement() {
                 <CardTitle className="flex items-center gap-2 text-base">
                   <X className="w-5 h-5 text-red-500" />
                   Règlements rejetés
-                  <Badge variant="destructive" className="ml-2">{rejectedSettlements.length}</Badge>
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2">
-                  {rejectedSettlements.map((s) => {
-                    const cd = COUNTRIES.find(c => c.code === s.walletCountry);
-                    return (
-                      <div key={s.id} className="p-3 border border-red-200 dark:border-red-900 rounded-md" data-testid={`settlement-rejected-${s.id}`}>
-                        <div className="flex items-center gap-2 flex-wrap mb-1">
-                          <span className="font-semibold text-sm">{s.userName}</span>
-                          <Badge variant="destructive" className="text-xs"><X className="w-3 h-3 mr-1" />Rejeté</Badge>
-                        </div>
-                        <p className="text-xs text-muted-foreground flex items-center gap-1 flex-wrap mb-1">
-                          {formatAmount(s.amount, s.walletCurrency)} - {cd && <CountryFlag code={cd.code} size="xs" />} {cd?.name} - {new Date(s.createdAt).toLocaleDateString("fr-FR")}
-                        </p>
-                        {s.rejectionReason && (
-                          <p className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 rounded px-2 py-1">
-                            Motif : {s.rejectionReason}
-                          </p>
-                        )}
-                      </div>
-                    );
-                  })}
+                <div className="divide-y">
+                  {(() => {
+                    const buckets = new Map<string, SettlementAdmin[]>();
+                    for (const s of rejectedSettlements) {
+                      const d = new Date(s.createdAt);
+                      const key = `${s.userId}-${d.getFullYear()}-${d.getMonth()}-${d.getDate()}-${d.getHours()}-${d.getMinutes()}`;
+                      if (!buckets.has(key)) buckets.set(key, []);
+                      buckets.get(key)!.push(s);
+                    }
+                    return Array.from(buckets.entries())
+                      .sort((a, b) => new Date(b[1][0].createdAt).getTime() - new Date(a[1][0].createdAt).getTime())
+                      .map(([batchKey, items]) => {
+                        const first = items[0];
+                        const dateLabel = new Date(first.createdAt).toLocaleDateString("fr-FR");
+                        return (
+                          <div key={batchKey} className="py-3" data-testid={`batch-rejected-${batchKey}`}>
+                            <div className="flex items-center gap-2 flex-wrap mb-1">
+                              <span className="font-semibold text-sm">{first.userName}</span>
+                              <Badge variant="destructive" className="text-xs"><X className="w-3 h-3 mr-1" />Rejeté</Badge>
+                              <span className="text-xs text-muted-foreground">{dateLabel}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                              {items.map(s => {
+                                const cd = COUNTRIES.find(c => c.code === s.walletCountry);
+                                return cd ? <CountryFlag key={s.id} code={cd.code} size="xs" /> : null;
+                              })}
+                              <span className="text-xs text-muted-foreground">
+                                {items.map(s => COUNTRIES.find(c => c.code === s.walletCountry)?.name).filter(Boolean).join(" · ")}
+                              </span>
+                            </div>
+                            {first.rejectionReason && (
+                              <p className="text-xs text-red-600 dark:text-red-400">
+                                Motif : {first.rejectionReason}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      });
+                  })()}
                 </div>
               </CardContent>
             </Card>
@@ -1016,28 +1034,47 @@ export default function AdminBusinessManagement() {
                   Aucun règlement validé
                 </div>
               ) : (
-                <div className="space-y-2">
-                  {completedSettlements.map((s) => {
-                    const cd = COUNTRIES.find(c => c.code === s.walletCountry);
-                    return (
-                      <div key={s.id} className="p-3 border rounded-md" data-testid={`settlement-completed-${s.id}`}>
-                        <div className="flex items-center gap-2 flex-wrap mb-1">
-                          <span className="font-semibold text-sm">{s.userName}</span>
-                          <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs">
-                            <CheckCircle2 className="w-3 h-3 mr-1" />Validé
-                          </Badge>
-                        </div>
-                        <p className="text-xs text-muted-foreground flex items-center gap-1 flex-wrap mb-1">
-                          {formatAmount(s.amount, s.walletCurrency)} - {cd && <CountryFlag code={cd.code} size="xs" />} {cd?.name} - {new Date(s.createdAt).toLocaleDateString("fr-FR")}
-                        </p>
-                        {s.adminNotes && (
-                          <p className="text-xs text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/30 rounded px-2 py-1">
-                            Note : {s.adminNotes}
-                          </p>
-                        )}
-                      </div>
-                    );
-                  })}
+                <div className="divide-y">
+                  {(() => {
+                    const buckets = new Map<string, SettlementAdmin[]>();
+                    for (const s of completedSettlements) {
+                      const d = new Date(s.createdAt);
+                      const key = `${s.userId}-${d.getFullYear()}-${d.getMonth()}-${d.getDate()}-${d.getHours()}-${d.getMinutes()}`;
+                      if (!buckets.has(key)) buckets.set(key, []);
+                      buckets.get(key)!.push(s);
+                    }
+                    return Array.from(buckets.entries())
+                      .sort((a, b) => new Date(b[1][0].createdAt).getTime() - new Date(a[1][0].createdAt).getTime())
+                      .map(([batchKey, items]) => {
+                        const first = items[0];
+                        const dateLabel = new Date(first.createdAt).toLocaleDateString("fr-FR");
+                        return (
+                          <div key={batchKey} className="py-3" data-testid={`batch-completed-${batchKey}`}>
+                            <div className="flex items-center gap-2 flex-wrap mb-1">
+                              <span className="font-semibold text-sm">{first.userName}</span>
+                              <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs">
+                                <CheckCircle2 className="w-3 h-3 mr-1" />Validé
+                              </Badge>
+                              <span className="text-xs text-muted-foreground">{dateLabel}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                              {items.map(s => {
+                                const cd = COUNTRIES.find(c => c.code === s.walletCountry);
+                                return cd ? <CountryFlag key={s.id} code={cd.code} size="xs" /> : null;
+                              })}
+                              <span className="text-xs text-muted-foreground">
+                                {items.map(s => COUNTRIES.find(c => c.code === s.walletCountry)?.name).filter(Boolean).join(" · ")}
+                              </span>
+                            </div>
+                            {first.adminNotes && (
+                              <p className="text-xs text-green-700 dark:text-green-400">
+                                Note : {first.adminNotes}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      });
+                  })()}
                 </div>
               )}
             </CardContent>
