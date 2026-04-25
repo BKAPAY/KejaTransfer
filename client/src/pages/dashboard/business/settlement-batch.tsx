@@ -164,12 +164,9 @@ export default function BusinessSettlementBatch() {
                 >
                   <div className="flex items-center gap-3">
                     {cd && <CountryFlag code={cd.code} size="sm" />}
-                    <div>
-                      <p className="text-sm font-medium">{cd?.name ?? s.walletCountry}</p>
-                      <p className="text-xs text-muted-foreground">{formatAmount(s.amount, s.walletCurrency)}</p>
-                    </div>
+                    <p className="text-sm font-medium">{cd?.name ?? s.walletCountry}</p>
                   </div>
-                  <ItemStatusBadge status={s.status} />
+                  <span className="text-sm font-semibold tabular-nums">{formatAmount(s.amount, s.walletCurrency)}</span>
                 </div>
               );
             })}
