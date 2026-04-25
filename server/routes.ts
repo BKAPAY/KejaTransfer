@@ -1322,22 +1322,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ORDER BY country
       `);
       const incomingResult = await pool.query(`
-        SELECT t.country, COUNT(*) as count, SUM(t.amount) as total
+        SELECT t.country, t.currency, COUNT(*) as count, SUM(t.amount) as total
         FROM transactions t
         JOIN users u ON t.user_id = u.id
         WHERE u.account_type = 'business'
         AND t.status = 'completed'
         AND t.type IN ('deposit', 'payment_link', 'merchant_link', 'api_payment')
-        GROUP BY t.country
+        GROUP BY t.country, t.currency
       `);
       const outgoingResult = await pool.query(`
-        SELECT t.country, COUNT(*) as count, SUM(t.amount) as total
+        SELECT t.country, t.currency, COUNT(*) as count, SUM(t.amount) as total
         FROM transactions t
         JOIN users u ON t.user_id = u.id
         WHERE u.account_type = 'business'
         AND t.status = 'completed'
         AND t.type IN ('transfer', 'withdrawal', 'api_payout')
-        GROUP BY t.country
+        GROUP BY t.country, t.currency
       `);
       await pool.end();
 
@@ -1349,25 +1349,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         entries[key].walletCount += parseInt(r.wallet_count) || 0;
       }
       for (const r of incomingResult.rows) {
-        const existing = Object.values(entries).find((e: any) => e.country === r.country);
-        if (existing) {
-          existing.incomingCount = parseInt(r.count) || 0;
-          existing.incomingTotal = parseInt(r.total) || 0;
+        const key = `${r.country}-${r.currency}`;
+        if (entries[key]) {
+          entries[key].incomingCount += parseInt(r.count) || 0;
+          entries[key].incomingTotal += parseInt(r.total) || 0;
         } else {
-          const key = `${r.country}-XOF`;
-          entries[key] = { country: r.country, currency: "XOF", balance: 0, walletCount: 0, incomingCount: parseInt(r.count) || 0, incomingTotal: parseInt(r.total) || 0, outgoingCount: 0, outgoingTotal: 0 };
+          entries[key] = { country: r.country, currency: r.currency, balance: 0, walletCount: 0, incomingCount: parseInt(r.count) || 0, incomingTotal: parseInt(r.total) || 0, outgoingCount: 0, outgoingTotal: 0 };
         }
       }
       for (const r of outgoingResult.rows) {
-        const existing = Object.values(entries).find((e: any) => e.country === r.country);
-        if (existing) {
-          existing.outgoingCount = parseInt(r.count) || 0;
-          existing.outgoingTotal = parseInt(r.total) || 0;
+        const key = `${r.country}-${r.currency}`;
+        if (entries[key]) {
+          entries[key].outgoingCount += parseInt(r.count) || 0;
+          entries[key].outgoingTotal += parseInt(r.total) || 0;
         } else {
-          const key = `${r.country}-XOF`;
-          if (!entries[key]) entries[key] = { country: r.country, currency: "XOF", balance: 0, walletCount: 0, incomingCount: 0, incomingTotal: 0, outgoingCount: 0, outgoingTotal: 0 };
-          entries[key].outgoingCount = parseInt(r.count) || 0;
-          entries[key].outgoingTotal = parseInt(r.total) || 0;
+          entries[key] = { country: r.country, currency: r.currency, balance: 0, walletCount: 0, incomingCount: 0, incomingTotal: 0, outgoingCount: parseInt(r.count) || 0, outgoingTotal: parseInt(r.total) || 0 };
         }
       }
 
