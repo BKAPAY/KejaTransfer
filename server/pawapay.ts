@@ -37,18 +37,22 @@ const COUNTRY_DIAL_CODES: Record<string, string> = {
 };
 
 /**
- * Sanitize phone number to PawaPay MSISDN format.
- * Rules: digits only, no leading +, country code prepended if missing.
+ * Sanitize phone number to PawaPay MSISDN format (E.164 without leading +).
  *
- * BENIN (BJ) special rule: PawaPay expects the old 8-digit format (without "01").
- *   "0146447319" → "22946447319"   (strip local "01", prepend 229)
- *   "2290146447319" → "22946447319" (strip "01" after country code)
+ * Uses PAWAPAY_COUNTRIES config (phoneDigits + phoneFormat) to normalise
+ * the local part automatically for any country:
+ *   - If phoneFormat starts with "0" and local is 1 digit short  → prepend "0"
+ *   - If phoneFormat does NOT start with "0" and local starts with "0" → strip "0"
+ *   - Otherwise keep local as-is (handles legacy formats like BJ 8-digit old numbers)
  *
- * Other countries: Remove leading "0" before prepending country code.
- *   CI is kept as-is (leading 0 is part of the number).
- *
- * Example: "0656..." + country "CM" → "237656..."
- * Example: "+22946447319" → "22946447319"
+ * Examples:
+ *   CG "066006965" → local 9d, format "0XXXXXXXX" (9d) → keep → "242066006965" ✓
+ *   CG "66006965"  → local 8d, format "0XXXXXXXX" (9d) → +0  → "242066006965" ✓
+ *   BJ "0146500275"→ local 10d, format "01XXXXXXXX"(10d)→ keep→ "2290146500275" ✓
+ *   BJ "146500275" → local 9d, format "01XXXXXXXX"(10d) → +0  → "2290146500275" ✓
+ *   BJ "66006965"  → local 8d, format "01XXXXXXXX"(10d) → Δ=2→ keep→ "22966006965" ✓
+ *   CI "0777777777"→ local 10d, format "0XXXXXXXXX"(10d)→ keep→ "2250777777777" ✓
+ *   CM "677000000" → local 9d, format "6XXXXXXXX" (9d) → keep → "237677000000" ✓
  */
 function sanitizePhoneForPawaPay(phone: string, country: string): string {
   let n = phone.replace(/\s+/g, "").replace(/[^0-9+]/g, "");
@@ -58,38 +62,33 @@ function sanitizePhoneForPawaPay(phone: string, country: string): string {
   const countryUpper = country.toUpperCase();
   console.log(`[PawaPay Phone] Raw="${n}" country=${countryUpper} dialCode=${dialCode}`);
 
-  // Strip country code prefix if already present, then re-apply after normalisation
+  // Strip country code prefix if already present
   let local = n;
   if (dialCode && n.startsWith(dialCode)) {
     local = n.substring(dialCode.length);
   }
 
-  // --- Country-specific local number normalisation ---
-  if (countryUpper === "BJ") {
-    // BJ numbers: two valid formats
-    //   New (since Nov 2024): 10 digits starting "0" → MSISDN 229+10d = 13 digits
-    //   Old: 8 digits → MSISDN 229+8d = 11 digits
-    //
-    // Input variants we must handle:
-    //   "0146500275"  (10 digits, new) → keep as-is  → "2290146500275" ✓
-    //   "146500275"   (9 digits)       → restore "0" → "2290146500275" ✓
-    //   "66006965"    (8 digits, old)  → keep as-is  → "22966006965"   ✓
-    if (local.length === 9 && local.startsWith("1")) {
-      // New format with the "0" trunk prefix stripped — restore it
-      local = "0" + local;
-    }
-    // Otherwise keep local as-is (10-digit new with "0", or 8-digit old)
-  } else if (countryUpper === "CI") {
-    // CI: numbers start with "0" — keep as-is, no stripping
-  } else {
-    // All other countries: remove a single leading "0" before prepending country code
-    if (local.startsWith("0")) {
-      local = local.substring(1);
+  // Look up country config from shared registry
+  const countryCfg = PAWAPAY_COUNTRIES.find(c => c.code === countryUpper);
+  if (countryCfg) {
+    const expectedDigits = countryCfg.phoneDigits;
+    const formatStartsWithZero = countryCfg.phoneFormat.startsWith("0");
+
+    if (formatStartsWithZero) {
+      // Format requires leading "0": add it if exactly 1 digit short
+      if (local.length === expectedDigits - 1 && !local.startsWith("0")) {
+        local = "0" + local;
+      }
+      // If already correct length or differs by more than 1 → keep as-is
+    } else {
+      // Format does NOT start with "0": strip a leading "0" if present
+      if (local.startsWith("0")) {
+        local = local.substring(1);
+      }
     }
   }
 
   if (!dialCode) {
-    // Unknown country — return what we have without country code
     console.log(`[PawaPay Phone] No dialCode, Final MSISDN: "${local}" (len=${local.length})`);
     return local;
   }
