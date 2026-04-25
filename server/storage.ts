@@ -2705,9 +2705,9 @@ export class DbStorage implements IStorage {
       .select()
       .from(schema.feeConfigs)
       .where(and(
-        eq(schema.feeConfigs.provider, provider),
-        eq(schema.feeConfigs.country, country),
-        eq(schema.feeConfigs.operator, operator),
+        eq(schema.feeConfigs.provider, provider.toLowerCase()),
+        eq(schema.feeConfigs.country, country.toUpperCase()),
+        eq(schema.feeConfigs.operator, operator.toLowerCase()),
         eq(schema.feeConfigs.scope, scope)
       ))
       .limit(1);
@@ -2727,9 +2727,11 @@ export class DbStorage implements IStorage {
   }
 
   async createOrUpdateFeeConfig(config: InsertFeeConfig): Promise<FeeConfig> {
-    const provider = config.provider || "default";
+    const provider = (config.provider || "default").toLowerCase();
+    const country = config.country.toUpperCase();
+    const operator = config.operator.toLowerCase();
     const scope = config.scope || "personal";
-    const existing = await this.getFeeConfig(provider, config.country, config.operator, scope);
+    const existing = await this.getFeeConfig(provider, country, operator, scope);
     if (existing) {
       const results = await db
         .update(schema.feeConfigs)
@@ -2740,14 +2742,14 @@ export class DbStorage implements IStorage {
         })
         .where(and(
           eq(schema.feeConfigs.provider, provider),
-          eq(schema.feeConfigs.country, config.country),
-          eq(schema.feeConfigs.operator, config.operator),
+          eq(schema.feeConfigs.country, country),
+          eq(schema.feeConfigs.operator, operator),
           eq(schema.feeConfigs.scope, scope)
         ))
         .returning();
       return results[0];
     }
-    const results = await db.insert(schema.feeConfigs).values({ ...config, provider, scope }).returning();
+    const results = await db.insert(schema.feeConfigs).values({ ...config, provider, country, operator, scope }).returning();
     return results[0];
   }
 
@@ -2756,9 +2758,9 @@ export class DbStorage implements IStorage {
       .update(schema.feeConfigs)
       .set({ ...updates, updatedAt: new Date() })
       .where(and(
-        eq(schema.feeConfigs.provider, provider),
-        eq(schema.feeConfigs.country, country),
-        eq(schema.feeConfigs.operator, operator),
+        eq(schema.feeConfigs.provider, provider.toLowerCase()),
+        eq(schema.feeConfigs.country, country.toUpperCase()),
+        eq(schema.feeConfigs.operator, operator.toLowerCase()),
         eq(schema.feeConfigs.scope, scope)
       ))
       .returning();
@@ -2770,31 +2772,37 @@ export class DbStorage implements IStorage {
   }
 
   async getUserFeeConfig(userId: string, provider: string, country: string, operator: string): Promise<FeeConfig | undefined> {
+    const p = provider.toLowerCase();
+    const c = country.toUpperCase();
+    const o = operator.toLowerCase();
     const results = await db.select().from(schema.feeConfigs).where(and(
       eq(schema.feeConfigs.userId, userId),
-      eq(schema.feeConfigs.provider, provider),
-      eq(schema.feeConfigs.country, country),
-      eq(schema.feeConfigs.operator, operator),
+      eq(schema.feeConfigs.provider, p),
+      eq(schema.feeConfigs.country, c),
+      eq(schema.feeConfigs.operator, o),
     )).limit(1);
     return results[0];
   }
 
   async upsertUserFeeConfig(userId: string, provider: string, country: string, operator: string, incomingFeePercentage: number, outgoingFeePercentage: number): Promise<FeeConfig> {
-    const existing = await this.getUserFeeConfig(userId, provider, country, operator);
+    const p = provider.toLowerCase();
+    const c = country.toUpperCase();
+    const o = operator.toLowerCase();
+    const existing = await this.getUserFeeConfig(userId, p, c, o);
     if (existing) {
       const results = await db.update(schema.feeConfigs)
         .set({ incomingFeePercentage, outgoingFeePercentage, updatedAt: new Date() })
         .where(and(
           eq(schema.feeConfigs.userId, userId),
-          eq(schema.feeConfigs.provider, provider),
-          eq(schema.feeConfigs.country, country),
-          eq(schema.feeConfigs.operator, operator),
+          eq(schema.feeConfigs.provider, p),
+          eq(schema.feeConfigs.country, c),
+          eq(schema.feeConfigs.operator, o),
         ))
         .returning();
       return results[0];
     }
     const results = await db.insert(schema.feeConfigs).values({
-      userId, provider, country, operator, incomingFeePercentage, outgoingFeePercentage, scope: "business",
+      userId, provider: p, country: c, operator: o, incomingFeePercentage, outgoingFeePercentage, scope: "business",
     }).returning();
     return results[0];
   }
@@ -2802,9 +2810,9 @@ export class DbStorage implements IStorage {
   async deleteUserFeeConfig(userId: string, provider: string, country: string, operator: string): Promise<void> {
     await db.delete(schema.feeConfigs).where(and(
       eq(schema.feeConfigs.userId, userId),
-      eq(schema.feeConfigs.provider, provider),
-      eq(schema.feeConfigs.country, country),
-      eq(schema.feeConfigs.operator, operator),
+      eq(schema.feeConfigs.provider, provider.toLowerCase()),
+      eq(schema.feeConfigs.country, country.toUpperCase()),
+      eq(schema.feeConfigs.operator, operator.toLowerCase()),
     ));
   }
 

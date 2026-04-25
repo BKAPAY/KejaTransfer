@@ -3059,7 +3059,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Calculate fees on the amount in owner's currency with dynamic fee from database
       const { calculateIncomingFee, calculateCustomerPaysFee, getFeeFromDatabase, getIncomingExchangeFee: getApiPayXFee } = await import("./utils/fees");
-      const apiInitFeeConfig = await getFeeFromDatabase(storage, activeProvider, country, operator);
+      const apiInitFeeScope = owner?.accountType === "business" ? "business" : "personal";
+      const apiInitFeeConfig = await getFeeFromDatabase(storage, activeProvider, country, operator, apiInitFeeScope, apiInitFeeScope === "business" ? apiKey.userId : undefined);
       
       // Handle customerPaysFee logic like payment links
       let amountForProvider: number;
@@ -4123,7 +4124,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const ownerCurrency = owner.country ? getCurrencyForCountry(owner.country) : "XOF";
       const { calculateIncomingFee, calculateCustomerPaysFee, getFeeFromDatabase, getIncomingExchangeFee: getSessionXFee } = await import("./utils/fees");
-      const feeConfig = await getFeeFromDatabase(storage, activeProvider, country, operator);
+      const sessionFeeScope = owner?.accountType === "business" ? "business" : "personal";
+      const feeConfig = await getFeeFromDatabase(storage, activeProvider, country, operator, sessionFeeScope, sessionFeeScope === "business" ? apiKey.userId : undefined);
 
       let amountForProvider: number;
       let feeAmount: number;
@@ -4766,8 +4768,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // 11. Pre-check balance using netMode: recipient gets exact amount, fees added on top
-      const feeConfig = await getFeeFromDatabase(storage, activeProvider, countryCode, normalizedOperator);
-      const feeInfo = calculateOutgoingFeeFromNet(amountInUserCurrency, feeConfig.outgoing);
+      const apiPayoutFeeScope = user.accountType === "business" ? "business" : "personal";
+      const feeConfig = await getFeeFromDatabase(storage, activeProvider, countryCode, normalizedOperator, apiPayoutFeeScope, apiPayoutFeeScope === "business" ? user.id : undefined);
+      const feeInfo = calculateOutgoingFeeFromNet(amountInUserCurrency, feeConfig.outgoing, apiPayoutFeeScope === "business");
 
       // Exchange fee for personal accounts when payout currency differs from balance currency
       let payoutDestCurrency = requestedCurrency || getCurrencyForCountry(countryCode);
@@ -8500,10 +8503,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get dynamic fees from database for the active provider
-      const feeConfig = await getFeeFromDatabase(storage, activeProvider, country, operator);
+      const withdrawFeeScope = user.accountType === "business" ? "business" : "personal";
+      const feeConfig = await getFeeFromDatabase(storage, activeProvider, country, operator, withdrawFeeScope, withdrawFeeScope === "business" ? user.id : undefined);
       
       // Calculate fees with dynamic percentage
-      const feeInfo = calculateOutgoingFee(Math.floor(amount), feeConfig.outgoing);
+      const feeInfo = calculateOutgoingFee(Math.floor(amount), feeConfig.outgoing, withdrawFeeScope === "business");
 
       const isTransfer = type === "transfer";
 
