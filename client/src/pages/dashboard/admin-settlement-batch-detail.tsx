@@ -273,7 +273,7 @@ export default function AdminSettlementBatchDetail() {
             data-testid="button-reject-batch-detail"
           >
             <X className="w-4 h-4 mr-2" />
-            Rejeter{pendingItems.length > 1 ? " tout" : ""}
+            Rejeter
           </Button>
           <Button
             className="flex-1"
@@ -281,7 +281,7 @@ export default function AdminSettlementBatchDetail() {
             data-testid="button-validate-batch-detail"
           >
             <CheckCircle2 className="w-4 h-4 mr-2" />
-            Valider{pendingItems.length > 1 ? " tout" : ""}
+            Valider
           </Button>
         </div>
       )}
