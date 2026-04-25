@@ -45,7 +45,8 @@ export async function handleFedaPayDeposit(
     // Get dynamic fees from database for fedapay - calculate fees on the balance amount
     const feeScope = user.accountType === "business" ? "business" : "personal";
     const feeConfig = await getFeeFromDatabase(storage, "fedapay", country, operator, feeScope, feeScope === "business" ? userId : undefined);
-    const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming);
+    const allowDecimals = feeScope === "business";
+    const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming, allowDecimals);
 
     // Frais d'échange si devise fournisseur ≠ devise utilisateur (comptes personnels uniquement)
     const { feeAmount: incomingExchangeFee, feePercentage: exchangeFeePercentage } =
@@ -146,9 +147,10 @@ export async function handleFedaPayWithdrawal(
     // Get dynamic fees from database for fedapay
     const feeScope = user.accountType === "business" ? "business" : "personal";
     const feeConfig = await getFeeFromDatabase(storage, "fedapay", country, operator, feeScope, feeScope === "business" ? userId : undefined);
+    const allowDecimals = feeScope === "business";
     const feeInfo = netMode
-      ? calculateOutgoingFeeFromNet(grossAmount, feeConfig.outgoing)
-      : calculateOutgoingFee(grossAmount, feeConfig.outgoing);
+      ? calculateOutgoingFeeFromNet(grossAmount, feeConfig.outgoing, allowDecimals)
+      : calculateOutgoingFee(grossAmount, feeConfig.outgoing, allowDecimals);
 
     if (!skipBalanceOps && user.balance < feeInfo.totalDeductedFromBalance) {
       return { success: false, error: "Solde insuffisant" };
@@ -281,6 +283,7 @@ export async function handleFedaPayTransfer(
     // Get dynamic fees from database for fedapay transfers
     const feeScope = user.accountType === "business" ? "business" : "personal";
     const feeConfig = await getFeeFromDatabase(storage, "fedapay", country, operator, feeScope, feeScope === "business" ? userId : undefined);
+    const allowDecimals = feeScope === "business";
     const feePercentage = feeConfig.outgoing;
     const feeAmount = Math.floor((netAmount * feePercentage) / 1000);
     const totalDeductedFromBalance = netAmount + feeAmount;
@@ -411,6 +414,7 @@ export async function handlePaymentLinkPayment(
     // Get dynamic fees from database for fedapay
     const feeScope = user.accountType === "business" ? "business" : "personal";
     const feeConfig = await getFeeFromDatabase(storage, "fedapay", country, operator, feeScope, feeScope === "business" ? userId : undefined);
+    const allowDecimals = feeScope === "business";
     
     let grossAmount: number;
     let feeInfo: ReturnType<typeof calculateIncomingFee>;
@@ -429,7 +433,7 @@ export async function handlePaymentLinkPayment(
     } else {
       // Marchand paie les frais: logique standard - calculate fees on base amount
       grossAmount = providerAmount;
-      feeInfo = calculateIncomingFee(baseAmount, feeConfig.incoming);
+      feeInfo = calculateIncomingFee(baseAmount, feeConfig.incoming, allowDecimals);
     }
 
     const nameParts = customerName.split(" ");
@@ -532,7 +536,8 @@ export async function handleMerchantLinkPayment(
     // Get dynamic fees from database for fedapay - calculate fees on the balance amount
     const feeScope = user.accountType === "business" ? "business" : "personal";
     const feeConfig = await getFeeFromDatabase(storage, "fedapay", country, operator, feeScope, feeScope === "business" ? userId : undefined);
-    const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming);
+    const allowDecimals = feeScope === "business";
+    const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming, allowDecimals);
 
     const nameParts = customerName.split(" ");
     const firstName = nameParts[0] || "Client";
@@ -628,6 +633,7 @@ export async function handleApiPayment(
     // Get dynamic fees from database for fedapay
     const feeScope = user.accountType === "business" ? "business" : "personal";
     const feeConfig = await getFeeFromDatabase(storage, "fedapay", country, operator, feeScope, feeScope === "business" ? userId : undefined);
+    const allowDecimals = feeScope === "business";
     
     let grossAmount: number;
     let feeInfo: ReturnType<typeof calculateIncomingFee>;
@@ -646,7 +652,7 @@ export async function handleApiPayment(
     } else {
       // Marchand paie les frais: logique standard
       grossAmount = baseAmount;
-      feeInfo = calculateIncomingFee(grossAmount, feeConfig.incoming);
+      feeInfo = calculateIncomingFee(grossAmount, feeConfig.incoming, allowDecimals);
     }
 
     const nameParts = customerName.split(" ");

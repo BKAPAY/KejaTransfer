@@ -34,9 +34,10 @@ export async function handleMoneyFusionWithdrawal(
 
     const feeScope = user.accountType === "business" ? "business" : "personal";
     const feeConfig = await getFeeFromDatabase(storage, "moneyfusion", country, operator, feeScope, feeScope === "business" ? userId : undefined);
+    const allowDecimals = feeScope === "business";
     const feeInfo = netMode
-      ? calculateOutgoingFeeFromNet(grossAmount, feeConfig.outgoing)
-      : calculateOutgoingFee(grossAmount, feeConfig.outgoing);
+      ? calculateOutgoingFeeFromNet(grossAmount, feeConfig.outgoing, allowDecimals)
+      : calculateOutgoingFee(grossAmount, feeConfig.outgoing, allowDecimals);
 
     if (!skipBalanceOps && user.balance < feeInfo.totalDeductedFromBalance) {
       return { success: false, error: "L'operation ne peut pas etre effectuee pour le moment. Veuillez reessayer plus tard." };
@@ -173,6 +174,7 @@ export async function handleMoneyFusionTransfer(
 
     const feeScope = user.accountType === "business" ? "business" : "personal";
     const feeConfig = await getFeeFromDatabase(storage, "moneyfusion", country, operator, feeScope, feeScope === "business" ? userId : undefined);
+    const allowDecimals = feeScope === "business";
     const feeInfo = calculateOutgoingFee(netAmount, feeConfig.outgoing);
     const totalToDebit = netAmount + feeInfo.feeAmount;
 

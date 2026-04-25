@@ -97,14 +97,8 @@ export async function handlePawaPayDeposit(
       providerAmount = roundForCurrency(cpfInfo.totalForProvider, providerCurrency);
     }
 
-    let feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming);
-    // For business accounts, recalculate with decimal precision (e.g. 0.06 USD instead of 0)
-    if (user.accountType === "business") {
-      const rawFee = (balanceAmount * feeInfo.feePercentage) / 1000;
-      const precisionFee = Math.round(rawFee * 100) / 100;
-      const precisionNet = Math.round((balanceAmount - precisionFee) * 100) / 100;
-      feeInfo = { ...feeInfo, feeAmount: precisionFee, netAmount: Math.max(0, precisionNet) };
-    }
+    const allowDecimals = feeScope === "business";
+    let feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming, allowDecimals);
 
     // Calculate exchange fee if payer currency differs from merchant currency (personal accounts only)
     let incomingExchangeFee = 0;
@@ -241,9 +235,10 @@ export async function handlePawaPayWithdrawal(
 
     const feeScope = user.accountType === "business" ? "business" : "personal";
     const feeConfig = await getFeeFromDatabase(storage, "pawapay", country, operator, feeScope, feeScope === "business" ? userId : undefined);
+    const allowDecimals = feeScope === "business";
     const feeInfo = netMode
-      ? calculateOutgoingFeeFromNet(grossAmount, feeConfig.outgoing)
-      : calculateOutgoingFee(grossAmount, feeConfig.outgoing);
+      ? calculateOutgoingFeeFromNet(grossAmount, feeConfig.outgoing, allowDecimals)
+      : calculateOutgoingFee(grossAmount, feeConfig.outgoing, allowDecimals);
 
     if (!skipBalanceOps && user.balance < feeInfo.totalDeductedFromBalance) {
       return { success: false, error: "Solde insuffisant sur votre compte. Veuillez effectuer un dépôt avant de retirer." };
@@ -393,8 +388,9 @@ export async function handlePawaPayTransfer(
 
     const feeScope = user.accountType === "business" ? "business" : "personal";
     const feeConfig = await getFeeFromDatabase(storage, "pawapay", country, operator, feeScope, feeScope === "business" ? userId : undefined);
+    const allowDecimals = feeScope === "business";
     // Transfer: recipient gets full amount, fee is added ON TOP of balance deduction
-    const feeInfo = calculateOutgoingFeeFromNet(netAmount, feeConfig.outgoing);
+    const feeInfo = calculateOutgoingFeeFromNet(netAmount, feeConfig.outgoing, allowDecimals);
 
     if (user.balance < feeInfo.totalDeductedFromBalance) {
       return { success: false, error: "Solde insuffisant sur votre compte. Veuillez effectuer un dépôt avant de transférer." };

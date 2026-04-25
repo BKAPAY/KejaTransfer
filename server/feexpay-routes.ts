@@ -101,6 +101,7 @@ export async function handleFeeXPayDeposit(
 
     const feeScope = user.accountType === "business" ? "business" : "personal";
     const feeConfig = await getFeeFromDatabase(storage, "feexpay", country, operator, feeScope, feeScope === "business" ? userId : undefined);
+    const allowDecimals = feeScope === "business";
 
     // If customer pays fee, add service fee to the amount sent to provider
     let customerServiceFeeAmount = 0;
@@ -110,7 +111,7 @@ export async function handleFeeXPayDeposit(
       providerAmount = Math.floor(cpfInfo.totalForProvider);
     }
 
-    const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming);
+    const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming, allowDecimals);
 
     // Calculate exchange fee if payer currency differs from merchant currency (personal accounts only)
     let incomingExchangeFee = 0;
@@ -253,7 +254,8 @@ export async function handleFeeXPayWithdrawal(
 
     const feeScope = user.accountType === "business" ? "business" : "personal";
     const feeConfig = await getFeeFromDatabase(storage, "feexpay", country, operator, feeScope, feeScope === "business" ? userId : undefined);
-    const feeInfo = calculateOutgoingFee(grossAmount, feeConfig.outgoing);
+    const allowDecimals = feeScope === "business";
+    const feeInfo = calculateOutgoingFee(grossAmount, feeConfig.outgoing, allowDecimals);
 
     if (!skipBalanceOps && user.balance < feeInfo.totalDeductedFromBalance) {
       return { success: false, error: "Solde insuffisant" };
@@ -390,8 +392,9 @@ export async function handleFeeXPayTransfer(
 
     const feeScope = user.accountType === "business" ? "business" : "personal";
     const feeConfig = await getFeeFromDatabase(storage, "feexpay", country, operator, feeScope, feeScope === "business" ? userId : undefined);
+    const allowDecimals = feeScope === "business";
     const { calculateOutgoingFeeFromNet } = await import("./utils/fees");
-    const feeInfo = calculateOutgoingFeeFromNet(netAmount, feeConfig.outgoing);
+    const feeInfo = calculateOutgoingFeeFromNet(netAmount, feeConfig.outgoing, allowDecimals);
 
     if (user.balance < feeInfo.totalDeductedFromBalance) {
       return { success: false, error: "Solde insuffisant" };

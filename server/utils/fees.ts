@@ -244,15 +244,20 @@ export async function getFeeFromDatabase(
  * - Credit netAmount to user balance
  * - Display grossAmount in transaction history
  */
-export function calculateIncomingFee(grossAmount: number, feePercentageValue?: number): {
+export function calculateIncomingFee(grossAmount: number, feePercentageValue?: number, allowDecimals = false): {
   grossAmount: number;
   feeAmount: number;
   feePercentage: number;
   netAmount: number;
 } {
   const feePercentage = getFeePercentage(feePercentageValue);
-  const feeAmount = Math.floor((grossAmount * feePercentage) / 1000);
-  const netAmount = grossAmount - feeAmount;
+  const rawFee = (grossAmount * feePercentage) / 1000;
+  const feeAmount = allowDecimals
+    ? Math.round(rawFee * 100) / 100
+    : Math.floor(rawFee);
+  const netAmount = allowDecimals
+    ? Math.round((grossAmount - feeAmount) * 100) / 100
+    : grossAmount - feeAmount;
 
   return {
     grossAmount,
@@ -318,7 +323,7 @@ export function calculateCustomerPaysFee(baseAmount: number, feePercentageValue?
  * - Store grossAmount in transaction.amount (10000)
  * - Display grossAmount in transaction history (10000)
  */
-export function calculateOutgoingFee(grossAmount: number, feePercentageValue?: number | string): {
+export function calculateOutgoingFee(grossAmount: number, feePercentageValue?: number | string, allowDecimals = false): {
   grossAmount: number;
   feeAmount: number;
   feePercentage: number;
@@ -329,8 +334,13 @@ export function calculateOutgoingFee(grossAmount: number, feePercentageValue?: n
   const feePercentage = typeof feePercentageValue === 'string' 
     ? DEFAULT_FEE_PERCENTAGE 
     : getFeePercentage(feePercentageValue);
-  const feeAmount = Math.floor((grossAmount * feePercentage) / 1000);
-  const amountReceived = grossAmount - feeAmount;
+  const rawFee = (grossAmount * feePercentage) / 1000;
+  const feeAmount = allowDecimals
+    ? Math.round(rawFee * 100) / 100
+    : Math.floor(rawFee);
+  const amountReceived = allowDecimals
+    ? Math.round((grossAmount - feeAmount) * 100) / 100
+    : grossAmount - feeAmount;
   const totalDeductedFromBalance = grossAmount;
 
   return {
@@ -393,7 +403,7 @@ export async function getIncomingExchangeFee(
  * - Le solde du marchand est débité de 10600 (net + frais)
  * - Le fournisseur envoie exactement 10000 au destinataire
  */
-export function calculateOutgoingFeeFromNet(netAmount: number, feePercentageValue?: number | string): {
+export function calculateOutgoingFeeFromNet(netAmount: number, feePercentageValue?: number | string, allowDecimals = false): {
   grossAmount: number;
   feeAmount: number;
   feePercentage: number;
@@ -403,8 +413,13 @@ export function calculateOutgoingFeeFromNet(netAmount: number, feePercentageValu
   const feePercentage = typeof feePercentageValue === 'string'
     ? DEFAULT_FEE_PERCENTAGE
     : getFeePercentage(feePercentageValue);
-  const feeAmount = Math.floor((netAmount * feePercentage) / 1000);
-  const totalDeductedFromBalance = netAmount + feeAmount;
+  const rawFee = (netAmount * feePercentage) / 1000;
+  const feeAmount = allowDecimals
+    ? Math.round(rawFee * 100) / 100
+    : Math.floor(rawFee);
+  const totalDeductedFromBalance = allowDecimals
+    ? Math.round((netAmount + feeAmount) * 100) / 100
+    : netAmount + feeAmount;
 
   return {
     grossAmount: netAmount,

@@ -46,7 +46,8 @@ export async function handleMbiyoPayDeposit(
     
     const feeScope = user.accountType === "business" ? "business" : "personal";
     const feeConfig = await getFeeFromDatabase(storage, "mbiyopay", country, operator, feeScope, feeScope === "business" ? userId : undefined);
-    const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming);
+    const allowDecimals = feeScope === "business";
+    const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming, allowDecimals);
 
     // Exchange fee when payer's currency differs from user's balance currency (personal accounts only)
     const { feeAmount: incomingExchangeFee, feePercentage: exchangeFeePercentage } =
@@ -182,9 +183,10 @@ export async function handleMbiyoPayWithdrawal(
     
     const feeScope = user.accountType === "business" ? "business" : "personal";
     const feeConfig = await getFeeFromDatabase(storage, "mbiyopay", country, operator, feeScope, feeScope === "business" ? userId : undefined);
+    const allowDecimals = feeScope === "business";
     const feeInfo = netMode
-      ? calculateOutgoingFeeFromNet(grossAmount, feeConfig.outgoing)
-      : calculateOutgoingFee(grossAmount, feeConfig.outgoing);
+      ? calculateOutgoingFeeFromNet(grossAmount, feeConfig.outgoing, allowDecimals)
+      : calculateOutgoingFee(grossAmount, feeConfig.outgoing, allowDecimals);
 
     if (!skipBalanceOps && user.balance < feeInfo.totalDeductedFromBalance) {
       return { success: false, error: "Solde insuffisant" };
@@ -339,7 +341,8 @@ export async function handleMbiyoPayTransfer(
     
     const feeScope = user.accountType === "business" ? "business" : "personal";
     const feeConfig = await getFeeFromDatabase(storage, "mbiyopay", country, operator, feeScope, feeScope === "business" ? userId : undefined);
-    const feeInfo = calculateOutgoingFee(netAmount, feeConfig.outgoing);
+    const allowDecimals = feeScope === "business";
+    const feeInfo = calculateOutgoingFee(netAmount, feeConfig.outgoing, allowDecimals);
     const totalToDebit = netAmount + feeInfo.feeAmount;
 
     if (user.balance < totalToDebit) {
@@ -482,7 +485,8 @@ export async function handleMbiyoPayPaymentLink(
     // Get dynamic fees from database for mbiyopay - calculate on base amount
     const feeScope = user.accountType === "business" ? "business" : "personal";
     const feeConfig = await getFeeFromDatabase(storage, "mbiyopay", country, operator, feeScope, feeScope === "business" ? userId : undefined);
-    const feeInfo = calculateIncomingFee(baseAmount, feeConfig.incoming);
+    const allowDecimals = feeScope === "business";
+    const feeInfo = calculateIncomingFee(baseAmount, feeConfig.incoming, allowDecimals);
     
     // Use converted amount for provider if available, otherwise use base amount
     const providerCurrency = convertedCurrency || getCurrencyForCountry(country);
@@ -647,7 +651,8 @@ export async function handleMbiyoPayMerchantLink(
     // Get dynamic fees for mbiyopay - calculate on balance amount
     const feeScope = user.accountType === "business" ? "business" : "personal";
     const feeConfig = await getFeeFromDatabase(storage, "mbiyopay", country, operator, feeScope, feeScope === "business" ? userId : undefined);
-    const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming);
+    const allowDecimals = feeScope === "business";
+    const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming, allowDecimals);
 
     // Exchange fee when payer's currency differs from merchant's balance currency (personal accounts only)
     const { feeAmount: incomingExchangeFee, feePercentage: exchangeFeePercentage } =
@@ -771,7 +776,8 @@ export async function handleMbiyoPayApiPayment(
     // Get dynamic fees from database for mbiyopay
     const feeScope = user.accountType === "business" ? "business" : "personal";
     const feeConfig = await getFeeFromDatabase(storage, "mbiyopay", country, operator, feeScope, feeScope === "business" ? userId : undefined);
-    const feeInfo = calculateIncomingFee(grossAmount, feeConfig.incoming);
+    const allowDecimals = feeScope === "business";
+    const feeInfo = calculateIncomingFee(grossAmount, feeConfig.incoming, allowDecimals);
 
     const orderId = `BKAPAY-API-${apiKey.id}-${Date.now()}`;
     const startTime = Date.now();

@@ -68,7 +68,8 @@ export async function handleAfribaPayDeposit(
 
     const feeScope = user.accountType === "business" ? "business" : "personal";
     const feeConfig = await getFeeFromDatabase(storage, "afribapay", country, operator, feeScope, feeScope === "business" ? userId : undefined);
-    const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming);
+    const allowDecimals = feeScope === "business";
+    const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming, allowDecimals);
 
     // Exchange fee when payer's currency differs from user's balance currency (personal accounts only)
     const { feeAmount: incomingExchangeFee, feePercentage: exchangeFeePercentage } =
@@ -169,7 +170,8 @@ export async function handleAfribaPayWithdrawal(
 
     const feeScope = user.accountType === "business" ? "business" : "personal";
     const feeConfig = await getFeeFromDatabase(storage, "afribapay", country, operator, feeScope, feeScope === "business" ? userId : undefined);
-    const feeInfo = calculateOutgoingFee(grossAmount, feeConfig.outgoing);
+    const allowDecimals = feeScope === "business";
+    const feeInfo = calculateOutgoingFee(grossAmount, feeConfig.outgoing, allowDecimals);
 
     if (user.balance < feeInfo.totalDeductedFromBalance) {
       return { success: false, error: "Solde insuffisant" };
@@ -274,7 +276,8 @@ export async function handleAfribaPayTransfer(
 
     const feeScope = user.accountType === "business" ? "business" : "personal";
     const feeConfig = await getFeeFromDatabase(storage, "afribapay", country, operator, feeScope, feeScope === "business" ? userId : undefined);
-    const feeInfo = calculateOutgoingFee(netAmount, feeConfig.outgoing);
+    const allowDecimals = feeScope === "business";
+    const feeInfo = calculateOutgoingFee(netAmount, feeConfig.outgoing, allowDecimals);
     const feePercentage = feeInfo.feePercentage;
     const feeAmount = feeInfo.feeAmount;
     const totalDeducted = netAmount + feeAmount;
@@ -402,6 +405,7 @@ export async function handleAfribaPayPaymentLink(
 
     const feeScope = user.accountType === "business" ? "business" : "personal";
     const feeConfig = await getFeeFromDatabase(storage, "afribapay", country, operator, feeScope, feeScope === "business" ? userId : undefined);
+    const allowDecimals = feeScope === "business";
     const cpf = customerPaysFee ?? false;
 
     // If customer pays fee, add service fee to the amount sent to provider
@@ -413,7 +417,7 @@ export async function handleAfribaPayPaymentLink(
       providerAmountForAfribaPay = Math.floor(cpfInfo.totalForProvider);
     }
 
-    const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming);
+    const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming, allowDecimals);
 
     // Calculate exchange fee if payer currency differs from merchant currency (personal accounts only)
     let incomingExchangeFee = 0;
@@ -550,7 +554,8 @@ export async function handleAfribaPayMerchantLink(
 
     const feeScope = user.accountType === "business" ? "business" : "personal";
     const feeConfig = await getFeeFromDatabase(storage, "afribapay", country, operator, feeScope, feeScope === "business" ? userId : undefined);
-    const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming);
+    const allowDecimals = feeScope === "business";
+    const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming, allowDecimals);
 
     // Exchange fee when payer's currency differs from merchant's balance currency
     const { feeAmount: incomingExchangeFee, feePercentage: exchangeFeePercentage } =
@@ -672,7 +677,8 @@ export async function handleAfribaPayApiPayment(
 
     const feeScope = user.accountType === "business" ? "business" : "personal";
     const feeConfig = await getFeeFromDatabase(storage, "afribapay", country, operator, feeScope, feeScope === "business" ? userId : undefined);
-    const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming);
+    const allowDecimals = feeScope === "business";
+    const feeInfo = calculateIncomingFee(balanceAmount, feeConfig.incoming, allowDecimals);
 
     // Exchange fee when payer's currency differs from merchant's balance currency (personal accounts only)
     const { feeAmount: incomingExchangeFee, feePercentage: exchangeFeePercentage } =
