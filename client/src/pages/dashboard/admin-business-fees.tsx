@@ -244,7 +244,7 @@ export default function AdminBusinessFees() {
 
     if (value === undefined || value === "") return;
 
-    const numValue = parseFloat(value);
+    const numValue = parseFloat(value.replace(",", "."));
     if (isNaN(numValue) || numValue < 0 || numValue > 100) {
       toast({
         title: "Erreur",

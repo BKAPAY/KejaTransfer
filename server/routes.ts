@@ -3068,9 +3068,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let feePercentage: number;
       let netAmountForUser: number;
       
+      const apiInitAllowDecimals = apiInitFeeScope === "business";
       if (apiKey.customerPaysFee) {
         // Customer pays fee: send TOTAL (base + fees) to provider, user receives base amount
-        const feeInfo = calculateCustomerPaysFee(baseAmount, apiInitFeeConfig.incoming);
+        const feeInfo = calculateCustomerPaysFee(baseAmount, apiInitFeeConfig.incoming, apiInitAllowDecimals);
         amountForProvider = feeInfo.totalForProvider;
         feeAmount = feeInfo.feeAmount;
         feePercentage = feeInfo.feePercentage;
@@ -3083,7 +3084,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       } else {
         // User pays fee: send base amount, user receives net (base - fees)
-        const feeInfo = calculateIncomingFee(baseAmount, apiInitFeeConfig.incoming);
+        const feeInfo = calculateIncomingFee(baseAmount, apiInitFeeConfig.incoming, apiInitAllowDecimals);
         amountForProvider = feeInfo.grossAmount;
         feeAmount = feeInfo.feeAmount;
         feePercentage = feeInfo.feePercentage;
@@ -4132,14 +4133,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let feePercentage: number;
       let netAmountForUser: number;
 
+      const sessionAllowDecimals = sessionFeeScope === "business";
       if (apiKey.customerPaysFee) {
-        const feeInfo = calculateCustomerPaysFee(session.amount, feeConfig.incoming);
+        const feeInfo = calculateCustomerPaysFee(session.amount, feeConfig.incoming, sessionAllowDecimals);
         amountForProvider = feeInfo.totalForProvider;
         feeAmount = feeInfo.feeAmount;
         feePercentage = feeInfo.feePercentage;
         netAmountForUser = feeInfo.baseAmount;
       } else {
-        const feeInfo = calculateIncomingFee(session.amount, feeConfig.incoming);
+        const feeInfo = calculateIncomingFee(session.amount, feeConfig.incoming, sessionAllowDecimals);
         amountForProvider = feeInfo.grossAmount;
         feeAmount = feeInfo.feeAmount;
         feePercentage = feeInfo.feePercentage;
@@ -5521,12 +5523,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let netAmountForUser: number;
       let baseAmountInOwnerCurrency = paymentLink.amount;
       
-      // Get dynamic fee configuration from database (auto-detect active provider)
-      const feeConfig = await getDynamicFees(storage, country, operator);
-      
+      // Get fee configuration from database (scope: business or personal)
+      const linkFeeScope = owner?.accountType === "business" ? "business" : "personal";
+      const linkActiveProvider = await getActiveProviderForCountry(storage, country, operator);
+      const feeConfig = await getFeeFromDatabase(storage, linkActiveProvider, country, operator, linkFeeScope, linkFeeScope === "business" ? paymentLink.userId : undefined);
+      const linkAllowDecimals = linkFeeScope === "business";
+
       if (paymentLink.customerPaysFee) {
         // Customer pays fee: send TOTAL (base + fees) to provider, user receives base amount
-        const feeInfo = calculateCustomerPaysFee(paymentLink.amount, feeConfig.incoming);
+        const feeInfo = calculateCustomerPaysFee(paymentLink.amount, feeConfig.incoming, linkAllowDecimals);
         amountForProvider = feeInfo.totalForProvider;
         feeAmount = feeInfo.feeAmount;
         feePercentage = feeInfo.feePercentage;
@@ -5539,7 +5544,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       } else {
         // User pays fee: send base amount, user receives net (base - fees)
-        const feeInfo = calculateIncomingFee(paymentLink.amount, feeConfig.incoming);
+        const feeInfo = calculateIncomingFee(paymentLink.amount, feeConfig.incoming, linkAllowDecimals);
         amountForProvider = feeInfo.grossAmount;
         feeAmount = feeInfo.feeAmount;
         feePercentage = feeInfo.feePercentage;

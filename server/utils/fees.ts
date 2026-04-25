@@ -286,15 +286,18 @@ export function calculateIncomingFee(grossAmount: number, feePercentageValue?: n
  * - Credit baseAmount to user balance
  * - Store baseAmount as the net amount in transaction
  */
-export function calculateCustomerPaysFee(baseAmount: number, feePercentageValue?: number): {
+export function calculateCustomerPaysFee(baseAmount: number, feePercentageValue?: number, allowDecimals = false): {
   baseAmount: number;
   feeAmount: number;
   feePercentage: number;
   totalForProvider: number;
 } {
   const feePercentage = getFeePercentage(feePercentageValue);
-  const feeAmount = Math.floor((baseAmount * feePercentage) / 1000);
-  const totalForProvider = baseAmount + feeAmount;
+  const rawFee = (baseAmount * feePercentage) / 1000;
+  const feeAmount = allowDecimals ? Math.round(rawFee * 100) / 100 : Math.floor(rawFee);
+  const totalForProvider = allowDecimals
+    ? Math.round((baseAmount + feeAmount) * 100) / 100
+    : baseAmount + feeAmount;
 
   return {
     baseAmount,
