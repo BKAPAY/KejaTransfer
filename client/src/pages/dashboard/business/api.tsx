@@ -282,6 +282,26 @@ export default function BusinessApiPage() {
                       Recevez les notifications payin et payout sur une seule URL. Configurez votre endpoint : <code className="bg-muted px-1 rounded">https://votre-site.com/api/webhook/bkapay</code>
                     </p>
 
+                    {token.callbackSecret && (
+                      <div className="mb-3">
+                        <label className="text-xs font-medium text-muted-foreground">Secret de signature (HMAC-SHA256)</label>
+                        <div className="flex items-center gap-2 p-2 bg-muted rounded-md mt-1">
+                          <code className="flex-1 text-xs font-mono truncate" data-testid={`text-callback-secret-${token.id}`}>
+                            {visibleFields[`secret-${token.id}`] ? token.callbackSecret : maskValue(token.callbackSecret)}
+                          </code>
+                          <Button variant="ghost" size="sm" onClick={() => toggleVisibility(`secret-${token.id}`)} data-testid={`button-toggle-secret-${token.id}`}>
+                            {visibleFields[`secret-${token.id}`] ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => copyToClipboard(token.callbackSecret!, "Secret de signature")} data-testid={`button-copy-secret-${token.id}`}>
+                            <Copy className="w-3 h-3" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => regenerateCallbackSecretMutation.mutate(token.id)} disabled={regenerateCallbackSecretMutation.isPending} data-testid={`button-regenerate-secret-${token.id}`}>
+                            <RefreshCw className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
                     {(editingCallbackId === token.id || !token.callbackUrl) ? (
                       <div className="space-y-3">
                         <Input
@@ -305,25 +325,6 @@ export default function BusinessApiPage() {
                       </div>
                     ) : (
                       <div className="space-y-3">
-                        {token.callbackSecret && (
-                          <div>
-                            <label className="text-xs font-medium text-muted-foreground">Secret de signature (HMAC-SHA256)</label>
-                            <div className="flex items-center gap-2 p-2 bg-muted rounded-md mt-1">
-                              <code className="flex-1 text-xs font-mono truncate" data-testid={`text-callback-secret-${token.id}`}>
-                                {visibleFields[`secret-${token.id}`] ? token.callbackSecret : maskValue(token.callbackSecret)}
-                              </code>
-                              <Button variant="ghost" size="sm" onClick={() => toggleVisibility(`secret-${token.id}`)} data-testid={`button-toggle-secret-${token.id}`}>
-                                {visibleFields[`secret-${token.id}`] ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                              </Button>
-                              <Button variant="ghost" size="sm" onClick={() => copyToClipboard(token.callbackSecret!, "Secret de signature")} data-testid={`button-copy-secret-${token.id}`}>
-                                <Copy className="w-3 h-3" />
-                              </Button>
-                              <Button variant="ghost" size="sm" onClick={() => regenerateCallbackSecretMutation.mutate(token.id)} disabled={regenerateCallbackSecretMutation.isPending} data-testid={`button-regenerate-secret-${token.id}`}>
-                                <RefreshCw className="w-3 h-3" />
-                              </Button>
-                            </div>
-                          </div>
-                        )}
                         <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-md">
                           <code className="flex-1 text-xs font-mono truncate text-green-700 dark:text-green-300" data-testid={`text-callback-url-${token.id}`}>{token.callbackUrl}</code>
                           <Button variant="ghost" size="sm" onClick={() => copyToClipboard(token.callbackUrl!, "URL webhook")} data-testid={`button-copy-callback-${token.id}`}>

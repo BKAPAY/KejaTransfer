@@ -504,6 +504,30 @@ export default function ApiPage() {
                     Recevez une notification automatique quand un paiement est complete. Ideal pour activer automatiquement les abonnements.
                   </p>
                   
+                  {(apiKey as any).callbackSecret && (
+                    <div className="mb-3">
+                      <div className="flex items-center gap-2 mb-1">
+                        <label className="text-xs font-medium text-muted-foreground">Secret de signature payin (HMAC-SHA256)</label>
+                      </div>
+                      <div className="flex items-center gap-2 p-2 bg-muted rounded-md">
+                        <code className="flex-1 text-xs font-mono truncate">
+                          {visibleKeys[apiKey.id + '-secret']
+                            ? (apiKey as any).callbackSecret
+                            : maskKey((apiKey as any).callbackSecret)}
+                        </code>
+                        <Button variant="ghost" size="sm" onClick={() => toggleKeyVisibility(apiKey.id + '-secret')} data-testid={`button-toggle-secret-${apiKey.id}`}>
+                          {visibleKeys[apiKey.id + '-secret'] ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => copyToClipboard((apiKey as any).callbackSecret, "Secret payin")} data-testid={`button-copy-secret-${apiKey.id}`}>
+                          <Copy className="w-3 h-3" />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => regenerateSecretMutation.mutate(apiKey.id)} disabled={regenerateSecretMutation.isPending} title="Regenerer le secret payin" data-testid={`button-regenerate-secret-${apiKey.id}`}>
+                          <RefreshCw className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
                   {(editingCallback === apiKey.id || !(apiKey as any).callbackUrl) ? (
                     <div className="space-y-3">
                       <Input
@@ -550,29 +574,6 @@ export default function ApiPage() {
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      {(apiKey as any).callbackSecret && (
-                        <div>
-                          <div className="flex items-center gap-2 mb-1">
-                            <label className="text-xs font-medium text-muted-foreground">Secret de signature payin (HMAC-SHA256)</label>
-                          </div>
-                          <div className="flex items-center gap-2 p-2 bg-muted rounded-md">
-                            <code className="flex-1 text-xs font-mono truncate">
-                              {visibleKeys[apiKey.id + '-secret']
-                                ? (apiKey as any).callbackSecret
-                                : maskKey((apiKey as any).callbackSecret)}
-                            </code>
-                            <Button variant="ghost" size="sm" onClick={() => toggleKeyVisibility(apiKey.id + '-secret')} data-testid={`button-toggle-secret-${apiKey.id}`}>
-                              {visibleKeys[apiKey.id + '-secret'] ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                            </Button>
-                            <Button variant="ghost" size="sm" onClick={() => copyToClipboard((apiKey as any).callbackSecret, "Secret payin")} data-testid={`button-copy-secret-${apiKey.id}`}>
-                              <Copy className="w-3 h-3" />
-                            </Button>
-                            <Button variant="ghost" size="sm" onClick={() => regenerateSecretMutation.mutate(apiKey.id)} disabled={regenerateSecretMutation.isPending} title="Regenerer le secret payin" data-testid={`button-regenerate-secret-${apiKey.id}`}>
-                              <RefreshCw className="w-3 h-3" />
-                            </Button>
-                          </div>
-                        </div>
-                      )}
                       <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-md">
                         <code className="flex-1 text-xs font-mono truncate text-green-700 dark:text-green-300">
                           {(apiKey as any).callbackUrl}
