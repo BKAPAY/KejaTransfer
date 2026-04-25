@@ -95,7 +95,7 @@ export async function sendApiPayoutCallback(transactionId: string, metadata: any
   };
   const payloadStr = JSON.stringify(payoutPayload);
 
-  const MAX_ATTEMPTS = 120;   // 10 minutes at 5s intervals
+  const MAX_ATTEMPTS = 240;   // 20 minutes at 5s intervals
   const RETRY_INTERVAL_MS = 5000;
 
   let attempt = 0;
@@ -173,7 +173,7 @@ export async function sendBusinessWebhookCallback(
 
     const payloadStr = JSON.stringify(payload);
 
-    const MAX_ATTEMPTS = 300;
+    const MAX_ATTEMPTS = 400;
     const RETRY_INTERVAL_MS = 3000;
     let attempt = 0;
 

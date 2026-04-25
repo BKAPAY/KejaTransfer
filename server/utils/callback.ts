@@ -157,7 +157,7 @@ export async function sendPaymentCallback(
   const payloadJson = JSON.stringify(payload);
   const timestamp = payload.timestamp;
 
-  const MAX_ATTEMPTS = 120;
+  const MAX_ATTEMPTS = 240;
   const RETRY_INTERVAL_MS = 5000;
   let attempt = 0;
 
