@@ -111,6 +111,7 @@ const BusinessSettings = lazy(() => import("@/pages/dashboard/business/settings"
 const BusinessSettlements = lazy(() => import("@/pages/dashboard/business/settlements"));
 const BusinessSettlementScan = lazy(() => import("@/pages/dashboard/business/settlement-scan"));
 const BusinessSettlementDetail = lazy(() => import("@/pages/dashboard/business/settlement-detail"));
+const AdminSettlementBatchDetail = lazy(() => import("@/pages/dashboard/admin-settlement-batch-detail"));
 const BusinessFees = lazy(() => import("@/pages/dashboard/business/fees"));
 
 // Précharger le cache React Query depuis localStorage AVANT le premier rendu
@@ -298,6 +299,7 @@ function Router() {
           <Route path="/dashboard/admin" component={Admin} />
           <Route path="/dashboard/admin/business" component={AdminBusiness} />
           <Route path="/dashboard/admin/business/management" component={AdminBusinessManagement} />
+          <Route path="/dashboard/admin/settlement-batch/:userId/:ts" component={AdminSettlementBatchDetail} />
           <Route path="/dashboard/admin/business/users/:userId/history" component={AdminBusinessHistory} />
           <Route path="/dashboard/admin/business/kyc" component={AdminBusinessKyc} />
           <Route path="/dashboard/admin/business/kyc/:userId" component={AdminBusinessKycDetail} />
