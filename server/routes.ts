@@ -11882,6 +11882,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const updatedUser = await storage.getUser(transaction.userId);
 
+      // Fire callback to developer webhook if applicable
+      const updatedTx = await storage.getTransaction(transactionId);
+      if (updatedTx) {
+        const cbEvent = newStatus === "completed" ? "payment.completed" : "payment.failed";
+        trySendPaymentCallback(updatedTx, cbEvent, "[Admin/ChangeStatus]");
+      }
+
       res.json({ 
         success: true, 
         message: `Statut changé de '${transaction.status}' à '${newStatus}' avec succès`,
