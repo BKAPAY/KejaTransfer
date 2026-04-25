@@ -147,10 +147,7 @@ export default function AdminSettlementBatchDetail() {
   const dateLabel = batchDate.toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" });
   const timeLabel = batchDate.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
 
-  const totalByCurrency: Record<string, number> = {};
-  for (const s of batch) {
-    totalByCurrency[s.walletCurrency] = (totalByCurrency[s.walletCurrency] || 0) + s.amount;
-  }
+
 
   const overallStatus = allCompleted ? "completed" : allRejected ? "rejected" : anyPending ? "pending" : "partial";
 
@@ -258,21 +255,12 @@ export default function AdminSettlementBatchDetail() {
                       <p className="text-xs text-muted-foreground">{s.walletCurrency}</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="font-bold text-sm">{formatAmount(s.amount, s.walletCurrency)}</span>
-                    <StatusBadge status={s.status} />
-                  </div>
+                  <span className="font-bold text-sm">{formatAmount(s.amount, s.walletCurrency)}</span>
                 </div>
               );
             })}
           </div>
 
-          {Object.entries(totalByCurrency).map(([currency, total]) => (
-            <div key={currency} className="flex items-center justify-between pt-3 mt-1 border-t">
-              <span className="text-sm text-muted-foreground font-medium">Total {currency}</span>
-              <span className="font-bold text-sm">{formatAmount(total, currency)}</span>
-            </div>
-          ))}
         </CardContent>
       </Card>
 
