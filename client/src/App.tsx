@@ -8,7 +8,8 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { BusinessSidebar } from "@/components/business-sidebar";
 import { useEffect, useRef, useState, lazy, Suspense } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { Wallet, Loader2 } from "lucide-react";
+import { Wallet, Loader2, ShieldCheck, ShieldAlert, Clock } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { EmaliChatButton } from "@/components/emali-chat";
 import { CURRENT_VERSION } from "@/lib/doc-versions";
 import { COUNTRIES } from "@shared/schema";
@@ -205,6 +206,27 @@ function DashboardLayout({ children, type = "personal" }: { children: React.Reac
                   <SidebarTrigger size="lg" data-testid="button-sidebar-toggle" />
                   <span className="text-[10px] font-medium text-muted-foreground leading-none">MENU</span>
                 </div>
+                {type === "business" && (() => {
+                  const status = (user as any)?.kycStatus;
+                  if (status === "verified") return (
+                    <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs gap-1 px-2.5 py-1" data-testid="badge-kyc-verified">
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      Vérifié
+                    </Badge>
+                  );
+                  if (status === "submitted") return (
+                    <Badge variant="secondary" className="text-xs gap-1 px-2.5 py-1" data-testid="badge-kyc-pending">
+                      <Clock className="w-3.5 h-3.5" />
+                      En attente
+                    </Badge>
+                  );
+                  return (
+                    <Badge variant="destructive" className="text-xs gap-1 px-2.5 py-1" data-testid="badge-kyc-unverified">
+                      <ShieldAlert className="w-3.5 h-3.5" />
+                      Non vérifié
+                    </Badge>
+                  );
+                })()}
                 {type === "personal" && (
                   <div className="relative">
                     <EmaliChatButton />
