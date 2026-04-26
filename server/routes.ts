@@ -758,6 +758,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const user = userResult.rows[0];
         if (!user) { await client.query('ROLLBACK'); client.release(); await pool.end(); return res.status(404).json({ error: "Utilisateur non trouvé" }); }
 
+        if (user.kyc_status !== "verified") {
+          await client.query('ROLLBACK'); client.release(); await pool.end();
+          return res.status(403).json({ error: "Votre compte doit être vérifié pour effectuer un règlement. Complétez votre vérification KYC." });
+        }
+
         if (data.settlementMethod === "momo") {
           if (!user.momo_phone || !user.momo_operator || !user.momo_country) {
             await client.query('ROLLBACK'); client.release(); await pool.end();
