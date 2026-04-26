@@ -206,33 +206,33 @@ function DashboardLayout({ children, type = "personal" }: { children: React.Reac
                   <SidebarTrigger size="lg" data-testid="button-sidebar-toggle" />
                   <span className="text-[10px] font-medium text-muted-foreground leading-none">MENU</span>
                 </div>
-                {type === "business" && (() => {
-                  const status = (user as any)?.kycStatus;
-                  if (status === "verified") return (
-                    <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs gap-1 px-2.5 py-1" data-testid="badge-kyc-verified">
-                      <ShieldCheck className="w-3.5 h-3.5" />
-                      Vérifié
-                    </Badge>
-                  );
-                  if (status === "submitted") return (
-                    <Badge variant="secondary" className="text-xs gap-1 px-2.5 py-1" data-testid="badge-kyc-pending">
-                      <Clock className="w-3.5 h-3.5" />
-                      En attente
-                    </Badge>
-                  );
-                  return (
-                    <Badge variant="destructive" className="text-xs gap-1 px-2.5 py-1" data-testid="badge-kyc-unverified">
-                      <ShieldAlert className="w-3.5 h-3.5" />
-                      Non vérifié
-                    </Badge>
-                  );
-                })()}
                 {type === "personal" && (
                   <div className="relative">
                     <EmaliChatButton />
                   </div>
                 )}
               </div>
+              {type === "business" && (() => {
+                const status = (user as any)?.kycStatus;
+                if (status === "verified") return (
+                  <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs gap-1 px-2.5 py-1" data-testid="badge-kyc-verified">
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    Vérifié
+                  </Badge>
+                );
+                if (status === "submitted") return (
+                  <Badge variant="secondary" className="text-xs gap-1 px-2.5 py-1" data-testid="badge-kyc-pending">
+                    <Clock className="w-3.5 h-3.5" />
+                    En attente
+                  </Badge>
+                );
+                return (
+                  <Badge variant="destructive" className="text-xs gap-1 px-2.5 py-1" data-testid="badge-kyc-unverified">
+                    <ShieldAlert className="w-3.5 h-3.5" />
+                    Non vérifié
+                  </Badge>
+                );
+              })()}
               {type === "personal" && (
                 <div className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 rounded-lg" data-testid="header-balance">
                   <Wallet className="h-4 w-4 text-primary" />
