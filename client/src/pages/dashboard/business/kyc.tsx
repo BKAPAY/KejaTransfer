@@ -54,7 +54,7 @@ function StepIndicator({ current, total }: { current: number; total: number }) {
 }
 
 function DocUploadSlot({
-  label, hint, value, onUpload, onRemove, multiple, additionalFiles, onAddMore, loading
+  label, hint, value, onUpload, onRemove, multiple, additionalFiles, onAddMore, loading, required
 }: {
   label: string;
   hint?: string;
@@ -65,6 +65,7 @@ function DocUploadSlot({
   additionalFiles?: string[];
   onAddMore?: (base64: string, isImage: boolean) => void;
   loading?: boolean;
+  required?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const addMoreRef = useRef<HTMLInputElement>(null);
@@ -87,7 +88,9 @@ function DocUploadSlot({
 
   return (
     <div className="space-y-2">
-      <Label className="text-sm font-medium">{label}</Label>
+      <Label className="text-sm font-medium">
+        {label} {required && <span className="text-destructive">*</span>}
+      </Label>
       {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
 
       <input
@@ -559,7 +562,7 @@ export default function BusinessKyc() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Téléphone entreprise</Label>
+                    <Label>Téléphone entreprise <span className="text-destructive">*</span></Label>
                     <PhoneInputWithPrefix
                       country={profileForm.businessCountry}
                       value={profileForm.businessEnterprisePhone}
@@ -569,7 +572,7 @@ export default function BusinessKyc() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Email professionnel</Label>
+                    <Label>Email professionnel <span className="text-destructive">*</span></Label>
                     <Input
                       type="email"
                       placeholder="contact@entreprise.com"
@@ -654,6 +657,7 @@ export default function BusinessKyc() {
                 />
                 <FormField
                   label="Département / Région"
+                  required
                   value={step2.kycBusinessDepartment}
                   onChange={(v) => setStep2(p => ({ ...p, kycBusinessDepartment: v }))}
                   placeholder="Littoral"
@@ -668,11 +672,11 @@ export default function BusinessKyc() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <Label className="text-sm font-medium">Prénom</Label>
+                  <Label className="text-sm font-medium">Prénom <span className="text-destructive">*</span></Label>
                   <Input value={u?.firstName || ""} disabled className="bg-muted/50" />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-sm font-medium">Nom</Label>
+                  <Label className="text-sm font-medium">Nom <span className="text-destructive">*</span></Label>
                   <Input value={u?.lastName || ""} disabled className="bg-muted/50" />
                 </div>
               </div>
@@ -767,6 +771,7 @@ export default function BusinessKyc() {
             <DocUploadSlot
               label="Documents de l'entreprise"
               hint="Registre de commerce, statuts, ou tout document officiel (plusieurs autorisés)"
+              required
               multiple
               additionalFiles={docs.businessDocuments}
               onUpload={(b64) => handleUploadDoc("businessDocuments", b64)}
@@ -778,6 +783,7 @@ export default function BusinessKyc() {
             <DocUploadSlot
               label="Identification fiscale"
               hint="Document officiel d'identification fiscale (NIF/TIN)"
+              required
               value={docs.taxDocument}
               onUpload={(b64) => handleUploadDoc("taxDocument", b64)}
               onRemove={() => handleRemoveDoc("taxDocument")}
@@ -787,6 +793,7 @@ export default function BusinessKyc() {
             <DocUploadSlot
               label="Justificatif d'adresse"
               hint="Facture d'électricité, relevé bancaire ou certificat de résidence"
+              required
               value={docs.addressDocument}
               onUpload={(b64) => handleUploadDoc("addressDocument", b64)}
               onRemove={() => handleRemoveDoc("addressDocument")}
@@ -796,7 +803,7 @@ export default function BusinessKyc() {
             <div className="grid grid-cols-2 gap-4">
               <DocUploadSlot
                 label="Pièce d'identité — Recto"
-                hint="Obligatoire"
+                required
                 value={docs.idFront}
                 onUpload={(b64) => handleUploadDoc("idFront", b64)}
                 onRemove={() => handleRemoveDoc("idFront")}
@@ -804,7 +811,7 @@ export default function BusinessKyc() {
               />
               <DocUploadSlot
                 label="Pièce d'identité — Verso"
-                hint="Obligatoire"
+                required
                 value={docs.idBack}
                 onUpload={(b64) => handleUploadDoc("idBack", b64)}
                 onRemove={() => handleRemoveDoc("idBack")}
