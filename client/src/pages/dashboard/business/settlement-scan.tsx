@@ -508,7 +508,7 @@ export default function SettlementScan() {
                   >
                     <p className="font-mono text-sm leading-relaxed" style={{ color: "#cc9900" }}>
                       Vous n'avez aucun portefeuille avec un solde disponible.
-                      Pour effectuer un règlement, commencez par recevoir des paiements via vos liens de paiement.
+                      Les fonds arrivent automatiquement lorsque vos clients effectuent des paiements via votre intégration API (clé token).
                     </p>
                   </div>
                 </div>
