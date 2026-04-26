@@ -103,7 +103,7 @@ function MatrixCanvas() {
   );
 }
 
-type Phase = "scanning" | "sufficient" | "insufficient";
+type Phase = "scanning" | "sufficient" | "insufficient" | "no-wallets";
 
 export default function SettlementScan() {
   const [, navigate] = useLocation();
@@ -115,7 +115,7 @@ export default function SettlementScan() {
   const [submitting, setSubmitting] = useState(false);
   const [settlementMethod, setSettlementMethod] = useState<"bank" | "momo" | null>(null);
 
-  const { data: wallets = [] } = useQuery<BusinessWallet[]>({
+  const { data: wallets = [], isLoading: walletsLoading } = useQuery<BusinessWallet[]>({
     queryKey: ["/api/business/wallets"],
   });
 
@@ -141,34 +141,47 @@ export default function SettlementScan() {
   });
 
   useEffect(() => {
-    if (wallets.length === 0) return;
+    if (walletsLoading) return;
 
     let cancelled = false;
     const timers: ReturnType<typeof setTimeout>[] = [];
 
+    const noActiveWallets = walletsWithBalance.length === 0;
     const total = walletsWithBalance.reduce((sum, w) => sum + toUSD(w.balance, w.currency), 0);
     setTotalUSD(total);
     setLogLines([]);
     setProgress(0);
     setPhase("scanning");
 
-    const countryLabels = walletsWithBalance.map((w) => {
-      const cd = COUNTRIES.find((c) => c.code === w.country);
-      return { label: `${cd?.name ?? w.country} (${w.currency})`, wallet: w };
-    });
+    let systemLines: { text: string; ok: boolean }[];
 
-    const systemLines: { text: string; ok: boolean }[] = [
-      { text: "Initialisation du module de cryptage BKA-256...", ok: true },
-      { text: "Connexion au registre des portefeuilles sécurisés...", ok: true },
-      { text: "Protocole d'authentification SHA-3 établi...", ok: true },
-      ...countryLabels.map((c) => ({
-        text: `Lecture ${c.label}: ${fmtNative(c.wallet.balance, c.wallet.currency)}`,
-        ok: true,
-      })),
-      { text: "Conversion des soldes en équivalent USD...", ok: true },
-      { text: `Seuil minimum requis: ${MIN_USD}.00 USD`, ok: total >= MIN_USD },
-      { text: `Vérification finale du solde agrégé...`, ok: total >= MIN_USD },
-    ];
+    if (noActiveWallets) {
+      systemLines = [
+        { text: "Initialisation du module de cryptage BKA-256...", ok: true },
+        { text: "Connexion au registre des portefeuilles sécurisés...", ok: true },
+        { text: "Protocole d'authentification SHA-3 établi...", ok: true },
+        { text: "Analyse des portefeuilles enregistrés...", ok: true },
+        { text: "Aucun portefeuille actif détecté...", ok: false },
+        { text: "Règlement impossible sans solde disponible.", ok: false },
+      ];
+    } else {
+      const countryLabels = walletsWithBalance.map((w) => {
+        const cd = COUNTRIES.find((c) => c.code === w.country);
+        return { label: `${cd?.name ?? w.country} (${w.currency})`, wallet: w };
+      });
+      systemLines = [
+        { text: "Initialisation du module de cryptage BKA-256...", ok: true },
+        { text: "Connexion au registre des portefeuilles sécurisés...", ok: true },
+        { text: "Protocole d'authentification SHA-3 établi...", ok: true },
+        ...countryLabels.map((c) => ({
+          text: `Lecture ${c.label}: ${fmtNative(c.wallet.balance, c.wallet.currency)}`,
+          ok: true,
+        })),
+        { text: "Conversion des soldes en équivalent USD...", ok: true },
+        { text: `Seuil minimum requis: ${MIN_USD}.00 USD`, ok: total >= MIN_USD },
+        { text: `Vérification finale du solde agrégé...`, ok: total >= MIN_USD },
+      ];
+    }
 
     const totalDuration = 3800;
     const lineDelay = totalDuration / (systemLines.length + 2);
@@ -190,7 +203,11 @@ export default function SettlementScan() {
 
     const finishTimer = setTimeout(() => {
       if (!cancelled) {
-        setPhase(total >= MIN_USD ? "sufficient" : "insufficient");
+        if (noActiveWallets) {
+          setPhase("no-wallets");
+        } else {
+          setPhase(total >= MIN_USD ? "sufficient" : "insufficient");
+        }
       }
     }, totalDuration + 400);
 
@@ -200,7 +217,7 @@ export default function SettlementScan() {
       clearTimeout(finishTimer);
       clearInterval(progInterval);
     };
-  }, [wallets.length]);
+  }, [walletsLoading, walletsWithBalance.length]);
 
   const handleSubmit = async () => {
     if (!settlementMethod) return;
@@ -252,12 +269,28 @@ export default function SettlementScan() {
             <Badge
               className="font-mono text-xs"
               style={{
-                background: phase === "sufficient" ? "#00220f" : phase === "insufficient" ? "#220000" : "#001a00",
-                color: phase === "sufficient" ? "#00ff88" : phase === "insufficient" ? "#ff4444" : "#00cc66",
-                border: `1px solid ${phase === "sufficient" ? "#00ff88" : phase === "insufficient" ? "#ff4444" : "#005522"}`,
+                background:
+                  phase === "sufficient" ? "#00220f" :
+                  phase === "insufficient" ? "#220000" :
+                  phase === "no-wallets" ? "#1a1000" :
+                  "#001a00",
+                color:
+                  phase === "sufficient" ? "#00ff88" :
+                  phase === "insufficient" ? "#ff4444" :
+                  phase === "no-wallets" ? "#ffaa00" :
+                  "#00cc66",
+                border: `1px solid ${
+                  phase === "sufficient" ? "#00ff88" :
+                  phase === "insufficient" ? "#ff4444" :
+                  phase === "no-wallets" ? "#ffaa00" :
+                  "#005522"
+                }`,
               }}
             >
-              {phase === "scanning" ? "ANALYSE EN COURS" : phase === "sufficient" ? "ANALYSE COMPLÈTE" : "ERREUR DÉTECTÉE"}
+              {phase === "scanning" ? "ANALYSE EN COURS" :
+               phase === "sufficient" ? "ANALYSE COMPLÈTE" :
+               phase === "no-wallets" ? "AUCUN WALLET ACTIF" :
+               "ERREUR DÉTECTÉE"}
             </Badge>
           </div>
         </div>
@@ -447,6 +480,48 @@ export default function SettlementScan() {
                   {settlementMethod ? "Soumettre le règlement" : "Choisissez un mode"}
                 </Button>
               </div>
+            </div>
+          )}
+
+          {phase === "no-wallets" && (
+            <div className="w-full max-w-lg space-y-4">
+              <div
+                className="border rounded-lg p-5 space-y-4"
+                style={{ background: "rgba(10,7,0,0.88)", borderColor: "#ffaa00" }}
+              >
+                <div className="flex items-center gap-3">
+                  <XCircle className="w-6 h-6 shrink-0" style={{ color: "#ffaa00" }} />
+                  <div>
+                    <p className="font-mono font-semibold text-sm tracking-wider" style={{ color: "#ffcc55" }}>
+                      AUCUN PORTEFEUILLE ACTIF
+                    </p>
+                    <p className="font-mono text-xs" style={{ color: "#997722" }}>
+                      Analyse BKA-256 terminée — aucun solde disponible
+                    </p>
+                  </div>
+                </div>
+
+                <div className="border-t pt-3 space-y-3" style={{ borderColor: "rgba(255,170,0,0.2)" }}>
+                  <div
+                    className="px-3 py-3 rounded"
+                    style={{ background: "rgba(255,170,0,0.06)", border: "1px solid rgba(255,170,0,0.15)" }}
+                  >
+                    <p className="font-mono text-sm leading-relaxed" style={{ color: "#cc9900" }}>
+                      Vous n'avez aucun portefeuille avec un solde disponible.
+                      Pour effectuer un règlement, commencez par recevoir des paiements via vos liens de paiement.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <Button
+                className="w-full"
+                style={{ background: "#110900", color: "#ffaa00", border: "1px solid rgba(255,170,0,0.3)" }}
+                onClick={() => navigate("/dashboard/business/settlements")}
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Retour aux règlements
+              </Button>
             </div>
           )}
 
