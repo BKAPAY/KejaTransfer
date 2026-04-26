@@ -7,7 +7,9 @@ export function useAuth() {
     queryKey: ["/api/auth/me"],
     queryFn: getQueryFn({ on401: "returnNull" }),
     placeholderData: () => loadCachedQueryData("/api/auth/me") as User | null,
-    staleTime: 30000,
+    staleTime: 5000,
+    refetchInterval: 20000,
+    refetchOnWindowFocus: true,
     retry: (count, error) => {
       if (error?.message?.includes("401")) return false;
       return count < 2;
