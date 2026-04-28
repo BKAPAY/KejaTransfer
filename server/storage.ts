@@ -1903,10 +1903,15 @@ export class DbStorage implements IStorage {
     const userEmail = user.email;
     console.log(`[DeleteUser] Suppression complete de l'utilisateur ${userEmail} (${userId})...`);
     await db.delete(schema.loginLogs).where(eq(schema.loginLogs.userId, userId));
+    await db.delete(schema.paymentSessions).where(eq(schema.paymentSessions.userId, userId));
+    await db.delete(schema.settlements).where(eq(schema.settlements.userId, userId));
+    await db.delete(schema.businessWallets).where(eq(schema.businessWallets.userId, userId));
+    await db.delete(schema.businessTokens).where(eq(schema.businessTokens.userId, userId));
     await db.delete(schema.transactions).where(eq(schema.transactions.userId, userId));
     await db.delete(schema.paymentLinks).where(eq(schema.paymentLinks.userId, userId));
     await db.delete(schema.merchantLinks).where(eq(schema.merchantLinks.userId, userId));
     await db.delete(schema.apiKeys).where(eq(schema.apiKeys.userId, userId));
+    await db.delete(schema.feeConfigs).where(eq(schema.feeConfigs.userId, userId));
     await db.execute(sql`DELETE FROM session WHERE sess::text LIKE ${'%"userId":"' + userId + '"%'}`);
     await db.execute(sql`DELETE FROM verification_codes WHERE email = ${userEmail}`);
     await db.delete(schema.users).where(eq(schema.users.id, userId));
