@@ -233,13 +233,17 @@ export default function AdminBusinessManagement() {
 
   const deleteUserMutation = useMutation({
     mutationFn: async (userId: string) => {
-      await apiRequest("DELETE", `/api/admin/business/users/${userId}`);
+      const res = await apiRequest("POST", `/api/admin/delete-user`, { userId });
+      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/business/users"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/business/stats"] });
       setDeleteDialog({ open: false });
-      toast({ title: "Succes", description: "Utilisateur supprime" });
+      toast({ title: "Compte supprime", description: "Le compte et toutes ses données ont été effacés définitivement." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Erreur", description: err.message, variant: "destructive" });
     },
   });
 
