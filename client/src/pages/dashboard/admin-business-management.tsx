@@ -131,6 +131,7 @@ export default function AdminBusinessManagement() {
   const [validateBatchDialog, setValidateBatchDialog] = useState<{ open: boolean; settlements?: SettlementAdmin[] }>({ open: false });
   const [rejectBatchDialog, setRejectBatchDialog] = useState<{ open: boolean; settlements?: SettlementAdmin[] }>({ open: false });
   const [settlementNotes, setSettlementNotes] = useState("");
+  const [settlementFilter, setSettlementFilter] = useState<"pending" | "rejected" | "completed">("pending");
 
   const { data: stats, isLoading: statsLoading } = useQuery<BusinessStats>({
     queryKey: ["/api/admin/business/stats"],
@@ -939,201 +940,132 @@ export default function AdminBusinessManagement() {
             </Card>
           ) : (
           <>
-          {pendingSettlements.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Clock className="w-5 h-5 text-orange-500" />
-                  Règlements en attente
-                  <Badge variant="destructive" className="ml-2">{pendingSettlements.length}</Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="divide-y">
-                  {(() => {
-                    const buckets = new Map<string, SettlementAdmin[]>();
-                    for (const s of pendingSettlements) {
-                      const key = (s as any).batchId || s.id;
-                      if (!buckets.has(key)) buckets.set(key, []);
-                      buckets.get(key)!.push(s);
-                    }
-                    return Array.from(buckets.entries())
-                      .sort((a, b) => new Date(b[1][0].createdAt).getTime() - new Date(a[1][0].createdAt).getTime())
-                      .map(([batchKey, items]) => {
-                        const first = items[0];
-                        const batchDate = new Date(first.createdAt);
-                        const dateLabel = batchDate.toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" });
-                        const timeLabel = batchDate.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+            <div className="flex gap-2 flex-wrap">
+              <Button
+                size="sm"
+                variant={settlementFilter === "pending" ? "secondary" : "ghost"}
+                className={settlementFilter === "pending" ? "toggle-elevate toggle-elevated" : "toggle-elevate"}
+                onClick={() => setSettlementFilter("pending")}
+                data-testid="filter-settlements-pending"
+              >
+                <Clock className="w-3.5 h-3.5 mr-1.5 text-orange-500" />
+                En attente
+                {pendingSettlements.length > 0 && (
+                  <Badge variant="destructive" className="ml-1.5 text-xs">{pendingSettlements.length}</Badge>
+                )}
+              </Button>
+              <Button
+                size="sm"
+                variant={settlementFilter === "rejected" ? "secondary" : "ghost"}
+                className={settlementFilter === "rejected" ? "toggle-elevate toggle-elevated" : "toggle-elevate"}
+                onClick={() => setSettlementFilter("rejected")}
+                data-testid="filter-settlements-rejected"
+              >
+                <X className="w-3.5 h-3.5 mr-1.5 text-red-500" />
+                Rejeté
+                {rejectedSettlements.length > 0 && (
+                  <Badge variant="outline" className="ml-1.5 text-xs">{rejectedSettlements.length}</Badge>
+                )}
+              </Button>
+              <Button
+                size="sm"
+                variant={settlementFilter === "completed" ? "secondary" : "ghost"}
+                className={settlementFilter === "completed" ? "toggle-elevate toggle-elevated" : "toggle-elevate"}
+                onClick={() => setSettlementFilter("completed")}
+                data-testid="filter-settlements-completed"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5 mr-1.5 text-green-600" />
+                Validé
+                {completedSettlements.length > 0 && (
+                  <Badge variant="outline" className="ml-1.5 text-xs">{completedSettlements.length}</Badge>
+                )}
+              </Button>
+            </div>
 
-                        return (
-                          <button
-                            key={batchKey}
-                            className="w-full text-left py-4 flex items-center justify-between gap-4 hover-elevate"
-                            onClick={() => setLocation(`/dashboard/admin/settlement-batch/${first.userId}/${encodeURIComponent(batchKey)}`)}
-                            data-testid={`batch-pending-${batchKey}`}
-                          >
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap mb-1">
-                                <span className="font-semibold text-sm">{first.userName}</span>
-                                {items.length > 1 && (
-                                  <Badge variant="outline" className="text-xs">{items.length} pays</Badge>
-                                )}
-                                <Badge variant="secondary" className="text-xs">
-                                  <Clock className="w-3 h-3 mr-1" />En attente
-                                </Badge>
+            <Card>
+              <CardContent className="pt-4">
+                {(() => {
+                  const source =
+                    settlementFilter === "pending" ? pendingSettlements :
+                    settlementFilter === "rejected" ? rejectedSettlements :
+                    completedSettlements;
+
+                  if (source.length === 0) {
+                    const label =
+                      settlementFilter === "pending" ? "en attente" :
+                      settlementFilter === "rejected" ? "rejeté" : "validé";
+                    return (
+                      <div className="text-center py-10 text-muted-foreground text-sm">
+                        Aucun règlement {label}
+                      </div>
+                    );
+                  }
+
+                  const buckets = new Map<string, SettlementAdmin[]>();
+                  for (const s of source) {
+                    const key = (s as any).batchId || s.id;
+                    if (!buckets.has(key)) buckets.set(key, []);
+                    buckets.get(key)!.push(s);
+                  }
+
+                  return (
+                    <div className="divide-y">
+                      {Array.from(buckets.entries())
+                        .sort((a, b) => new Date(b[1][0].createdAt).getTime() - new Date(a[1][0].createdAt).getTime())
+                        .map(([batchKey, items]) => {
+                          const first = items[0];
+                          const batchDate = new Date(first.createdAt);
+                          const dateLabel = batchDate.toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" });
+                          const timeLabel = batchDate.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+                          return (
+                            <button
+                              key={batchKey}
+                              className="w-full text-left py-3 flex items-center justify-between gap-4 hover-elevate"
+                              onClick={() => setLocation(`/dashboard/admin/settlement-batch/${first.userId}/${encodeURIComponent(batchKey)}`)}
+                              data-testid={`batch-${settlementFilter}-${batchKey}`}
+                            >
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap mb-1">
+                                  <span className="font-semibold text-sm">{first.userName}</span>
+                                  {items.length > 1 && (
+                                    <Badge variant="outline" className="text-xs">{items.length} pays</Badge>
+                                  )}
+                                  {settlementFilter === "pending" && (
+                                    <Badge variant="secondary" className="text-xs">
+                                      <Clock className="w-3 h-3 mr-1" />En attente
+                                    </Badge>
+                                  )}
+                                  {settlementFilter === "rejected" && (
+                                    <Badge variant="destructive" className="text-xs">
+                                      <X className="w-3 h-3 mr-1" />Rejeté
+                                    </Badge>
+                                  )}
+                                  {settlementFilter === "completed" && (
+                                    <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs">
+                                      <CheckCircle2 className="w-3 h-3 mr-1" />Validé
+                                    </Badge>
+                                  )}
+                                  <span className="text-xs text-muted-foreground">{dateLabel} à {timeLabel}</span>
+                                </div>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  {items.map(s => {
+                                    const cd = COUNTRIES.find(c => c.code === s.walletCountry);
+                                    return cd ? <CountryFlag key={s.id} code={cd.code} size="xs" /> : null;
+                                  })}
+                                  <span className="text-xs text-muted-foreground">
+                                    {items.map(s => COUNTRIES.find(c => c.code === s.walletCountry)?.name).filter(Boolean).join(" · ")}
+                                  </span>
+                                </div>
                               </div>
-                              <p className="text-xs text-muted-foreground mb-1">{first.userEmail}</p>
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                {items.map(s => {
-                                  const cd = COUNTRIES.find(c => c.code === s.walletCountry);
-                                  return cd ? <CountryFlag key={s.id} code={cd.code} size="xs" /> : null;
-                                })}
-                                <span className="text-xs text-muted-foreground">
-                                  {dateLabel} à {timeLabel}
-                                </span>
-                              </div>
-                            </div>
-                            <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
-                          </button>
-                        );
-                      });
-                  })()}
-                </div>
+                              <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+                            </button>
+                          );
+                        })}
+                    </div>
+                  );
+                })()}
               </CardContent>
             </Card>
-          )}
-
-          {rejectedSettlements.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <X className="w-5 h-5 text-red-500" />
-                  Règlements rejetés
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="divide-y">
-                  {(() => {
-                    const buckets = new Map<string, SettlementAdmin[]>();
-                    for (const s of rejectedSettlements) {
-                      const key = (s as any).batchId || s.id;
-                      if (!buckets.has(key)) buckets.set(key, []);
-                      buckets.get(key)!.push(s);
-                    }
-                    return Array.from(buckets.entries())
-                      .sort((a, b) => new Date(b[1][0].createdAt).getTime() - new Date(a[1][0].createdAt).getTime())
-                      .map(([batchKey, items]) => {
-                        const first = items[0];
-                        const batchDate = new Date(first.createdAt);
-                        const dateLabel = batchDate.toLocaleDateString("fr-FR");
-                        return (
-                          <button
-                            key={batchKey}
-                            className="w-full text-left py-3 flex items-center justify-between gap-4 hover-elevate"
-                            onClick={() => setLocation(`/dashboard/admin/settlement-batch/${first.userId}/${encodeURIComponent(batchKey)}`)}
-                            data-testid={`batch-rejected-${batchKey}`}
-                          >
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap mb-1">
-                                <span className="font-semibold text-sm">{first.userName}</span>
-                                <Badge variant="destructive" className="text-xs"><X className="w-3 h-3 mr-1" />Rejeté</Badge>
-                                <span className="text-xs text-muted-foreground">{dateLabel}</span>
-                              </div>
-                              <div className="flex items-center gap-1.5 flex-wrap mb-1">
-                                {items.map(s => {
-                                  const cd = COUNTRIES.find(c => c.code === s.walletCountry);
-                                  return cd ? <CountryFlag key={s.id} code={cd.code} size="xs" /> : null;
-                                })}
-                                <span className="text-xs text-muted-foreground">
-                                  {items.map(s => COUNTRIES.find(c => c.code === s.walletCountry)?.name).filter(Boolean).join(" · ")}
-                                </span>
-                              </div>
-                              {first.rejectionReason && (
-                                <p className="text-xs text-red-600 dark:text-red-400 whitespace-pre-wrap">
-                                  {first.rejectionReason}
-                                </p>
-                              )}
-                            </div>
-                            <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
-                          </button>
-                        );
-                      });
-                  })()}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <CheckCircle2 className="w-5 h-5 text-green-600" />
-                Historique des règlements validés
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {completedSettlements.length === 0 && pendingSettlements.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  Aucun règlement pour le moment
-                </div>
-              ) : completedSettlements.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  Aucun règlement validé
-                </div>
-              ) : (
-                <div className="divide-y">
-                  {(() => {
-                    const buckets = new Map<string, SettlementAdmin[]>();
-                    for (const s of completedSettlements) {
-                      const key = (s as any).batchId || s.id;
-                      if (!buckets.has(key)) buckets.set(key, []);
-                      buckets.get(key)!.push(s);
-                    }
-                    return Array.from(buckets.entries())
-                      .sort((a, b) => new Date(b[1][0].createdAt).getTime() - new Date(a[1][0].createdAt).getTime())
-                      .map(([batchKey, items]) => {
-                        const first = items[0];
-                        const batchDate = new Date(first.createdAt);
-                        const dateLabel = batchDate.toLocaleDateString("fr-FR");
-                        return (
-                          <button
-                            key={batchKey}
-                            className="w-full text-left py-3 flex items-center justify-between gap-4 hover-elevate"
-                            onClick={() => setLocation(`/dashboard/admin/settlement-batch/${first.userId}/${encodeURIComponent(batchKey)}`)}
-                            data-testid={`batch-completed-${batchKey}`}
-                          >
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap mb-1">
-                                <span className="font-semibold text-sm">{first.userName}</span>
-                                <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs">
-                                  <CheckCircle2 className="w-3 h-3 mr-1" />Validé
-                                </Badge>
-                                <span className="text-xs text-muted-foreground">{dateLabel}</span>
-                              </div>
-                              <div className="flex items-center gap-1.5 flex-wrap mb-1">
-                                {items.map(s => {
-                                  const cd = COUNTRIES.find(c => c.code === s.walletCountry);
-                                  return cd ? <CountryFlag key={s.id} code={cd.code} size="xs" /> : null;
-                                })}
-                                <span className="text-xs text-muted-foreground">
-                                  {items.map(s => COUNTRIES.find(c => c.code === s.walletCountry)?.name).filter(Boolean).join(" · ")}
-                                </span>
-                              </div>
-                              {first.adminNotes && (
-                                <p className="text-xs text-green-700 dark:text-green-400 whitespace-pre-wrap">
-                                  {first.adminNotes}
-                                </p>
-                              )}
-                            </div>
-                            <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
-                          </button>
-                        );
-                      });
-                  })()}
-                </div>
-              )}
-            </CardContent>
-          </Card>
           </>
           )}
         </TabsContent>
