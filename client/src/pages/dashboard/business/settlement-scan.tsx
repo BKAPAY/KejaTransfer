@@ -127,7 +127,7 @@ export default function SettlementScan() {
   const hasMomo = currentUser?.momoPhone && currentUser?.momoOperator;
 
   const walletsWithBalance = useMemo(
-    () => wallets.filter((w) => w.balance > 0),
+    () => wallets.filter((w) => Math.floor(w.balance) >= 1),
     [wallets]
   );
 
