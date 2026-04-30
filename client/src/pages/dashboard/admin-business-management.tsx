@@ -1018,13 +1018,15 @@ export default function AdminBusinessManagement() {
                           const dateLabel = batchDate.toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" });
                           const timeLabel = batchDate.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
                           return (
-                            <button
+                            <div
                               key={batchKey}
-                              className="w-full text-left py-3 flex items-center justify-between gap-4 hover-elevate"
-                              onClick={() => setLocation(`/dashboard/admin/settlement-batch/${first.userId}/${encodeURIComponent(batchKey)}`)}
+                              className="py-3 flex items-center justify-between gap-3"
                               data-testid={`batch-${settlementFilter}-${batchKey}`}
                             >
-                              <div className="flex-1 min-w-0">
+                              <button
+                                className="flex-1 min-w-0 text-left hover-elevate rounded-md"
+                                onClick={() => setLocation(`/dashboard/admin/settlement-batch/${first.userId}/${encodeURIComponent(batchKey)}`)}
+                              >
                                 <div className="flex items-center gap-2 flex-wrap mb-1">
                                   <span className="font-semibold text-sm">{first.userName}</span>
                                   {items.length > 1 && (
@@ -1056,9 +1058,30 @@ export default function AdminBusinessManagement() {
                                     {items.map(s => COUNTRIES.find(c => c.code === s.walletCountry)?.name).filter(Boolean).join(" · ")}
                                   </span>
                                 </div>
-                              </div>
-                              <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
-                            </button>
+                              </button>
+                              {settlementFilter === "pending" ? (
+                                <div className="flex gap-1.5 shrink-0">
+                                  <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    onClick={() => { setRejectBatchDialog({ open: true, settlements: items }); setSettlementNotes(""); }}
+                                    data-testid={`button-reject-batch-${batchKey}`}
+                                  >
+                                    <X className="w-3.5 h-3.5 mr-1" />Rejeter
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    className="bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white"
+                                    onClick={() => { setValidateBatchDialog({ open: true, settlements: items }); setSettlementNotes(""); }}
+                                    data-testid={`button-validate-batch-${batchKey}`}
+                                  >
+                                    <CheckCircle2 className="w-3.5 h-3.5 mr-1" />Valider
+                                  </Button>
+                                </div>
+                              ) : (
+                                <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+                              )}
+                            </div>
                           );
                         })}
                     </div>
