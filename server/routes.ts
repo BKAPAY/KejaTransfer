@@ -675,6 +675,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await pool.end();
       res.json(result.rows.map((r: any) => ({
         id: r.id,
+        batchId: r.batch_id ?? r.id,
         userId: r.user_id,
         walletCountry: r.wallet_country,
         walletCurrency: r.wallet_currency,
@@ -746,6 +747,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         walletCurrency: z.string().min(1),
         amount: z.number().min(1),
         settlementMethod: z.enum(["bank", "momo"]).default("bank"),
+        batchId: z.string().optional(),
       });
       const data = schema.parse(req.body);
 
@@ -790,24 +792,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
           [data.amount, wallet.id]
         );
 
+        const batchId = data.batchId || crypto.randomUUID();
+
         if (data.settlementMethod === "momo") {
           await client.query(
-            `INSERT INTO settlements (user_id, wallet_country, wallet_currency, amount, status,
+            `INSERT INTO settlements (batch_id, user_id, wallet_country, wallet_currency, amount, status,
              settlement_method, momo_country, momo_operator, momo_phone)
-             VALUES ($1, $2, $3, $4, 'pending', 'momo', $5, $6, $7)`,
+             VALUES ($1, $2, $3, $4, $5, 'pending', 'momo', $6, $7, $8)`,
             [
-              req.session.userId, data.walletCountry, data.walletCurrency, data.amount,
+              batchId, req.session.userId, data.walletCountry, data.walletCurrency, data.amount,
               user.momo_country, user.momo_operator, user.momo_phone
             ]
           );
         } else {
           await client.query(
-            `INSERT INTO settlements (user_id, wallet_country, wallet_currency, amount, status,
+            `INSERT INTO settlements (batch_id, user_id, wallet_country, wallet_currency, amount, status,
              settlement_method, bank_account_holder, bank_account_number, bank_name, bank_swift_bic,
              bank_branch_address, bank_branch_name, bank_branch_sort_code, bank_country, bank_currency)
-             VALUES ($1, $2, $3, $4, 'pending', 'bank', $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+             VALUES ($1, $2, $3, $4, $5, 'pending', 'bank', $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
             [
-              req.session.userId, data.walletCountry, data.walletCurrency, data.amount,
+              batchId, req.session.userId, data.walletCountry, data.walletCurrency, data.amount,
               user.bank_account_holder, user.bank_account_number, user.bank_name,
               user.bank_swift_bic, user.bank_branch_address, user.bank_branch_name,
               user.bank_branch_sort_code, user.bank_country, user.bank_currency
@@ -844,6 +848,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await pool.end();
       res.json(result.rows.map((r: any) => ({
         id: r.id,
+        batchId: r.batch_id ?? r.id,
         userId: r.user_id,
         walletCountry: r.wallet_country,
         walletCurrency: r.wallet_currency,

@@ -134,7 +134,7 @@ export default function SettlementScan() {
   const MIN_USD = 30;
 
   const createSettlement = useMutation({
-    mutationFn: async (data: { walletCountry: string; walletCurrency: string; amount: number; settlementMethod: string }) => {
+    mutationFn: async (data: { walletCountry: string; walletCurrency: string; amount: number; settlementMethod: string; batchId: string }) => {
       const res = await apiRequest("POST", "/api/business/settlements", data);
       return res.json();
     },
@@ -222,6 +222,7 @@ export default function SettlementScan() {
   const handleSubmit = async () => {
     if (!settlementMethod) return;
     setSubmitting(true);
+    const batchId = crypto.randomUUID();
     try {
       for (const w of walletsWithBalance) {
         await createSettlement.mutateAsync({
@@ -229,6 +230,7 @@ export default function SettlementScan() {
           walletCurrency: w.currency,
           amount: Math.floor(w.balance),
           settlementMethod,
+          batchId,
         });
       }
       queryClient.invalidateQueries({ queryKey: ["/api/business/settlements"] });

@@ -8,11 +8,6 @@ import { CountryFlag } from "@/components/country-flag";
 import { COUNTRIES } from "@shared/schema";
 import type { Settlement } from "@shared/schema";
 
-function minuteBucket(dateStr: string) {
-  const d = new Date(dateStr);
-  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}-${d.getHours()}-${d.getMinutes()}`;
-}
-
 function batchStatus(items: Settlement[]): "pending" | "completed" | "rejected" | "partial" {
   const statuses = new Set(items.map(s => s.status));
   if (statuses.size === 1) return statuses.values().next().value as any;
@@ -46,7 +41,7 @@ function BatchStatusBadge({ status }: { status: string }) {
 function groupSettlements(settlements: Settlement[]) {
   const buckets = new Map<string, Settlement[]>();
   for (const s of settlements) {
-    const key = minuteBucket(s.createdAt);
+    const key = (s as any).batchId || s.id;
     if (!buckets.has(key)) buckets.set(key, []);
     buckets.get(key)!.push(s);
   }
@@ -132,7 +127,7 @@ export default function BusinessSettlements() {
                   <button
                     key={key}
                     className="w-full text-left py-4 flex items-center justify-between gap-4 hover-elevate"
-                    onClick={() => navigate(`/dashboard/business/settlement-batch/${ts}`)}
+                    onClick={() => navigate(`/dashboard/business/settlement-batch/${encodeURIComponent(key)}`)}
                     data-testid={`batch-${key}`}
                   >
                     <div className="flex-1 min-w-0">

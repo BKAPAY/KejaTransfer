@@ -307,6 +307,7 @@ export type InsertBusinessToken = z.infer<typeof insertBusinessTokenSchema>;
 
 export const settlements = pgTable("settlements", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  batchId: varchar("batch_id").notNull().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id),
   walletCountry: text("wallet_country").notNull(),
   walletCurrency: text("wallet_currency").notNull(),

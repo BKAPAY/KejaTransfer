@@ -19,6 +19,7 @@ import { useState } from "react";
 
 interface SettlementAdmin {
   id: string;
+  batchId: string;
   userId: string;
   walletCountry: string;
   walletCurrency: string;
@@ -43,11 +44,6 @@ interface SettlementAdmin {
 
 function formatAmount(val: number, currency: string) {
   return new Intl.NumberFormat("fr-FR").format(val) + " " + currency;
-}
-
-function minuteBucket(dateStr: string) {
-  const d = new Date(dateStr);
-  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}-${d.getHours()}-${d.getMinutes()}`;
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -77,12 +73,10 @@ export default function AdminSettlementBatchDetail() {
     queryKey: ["/api/admin/settlements"],
   });
 
-  const targetBucket = params.ts
-    ? minuteBucket(new Date(Number(params.ts)).toISOString())
-    : "";
+  const targetBatchId = params.ts ? decodeURIComponent(params.ts) : "";
 
   const batch = allSettlements.filter(
-    s => s.userId === params.userId && minuteBucket(s.createdAt) === targetBucket
+    s => s.userId === params.userId && (s.batchId === targetBatchId || s.id === targetBatchId)
   );
   const first = batch[0];
   const pendingItems = batch.filter(s => s.status === "pending");

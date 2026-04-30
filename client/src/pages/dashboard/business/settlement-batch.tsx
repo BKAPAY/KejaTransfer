@@ -12,11 +12,6 @@ import {
 
 type Settlement = BaseSettlement & { adminNotes?: string | null; rejectionReason?: string | null };
 
-function minuteBucket(dateStr: string) {
-  const d = new Date(dateStr);
-  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}-${d.getHours()}-${d.getMinutes()}`;
-}
-
 function formatAmount(val: number, currency: string) {
   return new Intl.NumberFormat("fr-FR").format(val) + " " + currency;
 }
@@ -80,11 +75,11 @@ export default function BusinessSettlementBatch() {
     queryKey: ["/api/business/settlements"],
   });
 
-  const targetBucket = params.ts
-    ? minuteBucket(new Date(Number(params.ts)).toISOString())
-    : "";
+  const targetBatchId = params.ts ? decodeURIComponent(params.ts) : "";
 
-  const batch = settlements.filter(s => minuteBucket(s.createdAt) === targetBucket);
+  const batch = settlements.filter(s =>
+    ((s as any).batchId === targetBatchId) || (s.id === targetBatchId)
+  );
   const first = batch[0];
   const status = first ? batchStatus(batch) : "pending";
 

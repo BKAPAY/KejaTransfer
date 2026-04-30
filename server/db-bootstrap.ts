@@ -519,6 +519,14 @@ async function bootstrapDatabase() {
         console.error("⚠️ settlements MOMO columns setup error:", e);
       }
 
+      // Add batch_id column to settlements table
+      try {
+        await seedClient`ALTER TABLE settlements ADD COLUMN IF NOT EXISTS batch_id VARCHAR DEFAULT gen_random_uuid()`;
+        console.log("✅ settlements.batch_id column ready");
+      } catch (e) {
+        console.error("⚠️ settlements batch_id column setup error:", e);
+      }
+
       console.log("⚙️ Ensuring database indexes exist...");
       await seedClient`CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions (user_id)`;
       await seedClient`CREATE INDEX IF NOT EXISTS idx_transactions_user_status ON transactions (user_id, status)`;

@@ -953,8 +953,7 @@ export default function AdminBusinessManagement() {
                   {(() => {
                     const buckets = new Map<string, SettlementAdmin[]>();
                     for (const s of pendingSettlements) {
-                      const d = new Date(s.createdAt);
-                      const key = `${s.userId}-${d.getFullYear()}-${d.getMonth()}-${d.getDate()}-${d.getHours()}-${d.getMinutes()}`;
+                      const key = (s as any).batchId || s.id;
                       if (!buckets.has(key)) buckets.set(key, []);
                       buckets.get(key)!.push(s);
                     }
@@ -965,13 +964,12 @@ export default function AdminBusinessManagement() {
                         const batchDate = new Date(first.createdAt);
                         const dateLabel = batchDate.toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" });
                         const timeLabel = batchDate.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
-                        const ts = batchDate.getTime();
 
                         return (
                           <button
                             key={batchKey}
                             className="w-full text-left py-4 flex items-center justify-between gap-4 hover-elevate"
-                            onClick={() => setLocation(`/dashboard/admin/settlement-batch/${first.userId}/${ts}`)}
+                            onClick={() => setLocation(`/dashboard/admin/settlement-batch/${first.userId}/${encodeURIComponent(batchKey)}`)}
                             data-testid={`batch-pending-${batchKey}`}
                           >
                             <div className="flex-1 min-w-0">
@@ -1018,8 +1016,7 @@ export default function AdminBusinessManagement() {
                   {(() => {
                     const buckets = new Map<string, SettlementAdmin[]>();
                     for (const s of rejectedSettlements) {
-                      const d = new Date(s.createdAt);
-                      const key = `${s.userId}-${d.getFullYear()}-${d.getMonth()}-${d.getDate()}-${d.getHours()}-${d.getMinutes()}`;
+                      const key = (s as any).batchId || s.id;
                       if (!buckets.has(key)) buckets.set(key, []);
                       buckets.get(key)!.push(s);
                     }
@@ -1029,12 +1026,11 @@ export default function AdminBusinessManagement() {
                         const first = items[0];
                         const batchDate = new Date(first.createdAt);
                         const dateLabel = batchDate.toLocaleDateString("fr-FR");
-                        const ts = batchDate.getTime();
                         return (
                           <button
                             key={batchKey}
                             className="w-full text-left py-3 flex items-center justify-between gap-4 hover-elevate"
-                            onClick={() => setLocation(`/dashboard/admin/settlement-batch/${first.userId}/${ts}`)}
+                            onClick={() => setLocation(`/dashboard/admin/settlement-batch/${first.userId}/${encodeURIComponent(batchKey)}`)}
                             data-testid={`batch-rejected-${batchKey}`}
                           >
                             <div className="flex-1 min-w-0">
@@ -1089,8 +1085,7 @@ export default function AdminBusinessManagement() {
                   {(() => {
                     const buckets = new Map<string, SettlementAdmin[]>();
                     for (const s of completedSettlements) {
-                      const d = new Date(s.createdAt);
-                      const key = `${s.userId}-${d.getFullYear()}-${d.getMonth()}-${d.getDate()}-${d.getHours()}-${d.getMinutes()}`;
+                      const key = (s as any).batchId || s.id;
                       if (!buckets.has(key)) buckets.set(key, []);
                       buckets.get(key)!.push(s);
                     }
@@ -1100,12 +1095,11 @@ export default function AdminBusinessManagement() {
                         const first = items[0];
                         const batchDate = new Date(first.createdAt);
                         const dateLabel = batchDate.toLocaleDateString("fr-FR");
-                        const ts = batchDate.getTime();
                         return (
                           <button
                             key={batchKey}
                             className="w-full text-left py-3 flex items-center justify-between gap-4 hover-elevate"
-                            onClick={() => setLocation(`/dashboard/admin/settlement-batch/${first.userId}/${ts}`)}
+                            onClick={() => setLocation(`/dashboard/admin/settlement-batch/${first.userId}/${encodeURIComponent(batchKey)}`)}
                             data-testid={`batch-completed-${batchKey}`}
                           >
                             <div className="flex-1 min-w-0">
