@@ -141,9 +141,6 @@ export default function AdminSettlementBatchDetail() {
   const dateLabel = batchDate.toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" });
   const timeLabel = batchDate.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
 
-
-
-  const anyPending = batch.some(s => s.status === "pending");
   const overallStatus = allCompleted ? "completed" : allRejected ? "rejected" : anyPending ? "pending" : "partial";
 
   return (
