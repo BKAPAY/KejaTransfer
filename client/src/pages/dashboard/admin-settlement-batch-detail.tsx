@@ -1,18 +1,14 @@
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
 import { CountryFlag } from "@/components/country-flag";
 import { COUNTRIES } from "@shared/schema";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
 import {
-  ArrowLeft, Clock, CheckCircle2, X, Loader2, Building2, Banknote,
+  ArrowLeft, Clock, CheckCircle2, Loader2, Building2, Banknote,
   User as UserIcon, Calendar, XCircle, Smartphone, AlertCircle,
 } from "lucide-react";
-import { useState } from "react";
 
 interface SettlementAdmin {
   id: string;
@@ -61,9 +57,6 @@ function StatusBadge({ status }: { status: string }) {
 export default function AdminSettlementBatchDetail() {
   const params = useParams<{ userId: string; ts: string }>();
   const [, navigate] = useLocation();
-  const { toast } = useToast();
-  const [action, setAction] = useState<"none" | "validate" | "reject">("none");
-  const [notes, setNotes] = useState("");
 
   const { data: allSettlements = [], isLoading } = useQuery<SettlementAdmin[]>({
     queryKey: ["/api/admin/settlements"],
@@ -75,48 +68,8 @@ export default function AdminSettlementBatchDetail() {
     s => s.userId === params.userId && (s.batchId === targetBatchId || s.id === targetBatchId)
   );
   const first = batch[0];
-  const pendingItems = batch.filter(s => s.status === "pending");
-  const anyPending = pendingItems.length > 0;
   const allCompleted = batch.length > 0 && batch.every(s => s.status === "completed");
   const allRejected = batch.length > 0 && batch.every(s => s.status === "rejected");
-
-  const validateBatchMutation = useMutation({
-    mutationFn: async ({ adminNotes }: { adminNotes: string }) => {
-      for (const s of pendingItems) {
-        const res = await apiRequest("POST", `/api/admin/settlements/${s.id}/validate`, { adminNotes });
-        if (!res.ok) throw new Error(`Erreur sur ${s.walletCountry}`);
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/settlements"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/settlements/pending-count"] });
-      setAction("none");
-      setNotes("");
-      toast({ title: "Lot validé", description: "Tous les règlements ont été validés." });
-    },
-    onError: (e: Error) => {
-      toast({ title: "Erreur", description: e.message, variant: "destructive" });
-    },
-  });
-
-  const rejectBatchMutation = useMutation({
-    mutationFn: async ({ rejectionReason }: { rejectionReason: string }) => {
-      for (const s of pendingItems) {
-        const res = await apiRequest("POST", `/api/admin/settlements/${s.id}/reject`, { rejectionReason });
-        if (!res.ok) throw new Error(`Erreur sur ${s.walletCountry}`);
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/settlements"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/settlements/pending-count"] });
-      setAction("none");
-      setNotes("");
-      toast({ title: "Lot rejeté", description: "Les soldes ont été recrédités automatiquement." });
-    },
-    onError: (e: Error) => {
-      toast({ title: "Erreur", description: e.message, variant: "destructive" });
-    },
-  });
 
   if (isLoading) {
     return (
@@ -143,6 +96,7 @@ export default function AdminSettlementBatchDetail() {
 
 
 
+  const anyPending = batch.some(s => s.status === "pending");
   const overallStatus = allCompleted ? "completed" : allRejected ? "rejected" : anyPending ? "pending" : "partial";
 
   return (
@@ -286,122 +240,27 @@ export default function AdminSettlementBatchDetail() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardContent className="py-4 space-y-4">
-          <div>
-            <p className="text-xs text-muted-foreground mb-2 font-medium uppercase tracking-wide">Décision</p>
-            <div className="flex gap-2 flex-wrap">
-              <Button
-                variant={action === "none" ? "secondary" : "ghost"}
-                size="sm"
-                className={action === "none" ? "toggle-elevate toggle-elevated" : "toggle-elevate"}
-                onClick={() => { setAction("none"); setNotes(""); }}
-                data-testid="button-action-pending"
-              >
-                <Clock className="w-3.5 h-3.5 mr-1.5" />
-                En attente
-              </Button>
-              <Button
-                variant={action === "reject" ? "destructive" : "ghost"}
-                size="sm"
-                className={action === "reject" ? "toggle-elevate toggle-elevated" : "toggle-elevate"}
-                onClick={() => { setAction("reject"); setNotes(""); }}
-                disabled={!anyPending}
-                data-testid="button-action-reject"
-              >
-                <X className="w-3.5 h-3.5 mr-1.5" />
-                Rejeter
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className={action === "validate"
-                  ? "toggle-elevate toggle-elevated bg-green-600 dark:bg-green-700 text-white"
-                  : "toggle-elevate"}
-                onClick={() => { setAction("validate"); setNotes(""); }}
-                disabled={!anyPending}
-                data-testid="button-action-validate"
-              >
-                <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
-                Valider
-              </Button>
-            </div>
-          </div>
-
-          {action === "reject" && (
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-red-600 dark:text-red-400">
-                Motif de rejet <span className="text-destructive">*</span>
-              </label>
-              <Textarea
-                placeholder="Ex : Documents manquants, informations bancaires incorrectes..."
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                rows={3}
-                data-testid="textarea-reject-reason"
-              />
-              <p className="text-xs text-muted-foreground">
-                Les soldes seront recrédités automatiquement. Ce motif sera visible par l'entreprise.
-              </p>
-              <Button
-                variant="destructive"
-                className="w-full"
-                onClick={() => { if (notes.trim()) rejectBatchMutation.mutate({ rejectionReason: notes.trim() }); }}
-                disabled={!notes.trim() || rejectBatchMutation.isPending}
-                data-testid="button-confirm-reject"
-              >
-                {rejectBatchMutation.isPending
-                  ? <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                  : <X className="w-4 h-4 mr-2" />}
-                Confirmer le rejet
-              </Button>
-            </div>
-          )}
-
-          {action === "validate" && (
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-green-700 dark:text-green-400">
-                Notes de validation <span className="text-destructive">*</span>
-              </label>
-              <Textarea
-                placeholder="Ex : Virement effectué le 25/04/2026, référence TXN-XXXX..."
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                rows={3}
-                data-testid="textarea-validate-notes"
-              />
-              <p className="text-xs text-muted-foreground">
-                Ces notes seront visibles par l'entreprise dans son historique.
-              </p>
-              <Button
-                className="w-full bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white"
-                onClick={() => { if (notes.trim()) validateBatchMutation.mutate({ adminNotes: notes.trim() }); }}
-                disabled={!notes.trim() || validateBatchMutation.isPending}
-                data-testid="button-confirm-validate"
-              >
-                {validateBatchMutation.isPending
-                  ? <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                  : <CheckCircle2 className="w-4 h-4 mr-2" />}
-                Confirmer la validation
-              </Button>
-            </div>
-          )}
-
-          {action === "none" && allCompleted && first.adminNotes && (
-            <div className="flex items-start gap-2 pt-1">
+      {allCompleted && first.adminNotes && (
+        <Card>
+          <CardContent className="py-4">
+            <div className="flex items-start gap-2">
               <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0 mt-0.5" />
               <p className="text-sm text-green-700 dark:text-green-400 whitespace-pre-wrap">{first.adminNotes}</p>
             </div>
-          )}
+          </CardContent>
+        </Card>
+      )}
 
-          {action === "none" && allRejected && first.rejectionReason && (
-            <div className="flex items-start gap-2 pt-1">
+      {allRejected && first.rejectionReason && (
+        <Card>
+          <CardContent className="py-4">
+            <div className="flex items-start gap-2">
               <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
               <p className="text-sm text-red-600 dark:text-red-400 whitespace-pre-wrap">{first.rejectionReason}</p>
             </div>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
