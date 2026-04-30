@@ -177,7 +177,7 @@ export default function BusinessSettlementBatch() {
               <div>
                 <p className="text-sm font-medium text-red-600 dark:text-red-400">Règlement(s) rejeté(s)</p>
                 {rejectedItems[0].rejectionReason && (
-                  <p className="text-xs text-muted-foreground mt-1 whitespace-pre-wrap">{rejectedItems[0].rejectionReason}</p>
+                  <p className="text-xs text-red-600 dark:text-red-400 mt-1 whitespace-pre-wrap">{rejectedItems[0].rejectionReason}</p>
                 )}
                 <p className="text-xs text-muted-foreground mt-1">
                   Les soldes concernés ont été automatiquement recrédités sur vos wallets.
@@ -205,7 +205,7 @@ export default function BusinessSettlementBatch() {
               <div>
                 <p className="text-sm font-medium text-green-700 dark:text-green-400">Virement effectué</p>
                 {first.adminNotes && (
-                  <p className="text-xs text-muted-foreground mt-1">{first.adminNotes}</p>
+                  <p className="text-xs text-green-700 dark:text-green-400 mt-1 whitespace-pre-wrap">{first.adminNotes}</p>
                 )}
               </div>
             </div>
