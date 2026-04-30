@@ -1059,28 +1059,7 @@ export default function AdminBusinessManagement() {
                                   </span>
                                 </div>
                               </button>
-                              {settlementFilter === "pending" ? (
-                                <div className="flex gap-1.5 shrink-0">
-                                  <Button
-                                    size="sm"
-                                    variant="destructive"
-                                    onClick={() => { setRejectBatchDialog({ open: true, settlements: items }); setSettlementNotes(""); }}
-                                    data-testid={`button-reject-batch-${batchKey}`}
-                                  >
-                                    <X className="w-3.5 h-3.5 mr-1" />Rejeter
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    className="bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white"
-                                    onClick={() => { setValidateBatchDialog({ open: true, settlements: items }); setSettlementNotes(""); }}
-                                    data-testid={`button-validate-batch-${batchKey}`}
-                                  >
-                                    <CheckCircle2 className="w-3.5 h-3.5 mr-1" />Valider
-                                  </Button>
-                                </div>
-                              ) : (
-                                <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
-                              )}
+                              <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
                             </div>
                           );
                         })}
