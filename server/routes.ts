@@ -583,6 +583,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Eligibilite de reversement basee sur le taux de change reel (ExchangeRate API)
+  app.get("/api/business/settlement-eligibility", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const MIN_USD = 30;
+      const wallets = await storage.getBusinessWallets(req.session.userId!);
+      const activeWallets = wallets.filter((w: any) => Math.floor(Number(w.balance) || 0) >= 1);
+
+      const conversions = await Promise.all(
+        activeWallets.map(async (w: any) => {
+          const amount = Math.floor(Number(w.balance) || 0);
+          const result = await convertCurrency(amount, w.currency, "USD");
+          return {
+            country: w.country,
+            currency: w.currency,
+            balance: amount,
+            usdAmount: result.success ? result.convertedAmount : 0,
+            conversionRate: result.success ? result.conversionRate : 0,
+            conversionSuccess: result.success,
+            conversionError: result.success ? null : (result.error || "Erreur de conversion"),
+          };
+        })
+      );
+
+      const totalUsd = conversions.reduce((sum, c) => sum + (c.usdAmount || 0), 0);
+      const totalUsdRounded = Math.round(totalUsd * 100) / 100;
+      const allConvertedOk = conversions.every(c => c.conversionSuccess);
+      const firstError = conversions.find(c => !c.conversionSuccess)?.conversionError || null;
+
+      res.json({
+        minUsd: MIN_USD,
+        totalUsd: totalUsdRounded,
+        eligible: allConvertedOk && totalUsdRounded >= MIN_USD,
+        hasActiveWallets: activeWallets.length > 0,
+        conversionAvailable: allConvertedOk,
+        conversionError: firstError,
+        wallets: conversions,
+      });
+    } catch (error: any) {
+      console.error("Get settlement eligibility error:", error);
+      res.status(500).json({ error: "Erreur lors du calcul d'éligibilité" });
+    }
+  });
+
   app.put("/api/business/profile", requireAuth, async (req: Request, res: Response) => {
     try {
       const schema = z.object({

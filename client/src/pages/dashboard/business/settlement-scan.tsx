@@ -39,26 +39,27 @@ interface BusinessWallet {
   balance: number;
 }
 
-const CHARS = "ATCGATCGTAGCATCGTAGCTAGCATCGNNCGATCGGGATCTAGCTAGCATCG01234567890ABCDEF+=#@%&!?";
-
-const TO_USD: Record<string, number> = {
-  XOF: 0.0015,
-  XAF: 0.0015,
-  CDF: 0.000357,
-  GNF: 0.000118,
-  RWF: 0.00075,
-  USD: 1,
-  EUR: 1.08,
-  GHS: 0.065,
-  NGN: 0.00063,
-  KES: 0.0077,
-  TZS: 0.00038,
-};
-
-function toUSD(amount: number, currency: string): number {
-  const rate = TO_USD[currency] ?? 0.0015;
-  return amount * rate;
+interface EligibilityWallet {
+  country: string;
+  currency: string;
+  balance: number;
+  usdAmount: number;
+  conversionRate: number;
+  conversionSuccess: boolean;
+  conversionError: string | null;
 }
+
+interface SettlementEligibility {
+  minUsd: number;
+  totalUsd: number;
+  eligible: boolean;
+  hasActiveWallets: boolean;
+  conversionAvailable: boolean;
+  conversionError: string | null;
+  wallets: EligibilityWallet[];
+}
+
+const CHARS = "ATCGATCGTAGCATCGTAGCTAGCATCGNNCGATCGGGATCTAGCTAGCATCG01234567890ABCDEF+=#@%&!?";
 
 function fmtUSD(amount: number) {
   return new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount) + " USD";
@@ -124,7 +125,7 @@ function MatrixCanvas() {
   );
 }
 
-type Phase = "scanning" | "sufficient" | "insufficient" | "no-wallets" | "weekend";
+type Phase = "scanning" | "sufficient" | "insufficient" | "no-wallets" | "weekend" | "conversion-error";
 
 export default function SettlementScan() {
   const [, navigate] = useLocation();
@@ -140,6 +141,11 @@ export default function SettlementScan() {
     queryKey: ["/api/business/wallets"],
   });
 
+  const { data: eligibility, isLoading: eligibilityLoading } = useQuery<SettlementEligibility>({
+    queryKey: ["/api/business/settlement-eligibility"],
+    refetchOnWindowFocus: false,
+  });
+
   const { data: currentUser } = useQuery<any>({
     queryKey: ["/api/auth/me"],
   });
@@ -152,7 +158,17 @@ export default function SettlementScan() {
     [wallets]
   );
 
-  const MIN_USD = 30;
+  const usdByWalletKey = useMemo(() => {
+    const map = new Map<string, number>();
+    eligibility?.wallets.forEach((w) => {
+      map.set(`${w.country}-${w.currency}`, w.usdAmount);
+    });
+    return map;
+  }, [eligibility]);
+
+  const getUsd = (w: BusinessWallet) => usdByWalletKey.get(`${w.country}-${w.currency}`) ?? 0;
+
+  const MIN_USD = eligibility?.minUsd ?? 30;
 
   const createSettlement = useMutation({
     mutationFn: async (data: { walletCountry: string; walletCurrency: string; amount: number; settlementMethod: string; batchId: string }) => {
@@ -162,13 +178,14 @@ export default function SettlementScan() {
   });
 
   useEffect(() => {
-    if (walletsLoading) return;
+    if (walletsLoading || eligibilityLoading || !eligibility) return;
 
     let cancelled = false;
     const timers: ReturnType<typeof setTimeout>[] = [];
 
-    const noActiveWallets = walletsWithBalance.length === 0;
-    const total = walletsWithBalance.reduce((sum, w) => sum + toUSD(w.balance, w.currency), 0);
+    const noActiveWallets = !eligibility.hasActiveWallets;
+    const conversionFailed = !eligibility.conversionAvailable;
+    const total = eligibility.totalUsd;
     setTotalUSD(total);
     setLogLines([]);
     setProgress(0);
@@ -185,8 +202,17 @@ export default function SettlementScan() {
         { text: "Aucun portefeuille actif détecté...", ok: false },
         { text: "Règlement impossible sans solde disponible.", ok: false },
       ];
+    } else if (conversionFailed) {
+      systemLines = [
+        { text: "Initialisation du module de cryptage BKA-256...", ok: true },
+        { text: "Connexion au registre des portefeuilles sécurisés...", ok: true },
+        { text: "Protocole d'authentification SHA-3 établi...", ok: true },
+        { text: "Connexion au service de taux de change en temps réel...", ok: false },
+        { text: "Échec de la récupération des taux de conversion.", ok: false },
+        { text: "Conversion vers USD impossible — vérifiez la configuration.", ok: false },
+      ];
     } else {
-      const countryLabels = walletsWithBalance.map((w) => {
+      const countryLabels = eligibility.wallets.map((w) => {
         const cd = COUNTRIES.find((c) => c.code === w.country);
         return { label: `${cd?.name ?? w.country} (${w.currency})`, wallet: w };
       });
@@ -194,13 +220,13 @@ export default function SettlementScan() {
         { text: "Initialisation du module de cryptage BKA-256...", ok: true },
         { text: "Connexion au registre des portefeuilles sécurisés...", ok: true },
         { text: "Protocole d'authentification SHA-3 établi...", ok: true },
+        { text: "Récupération des taux de change en temps réel...", ok: true },
         ...countryLabels.map((c) => ({
-          text: `Lecture ${c.label}: ${fmtNative(c.wallet.balance, c.wallet.currency)}`,
+          text: `${c.label}: ${fmtNative(c.wallet.balance, c.wallet.currency)} → ${fmtUSD(c.wallet.usdAmount)}`,
           ok: true,
         })),
-        { text: "Conversion des soldes en équivalent USD...", ok: true },
         { text: `Seuil minimum requis: ${MIN_USD}.00 USD`, ok: total >= MIN_USD },
-        { text: `Vérification finale du solde agrégé...`, ok: total >= MIN_USD },
+        { text: `Total agrégé: ${fmtUSD(total)}`, ok: total >= MIN_USD },
       ];
     }
 
@@ -226,6 +252,8 @@ export default function SettlementScan() {
       if (!cancelled) {
         if (noActiveWallets) {
           setPhase("no-wallets");
+        } else if (conversionFailed) {
+          setPhase("conversion-error");
         } else if (total < MIN_USD) {
           setPhase("insufficient");
         } else if (isWeekendInLagos()) {
@@ -242,7 +270,7 @@ export default function SettlementScan() {
       clearTimeout(finishTimer);
       clearInterval(progInterval);
     };
-  }, [walletsLoading, walletsWithBalance.length]);
+  }, [walletsLoading, eligibilityLoading, eligibility]);
 
   const handleSubmit = async () => {
     if (!settlementMethod) return;
@@ -424,7 +452,7 @@ export default function SettlementScan() {
                             <CountryFlag code={w.country} size="sm" />
                             <div>
                               <p className="text-green-200 text-sm font-medium">{cd?.name ?? w.country}</p>
-                              <p className="text-green-600 font-mono text-xs">≈ {fmtUSD(toUSD(w.balance, w.currency))}</p>
+                              <p className="text-green-600 font-mono text-xs">≈ {fmtUSD(getUsd(w))}</p>
                             </div>
                           </div>
                           <span className="text-green-300 font-mono font-semibold text-sm tabular-nums">
