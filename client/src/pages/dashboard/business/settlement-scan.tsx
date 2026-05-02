@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { CountryFlag } from "@/components/country-flag";
-import { COUNTRIES, CURRENCY_CONVERSION_RATES } from "@shared/schema";
+import { COUNTRIES } from "@shared/schema";
 import {
   CheckCircle2, XCircle, ArrowLeft, ShieldCheck, Send, Loader2, Building2, Smartphone, CalendarX,
 } from "lucide-react";
@@ -360,6 +360,7 @@ export default function SettlementScan() {
                phase === "sufficient" ? "ANALYSE COMPLÈTE" :
                phase === "no-wallets" ? "AUCUN WALLET ACTIF" :
                phase === "weekend" ? "SERVICE INDISPONIBLE" :
+               phase === "conversion-error" ? "TAUX DE CHANGE INDISPONIBLE" :
                "ERREUR DÉTECTÉE"}
             </Badge>
           </div>
@@ -588,6 +589,53 @@ export default function SettlementScan() {
                 className="w-full"
                 style={{ background: "#110900", color: "#ffaa00", border: "1px solid rgba(255,170,0,0.3)" }}
                 onClick={() => navigate("/dashboard/business/settlements")}
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Retour aux règlements
+              </Button>
+            </div>
+          )}
+
+          {phase === "conversion-error" && (
+            <div className="w-full max-w-lg space-y-4">
+              <div
+                className="border rounded-lg p-5 space-y-4"
+                style={{ background: "rgba(10,7,0,0.88)", borderColor: "#ffaa00" }}
+              >
+                <div className="flex items-center gap-3">
+                  <XCircle className="w-6 h-6 shrink-0" style={{ color: "#ffaa00" }} />
+                  <div>
+                    <p className="font-mono font-semibold text-sm tracking-wider" style={{ color: "#ffcc55" }}>
+                      TAUX DE CHANGE INDISPONIBLE
+                    </p>
+                    <p className="font-mono text-xs" style={{ color: "#997722" }}>
+                      Service de conversion temporairement inaccessible
+                    </p>
+                  </div>
+                </div>
+
+                <div className="border-t pt-3 space-y-3" style={{ borderColor: "rgba(255,170,0,0.2)" }}>
+                  <div
+                    className="px-3 py-3 rounded"
+                    style={{ background: "rgba(255,170,0,0.06)", border: "1px solid rgba(255,170,0,0.15)" }}
+                  >
+                    <p className="font-mono text-sm leading-relaxed" style={{ color: "#cc9900" }}>
+                      Le service de taux de change en temps réel est temporairement indisponible. Sans ces taux, nous ne pouvons pas vérifier que vos soldes atteignent le seuil minimum de {MIN_USD} USD. Veuillez réessayer dans quelques minutes.
+                    </p>
+                  </div>
+                  {eligibility?.conversionError && (
+                    <p className="font-mono text-xs" style={{ color: "#997722" }}>
+                      Détail: {eligibility.conversionError}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <Button
+                className="w-full"
+                style={{ background: "#110900", color: "#ffaa00", border: "1px solid rgba(255,170,0,0.3)" }}
+                onClick={() => navigate("/dashboard/business/settlements")}
+                data-testid="button-back-conversion-error"
               >
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Retour aux règlements
