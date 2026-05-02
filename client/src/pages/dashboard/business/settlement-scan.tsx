@@ -8,8 +8,29 @@ import { useToast } from "@/hooks/use-toast";
 import { CountryFlag } from "@/components/country-flag";
 import { COUNTRIES, CURRENCY_CONVERSION_RATES } from "@shared/schema";
 import {
-  CheckCircle2, XCircle, ArrowLeft, ShieldCheck, Send, Loader2, Building2, Smartphone,
+  CheckCircle2, XCircle, ArrowLeft, ShieldCheck, Send, Loader2, Building2, Smartphone, CalendarX,
 } from "lucide-react";
+
+function isWeekendInLagos(): boolean {
+  const day = new Date().toLocaleString("en-US", { timeZone: "Africa/Lagos", weekday: "long" });
+  return day === "Saturday" || day === "Sunday";
+}
+
+function getNextMondayLabel(): string {
+  const now = new Date();
+  const lagosDayName = now.toLocaleString("en-US", { timeZone: "Africa/Lagos", weekday: "long" });
+  const daysUntilMonday = lagosDayName === "Saturday" ? 2 : lagosDayName === "Sunday" ? 1 : 0;
+  if (daysUntilMonday === 0) return "lundi prochain";
+  // Compute the calendar date in Africa/Lagos (UTC+1, no DST) to avoid off-by-one when client TZ differs
+  const lagosMs = now.getTime() + (60 * 60 * 1000) - (now.getTimezoneOffset() * 60 * 1000);
+  const monday = new Date(lagosMs + daysUntilMonday * 24 * 60 * 60 * 1000);
+  return monday.toLocaleDateString("fr-FR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    timeZone: "UTC",
+  });
+}
 
 interface BusinessWallet {
   id: string;
@@ -103,7 +124,7 @@ function MatrixCanvas() {
   );
 }
 
-type Phase = "scanning" | "sufficient" | "insufficient" | "no-wallets";
+type Phase = "scanning" | "sufficient" | "insufficient" | "no-wallets" | "weekend";
 
 export default function SettlementScan() {
   const [, navigate] = useLocation();
@@ -205,8 +226,12 @@ export default function SettlementScan() {
       if (!cancelled) {
         if (noActiveWallets) {
           setPhase("no-wallets");
+        } else if (total < MIN_USD) {
+          setPhase("insufficient");
+        } else if (isWeekendInLagos()) {
+          setPhase("weekend");
         } else {
-          setPhase(total >= MIN_USD ? "sufficient" : "insufficient");
+          setPhase("sufficient");
         }
       }
     }, totalDuration + 400);
@@ -221,6 +246,11 @@ export default function SettlementScan() {
 
   const handleSubmit = async () => {
     if (!settlementMethod) return;
+    // Safety check: weekend block on client side too (in case scan was opened Friday and user clicked after midnight)
+    if (isWeekendInLagos()) {
+      setPhase("weekend");
+      return;
+    }
     setSubmitting(true);
     const batchId = crypto.randomUUID();
     try {
@@ -241,7 +271,13 @@ export default function SettlementScan() {
       });
       navigate("/dashboard/business/settlements");
     } catch (err: any) {
-      toast({ title: "Erreur", description: err.message, variant: "destructive" });
+      // Backend may return 403 WEEKEND_BLOCKED if scan crossed into the weekend
+      const msg = String(err?.message || "");
+      if (msg.includes("week-end") || msg.includes("WEEKEND_BLOCKED")) {
+        setPhase("weekend");
+      } else {
+        toast({ title: "Erreur", description: msg || "Erreur lors de la soumission", variant: "destructive" });
+      }
     } finally {
       setSubmitting(false);
     }
@@ -275,16 +311,19 @@ export default function SettlementScan() {
                   phase === "sufficient" ? "#00220f" :
                   phase === "insufficient" ? "#220000" :
                   phase === "no-wallets" ? "#1a1000" :
+                  phase === "weekend" ? "#0a1a2a" :
                   "#001a00",
                 color:
                   phase === "sufficient" ? "#00ff88" :
                   phase === "insufficient" ? "#ff4444" :
                   phase === "no-wallets" ? "#ffaa00" :
+                  phase === "weekend" ? "#5599ff" :
                   "#00cc66",
                 border: `1px solid ${
                   phase === "sufficient" ? "#00ff88" :
                   phase === "insufficient" ? "#ff4444" :
                   phase === "no-wallets" ? "#ffaa00" :
+                  phase === "weekend" ? "#3377cc" :
                   "#005522"
                 }`,
               }}
@@ -292,6 +331,7 @@ export default function SettlementScan() {
               {phase === "scanning" ? "ANALYSE EN COURS" :
                phase === "sufficient" ? "ANALYSE COMPLÈTE" :
                phase === "no-wallets" ? "AUCUN WALLET ACTIF" :
+               phase === "weekend" ? "SERVICE INDISPONIBLE" :
                "ERREUR DÉTECTÉE"}
             </Badge>
           </div>
@@ -520,6 +560,64 @@ export default function SettlementScan() {
                 className="w-full"
                 style={{ background: "#110900", color: "#ffaa00", border: "1px solid rgba(255,170,0,0.3)" }}
                 onClick={() => navigate("/dashboard/business/settlements")}
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Retour aux règlements
+              </Button>
+            </div>
+          )}
+
+          {phase === "weekend" && (
+            <div className="w-full max-w-lg space-y-4">
+              <div
+                className="border rounded-lg p-5 space-y-4"
+                style={{ background: "rgba(5,12,22,0.92)", borderColor: "#3377cc" }}
+              >
+                <div className="flex items-center gap-3">
+                  <CalendarX className="w-6 h-6 shrink-0" style={{ color: "#5599ff" }} />
+                  <div>
+                    <p className="font-mono font-semibold text-sm tracking-wider" style={{ color: "#88bbff" }}>
+                      DEMANDES SUSPENDUES — WEEK-END
+                    </p>
+                    <p className="font-mono text-xs" style={{ color: "#5577aa" }}>
+                      Service de règlement indisponible le samedi et dimanche
+                    </p>
+                  </div>
+                </div>
+
+                <div className="border-t pt-3 space-y-3" style={{ borderColor: "rgba(85,153,255,0.2)" }}>
+                  <div
+                    className="px-3 py-3 rounded"
+                    style={{ background: "rgba(85,153,255,0.06)", border: "1px solid rgba(85,153,255,0.18)" }}
+                  >
+                    <p className="font-mono text-sm leading-relaxed" style={{ color: "#aaccff" }}>
+                      Pour des raisons de traitement bancaire et de validation par notre équipe, les demandes de règlement ne sont acceptées que du <span className="font-bold" style={{ color: "#cce0ff" }}>lundi au vendredi</span>.
+                    </p>
+                  </div>
+
+                  <div
+                    className="flex items-center justify-between px-3 py-3 rounded"
+                    style={{ background: "rgba(85,153,255,0.04)", border: "1px solid rgba(85,153,255,0.15)" }}
+                  >
+                    <span className="font-mono text-sm" style={{ color: "#7799cc" }}>Reprise du service</span>
+                    <span className="font-mono font-bold text-sm capitalize" style={{ color: "#aaccff" }}>
+                      {getNextMondayLabel()}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t" style={{ borderColor: "rgba(85,153,255,0.2)" }}>
+                  <p className="font-mono text-xs text-center leading-relaxed" style={{ color: "#5577aa" }}>
+                    Vos fonds restent disponibles dans vos portefeuilles. Vous pourrez soumettre votre demande dès la réouverture du service.
+                  </p>
+                </div>
+              </div>
+
+              <Button
+                className="w-full"
+                style={{ background: "#0a1828", color: "#88bbff", border: "1px solid rgba(85,153,255,0.3)" }}
+                onClick={() => navigate("/dashboard/business/settlements")}
+                data-testid="button-back-weekend"
               >
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Retour aux règlements

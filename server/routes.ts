@@ -742,6 +742,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/business/settlements", requireAuth, async (req: Request, res: Response) => {
     try {
+      // Block settlement requests on weekends (Saturday/Sunday, Africa/Lagos timezone)
+      const lagosWeekday = new Date().toLocaleString("en-US", { timeZone: "Africa/Lagos", weekday: "long" });
+      if (lagosWeekday === "Saturday" || lagosWeekday === "Sunday") {
+        return res.status(403).json({
+          error: "Les demandes de règlement ne sont pas autorisées le week-end. Notre équipe traite les règlements uniquement du lundi au vendredi. Veuillez soumettre votre demande à partir du lundi.",
+          code: "WEEKEND_BLOCKED",
+        });
+      }
+
       const schema = z.object({
         walletCountry: z.string().min(1),
         walletCurrency: z.string().min(1),
