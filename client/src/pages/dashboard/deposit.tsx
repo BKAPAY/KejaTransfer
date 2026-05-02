@@ -123,6 +123,9 @@ export default function Deposit() {
   const [selectedCurrency, setSelectedCurrency] = useState<string>("");
   const [feePercentage, setFeePercentage] = useState<number>(60);
   const [exchangeFeePercentage, setExchangeFeePercentage] = useState<number>(0);
+  const [paymentAmountOverride, setPaymentAmountOverride] = useState<number | undefined>(undefined);
+  const [editingDirection, setEditingDirection] = useState<"balance" | "payment">("balance");
+  const [reverseLoading, setReverseLoading] = useState(false);
 
   const { data: user } = useQuery<User>({
     queryKey: ["/api/auth/me"],
@@ -268,9 +271,11 @@ export default function Deposit() {
   // Only need conversion if a country is selected AND payment currency is determined AND currencies differ
   const needsConversion = !!selectedCountry && !!paymentCurrency && paymentCurrency !== userBalanceCurrency;
   // Montant à injecter dans les codes USSD = montant converti en devise de l'opérateur si conversion, sinon montant saisi
-  const amountForUssd = (needsConversion && conversionData?.convertedAmount && conversionData.convertedAmount > 0)
-    ? Math.round(conversionData.convertedAmount)
-    : (amount || 0);
+  const amountForUssd = (editingDirection === "payment" && paymentAmountOverride && paymentAmountOverride > 0)
+    ? Math.round(paymentAmountOverride)
+    : ((needsConversion && conversionData?.convertedAmount && conversionData.convertedAmount > 0)
+        ? Math.round(conversionData.convertedAmount)
+        : (amount || 0));
 
   // Fetch exchange fee when payment currency differs from user's balance currency
   useEffect(() => {
@@ -327,24 +332,58 @@ export default function Deposit() {
   }, []);
 
   useEffect(() => {
-    if (needsConversion && amount && amount > 0) {
+    if (needsConversion && amount && amount > 0 && editingDirection === "balance") {
       const debounceTimer = setTimeout(() => {
         // Convert FROM user's balance currency TO the payment currency of selected country
         fetchConversion(amount, userBalanceCurrency, paymentCurrency);
       }, 500);
       return () => clearTimeout(debounceTimer);
-    } else {
+    } else if (!needsConversion) {
       setConversionData(null);
     }
-  }, [needsConversion, amount, paymentCurrency, userBalanceCurrency, fetchConversion, selectedCurrency]);
+  }, [needsConversion, amount, paymentCurrency, userBalanceCurrency, fetchConversion, selectedCurrency, editingDirection]);
+
+  // Reset payment override when country/currency changes
+  useEffect(() => {
+    setPaymentAmountOverride(undefined);
+    setEditingDirection("balance");
+  }, [selectedCountry, paymentCurrency]);
+
+  // Reverse conversion: paymentCurrency -> balanceCurrency (when user edits the green box)
+  useEffect(() => {
+    let cancelled = false;
+    if (editingDirection === "payment" && needsConversion && paymentAmountOverride && paymentAmountOverride > 0) {
+      setReverseLoading(true);
+      const t = setTimeout(async () => {
+        try {
+          const res = await fetch("/api/convert-currency", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ amount: paymentAmountOverride, fromCurrency: paymentCurrency, toCurrency: userBalanceCurrency }),
+          });
+          if (res.ok && !cancelled) {
+            const data = await res.json();
+            const decimals = getCurrencyDecimals(userBalanceCurrency);
+            const rounded = decimals === 0 ? Math.round(data.convertedAmount) : Number(data.convertedAmount.toFixed(decimals));
+            setDepositAmount(rounded);
+          }
+        } finally {
+          if (!cancelled) setReverseLoading(false);
+        }
+      }, 500);
+      return () => { cancelled = true; clearTimeout(t); };
+    }
+  }, [editingDirection, paymentAmountOverride, needsConversion, paymentCurrency, userBalanceCurrency]);
 
   const depositMutation = useMutation({
     mutationFn: async (data: DepositFormData) => {
-      const providerAmount = needsConversion && conversionData?.convertedAmount 
-        ? conversionData.convertedAmount 
-        : depositAmount;
-      const providerCurrency = needsConversion && conversionData?.targetCurrency
-        ? conversionData.targetCurrency
+      const providerAmount = editingDirection === "payment" && paymentAmountOverride
+        ? paymentAmountOverride
+        : (needsConversion && conversionData?.convertedAmount 
+            ? conversionData.convertedAmount 
+            : depositAmount);
+      const providerCurrency = needsConversion 
+        ? paymentCurrency
         : selectedCurrency;
       
       const res = await apiRequest("POST", "/api/fedapay/deposit", {
@@ -452,8 +491,10 @@ export default function Deposit() {
       }
       
       if (paymentData.provider === "mbiyopay") {
-        const providerAmount = conversionData ? Math.floor(conversionData.convertedAmount) : depositAmount;
-        const providerCurrency = conversionData ? conversionData.targetCurrency : userBalanceCurrency;
+        const providerAmount = editingDirection === "payment" && paymentAmountOverride
+          ? Math.floor(paymentAmountOverride)
+          : (conversionData ? Math.floor(conversionData.convertedAmount) : depositAmount);
+        const providerCurrency = needsConversion ? paymentCurrency : userBalanceCurrency;
         const res = await apiRequest("POST", "/api/fedapay/deposit", {
           ...formData,
           amount: providerAmount,
@@ -891,6 +932,8 @@ export default function Deposit() {
                 min="100"
                 value={depositAmount || ""}
                 onChange={(e) => {
+                  setEditingDirection("balance");
+                  setPaymentAmountOverride(undefined);
                   const val = e.target.value;
                   setDepositAmount(val === "" ? undefined : Number(val));
                 }}
@@ -1018,24 +1061,35 @@ export default function Deposit() {
                       )}
                     />
 
-                    {conversionData && (
+                    {(conversionData || (editingDirection === "payment" && paymentAmountOverride)) && needsConversion && (
                       <div className="bg-green-50 dark:bg-green-950 p-3 rounded-md border border-green-200 dark:border-green-800">
-                        <p className="text-sm text-green-700 dark:text-green-300 font-medium">
-                          Montant a payer ({paymentCurrency})
-                        </p>
-                        {conversionData.isLoading ? (
-                          <div className="flex items-center gap-2 mt-1">
-                            <Loader2 className="h-4 w-4 animate-spin text-green-600" />
-                            <span className="text-sm text-green-600">Conversion en cours...</span>
-                          </div>
-                        ) : (
-                          <p className="text-lg font-bold text-green-800 dark:text-green-200" data-testid="text-converted-amount">
-                            {new Intl.NumberFormat("fr-FR", {
-                              minimumFractionDigits: getCurrencyDecimals(paymentCurrency),
-                              maximumFractionDigits: getCurrencyDecimals(paymentCurrency),
-                            }).format(conversionData.convertedAmount)} {paymentCurrency}
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm text-green-700 dark:text-green-300 font-medium">
+                            Montant a payer ({paymentCurrency})
                           </p>
-                        )}
+                          {(reverseLoading || conversionData?.isLoading) && (
+                            <Loader2 className="h-3 w-3 animate-spin text-green-600" />
+                          )}
+                        </div>
+                        <Input
+                          type="number"
+                          inputMode="decimal"
+                          placeholder="0"
+                          className="bg-transparent border-0 shadow-none text-lg font-bold text-green-800 dark:text-green-200 px-0 focus-visible:ring-0 h-auto py-0 mt-1"
+                          value={
+                            editingDirection === "payment"
+                              ? (paymentAmountOverride ?? "")
+                              : (conversionData?.convertedAmount
+                                  ? Number(conversionData.convertedAmount.toFixed(getCurrencyDecimals(paymentCurrency)))
+                                  : "")
+                          }
+                          onChange={(e) => {
+                            setEditingDirection("payment");
+                            const val = e.target.value;
+                            setPaymentAmountOverride(val === "" ? undefined : Number(val));
+                          }}
+                          data-testid="input-payment-amount"
+                        />
                       </div>
                     )}
 

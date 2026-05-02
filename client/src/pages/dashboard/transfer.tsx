@@ -58,6 +58,9 @@ export default function Transfer() {
     conversionRate: number;
     isLoading: boolean;
   } | null>(null);
+  const [paymentAmountOverride, setPaymentAmountOverride] = useState<number | undefined>(undefined);
+  const [editingDirection, setEditingDirection] = useState<"balance" | "payment">("balance");
+  const [reverseLoading, setReverseLoading] = useState(false);
 
   const { data: user } = useQuery<User>({
     queryKey: ["/api/auth/me"],
@@ -169,15 +172,47 @@ export default function Transfer() {
   }, []);
 
   useEffect(() => {
-    if (needsConversion && amount && amount > 0) {
+    if (needsConversion && amount && amount > 0 && editingDirection === "balance") {
       const debounceTimer = setTimeout(() => {
         fetchConversion(amount, userBalanceCurrency, targetCurrency);
       }, 500);
       return () => clearTimeout(debounceTimer);
-    } else {
+    } else if (!needsConversion) {
       setConversionData(null);
     }
-  }, [needsConversion, amount, userBalanceCurrency, targetCurrency, fetchConversion, selectedCurrency]);
+  }, [needsConversion, amount, userBalanceCurrency, targetCurrency, fetchConversion, selectedCurrency, editingDirection]);
+
+  // Reset payment override when country/currency changes
+  useEffect(() => {
+    setPaymentAmountOverride(undefined);
+    setEditingDirection("balance");
+  }, [selectedCountry, targetCurrency]);
+
+  // Reverse conversion: targetCurrency -> balanceCurrency (when user edits the green box)
+  useEffect(() => {
+    let cancelled = false;
+    if (editingDirection === "payment" && needsConversion && paymentAmountOverride && paymentAmountOverride > 0) {
+      setReverseLoading(true);
+      const t = setTimeout(async () => {
+        try {
+          const res = await fetch("/api/convert-currency", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ amount: paymentAmountOverride, fromCurrency: targetCurrency, toCurrency: userBalanceCurrency }),
+          });
+          if (res.ok && !cancelled) {
+            const data = await res.json();
+            const decimals = getCurrencyDecimals(userBalanceCurrency);
+            const rounded = decimals === 0 ? Math.round(data.convertedAmount) : Number(data.convertedAmount.toFixed(decimals));
+            form.setValue("amount", rounded);
+          }
+        } finally {
+          if (!cancelled) setReverseLoading(false);
+        }
+      }, 500);
+      return () => { cancelled = true; clearTimeout(t); };
+    }
+  }, [editingDirection, paymentAmountOverride, needsConversion, targetCurrency, userBalanceCurrency, form]);
 
   // Fetch outgoing exchange fee for personal accounts when currencies differ
   useEffect(() => {
@@ -395,6 +430,8 @@ export default function Transfer() {
                 min="500"
                 value={amount || ""}
                 onChange={(e) => {
+                  setEditingDirection("balance");
+                  setPaymentAmountOverride(undefined);
                   const val = e.target.value;
                   form.setValue("amount", val === "" ? undefined as any : Number(val));
                 }}
@@ -531,18 +568,39 @@ export default function Transfer() {
                             </p>
                           </div>
                         </div>
-                        {needsConversion && conversionData && !conversionData.isLoading && conversionData.convertedAmount > 0 && (
-                          <div className="bg-green-50 dark:bg-green-950/30 p-3 rounded-md border border-green-200 dark:border-green-800 flex justify-between items-center">
-                            <p className="text-sm text-green-700 dark:text-green-400">Destinataire recevra</p>
-                            <p className="text-lg font-semibold text-green-700 dark:text-green-400" data-testid="text-converted-amount">
-                              {new Intl.NumberFormat("fr-FR", {
-                                minimumFractionDigits: getCurrencyDecimals(conversionData.targetCurrency),
-                                maximumFractionDigits: getCurrencyDecimals(conversionData.targetCurrency),
-                              }).format(conversionData.convertedAmount)} {conversionData.targetCurrency}
-                            </p>
+                        {needsConversion && (conversionData || (editingDirection === "payment" && paymentAmountOverride)) && (
+                          <div className="bg-green-50 dark:bg-green-950/30 p-3 rounded-md border border-green-200 dark:border-green-800 flex justify-between items-center gap-2">
+                            <div className="flex items-center gap-2 flex-1">
+                              <p className="text-sm text-green-700 dark:text-green-400 whitespace-nowrap">Destinataire recevra</p>
+                              {(reverseLoading || conversionData?.isLoading) && (
+                                <Loader2 className="h-3 w-3 animate-spin text-green-600" />
+                              )}
+                            </div>
+                            <div className="flex items-baseline gap-1 min-w-0">
+                              <Input
+                                type="number"
+                                inputMode="decimal"
+                                placeholder="0"
+                                className="bg-transparent border-0 shadow-none text-lg font-semibold text-green-700 dark:text-green-400 px-0 focus-visible:ring-0 h-auto py-0 text-right max-w-[140px]"
+                                value={
+                                  editingDirection === "payment"
+                                    ? (paymentAmountOverride ?? "")
+                                    : (conversionData?.convertedAmount
+                                        ? Number(conversionData.convertedAmount.toFixed(getCurrencyDecimals(targetCurrency)))
+                                        : "")
+                                }
+                                onChange={(e) => {
+                                  setEditingDirection("payment");
+                                  const val = e.target.value;
+                                  setPaymentAmountOverride(val === "" ? undefined : Number(val));
+                                }}
+                                data-testid="input-recipient-amount"
+                              />
+                              <span className="text-sm font-semibold text-green-700 dark:text-green-400">{targetCurrency}</span>
+                            </div>
                           </div>
                         )}
-                        {needsConversion && (conversionData?.isLoading || !conversionData) && (
+                        {needsConversion && !conversionData && !paymentAmountOverride && (
                           <div className="bg-muted p-3 rounded-md border flex items-center gap-2 text-muted-foreground">
                             <Loader2 className="h-3 w-3 animate-spin" />
                             <span className="text-sm">Calcul de la conversion...</span>
