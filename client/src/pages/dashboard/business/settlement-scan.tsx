@@ -149,8 +149,6 @@ export default function SettlementScan() {
     staleTime: Infinity,
   });
 
-  const scanStartedRef = useRef(false);
-
   const { data: currentUser } = useQuery<any>({
     queryKey: ["/api/auth/me"],
   });
@@ -184,8 +182,6 @@ export default function SettlementScan() {
 
   useEffect(() => {
     if (walletsLoading || eligibilityLoading || !eligibility) return;
-    if (scanStartedRef.current) return;
-    scanStartedRef.current = true;
 
     let cancelled = false;
     const timers: ReturnType<typeof setTimeout>[] = [];
