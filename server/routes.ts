@@ -11855,6 +11855,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin: reset user's withdrawal/security code (so user can set a new one)
+  app.post("/api/admin/user/:userId/reset-security-code", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { userId } = req.params;
+      const target = await storage.getUser(userId);
+      if (!target) {
+        return res.status(404).json({ error: "Utilisateur non trouvé" });
+      }
+      if (target.isPrimaryAdmin && !(req as any).user?.isPrimaryAdmin) {
+        return res.status(403).json({ error: "Seul l'administrateur principal peut réinitialiser son propre code" });
+      }
+      await storage.resetUserSecurityCode(userId);
+      const adminEmail = (req as any).user?.email || "admin";
+      console.log(`[Admin Reset Security Code] ${adminEmail} reset security code for user ${userId} (${target.email})`);
+      res.json({ success: true, message: "Code de retrait réinitialisé. L'utilisateur peut maintenant en définir un nouveau depuis Paramètres." });
+    } catch (error: any) {
+      console.error("Reset security code error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
   app.get("/api/admin/user/:userId/transactions", requireAdmin, async (req: Request, res: Response) => {
     try {
       const transactions = await storage.getTransactions(req.params.userId);

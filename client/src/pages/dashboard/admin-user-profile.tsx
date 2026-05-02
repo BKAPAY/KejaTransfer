@@ -10,12 +10,17 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   ArrowLeft, User, Mail, Phone, MapPin, Calendar, Shield, CheckCircle, XCircle,
-  PlusCircle, MinusCircle, Pencil, Save, X, Building2,
+  PlusCircle, MinusCircle, Pencil, Save, X, Building2, KeyRound, RotateCcw,
 } from "lucide-react";
 import type { User as UserType } from "@shared/schema";
 import { COUNTRIES } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 const COUNTRY_NAMES: Record<string, string> = {
   BJ: "Bénin", TG: "Togo", CI: "Côte d'Ivoire", SN: "Sénégal", BF: "Burkina Faso",
@@ -111,6 +116,27 @@ export default function AdminUserProfile() {
       toast({
         title: "Erreur",
         description: err?.message || "Impossible de mettre à jour le profil",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const resetSecurityCodeMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/admin/user/${userId}/reset-security-code`, {});
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Code de retrait réinitialisé",
+        description: data?.message || "L'utilisateur peut définir un nouveau code depuis Paramètres.",
+      });
+      queryClient.invalidateQueries({ queryKey: [`/api/admin/user/${userId}/profile`] });
+    },
+    onError: (err: any) => {
+      toast({
+        title: "Erreur",
+        description: err?.message || "Impossible de réinitialiser le code",
         variant: "destructive",
       });
     },
@@ -449,6 +475,64 @@ export default function AdminUserProfile() {
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Code de retrait — uniquement pour les comptes personnels */}
+          {!isBusinessAccount && (
+            <div className="pt-4 border-t space-y-3">
+              <h3 className="text-sm font-semibold flex items-center gap-2">
+                <KeyRound className="w-4 h-4" />
+                Code de retrait (sécurité)
+              </h3>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <p className="text-sm">
+                    Statut :{" "}
+                    {user.securityCode ? (
+                      <Badge variant="default" data-testid="status-security-code">Configuré</Badge>
+                    ) : (
+                      <Badge variant="outline" data-testid="status-security-code">Non configuré</Badge>
+                    )}
+                  </p>
+                  <p className="text-xs text-muted-foreground max-w-md">
+                    La réinitialisation supprime le code actuel. L'utilisateur pourra ensuite définir un nouveau code à 6 chiffres depuis Paramètres &gt; Sécurité.
+                  </p>
+                </div>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      disabled={!user.securityCode || resetSecurityCodeMutation.isPending}
+                      data-testid="button-reset-security-code"
+                    >
+                      <RotateCcw className="w-3 h-3 mr-1" />
+                      Réinitialiser le code
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Réinitialiser le code de retrait ?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Le code de retrait actuel de {user.firstName} {user.lastName} sera supprimé.
+                        L'utilisateur ne pourra plus effectuer de retrait ni de transfert tant qu'il n'aura
+                        pas défini un nouveau code à 6 chiffres depuis Paramètres &gt; Sécurité.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel data-testid="button-cancel-reset-code">Annuler</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => resetSecurityCodeMutation.mutate()}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        data-testid="button-confirm-reset-code"
+                      >
+                        {resetSecurityCodeMutation.isPending ? "Réinitialisation..." : "Confirmer la réinitialisation"}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
             </div>
           )}
 
