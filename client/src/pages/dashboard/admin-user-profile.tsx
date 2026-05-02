@@ -454,10 +454,12 @@ export default function AdminUserProfile() {
 
           {/* Statut & métadonnées */}
           <div className="pt-4 border-t grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <p className="text-sm text-muted-foreground">Solde</p>
-              <p className="font-bold text-xl" data-testid="text-balance">{formatAmount(user.balance)}</p>
-            </div>
+            {!isBusinessAccount && (
+              <div>
+                <p className="text-sm text-muted-foreground">Solde</p>
+                <p className="font-bold text-xl" data-testid="text-balance">{formatAmount(user.balance)}</p>
+              </div>
+            )}
             <div>
               <p className="text-sm text-muted-foreground flex items-center gap-1">
                 <Calendar className="w-3 h-3" /> Date d'inscription
@@ -472,7 +474,8 @@ export default function AdminUserProfile() {
             </div>
           </div>
 
-          {/* Ajustement manuel du solde */}
+          {/* Ajustement manuel du solde — uniquement pour les comptes personnels */}
+          {!isBusinessAccount && (
           <div className="pt-4 border-t space-y-3">
             <p className="text-sm font-medium">Ajustement manuel du solde</p>
             <div className="flex flex-wrap gap-2">
@@ -531,6 +534,7 @@ export default function AdminUserProfile() {
                   : `Débiter ${adjustAmount ? parseInt(adjustAmount).toLocaleString("fr-FR") : "..."} ${userCurrency}`}
             </Button>
           </div>
+          )}
         </CardContent>
       </Card>
     </div>
