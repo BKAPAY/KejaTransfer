@@ -378,6 +378,7 @@ export default function KycVerificationPage() {
       if ((user as any).kycUrlInstagram) addField("Instagram", (user as any).kycUrlInstagram);
       if ((user as any).kycUrlFacebook) addField("Facebook", (user as any).kycUrlFacebook);
       if ((user as any).kycUrlTiktok) addField("TikTok", (user as any).kycUrlTiktok);
+      if ((user as any).kycUrlYoutube) addField("YouTube", (user as any).kycUrlYoutube);
       if ((user as any).kycUrlWhatsappGroup) addField("Groupe WhatsApp", (user as any).kycUrlWhatsappGroup);
       if ((user as any).kycUrlWhatsappChannel) addField("Chaine WhatsApp", (user as any).kycUrlWhatsappChannel);
     }
@@ -721,6 +722,7 @@ export default function KycVerificationPage() {
                   { key: "kycUrlInstagram", label: "Instagram", testId: "url-instagram" },
                   { key: "kycUrlFacebook", label: "Facebook", testId: "url-facebook" },
                   { key: "kycUrlTiktok", label: "TikTok", testId: "url-tiktok" },
+                  { key: "kycUrlYoutube", label: "YouTube", testId: "url-youtube" },
                   { key: "kycUrlWhatsappGroup", label: "Groupe WhatsApp", testId: "url-whatsapp-group" },
                   { key: "kycUrlWhatsappChannel", label: "Chaine WhatsApp", testId: "url-whatsapp-channel" },
                 ].map(({ key, label, testId }) => (

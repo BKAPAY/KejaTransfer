@@ -2231,13 +2231,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // KYC Final Submit - just changes status to submitted
   app.post("/api/kyc/submit", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { kycIdFront, kycIdBack, kycSelfie, kycSignature, kycActivityDescription, kycLatitude, kycLongitude, kycAddress, kycAcceptedTerms, kycPhone, kycWhatsapp, kycActivityUrl, kycUrlWebsite, kycUrlInstagram, kycUrlFacebook, kycUrlTiktok, kycUrlWhatsappGroup, kycUrlWhatsappChannel } = req.body;
+      const { kycIdFront, kycIdBack, kycSelfie, kycSignature, kycActivityDescription, kycLatitude, kycLongitude, kycAddress, kycAcceptedTerms, kycPhone, kycWhatsapp, kycActivityUrl, kycUrlWebsite, kycUrlInstagram, kycUrlFacebook, kycUrlTiktok, kycUrlYoutube, kycUrlWhatsappGroup, kycUrlWhatsappChannel } = req.body;
 
       if (!kycIdFront || !kycIdBack || !kycSelfie || !kycSignature) {
         return res.status(400).json({ error: "Tous les documents sont requis" });
       }
 
-      const urlFields = [kycUrlWebsite, kycUrlInstagram, kycUrlFacebook, kycUrlTiktok, kycUrlWhatsappGroup, kycUrlWhatsappChannel].filter(u => u && typeof u === "string" && u.trim());
+      const urlFields = [kycUrlWebsite, kycUrlInstagram, kycUrlFacebook, kycUrlTiktok, kycUrlYoutube, kycUrlWhatsappGroup, kycUrlWhatsappChannel].filter(u => u && typeof u === "string" && u.trim());
       if (urlFields.length < 1) {
         return res.status(400).json({ error: "Vous devez renseigner au moins 1 lien d'activite" });
       }
@@ -2259,6 +2259,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         kycUrlInstagram: kycUrlInstagram || "",
         kycUrlFacebook: kycUrlFacebook || "",
         kycUrlTiktok: kycUrlTiktok || "",
+        kycUrlYoutube: kycUrlYoutube || "",
         kycUrlWhatsappGroup: kycUrlWhatsappGroup || "",
         kycUrlWhatsappChannel: kycUrlWhatsappChannel || "",
       });

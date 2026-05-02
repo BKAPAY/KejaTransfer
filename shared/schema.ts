@@ -43,6 +43,7 @@ export const users = pgTable("users", {
   kycUrlInstagram: text("kyc_url_instagram"),
   kycUrlFacebook: text("kyc_url_facebook"),
   kycUrlTiktok: text("kyc_url_tiktok"),
+  kycUrlYoutube: text("kyc_url_youtube"),
   kycUrlWhatsappGroup: text("kyc_url_whatsapp_group"),
   kycUrlWhatsappChannel: text("kyc_url_whatsapp_channel"),
   kycRejectionReason: text("kyc_rejection_reason"), // Reason for KYC rejection

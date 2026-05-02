@@ -6,7 +6,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useState, useRef, useEffect, useCallback } from "react";
-import { CheckCircle2, Clock, AlertCircle, X, Camera, Shield, ArrowRight, ArrowLeft, User, FileText, PenTool, Trash2, Loader2, MapPin, Briefcase, Navigation, Globe } from "lucide-react";
+import { CheckCircle2, Clock, AlertCircle, X, Camera, Shield, ArrowRight, ArrowLeft, User, FileText, PenTool, Trash2, Loader2, MapPin, Briefcase, Navigation, Globe, Check, Pencil } from "lucide-react";
+import { SiFacebook, SiInstagram, SiTiktok, SiYoutube, SiWhatsapp } from "react-icons/si";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -82,8 +83,10 @@ export default function KYC() {
   const [kycUrlInstagram, setKycUrlInstagram] = useState("");
   const [kycUrlFacebook, setKycUrlFacebook] = useState("");
   const [kycUrlTiktok, setKycUrlTiktok] = useState("");
+  const [kycUrlYoutube, setKycUrlYoutube] = useState("");
   const [kycUrlWhatsappGroup, setKycUrlWhatsappGroup] = useState("");
   const [kycUrlWhatsappChannel, setKycUrlWhatsappChannel] = useState("");
+  const [activePlatform, setActivePlatform] = useState<string | null>(null);
   const [isResubmitting, setIsResubmitting] = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
   const [cameraMode, setCameraMode] = useState<CameraMode>(null);
@@ -510,6 +513,7 @@ export default function KYC() {
         kycUrlInstagram: kycUrlInstagram,
         kycUrlFacebook: kycUrlFacebook,
         kycUrlTiktok: kycUrlTiktok,
+        kycUrlYoutube: kycUrlYoutube,
         kycUrlWhatsappGroup: kycUrlWhatsappGroup,
         kycUrlWhatsappChannel: kycUrlWhatsappChannel,
       });
@@ -908,7 +912,80 @@ export default function KYC() {
     </div>
   );
 
-  const filledUrlCount = [kycUrlWebsite].filter(u => u.trim()).length;
+  const platformConfigs = [
+    {
+      key: "website",
+      label: "Site web",
+      icon: Globe,
+      iconClass: "text-blue-600",
+      bgClass: "bg-blue-50 dark:bg-blue-950/30",
+      placeholder: "https://www.monsite.com",
+      value: kycUrlWebsite,
+      setValue: setKycUrlWebsite,
+    },
+    {
+      key: "facebook",
+      label: "Facebook",
+      icon: SiFacebook,
+      iconClass: "text-[#1877F2]",
+      bgClass: "bg-blue-50 dark:bg-blue-950/30",
+      placeholder: "https://facebook.com/votre-page",
+      value: kycUrlFacebook,
+      setValue: setKycUrlFacebook,
+    },
+    {
+      key: "instagram",
+      label: "Instagram",
+      icon: SiInstagram,
+      iconClass: "text-[#E4405F]",
+      bgClass: "bg-pink-50 dark:bg-pink-950/30",
+      placeholder: "https://instagram.com/votre-compte",
+      value: kycUrlInstagram,
+      setValue: setKycUrlInstagram,
+    },
+    {
+      key: "tiktok",
+      label: "TikTok",
+      icon: SiTiktok,
+      iconClass: "text-foreground",
+      bgClass: "bg-muted",
+      placeholder: "https://tiktok.com/@votre-compte",
+      value: kycUrlTiktok,
+      setValue: setKycUrlTiktok,
+    },
+    {
+      key: "youtube",
+      label: "YouTube",
+      icon: SiYoutube,
+      iconClass: "text-[#FF0000]",
+      bgClass: "bg-red-50 dark:bg-red-950/30",
+      placeholder: "https://youtube.com/@votre-chaine",
+      value: kycUrlYoutube,
+      setValue: setKycUrlYoutube,
+    },
+    {
+      key: "whatsappGroup",
+      label: "Groupe WhatsApp",
+      icon: SiWhatsapp,
+      iconClass: "text-[#25D366]",
+      bgClass: "bg-green-50 dark:bg-green-950/30",
+      placeholder: "https://chat.whatsapp.com/...",
+      value: kycUrlWhatsappGroup,
+      setValue: setKycUrlWhatsappGroup,
+    },
+    {
+      key: "whatsappChannel",
+      label: "Chaîne WhatsApp",
+      icon: SiWhatsapp,
+      iconClass: "text-[#25D366]",
+      bgClass: "bg-green-50 dark:bg-green-950/30",
+      placeholder: "https://whatsapp.com/channel/...",
+      value: kycUrlWhatsappChannel,
+      setValue: setKycUrlWhatsappChannel,
+    },
+  ];
+
+  const filledUrlCount = platformConfigs.filter(p => p.value.trim()).length;
 
   const isWhatsappPersonalLink = (url: string) => /wa\.me\//i.test(url);
 
@@ -916,15 +993,15 @@ export default function KYC() {
     <div className="space-y-6">
       <div className="text-center mb-4">
         <Globe className="w-10 h-10 mx-auto mb-2 text-primary" />
-        <h3 className="text-lg font-semibold">Etape 3 : Liens de votre activite</h3>
-        <p className="text-sm text-muted-foreground">Renseignez un lien de présence en ligne lié à votre activité</p>
+        <h3 className="text-lg font-semibold">Etape 3 : Liens de votre activité</h3>
+        <p className="text-sm text-muted-foreground">Cliquez sur une plateforme pour ajouter votre lien</p>
       </div>
 
       <Card className="border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-950/30">
         <CardContent className="p-4 space-y-2">
           <p className="text-sm font-medium text-orange-800 dark:text-orange-300">Informations importantes :</p>
           <ul className="text-xs text-orange-700 dark:text-orange-400 space-y-1 list-disc pl-4">
-            <li>Fournissez <strong>un seul lien</strong> parmi : Facebook, Instagram, TikTok, YouTube, site web, groupe WhatsApp, chaîne WhatsApp — peu importe la plateforme.</li>
+            <li>Fournissez <strong>au moins un lien</strong> parmi : site web, Facebook, Instagram, TikTok, YouTube, groupe WhatsApp, chaîne WhatsApp.</li>
             <li>Le lien doit correspondre à une page ou chaîne <strong>active</strong> qui présente clairement votre activité. Une page vide, nouvelle ou sans rapport avec votre activité entraînera un <strong>rejet de votre vérification</strong>.</li>
           </ul>
         </CardContent>
@@ -933,25 +1010,92 @@ export default function KYC() {
       <Card>
         <CardContent className="p-4 space-y-4">
           <div className="flex items-center justify-between flex-wrap gap-1">
-            <p className="text-sm font-medium">{filledUrlCount}/1 lien renseigné minimum</p>
+            <p className="text-sm font-medium">{filledUrlCount} lien{filledUrlCount > 1 ? "s" : ""} renseigné{filledUrlCount > 1 ? "s" : ""} (minimum 1)</p>
             <Badge variant={filledUrlCount >= 1 ? "default" : "destructive"}>
               {filledUrlCount >= 1 ? "OK" : "Insuffisant"}
             </Badge>
           </div>
 
-          <div className="space-y-1">
-            <label className="text-sm font-medium flex items-center gap-2">
-              <Globe className="w-4 h-4" /> Lien de présence en ligne
-            </label>
-            <Input
-              type="url"
-              value={kycUrlWebsite}
-              onChange={(e) => setKycUrlWebsite(e.target.value)}
-              placeholder="https://facebook.com/mapage  ou  https://instagram.com/moncompte  ou  https://tiktok.com/@moncompte  …"
-              data-testid="input-url-website"
-            />
-            <p className="text-xs text-muted-foreground">Facebook, Instagram, TikTok, YouTube, site web, groupe WhatsApp, chaîne WhatsApp — n'importe quel lien actif.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {platformConfigs.map((p) => {
+              const Icon = p.icon;
+              const filled = !!p.value.trim();
+              const isActive = activePlatform === p.key;
+              return (
+                <button
+                  key={p.key}
+                  type="button"
+                  onClick={() => setActivePlatform(isActive ? null : p.key)}
+                  className={`flex items-center gap-3 p-3 rounded-md border text-left hover-elevate active-elevate-2 ${
+                    isActive ? "border-primary ring-2 ring-primary/30" : "border-border"
+                  }`}
+                  data-testid={`button-platform-${p.key}`}
+                >
+                  <div className={`w-10 h-10 rounded-md flex items-center justify-center ${p.bgClass} flex-shrink-0`}>
+                    <Icon className={`w-5 h-5 ${p.iconClass}`} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">{p.label}</p>
+                    {filled ? (
+                      <p className="text-xs text-muted-foreground truncate">{p.value}</p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">Ajouter un lien</p>
+                    )}
+                  </div>
+                  {filled ? (
+                    <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0" />
+                  ) : (
+                    <Pencil className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                  )}
+                </button>
+              );
+            })}
           </div>
+
+          {activePlatform && (() => {
+            const p = platformConfigs.find(c => c.key === activePlatform);
+            if (!p) return null;
+            const Icon = p.icon;
+            return (
+              <div className="border rounded-md p-4 space-y-3 bg-muted/30">
+                <div className="flex items-center gap-2">
+                  <Icon className={`w-5 h-5 ${p.iconClass}`} />
+                  <label className="text-sm font-medium">Lien {p.label}</label>
+                </div>
+                <Input
+                  type="url"
+                  value={p.value}
+                  onChange={(e) => p.setValue(e.target.value)}
+                  placeholder={p.placeholder}
+                  autoFocus
+                  data-testid={`input-url-${p.key}`}
+                />
+                <div className="flex gap-2 justify-end">
+                  {p.value.trim() && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => { p.setValue(""); }}
+                      data-testid={`button-clear-url-${p.key}`}
+                    >
+                      <Trash2 className="w-4 h-4 mr-1" />
+                      Effacer
+                    </Button>
+                  )}
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => setActivePlatform(null)}
+                    data-testid={`button-confirm-url-${p.key}`}
+                  >
+                    <Check className="w-4 h-4 mr-1" />
+                    Valider
+                  </Button>
+                </div>
+              </div>
+            );
+          })()}
         </CardContent>
       </Card>
 
@@ -1442,8 +1586,10 @@ export default function KYC() {
     setKycUrlInstagram("");
     setKycUrlFacebook("");
     setKycUrlTiktok("");
+    setKycUrlYoutube("");
     setKycUrlWhatsappGroup("");
     setKycUrlWhatsappChannel("");
+    setActivePlatform(null);
     setLocationData(null);
     setLocationAddress("");
     setLocationError("");
