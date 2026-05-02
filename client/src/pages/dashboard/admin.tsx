@@ -1763,16 +1763,6 @@ export default function Admin() {
                 </div>
               )}
 
-              <div className="flex gap-2 pt-4 border-t">
-                <Button
-                  variant="outline"
-                  onClick={() => setLocation(`/dashboard/management?userId=${selectedUser.id}`)}
-                  data-testid="button-manage-user"
-                >
-                  <Settings className="w-4 h-4 mr-2" />
-                  Gerer cet utilisateur
-                </Button>
-              </div>
             </div>
           )}
         </DialogContent>
