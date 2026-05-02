@@ -144,7 +144,12 @@ export default function SettlementScan() {
   const { data: eligibility, isLoading: eligibilityLoading } = useQuery<SettlementEligibility>({
     queryKey: ["/api/business/settlement-eligibility"],
     refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    staleTime: Infinity,
   });
+
+  const scanStartedRef = useRef(false);
 
   const { data: currentUser } = useQuery<any>({
     queryKey: ["/api/auth/me"],
@@ -179,6 +184,8 @@ export default function SettlementScan() {
 
   useEffect(() => {
     if (walletsLoading || eligibilityLoading || !eligibility) return;
+    if (scanStartedRef.current) return;
+    scanStartedRef.current = true;
 
     let cancelled = false;
     const timers: ReturnType<typeof setTimeout>[] = [];
