@@ -61,6 +61,7 @@ export default function Transfer() {
   const [paymentAmountOverride, setPaymentAmountOverride] = useState<number | undefined>(undefined);
   const [editingDirection, setEditingDirection] = useState<"balance" | "payment">("balance");
   const [reverseLoading, setReverseLoading] = useState(false);
+  const [isPaymentFocused, setIsPaymentFocused] = useState(false);
 
   const { data: user } = useQuery<User>({
     queryKey: ["/api/auth/me"],
@@ -568,38 +569,46 @@ export default function Transfer() {
                             </p>
                           </div>
                         </div>
-                        {needsConversion && (conversionData || (editingDirection === "payment" && paymentAmountOverride)) && (
-                          <div className="bg-green-50 dark:bg-green-950/30 p-3 rounded-md border border-green-200 dark:border-green-800 flex justify-between items-center gap-2">
-                            <div className="flex items-center gap-2 flex-1">
-                              <p className="text-sm text-green-700 dark:text-green-400 whitespace-nowrap">Destinataire recevra</p>
-                              {(reverseLoading || conversionData?.isLoading) && (
-                                <Loader2 className="h-3 w-3 animate-spin text-green-600" />
-                              )}
+                        {needsConversion && (conversionData || (editingDirection === "payment" && paymentAmountOverride)) && (() => {
+                          const rawValue = editingDirection === "payment"
+                            ? paymentAmountOverride
+                            : conversionData?.convertedAmount;
+                          const decimals = getCurrencyDecimals(targetCurrency);
+                          const formattedValue = rawValue !== undefined && rawValue !== null
+                            ? new Intl.NumberFormat("fr-FR", { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(rawValue)
+                            : "";
+                          const editValue = rawValue !== undefined && rawValue !== null
+                            ? Number(rawValue.toFixed(decimals)).toString()
+                            : "";
+                          return (
+                            <div className="bg-green-50 dark:bg-green-950/30 p-3 rounded-md border border-green-200 dark:border-green-800 flex justify-between items-center gap-2">
+                              <div className="flex items-center gap-2">
+                                <p className="text-sm text-green-700 dark:text-green-400 whitespace-nowrap">Destinataire recevra</p>
+                                {(reverseLoading || conversionData?.isLoading) && (
+                                  <Loader2 className="h-3 w-3 animate-spin text-green-600" />
+                                )}
+                              </div>
+                              <div className="flex items-baseline gap-1 min-w-0">
+                                <Input
+                                  type="text"
+                                  inputMode="decimal"
+                                  placeholder="0"
+                                  className="bg-transparent border-0 shadow-none text-lg font-semibold text-green-700 dark:text-green-400 px-0 focus-visible:ring-0 h-auto py-0 text-right max-w-[140px]"
+                                  value={isPaymentFocused ? editValue : formattedValue}
+                                  onFocus={() => setIsPaymentFocused(true)}
+                                  onBlur={() => setIsPaymentFocused(false)}
+                                  onChange={(e) => {
+                                    setEditingDirection("payment");
+                                    const val = e.target.value.replace(/[^0-9.,]/g, "").replace(",", ".");
+                                    setPaymentAmountOverride(val === "" ? undefined : Number(val));
+                                  }}
+                                  data-testid="input-recipient-amount"
+                                />
+                                <span className="text-sm font-semibold text-green-700 dark:text-green-400">{targetCurrency}</span>
+                              </div>
                             </div>
-                            <div className="flex items-baseline gap-1 min-w-0">
-                              <Input
-                                type="number"
-                                inputMode="decimal"
-                                placeholder="0"
-                                className="bg-transparent border-0 shadow-none text-lg font-semibold text-green-700 dark:text-green-400 px-0 focus-visible:ring-0 h-auto py-0 text-right max-w-[140px]"
-                                value={
-                                  editingDirection === "payment"
-                                    ? (paymentAmountOverride ?? "")
-                                    : (conversionData?.convertedAmount
-                                        ? Number(conversionData.convertedAmount.toFixed(getCurrencyDecimals(targetCurrency)))
-                                        : "")
-                                }
-                                onChange={(e) => {
-                                  setEditingDirection("payment");
-                                  const val = e.target.value;
-                                  setPaymentAmountOverride(val === "" ? undefined : Number(val));
-                                }}
-                                data-testid="input-recipient-amount"
-                              />
-                              <span className="text-sm font-semibold text-green-700 dark:text-green-400">{targetCurrency}</span>
-                            </div>
-                          </div>
-                        )}
+                          );
+                        })()}
                         {needsConversion && !conversionData && !paymentAmountOverride && (
                           <div className="bg-muted p-3 rounded-md border flex items-center gap-2 text-muted-foreground">
                             <Loader2 className="h-3 w-3 animate-spin" />
