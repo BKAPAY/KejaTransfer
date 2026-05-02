@@ -42,9 +42,16 @@ async function getExchangeRateApiKey(): Promise<string | null> {
 
   try {
     const { storage } = await import("./storage");
-    const config = await storage.getProviderConfig("exchangerate");
-    if (config?.apiKey) {
-      cachedApiKey = config.apiKey;
+    // Verifier les deux scopes (business prioritaire, sinon personal)
+    const businessConfig = await storage.getProviderConfig("exchangerate", "business");
+    if (businessConfig?.apiKey) {
+      cachedApiKey = businessConfig.apiKey;
+      apiKeyFetchedAt = Date.now();
+      return cachedApiKey;
+    }
+    const personalConfig = await storage.getProviderConfig("exchangerate", "personal");
+    if (personalConfig?.apiKey) {
+      cachedApiKey = personalConfig.apiKey;
       apiKeyFetchedAt = Date.now();
       return cachedApiKey;
     }
