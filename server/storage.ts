@@ -58,6 +58,18 @@ export interface IStorage {
   updateUserWithdrawalPhones(id: string, withdrawalPhones: string[]): Promise<User | undefined>;
   updateUserSecurityCode(id: string, securityCode: string): Promise<User | undefined>;
   updateBusinessProfile(id: string, data: { businessRegistrationNumber?: string; businessCountry?: string; businessPhone?: string; businessEnterprisePhone?: string; businessEmail?: string }): Promise<User | undefined>;
+  adminUpdateUserProfile(id: string, data: {
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    country?: string;
+    businessName?: string | null;
+    businessRegistrationNumber?: string | null;
+    businessCountry?: string | null;
+    businessPhone?: string | null;
+    businessEnterprisePhone?: string | null;
+    businessEmail?: string | null;
+  }): Promise<User | undefined>;
   saveBusinessKycStep2(userId: string, data: {
     kycBusinessAccountNumber?: string; kycTaxId?: string; kycBusinessAddress?: string;
     kycBusinessCity?: string; kycBusinessDepartment?: string; kycDirectorIdNumber?: string;
@@ -564,6 +576,33 @@ export class DbStorage implements IStorage {
     const results = await db
       .update(schema.users)
       .set(data)
+      .where(eq(schema.users.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async adminUpdateUserProfile(id: string, data: {
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    country?: string;
+    businessName?: string | null;
+    businessRegistrationNumber?: string | null;
+    businessCountry?: string | null;
+    businessPhone?: string | null;
+    businessEnterprisePhone?: string | null;
+    businessEmail?: string | null;
+  }): Promise<User | undefined> {
+    const cleaned: Record<string, any> = {};
+    for (const [k, v] of Object.entries(data)) {
+      if (v !== undefined) cleaned[k] = v;
+    }
+    if (Object.keys(cleaned).length === 0) {
+      return await this.getUser(id);
+    }
+    const results = await db
+      .update(schema.users)
+      .set(cleaned)
       .where(eq(schema.users.id, id))
       .returning();
     return results[0];

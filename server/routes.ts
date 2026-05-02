@@ -11795,6 +11795,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin: edit user/business profile (personal info + business info + email)
+  app.patch("/api/admin/user/:userId/profile", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { userId } = req.params;
+      const target = await storage.getUser(userId);
+      if (!target) {
+        return res.status(404).json({ error: "Utilisateur non trouvé" });
+      }
+
+      const updateSchema = z.object({
+        firstName: z.string().trim().min(1).max(100).optional(),
+        lastName: z.string().trim().min(1).max(100).optional(),
+        email: z.string().trim().toLowerCase().email("Email invalide").max(200).optional(),
+        country: z.string().trim().min(2).max(3).optional(),
+        businessName: z.string().trim().max(200).nullable().optional(),
+        businessRegistrationNumber: z.string().trim().max(100).nullable().optional(),
+        businessCountry: z.string().trim().min(2).max(3).nullable().optional(),
+        businessPhone: z.string().trim().max(30).nullable().optional(),
+        businessEnterprisePhone: z.string().trim().max(30).nullable().optional(),
+        businessEmail: z.string().trim().toLowerCase().email("Email entreprise invalide").max(200).nullable().or(z.literal("")).optional(),
+      });
+
+      const parsed = updateSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.errors[0]?.message || "Données invalides" });
+      }
+      const data = parsed.data;
+
+      // Normalize empty strings on nullable fields to null
+      const nullableKeys: (keyof typeof data)[] = [
+        "businessName", "businessRegistrationNumber", "businessCountry",
+        "businessPhone", "businessEnterprisePhone", "businessEmail",
+      ];
+      for (const k of nullableKeys) {
+        if (data[k] === "") (data as any)[k] = null;
+      }
+
+      // Email uniqueness check
+      if (data.email && data.email !== target.email) {
+        const existing = await storage.getUserByEmail(data.email);
+        if (existing && existing.id !== userId) {
+          return res.status(409).json({ error: "Cet email est déjà utilisé par un autre compte" });
+        }
+      }
+
+      // Don't allow changing primary admin's email by non-primary admins
+      if (target.isPrimaryAdmin && !(req as any).user?.isPrimaryAdmin) {
+        return res.status(403).json({ error: "Seul l'administrateur principal peut modifier son propre profil" });
+      }
+
+      const updated = await storage.adminUpdateUserProfile(userId, data);
+      const adminEmail = (req as any).user?.email || "admin";
+      console.log(`[Admin Profile Update] ${adminEmail} updated profile of user ${userId} (${target.email}). Fields: ${Object.keys(data).join(", ")}`);
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Admin profile update error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
   app.get("/api/admin/user/:userId/transactions", requireAdmin, async (req: Request, res: Response) => {
     try {
       const transactions = await storage.getTransactions(req.params.userId);
