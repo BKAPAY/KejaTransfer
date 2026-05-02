@@ -356,7 +356,16 @@ export default function Merchant() {
       const countryCurrency = COUNTRIES.find(c => c.code === selectedCountry)?.currency || "XOF";
       setSelectedCurrency(countryCurrency);
     }
+    // Reset amount when country changes : le client doit le ressaisir dans la nouvelle devise locale
+    form.setValue("amount", undefined as any);
+    setConversionData(null);
   }, [selectedCountry]);
+
+  // Reset amount when selectedCurrency changes (multi-currency countries)
+  useEffect(() => {
+    form.setValue("amount", undefined as any);
+    setConversionData(null);
+  }, [selectedCurrency]);
 
   const ownerCountry = (merchantLink as any)?.ownerCountry || null;
   const ownerCurrency = (merchantLink as any)?.ownerCurrency || "XOF";
@@ -404,9 +413,11 @@ export default function Merchant() {
   }, []);
 
   useEffect(() => {
+    // Le client saisit le montant dans SA devise locale (targetCurrency).
+    // On convertit vers la devise du marchand (ownerCurrency) pour le crédit du solde.
     if (needsConversion && watchedAmount && watchedAmount > 0) {
       const debounceTimer = setTimeout(() => {
-        fetchConversion(watchedAmount, ownerCurrency, targetCurrency);
+        fetchConversion(watchedAmount, targetCurrency, ownerCurrency);
       }, 500);
       return () => clearTimeout(debounceTimer);
     } else {
@@ -414,10 +425,8 @@ export default function Merchant() {
     }
   }, [needsConversion, watchedAmount, ownerCurrency, targetCurrency, fetchConversion, selectedCurrency]);
 
-  // Montant à injecter dans les codes USSD = montant converti si conversion, sinon montant saisi
-  const amountForUssd = (needsConversion && conversionData?.convertedAmount && conversionData.convertedAmount > 0)
-    ? Math.round(conversionData.convertedAmount)
-    : (watchedAmount || 0);
+  // Le montant est déjà saisi dans la devise locale du client → utilisé tel quel pour les codes USSD
+  const amountForUssd = Math.round(watchedAmount || 0);
 
   // Fonction pour recommencer un nouveau paiement
   const handleNewPayment = () => {
@@ -477,14 +486,15 @@ export default function Merchant() {
   // FedaPay payment init mutation
   const initMutation = useMutation({
     mutationFn: async (data: MerchantPaymentFormData) => {
-      // Send converted amount to provider, original amount for balance credit
-      const providerAmount = needsConversion && conversionData?.convertedAmount 
-        ? conversionData.convertedAmount 
+      // Le client saisit data.amount dans SA devise locale (targetCurrency).
+      // On envoie ce montant tel quel au provider, et le montant converti vers
+      // la devise du marchand sert au crédit du solde (originalAmount/originalCurrency).
+      const providerAmount = data.amount;
+      const providerCurrency = targetCurrency || selectedCurrency;
+      const ownerAmountForBalance = needsConversion && conversionData?.convertedAmount
+        ? conversionData.convertedAmount
         : data.amount;
-      const providerCurrency = needsConversion && conversionData?.targetCurrency
-        ? conversionData.targetCurrency
-        : selectedCurrency;
-      
+
       const body: any = {
         amount: providerAmount,
         customerName: data.customerName,
@@ -493,7 +503,7 @@ export default function Merchant() {
         country: data.country,
         operator: data.operator,
         currency: providerCurrency,
-        originalAmount: data.amount,
+        originalAmount: ownerAmountForBalance,
         originalCurrency: ownerCurrency,
       };
       if (mbiyoOtpCode || authCode) {
@@ -1380,60 +1390,6 @@ export default function Merchant() {
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-2 sm:space-y-3 lg:space-y-4">
         <FormField
           control={form.control}
-          name="amount"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel className="text-xs sm:text-sm">Montant ({ownerCurrency})</FormLabel>
-              <FormControl>
-                <Input
-                  type="number"
-                  placeholder="10000"
-                  data-testid="input-amount"
-                  {...field}
-                  onChange={(e) => field.onChange(parseFloat(e.target.value))}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="customerName"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel className="text-xs sm:text-sm">Nom complet</FormLabel>
-              <FormControl>
-                <Input
-                  placeholder="Jean Dupont"
-                  data-testid="input-name"
-                  {...field}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="customerEmail"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel className="text-xs sm:text-sm">Email</FormLabel>
-              <FormControl>
-                <Input
-                  type="email"
-                  placeholder="jean@exemple.com"
-                  data-testid="input-email"
-                  {...field}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
           name="country"
           render={({ field }) => (
             <FormItem>
@@ -1604,12 +1560,76 @@ export default function Merchant() {
           </div>
         )}
         
-        {conversionData && (
+        <FormField
+          control={form.control}
+          name="customerName"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="text-xs sm:text-sm">Nom complet</FormLabel>
+              <FormControl>
+                <Input
+                  placeholder="Jean Dupont"
+                  data-testid="input-name"
+                  {...field}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="customerEmail"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="text-xs sm:text-sm">Email</FormLabel>
+              <FormControl>
+                <Input
+                  type="email"
+                  placeholder="jean@exemple.com"
+                  data-testid="input-email"
+                  {...field}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="amount"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="text-xs sm:text-sm">
+                Montant à payer{selectedCountry ? ` (${targetCurrency})` : ""}
+              </FormLabel>
+              <FormControl>
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  step="any"
+                  placeholder={selectedCountry ? "Entrez le montant" : "Sélectionnez d'abord un pays"}
+                  disabled={!selectedCountry}
+                  data-testid="input-amount"
+                  {...field}
+                  value={field.value ?? ""}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    field.onChange(v === "" ? undefined : parseFloat(v));
+                  }}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {needsConversion && watchedAmount && watchedAmount > 0 && (
           <div className="bg-green-50 dark:bg-green-950 p-3 rounded-md border border-green-200 dark:border-green-800">
             <p className="text-xs sm:text-sm text-green-700 dark:text-green-300 font-medium">
-              Montant à payer
+              Le marchand recevra
             </p>
-            {conversionData.isLoading ? (
+            {!conversionData || conversionData.isLoading ? (
               <div className="flex items-center gap-2 mt-1">
                 <Loader2 className="h-4 w-4 animate-spin text-green-600" />
                 <span className="text-sm text-green-600">Conversion en cours...</span>
@@ -1617,18 +1637,18 @@ export default function Merchant() {
             ) : (
               <p className="text-base sm:text-lg font-bold text-green-800 dark:text-green-200" data-testid="text-converted-amount">
                 {new Intl.NumberFormat("fr-FR", {
-                  minimumFractionDigits: getCurrencyDecimals(conversionData.targetCurrency),
-                  maximumFractionDigits: getCurrencyDecimals(conversionData.targetCurrency),
-                }).format(conversionData.convertedAmount)} {conversionData.targetCurrency}
+                  minimumFractionDigits: getCurrencyDecimals(ownerCurrency),
+                  maximumFractionDigits: getCurrencyDecimals(ownerCurrency),
+                }).format(conversionData.convertedAmount)} {ownerCurrency}
               </p>
             )}
           </div>
         )}
-        
+
         <Button
           type="submit"
           className="w-full"
-          disabled={initMutation.isPending || isLoadingOperators || Boolean(noOperatorsAvailable) || (Boolean(showOtpOnForm) && !(isMbiyoOtpOperator ? mbiyoOtpCode : authCode).trim())}
+          disabled={initMutation.isPending || isLoadingOperators || Boolean(noOperatorsAvailable) || !watchedAmount || watchedAmount <= 0 || (Boolean(needsConversion) && (!conversionData || conversionData.isLoading)) || (Boolean(showOtpOnForm) && !(isMbiyoOtpOperator ? mbiyoOtpCode : authCode).trim())}
           data-testid="button-pay"
         >
           {initMutation.isPending ? (
