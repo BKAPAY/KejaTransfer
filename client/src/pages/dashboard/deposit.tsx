@@ -123,6 +123,9 @@ export default function Deposit() {
   const [selectedCurrency, setSelectedCurrency] = useState<string>("");
   const [feePercentage, setFeePercentage] = useState<number>(60);
   const [exchangeFeePercentage, setExchangeFeePercentage] = useState<number>(0);
+  const [inputCurrencyMode, setInputCurrencyMode] = useState<"balance" | "payment">("balance");
+  const [paymentAmountInput, setPaymentAmountInput] = useState<number | undefined>(undefined);
+  const [reverseConversion, setReverseConversion] = useState<{ convertedAmount: number; isLoading: boolean } | null>(null);
 
   const { data: user } = useQuery<User>({
     queryKey: ["/api/auth/me"],
@@ -338,13 +341,51 @@ export default function Deposit() {
     }
   }, [needsConversion, amount, paymentCurrency, userBalanceCurrency, fetchConversion, selectedCurrency]);
 
+  // Reset to balance mode when no currency conversion is needed
+  useEffect(() => {
+    if (!needsConversion) {
+      setInputCurrencyMode("balance");
+      setPaymentAmountInput(undefined);
+      setReverseConversion(null);
+    }
+  }, [needsConversion]);
+
+  // Reverse conversion: paymentCurrency -> balanceCurrency (when user types in payment mode)
+  useEffect(() => {
+    let cancelled = false;
+    if (inputCurrencyMode === "payment" && needsConversion && paymentAmountInput && paymentAmountInput > 0) {
+      setReverseConversion(prev => prev ? { ...prev, isLoading: true } : { convertedAmount: 0, isLoading: true });
+      const t = setTimeout(async () => {
+        try {
+          const res = await fetch("/api/convert-currency", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ amount: paymentAmountInput, fromCurrency: paymentCurrency, toCurrency: userBalanceCurrency }),
+          });
+          if (res.ok && !cancelled) {
+            const data = await res.json();
+            setReverseConversion({ convertedAmount: data.convertedAmount, isLoading: false });
+            setDepositAmount(data.convertedAmount);
+          }
+        } catch {
+          if (!cancelled) setReverseConversion(null);
+        }
+      }, 500);
+      return () => { cancelled = true; clearTimeout(t); };
+    } else if (inputCurrencyMode === "balance") {
+      setReverseConversion(null);
+    }
+  }, [inputCurrencyMode, paymentAmountInput, needsConversion, paymentCurrency, userBalanceCurrency]);
+
   const depositMutation = useMutation({
     mutationFn: async (data: DepositFormData) => {
-      const providerAmount = needsConversion && conversionData?.convertedAmount 
-        ? conversionData.convertedAmount 
-        : depositAmount;
-      const providerCurrency = needsConversion && conversionData?.targetCurrency
-        ? conversionData.targetCurrency
+      const providerAmount = inputCurrencyMode === "payment" && paymentAmountInput
+        ? paymentAmountInput
+        : (needsConversion && conversionData?.convertedAmount 
+            ? conversionData.convertedAmount 
+            : depositAmount);
+      const providerCurrency = needsConversion 
+        ? paymentCurrency
         : selectedCurrency;
       
       const res = await apiRequest("POST", "/api/fedapay/deposit", {
@@ -452,8 +493,10 @@ export default function Deposit() {
       }
       
       if (paymentData.provider === "mbiyopay") {
-        const providerAmount = conversionData ? Math.floor(conversionData.convertedAmount) : depositAmount;
-        const providerCurrency = conversionData ? conversionData.targetCurrency : userBalanceCurrency;
+        const providerAmount = inputCurrencyMode === "payment" && paymentAmountInput
+          ? Math.floor(paymentAmountInput)
+          : (conversionData ? Math.floor(conversionData.convertedAmount) : depositAmount);
+        const providerCurrency = needsConversion ? paymentCurrency : userBalanceCurrency;
         const res = await apiRequest("POST", "/api/fedapay/deposit", {
           ...formData,
           amount: providerAmount,
@@ -883,20 +926,81 @@ export default function Deposit() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Montant ({userBalanceCurrency})</label>
-              <Input
-                type="number"
-                placeholder="10000"
-                data-testid="input-deposit-amount"
-                min="100"
-                value={depositAmount || ""}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setDepositAmount(val === "" ? undefined : Number(val));
-                }}
-              />
-              {depositAmount !== undefined && depositAmount < depositMin && (
-                <p className="text-sm text-destructive">Le montant minimum est de {depositMin.toLocaleString("fr-FR")} {userBalanceCurrency}</p>
+              {user?.accountType === "personal" && needsConversion && (
+                <div className="flex gap-2 flex-wrap">
+                  <Button
+                    type="button"
+                    variant={inputCurrencyMode === "balance" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setInputCurrencyMode("balance");
+                      setPaymentAmountInput(undefined);
+                      setDepositAmount(undefined);
+                    }}
+                    data-testid="button-deposit-mode-balance"
+                  >
+                    Saisir en {userBalanceCurrency}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={inputCurrencyMode === "payment" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setInputCurrencyMode("payment");
+                      setPaymentAmountInput(undefined);
+                      setDepositAmount(undefined);
+                    }}
+                    data-testid="button-deposit-mode-payment"
+                  >
+                    Saisir en {paymentCurrency}
+                  </Button>
+                </div>
+              )}
+              {inputCurrencyMode === "payment" ? (
+                <>
+                  <label className="text-sm font-medium">Montant ({paymentCurrency})</label>
+                  <Input
+                    type="number"
+                    placeholder="10000"
+                    data-testid="input-deposit-amount-payment"
+                    min="1"
+                    value={paymentAmountInput ?? ""}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setPaymentAmountInput(val === "" ? undefined : Number(val));
+                    }}
+                  />
+                  {reverseConversion?.isLoading ? (
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Loader2 className="h-3 w-3 animate-spin" /> Conversion en cours...
+                    </p>
+                  ) : depositAmount !== undefined && depositAmount > 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                      Equivaut a {new Intl.NumberFormat("fr-FR").format(Math.floor(depositAmount))} {userBalanceCurrency} debite de votre solde
+                    </p>
+                  ) : null}
+                  {depositAmount !== undefined && depositAmount > 0 && depositAmount < depositMin && (
+                    <p className="text-sm text-destructive">Le montant minimum est de {depositMin.toLocaleString("fr-FR")} {userBalanceCurrency}</p>
+                  )}
+                </>
+              ) : (
+                <>
+                  <label className="text-sm font-medium">Montant ({userBalanceCurrency})</label>
+                  <Input
+                    type="number"
+                    placeholder="10000"
+                    data-testid="input-deposit-amount"
+                    min="100"
+                    value={depositAmount || ""}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setDepositAmount(val === "" ? undefined : Number(val));
+                    }}
+                  />
+                  {depositAmount !== undefined && depositAmount < depositMin && (
+                    <p className="text-sm text-destructive">Le montant minimum est de {depositMin.toLocaleString("fr-FR")} {userBalanceCurrency}</p>
+                  )}
+                </>
               )}
             </div>
 
@@ -1018,7 +1122,7 @@ export default function Deposit() {
                       )}
                     />
 
-                    {conversionData && (
+                    {conversionData && inputCurrencyMode !== "payment" && (
                       <div className="bg-green-50 dark:bg-green-950 p-3 rounded-md border border-green-200 dark:border-green-800">
                         <p className="text-sm text-green-700 dark:text-green-300 font-medium">
                           Montant a payer ({paymentCurrency})
