@@ -198,8 +198,8 @@ export default function Home() {
       {/* Hero Section with background image */}
       <section className="relative py-12 md:py-24 lg:py-36 overflow-hidden bg-black">
           <div className="absolute inset-0">
-          <img src={heroMainImage} alt="" className="w-full h-full object-cover brightness-110 contrast-105" decoding="async" />
-          <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/45 to-black/25" />
+          <img src={heroMainImage} alt="" className="w-full h-full object-cover brightness-125 contrast-110 saturate-110" decoding="async" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/35 to-black/15" />
         </div>
         <div className="container mx-auto px-2 sm:px-4 md:px-8 max-w-7xl relative z-10">
           <div className="space-y-3 sm:space-y-6 lg:space-y-8 max-w-2xl">
