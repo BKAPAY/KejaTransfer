@@ -203,7 +203,7 @@ export default function Home() {
         </div>
         <div className="container mx-auto px-2 sm:px-4 md:px-8 max-w-7xl relative z-10">
           <div className="space-y-3 sm:space-y-6 lg:space-y-8 max-w-2xl">
-            <div className="space-y-2 sm:space-y-4 -translate-y-5 sm:-translate-y-8 lg:-translate-y-10">
+            <div className="space-y-2 sm:space-y-4 translate-y-10 sm:translate-y-16 lg:translate-y-20">
               <h1 className="text-xs sm:text-sm md:text-base lg:text-lg xl:text-xl font-bold text-white leading-tight max-w-xl">
                 Paiements Mobile Money pour l'Afrique
               </h1>
@@ -211,7 +211,7 @@ export default function Home() {
                 Acceptez les paiements Orange Money, MTN, Moov, Wave et plus dans plus de 17 pays. Plateforme simple, sécurisée et fiable.
               </p>
             </div>
-            <div className="flex flex-wrap gap-2 sm:gap-4 translate-y-6 sm:translate-y-8 lg:translate-y-10">
+            <div className="flex flex-wrap gap-2 sm:gap-4 translate-y-16 sm:translate-y-24 lg:translate-y-28">
               <Link href="/signup">
                 <Button className="text-xs sm:text-sm md:text-base" data-testid="button-hero-signup">
                   Commencer
