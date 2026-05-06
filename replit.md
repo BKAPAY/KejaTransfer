@@ -1,9 +1,84 @@
 # BKApay - Mobile Money Payment Platform
 
-## Overview
-BKApay is a mobile money payment platform for Africa, enabling businesses and individuals to accept payments via various mobile money services across multiple countries. It supports deposits, withdrawals, payment links, and API integrations with a uniform 6% transaction fee. The platform's vision is to become a leading payment solution in the region, simplifying financial transactions and fostering economic growth.
+BKApay is a mobile money payment platform for Africa, enabling businesses and individuals to accept payments via various mobile money services across multiple countries.
 
-## User Preferences
+## Run & Operate
+
+```bash
+# Install dependencies
+npm install
+
+# Run development server (frontend and backend)
+npm run dev
+
+# Build for production
+npm run build
+
+# Typecheck
+npm run typecheck
+
+# Generate Drizzle migrations
+drizzle-kit generate:pg
+
+# Push DB schema changes
+drizzle-kit push:pg
+```
+
+**Required Environment Variables:**
+- `DATABASE_URL`
+- `SESSION_SECRET`
+- `FEDAPAY_API_KEY`, `FEDAPAY_SECRET_KEY`
+- `NOWPAYMENTS_API_KEY`, `NOWPAYMENTS_IPN_SECRET`
+- `MONEYFUSION_PRIVATE_KEY`
+- `FEEXPAY_API_KEY`, `FEEXPAY_PUBLIC_KEY`
+- `MAILTRAP_USER`, `MAILTRAP_PASS`
+- `GMAIL_SMTP_USER`, `GMAIL_SMTP_PASS`
+- `OPENAI_API_KEY`
+- `BASE_URL` (production domain)
+
+## Stack
+
+- **Frontend:** React 18, TypeScript, Shadcn UI, Tailwind CSS, Wouter, TanStack Query, React Hook Form, Zod
+- **Backend:** Express.js, TypeScript, PostgreSQL, Drizzle ORM, Bcrypt, Express Session
+- **Database:** PostgreSQL
+- **Build Tool:** Vite
+
+## Where things live
+
+- **Frontend App:** `client/src/`
+- **Backend API & Logic:** `server/`
+- **Database Schema:** `server/db/schema.ts`
+- **Drizzle Migrations:** `server/db/migrations/`
+- **API Routes:** `server/routes.ts`
+- **Authentication Middleware:** `server/middleware/auth.ts`
+- **Payment Gateway Integrations:** `server/{gateway_name}.ts` (e.g., `server/fedapay.ts`, `server/nowpayments.ts`)
+- **Shared Utilities/Types:** `shared/`
+- **Frontend Theme & Styles:** `client/src/index.css`, `client/tailwind.config.js`
+
+## Architecture decisions
+
+- **Unified 6% Transaction Fee:** A flat 6% fee is applied universally, simplifying pricing but requiring careful calculation logic for gross/net amounts based on transaction direction (deposit/withdrawal/transfer).
+- **Multi-Provider System with Country/Direction Exclusivity:** Supports numerous payment gateways, but only one provider is active per country for a given operation (payin/payout), simplifying user choice and reducing integration complexity.
+- **Strict Account Isolation (Personal vs. Business):** Personal and business accounts are entirely separate, including balances, transaction flows, API keys, and admin views, ensuring data integrity and tailored functionality.
+- **Robust Security for Withdrawals and Logins:** Withdrawals require a 6-digit security code and pre-registered phone numbers. Logins enforce mandatory camera photo capture and GPS location, with server-side validation, significantly enhancing account security.
+- **Silent Fees & Provider Agnostic API:** All fees are silently incorporated into transactions. The Business API v2.0 provides provider-agnostic responses, abstracting underlying gateway specifics from integrators.
+
+## Product
+
+- Mobile money deposits and withdrawals
+- Payment links for individuals and merchants
+- API integrations for businesses (payin/payout)
+- Cryptocurrency withdrawals (via NOWPayments)
+- User dashboard for transaction history, link management, API keys
+- Admin dashboard for user management, KYC, suspensions, platform settings
+- Real-time transaction processing with webhook confirmations
+- Multi-currency support with exchange rate conversions
+- EMALI (AI assistant) for transactional operations (withdrawals, transfers)
+- Admin broadcast messaging system with AI polishing
+- Business bank account configuration and settlement requests
+
+## User preferences
+
 TOUTES les communications avec l'utilisateur doivent être en français. Pas d'anglais dans les messages, explications, résumés ou descriptions de tâches.
 I prefer detailed explanations in French.
 The application should be 100% functional before deployment.
@@ -13,80 +88,19 @@ The BASE_URL must be set to the production domain.
 Automatic database migration with smart reconciliation is a must-have for deployment.
 Authentication should be persistent across sessions and handle production environment specifics like reverse proxies and cookie policies.
 
-## System Architecture
+## Gotchas
 
-### UI/UX Decisions
-The frontend uses React 18 with TypeScript, Shadcn UI, and Tailwind CSS for a professional and consistent design, with Wouter for navigation. Public pages include authentication flows and policy pages. The authenticated dashboard offers an overview, transaction history, payment/merchant link management, API key management, and interfaces for deposits and withdrawals. An Admin Dashboard manages users, KYC, and suspensions. All UI messages are in French, avoiding technical jargon.
+- **Database Migrations:** Always run `drizzle-kit generate:pg` then `drizzle-kit push:pg` after schema changes. The `db-bootstrap.ts` script handles intelligent reconciliation on startup.
+- **Session Persistence:** Ensure `app.set("trust proxy", 1)` and `sameSite: 'lax'` are correctly configured for production to handle reverse proxies and cookie policies.
+- **Crypto Fees:** Cryptocurrency transactions involve a complex fee structure (10% markup, 15% crypto fee, optional 6% standard fee) and XOF → USD conversion.
+- **PawaPay Decimal Handling:** Be aware of zero-decimal currency specific rounding rules enforced by `roundForCurrency()` and `roundToDecimals()`.
+- **Business API Safety:** If `metadata.scope === "business"` is missing for an incoming transaction, funds will NOT be credited to a business wallet, acting as a safety guard.
 
-### Technical Implementations
-- **Frontend**: React 18, TypeScript, Wouter, React Hook Form + Zod, Shadcn UI, Tailwind CSS, TanStack Query.
-- **Backend**: Express.js, TypeScript, PostgreSQL, Drizzle ORM, Bcrypt, Express Session.
-- **Database**: PostgreSQL storing `users`, `payment_links`, `merchant_links`, `api_keys`, and `transactions` with various statuses.
-- **Authentication**: Persistent sessions using `connect-pg-simple`, configured for production environments (`app.set("trust proxy", 1)`, `sameSite: 'lax'`).
-- **Automatic Database Migrations**: `db-bootstrap.ts` script handles Drizzle ORM migrations on startup with intelligent reconciliation and SHA256 hash verification.
-- **Multi-Provider System**: Supports AfribaPay, Paydunya, FedaPay, MbiyoPay, MoneyFusion (payout-only), PawaPay, FeeXPay, and NOWPayments (cryptocurrency) with mutual exclusivity per country (for both payin and payout).
-- **Payment Gateway Integration**: FedaPay is a primary gateway for collect (incoming) and payout (outgoing) payments across 7 countries. Payments involve FedaPay redirect and webhook/polling confirmation.
-- **Withdrawal Flows**: Utilizes FedaPay Payout API, including KYC validation, balance checks, and phone number sanitization. Transfer and Withdrawal pages feature a `PaymentMethodSelector` toggle between Mobile Money and Cryptocurrency options.
-- **Crypto Withdrawals/Transfers (NOWPayments)**: Users can withdraw or transfer funds to a crypto wallet address via the `CryptoWithdrawalFlow` component. Backend validates security code, crypto minimums, wallet address, and balance, then automatically calls the NOWPayments Payout API (`POST /v1/payout`) to initiate the withdrawal. If the API call fails, the user's balance is refunded. A dedicated webhook (`POST /api/webhooks/nowpayments/payout`) handles payout status notifications (FINISHED, FAILED, etc.) with mandatory IPN signature verification and idempotent processing to prevent double refunds. Transaction metadata stores `payoutId` and `payoutWithdrawalId` for tracking.
-- **Silent Fees**: A uniform 6% transaction fee is applied across all countries and operators.
-  - **Deposits (Incoming)**: Client pays GROSS, user receives NET (GROSS - 6%).
-  - **Withdrawals (Outgoing)**: User enters GROSS, provider receives NET (GROSS - 6%). User's balance debited GROSS.
-  - **Transfers (Outgoing)**: User enters NET, provider receives NET. User's balance debited NET + 6%.
-- **Login Tracking System**: Records login history per user including IP address, approximate geolocation (city, country, ISP via ip-api.com), device type, browser, OS. Admin can view full connection history from the management page via "Connexions" button. Table `login_logs` created at bootstrap. Includes mandatory camera photo capture and GPS precise location at each login via `/login-verify` page. Users who refuse camera/GPS permissions are blocked from accessing the dashboard. Photo and GPS coordinates (with Google Maps link) displayed in admin connection history. Session stores `loginLogId` and `loginVerified` flags. Server-side enforcement via `requireAuth` middleware blocks unverified sessions.
-- **Account Suspension**: System for user account suspension and reactivation.
-- **Deposit Toggle System**: Global deposit enable/disable via `platform_settings` key `deposit_enabled`, plus per-user override via `users.deposit_override_enabled`. Admin page has a "Depot : ON/OFF" button for global toggle. When global deposit is OFF, management page shows per-user "Depot ON/OFF" buttons. Server-side enforcement on `/api/fedapay/deposit` and `/api/softpay/init-payment` blocks deposits when disabled. When global deposit is re-enabled, all per-user overrides are reset to false.
-- **API Gateway**: Provides versioned API for developers to integrate with BKApay for incoming payments, including webhook/callback notifications.
-  - **Legacy API Pay** (`/api-pay/:publicKey?amount=...`): Simple redirect flow, amount visible in URL. Still supported for backward compatibility.
-  - **Secure Payment Sessions v1.6** (`POST /api/v1/payment-sessions`): Server-side session creation with secret key (`sk_live_`). Amount locked server-side, never in URL. Creates a `payment_url` pointing to `/checkout/:sessionId`. Table `payment_sessions` in DB. Routes: `GET /api/v1/payment-sessions/:id` (public session info), `POST /api/v1/payment-sessions/:id/pay` (initiate payment, all providers: PawaPay/FedaPay/Paydunya/MbiyoPay/AfribaPay), `GET /api/v1/payment-sessions/:id/status` (session status). Frontend checkout page at `client/src/pages/checkout.tsx`.
-  - **API Payout v1.5** (`POST /api/v1/payout`): Send money to mobile money numbers via API key.
-  - **Business API v2.0** (Direct payin/payout for business accounts):
-    - Single `bt_live_...` token for authentication (table: `business_tokens`).
-    - `POST /api/v1/business/payin`: Direct mobile money collection (no redirect). Body: `{phone, operator, country, amount, currency}`. Supports all providers including Paydunya (invoice + Softpay STK push).
-    - `POST /api/v1/business/payout`: Direct mobile money disbursement. Debits business wallet per country.
-    - **Provider Transparency**: All business API responses are provider-agnostic. Error messages are sanitized to never expose internal provider names (PawaPay, Paydunya, FedaPay, etc.). Generic error codes: `OPERATOR_UNAVAILABLE`, `TRANSACTION_FAILED`, `INTERNAL_ERROR`.
-    - **Business Wallet Isolation**: Business payins credit `business_wallets` (per country/currency), NOT `users.balance`. `finalizeIncomingTransaction` detects `metadata.scope === "business"` and routes the credit to `creditBusinessWallet(userId, country, currency, netAmount)`. If business wallet coordinates are missing, the transaction is marked completed but NOT credited to personal balance (safety guard). Business payouts debit from `business_wallets`. All payout handlers accept `skipBalanceOps` to bypass personal balance operations. On failure (sync or async via polling/webhooks), the business wallet is refunded via `creditBusinessWallet`. The `safeRefundOutgoingTransaction` function in `payment-polling.ts` is scope-aware: checks `metadata.scope === "business"` and refunds business wallet accordingly.
-    - `GET /api/v1/business/payin/:id/status` and `GET /api/v1/business/payout/:id/status`: Status check endpoints.
-    - Token management: `GET/POST/PUT/DELETE /api/business/tokens`, regenerate, callback secret management.
-    - Uses business-scope provider configs, fee configs, country-operator configs (scope="business").
-- **Account Separation**: Personal and business accounts are fully isolated:
-  - Admin stats (`/api/admin/stats`) filter personal-only users. Business stats at `/api/admin/business/stats`.
-  - Provider configs, fee configs, country-operator configs all use `scope` column ("personal"|"business").
-  - Business admin pages mirror personal admin quality (providers, country-operator, fees, management with stats).
-  - Documentation page has two tabs: "Integration Compte Personnel" and "Integration Compte Entreprise".
-- **Transaction Security**: Transactions are created as "pending" and only marked "completed" after strict FedaPay confirmation, using atomic functions to prevent race conditions.
-- **Customer Email Privacy**: Customer emails are never sent to payment providers; generic `noreply@bkapay.com` is used for provider API calls.
-- **Operator Filtering**: Country-specific operator filtering for collect and payout.
-- **User Country System**: Users must select from 5 authorized countries during registration, which cannot be changed later.
-- **Withdrawal Security System**: Allows users to configure up to 3 withdrawal phone numbers and requires a 6-digit bcrypt-hashed security code for all withdrawals.
-- **Phone Input**: Implements `PhoneInputWithPrefix` with locked country dial codes for various forms.
-- **Email Verification**: Supports optional two-step email verification during signup and a three-step password reset flow using Gmail SMTP via nodemailer.
-- **Cryptocurrency Payments (NOWPayments)**: Supports various cryptocurrencies with a XOF → USD conversion and a complex fee structure (10% markup, 15% crypto fee, optional 6% standard fee). Admin controls crypto availability at the **currency level** with separate `payinEnabled` and `payoutEnabled` toggles per cryptocurrency (BTC, ETH, USDT, etc.) in the Countries & Operators page (NOWPayments tab), Fournisseurs page, and Crypto Config page. The `crypto_currencies` table stores `payin_enabled` and `payout_enabled` columns. The `/api/crypto/currencies` endpoint accepts a `direction=payin|payout` query parameter to return only currencies enabled for that direction. `CryptoPaymentFlow` fetches payin-enabled currencies, `CryptoWithdrawalFlow` fetches payout-enabled currencies. Crypto option is always shown in PaymentMethodSelector.
-- **Multi-Currency Support**: Supports multiple currencies for certain countries (e.g., CDF and USD for DRC) with a `CurrencySelector` and real-time conversion using an exchange rate API.
-- **Currency Conversion Rule**: All final converted amounts are sent to payment providers, with transaction metadata storing `providerAmount`, `providerCurrency`, `balanceAmount`, and `balanceCurrency`.
-- **PawaPay Decimal Support**: Zero-decimal currencies (XOF, XAF, CDF, RWF, UGX, TZS, MWK, SLE, NGN, KES, GNF, MGA) are floored to integers. All other currencies (USD, GHS, ZMW, MZN, LSL, EUR) preserve 2 decimal places. The `roundForCurrency()` function in `server/pawapay.ts` and `roundToDecimals()` in `server/currency-converter.ts` both enforce this consistently.
-- **EMALI Transactional**: EMALI can execute retraits et transferts via OpenAI function calling (tools: calculate_fees, execute_withdrawal, execute_transfer, convert_currency). Le chat guide l'utilisateur étape par étape, vérifie KYC/code de sécurité/numéros autorisés, calcule les frais, et exécute les opérations en temps réel. Sécurité: validation des numéros de retrait autorisés côté serveur, code de sécurité obligatoire pour les retraits.
-- **Admin Messaging System**: Admin can send broadcast emails to users via the "Messages" tab in the admin dashboard. Features: audience filtering by account type (personal/merchant/both) and KYC status (verified/unverified/all), or manual user selection with search. AI message polishing via OpenAI GPT-4o (accept/reject flow). Emails sent via existing Mailtrap system with branded HTML template. Server-side validation (string type checks, length limits, admin exclusion). HTML injection protection via `escapeHtml()` function.
-- **Bank Account Configuration**: Business users can configure bank account details (holder, IBAN, bank name, SWIFT/BIC, branch info, country, currency) in Settings page. Admin can view bank account details for each business user.
-- **Settlement (Règlement) System**: Business users can request fund transfers from their wallets to their bank account. Creates a settlement record with status "pending". Admin can view/manage settlements in the "Reglements" tab of business admin with pending count badge, and mark them as "completed". Table: `settlements` with bank account snapshot.
-- **Payment Link Custom Fields & Documents**: Personal accounts can add up to 3 custom fields (text/email/number) and up to 3 downloadable documents (max 5MB each, stored as base64) to payment links. Custom fields are filled by the customer before payment and stored in transaction metadata (`customFieldResponses`). Documents are hidden from the public pre-payment page; they are served via a secure post-payment endpoint (`GET /api/payment-links/documents/:token/:transactionId`) that verifies the transaction is completed and linked to the payment link. Documents are also sent by email after successful payment via `sendPaymentDocumentsEmail()`. DB columns: `custom_fields` (TEXT/JSON), `document_urls` (TEXT[]), `document_names` (TEXT[]) on `payment_links` table.
-- **Business Admin Reorganization**: Admin business management page has 3 tabs: Utilisateurs, Pays (country stats with payment counts), Reglements (with pending badge). "Soldes" button shows wallet balances. Bank detail dialog for each user.
-- **Active Users 7 Days**: Route `/api/admin/active-users-7d` now includes both transaction activity AND login activity (login_logs table). No longer excludes admin users.
+## Pointers
 
-## External Dependencies
-- **AfribaPay API**: Payment gateway.
-- **Paydunya API**: Payment gateway.
-- **FedaPay API**: Payment gateway.
-- **MbiyoPay API**: Payment gateway.
-- **MoneyFusion API**: Payout-only payment gateway (24 countries, withdrawals/transfers only). Documentation officielle: https://docs.moneyfusion.net/fr/payout. Endpoint: `POST https://pay.moneyfusion.net/api/v1/withdraw`. Header: `moneyfusion-private-key`. Body: `{countryCode, phone (format local sans préfixe), amount, withdraw_mode, webhook_url}`. Webhooks: `payout.session.completed` / `payout.session.cancelled`. IP du serveur doit être whitelistée dans le dashboard MoneyFusion.
-- **FeeXPay API**: Payment gateway for 7 countries (BJ, TG, BF, SN, CI, CM, CG). Base URL: `https://api.feexpay.me`. Auth: `Bearer fp_API_KEY`. Pay-in: `POST /api/transactions/public/requesttopay/{networkKey}`. Payout: `POST /api/transactions/public/payout` (single endpoint, `operator` in body). Operators: MTN, Moov, Orange, Togocom, Celtiis, Free, Wave. Wave (SN/CI) uses redirect flow (`redirectUrl`). Coris (BJ) uses 2-step OTP flow (1st call `otp:""` triggers SMS, 2nd call with code). Config: `apiKey` (Bearer token), `publicKey` (Shop/Merchant ID). Phone format: international without `+`. Files: `shared/feexpay-countries.ts`, `server/feexpay.ts`, `server/feexpay-routes.ts`.
-- **NOWPayments API**: Cryptocurrency payment gateway.
-- **PostgreSQL**: Primary database.
-- **Drizzle ORM**: Database interactions.
-- **connect-pg-simple**: PostgreSQL session store.
-- **nodemailer**: Email service (for Gmail SMTP).
-
-## Performance Optimizations
-- **Server-Side Cache**: In-memory cache (`platformSettingsCache`) for frequently-read platform settings (`maintenance_mode`, `deposit_enabled`, `emali_enabled`) with 30s TTL. Cache is invalidated immediately when admin toggles a setting. Functions: `getCachedSetting()`, `setCachedSetting()`, `invalidateCachedSetting()` in `server/routes.ts`.
-- **Frontend Code Splitting**: All page components in `client/src/App.tsx` use `React.lazy()` for on-demand loading. `PageLoader` spinner shown during chunk loading via `Suspense` boundaries.
-- **Reduced Polling**: Maintenance check every 30s (was 10s). Dashboard stats refetch every 60s (was 30s). Analytics refetch every 120s (was 60s). User data staleTime 60s.
-- **PawaPay Active Configuration**: `getPawaPayActiveConf(operationType?)` in `server/pawapay.ts` queries PawaPay API for active corridors. Route: `GET /api/admin/pawapay/active-conf?operation=PAYOUT`.
+- **Drizzle ORM Documentation:** [https://orm.drizzle.team/docs/overview](https://orm.drizzle.team/docs/overview)
+- **FedaPay API Docs:** _Populate as you build_
+- **NOWPayments API Docs:** _Populate as you build_
+- **MoneyFusion API Docs:** [https://docs.moneyfusion.net/fr/payout](https://docs.moneyfusion.net/fr/payout)
+- **Shadcn UI Documentation:** [https://ui.shadcn.com/docs](https://ui.shadcn.com/docs)
+- **Tailwind CSS Documentation:** [https://tailwindcss.com/docs](https://tailwindcss.com/docs)
