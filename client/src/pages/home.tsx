@@ -204,7 +204,7 @@ export default function Home() {
         <div className="container mx-auto px-2 sm:px-4 md:px-8 max-w-7xl relative z-10">
           <div className="space-y-3 sm:space-y-6 lg:space-y-8 max-w-2xl">
             <div className="space-y-2 sm:space-y-4">
-              <h1 className="text-xl sm:text-2xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-white leading-tight [text-shadow:0_0_8px_#22c55e,0_0_2px_#16a34a]">
+              <h1 className="text-sm sm:text-base md:text-xl lg:text-2xl xl:text-3xl font-bold text-white leading-tight [text-shadow:0_0_8px_#22c55e,0_0_2px_#16a34a]">
                 Paiements Mobile Money pour l'Afrique
               </h1>
               <p className="text-xs sm:text-sm md:text-base lg:text-lg text-white/80 [text-shadow:0_0_6px_#22c55e]">
