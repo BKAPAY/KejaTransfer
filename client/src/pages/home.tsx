@@ -204,21 +204,21 @@ export default function Home() {
         <div className="container mx-auto px-2 sm:px-4 md:px-8 max-w-7xl relative z-10">
           <div className="space-y-3 sm:space-y-6 lg:space-y-8 max-w-2xl">
             <div className="space-y-2 sm:space-y-4">
-              <h1 className="text-xl sm:text-2xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-green-400 leading-tight">
+              <h1 className="text-xl sm:text-2xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-white leading-tight [text-shadow:0_0_8px_#22c55e,0_0_2px_#16a34a]">
                 Paiements Mobile Money pour l'Afrique
               </h1>
-              <p className="text-xs sm:text-sm md:text-base lg:text-lg text-green-300/90">
+              <p className="text-xs sm:text-sm md:text-base lg:text-lg text-white/80 [text-shadow:0_0_6px_#22c55e]">
                 Acceptez les paiements Orange Money, MTN, Moov, Wave et plus dans plus de 17 pays. Plateforme simple, sécurisée et fiable.
               </p>
             </div>
             <div className="flex flex-wrap gap-2 sm:gap-4">
               <Link href="/signup">
-                <Button className="text-xs sm:text-sm md:text-base bg-green-500 border border-green-400 text-white" data-testid="button-hero-signup">
+                <Button className="text-xs sm:text-sm md:text-base border-2 border-green-500 shadow-[0_0_8px_#22c55e]" data-testid="button-hero-signup">
                   Commencer
                 </Button>
               </Link>
               <Link href="/login">
-                <Button variant="outline" className="text-xs sm:text-sm md:text-base border-green-400 text-green-400 bg-green-500/10 backdrop-blur-sm" data-testid="button-hero-login">
+                <Button variant="outline" className="text-xs sm:text-sm md:text-base border-2 border-green-500 text-white bg-white/10 backdrop-blur-sm shadow-[0_0_8px_#22c55e]" data-testid="button-hero-login">
                   Se connecter
                 </Button>
               </Link>
