@@ -153,17 +153,18 @@ function SidebarMenuItems({
 export function AppSidebar() {
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
-  const { setOpenMobile, isMobile } = useSidebar();
+  const { setOpenMobile, isMobile, open } = useSidebar();
   const [logoWhiteBg, setLogoWhiteBg] = useState(true);
   const [logoSpinKey, setLogoSpinKey] = useState(0);
+  const prevOpenRef = useState(() => open);
 
   useEffect(() => {
-    const interval = setInterval(() => {
+    if (prevOpenRef[0] !== open) {
+      prevOpenRef[0] = open;
       setLogoSpinKey(k => k + 1);
       setLogoWhiteBg(b => !b);
-    }, 3000);
-    return () => clearInterval(interval);
-  }, []);
+    }
+  }, [open]);
 
   const { data: user } = useQuery<UserType>({
     queryKey: ["/api/auth/me"],
