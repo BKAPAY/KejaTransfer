@@ -139,16 +139,16 @@ export default function BusinessDashboard() {
       </div>
 
       <div className="flex items-center gap-2">
-        <TrendingUp className="h-4 w-4 text-muted-foreground" />
-        <span className="text-sm text-muted-foreground">
-          Wallets par pays — les paiements collectés dans chaque pays alimentent le wallet correspondant
+        <TrendingUp className="h-3 w-3 text-muted-foreground" />
+        <span className="text-xs text-muted-foreground">
+          Wallets par pays
         </span>
       </div>
 
-      <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-2">
         {isLoading
           ? Array.from({ length: 12 }).map((_, i) => (
-              <Skeleton key={i} className="h-20 w-full rounded-lg" />
+              <Skeleton key={i} className="h-14 w-full rounded-lg" />
             ))
           : sortedKeys.map(key => {
               const info = COUNTRY_INFO[key];
@@ -165,22 +165,22 @@ export default function BusinessDashboard() {
                   data-testid={`wallet-card-${key.toLowerCase()}`}
                   className={`transition-all duration-200 ${isDisabled ? "opacity-60 pointer-events-none select-none" : ""}`}
                 >
-                  <CardContent className="py-4 px-5 space-y-2">
-                    <div className="flex items-center gap-3">
-                      <CountryFlag code={key.slice(0, 2)} size="md" className="flex-shrink-0" />
-                      <p className="font-medium leading-tight">{info.name}</p>
+                  <CardContent className="py-2 px-3">
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <CountryFlag code={key.slice(0, 2)} size="sm" className="flex-shrink-0" />
+                      <p className="text-xs font-medium leading-tight truncate">{info.name}</p>
                       {isDisabled ? (
-                        <Badge variant="secondary" className="text-xs ml-auto">
-                          Indisponible
+                        <Badge variant="secondary" className="text-[10px] ml-auto px-1 py-0">
+                          Off
                         </Badge>
                       ) : isPositive ? (
-                        <Badge variant="secondary" className="text-xs ml-auto">
+                        <Badge variant="secondary" className="text-[10px] ml-auto px-1 py-0">
                           Actif
                         </Badge>
                       ) : null}
                     </div>
                     <p
-                      className={`font-bold text-xl tabular-nums ${
+                      className={`font-bold text-sm tabular-nums ${
                         isPositive && !isDisabled ? "text-foreground" : "text-muted-foreground"
                       }`}
                       data-testid={`wallet-balance-${key.toLowerCase()}`}
