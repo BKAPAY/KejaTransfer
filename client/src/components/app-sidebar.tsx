@@ -27,6 +27,7 @@ import {
   Shield,
   Send,
 } from "lucide-react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { User as UserType } from "@shared/schema";
 import logoImage from "@assets/bkapay-logo.png";
@@ -153,6 +154,16 @@ export function AppSidebar() {
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
   const { setOpenMobile, isMobile } = useSidebar();
+  const [logoWhiteBg, setLogoWhiteBg] = useState(true);
+  const [logoSpinKey, setLogoSpinKey] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setLogoSpinKey(k => k + 1);
+      setLogoWhiteBg(b => !b);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, []);
 
   const { data: user } = useQuery<UserType>({
     queryKey: ["/api/auth/me"],
@@ -194,7 +205,10 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarHeader className="p-6">
         <div className="flex items-center gap-3">
-          <div className="bg-white rounded-md px-2 py-1 flex-shrink-0">
+          <div
+            key={logoSpinKey}
+            className={`logo-spin-once rounded-md px-2 py-1 flex-shrink-0 transition-colors duration-500 ${logoWhiteBg ? "bg-white" : "bg-transparent"}`}
+          >
             <img src={logoImage} alt="BKApay" className="h-8 w-auto" />
           </div>
         </div>

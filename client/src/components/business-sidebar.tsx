@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import {
   Sidebar,
@@ -46,6 +46,16 @@ export function BusinessSidebar() {
   const [historyOpen, setHistoryOpen] = useState(
     location.startsWith("/dashboard/business/history")
   );
+  const [logoWhiteBg, setLogoWhiteBg] = useState(true);
+  const [logoSpinKey, setLogoSpinKey] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setLogoSpinKey(k => k + 1);
+      setLogoWhiteBg(b => !b);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, []);
 
   const { data: user } = useQuery<UserType>({
     queryKey: ["/api/auth/me"],
@@ -84,7 +94,10 @@ export function BusinessSidebar() {
     <Sidebar>
       <SidebarHeader className="px-4 pt-4 pb-2">
         <div className="flex items-center gap-3">
-          <div className="bg-white rounded-md px-2 py-1 flex-shrink-0">
+          <div
+            key={logoSpinKey}
+            className={`logo-spin-once rounded-md px-2 py-1 flex-shrink-0 transition-colors duration-500 ${logoWhiteBg ? "bg-white" : "bg-transparent"}`}
+          >
             <img src={logoImage} alt="BKApay" className="h-8 w-auto" />
           </div>
         </div>

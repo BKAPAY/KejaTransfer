@@ -286,6 +286,15 @@
     inset: -1px;
   }
 
+  /* Logo spin animation */
+  @keyframes logo-spin-once {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+  }
+  .logo-spin-once {
+    animation: logo-spin-once 0.7s ease-in-out;
+  }
+
   /* Infinite scroll animation from right to left */
   @keyframes scroll-left {
     0% {
