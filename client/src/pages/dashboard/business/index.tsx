@@ -138,13 +138,6 @@ export default function BusinessDashboard() {
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
-        <TrendingUp className="h-3 w-3 text-muted-foreground" />
-        <span className="text-xs text-muted-foreground">
-          Wallets par pays
-        </span>
-      </div>
-
       <div className="grid grid-cols-2 gap-2">
         {isLoading
           ? Array.from({ length: 12 }).map((_, i) => (
