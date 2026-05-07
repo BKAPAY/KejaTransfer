@@ -194,7 +194,9 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarHeader className="p-6">
         <div className="flex items-center gap-3">
-          <img src={logoImage} alt="BKApay" className="h-10 w-auto" />
+          <div className="bg-white rounded-md px-2 py-1 flex-shrink-0">
+            <img src={logoImage} alt="BKApay" className="h-8 w-auto" />
+          </div>
         </div>
       </SidebarHeader>
 

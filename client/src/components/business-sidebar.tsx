@@ -84,10 +84,12 @@ export function BusinessSidebar() {
     <Sidebar>
       <SidebarHeader className="p-6">
         <div className="flex items-center gap-3">
-          <img src={logoImage} alt="BKApay" className="h-10 w-auto" />
+          <div className="bg-white rounded-md px-2 py-1 flex-shrink-0">
+            <img src={logoImage} alt="BKApay" className="h-8 w-auto" />
+          </div>
         </div>
         {user?.businessName && (
-          <p className="text-xs text-muted-foreground mt-1 font-medium truncate">
+          <p className="text-xs text-green-400 mt-1 font-semibold truncate">
             {user.businessName}
           </p>
         )}
