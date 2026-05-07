@@ -82,7 +82,7 @@ export function BusinessSidebar() {
 
   return (
     <Sidebar>
-      <SidebarHeader className="p-6">
+      <SidebarHeader className="px-4 pt-4 pb-2">
         <div className="flex items-center gap-3">
           <div className="bg-white rounded-md px-2 py-1 flex-shrink-0">
             <img src={logoImage} alt="BKApay" className="h-8 w-auto" />
