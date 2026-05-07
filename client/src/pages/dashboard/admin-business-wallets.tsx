@@ -3,8 +3,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, Building2, TrendingUp } from "lucide-react";
-import { useLocation, useParams } from "wouter";
+import { ChevronLeft, Building2 } from "lucide-react";
+import { useLocation, useParams, Link } from "wouter";
 import { CountryFlag } from "@/components/country-flag";
 import type { User } from "@shared/schema";
 
@@ -154,12 +154,9 @@ export default function AdminBusinessWallets() {
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
-        <TrendingUp className="h-4 w-4 text-muted-foreground" />
-        <span className="text-sm text-muted-foreground">
-          Wallets par pays — soldes en temps réel
-        </span>
-      </div>
+      <p className="text-sm text-muted-foreground">
+        Wallets par pays — soldes en temps réel. Cliquez sur un wallet pour voir les détails.
+      </p>
 
       <div className="space-y-3">
         {isLoading
@@ -175,11 +172,11 @@ export default function AdminBusinessWallets() {
               const countryCode = getCountryCodeFromKey(key);
               const isDisabled = disabledCountries.includes(countryCode);
 
-              return (
+              const cardContent = (
                 <Card
                   key={key}
                   data-testid={`wallet-card-${key.toLowerCase()}`}
-                  className={`transition-all duration-200 ${isDisabled ? "opacity-60 pointer-events-none select-none" : ""}`}
+                  className={`transition-all duration-200 ${!isDisabled ? "hover-elevate cursor-pointer" : "opacity-60 pointer-events-none select-none"}`}
                 >
                   <CardContent className="py-4 px-5 space-y-2">
                     <div className="flex items-center gap-3">
@@ -205,6 +202,12 @@ export default function AdminBusinessWallets() {
                     </p>
                   </CardContent>
                 </Card>
+              );
+
+              return isDisabled ? cardContent : (
+                <Link key={key} href={`/dashboard/admin/business/users/${userId}/wallet/${key}`}>
+                  {cardContent}
+                </Link>
               );
             })
         }
