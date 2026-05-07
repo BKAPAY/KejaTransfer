@@ -583,6 +583,110 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Statistiques d'un wallet par pays avec filtre de période
+  app.get("/api/business/wallet-stats/:country", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+      const userId = req.session.userId!;
+      const country = req.params.country;
+      const currency = (req.query.currency as string) || null;
+
+      let dateFrom: Date;
+      if (req.query.from && req.query.to) {
+        dateFrom = new Date(req.query.from as string);
+      } else {
+        const days = parseInt((req.query.days as string) || "30", 10);
+        dateFrom = new Date();
+        dateFrom.setDate(dateFrom.getDate() - days);
+      }
+      const dateTo = req.query.to ? new Date(req.query.to as string) : new Date();
+
+      // Handle CD (Congo) which has two currencies: CD_CDF and CD_USD
+      const actualCountry = country.includes("_") ? "CD" : country;
+      const currencyFilter = country.includes("_") ? country.split("_")[1] : currency;
+
+      const payinResult = await pool.query(`
+        SELECT COALESCE(SUM(t.amount), 0) as total, COUNT(*) as count
+        FROM transactions t
+        JOIN users u ON t.user_id = u.id
+        WHERE t.user_id = $1
+          AND t.country = $2
+          AND t.status = 'completed'
+          AND t.type IN ('deposit', 'payment_link', 'merchant_link', 'api_payment')
+          AND t.created_at >= $3
+          AND t.created_at <= $4
+          ${currencyFilter ? "AND t.currency = '" + currencyFilter + "'" : ""}
+      `, [userId, actualCountry, dateFrom.toISOString(), dateTo.toISOString()]);
+
+      const payoutResult = await pool.query(`
+        SELECT COALESCE(SUM(t.amount), 0) as total, COUNT(*) as count
+        FROM transactions t
+        WHERE t.user_id = $1
+          AND t.country = $2
+          AND t.status = 'completed'
+          AND t.type IN ('transfer', 'withdrawal', 'api_payout')
+          AND t.created_at >= $3
+          AND t.created_at <= $4
+          ${currencyFilter ? "AND t.currency = '" + currencyFilter + "'" : ""}
+      `, [userId, actualCountry, dateFrom.toISOString(), dateTo.toISOString()]);
+
+      const settlementsResult = await pool.query(`
+        SELECT COALESCE(SUM(amount), 0) as total, COUNT(*) as count
+        FROM settlements
+        WHERE user_id = $1
+          AND wallet_country = $2
+          AND created_at >= $3
+          AND created_at <= $4
+          ${currencyFilter ? "AND wallet_currency = '" + currencyFilter + "'" : ""}
+      `, [userId, actualCountry, dateFrom.toISOString(), dateTo.toISOString()]);
+
+      const txListResult = await pool.query(`
+        SELECT t.id, t.type, t.amount, t.currency, t.status, t.customer_name, t.customer_phone,
+               t.operator, t.created_at, t.fee
+        FROM transactions t
+        WHERE t.user_id = $1
+          AND t.country = $2
+          AND t.status = 'completed'
+          AND t.created_at >= $3
+          AND t.created_at <= $4
+          ${currencyFilter ? "AND t.currency = '" + currencyFilter + "'" : ""}
+        ORDER BY t.created_at DESC
+        LIMIT 100
+      `, [userId, actualCountry, dateFrom.toISOString(), dateTo.toISOString()]);
+
+      await pool.end();
+
+      res.json({
+        country: actualCountry,
+        currency: currencyFilter,
+        periodDays: req.query.days || null,
+        from: dateFrom.toISOString(),
+        to: dateTo.toISOString(),
+        totalPayin: parseInt(payinResult.rows[0]?.total) || 0,
+        countPayin: parseInt(payinResult.rows[0]?.count) || 0,
+        totalPayout: parseInt(payoutResult.rows[0]?.total) || 0,
+        countPayout: parseInt(payoutResult.rows[0]?.count) || 0,
+        totalSettlements: parseInt(settlementsResult.rows[0]?.total) || 0,
+        countSettlements: parseInt(settlementsResult.rows[0]?.count) || 0,
+        transactions: txListResult.rows.map((r: any) => ({
+          id: r.id,
+          type: r.type,
+          amount: parseInt(r.amount) || 0,
+          currency: r.currency,
+          status: r.status,
+          customerName: r.customer_name,
+          customerPhone: r.customer_phone,
+          operator: r.operator,
+          createdAt: r.created_at,
+          fee: parseFloat(r.fee) || 0,
+        })),
+      });
+    } catch (error: any) {
+      console.error("Wallet stats error:", error);
+      res.status(500).json({ error: "Erreur lors du calcul des statistiques" });
+    }
+  });
+
   // Eligibilite de reversement basee sur le taux de change reel (ExchangeRate API)
   app.get("/api/business/settlement-eligibility", requireAuth, async (req: Request, res: Response) => {
     try {

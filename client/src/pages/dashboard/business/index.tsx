@@ -2,9 +2,10 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Building2, TrendingUp } from "lucide-react";
+import { Building2 } from "lucide-react";
 import type { User } from "@shared/schema";
 import { CountryFlag } from "@/components/country-flag";
+import { Link } from "wouter";
 
 interface BusinessWallet {
   id: string;
@@ -152,11 +153,11 @@ export default function BusinessDashboard() {
               const countryCode = getCountryCodeFromKey(key);
               const isDisabled = disabledCountries.includes(countryCode);
 
-              return (
+              const cardContent = (
                 <Card
                   key={key}
                   data-testid={`wallet-card-${key.toLowerCase()}`}
-                  className={`transition-all duration-200 ${isDisabled ? "opacity-60 pointer-events-none select-none" : ""}`}
+                  className={`transition-all duration-200 ${!isDisabled ? "hover-elevate cursor-pointer" : "opacity-60 pointer-events-none select-none"}`}
                 >
                   <CardContent className="py-2 px-3">
                     <div className="flex items-center gap-1.5 mb-0.5">
@@ -182,6 +183,12 @@ export default function BusinessDashboard() {
                     </p>
                   </CardContent>
                 </Card>
+              );
+
+              return isDisabled ? cardContent : (
+                <Link key={key} href={`/dashboard/business/wallet/${key}`}>
+                  {cardContent}
+                </Link>
               );
             })
         }

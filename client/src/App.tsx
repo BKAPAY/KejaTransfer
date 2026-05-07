@@ -115,6 +115,7 @@ const BusinessSettlementDetail = lazy(() => import("@/pages/dashboard/business/s
 const BusinessSettlementBatch = lazy(() => import("@/pages/dashboard/business/settlement-batch"));
 const AdminSettlementBatchDetail = lazy(() => import("@/pages/dashboard/admin-settlement-batch-detail"));
 const BusinessFees = lazy(() => import("@/pages/dashboard/business/fees"));
+const BusinessWalletDetail = lazy(() => import("@/pages/dashboard/business/wallet-detail"));
 
 // Précharger le cache React Query depuis localStorage AVANT le premier rendu
 // → les infos utilisateur (nom, solde...) s'affichent instantanément au rechargement de page
@@ -276,6 +277,7 @@ function Router() {
           <Route path="/dashboard/business/settlement-batch/:ts" component={BusinessSettlementBatch} />
           <Route path="/dashboard/business/settlements/:id" component={BusinessSettlementDetail} />
           <Route path="/dashboard/business/fees" component={BusinessFees} />
+          <Route path="/dashboard/business/wallet/:country" component={BusinessWalletDetail} />
           <Route path="/dashboard/business/documentation" component={DocumentationBusiness} />
           <Route path="/dashboard/business/support" component={Support} />
           <Route path="/dashboard/business/analytics" component={AnalyticsBusiness} />
