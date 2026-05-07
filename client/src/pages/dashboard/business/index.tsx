@@ -129,7 +129,7 @@ export default function BusinessDashboard() {
           <Building2 className="h-6 w-6 text-primary" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">
+          <h1 className="text-2xl font-bold tracking-tight text-blue-600 dark:text-blue-400">
             {user?.businessName || "Tableau de bord Entreprise"}
           </h1>
           <p className="text-sm text-muted-foreground">
