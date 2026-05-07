@@ -6,13 +6,38 @@ import { Button } from "@/components/ui/button";
 import { Download, FileImage } from "lucide-react";
 
 interface TransactionMetadata {
+  payAddress?: string;
+  cryptoCurrency?: string;
+  cryptoAmount?: number;
+  paymentId?: string;
+  nowpaymentsId?: string;
+  fedapayTransactionId?: number;
+  fedapayReference?: string;
+  mbiyopayTransactionId?: string;
+  afribaPayTransactionId?: string;
+  afribaPayOrderId?: string;
+  moneyfusionRef?: string;
+  wizallTransactionId?: string;
+  pawaPayDepositId?: string;
+  pawaPayPayoutId?: string;
+  operatorKey?: string;
   provider?: string;
+  providerAmount?: number;
+  providerCurrency?: string;
+  balanceAmount?: number;
+  balanceCurrency?: string;
+  conversionRate?: number;
   exchangeFee?: number;
   exchangeFeePercentage?: number;
   netAmountForUser?: number;
-  netMode?: boolean;
-  apiKeyId?: string;
+  scope?: string;
   businessTokenId?: string;
+  apiKeyId?: string;
+  orderId?: string;
+  netMode?: boolean;
+  customerPaysFee?: boolean;
+  customerServiceFee?: number;
+  customFieldResponses?: Record<string, unknown>;
   [key: string]: any;
 }
 
@@ -22,13 +47,14 @@ const TOOTH_COUNT = 18;
 const OUTER_BG = "#e8edf2";
 const WHITE = "#ffffff";
 
-const OUTGOING_TYPES = ["withdrawal", "transfer"];
+const OUTGOING_TYPES = ["withdrawal", "transfer", "api_payout"];
 const INCOMING_TYPES = ["deposit", "payment_link", "merchant_link", "api_payment"];
 
 function fmtAmt(amount: number, currency: string) {
+  const hasDecimals = amount % 1 !== 0;
   return new Intl.NumberFormat("fr-FR", {
     minimumFractionDigits: 0,
-    maximumFractionDigits: currency === "USD" || currency === "EUR" ? 2 : 0,
+    maximumFractionDigits: hasDecimals ? 2 : (currency === "USD" || currency === "EUR" ? 2 : 0),
   }).format(amount) + " " + currency;
 }
 
@@ -76,14 +102,18 @@ const TYPE_LABELS: Record<string, string> = {
   payment_link: "Lien de paiement",
   merchant_link: "Lien marchand",
   api_payment: "Paiement API",
+  api_payout: "Payout API",
 };
 
-function ReceiptRow({ label, value, color = "#1e293b", bold = false }: {
-  label: string; value: string; color?: string; bold?: boolean;
+function ReceiptRow({ label, value, color = "#1e293b", bold = false, sublabel }: {
+  label: string; value: string; color?: string; bold?: boolean; sublabel?: string;
 }) {
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0" }}>
-      <span style={{ fontSize: 12, color: "#64748b", fontFamily: "inherit" }}>{label}</span>
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "5px 0" }}>
+      <div>
+        <span style={{ fontSize: 12, color: "#64748b", fontFamily: "inherit" }}>{label}</span>
+        {sublabel && <span style={{ fontSize: 10, color: "#94a3b8", display: "block" }}>{sublabel}</span>}
+      </div>
       <span style={{ fontSize: 12, color, fontWeight: bold ? 700 : 500, fontFamily: "inherit" }}>{value}</span>
     </div>
   );
@@ -95,6 +125,14 @@ function DashedLine() {
       borderTop: "2px dashed #e2e8f0",
       margin: "12px 0",
     }} />
+  );
+}
+
+function SectionTitle({ title }: { title: string }) {
+  return (
+    <div style={{ fontSize: 9, fontWeight: 700, color: "#94a3b8", letterSpacing: 1.5, textTransform: "uppercase" as const, marginBottom: 10 }}>
+      {title}
+    </div>
   );
 }
 
@@ -111,6 +149,19 @@ function PerforationLine() {
   );
 }
 
+function SummaryBox({ children, color = "#f8fafc" }: { children: React.ReactNode; color?: string }) {
+  return (
+    <div style={{
+      borderTop: "1px solid #e2e8f0",
+      background: color,
+      margin: "8px -0px 0 -0px",
+      padding: "8px 0 0 0",
+    }}>
+      {children}
+    </div>
+  );
+}
+
 interface ReceiptTemplateProps {
   transaction: Transaction;
   metadata: TransactionMetadata | null;
@@ -123,13 +174,36 @@ const ReceiptTemplate = forwardRef<HTMLDivElement, ReceiptTemplateProps>(
     const exchangeFee = metadata?.exchangeFee || 0;
     const isOutgoing = OUTGOING_TYPES.includes(transaction.type);
     const isIncoming = INCOMING_TYPES.includes(transaction.type);
-    // Pour les entrantes cross-devise : transaction.fee = service + échange combinés
-    // → soustraire exchangeFee pour isoler les vrais frais de service
+
+    // Même logique que le dialog
     const trueServiceFee = isIncoming ? Math.max(0, serviceFee - exchangeFee) : serviceFee;
     const totalFee = trueServiceFee + exchangeFee;
+
     const isNetMode = !!(metadata?.netMode) || !!(metadata?.apiKeyId && !metadata?.businessTokenId);
-    const cpf = isIncoming && !!(metadata?.customerPaysFee);
+    const isFeeOnTop = transaction.type === "transfer"
+      || (transaction.type === "withdrawal" && exchangeFee > 0)
+      || isNetMode;
+
+    const isCustomerPaysFee = !!(metadata?.customerPaysFee);
+    const storedCustomerServiceFee = metadata?.customerServiceFee || 0;
+    const inferredCustomerServiceFee = (isCustomerPaysFee && storedCustomerServiceFee === 0 && metadata?.providerAmount && metadata.providerAmount > transaction.amount && (metadata.providerCurrency === (transaction.currency || "XOF")))
+      ? (metadata.providerAmount - transaction.amount)
+      : 0;
+    const effectiveCustomerServiceFee = storedCustomerServiceFee || inferredCustomerServiceFee;
+
     const status = STATUS_CONF[transaction.status] || STATUS_CONF.pending;
+
+    // Même logique displayTransactionId que le dialog
+    const displayTransactionId = transaction.paydunyaToken
+      || (metadata?.fedapayTransactionId ? String(metadata.fedapayTransactionId) : null)
+      || metadata?.mbiyopayTransactionId
+      || metadata?.afribaPayTransactionId
+      || metadata?.pawaPayDepositId
+      || metadata?.pawaPayPayoutId
+      || (metadata?.nowpaymentsId ? String(metadata.nowpaymentsId) : null)
+      || (metadata?.orderId ? String(metadata.orderId) : null)
+      || transaction.id;
+
     const typeLabel = TYPE_LABELS[transaction.type] || transaction.type;
 
     const dateStr = new Date(transaction.createdAt).toLocaleDateString("fr-FR", {
@@ -137,22 +211,37 @@ const ReceiptTemplate = forwardRef<HTMLDivElement, ReceiptTemplateProps>(
       hour: "2-digit", minute: "2-digit",
     });
 
-    // cpf=true : transaction.amount = BASE (marchand reçoit), client paie base+fee
-    const amountLabel = isOutgoing
-      ? "MONTANT SAISI"
-      : cpf ? "MONTANT" : totalFee > 0 ? "MONTANT BRUT REÇU" : "MONTANT";
-    const mainAmount = fmtAmt(transaction.amount, currency);
-    const subtitleAmount = totalFee > 0
-      ? (isOutgoing && !isNetMode
-          ? `Net destinataire : ${fmtAmt(Math.max(0, transaction.amount - totalFee), currency)}`
-          : isOutgoing && isNetMode
-          ? `Débité du solde : ${fmtAmt(transaction.amount + totalFee, currency)}`
-          : cpf
-          ? (exchangeFee > 0 ? `Net crédité : ${fmtAmt(Math.max(0, transaction.amount - exchangeFee), currency)}` : null)
-          : `Net crédité : ${fmtAmt(Math.max(0, transaction.amount - totalFee), currency)}`)
-      : null;
+    // Libellé du montant principal — identique au dialog
+    let amountLabel: string;
+    if (isOutgoing) {
+      amountLabel = isFeeOnTop ? "MONTANT ENVOYÉ AU DESTINATAIRE" : "MONTANT SAISI";
+    } else if (isCustomerPaysFee) {
+      amountLabel = "MONTANT";
+    } else if (totalFee > 0) {
+      amountLabel = "MONTANT BRUT REÇU";
+    } else {
+      amountLabel = "MONTANT";
+    }
 
-    const hasBreakdown = totalFee > 0;
+    // Sous-titre du montant — identique au dialog
+    let subtitleAmount: string | null = null;
+    if (isOutgoing && totalFee > 0) {
+      if (isFeeOnTop) {
+        subtitleAmount = `Débité de votre solde : ${fmtAmt(transaction.amount + totalFee, currency)}`;
+      } else {
+        subtitleAmount = `Net destinataire : ${fmtAmt(Math.max(0, transaction.amount - serviceFee), currency)}`;
+      }
+    } else if (!isOutgoing && !isCustomerPaysFee && totalFee > 0) {
+      subtitleAmount = `Net crédité : ${fmtAmt(Math.max(0, transaction.amount - totalFee), currency)}`;
+    } else if (!isOutgoing && isCustomerPaysFee && exchangeFee > 0) {
+      subtitleAmount = `Net crédité : ${fmtAmt(Math.max(0, transaction.amount - exchangeFee), currency)}`;
+    }
+
+    const isCryptoPayment = !!(metadata?.payAddress || metadata?.cryptoCurrency);
+    const hasCrossCurrency = !!(metadata?.providerAmount && metadata?.providerCurrency && metadata.providerCurrency !== currency);
+
+    // Afficher le récapitulatif financier ?
+    const hasFinancialBreakdown = (totalFee > 0 || (isCustomerPaysFee && effectiveCustomerServiceFee > 0));
 
     return (
       <div
@@ -207,81 +296,96 @@ const ReceiptTemplate = forwardRef<HTMLDivElement, ReceiptTemplateProps>(
 
           {/* Main amount */}
           <div style={{ textAlign: "center", marginBottom: 16 }}>
-            <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 4 }}>
+            <div style={{ fontSize: 9, color: "#94a3b8", letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 4 }}>
               {amountLabel}
             </div>
-            <div style={{ fontSize: 36, fontWeight: 800, color: status.text, letterSpacing: -1 }}>
-              {mainAmount}
+            <div style={{ fontSize: 34, fontWeight: 800, color: status.text, letterSpacing: -1 }}>
+              {fmtAmt(transaction.amount, currency)}
             </div>
             {subtitleAmount && (
               <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>{subtitleAmount}</div>
             )}
           </div>
 
-          {/* Financial breakdown */}
-          {hasBreakdown && (
+          {/* Récapitulatif financier — même logique que FinancialBreakdown du dialog */}
+          {hasFinancialBreakdown && (
             <>
               <DashedLine />
               <div style={{ marginBottom: 4 }}>
-                <div style={{ fontSize: 9, fontWeight: 700, color: "#94a3b8", letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 10 }}>
-                  Récapitulatif financier
-                </div>
-                {isOutgoing && !isNetMode && (
+                <SectionTitle title="Récapitulatif financier" />
+
+                {isOutgoing && isFeeOnTop && (
+                  <>
+                    <ReceiptRow label="Montant envoyé au destinataire" value={fmtAmt(transaction.amount, currency)} />
+                    {serviceFee > 0 && <ReceiptRow label="Frais de service" value={`+${fmtAmt(serviceFee, currency)}`} color="#ef4444" />}
+                    {exchangeFee > 0 && <ReceiptRow label="Frais d'échange de devise" value={`+${fmtAmt(exchangeFee, currency)}`} color="#f97316" />}
+                    <SummaryBox color="#fff7ed">
+                      <ReceiptRow label="Débité de votre solde" value={fmtAmt(transaction.amount + totalFee, currency)} color="#b91c1c" bold />
+                    </SummaryBox>
+                  </>
+                )}
+
+                {isOutgoing && !isFeeOnTop && (
                   <>
                     <ReceiptRow label="Montant saisi" value={fmtAmt(transaction.amount, currency)} />
                     {serviceFee > 0 && <ReceiptRow label="Frais de service" value={`-${fmtAmt(serviceFee, currency)}`} color="#ef4444" />}
-                    {exchangeFee > 0 && <ReceiptRow label="Frais d'échange" value={`-${fmtAmt(exchangeFee, currency)}`} color="#f97316" />}
-                    <div style={{ borderTop: "1px solid #e2e8f0", margin: "8px 0" }} />
-                    <ReceiptRow label="Reçu par le destinataire" value={fmtAmt(Math.max(0, transaction.amount - totalFee), currency)} color="#15803d" bold />
+                    <SummaryBox color="#f0fdf4">
+                      <ReceiptRow label="Reçu par le destinataire" value={fmtAmt(Math.max(0, transaction.amount - serviceFee), currency)} color="#15803d" bold />
+                    </SummaryBox>
                   </>
                 )}
-                {isOutgoing && isNetMode && (
-                  <>
-                    <ReceiptRow label="Montant envoyé" value={fmtAmt(transaction.amount, currency)} />
-                    {serviceFee > 0 && <ReceiptRow label="Frais de service" value={`+${fmtAmt(serviceFee, currency)}`} color="#ef4444" />}
-                    {exchangeFee > 0 && <ReceiptRow label="Frais d'échange" value={`+${fmtAmt(exchangeFee, currency)}`} color="#f97316" />}
-                    <div style={{ borderTop: "1px solid #e2e8f0", margin: "8px 0" }} />
-                    <ReceiptRow label="Débité de votre solde" value={fmtAmt(transaction.amount + totalFee, currency)} color="#b91c1c" bold />
-                  </>
-                )}
-                {isIncoming && (() => {
-                  const cpf = !!(metadata?.customerPaysFee);
-                  const base = transaction.amount;
-                  // cpf=true : transaction.amount = montant BASE (marchand reçoit), client paie base+displayServiceFee
-                  // Quand cross-devise (PawaPay), transaction.fee = exchangeFee → displayServiceFee = 0 (évite double-comptage)
-                  // Quand même devise, transaction.fee = service fee → displayServiceFee = serviceFee
-                  // Pour CPF : displayServiceFee = frais réglés par le client (= trueServiceFee)
-                  // Pour standard : on utilise trueServiceFee (déjà corrigé du double-comptage)
-                  const displayServiceFee = cpf ? trueServiceFee : 0;
-                  const grossFromClient = cpf ? base + displayServiceFee : base;
-                  const netStandard = Math.max(0, base - totalFee);
-                  const creditedCpf = Math.max(0, base - exchangeFee);
+
+                {isIncoming && isCustomerPaysFee && (() => {
+                  const isCrossCcy = !!(metadata?.providerCurrency && metadata.providerCurrency !== currency);
+                  const providerCcy = metadata?.providerCurrency || currency;
+                  const displayServiceFee = storedCustomerServiceFee || Math.max(0, serviceFee - exchangeFee);
+                  const serviceFeeCcy = isCrossCcy ? providerCcy : currency;
+                  const grossFromClientAmount = isCrossCcy
+                    ? (metadata?.providerAmount || transaction.amount)
+                    : transaction.amount + displayServiceFee;
+                  const grossFromClientCcy = isCrossCcy ? providerCcy : currency;
+                  const creditedToOwner = Math.max(0, transaction.amount - exchangeFee);
                   return (
                     <>
-                      <ReceiptRow
-                        label={cpf ? "Total payé par le client" : "Montant reçu du payeur"}
-                        value={fmtAmt(cpf ? grossFromClient : base, currency)}
-                      />
-                      {cpf ? (
-                        displayServiceFee > 0 && <ReceiptRow label="Frais réglés par le client" value={`+${fmtAmt(displayServiceFee, currency)}`} color="#64748b" />
-                      ) : (
-                        trueServiceFee > 0 && <ReceiptRow label="Frais de service" value={`-${fmtAmt(trueServiceFee, currency)}`} color="#ef4444" />
+                      <ReceiptRow label="Total payé par le client" value={fmtAmt(grossFromClientAmount, grossFromClientCcy)} />
+                      {displayServiceFee > 0 && (
+                        <ReceiptRow
+                          label="Frais réglés par le client"
+                          value={`+${fmtAmt(displayServiceFee, serviceFeeCcy)}`}
+                          sublabel="pris en charge par le payeur"
+                          color="#64748b"
+                        />
                       )}
-                      {exchangeFee > 0 && <ReceiptRow label="Frais d'échange" value={`-${fmtAmt(exchangeFee, currency)}`} color="#f97316" />}
-                      <div style={{ borderTop: "1px solid #e2e8f0", margin: "8px 0" }} />
-                      <ReceiptRow label="Crédité sur votre compte" value={fmtAmt(cpf ? creditedCpf : netStandard, currency)} color="#15803d" bold />
+                      {exchangeFee > 0 && (
+                        <ReceiptRow label="Frais d'échange de devise" value={`-${fmtAmt(exchangeFee, currency)}`} color="#f97316" />
+                      )}
+                      <SummaryBox color="#f0fdf4">
+                        <ReceiptRow label="Crédité sur votre compte" value={fmtAmt(creditedToOwner, currency)} color="#15803d" bold />
+                      </SummaryBox>
                     </>
                   );
                 })()}
+
+                {isIncoming && !isCustomerPaysFee && (
+                  <>
+                    <ReceiptRow label="Montant reçu du payeur" value={fmtAmt(transaction.amount, currency)} />
+                    {trueServiceFee > 0 && <ReceiptRow label="Frais de service" value={`-${fmtAmt(trueServiceFee, currency)}`} color="#ef4444" />}
+                    {exchangeFee > 0 && <ReceiptRow label="Frais d'échange de devise" value={`-${fmtAmt(exchangeFee, currency)}`} color="#f97316" />}
+                    <SummaryBox color="#f0fdf4">
+                      <ReceiptRow label="Crédité sur votre compte" value={fmtAmt(Math.max(0, transaction.amount - totalFee), currency)} color="#15803d" bold />
+                    </SummaryBox>
+                  </>
+                )}
               </div>
             </>
           )}
 
-          {/* Info */}
-          {(transaction.country || transaction.operator || metadata?.provider) && (
+          {/* Informations générales */}
+          {(transaction.country || transaction.operator || metadata?.provider || transaction.description) && (
             <>
               <DashedLine />
               <div>
+                <SectionTitle title="Informations" />
                 {transaction.country && <ReceiptRow label="Pays" value={transaction.country} />}
                 {transaction.operator && <ReceiptRow label="Opérateur" value={transaction.operator} />}
                 {metadata?.provider && <ReceiptRow label="Fournisseur" value={metadata.provider} />}
@@ -295,14 +399,60 @@ const ReceiptTemplate = forwardRef<HTMLDivElement, ReceiptTemplateProps>(
             </>
           )}
 
-          {/* Customer */}
+          {/* Conversion de devises — identique au dialog */}
+          {hasCrossCurrency && (
+            <>
+              <DashedLine />
+              <div style={{
+                background: "#eff6ff",
+                border: "1px solid #bfdbfe",
+                borderRadius: 6,
+                padding: "10px 12px",
+              }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "#1d4ed8", marginBottom: 8 }}>Conversion de devises</div>
+                <ReceiptRow
+                  label="Montant envoyé au réseau"
+                  value={`${metadata!.providerAmount!.toLocaleString("fr-FR")} ${metadata!.providerCurrency}`}
+                />
+                {metadata?.conversionRate && (
+                  <ReceiptRow
+                    label="Taux de conversion"
+                    value={`1 ${metadata.providerCurrency} = ${metadata.conversionRate} ${currency}`}
+                    color="#64748b"
+                  />
+                )}
+              </div>
+            </>
+          )}
+
+          {/* Crypto — identique au dialog */}
+          {isCryptoPayment && (
+            <>
+              <DashedLine />
+              <div>
+                <SectionTitle title="Cryptomonnaie" />
+                {metadata?.cryptoCurrency && <ReceiptRow label="Devise crypto" value={metadata.cryptoCurrency.toUpperCase()} />}
+                {metadata?.cryptoAmount && (
+                  <ReceiptRow label="Montant crypto" value={`${metadata.cryptoAmount} ${metadata.cryptoCurrency?.toUpperCase() || ""}`} />
+                )}
+                {metadata?.payAddress && (
+                  <div style={{ marginTop: 6 }}>
+                    <div style={{ fontSize: 10, color: "#94a3b8", marginBottom: 2 }}>Adresse</div>
+                    <div style={{ fontSize: 9, fontFamily: "monospace", color: "#475569", wordBreak: "break-all", lineHeight: 1.5 }}>
+                      {metadata.payAddress}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
+          {/* Client */}
           {(transaction.customerName || transaction.customerEmail || transaction.customerPhone) && (
             <>
               <DashedLine />
               <div>
-                <div style={{ fontSize: 9, fontWeight: 700, color: "#94a3b8", letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 8 }}>
-                  Client
-                </div>
+                <SectionTitle title="Client" />
                 {transaction.customerName && <ReceiptRow label="Nom" value={transaction.customerName} />}
                 {transaction.customerEmail && <ReceiptRow label="Email" value={transaction.customerEmail} />}
                 {transaction.customerPhone && <ReceiptRow label="Téléphone" value={transaction.customerPhone} />}
@@ -310,14 +460,12 @@ const ReceiptTemplate = forwardRef<HTMLDivElement, ReceiptTemplateProps>(
             </>
           )}
 
-          {/* Custom fields */}
+          {/* Champs personnalisés */}
           {metadata?.customFieldResponses && Object.keys(metadata.customFieldResponses).length > 0 && (
             <>
               <DashedLine />
               <div>
-                <div style={{ fontSize: 9, fontWeight: 700, color: "#94a3b8", letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 8 }}>
-                  Informations supplémentaires
-                </div>
+                <SectionTitle title="Champs personnalisés" />
                 {Object.entries(metadata.customFieldResponses).map(([label, value]) => (
                   <ReceiptRow key={label} label={label} value={String(value)} />
                 ))}
@@ -325,7 +473,7 @@ const ReceiptTemplate = forwardRef<HTMLDivElement, ReceiptTemplateProps>(
             </>
           )}
 
-          {/* Perforation + Transaction ID */}
+          {/* Perforation + Transaction ID — même ID que le dialog */}
           <PerforationLine />
 
           <div style={{ textAlign: "center" }}>
@@ -338,7 +486,7 @@ const ReceiptTemplate = forwardRef<HTMLDivElement, ReceiptTemplateProps>(
               borderRadius: 4, padding: "4px 8px", wordBreak: "break-all",
               lineHeight: 1.6,
             }}>
-              {transaction.id}
+              {displayTransactionId}
             </div>
           </div>
 
@@ -435,7 +583,7 @@ export function DownloadReceiptButtons({ transaction, metadata }: DownloadReceip
         </Button>
       </div>
 
-      {/* Hidden receipt rendered off-screen for capture */}
+      {/* Reçu rendu hors-écran pour la capture */}
       <div style={{ position: "fixed", left: "-9999px", top: 0, zIndex: -1 }}>
         <ReceiptTemplate ref={receiptRef} transaction={transaction} metadata={metadata} />
       </div>
