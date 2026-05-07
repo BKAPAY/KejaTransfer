@@ -636,10 +636,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         WHERE user_id = $1
           AND wallet_country = $2
           AND status = 'completed'
-          AND created_at >= $3
-          AND created_at <= $4
           ${currencyFilter ? "AND wallet_currency = '" + currencyFilter + "'" : ""}
-      `, [userId, actualCountry, dateFrom.toISOString(), dateTo.toISOString()]);
+      `, [userId, actualCountry]);
 
       const txListResult = await pool.query(`
         SELECT t.id, t.type, t.amount, t.currency, t.status, t.customer_name, t.customer_phone,
