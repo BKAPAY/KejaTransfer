@@ -8454,6 +8454,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             status: "pending",
             country,
             operator,
+            customerName: effectiveCustomerName,
+            customerPhone: phone,
             description: `Depot de ${Math.floor(amount)} ${depositProviderCurrency}`,
             paydunyaToken: paydunyaResponse.token,
             metadata: JSON.stringify({
