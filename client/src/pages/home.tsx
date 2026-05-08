@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { CreditCard, Link as LinkIcon, Code, BarChart3, Shield, Zap, User, Building2, Check, ArrowRight, ChevronRight, BookOpen } from "lucide-react";
@@ -34,10 +34,7 @@ import cryptoHeroImage from "@assets/crypto-payment-hero.png";
 import cardHeroImage from "@assets/card-payment-hero.png";
 import heroMainImage from "@assets/ChatGPT_Image_6_mai_2026,_13_22_24_1778070414038.png";
 import mobileMoneyHeroImage from "@assets/generated_images/v3_mobile_money_hero.png";
-import adAfricaMapImage from "@assets/ad_photos/ad_07_africa_map.png";
-import adMarketImage from "@assets/ad_photos/ad_03_market_entrepreneur.png";
-import adCryptoImage from "@assets/ad_photos/ad_05_crypto_mobile.png";
-import adManJumpImage from "@assets/ad_photos/ad_08_man_celebrating.png";
+import bkapayBannerGif from "@assets/bkapay_banner_anim.gif";
 
 const countries = COUNTRIES;
 
@@ -125,50 +122,17 @@ function useScrollAnimation() {
   return ref;
 }
 
-const adSlides = [
-  { src: adAfricaMapImage, alt: "BKApay - Plus de 17 pays connectés en Afrique" },
-  { src: adMarketImage, alt: "BKApay - Acceptez les paiements partout" },
-  { src: adCryptoImage, alt: "BKApay - Mobile Money + Crypto" },
-  { src: adManJumpImage, alt: "BKApay - La joie des paiements réussis" },
-];
-
-function AdSlideshow() {
-  const [current, setCurrent] = useState(0);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrent((prev) => (prev + 1) % adSlides.length);
-    }, 4000);
-    return () => clearInterval(timer);
-  }, []);
-
+function BkaBanner() {
   return (
-    <section className="py-4 sm:py-6 md:py-8 overflow-hidden">
-      <div className="container mx-auto px-2 sm:px-4 md:px-8 max-w-7xl">
-        <div className="relative rounded-md overflow-hidden">
-          {adSlides.map((slide, index) => (
-            <img
-              key={index}
-              src={slide.src}
-              alt={slide.alt}
-              loading="lazy"
-              decoding="async"
-              className={`w-full rounded-md transition-opacity duration-1000 ${index === current ? "opacity-100" : "opacity-0 absolute inset-0"}`}
-              data-testid={`img-ad-slide-${index}`}
-            />
-          ))}
-          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2">
-            {adSlides.map((_, index) => (
-              <button
-                key={index}
-                onClick={() => setCurrent(index)}
-                className={`w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full transition-all ${index === current ? "bg-white scale-110" : "bg-white/50"}`}
-                data-testid={`button-ad-dot-${index}`}
-              />
-            ))}
-          </div>
-        </div>
-      </div>
+    <section className="w-full overflow-hidden">
+      <img
+        src={bkapayBannerGif}
+        alt="BKApay – Collecter les paiements dans plusieurs pays"
+        decoding="async"
+        className="w-full block"
+        style={{ display: "block", width: "100%", height: "auto", maxWidth: "none" }}
+        data-testid="img-bkapay-banner"
+      />
     </section>
   );
 }
@@ -245,8 +209,8 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Promotional Slideshow */}
-      <AdSlideshow />
+      {/* Bannière animée BKApay */}
+      <BkaBanner />
 
       {/* Mobile Money Hero Section */}
       <section className="py-8 sm:py-12 md:py-16 lg:py-20 overflow-hidden">
