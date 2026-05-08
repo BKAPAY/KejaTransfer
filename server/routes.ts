@@ -8513,6 +8513,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               });
             } else {
               console.error(`[DEPOSIT PAYDUNYA] SOFTPAY call failed:`, softpayResult.message);
+              // Marquer la transaction comme échouée pour qu'elle n'apparaisse pas en attente
+              await storage.updateTransactionStatus(transactionId, "failed");
               return res.status(400).json({ 
                 success: false, 
                 error: softpayResult.message || "Erreur lors du paiement SOFTPAY" 
