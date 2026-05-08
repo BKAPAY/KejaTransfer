@@ -32,7 +32,7 @@ import fastPaymentImage from "@assets/generated_images/v3_fast_payment.png";
 
 import cryptoHeroImage from "@assets/crypto-payment-hero.png";
 import cardHeroImage from "@assets/card-payment-hero.png";
-import heroMainImage from "@assets/ChatGPT_Image_6_mai_2026,_13_22_24_1778070414038.png";
+
 import mobileMoneyHeroImage from "@assets/generated_images/v3_mobile_money_hero.png";
 import bkapayBannerGif from "@assets/bkapay_banner_anim.gif";
 
@@ -159,30 +159,70 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Hero Section with background image */}
-      <section className="relative py-12 md:py-24 lg:py-36 overflow-hidden bg-black">
-        <div className="absolute inset-0">
-          <img src={heroMainImage} alt="" className="w-full h-full object-cover brightness-150 contrast-110 saturate-110" decoding="async" />
-          <div className="absolute inset-0 bg-gradient-to-r from-black/55 via-black/30 to-black/10" />
+      {/* Hero Section — fond néon CSS pur */}
+      <section className="relative py-12 md:py-24 lg:py-36 overflow-hidden" style={{ background: "radial-gradient(ellipse 80% 60% at 60% 40%, #001a0d 0%, #000d00 100%)" }}>
+        {/* Orbes néon flous — couche décorative */}
+        <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
+          {/* Grand orbe vert principal */}
+          <div style={{
+            position: "absolute", top: "10%", right: "8%",
+            width: "520px", height: "380px",
+            background: "radial-gradient(ellipse, rgba(34,197,94,0.28) 0%, rgba(16,185,129,0.12) 45%, transparent 75%)",
+            filter: "blur(48px)", borderRadius: "50%",
+          }} />
+          {/* Orbe cyan accent */}
+          <div style={{
+            position: "absolute", top: "50%", right: "30%",
+            width: "320px", height: "240px",
+            background: "radial-gradient(ellipse, rgba(6,182,212,0.18) 0%, transparent 70%)",
+            filter: "blur(56px)", borderRadius: "50%",
+          }} />
+          {/* Orbe vert gauche bas */}
+          <div style={{
+            position: "absolute", bottom: "-10%", left: "20%",
+            width: "400px", height: "300px",
+            background: "radial-gradient(ellipse, rgba(34,197,94,0.14) 0%, transparent 70%)",
+            filter: "blur(64px)", borderRadius: "50%",
+          }} />
+          {/* Orbe bleu profond droite */}
+          <div style={{
+            position: "absolute", top: "-5%", right: "-5%",
+            width: "280px", height: "280px",
+            background: "radial-gradient(ellipse, rgba(59,130,246,0.12) 0%, transparent 70%)",
+            filter: "blur(48px)", borderRadius: "50%",
+          }} />
+          {/* Grille de points subtile */}
+          <div style={{
+            position: "absolute", inset: 0,
+            backgroundImage: "radial-gradient(circle, rgba(34,197,94,0.08) 1px, transparent 1px)",
+            backgroundSize: "40px 40px",
+          }} />
+          {/* Ligne néon horizontale */}
+          <div style={{
+            position: "absolute", top: "55%", left: 0, right: 0,
+            height: "1px",
+            background: "linear-gradient(to right, transparent, rgba(34,197,94,0.25) 30%, rgba(6,182,212,0.2) 60%, transparent)",
+          }} />
         </div>
+
         <div className="container mx-auto px-2 sm:px-4 md:px-8 max-w-7xl relative z-10">
           <div className="space-y-3 sm:space-y-6 lg:space-y-8 max-w-2xl">
             <div className="space-y-2 sm:space-y-4">
-              <h1 className="text-sm sm:text-base md:text-xl lg:text-2xl xl:text-3xl font-bold text-white leading-tight [text-shadow:0_0_8px_#22c55e,0_0_2px_#16a34a]">
+              <h1 className="text-sm sm:text-base md:text-xl lg:text-2xl xl:text-3xl font-bold text-white leading-tight [text-shadow:0_0_12px_rgba(34,197,94,0.8),0_0_4px_rgba(34,197,94,0.6)]">
                 Paiements Mobile Money pour l'Afrique
               </h1>
-              <p className="text-xs sm:text-sm md:text-base lg:text-lg text-white/80 [text-shadow:0_0_6px_#22c55e]">
+              <p className="text-xs sm:text-sm md:text-base lg:text-lg text-white/75 [text-shadow:0_0_8px_rgba(34,197,94,0.4)]">
                 Acceptez les paiements Orange Money, MTN, Moov, Wave et plus dans plus de 17 pays. Plateforme simple, sécurisée et fiable.
               </p>
             </div>
             <div className="flex flex-wrap gap-2 sm:gap-4">
               <Link href="/signup">
-                <Button className="text-xs sm:text-sm md:text-base border-2 border-green-500 shadow-[0_0_8px_#22c55e]" data-testid="button-hero-signup">
+                <Button className="text-xs sm:text-sm md:text-base border-2 border-green-500 shadow-[0_0_12px_rgba(34,197,94,0.5)]" data-testid="button-hero-signup">
                   Commencer
                 </Button>
               </Link>
               <Link href="/login">
-                <Button variant="outline" className="text-xs sm:text-sm md:text-base border-2 border-green-500 text-white bg-white/10 backdrop-blur-sm shadow-[0_0_8px_#22c55e]" data-testid="button-hero-login">
+                <Button variant="outline" className="text-xs sm:text-sm md:text-base border-2 border-green-500 text-white bg-white/5 backdrop-blur-sm shadow-[0_0_10px_rgba(34,197,94,0.3)]" data-testid="button-hero-login">
                   Se connecter
                 </Button>
               </Link>
