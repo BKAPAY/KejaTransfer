@@ -12,3 +12,9 @@ id = "87WB_N5anG3JvVchlb_G7"
 uri = "file://bkapay_animation.gif"
 type = "image"
 title = "BKApay - Animation professionnelle"
+
+[[outputs]]
+id = "SeV_8oDh7zjQRMsMRas9X"
+uri = "file://bkapay_pro.gif"
+type = "image"
+title = "BKApay — Animation professionnelle"
