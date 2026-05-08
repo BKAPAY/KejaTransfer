@@ -20,6 +20,7 @@ import { CountryFlag, getCountryName } from "@/components/country-flag";
 
 const COUNTRY_NAMES: Record<string, string> = {
   BJ: "Bénin",
+  BF: "Burkina Faso",
   TG: "Togo",
   CI: "Côte d'Ivoire",
   SN: "Sénégal",
@@ -32,7 +33,7 @@ const signupSchema = z.object({
   firstName: z.string().min(2, "Le prénom doit contenir au moins 2 caractères"),
   lastName: z.string().min(2, "Le nom doit contenir au moins 2 caractères"),
   email: z.string().email("Email invalide"),
-  country: z.enum(["BJ", "TG", "CI", "SN", "CM", "CD", "CG"], {
+  country: z.enum(["BJ", "BF", "TG", "CI", "SN", "CM", "CD", "CG"], {
     required_error: "Veuillez sélectionner votre pays",
   }),
   password: z.string().min(8, "Le mot de passe doit contenir au moins 8 caractères"),
@@ -66,7 +67,7 @@ export default function Signup() {
         firstName: z.string().min(2, "Le prénom doit contenir au moins 2 caractères"),
         lastName: z.string().min(2, "Le nom doit contenir au moins 2 caractères"),
         email: z.string().email("Email invalide"),
-        country: z.enum(["BJ", "TG", "CI", "SN", "CM", "CD", "CG"]).optional(),
+        country: z.enum(["BJ", "BF", "TG", "CI", "SN", "CM", "CD", "CG"]).optional(),
         businessName: z.string().optional(),
         password: z.string().min(8, "Le mot de passe doit contenir au moins 8 caractères"),
         confirmPassword: z.string(),
