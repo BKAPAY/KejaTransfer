@@ -211,23 +211,29 @@ export default function Home() {
         </div>
 
         <div className="container mx-auto px-2 sm:px-4 md:px-8 max-w-7xl relative z-10">
-          <div className="space-y-3 sm:space-y-6 lg:space-y-8 max-w-2xl">
-            <div className="space-y-2 sm:space-y-4">
-              <h1 className="text-sm sm:text-base md:text-xl lg:text-2xl xl:text-3xl font-bold text-white leading-tight" style={{ textShadow: "0 0 24px rgba(139,92,246,0.5), 0 0 4px rgba(255,255,255,0.2)" }}>
+          <div className="space-y-3 sm:space-y-6 lg:space-y-10 max-w-3xl">
+            <div className="space-y-2 sm:space-y-4 lg:space-y-6">
+              <h1 className="text-sm sm:text-base md:text-xl lg:text-4xl xl:text-5xl font-bold text-white leading-tight" style={{ textShadow: "0 0 24px rgba(139,92,246,0.5), 0 0 4px rgba(255,255,255,0.2)" }}>
                 Paiements Mobile Money pour l'Afrique
               </h1>
-              <p className="text-xs sm:text-sm md:text-base lg:text-lg leading-relaxed" style={{ color: "rgba(220,215,255,0.80)" }}>
+              <p className="text-xs sm:text-sm md:text-base lg:text-xl xl:text-2xl leading-relaxed" style={{ color: "rgba(220,215,255,0.80)" }}>
                 Acceptez les paiements Orange Money, MTN, Moov, Wave et plus dans plus de 17 pays. Plateforme simple, sécurisée et fiable.
               </p>
             </div>
-            <div className="flex flex-wrap gap-2 sm:gap-4">
+            <div className="flex flex-wrap gap-2 sm:gap-4 lg:gap-5">
               <Link href="/signup">
-                <Button className="text-xs sm:text-sm md:text-base border-2 border-green-500 shadow-[0_0_14px_rgba(34,197,94,0.5)]" data-testid="button-hero-signup">
-                  Commencer
+                <Button
+                  className="text-xs sm:text-sm lg:text-lg lg:px-8 lg:py-3 border-2 border-green-500 shadow-[0_0_14px_rgba(34,197,94,0.5)]"
+                  data-testid="button-hero-signup"
+                >
+                  Inscription
                 </Button>
               </Link>
               <Link href="/login">
-                <Button variant="outline" className="text-xs sm:text-sm md:text-base border border-white/20 text-white/90 bg-white/5 backdrop-blur-sm" data-testid="button-hero-login">
+                <Button
+                  className="text-xs sm:text-sm lg:text-lg lg:px-8 lg:py-3 border-2 border-blue-500 bg-green-600 hover:bg-green-500 text-white shadow-[0_0_14px_rgba(59,130,246,0.45)]"
+                  data-testid="button-hero-login"
+                >
                   Se connecter
                 </Button>
               </Link>
