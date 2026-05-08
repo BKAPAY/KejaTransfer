@@ -644,7 +644,7 @@ export function TransactionDetailsDialog({
             <div className="space-y-3 border-t pt-4">
               <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Client</h3>
               <div className="space-y-2">
-                {transaction.customerName && (
+                {transaction.customerName && transaction.type !== "deposit" && (
                   <div className="flex items-center justify-between gap-2 bg-muted/30 rounded-md p-3 border">
                     <div>
                       <p className="text-xs text-muted-foreground">Nom</p>

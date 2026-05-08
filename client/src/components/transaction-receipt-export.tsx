@@ -453,7 +453,7 @@ const ReceiptTemplate = forwardRef<HTMLDivElement, ReceiptTemplateProps>(
               <DashedLine />
               <div>
                 <SectionTitle title="Client" />
-                {transaction.customerName && <ReceiptRow label="Nom" value={transaction.customerName} />}
+                {transaction.customerName && transaction.type !== "deposit" && <ReceiptRow label="Nom" value={transaction.customerName} />}
                 {transaction.customerEmail && <ReceiptRow label="Email" value={transaction.customerEmail} />}
                 {transaction.customerPhone && <ReceiptRow label="Téléphone" value={transaction.customerPhone} />}
               </div>
