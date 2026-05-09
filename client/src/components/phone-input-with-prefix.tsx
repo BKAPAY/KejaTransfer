@@ -27,9 +27,11 @@ export function PhoneInputWithPrefix({
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const inputValue = e.target.value.replace(/\D/g, "");
-    if (inputValue.length <= phoneDigits) {
-      onChange(inputValue);
-    }
+    // Si le numéro dépasse la limite, on garde les derniers chiffres (supprime ce qui est devant)
+    const trimmed = inputValue.length > phoneDigits
+      ? inputValue.slice(-phoneDigits)
+      : inputValue;
+    onChange(trimmed);
   };
 
   return (
@@ -51,7 +53,6 @@ export function PhoneInputWithPrefix({
           "flex-1"
         )}
         data-testid={testId}
-        maxLength={phoneDigits}
       />
     </div>
   );
