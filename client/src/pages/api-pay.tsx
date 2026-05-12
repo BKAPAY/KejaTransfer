@@ -228,9 +228,15 @@ export default function ApiPay() {
         const { detectCountryClient } = await import("@/lib/detect-country");
         const data = await detectCountryClient();
         if (data.detected && data.country && enabledCountriesOperators) {
-          if (Object.keys(enabledCountriesOperators).includes(data.country)) {
+          const isAdminEnabled = Object.keys(enabledCountriesOperators).includes(data.country);
+          // Ne pas auto-sélectionner si le pays détecté n'est pas dans les pays autorisés de la clé API
+          const keyAllowed = apiKeyInfo?.allowedCountries;
+          const isKeyAllowed = !keyAllowed || keyAllowed.length === 0 || keyAllowed.includes(data.country);
+          if (isAdminEnabled && isKeyAllowed) {
             setCountry(data.country);
             console.log(`[GeoIP] Auto-selected country: ${data.country}`);
+          } else {
+            console.log(`[GeoIP] Detected ${data.country} but not in API key's allowed countries — letting user pick manually`);
           }
         }
       } catch (error) {
@@ -240,7 +246,7 @@ export default function ApiPay() {
     if (enabledCountriesOperators && !country) {
       detectCountry();
     }
-  }, [enabledCountriesOperators, country]);
+  }, [enabledCountriesOperators, country, apiKeyInfo]);
 
   // Fetch dynamic fees when country and operator are selected
   useEffect(() => {

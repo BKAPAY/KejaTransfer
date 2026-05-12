@@ -37,6 +37,7 @@ interface SessionInfo {
   api_key_id?: string;
   customerPaysCryptoFee?: boolean;
   customerPaysFee?: boolean;
+  allowedCountries?: string[];
 }
 
 type Stage = "form" | "otp" | "polling" | "completed" | "failed" | "expired" | "redirect";
@@ -305,9 +306,15 @@ export default function Checkout() {
         const { detectCountryClient } = await import("@/lib/detect-country");
         const data = await detectCountryClient();
         if (data.detected && data.country && enabledCountriesOperators) {
-          if (Object.keys(enabledCountriesOperators).includes(data.country)) {
+          const isAdminEnabled = Object.keys(enabledCountriesOperators).includes(data.country);
+          // Ne pas auto-sélectionner si le pays détecté n'est pas dans les pays autorisés de la session
+          const sessionAllowed = session?.allowedCountries;
+          const isSessionAllowed = !sessionAllowed || sessionAllowed.length === 0 || sessionAllowed.includes(data.country);
+          if (isAdminEnabled && isSessionAllowed) {
             setCountry(data.country);
             console.log(`[GeoIP] Auto-selected country: ${data.country}`);
+          } else {
+            console.log(`[GeoIP] Detected ${data.country} but not in session's allowed countries — letting user pick manually`);
           }
         }
       } catch {}
@@ -315,7 +322,7 @@ export default function Checkout() {
     if (enabledCountriesOperators && !country) {
       detectCountry();
     }
-  }, [enabledCountriesOperators, country]);
+  }, [enabledCountriesOperators, country, session]);
 
   useEffect(() => {
     if (session?.expires_at) {

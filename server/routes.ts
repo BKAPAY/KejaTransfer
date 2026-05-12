@@ -4395,6 +4395,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         api_key_id: session.apiKeyId,
         customerPaysCryptoFee: (apiKey as any)?.customerPaysCryptoFee || false,
         customerPaysFee: apiKey?.customerPaysFee || false,
+        allowedCountries: apiKey?.allowedCountries || [],
       });
     } catch (error: any) {
       console.error("[Payment Session Get] Error:", error);
