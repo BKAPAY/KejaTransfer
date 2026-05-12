@@ -461,9 +461,15 @@ export default function Pay() {
         const { detectCountryClient } = await import("@/lib/detect-country");
         const data = await detectCountryClient();
         if (data.detected && data.country && enabledCountriesOperators) {
-          if (Object.keys(enabledCountriesOperators).includes(data.country)) {
+          const isAdminEnabled = Object.keys(enabledCountriesOperators).includes(data.country);
+          // Ne pas auto-sélectionner si le pays détecté n'est pas dans les pays autorisés du lien
+          const linkAllowed = paymentLink?.allowedCountries;
+          const isLinkAllowed = !linkAllowed || linkAllowed.length === 0 || linkAllowed.includes(data.country);
+          if (isAdminEnabled && isLinkAllowed) {
             form.setValue("country", data.country);
             console.log(`[GeoIP] Auto-selected country: ${data.country}`);
+          } else {
+            console.log(`[GeoIP] Detected ${data.country} but not in link's allowed countries — letting user pick manually`);
           }
         }
       } catch (error) {
@@ -473,7 +479,7 @@ export default function Pay() {
     if (enabledCountriesOperators && !selectedCountry && !savedCountry) {
       detectCountry();
     }
-  }, [enabledCountriesOperators, selectedCountry, savedCountry, form]);
+  }, [enabledCountriesOperators, selectedCountry, savedCountry, form, paymentLink]);
 
   // Fetch dynamic fees when country and operator are selected
   useEffect(() => {
