@@ -2383,7 +2383,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Tous les documents sont requis" });
       }
 
-      const urlFields = [kycUrlWebsite, kycUrlInstagram, kycUrlFacebook, kycUrlTiktok, kycUrlYoutube, kycUrlWhatsappGroup, kycUrlWhatsappChannel].filter(u => u && typeof u === "string" && u.trim());
+      const KYC_URL_VALIDATORS: Record<string, { field: string; test: RegExp; label: string }> = {
+        kycUrlWebsite:        { field: "Site web",          test: /^https?:\/\/.{3,}/i,                                          label: "URL site web invalide" },
+        kycUrlFacebook:       { field: "Facebook",          test: /^https?:\/\/(www\.)?(facebook\.com|fb\.com|fb\.me)\//i,        label: "L'URL Facebook doit pointer vers facebook.com" },
+        kycUrlInstagram:      { field: "Instagram",         test: /^https?:\/\/(www\.)?instagram\.com\//i,                        label: "L'URL Instagram doit pointer vers instagram.com" },
+        kycUrlTiktok:         { field: "TikTok",            test: /^https?:\/\/(www\.)?tiktok\.com\//i,                           label: "L'URL TikTok doit pointer vers tiktok.com" },
+        kycUrlYoutube:        { field: "YouTube",           test: /^https?:\/\/(www\.)?(youtube\.com|youtu\.be)\//i,               label: "L'URL YouTube doit pointer vers youtube.com ou youtu.be" },
+        kycUrlWhatsappGroup:  { field: "Groupe WhatsApp",   test: /^https?:\/\/chat\.whatsapp\.com\//i,                           label: "Le lien groupe WhatsApp doit commencer par https://chat.whatsapp.com/" },
+        kycUrlWhatsappChannel:{ field: "Chaine WhatsApp",   test: /^https?:\/\/(www\.)?whatsapp\.com\/channel\//i,                label: "Le lien chaine WhatsApp doit commencer par https://whatsapp.com/channel/" },
+      };
+      const urlMap: Record<string, string> = { kycUrlWebsite, kycUrlInstagram, kycUrlFacebook, kycUrlTiktok, kycUrlYoutube, kycUrlWhatsappGroup, kycUrlWhatsappChannel };
+      for (const [fieldName, validator] of Object.entries(KYC_URL_VALIDATORS)) {
+        const val = urlMap[fieldName];
+        if (val && typeof val === "string" && val.trim()) {
+          if (!validator.test.test(val.trim())) {
+            return res.status(400).json({ error: `${validator.label}` });
+          }
+        }
+      }
+      const urlFields = Object.values(urlMap).filter(u => u && typeof u === "string" && u.trim());
       if (urlFields.length < 1) {
         return res.status(400).json({ error: "Vous devez renseigner au moins 1 lien d'activite" });
       }

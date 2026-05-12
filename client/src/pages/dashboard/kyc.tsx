@@ -995,7 +995,49 @@ export default function KYC() {
     },
   ];
 
-  const filledUrlCount = platformConfigs.filter(p => p.value.trim()).length;
+  const URL_VALIDATORS: Record<string, { test: (url: string) => boolean; error: string }> = {
+    website: {
+      test: (url) => /^https?:\/\/.{3,}/i.test(url),
+      error: "Entrez une URL valide commencant par https:// ou http://",
+    },
+    facebook: {
+      test: (url) => /^https?:\/\/(www\.)?(facebook\.com|fb\.com|fb\.me)\//i.test(url),
+      error: "L'URL doit etre un lien Facebook (facebook.com)",
+    },
+    instagram: {
+      test: (url) => /^https?:\/\/(www\.)?instagram\.com\//i.test(url),
+      error: "L'URL doit etre un lien Instagram (instagram.com)",
+    },
+    tiktok: {
+      test: (url) => /^https?:\/\/(www\.)?tiktok\.com\//i.test(url),
+      error: "L'URL doit etre un lien TikTok (tiktok.com)",
+    },
+    youtube: {
+      test: (url) => /^https?:\/\/(www\.)?(youtube\.com|youtu\.be)\//i.test(url),
+      error: "L'URL doit etre un lien YouTube (youtube.com ou youtu.be)",
+    },
+    whatsappGroup: {
+      test: (url) => /^https?:\/\/chat\.whatsapp\.com\//i.test(url),
+      error: "Le lien groupe WhatsApp doit commencer par https://chat.whatsapp.com/",
+    },
+    whatsappChannel: {
+      test: (url) => /^https?:\/\/(www\.)?whatsapp\.com\/channel\//i.test(url),
+      error: "Le lien chaine WhatsApp doit commencer par https://whatsapp.com/channel/",
+    },
+  };
+
+  const validateUrl = (key: string, url: string): string | null => {
+    if (!url.trim()) return null;
+    const validator = URL_VALIDATORS[key];
+    if (!validator) return null;
+    return validator.test(url) ? null : validator.error;
+  };
+
+  const filledUrlCount = platformConfigs.filter(p => {
+    const trimmed = p.value.trim();
+    if (!trimmed) return false;
+    return validateUrl(p.key, trimmed) === null;
+  }).length;
 
   const isWhatsappPersonalLink = (url: string) => /wa\.me\//i.test(url);
 
@@ -1066,20 +1108,37 @@ export default function KYC() {
             const p = platformConfigs.find(c => c.key === activePlatform);
             if (!p) return null;
             const Icon = p.icon;
+            const urlError = validateUrl(p.key, p.value);
+            const canConfirm = !p.value.trim() || urlError === null;
             return (
               <div className="border rounded-md p-4 space-y-3 bg-muted/30">
                 <div className="flex items-center gap-2">
                   <Icon className={`w-5 h-5 ${p.iconClass}`} />
                   <label className="text-sm font-medium">Lien {p.label}</label>
                 </div>
-                <Input
-                  type="url"
-                  value={p.value}
-                  onChange={(e) => p.setValue(e.target.value)}
-                  placeholder={p.placeholder}
-                  autoFocus
-                  data-testid={`input-url-${p.key}`}
-                />
+                <div className="space-y-1">
+                  <Input
+                    type="url"
+                    value={p.value}
+                    onChange={(e) => p.setValue(e.target.value)}
+                    placeholder={p.placeholder}
+                    autoFocus
+                    data-testid={`input-url-${p.key}`}
+                    className={urlError ? "border-red-500 focus-visible:ring-red-500" : ""}
+                  />
+                  {urlError && (
+                    <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3 flex-shrink-0" />
+                      {urlError}
+                    </p>
+                  )}
+                  {!urlError && p.value.trim() && (
+                    <p className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3 flex-shrink-0" />
+                      Lien valide
+                    </p>
+                  )}
+                </div>
                 <div className="flex gap-2 justify-end">
                   {p.value.trim() && (
                     <Button
@@ -1097,6 +1156,7 @@ export default function KYC() {
                     type="button"
                     size="sm"
                     onClick={() => setActivePlatform(null)}
+                    disabled={!canConfirm}
                     data-testid={`button-confirm-url-${p.key}`}
                   >
                     <Check className="w-4 h-4 mr-1" />
