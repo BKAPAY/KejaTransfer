@@ -2377,7 +2377,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // KYC Final Submit - just changes status to submitted
   app.post("/api/kyc/submit", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { kycIdFront, kycIdBack, kycSelfie, kycSignature, kycActivityDescription, kycLatitude, kycLongitude, kycAddress, kycAcceptedTerms, kycPhone, kycWhatsapp, kycActivityUrl, kycUrlWebsite, kycUrlInstagram, kycUrlFacebook, kycUrlTiktok, kycUrlYoutube, kycUrlWhatsappGroup, kycUrlWhatsappChannel } = req.body;
+      const { kycIdFront, kycIdBack, kycSelfie, kycSignature, kycActivityDescription, kycLatitude, kycLongitude, kycAddress, kycAcceptedTerms, kycPhone, kycWhatsapp, kycActivityUrl, kycUrlWebsite, kycUrlInstagram, kycUrlFacebook, kycUrlTiktok, kycUrlYoutube, kycUrlWhatsappGroup, kycUrlWhatsappChannel, kycDocumentType, kycDocumentNumber, kycDocumentExpiryDate } = req.body;
 
       if (!kycIdFront || !kycIdBack || !kycSelfie || !kycSignature) {
         return res.status(400).json({ error: "Tous les documents sont requis" });
@@ -2408,6 +2408,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         kycUrlYoutube: kycUrlYoutube || "",
         kycUrlWhatsappGroup: kycUrlWhatsappGroup || "",
         kycUrlWhatsappChannel: kycUrlWhatsappChannel || "",
+        kycDocumentType: kycDocumentType || "",
+        kycDocumentNumber: kycDocumentNumber || "",
+        kycDocumentExpiryDate: kycDocumentExpiryDate || "",
       });
 
       if (!user) {

@@ -270,6 +270,9 @@ async function bootstrapDatabase() {
       await kycPhoneClient`ALTER TABLE users ADD COLUMN IF NOT EXISTS kyc_url_tiktok TEXT`;
       await kycPhoneClient`ALTER TABLE users ADD COLUMN IF NOT EXISTS kyc_url_whatsapp_group TEXT`;
       await kycPhoneClient`ALTER TABLE users ADD COLUMN IF NOT EXISTS kyc_url_whatsapp_channel TEXT`;
+      await kycPhoneClient`ALTER TABLE users ADD COLUMN IF NOT EXISTS kyc_document_type TEXT`;
+      await kycPhoneClient`ALTER TABLE users ADD COLUMN IF NOT EXISTS kyc_document_number TEXT`;
+      await kycPhoneClient`ALTER TABLE users ADD COLUMN IF NOT EXISTS kyc_document_expiry_date TEXT`;
       console.log("✅ users.kyc_phone and kyc_whatsapp columns ready");
     } catch (e) {
       console.error("⚠️ kyc_phone/kyc_whatsapp column setup error:", e);

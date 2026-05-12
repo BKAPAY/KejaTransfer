@@ -46,6 +46,9 @@ export const users = pgTable("users", {
   kycUrlYoutube: text("kyc_url_youtube"),
   kycUrlWhatsappGroup: text("kyc_url_whatsapp_group"),
   kycUrlWhatsappChannel: text("kyc_url_whatsapp_channel"),
+  kycDocumentType: text("kyc_document_type"), // Type de piece d'identite: cni, passport, driving_license, residence_card, voter_card
+  kycDocumentNumber: text("kyc_document_number"), // Numero de la piece d'identite
+  kycDocumentExpiryDate: text("kyc_document_expiry_date"), // Date d'expiration (YYYY-MM-DD), null si sans expiration
   kycRejectionReason: text("kyc_rejection_reason"), // Reason for KYC rejection
   kycRejectionCount: integer("kyc_rejection_count").notNull().default(0), // Number of KYC rejections
   // Business KYC Step 2 - legal info

@@ -6,7 +6,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useState, useRef, useEffect, useCallback } from "react";
-import { CheckCircle2, Clock, AlertCircle, X, Camera, Shield, ArrowRight, ArrowLeft, User, FileText, PenTool, Trash2, Loader2, MapPin, Briefcase, Navigation, Globe, Check, Pencil } from "lucide-react";
+import { CheckCircle2, Clock, AlertCircle, X, Camera, Shield, ArrowRight, ArrowLeft, User, FileText, PenTool, Trash2, Loader2, MapPin, Briefcase, Navigation, Globe, Check, Pencil, CreditCard } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SiFacebook, SiInstagram, SiTiktok, SiYoutube, SiWhatsapp } from "react-icons/si";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -87,6 +88,9 @@ export default function KYC() {
   const [kycUrlWhatsappGroup, setKycUrlWhatsappGroup] = useState("");
   const [kycUrlWhatsappChannel, setKycUrlWhatsappChannel] = useState("");
   const [activePlatform, setActivePlatform] = useState<string | null>(null);
+  const [kycDocumentType, setKycDocumentType] = useState("");
+  const [kycDocumentNumber, setKycDocumentNumber] = useState("");
+  const [kycDocumentExpiryDate, setKycDocumentExpiryDate] = useState("");
   const [isResubmitting, setIsResubmitting] = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
   const [cameraMode, setCameraMode] = useState<CameraMode>(null);
@@ -516,6 +520,9 @@ export default function KYC() {
         kycUrlYoutube: kycUrlYoutube,
         kycUrlWhatsappGroup: kycUrlWhatsappGroup,
         kycUrlWhatsappChannel: kycUrlWhatsappChannel,
+        kycDocumentType: kycDocumentType,
+        kycDocumentNumber: kycDocumentNumber,
+        kycDocumentExpiryDate: kycDocumentExpiryDate,
       });
     },
     onSuccess: () => {
@@ -530,6 +537,9 @@ export default function KYC() {
       setActivityDescription("");
       setLocationData(null);
       setLocationAddress("");
+      setKycDocumentType("");
+      setKycDocumentNumber("");
+      setKycDocumentExpiryDate("");
       setCurrentStep(1);
       setIsResubmitting(false);
       setUploadState({
@@ -1158,6 +1168,71 @@ export default function KYC() {
         </div>
       )}
 
+      {(() => {
+        const DOCUMENT_TYPES = [
+          { value: "cni", label: "Carte Nationale d'Identite (CNI)", hasExpiry: true },
+          { value: "passport", label: "Passeport", hasExpiry: true },
+          { value: "driving_license", label: "Permis de conduire", hasExpiry: true },
+          { value: "residence_card", label: "Carte de sejour / Titre de sejour", hasExpiry: true },
+          { value: "voter_card", label: "Carte electorale", hasExpiry: false },
+        ];
+        const selectedDoc = DOCUMENT_TYPES.find(d => d.value === kycDocumentType);
+        const hasExpiry = selectedDoc?.hasExpiry ?? false;
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <CreditCard className="w-4 h-4" />
+                Informations sur la piece d'identite
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <label className="text-sm font-medium text-foreground mb-2 block">
+                  Type de piece d'identite <span className="text-destructive">*</span>
+                </label>
+                <Select value={kycDocumentType} onValueChange={setKycDocumentType}>
+                  <SelectTrigger data-testid="select-document-type">
+                    <SelectValue placeholder="Choisir le type de piece" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DOCUMENT_TYPES.map(dt => (
+                      <SelectItem key={dt.value} value={dt.value}>{dt.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {kycDocumentType && (
+                <div>
+                  <label className="text-sm font-medium text-foreground mb-2 block">
+                    Numero de la piece <span className="text-destructive">*</span>
+                  </label>
+                  <Input
+                    value={kycDocumentNumber}
+                    onChange={e => setKycDocumentNumber(e.target.value)}
+                    placeholder="Entrez le numero de la piece"
+                    data-testid="input-document-number"
+                  />
+                </div>
+              )}
+              {kycDocumentType && hasExpiry && (
+                <div>
+                  <label className="text-sm font-medium text-foreground mb-2 block">
+                    Date d'expiration <span className="text-destructive">*</span>
+                  </label>
+                  <Input
+                    type="date"
+                    value={kycDocumentExpiryDate}
+                    onChange={e => setKycDocumentExpiryDate(e.target.value)}
+                    data-testid="input-document-expiry"
+                  />
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })()}
+
       <div className="space-y-4">
         <div>
           <label className="text-sm font-medium text-foreground mb-2 block">
@@ -1301,7 +1376,19 @@ export default function KYC() {
         <Button
           className="flex-1"
           onClick={() => setCurrentStep(5)}
-          disabled={uploadState.front.status !== "done" || uploadState.back.status !== "done" || uploadState.selfie.status !== "done"}
+          disabled={(() => {
+            if (!kycDocumentType || !kycDocumentNumber.trim()) return true;
+            const DOCUMENT_TYPES = [
+              { value: "cni", hasExpiry: true },
+              { value: "passport", hasExpiry: true },
+              { value: "driving_license", hasExpiry: true },
+              { value: "residence_card", hasExpiry: true },
+              { value: "voter_card", hasExpiry: false },
+            ];
+            const selectedDoc = DOCUMENT_TYPES.find(d => d.value === kycDocumentType);
+            if (selectedDoc?.hasExpiry && !kycDocumentExpiryDate) return true;
+            return uploadState.front.status !== "done" || uploadState.back.status !== "done" || uploadState.selfie.status !== "done";
+          })()}
           data-testid="button-next-step-4"
         >
           Etape suivante

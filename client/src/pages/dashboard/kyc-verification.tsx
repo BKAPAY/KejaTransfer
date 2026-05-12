@@ -43,6 +43,51 @@ const kycMarkerIcon = new L.Icon({
 
 type PartialUser = Pick<User, 'id' | 'email' | 'firstName' | 'lastName' | 'kycStatus' | 'kycRejectionReason' | 'createdAt' | 'balance' | 'isAdmin' | 'suspended'>;
 
+const DOCUMENT_TYPE_LABELS: Record<string, string> = {
+  cni: "Carte Nationale d'Identite (CNI)",
+  passport: "Passeport",
+  driving_license: "Permis de conduire",
+  residence_card: "Carte de sejour / Titre de sejour",
+  voter_card: "Carte electorale",
+};
+
+function safeImgSrc(src: string | null | undefined): string {
+  if (!src) return "";
+  if (src.startsWith("data:")) return src;
+  return `data:image/jpeg;base64,${src}`;
+}
+
+function KycImage({ src, alt, className }: { src: string | null | undefined; alt: string; className?: string }) {
+  const [failed, setFailed] = useState(false);
+  const safeSrc = safeImgSrc(src);
+  if (!safeSrc) return null;
+  if (failed) {
+    return (
+      <div className="w-full h-40 flex flex-col items-center justify-center border rounded bg-muted/30 gap-2">
+        <p className="text-xs text-muted-foreground text-center px-2">
+          Image non affichable. Le fichier est peut-etre trop volumineux ou dans un format non supporte.
+        </p>
+        <a
+          href={safeSrc}
+          download={`${alt}.jpg`}
+          className="text-xs text-primary underline"
+          onClick={e => e.stopPropagation()}
+        >
+          Telecharger l'image
+        </a>
+      </div>
+    );
+  }
+  return (
+    <img
+      src={safeSrc}
+      alt={alt}
+      className={className}
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
 export default function KycVerificationPage() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
@@ -675,6 +720,24 @@ export default function KycVerificationPage() {
                     <p className="text-sm font-medium">{(selectedUserDetails as any).kycWhatsapp}</p>
                   </div>
                 )}
+                {(selectedUserDetails as any).kycDocumentType && (
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground">Type de piece d'identite</p>
+                    <p className="text-sm font-medium">{DOCUMENT_TYPE_LABELS[(selectedUserDetails as any).kycDocumentType] || (selectedUserDetails as any).kycDocumentType}</p>
+                  </div>
+                )}
+                {(selectedUserDetails as any).kycDocumentNumber && (
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground">Numero de la piece</p>
+                    <p className="text-sm font-medium">{(selectedUserDetails as any).kycDocumentNumber}</p>
+                  </div>
+                )}
+                {(selectedUserDetails as any).kycDocumentExpiryDate && (
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground">Date d'expiration</p>
+                    <p className="text-sm font-medium">{new Date((selectedUserDetails as any).kycDocumentExpiryDate).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}</p>
+                  </div>
+                )}
                 <div>
                   <p className="text-xs font-medium text-muted-foreground">Statut KYC</p>
                   <div className="mt-1">{getStatusBadge(selectedUserDetails.kycStatus)}</div>
@@ -848,57 +911,41 @@ export default function KycVerificationPage() {
                 {selectedUserDetails.kycIdFront && (
                   <div
                     className="border rounded-lg p-4 cursor-pointer hover-elevate"
-                    onClick={() => setLightboxImage({ src: selectedUserDetails.kycIdFront!, alt: "Piece d'identite (Recto)" })}
+                    onClick={() => setLightboxImage({ src: safeImgSrc(selectedUserDetails.kycIdFront), alt: "Piece d'identite (Recto)" })}
                     data-testid="button-view-id-front"
                   >
                     <p className="text-sm font-medium mb-3">Piece d'identite (Recto)</p>
-                    <img
-                      src={selectedUserDetails.kycIdFront}
-                      alt="ID Front"
-                      className="w-full h-64 object-contain rounded"
-                    />
+                    <KycImage src={selectedUserDetails.kycIdFront} alt="ID Front" className="w-full h-64 object-contain rounded" />
                   </div>
                 )}
                 {selectedUserDetails.kycIdBack && (
                   <div
                     className="border rounded-lg p-4 cursor-pointer hover-elevate"
-                    onClick={() => setLightboxImage({ src: selectedUserDetails.kycIdBack!, alt: "Piece d'identite (Verso)" })}
+                    onClick={() => setLightboxImage({ src: safeImgSrc(selectedUserDetails.kycIdBack), alt: "Piece d'identite (Verso)" })}
                     data-testid="button-view-id-back"
                   >
                     <p className="text-sm font-medium mb-3">Piece d'identite (Verso)</p>
-                    <img
-                      src={selectedUserDetails.kycIdBack}
-                      alt="ID Back"
-                      className="w-full h-64 object-contain rounded"
-                    />
+                    <KycImage src={selectedUserDetails.kycIdBack} alt="ID Back" className="w-full h-64 object-contain rounded" />
                   </div>
                 )}
                 {selectedUserDetails.kycSelfie && (
                   <div
                     className="border rounded-lg p-4 cursor-pointer hover-elevate"
-                    onClick={() => setLightboxImage({ src: selectedUserDetails.kycSelfie!, alt: "Photo avec piece en main" })}
+                    onClick={() => setLightboxImage({ src: safeImgSrc(selectedUserDetails.kycSelfie), alt: "Photo avec piece en main" })}
                     data-testid="button-view-selfie"
                   >
                     <p className="text-sm font-medium mb-3">Photo avec piece en main</p>
-                    <img
-                      src={selectedUserDetails.kycSelfie}
-                      alt="Selfie"
-                      className="w-full h-64 object-contain rounded"
-                    />
+                    <KycImage src={selectedUserDetails.kycSelfie} alt="Selfie" className="w-full h-64 object-contain rounded" />
                   </div>
                 )}
                 {selectedUserDetails.kycSignature && (
                   <div
                     className="border rounded-lg p-4 cursor-pointer hover-elevate"
-                    onClick={() => setLightboxImage({ src: selectedUserDetails.kycSignature!, alt: "Signature" })}
+                    onClick={() => setLightboxImage({ src: safeImgSrc(selectedUserDetails.kycSignature), alt: "Signature" })}
                     data-testid="button-view-signature"
                   >
                     <p className="text-sm font-medium mb-3">Signature</p>
-                    <img
-                      src={selectedUserDetails.kycSignature}
-                      alt="Signature"
-                      className="w-full h-32 object-contain rounded bg-white"
-                    />
+                    <KycImage src={selectedUserDetails.kycSignature} alt="Signature" className="w-full h-32 object-contain rounded bg-white" />
                   </div>
                 )}
               </div>
