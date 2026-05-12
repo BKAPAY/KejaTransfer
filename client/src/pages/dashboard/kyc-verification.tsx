@@ -51,10 +51,21 @@ const DOCUMENT_TYPE_LABELS: Record<string, string> = {
   voter_card: "Carte electorale",
 };
 
+function detectMimeFromBase64(b64: string): string {
+  const head = b64.substring(0, 16).replace(/\s/g, "");
+  if (head.startsWith("/9j/")) return "image/jpeg";
+  if (head.startsWith("iVBORw0KGgo")) return "image/png";
+  if (head.startsWith("R0lGOD")) return "image/gif";
+  if (head.startsWith("UklGR")) return "image/webp";
+  if (head.startsWith("Qk")) return "image/bmp";
+  return "image/jpeg";
+}
+
 function safeImgSrc(src: string | null | undefined): string {
   if (!src) return "";
   if (src.startsWith("data:")) return src;
-  return `data:image/jpeg;base64,${src}`;
+  const mime = detectMimeFromBase64(src);
+  return `data:${mime};base64,${src}`;
 }
 
 function KycImage({ src, alt, className }: { src: string | null | undefined; alt: string; className?: string }) {
