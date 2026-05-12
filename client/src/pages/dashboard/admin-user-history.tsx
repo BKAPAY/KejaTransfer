@@ -273,6 +273,19 @@ export default function AdminUserHistory() {
                         {tx.operator && (
                           <span className="text-xs text-muted-foreground capitalize">{tx.operator}</span>
                         )}
+                        {(() => {
+                          try {
+                            const meta = tx.metadata ? JSON.parse(tx.metadata as string) : null;
+                            if (meta?.customerPaysFee) {
+                              return (
+                                <Badge variant="outline" className="text-xs shrink-0 border-blue-400 text-blue-600 dark:text-blue-400">
+                                  Frais client
+                                </Badge>
+                              );
+                            }
+                            return null;
+                          } catch { return null; }
+                        })()}
                       </div>
                       <p className="text-xs text-muted-foreground">
                         {new Date(tx.createdAt).toLocaleDateString("fr-FR", {

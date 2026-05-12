@@ -292,6 +292,19 @@ export default function History() {
                         {transaction.operator && (
                           <span className="text-xs text-muted-foreground capitalize">{transaction.operator}</span>
                         )}
+                        {(() => {
+                          try {
+                            const meta = transaction.metadata ? JSON.parse(transaction.metadata as string) : null;
+                            if (meta?.customerPaysFee) {
+                              return (
+                                <Badge variant="outline" className="text-xs shrink-0 border-blue-400 text-blue-600 dark:text-blue-400">
+                                  Frais client
+                                </Badge>
+                              );
+                            }
+                            return null;
+                          } catch { return null; }
+                        })()}
                       </div>
                       <p className="text-xs text-muted-foreground">
                         {new Date(transaction.createdAt).toLocaleDateString("fr-FR", {
