@@ -343,6 +343,9 @@ export default function KycVerificationPage() {
     addField("Pays", user.country || "Non defini");
     addField("Statut KYC", getStatusText(user.kycStatus));
     addField("Date d'inscription", new Date(user.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" }));
+    if ((user as any).kycDocumentType) addField("Type de piece d'identite", DOCUMENT_TYPE_LABELS[(user as any).kycDocumentType] || (user as any).kycDocumentType);
+    if ((user as any).kycDocumentNumber) addField("Numero de la piece", (user as any).kycDocumentNumber);
+    if ((user as any).kycDocumentExpiryDate) addField("Date d'expiration de la piece", new Date((user as any).kycDocumentExpiryDate).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" }));
 
     if (user.kycRejectionReason) {
       doc.setFontSize(9);
@@ -411,7 +414,7 @@ export default function KycVerificationPage() {
           y += 10;
           resolve();
         };
-        img.src = imageUrl;
+        img.src = safeImgSrc(imageUrl);
       });
     };
 
