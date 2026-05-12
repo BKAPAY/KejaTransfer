@@ -22,6 +22,13 @@ app.use(express.json({
 }));
 app.use(express.urlencoded({ extended: false }));
 
+app.use((req, res, next) => {
+  if (!req.path.startsWith("/api/") && !req.path.startsWith("/dashboard")) {
+    res.setHeader("X-Robots-Tag", "index, follow");
+  }
+  next();
+});
+
 app.get("/healthz", (_req, res) => {
   if (bootstrapError) {
     return res.status(503).json({ status: "error", message: bootstrapError });
