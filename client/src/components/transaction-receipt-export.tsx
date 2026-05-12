@@ -338,7 +338,7 @@ const ReceiptTemplate = forwardRef<HTMLDivElement, ReceiptTemplateProps>(
                 {isIncoming && isCustomerPaysFee && (() => {
                   const isCrossCcy = !!(metadata?.providerCurrency && metadata.providerCurrency !== currency);
                   const providerCcy = metadata?.providerCurrency || currency;
-                  const displayServiceFee = storedCustomerServiceFee || Math.max(0, serviceFee - exchangeFee);
+                  const displayServiceFee = effectiveCustomerServiceFee || Math.max(0, serviceFee - exchangeFee);
                   const serviceFeeCcy = isCrossCcy ? providerCcy : currency;
                   const grossFromClientAmount = isCrossCcy
                     ? (metadata?.providerAmount || transaction.amount)

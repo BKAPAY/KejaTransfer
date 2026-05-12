@@ -186,6 +186,7 @@ export async function handlePawaPayDeposit(
       balanceAmount: netAmountForUser,
       balanceCurrency: userCurrency,
       customerPaysFee,
+      ...(customerPaysFee && customerServiceFeeAmount > 0 ? { customerServiceFee: customerServiceFeeAmount } : {}),
       ...(incomingExchangeFee > 0 ? { exchangeFee: incomingExchangeFee, exchangeFeePercentage: incomingExchangeFeePercentage } : {}),
       orderId,
       startTime,

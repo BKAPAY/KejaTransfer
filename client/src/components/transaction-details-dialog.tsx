@@ -220,7 +220,8 @@ function FinancialBreakdown({
       const providerCcy = metadata?.providerCurrency || currency;
 
       // Frais de service payés par le client (dans la devise du fournisseur)
-      const displayServiceFee = storedCustomerServiceFee || Math.max(0, serviceFee - exchangeFee);
+      // Priorité : valeur stockée → valeur inférée depuis providerAmount-amount → fallback tx.fee
+      const displayServiceFee = effectiveCustomerServiceFee || Math.max(0, serviceFee - exchangeFee);
       const serviceFeeCcy = isCrossCurrency ? providerCcy : currency;
 
       // Total payé par le client :
