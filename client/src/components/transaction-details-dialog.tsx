@@ -150,8 +150,8 @@ function FinancialBreakdown({
     : 0;
   const effectiveCustomerServiceFee = storedCustomerServiceFee || inferredCustomerServiceFee;
 
-  // Ne rien afficher si aucuns frais connus — sauf si le client paie des frais
-  if (totalFee === 0 && !(isCustomerPaysFee && effectiveCustomerServiceFee > 0)) return null;
+  // Ne rien afficher si aucuns frais connus ET que les frais ne sont pas à la charge du client
+  if (totalFee === 0 && !isCustomerPaysFee) return null;
 
   if (isOutgoing) {
     if (isFeeOnTop) {
@@ -241,14 +241,12 @@ function FinancialBreakdown({
           <div className="rounded-lg border overflow-hidden">
             <div className="p-4 space-y-3 bg-card">
               <FinancialRow label="Total payé par le client" value={fmtAmount(grossFromClientAmount, grossFromClientCcy)} />
-              {displayServiceFee > 0 && (
-                <FinancialRow
-                  label="Frais réglés par le client"
-                  value={`+${fmtAmount(displayServiceFee, serviceFeeCcy)}`}
-                  sublabel="pris en charge par le payeur"
-                  color="muted"
-                />
-              )}
+              <FinancialRow
+                label="Frais réglés par le client"
+                value={displayServiceFee > 0 ? `+${fmtAmount(displayServiceFee, serviceFeeCcy)}` : `Inclus`}
+                sublabel="pris en charge par le payeur"
+                color="muted"
+              />
               {exchangeFee > 0 && (
                 <FinancialRow label="Frais d'échange de devise" value={`-${fmtAmount(exchangeFee, currency)}`} color="orange" />
               )}
