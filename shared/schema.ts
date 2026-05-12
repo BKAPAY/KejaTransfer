@@ -802,55 +802,161 @@ export const insertCurrencyExchangeFeeSchema = createInsertSchema(currencyExchan
 export type InsertCurrencyExchangeFee = z.infer<typeof insertCurrencyExchangeFeeSchema>;
 
 // All supported currency pairs for exchange fee configuration
-// Currencies used in supported countries: XOF, XAF, CDF, GNF (Guinée), GHS (Ghana), RWF (Rwanda)
+// Devises: XOF, XAF, CDF, GNF, GHS, RWF, SLE, KES, ZMW, NGN, UGX, TZS, MWK, GMD, EUR, USD
 export const CURRENCY_EXCHANGE_PAIRS = [
-  // Entre XOF, XAF, CDF (paires dédiées paiements entrants/sortants)
-  { from: "XOF", to: "XAF" },
-  { from: "XAF", to: "XOF" },
-  { from: "XOF", to: "CDF" },
-  { from: "CDF", to: "XOF" },
-  { from: "XAF", to: "CDF" },
-  { from: "CDF", to: "XAF" },
-  // XOF vers autres devises africaines du site
-  { from: "XOF", to: "GNF" },
-  { from: "XOF", to: "GHS" },
-  { from: "XOF", to: "RWF" },
-  // XAF vers autres devises africaines du site
-  { from: "XAF", to: "GNF" },
-  { from: "XAF", to: "GHS" },
-  { from: "XAF", to: "RWF" },
-  // CDF vers autres devises africaines du site
-  { from: "CDF", to: "GNF" },
-  { from: "CDF", to: "GHS" },
-  { from: "CDF", to: "RWF" },
-  // GNF vers XOF, XAF, CDF
-  { from: "GNF", to: "XOF" },
-  { from: "GNF", to: "XAF" },
-  { from: "GNF", to: "CDF" },
-  // GHS vers XOF, XAF, CDF
-  { from: "GHS", to: "XOF" },
-  { from: "GHS", to: "XAF" },
-  { from: "GHS", to: "CDF" },
-  // RWF vers XOF, XAF, CDF
-  { from: "RWF", to: "XOF" },
-  { from: "RWF", to: "XAF" },
-  { from: "RWF", to: "CDF" },
-  // XOF, XAF, CDF vers EUR
-  { from: "XOF", to: "EUR" },
-  { from: "XAF", to: "EUR" },
-  { from: "CDF", to: "EUR" },
-  // XOF, XAF, CDF vers USD
-  { from: "XOF", to: "USD" },
-  { from: "XAF", to: "USD" },
-  { from: "CDF", to: "USD" },
-  // USD vers XOF, XAF, CDF (dépôts entrants en USD)
-  { from: "USD", to: "XOF" },
-  { from: "USD", to: "XAF" },
-  { from: "USD", to: "CDF" },
-  // EUR vers XOF, XAF, CDF (dépôts entrants en EUR)
-  { from: "EUR", to: "XOF" },
-  { from: "EUR", to: "XAF" },
-  { from: "EUR", to: "CDF" },
+  // ── Zone CFA Ouest + Congo ─────────────────────────────────────────────────
+  { from: "XOF", to: "XAF" }, { from: "XAF", to: "XOF" },
+  { from: "XOF", to: "CDF" }, { from: "CDF", to: "XOF" },
+  { from: "XAF", to: "CDF" }, { from: "CDF", to: "XAF" },
+
+  // ── XOF ↔ toutes les autres devises africaines ─────────────────────────────
+  { from: "XOF", to: "GNF" }, { from: "GNF", to: "XOF" },
+  { from: "XOF", to: "GHS" }, { from: "GHS", to: "XOF" },
+  { from: "XOF", to: "RWF" }, { from: "RWF", to: "XOF" },
+  { from: "XOF", to: "SLE" }, { from: "SLE", to: "XOF" },
+  { from: "XOF", to: "KES" }, { from: "KES", to: "XOF" },
+  { from: "XOF", to: "ZMW" }, { from: "ZMW", to: "XOF" },
+  { from: "XOF", to: "NGN" }, { from: "NGN", to: "XOF" },
+  { from: "XOF", to: "UGX" }, { from: "UGX", to: "XOF" },
+  { from: "XOF", to: "TZS" }, { from: "TZS", to: "XOF" },
+  { from: "XOF", to: "MWK" }, { from: "MWK", to: "XOF" },
+  { from: "XOF", to: "GMD" }, { from: "GMD", to: "XOF" },
+
+  // ── XAF ↔ toutes les autres devises africaines ─────────────────────────────
+  { from: "XAF", to: "GNF" }, { from: "GNF", to: "XAF" },
+  { from: "XAF", to: "GHS" }, { from: "GHS", to: "XAF" },
+  { from: "XAF", to: "RWF" }, { from: "RWF", to: "XAF" },
+  { from: "XAF", to: "SLE" }, { from: "SLE", to: "XAF" },
+  { from: "XAF", to: "KES" }, { from: "KES", to: "XAF" },
+  { from: "XAF", to: "ZMW" }, { from: "ZMW", to: "XAF" },
+  { from: "XAF", to: "NGN" }, { from: "NGN", to: "XAF" },
+  { from: "XAF", to: "UGX" }, { from: "UGX", to: "XAF" },
+  { from: "XAF", to: "TZS" }, { from: "TZS", to: "XAF" },
+  { from: "XAF", to: "MWK" }, { from: "MWK", to: "XAF" },
+  { from: "XAF", to: "GMD" }, { from: "GMD", to: "XAF" },
+
+  // ── CDF ↔ toutes les autres devises africaines ─────────────────────────────
+  { from: "CDF", to: "GNF" }, { from: "GNF", to: "CDF" },
+  { from: "CDF", to: "GHS" }, { from: "GHS", to: "CDF" },
+  { from: "CDF", to: "RWF" }, { from: "RWF", to: "CDF" },
+  { from: "CDF", to: "SLE" }, { from: "SLE", to: "CDF" },
+  { from: "CDF", to: "KES" }, { from: "KES", to: "CDF" },
+  { from: "CDF", to: "ZMW" }, { from: "ZMW", to: "CDF" },
+  { from: "CDF", to: "NGN" }, { from: "NGN", to: "CDF" },
+  { from: "CDF", to: "UGX" }, { from: "UGX", to: "CDF" },
+  { from: "CDF", to: "TZS" }, { from: "TZS", to: "CDF" },
+  { from: "CDF", to: "MWK" }, { from: "MWK", to: "CDF" },
+  { from: "CDF", to: "GMD" }, { from: "GMD", to: "CDF" },
+
+  // ── GNF ↔ autres devises africaines ────────────────────────────────────────
+  { from: "GNF", to: "GHS" }, { from: "GHS", to: "GNF" },
+  { from: "GNF", to: "RWF" }, { from: "RWF", to: "GNF" },
+  { from: "GNF", to: "SLE" }, { from: "SLE", to: "GNF" },
+  { from: "GNF", to: "KES" }, { from: "KES", to: "GNF" },
+  { from: "GNF", to: "ZMW" }, { from: "ZMW", to: "GNF" },
+  { from: "GNF", to: "NGN" }, { from: "NGN", to: "GNF" },
+  { from: "GNF", to: "UGX" }, { from: "UGX", to: "GNF" },
+  { from: "GNF", to: "TZS" }, { from: "TZS", to: "GNF" },
+  { from: "GNF", to: "MWK" }, { from: "MWK", to: "GNF" },
+  { from: "GNF", to: "GMD" }, { from: "GMD", to: "GNF" },
+
+  // ── GHS ↔ autres devises africaines ────────────────────────────────────────
+  { from: "GHS", to: "RWF" }, { from: "RWF", to: "GHS" },
+  { from: "GHS", to: "SLE" }, { from: "SLE", to: "GHS" },
+  { from: "GHS", to: "KES" }, { from: "KES", to: "GHS" },
+  { from: "GHS", to: "ZMW" }, { from: "ZMW", to: "GHS" },
+  { from: "GHS", to: "NGN" }, { from: "NGN", to: "GHS" },
+  { from: "GHS", to: "UGX" }, { from: "UGX", to: "GHS" },
+  { from: "GHS", to: "TZS" }, { from: "TZS", to: "GHS" },
+  { from: "GHS", to: "MWK" }, { from: "MWK", to: "GHS" },
+  { from: "GHS", to: "GMD" }, { from: "GMD", to: "GHS" },
+
+  // ── RWF ↔ autres devises africaines ────────────────────────────────────────
+  { from: "RWF", to: "SLE" }, { from: "SLE", to: "RWF" },
+  { from: "RWF", to: "KES" }, { from: "KES", to: "RWF" },
+  { from: "RWF", to: "ZMW" }, { from: "ZMW", to: "RWF" },
+  { from: "RWF", to: "NGN" }, { from: "NGN", to: "RWF" },
+  { from: "RWF", to: "UGX" }, { from: "UGX", to: "RWF" },
+  { from: "RWF", to: "TZS" }, { from: "TZS", to: "RWF" },
+  { from: "RWF", to: "MWK" }, { from: "MWK", to: "RWF" },
+  { from: "RWF", to: "GMD" }, { from: "GMD", to: "RWF" },
+
+  // ── SLE ↔ autres devises africaines ────────────────────────────────────────
+  { from: "SLE", to: "KES" }, { from: "KES", to: "SLE" },
+  { from: "SLE", to: "ZMW" }, { from: "ZMW", to: "SLE" },
+  { from: "SLE", to: "NGN" }, { from: "NGN", to: "SLE" },
+  { from: "SLE", to: "UGX" }, { from: "UGX", to: "SLE" },
+  { from: "SLE", to: "TZS" }, { from: "TZS", to: "SLE" },
+  { from: "SLE", to: "MWK" }, { from: "MWK", to: "SLE" },
+  { from: "SLE", to: "GMD" }, { from: "GMD", to: "SLE" },
+
+  // ── KES ↔ autres devises africaines ────────────────────────────────────────
+  { from: "KES", to: "ZMW" }, { from: "ZMW", to: "KES" },
+  { from: "KES", to: "NGN" }, { from: "NGN", to: "KES" },
+  { from: "KES", to: "UGX" }, { from: "UGX", to: "KES" },
+  { from: "KES", to: "TZS" }, { from: "TZS", to: "KES" },
+  { from: "KES", to: "MWK" }, { from: "MWK", to: "KES" },
+  { from: "KES", to: "GMD" }, { from: "GMD", to: "KES" },
+
+  // ── ZMW ↔ autres devises africaines ────────────────────────────────────────
+  { from: "ZMW", to: "NGN" }, { from: "NGN", to: "ZMW" },
+  { from: "ZMW", to: "UGX" }, { from: "UGX", to: "ZMW" },
+  { from: "ZMW", to: "TZS" }, { from: "TZS", to: "ZMW" },
+  { from: "ZMW", to: "MWK" }, { from: "MWK", to: "ZMW" },
+  { from: "ZMW", to: "GMD" }, { from: "GMD", to: "ZMW" },
+
+  // ── NGN ↔ autres devises africaines ────────────────────────────────────────
+  { from: "NGN", to: "UGX" }, { from: "UGX", to: "NGN" },
+  { from: "NGN", to: "TZS" }, { from: "TZS", to: "NGN" },
+  { from: "NGN", to: "MWK" }, { from: "MWK", to: "NGN" },
+  { from: "NGN", to: "GMD" }, { from: "GMD", to: "NGN" },
+
+  // ── UGX ↔ autres devises africaines ────────────────────────────────────────
+  { from: "UGX", to: "TZS" }, { from: "TZS", to: "UGX" },
+  { from: "UGX", to: "MWK" }, { from: "MWK", to: "UGX" },
+  { from: "UGX", to: "GMD" }, { from: "GMD", to: "UGX" },
+
+  // ── TZS ↔ autres devises africaines ────────────────────────────────────────
+  { from: "TZS", to: "MWK" }, { from: "MWK", to: "TZS" },
+  { from: "TZS", to: "GMD" }, { from: "GMD", to: "TZS" },
+
+  // ── MWK ↔ GMD ──────────────────────────────────────────────────────────────
+  { from: "MWK", to: "GMD" }, { from: "GMD", to: "MWK" },
+
+  // ── Toutes les devises africaines ↔ EUR ────────────────────────────────────
+  { from: "XOF", to: "EUR" }, { from: "EUR", to: "XOF" },
+  { from: "XAF", to: "EUR" }, { from: "EUR", to: "XAF" },
+  { from: "CDF", to: "EUR" }, { from: "EUR", to: "CDF" },
+  { from: "GNF", to: "EUR" }, { from: "EUR", to: "GNF" },
+  { from: "GHS", to: "EUR" }, { from: "EUR", to: "GHS" },
+  { from: "RWF", to: "EUR" }, { from: "EUR", to: "RWF" },
+  { from: "SLE", to: "EUR" }, { from: "EUR", to: "SLE" },
+  { from: "KES", to: "EUR" }, { from: "EUR", to: "KES" },
+  { from: "ZMW", to: "EUR" }, { from: "EUR", to: "ZMW" },
+  { from: "NGN", to: "EUR" }, { from: "EUR", to: "NGN" },
+  { from: "UGX", to: "EUR" }, { from: "EUR", to: "UGX" },
+  { from: "TZS", to: "EUR" }, { from: "EUR", to: "TZS" },
+  { from: "MWK", to: "EUR" }, { from: "EUR", to: "MWK" },
+  { from: "GMD", to: "EUR" }, { from: "EUR", to: "GMD" },
+
+  // ── Toutes les devises africaines ↔ USD ────────────────────────────────────
+  { from: "XOF", to: "USD" }, { from: "USD", to: "XOF" },
+  { from: "XAF", to: "USD" }, { from: "USD", to: "XAF" },
+  { from: "CDF", to: "USD" }, { from: "USD", to: "CDF" },
+  { from: "GNF", to: "USD" }, { from: "USD", to: "GNF" },
+  { from: "GHS", to: "USD" }, { from: "USD", to: "GHS" },
+  { from: "RWF", to: "USD" }, { from: "USD", to: "RWF" },
+  { from: "SLE", to: "USD" }, { from: "USD", to: "SLE" },
+  { from: "KES", to: "USD" }, { from: "USD", to: "KES" },
+  { from: "ZMW", to: "USD" }, { from: "USD", to: "ZMW" },
+  { from: "NGN", to: "USD" }, { from: "USD", to: "NGN" },
+  { from: "UGX", to: "USD" }, { from: "USD", to: "UGX" },
+  { from: "TZS", to: "USD" }, { from: "USD", to: "TZS" },
+  { from: "MWK", to: "USD" }, { from: "USD", to: "MWK" },
+  { from: "GMD", to: "USD" }, { from: "USD", to: "GMD" },
+
+  // ── EUR ↔ USD ───────────────────────────────────────────────────────────────
+  { from: "EUR", to: "USD" }, { from: "USD", to: "EUR" },
 ] as const;
 
 // Chat schema for EMALI
