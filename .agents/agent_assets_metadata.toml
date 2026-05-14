@@ -24,3 +24,9 @@ id = "JqfgRHzReALe-q2plPSy3"
 uri = "file://BKApay_Dossier_Presentation.docx"
 type = "word_document"
 title = "BKApay — Dossier de présentation"
+
+[[outputs]]
+id = "yU5-J1iGkxT0RXZjbf6XF"
+uri = "file://BKApay_Dossier_Presentation.pdf"
+type = "pdf"
+title = "BKApay — Dossier de présentation (PDF)"
