@@ -18,3 +18,9 @@ id = "SeV_8oDh7zjQRMsMRas9X"
 uri = "file://bkapay_pro.gif"
 type = "image"
 title = "BKApay — Animation professionnelle"
+
+[[outputs]]
+id = "JqfgRHzReALe-q2plPSy3"
+uri = "file://BKApay_Dossier_Presentation.docx"
+type = "word_document"
+title = "BKApay — Dossier de présentation candidature accompagnement"
