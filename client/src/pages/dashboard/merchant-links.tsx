@@ -32,7 +32,7 @@ const merchantLinkSchema = z.object({
 
 type MerchantLinkFormData = z.infer<typeof merchantLinkSchema>;
 
-// Palette de couleurs BKApay pour le QR code
+// Palette de couleurs BKApay
 const QR_COLORS = {
   dark: "#1e3a5f",
   light: "#ffffff",
@@ -40,70 +40,171 @@ const QR_COLORS = {
   gold: "#f59e0b",
 };
 
-// Génère un QR code coloré dans un canvas hors écran et retourne le dataURL PNG
-async function generateBrandedQRCanvas(url: string, merchantName: string, size = 400): Promise<string> {
-  // 1. Générer le QR code brut dans un canvas temporaire
+// Charge une image depuis une URL
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error(`Impossible de charger : ${src}`));
+    img.src = src;
+  });
+}
+
+// Génère le poster professionnel complet (800×1130 px)
+async function generatePosterCanvas(url: string, merchantName: string): Promise<HTMLCanvasElement> {
+  const W = 800;
+  const H = 1130;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d")!;
+
+  // ── Fond global bleu marine dégradé ──────────────────────────────────────
+  const bgGrad = ctx.createLinearGradient(0, 0, 0, H);
+  bgGrad.addColorStop(0, "#1a3058");
+  bgGrad.addColorStop(1, "#0c1d38");
+  ctx.fillStyle = bgGrad;
+  ctx.fillRect(0, 0, W, H);
+
+  // ── Motif décoratif (cercles flous en arrière-plan) ───────────────────────
+  const drawCircle = (x: number, y: number, r: number, color: string) => {
+    const grad = ctx.createRadialGradient(x, y, 0, x, y, r);
+    grad.addColorStop(0, color);
+    grad.addColorStop(1, "transparent");
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  };
+  drawCircle(680, 120, 200, "rgba(37,99,235,0.18)");
+  drawCircle(120, 900, 180, "rgba(245,158,11,0.12)");
+  drawCircle(400, 560, 280, "rgba(37,99,235,0.08)");
+
+  // ── En-tête blanc ─────────────────────────────────────────────────────────
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, W, 138);
+
+  // Logo BKApay
+  try {
+    const logo = await loadImage("/bkapay-logo-full.png");
+    const logoH = 72;
+    const logoW = Math.round((logo.width / logo.height) * logoH);
+    ctx.drawImage(logo, (W - logoW) / 2, 20, logoW, logoH);
+  } catch {
+    // Fallback texte si logo absent
+    ctx.fillStyle = QR_COLORS.accent;
+    ctx.font = "bold 40px Georgia, serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("BKAPAY", W / 2, 64);
+  }
+
+  // Tagline sous le logo
+  ctx.fillStyle = "#64748b";
+  ctx.font = "500 15px system-ui, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  ctx.fillText("Mobile Monnaie pour l'Afrique", W / 2, 104);
+
+  // ── Barre or ──────────────────────────────────────────────────────────────
+  ctx.fillStyle = QR_COLORS.gold;
+  ctx.fillRect(0, 138, W, 5);
+
+  // ── Section message ───────────────────────────────────────────────────────
+  const msgTop = 170;
+
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+
+  // "Scannez pour payer au marchand"
+  ctx.fillStyle = "#94a3b8";
+  ctx.font = "300 20px system-ui, sans-serif";
+  ctx.fillText("Scannez pour payer au marchand", W / 2, msgTop);
+
+  // Nom du marchand (doré, grand)
+  ctx.fillStyle = QR_COLORS.gold;
+  ctx.font = "bold 52px system-ui, sans-serif";
+  ctx.fillText(merchantName, W / 2, msgTop + 34);
+
+  // "via lien marchand BKAPAY"
+  ctx.fillStyle = "#cbd5e1";
+  ctx.font = "400 18px system-ui, sans-serif";
+  ctx.fillText("via lien marchand BKAPAY", W / 2, msgTop + 102);
+
+  // ── Card QR code ──────────────────────────────────────────────────────────
+  const qrSize = 460;
+  const qrCardPad = 24;
+  const qrCardW = qrSize + qrCardPad * 2;
+  const qrCardH = qrSize + qrCardPad * 2;
+  const qrCardX = (W - qrCardW) / 2;
+  const qrCardY = msgTop + 142;
+
+  // Ombre portée
+  ctx.shadowColor = "rgba(0,0,0,0.4)";
+  ctx.shadowBlur = 32;
+  ctx.shadowOffsetY = 8;
+  ctx.fillStyle = "#ffffff";
+  ctx.beginPath();
+  ctx.roundRect(qrCardX, qrCardY, qrCardW, qrCardH, 20);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetY = 0;
+
+  // Génération et dessin du QR code
   const qrCanvas = document.createElement("canvas");
   await QRCode.toCanvas(qrCanvas, url, {
-    width: size,
+    width: qrSize,
     margin: 2,
-    color: {
-      dark: QR_COLORS.dark,
-      light: QR_COLORS.light,
-    },
+    color: { dark: QR_COLORS.dark, light: "#ffffff" },
     errorCorrectionLevel: "H",
   });
-  // Inscrire BKAPAY au centre du QR brut
-  drawCenterLabel(qrCanvas, Math.round(size * 0.072));
+  drawCenterLabel(qrCanvas, Math.round(qrSize * 0.072));
+  ctx.drawImage(qrCanvas, qrCardX + qrCardPad, qrCardY + qrCardPad, qrSize, qrSize);
 
-  // 2. Créer le canvas final avec branding
-  const padding = 32;
-  const headerH = 64;
-  const footerH = 72;
-  const totalW = size + padding * 2;
-  const totalH = size + padding * 2 + headerH + footerH;
+  // ── Pied de page ──────────────────────────────────────────────────────────
+  const footerY = qrCardY + qrCardH + 32;
 
-  const finalCanvas = document.createElement("canvas");
-  finalCanvas.width = totalW;
-  finalCanvas.height = totalH;
-  const ctx = finalCanvas.getContext("2d")!;
+  // Ligne or
+  ctx.fillStyle = "rgba(245,158,11,0.5)";
+  ctx.fillRect(60, footerY, W - 120, 1);
 
-  // Fond blanc
-  ctx.fillStyle = "#ffffff";
-  ctx.roundRect(0, 0, totalW, totalH, 16);
+  // Icône bouclier dessiné
+  const shX = W / 2 - 10;
+  const shY = footerY + 20;
+  ctx.fillStyle = "#f59e0b";
+  ctx.beginPath();
+  ctx.moveTo(shX + 10, shY);
+  ctx.lineTo(shX + 20, shY + 5);
+  ctx.lineTo(shX + 20, shY + 14);
+  ctx.quadraticCurveTo(shX + 20, shY + 22, shX + 10, shY + 26);
+  ctx.quadraticCurveTo(shX, shY + 22, shX, shY + 14);
+  ctx.lineTo(shX, shY + 5);
+  ctx.closePath();
   ctx.fill();
 
-  // Bande supérieure bleue
-  ctx.fillStyle = QR_COLORS.accent;
-  ctx.roundRect(0, 0, totalW, headerH, [16, 16, 0, 0]);
-  ctx.fill();
-
-  // Nom marchand dans l'en-tête
-  ctx.fillStyle = "#ffffff";
-  ctx.font = "bold 22px system-ui, sans-serif";
+  // "Paiement sécurisé par BKAPAY"
+  ctx.fillStyle = "#94a3b8";
+  ctx.font = "400 15px system-ui, sans-serif";
   ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText(merchantName, totalW / 2, headerH / 2);
+  ctx.textBaseline = "top";
+  ctx.fillText("Paiement sécurisé par BKAPAY", W / 2 + 12, footerY + 24);
 
-  // QR code centré
-  ctx.drawImage(qrCanvas, padding, headerH + padding, size, size);
+  // URL en bas (petite, discrète)
+  ctx.fillStyle = "#475569";
+  ctx.font = "400 11px system-ui, sans-serif";
+  ctx.fillText(url, W / 2, footerY + 50);
 
-  // Bande inférieure dorée
-  ctx.fillStyle = QR_COLORS.gold;
-  ctx.fillRect(0, totalH - footerH, totalW, footerH);
+  // Points décoratifs
+  [0.25, 0.5, 0.75].forEach((f) => {
+    ctx.fillStyle = "rgba(245,158,11,0.5)";
+    ctx.beginPath();
+    ctx.arc(W * f, H - 20, 3, 0, Math.PI * 2);
+    ctx.fill();
+  });
 
-  // Texte bas
-  ctx.fillStyle = "#1a1a1a";
-  ctx.font = "bold 14px system-ui, sans-serif";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText(`Scanner pour payer · ${merchantName}`, totalW / 2, totalH - footerH + 22);
-
-  ctx.fillStyle = QR_COLORS.dark;
-  ctx.font = "bold 16px system-ui, sans-serif";
-  ctx.fillText("par BKAPAY", totalW / 2, totalH - footerH + 46);
-
-  return finalCanvas.toDataURL("image/png", 1.0);
+  return canvas;
 }
 
 // Dessine "BKAPAY" au centre d'un canvas QR déjà généré
@@ -194,14 +295,15 @@ function MerchantLinkCard({ link }: { link: MerchantLink }) {
   const downloadPNG = useCallback(async () => {
     setDownloading("png");
     try {
-      const dataUrl = await generateBrandedQRCanvas(url, link.merchantName, 400);
+      const poster = await generatePosterCanvas(url, link.merchantName);
+      const dataUrl = poster.toDataURL("image/png", 1.0);
       const a = document.createElement("a");
       a.href = dataUrl;
-      a.download = `qr-${link.merchantName.toLowerCase()}-bkapay.png`;
+      a.download = `affiche-${link.merchantName.toLowerCase()}-bkapay.png`;
       a.click();
-      toast({ title: "Téléchargé", description: "Code QR exporté en PNG" });
+      toast({ title: "Téléchargé", description: "Affiche exportée en PNG haute résolution" });
     } catch {
-      toast({ title: "Erreur", description: "Impossible de générer l'image", variant: "destructive" });
+      toast({ title: "Erreur", description: "Impossible de générer l'affiche", variant: "destructive" });
     } finally {
       setDownloading(null);
     }
@@ -210,93 +312,24 @@ function MerchantLinkCard({ link }: { link: MerchantLink }) {
   const downloadPDF = useCallback(async () => {
     setDownloading("pdf");
     try {
-      const imgData = await generateBrandedQRCanvas(url, link.merchantName, 500);
+      // Générer le poster haute résolution (800×1130)
+      const poster = await generatePosterCanvas(url, link.merchantName);
+      const imgData = poster.toDataURL("image/png", 1.0);
+
+      // PDF A4 portrait — le poster rempli toute la page
       const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-      const pageW = pdf.internal.pageSize.getWidth();
-      const pageH = pdf.internal.pageSize.getHeight();
+      const pageW = pdf.internal.pageSize.getWidth();   // 210 mm
+      const pageH = pdf.internal.pageSize.getHeight();  // 297 mm
 
-      pdf.setFillColor(255, 255, 255);
-      pdf.rect(0, 0, pageW, pageH, "F");
+      // Calcul des proportions pour conserver le ratio du poster
+      const posterRatio = poster.height / poster.width;  // ≈ 1130/800
+      const imgH = pageW * posterRatio;
+      const imgY = Math.max(0, (pageH - imgH) / 2);
 
-      pdf.setFillColor(37, 99, 235);
-      pdf.rect(0, 0, pageW, 30, "F");
-      pdf.setTextColor(255, 255, 255);
-      pdf.setFontSize(22);
-      pdf.setFont("helvetica", "bold");
-      pdf.text("BKAPAY", pageW / 2, 18, { align: "center" });
-      pdf.setFontSize(12);
-      pdf.text("Code QR de paiement marchand", pageW / 2, 26, { align: "center" });
+      pdf.addImage(imgData, "PNG", 0, imgY, pageW, imgH);
 
-      const cardX = 30;
-      const cardW = pageW - 60;
-      const cardY = 45;
-      const cardH = 185;
-
-      pdf.setFillColor(248, 250, 252);
-      pdf.roundedRect(cardX, cardY, cardW, cardH, 4, 4, "F");
-      pdf.setDrawColor(226, 232, 240);
-      pdf.roundedRect(cardX, cardY, cardW, cardH, 4, 4, "S");
-
-      pdf.setFillColor(37, 99, 235);
-      pdf.roundedRect(cardX, cardY, cardW, 18, 4, 4, "F");
-      pdf.rect(cardX, cardY + 10, cardW, 8, "F");
-      pdf.setTextColor(255, 255, 255);
-      pdf.setFontSize(16);
-      pdf.setFont("helvetica", "bold");
-      pdf.text(link.merchantName, pageW / 2, cardY + 12, { align: "center" });
-
-      const qrSize = 100;
-      const qrX = (pageW - qrSize) / 2;
-      const qrY = cardY + 25;
-      pdf.addImage(imgData, "PNG", qrX, qrY, qrSize, qrSize);
-
-      pdf.setTextColor(30, 58, 95);
-      pdf.setFontSize(11);
-      pdf.setFont("helvetica", "normal");
-      pdf.text("Scanner pour payer", pageW / 2, qrY + qrSize + 10, { align: "center" });
-      pdf.setFontSize(13);
-      pdf.setFont("helvetica", "bold");
-      pdf.setTextColor(37, 99, 235);
-      pdf.text(link.merchantName, pageW / 2, qrY + qrSize + 18, { align: "center" });
-      pdf.setFontSize(7);
-      pdf.setFont("helvetica", "normal");
-      pdf.setTextColor(100, 116, 139);
-      pdf.text(url, pageW / 2, qrY + qrSize + 28, { align: "center" });
-
-      pdf.setFillColor(245, 158, 11);
-      pdf.rect(cardX, cardY + cardH - 18, cardW, 18, "F");
-      pdf.roundedRect(cardX, cardY + cardH - 18, cardW, 18, 4, 4, "F");
-      pdf.rect(cardX, cardY + cardH - 28, cardW, 10, "F");
-      pdf.setTextColor(26, 26, 46);
-      pdf.setFontSize(10);
-      pdf.setFont("helvetica", "bold");
-      pdf.text("par BKAPAY", pageW / 2, cardY + cardH - 7, { align: "center" });
-
-      pdf.setTextColor(71, 85, 105);
-      pdf.setFontSize(10);
-      pdf.setFont("helvetica", "normal");
-      const instrY = cardY + cardH + 15;
-      pdf.text("Comment payer :", cardX, instrY);
-      pdf.setFontSize(9);
-      [
-        "1. Ouvrez l'appareil photo de votre smartphone",
-        "2. Pointez vers le code QR ci-dessus",
-        "3. Appuyez sur le lien qui apparaît",
-        "4. Choisissez votre montant et payez",
-      ].forEach((s, i) => pdf.text(s, cardX, instrY + 8 + i * 7));
-
-      pdf.setFillColor(30, 58, 95);
-      pdf.rect(0, pageH - 20, pageW, 20, "F");
-      pdf.setTextColor(255, 255, 255);
-      pdf.setFontSize(9);
-      pdf.setFont("helvetica", "normal");
-      pdf.text(
-        `Généré le ${new Date().toLocaleDateString("fr-FR")} · BKAPAY - Plateforme de paiement mobile money`,
-        pageW / 2, pageH - 8, { align: "center" }
-      );
-
-      pdf.save(`qr-${link.merchantName.toLowerCase()}-bkapay.pdf`);
-      toast({ title: "Téléchargé", description: "Code QR exporté en PDF" });
+      pdf.save(`affiche-${link.merchantName.toLowerCase()}-bkapay.pdf`);
+      toast({ title: "Téléchargé", description: "Affiche exportée en PDF A4 prêt à imprimer" });
     } catch (e) {
       console.error(e);
       toast({ title: "Erreur", description: "Impossible de générer le PDF", variant: "destructive" });
