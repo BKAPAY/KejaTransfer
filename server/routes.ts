@@ -12681,7 +12681,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Countries appear even if no operators are enabled (empty array) - UI shows "no operators" message
   app.get("/api/countries-operators/withdrawals", async (req: Request, res: Response) => {
     try {
-      const configs = await storage.getCountryOperatorConfigs("business");
+      const configs = await storage.getCountryOperatorConfigs("personal");
       const activeOutgoing = configs.filter(c => c.outgoingEnabled);
 
       const result: Record<string, string[]> = {};
