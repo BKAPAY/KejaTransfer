@@ -224,18 +224,21 @@ function FinancialBreakdown({
       const displayServiceFee = effectiveCustomerServiceFee || Math.max(0, serviceFee - exchangeFee);
 
       // Conversion des montants en devise de l'utilisateur (currency) pour l'affichage
-      // Cross-devise : on convertit proportionnellement via le taux implicite de la transaction
-      // Taux implicite = gross (devise utilisateur) / (providerAmount - displayServiceFee en devise réseau)
+      // Deux cas cross-devise :
+      // 1. effectiveCustomerServiceFee > 0 : frais stockés en devise fournisseur (XAF) → conversion proportionnelle
+      // 2. effectiveCustomerServiceFee = 0 : frais calculés depuis transaction.fee (déjà en devise utilisateur) → utiliser directement
       let grossFromClientAmount: number;
       let displayServiceFeeUser: number;
-      if (isCrossCurrency && metadata?.providerAmount && displayServiceFee > 0) {
+      if (isCrossCurrency && effectiveCustomerServiceFee > 0 && metadata?.providerAmount && displayServiceFee > 0) {
+        // Frais stockés en devise fournisseur → taux implicite = gross / (providerAmount - displayServiceFee)
         const providerBase = (metadata.providerAmount as number) - displayServiceFee;
         const ratio = providerBase > 0 ? gross / providerBase : 1;
         displayServiceFeeUser = Math.round(displayServiceFee * ratio);
         grossFromClientAmount = gross + displayServiceFeeUser;
       } else if (isCrossCurrency) {
-        displayServiceFeeUser = 0;
-        grossFromClientAmount = gross;
+        // Frais dérivés de transaction.fee - exchangeFee → déjà en devise utilisateur
+        displayServiceFeeUser = displayServiceFee;
+        grossFromClientAmount = gross + displayServiceFeeUser;
       } else {
         displayServiceFeeUser = displayServiceFee;
         grossFromClientAmount = gross + displayServiceFee;

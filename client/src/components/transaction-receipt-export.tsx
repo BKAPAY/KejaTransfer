@@ -340,17 +340,19 @@ const ReceiptTemplate = forwardRef<HTMLDivElement, ReceiptTemplateProps>(
                   const displayServiceFee = effectiveCustomerServiceFee || Math.max(0, serviceFee - exchangeFee);
 
                   // Tous les montants affichés en devise de l'utilisateur (currency)
-                  // Cross-devise : conversion proportionnelle via le taux implicite de la transaction
+                  // Cas 1 (effectiveCustomerServiceFee > 0) : frais en devise fournisseur → conversion proportionnelle
+                  // Cas 2 (effectiveCustomerServiceFee = 0) : frais dérivés de transaction.fee → déjà en devise utilisateur
                   let grossFromClientAmount: number;
                   let displayServiceFeeUser: number;
-                  if (isCrossCcy && metadata?.providerAmount && displayServiceFee > 0) {
+                  if (isCrossCcy && effectiveCustomerServiceFee > 0 && metadata?.providerAmount && displayServiceFee > 0) {
                     const providerBase = (metadata.providerAmount as number) - displayServiceFee;
                     const ratio = providerBase > 0 ? transaction.amount / providerBase : 1;
                     displayServiceFeeUser = Math.round(displayServiceFee * ratio);
                     grossFromClientAmount = transaction.amount + displayServiceFeeUser;
                   } else if (isCrossCcy) {
-                    displayServiceFeeUser = 0;
-                    grossFromClientAmount = transaction.amount;
+                    // Frais déjà en devise utilisateur (pas de conversion nécessaire)
+                    displayServiceFeeUser = displayServiceFee;
+                    grossFromClientAmount = transaction.amount + displayServiceFeeUser;
                   } else {
                     displayServiceFeeUser = displayServiceFee;
                     grossFromClientAmount = transaction.amount + displayServiceFee;
