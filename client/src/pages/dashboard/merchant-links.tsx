@@ -1,13 +1,12 @@
-import { useState } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Plus, Copy, ExternalLink, Trash2, Store } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Plus, Copy, ExternalLink, Trash2, Store, Download, FileText, QrCode } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { MerchantLink } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
-import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -20,6 +19,9 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import QRCode from "qrcode";
+import { jsPDF } from "jspdf";
 
 const merchantLinkSchema = z.object({
   merchantName: z.string()
@@ -29,6 +31,375 @@ const merchantLinkSchema = z.object({
 });
 
 type MerchantLinkFormData = z.infer<typeof merchantLinkSchema>;
+
+// Palette de couleurs BKApay pour le QR code
+const QR_COLORS = {
+  dark: "#1e3a5f",
+  light: "#ffffff",
+  accent: "#2563eb",
+  gold: "#f59e0b",
+};
+
+// Génère un QR code coloré dans un canvas hors écran et retourne le dataURL PNG
+async function generateBrandedQRCanvas(url: string, merchantName: string, size = 400): Promise<string> {
+  // 1. Générer le QR code brut dans un canvas temporaire
+  const qrCanvas = document.createElement("canvas");
+  await QRCode.toCanvas(qrCanvas, url, {
+    width: size,
+    margin: 2,
+    color: {
+      dark: QR_COLORS.dark,
+      light: QR_COLORS.light,
+    },
+    errorCorrectionLevel: "H",
+  });
+
+  // 2. Créer le canvas final avec branding
+  const padding = 32;
+  const headerH = 64;
+  const footerH = 72;
+  const totalW = size + padding * 2;
+  const totalH = size + padding * 2 + headerH + footerH;
+
+  const finalCanvas = document.createElement("canvas");
+  finalCanvas.width = totalW;
+  finalCanvas.height = totalH;
+  const ctx = finalCanvas.getContext("2d")!;
+
+  // Fond blanc
+  ctx.fillStyle = "#ffffff";
+  ctx.roundRect(0, 0, totalW, totalH, 16);
+  ctx.fill();
+
+  // Bande supérieure bleue
+  ctx.fillStyle = QR_COLORS.accent;
+  ctx.roundRect(0, 0, totalW, headerH, [16, 16, 0, 0]);
+  ctx.fill();
+
+  // Nom marchand dans l'en-tête
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 22px system-ui, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(merchantName, totalW / 2, headerH / 2);
+
+  // QR code centré
+  ctx.drawImage(qrCanvas, padding, headerH + padding, size, size);
+
+  // Bande inférieure dorée
+  ctx.fillStyle = QR_COLORS.gold;
+  ctx.fillRect(0, totalH - footerH, totalW, footerH);
+
+  // Texte bas
+  ctx.fillStyle = "#1a1a1a";
+  ctx.font = "bold 14px system-ui, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(`Scanner pour payer · ${merchantName}`, totalW / 2, totalH - footerH + 22);
+
+  ctx.fillStyle = QR_COLORS.dark;
+  ctx.font = "bold 16px system-ui, sans-serif";
+  ctx.fillText("par BKAPAY", totalW / 2, totalH - footerH + 46);
+
+  return finalCanvas.toDataURL("image/png", 1.0);
+}
+
+// Composant QR affiché dans la page
+function MerchantQRCode({ url, merchantName }: { url: string; merchantName: string }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    if (!canvasRef.current) return;
+    QRCode.toCanvas(canvasRef.current, url, {
+      width: 200,
+      margin: 2,
+      color: {
+        dark: QR_COLORS.dark,
+        light: QR_COLORS.light,
+      },
+      errorCorrectionLevel: "H",
+    }).catch(console.error);
+  }, [url]);
+
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <div className="rounded-md overflow-hidden border-2 border-blue-500 p-2 bg-white">
+        <canvas ref={canvasRef} data-testid="qr-code-canvas" />
+      </div>
+    </div>
+  );
+}
+
+// Card QR code complète avec en-tête et pied de page de marque (aperçu)
+function BrandedQRPreview({ url, merchantName }: { url: string; merchantName: string }) {
+  return (
+    <div className="flex flex-col rounded-xl overflow-hidden border shadow-sm w-56 mx-auto select-none">
+      {/* En-tête bleue */}
+      <div className="bg-blue-600 py-3 px-4 text-center">
+        <p className="text-white font-bold text-base tracking-wide">{merchantName}</p>
+      </div>
+      {/* QR code */}
+      <div className="bg-white p-4 flex justify-center">
+        <MerchantQRCode url={url} merchantName={merchantName} />
+      </div>
+      {/* Pied de page doré */}
+      <div className="bg-amber-400 py-2 px-4 text-center">
+        <p className="text-gray-800 text-xs font-semibold">Scanner pour payer · {merchantName}</p>
+        <p className="text-blue-900 text-sm font-bold">par BKAPAY</p>
+      </div>
+    </div>
+  );
+}
+
+function MerchantLinkCard({ link }: { link: MerchantLink }) {
+  const { toast } = useToast();
+  const [downloading, setDownloading] = useState<"png" | "pdf" | null>(null);
+  const url = `${window.location.origin}/merchant/${link.token}`;
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(url);
+    toast({ title: "Copié", description: "Le lien a été copié dans le presse-papiers" });
+  };
+
+  const downloadPNG = useCallback(async () => {
+    setDownloading("png");
+    try {
+      const dataUrl = await generateBrandedQRCanvas(url, link.merchantName, 400);
+      const a = document.createElement("a");
+      a.href = dataUrl;
+      a.download = `qr-${link.merchantName.toLowerCase()}-bkapay.png`;
+      a.click();
+      toast({ title: "Téléchargé", description: "Code QR exporté en PNG" });
+    } catch {
+      toast({ title: "Erreur", description: "Impossible de générer l'image", variant: "destructive" });
+    } finally {
+      setDownloading(null);
+    }
+  }, [url, link.merchantName, toast]);
+
+  const downloadPDF = useCallback(async () => {
+    setDownloading("pdf");
+    try {
+      const imgData = await generateBrandedQRCanvas(url, link.merchantName, 500);
+
+      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+
+      // Fond blanc
+      pdf.setFillColor(255, 255, 255);
+      pdf.rect(0, 0, pageW, pageH, "F");
+
+      // En-tête bleue
+      pdf.setFillColor(37, 99, 235);
+      pdf.rect(0, 0, pageW, 30, "F");
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(22);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("BKAPAY", pageW / 2, 18, { align: "center" });
+      pdf.setFontSize(12);
+      pdf.text("Code QR de paiement marchand", pageW / 2, 26, { align: "center" });
+
+      // Card centrale
+      const cardX = 30;
+      const cardW = pageW - 60;
+      const cardY = 45;
+      const cardH = 185;
+
+      pdf.setFillColor(248, 250, 252);
+      pdf.roundedRect(cardX, cardY, cardW, cardH, 4, 4, "F");
+      pdf.setDrawColor(226, 232, 240);
+      pdf.roundedRect(cardX, cardY, cardW, cardH, 4, 4, "S");
+
+      // Nom marchand dans la card
+      pdf.setFillColor(37, 99, 235);
+      pdf.roundedRect(cardX, cardY, cardW, 18, 4, 4, "F");
+      pdf.rect(cardX, cardY + 10, cardW, 8, "F");
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(16);
+      pdf.setFont("helvetica", "bold");
+      pdf.text(link.merchantName, pageW / 2, cardY + 12, { align: "center" });
+
+      // QR code image (centré)
+      const qrSize = 100;
+      const qrX = (pageW - qrSize) / 2;
+      const qrY = cardY + 25;
+      pdf.addImage(imgData, "PNG", qrX, qrY, qrSize, qrSize);
+
+      // Texte sous le QR
+      pdf.setTextColor(30, 58, 95);
+      pdf.setFontSize(11);
+      pdf.setFont("helvetica", "normal");
+      pdf.text("Scanner pour payer", pageW / 2, qrY + qrSize + 10, { align: "center" });
+
+      pdf.setFontSize(13);
+      pdf.setFont("helvetica", "bold");
+      pdf.setTextColor(37, 99, 235);
+      pdf.text(link.merchantName, pageW / 2, qrY + qrSize + 18, { align: "center" });
+
+      // Lien URL
+      pdf.setFontSize(7);
+      pdf.setFont("helvetica", "normal");
+      pdf.setTextColor(100, 116, 139);
+      pdf.text(url, pageW / 2, qrY + qrSize + 28, { align: "center" });
+
+      // Pied doré dans la card
+      pdf.setFillColor(245, 158, 11);
+      pdf.rect(cardX, cardY + cardH - 18, cardW, 18, "F");
+      pdf.roundedRect(cardX, cardY + cardH - 18, cardW, 18, 4, 4, "F");
+      pdf.rect(cardX, cardY + cardH - 28, cardW, 10, "F");
+      pdf.setTextColor(26, 26, 46);
+      pdf.setFontSize(10);
+      pdf.setFont("helvetica", "bold");
+      pdf.text(`par BKAPAY`, pageW / 2, cardY + cardH - 7, { align: "center" });
+
+      // Instructions
+      pdf.setTextColor(71, 85, 105);
+      pdf.setFontSize(10);
+      pdf.setFont("helvetica", "normal");
+      const instrY = cardY + cardH + 15;
+      pdf.text("Comment payer :", cardX, instrY);
+      pdf.setFontSize(9);
+      const steps = [
+        "1. Ouvrez l'appareil photo de votre smartphone",
+        "2. Pointez vers le code QR ci-dessus",
+        "3. Appuyez sur le lien qui apparaît",
+        "4. Choisissez votre montant et payez",
+      ];
+      steps.forEach((s, i) => {
+        pdf.text(s, cardX, instrY + 8 + i * 7);
+      });
+
+      // Pied de page du PDF
+      pdf.setFillColor(30, 58, 95);
+      pdf.rect(0, pageH - 20, pageW, 20, "F");
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(9);
+      pdf.setFont("helvetica", "normal");
+      pdf.text(
+        `Généré le ${new Date().toLocaleDateString("fr-FR")} · BKAPAY - Plateforme de paiement mobile money`,
+        pageW / 2,
+        pageH - 8,
+        { align: "center" }
+      );
+
+      pdf.save(`qr-${link.merchantName.toLowerCase()}-bkapay.pdf`);
+      toast({ title: "Téléchargé", description: "Code QR exporté en PDF" });
+    } catch (e) {
+      console.error(e);
+      toast({ title: "Erreur", description: "Impossible de générer le PDF", variant: "destructive" });
+    } finally {
+      setDownloading(null);
+    }
+  }, [url, link.merchantName, toast]);
+
+  return (
+    <Card data-testid={`merchant-link-${link.id}`} className="overflow-hidden">
+      {/* En-tête de la card */}
+      <div className="bg-blue-600 px-6 py-4 flex items-center justify-between gap-4">
+        <div>
+          <h2 className="text-white font-bold text-xl tracking-wide">{link.merchantName}</h2>
+          <p className="text-blue-100 text-xs mt-0.5">
+            Créé le {new Date(link.createdAt).toLocaleDateString("fr-FR")}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Badge variant={link.isActive ? "default" : "secondary"} className="bg-white/20 text-white border-white/30">
+            {link.isActive ? "Actif" : "Inactif"}
+          </Badge>
+          <Store className="w-7 h-7 text-blue-100" />
+        </div>
+      </div>
+
+      <CardContent className="p-6">
+        <div className="grid md:grid-cols-2 gap-8 items-start">
+          {/* Colonne QR */}
+          <div className="flex flex-col items-center gap-4">
+            <p className="text-sm font-semibold text-muted-foreground flex items-center gap-1">
+              <QrCode className="w-4 h-4" />
+              Aperçu du code QR
+            </p>
+            <BrandedQRPreview url={url} merchantName={link.merchantName} />
+            {/* Boutons de téléchargement */}
+            <div className="flex gap-3 mt-1 flex-wrap justify-center">
+              <Button
+                variant="outline"
+                onClick={downloadPNG}
+                disabled={downloading !== null}
+                data-testid={`button-download-png-${link.id}`}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                {downloading === "png" ? "Export..." : "Télécharger PNG"}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={downloadPDF}
+                disabled={downloading !== null}
+                data-testid={`button-download-pdf-${link.id}`}
+              >
+                <FileText className="w-4 h-4 mr-2" />
+                {downloading === "pdf" ? "Export..." : "Télécharger PDF"}
+              </Button>
+            </div>
+          </div>
+
+          {/* Colonne informations */}
+          <div className="flex flex-col gap-4">
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">
+                Lien de paiement
+              </p>
+              <div className="flex items-center gap-2 p-3 bg-muted rounded-md">
+                <code className="flex-1 text-xs truncate">{url}</code>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={copyToClipboard}
+                  data-testid={`button-copy-${link.id}`}
+                >
+                  <Copy className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  asChild
+                  data-testid={`button-open-${link.id}`}
+                >
+                  <a href={url} target="_blank" rel="noopener noreferrer">
+                    <ExternalLink className="w-4 h-4" />
+                  </a>
+                </Button>
+              </div>
+            </div>
+
+            <div className="rounded-md bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 p-4">
+              <p className="text-sm font-semibold text-amber-800 dark:text-amber-400 mb-2">
+                Comment partager votre QR code
+              </p>
+              <ol className="text-xs text-amber-700 dark:text-amber-500 space-y-1.5 list-decimal list-inside">
+                <li>Téléchargez le QR code en PNG ou PDF</li>
+                <li>Imprimez-le et affichez-le en caisse</li>
+                <li>Envoyez-le à vos clients par WhatsApp</li>
+                <li>Le client scanne et paie directement</li>
+              </ol>
+            </div>
+
+            <div className="rounded-md bg-muted/50 p-3">
+              <p className="text-xs text-muted-foreground">
+                <span className="font-semibold text-foreground">Token :</span>{" "}
+                <code className="text-xs">{link.token}</code>
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Ce lien accepte tout montant choisi par le client
+              </p>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function MerchantLinks() {
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -40,9 +411,7 @@ export default function MerchantLinks() {
 
   const form = useForm<MerchantLinkFormData>({
     resolver: zodResolver(merchantLinkSchema),
-    defaultValues: {
-      merchantName: "",
-    },
+    defaultValues: { merchantName: "" },
   });
 
   const createMutation = useMutation({
@@ -67,67 +436,35 @@ export default function MerchantLinks() {
     },
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      return await apiRequest("DELETE", `/api/merchant-links/${id}`, {});
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchant-links"] });
-      toast({
-        title: "Lien supprimé",
-        description: "Le lien marchand a été supprimé",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Erreur",
-        description: error.message || "Erreur lors de la suppression",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const copyToClipboard = (token: string, isShortToken = false) => {
-    const textToCopy = isShortToken ? token : `${window.location.origin}/merchant/${token}`;
-    navigator.clipboard.writeText(textToCopy);
-    toast({
-      title: "Copié",
-      description: isShortToken ? "Le token a été copié" : "Le lien a été copié dans le presse-papiers",
-    });
-  };
-
-  const onSubmit = (data: MerchantLinkFormData) => {
-    createMutation.mutate(data);
-  };
-
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-2 flex-wrap">
+    <div className="space-y-6">
+      {/* En-tête de page */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold text-foreground mb-1">Lien marchand</h1>
-          <p className="text-sm text-muted-foreground">
-            Montant flexible choisi par le client
+          <h1 className="text-2xl font-bold text-foreground">Lien marchand</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Acceptez des paiements mobiles — montant libre choisi par vos clients
           </p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button 
+            <Button
               data-testid="button-create-merchant-link"
               disabled={merchantLinks && merchantLinks.length > 0}
             >
               <Plus className="w-4 h-4 mr-2" />
-              {merchantLinks && merchantLinks.length > 0 ? "Lien créé" : "Créer mon lien"}
+              {merchantLinks && merchantLinks.length > 0 ? "Lien déjà créé" : "Créer mon lien"}
             </Button>
           </DialogTrigger>
           <DialogContent className="max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Créer un lien marchand</DialogTitle>
               <DialogDescription>
-                Vos clients pourront entrer le montant qu'ils souhaitent payer
+                Vos clients pourront choisir librement le montant à payer. Le lien est permanent et ne peut être créé qu'une seule fois.
               </DialogDescription>
             </DialogHeader>
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pb-4">
+              <form onSubmit={form.handleSubmit((d) => createMutation.mutate(d))} className="space-y-4 pb-4">
                 <FormField
                   control={form.control}
                   name="merchantName"
@@ -139,33 +476,22 @@ export default function MerchantLinks() {
                           placeholder="Ex: BOUTIQUE (3-10 majuscules)"
                           data-testid="input-merchant-name"
                           value={field.value || ""}
-                          onChange={(e) => {
-                            const val = e.target.value.toUpperCase();
-                            field.onChange(val);
-                          }}
+                          onChange={(e) => field.onChange(e.target.value.toUpperCase())}
                           maxLength={10}
                         />
                       </FormControl>
                       <FormMessage />
-                      <p className="text-xs text-muted-foreground mt-1">3-10 lettres majuscules. Unique et immuable.</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        3 à 10 lettres majuscules uniquement. Identifiant permanent et unique.
+                      </p>
                     </FormItem>
                   )}
                 />
-
                 <div className="flex justify-end gap-3">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setDialogOpen(false)}
-                    data-testid="button-cancel"
-                  >
+                  <Button type="button" variant="outline" onClick={() => setDialogOpen(false)} data-testid="button-cancel">
                     Annuler
                   </Button>
-                  <Button
-                    type="submit"
-                    disabled={createMutation.isPending}
-                    data-testid="button-submit"
-                  >
+                  <Button type="submit" disabled={createMutation.isPending} data-testid="button-submit">
                     {createMutation.isPending ? "Création..." : "Créer le lien"}
                   </Button>
                 </div>
@@ -175,70 +501,29 @@ export default function MerchantLinks() {
         </Dialog>
       </div>
 
-      {/* Merchant Links List */}
+      {/* Contenu principal */}
       <div className="grid gap-6">
         {isLoading ? (
           <Card>
-            <CardContent className="py-12">
-              <p className="text-center text-muted-foreground">Chargement...</p>
+            <CardContent className="py-16 text-center text-muted-foreground">
+              Chargement...
             </CardContent>
           </Card>
         ) : merchantLinks && merchantLinks.length > 0 ? (
-          merchantLinks.map((link) => (
-            <Card key={link.id} data-testid={`merchant-link-${link.id}`}>
-              <CardHeader>
-                <div className="flex items-start justify-between gap-4 flex-wrap">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <CardTitle className="text-lg">{link.merchantName}</CardTitle>
-                      <Badge variant={link.isActive ? "default" : "secondary"}>
-                        {link.isActive ? "Actif" : "Inactif"}
-                      </Badge>
-                    </div>
-                    <CardDescription className="mt-2">
-                      Créé le {new Date(link.createdAt).toLocaleDateString("fr-FR")}
-                    </CardDescription>
-                  </div>
-                  <Store className="w-8 h-8 text-muted-foreground" />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2 p-3 bg-muted rounded-md">
-                    <code className="flex-1 text-xs sm:text-sm truncate">
-                      {`${window.location.origin}/merchant/${link.token}`}
-                    </code>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => copyToClipboard(link.token, false)}
-                      data-testid={`button-copy-${link.id}`}
-                    >
-                      <Copy className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      asChild
-                      data-testid={`button-open-${link.id}`}
-                    >
-                      <a href={`/merchant/${link.token}`} target="_blank" rel="noopener noreferrer">
-                        <ExternalLink className="w-4 h-4" />
-                      </a>
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))
+          merchantLinks.map((link) => <MerchantLinkCard key={link.id} link={link} />)
         ) : (
           <Card>
-            <CardContent className="py-12">
-              <div className="text-center">
-                <Store className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-                <p className="text-muted-foreground mb-4">
-                  Vous n'avez pas encore créé de lien marchand
-                </p>
+            <CardContent className="py-16">
+              <div className="text-center space-y-4">
+                <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto">
+                  <Store className="w-8 h-8 text-muted-foreground" />
+                </div>
+                <div>
+                  <p className="font-semibold text-foreground">Aucun lien marchand</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Créez votre lien pour recevoir des paiements et générer votre code QR
+                  </p>
+                </div>
                 <Button onClick={() => setDialogOpen(true)} data-testid="button-create-first">
                   <Plus className="w-4 h-4 mr-2" />
                   Créer mon lien marchand
