@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100">
+  <rect width="200" height="100" rx="12" fill="#1A6FE0"/>
+  <text x="100" y="66" font-family="Arial,sans-serif" font-size="46" font-weight="800" fill="#ffffff" text-anchor="middle">Wave</text>
+</svg>

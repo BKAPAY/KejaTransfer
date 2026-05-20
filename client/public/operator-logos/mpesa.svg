@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100">
+  <rect width="200" height="100" rx="12" fill="#007B3E"/>
+  <text x="100" y="58" font-family="Arial Black,Arial,sans-serif" font-size="36" font-weight="900" fill="#ffffff" text-anchor="middle">M-PESA</text>
+  <text x="100" y="84" font-family="Arial,sans-serif" font-size="16" font-weight="400" fill="#99ddbb" text-anchor="middle">Mobile Money</text>
+</svg>
