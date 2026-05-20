@@ -12266,6 +12266,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/admin/user/:userId/merchant-links/:linkId", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { linkId } = req.params;
+      const { merchantName } = req.body;
+
+      if (!merchantName || typeof merchantName !== "string" || merchantName.trim().length < 2) {
+        return res.status(400).json({ error: "Le nom marchand doit contenir au moins 2 caractères." });
+      }
+
+      const trimmedName = merchantName.trim();
+
+      // Vérifier unicité du nom (hors le lien actuel)
+      const existing = await storage.getMerchantLinkByName(trimmedName);
+      if (existing && existing.id !== linkId) {
+        return res.status(400).json({ error: "Ce nom marchand est déjà utilisé par un autre utilisateur." });
+      }
+
+      const updated = await storage.updateMerchantLinkName(linkId, trimmedName);
+      if (!updated) {
+        return res.status(404).json({ error: "Lien marchand introuvable." });
+      }
+
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Update merchant link name error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
   app.get("/api/admin/user/:userId/api-keys", requireAdmin, async (req: Request, res: Response) => {
     try {
       const keys = await storage.getApiKeys(req.params.userId);
