@@ -427,6 +427,11 @@ function MerchantLinkCard({ link }: { link: MerchantLink }) {
           <BrandedQRPreview url={url} merchantName={link.merchantName} />
         </div>
 
+        {/* Message d'instruction avant les boutons */}
+        <p className="text-sm text-center text-muted-foreground leading-snug">
+          Téléchargez le code QR et collez-le dans votre boutique pour collecter les paiements
+        </p>
+
         {/* Boutons de téléchargement — pleine largeur sur mobile */}
         <div className="grid grid-cols-2 gap-2">
           <Button
