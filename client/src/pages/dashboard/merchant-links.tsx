@@ -104,48 +104,42 @@ async function generateBrandedQRCanvas(url: string, merchantName: string, size =
   return finalCanvas.toDataURL("image/png", 1.0);
 }
 
-// Composant QR affiché dans la page
-function MerchantQRCode({ url, merchantName }: { url: string; merchantName: string }) {
+// Composant QR affiché dans la page — taille responsive
+function MerchantQRCode({ url }: { url: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     if (!canvasRef.current) return;
     QRCode.toCanvas(canvasRef.current, url, {
-      width: 200,
+      width: 180,
       margin: 2,
-      color: {
-        dark: QR_COLORS.dark,
-        light: QR_COLORS.light,
-      },
+      color: { dark: QR_COLORS.dark, light: QR_COLORS.light },
       errorCorrectionLevel: "H",
     }).catch(console.error);
   }, [url]);
 
   return (
-    <div className="flex flex-col items-center gap-2">
-      <div className="rounded-md overflow-hidden border-2 border-blue-500 p-2 bg-white">
-        <canvas ref={canvasRef} data-testid="qr-code-canvas" />
-      </div>
-    </div>
+    <canvas
+      ref={canvasRef}
+      data-testid="qr-code-canvas"
+      style={{ display: "block", maxWidth: "100%" }}
+    />
   );
 }
 
-// Card QR code complète avec en-tête et pied de page de marque (aperçu)
+// Aperçu branded du QR — entièrement responsive
 function BrandedQRPreview({ url, merchantName }: { url: string; merchantName: string }) {
   return (
-    <div className="flex flex-col rounded-xl overflow-hidden border shadow-sm w-56 mx-auto select-none">
-      {/* En-tête bleue */}
+    <div className="w-full max-w-[260px] mx-auto rounded-xl overflow-hidden border shadow-sm select-none">
       <div className="bg-blue-600 py-3 px-4 text-center">
-        <p className="text-white font-bold text-base tracking-wide">{merchantName}</p>
+        <p className="text-white font-bold text-sm tracking-wider truncate">{merchantName}</p>
       </div>
-      {/* QR code */}
       <div className="bg-white p-4 flex justify-center">
-        <MerchantQRCode url={url} merchantName={merchantName} />
+        <MerchantQRCode url={url} />
       </div>
-      {/* Pied de page doré */}
-      <div className="bg-amber-400 py-2 px-4 text-center">
-        <p className="text-gray-800 text-xs font-semibold">Scanner pour payer · {merchantName}</p>
-        <p className="text-blue-900 text-sm font-bold">par BKAPAY</p>
+      <div className="bg-amber-400 py-2 px-3 text-center">
+        <p className="text-gray-800 text-[11px] font-semibold leading-tight">Scanner pour payer · {merchantName}</p>
+        <p className="text-blue-900 text-xs font-bold mt-0.5">par BKAPAY</p>
       </div>
     </div>
   );
@@ -181,17 +175,13 @@ function MerchantLinkCard({ link }: { link: MerchantLink }) {
     setDownloading("pdf");
     try {
       const imgData = await generateBrandedQRCanvas(url, link.merchantName, 500);
-
       const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-
       const pageW = pdf.internal.pageSize.getWidth();
       const pageH = pdf.internal.pageSize.getHeight();
 
-      // Fond blanc
       pdf.setFillColor(255, 255, 255);
       pdf.rect(0, 0, pageW, pageH, "F");
 
-      // En-tête bleue
       pdf.setFillColor(37, 99, 235);
       pdf.rect(0, 0, pageW, 30, "F");
       pdf.setTextColor(255, 255, 255);
@@ -201,7 +191,6 @@ function MerchantLinkCard({ link }: { link: MerchantLink }) {
       pdf.setFontSize(12);
       pdf.text("Code QR de paiement marchand", pageW / 2, 26, { align: "center" });
 
-      // Card centrale
       const cardX = 30;
       const cardW = pageW - 60;
       const cardY = 45;
@@ -212,7 +201,6 @@ function MerchantLinkCard({ link }: { link: MerchantLink }) {
       pdf.setDrawColor(226, 232, 240);
       pdf.roundedRect(cardX, cardY, cardW, cardH, 4, 4, "S");
 
-      // Nom marchand dans la card
       pdf.setFillColor(37, 99, 235);
       pdf.roundedRect(cardX, cardY, cardW, 18, 4, 4, "F");
       pdf.rect(cardX, cardY + 10, cardW, 8, "F");
@@ -221,30 +209,24 @@ function MerchantLinkCard({ link }: { link: MerchantLink }) {
       pdf.setFont("helvetica", "bold");
       pdf.text(link.merchantName, pageW / 2, cardY + 12, { align: "center" });
 
-      // QR code image (centré)
       const qrSize = 100;
       const qrX = (pageW - qrSize) / 2;
       const qrY = cardY + 25;
       pdf.addImage(imgData, "PNG", qrX, qrY, qrSize, qrSize);
 
-      // Texte sous le QR
       pdf.setTextColor(30, 58, 95);
       pdf.setFontSize(11);
       pdf.setFont("helvetica", "normal");
       pdf.text("Scanner pour payer", pageW / 2, qrY + qrSize + 10, { align: "center" });
-
       pdf.setFontSize(13);
       pdf.setFont("helvetica", "bold");
       pdf.setTextColor(37, 99, 235);
       pdf.text(link.merchantName, pageW / 2, qrY + qrSize + 18, { align: "center" });
-
-      // Lien URL
       pdf.setFontSize(7);
       pdf.setFont("helvetica", "normal");
       pdf.setTextColor(100, 116, 139);
       pdf.text(url, pageW / 2, qrY + qrSize + 28, { align: "center" });
 
-      // Pied doré dans la card
       pdf.setFillColor(245, 158, 11);
       pdf.rect(cardX, cardY + cardH - 18, cardW, 18, "F");
       pdf.roundedRect(cardX, cardY + cardH - 18, cardW, 18, 4, 4, "F");
@@ -252,26 +234,21 @@ function MerchantLinkCard({ link }: { link: MerchantLink }) {
       pdf.setTextColor(26, 26, 46);
       pdf.setFontSize(10);
       pdf.setFont("helvetica", "bold");
-      pdf.text(`par BKAPAY`, pageW / 2, cardY + cardH - 7, { align: "center" });
+      pdf.text("par BKAPAY", pageW / 2, cardY + cardH - 7, { align: "center" });
 
-      // Instructions
       pdf.setTextColor(71, 85, 105);
       pdf.setFontSize(10);
       pdf.setFont("helvetica", "normal");
       const instrY = cardY + cardH + 15;
       pdf.text("Comment payer :", cardX, instrY);
       pdf.setFontSize(9);
-      const steps = [
+      [
         "1. Ouvrez l'appareil photo de votre smartphone",
         "2. Pointez vers le code QR ci-dessus",
         "3. Appuyez sur le lien qui apparaît",
         "4. Choisissez votre montant et payez",
-      ];
-      steps.forEach((s, i) => {
-        pdf.text(s, cardX, instrY + 8 + i * 7);
-      });
+      ].forEach((s, i) => pdf.text(s, cardX, instrY + 8 + i * 7));
 
-      // Pied de page du PDF
       pdf.setFillColor(30, 58, 95);
       pdf.rect(0, pageH - 20, pageW, 20, "F");
       pdf.setTextColor(255, 255, 255);
@@ -279,9 +256,7 @@ function MerchantLinkCard({ link }: { link: MerchantLink }) {
       pdf.setFont("helvetica", "normal");
       pdf.text(
         `Généré le ${new Date().toLocaleDateString("fr-FR")} · BKAPAY - Plateforme de paiement mobile money`,
-        pageW / 2,
-        pageH - 8,
-        { align: "center" }
+        pageW / 2, pageH - 8, { align: "center" }
       );
 
       pdf.save(`qr-${link.merchantName.toLowerCase()}-bkapay.pdf`);
@@ -296,105 +271,80 @@ function MerchantLinkCard({ link }: { link: MerchantLink }) {
 
   return (
     <Card data-testid={`merchant-link-${link.id}`} className="overflow-hidden">
-      {/* En-tête de la card */}
-      <div className="bg-blue-600 px-6 py-4 flex items-center justify-between gap-4">
-        <div>
-          <h2 className="text-white font-bold text-xl tracking-wide">{link.merchantName}</h2>
+      {/* En-tête */}
+      <div className="bg-blue-600 px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+        <div className="min-w-0">
+          <h2 className="text-white font-bold text-lg tracking-wide truncate">{link.merchantName}</h2>
           <p className="text-blue-100 text-xs mt-0.5">
             Créé le {new Date(link.createdAt).toLocaleDateString("fr-FR")}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <Badge variant={link.isActive ? "default" : "secondary"} className="bg-white/20 text-white border-white/30">
             {link.isActive ? "Actif" : "Inactif"}
           </Badge>
-          <Store className="w-7 h-7 text-blue-100" />
+          <Store className="w-6 h-6 text-blue-100" />
         </div>
       </div>
 
-      <CardContent className="p-6">
-        <div className="grid md:grid-cols-2 gap-8 items-start">
-          {/* Colonne QR */}
-          <div className="flex flex-col items-center gap-4">
-            <p className="text-sm font-semibold text-muted-foreground flex items-center gap-1">
-              <QrCode className="w-4 h-4" />
-              Aperçu du code QR
-            </p>
-            <BrandedQRPreview url={url} merchantName={link.merchantName} />
-            {/* Boutons de téléchargement */}
-            <div className="flex gap-3 mt-1 flex-wrap justify-center">
-              <Button
-                variant="outline"
-                onClick={downloadPNG}
-                disabled={downloading !== null}
-                data-testid={`button-download-png-${link.id}`}
-              >
-                <Download className="w-4 h-4 mr-2" />
-                {downloading === "png" ? "Export..." : "Télécharger PNG"}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={downloadPDF}
-                disabled={downloading !== null}
-                data-testid={`button-download-pdf-${link.id}`}
-              >
-                <FileText className="w-4 h-4 mr-2" />
-                {downloading === "pdf" ? "Export..." : "Télécharger PDF"}
-              </Button>
-            </div>
+      <CardContent className="p-4 space-y-5">
+        {/* Aperçu QR — centré, largeur max contrainte */}
+        <div className="space-y-3">
+          <p className="text-xs font-semibold text-muted-foreground flex items-center gap-1 uppercase tracking-wide">
+            <QrCode className="w-3.5 h-3.5" />
+            Code QR de paiement
+          </p>
+          <BrandedQRPreview url={url} merchantName={link.merchantName} />
+        </div>
+
+        {/* Boutons de téléchargement — pleine largeur sur mobile */}
+        <div className="grid grid-cols-2 gap-2">
+          <Button
+            variant="outline"
+            onClick={downloadPNG}
+            disabled={downloading !== null}
+            data-testid={`button-download-png-${link.id}`}
+            className="w-full"
+          >
+            <Download className="w-4 h-4 mr-1.5" />
+            {downloading === "png" ? "Export..." : "PNG"}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={downloadPDF}
+            disabled={downloading !== null}
+            data-testid={`button-download-pdf-${link.id}`}
+            className="w-full"
+          >
+            <FileText className="w-4 h-4 mr-1.5" />
+            {downloading === "pdf" ? "Export..." : "PDF"}
+          </Button>
+        </div>
+
+        {/* Lien de paiement */}
+        <div className="space-y-1.5">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Lien de paiement</p>
+          <div className="flex items-center gap-1 p-2.5 bg-muted rounded-md min-w-0">
+            <code className="flex-1 text-xs truncate min-w-0">{url}</code>
+            <Button variant="ghost" size="icon" onClick={copyToClipboard} data-testid={`button-copy-${link.id}`} className="shrink-0">
+              <Copy className="w-4 h-4" />
+            </Button>
+            <Button variant="ghost" size="icon" asChild data-testid={`button-open-${link.id}`} className="shrink-0">
+              <a href={url} target="_blank" rel="noopener noreferrer">
+                <ExternalLink className="w-4 h-4" />
+              </a>
+            </Button>
           </div>
+        </div>
 
-          {/* Colonne informations */}
-          <div className="flex flex-col gap-4">
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">
-                Lien de paiement
-              </p>
-              <div className="flex items-center gap-2 p-3 bg-muted rounded-md">
-                <code className="flex-1 text-xs truncate">{url}</code>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={copyToClipboard}
-                  data-testid={`button-copy-${link.id}`}
-                >
-                  <Copy className="w-4 h-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  asChild
-                  data-testid={`button-open-${link.id}`}
-                >
-                  <a href={url} target="_blank" rel="noopener noreferrer">
-                    <ExternalLink className="w-4 h-4" />
-                  </a>
-                </Button>
-              </div>
-            </div>
-
-            <div className="rounded-md bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 p-4">
-              <p className="text-sm font-semibold text-amber-800 dark:text-amber-400 mb-2">
-                Comment partager votre QR code
-              </p>
-              <ol className="text-xs text-amber-700 dark:text-amber-500 space-y-1.5 list-decimal list-inside">
-                <li>Téléchargez le QR code en PNG ou PDF</li>
-                <li>Imprimez-le et affichez-le en caisse</li>
-                <li>Envoyez-le à vos clients par WhatsApp</li>
-                <li>Le client scanne et paie directement</li>
-              </ol>
-            </div>
-
-            <div className="rounded-md bg-muted/50 p-3">
-              <p className="text-xs text-muted-foreground">
-                <span className="font-semibold text-foreground">Token :</span>{" "}
-                <code className="text-xs">{link.token}</code>
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Ce lien accepte tout montant choisi par le client
-              </p>
-            </div>
-          </div>
+        {/* Conseils de partage */}
+        <div className="rounded-md bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 p-3">
+          <p className="text-xs font-semibold text-amber-800 dark:text-amber-400 mb-1.5">Comment partager</p>
+          <ol className="text-xs text-amber-700 dark:text-amber-500 space-y-1 list-decimal list-inside">
+            <li>Téléchargez le QR code (PNG ou PDF)</li>
+            <li>Imprimez-le ou envoyez-le par WhatsApp</li>
+            <li>Le client scanne et choisit le montant</li>
+          </ol>
         </div>
       </CardContent>
     </Card>
