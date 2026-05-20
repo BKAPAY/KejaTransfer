@@ -223,7 +223,23 @@ async function generatePosterCanvas(url: string, merchantName: string): Promise<
   ctx.drawImage(qrCanvas, cardX + qrPad, cardY + qrPad, qrLogicSize, qrLogicSize);
 
   // ── Pied de page ──────────────────────────────────────────────────────────
-  const footerY = cardY + cardH + 30;
+  // ── Instruction sous le QR ───────────────────────────────────────────────
+  const instrY = cardY + cardH + 14;
+
+  // Fond arrondi léger
+  ctx.fillStyle = "rgba(245,158,11,0.12)";
+  ctx.beginPath();
+  ctx.roundRect((LW - 420) / 2, instrY, 420, 34, 8);
+  ctx.fill();
+
+  // Texte d'instruction
+  ctx.fillStyle = "#f59e0b";
+  ctx.font = "600 15px Arial, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("Scannez puis appuyez sur le lien qui s'affiche", LW / 2, instrY + 17);
+
+  const footerY = cardY + cardH + 58;
 
   // Séparateur or
   const sepG = ctx.createLinearGradient(0, 0, LW, 0);
