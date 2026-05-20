@@ -12681,16 +12681,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Countries appear even if no operators are enabled (empty array) - UI shows "no operators" message
   app.get("/api/countries-operators/withdrawals", async (req: Request, res: Response) => {
     try {
-      const configs = await storage.getCountryOperatorConfigs("personal");
-      const activeOutgoing = configs.filter(c => c.outgoingEnabled);
+      const [configs, countryStatuses] = await Promise.all([
+        storage.getCountryOperatorConfigs("personal"),
+        storage.getCountryStatuses("personal"),
+      ]);
+
+      // Initialize with ALL countries where payout is enabled at country level (even if no operators)
+      const payoutEnabledMap = new Map<string, boolean>();
+      for (const cs of countryStatuses) {
+        if (cs.payoutEnabled) {
+          payoutEnabledMap.set(`${cs.provider}-${cs.country}`, true);
+        }
+      }
 
       const result: Record<string, string[]> = {};
+      // Add all payout-enabled countries with empty arrays first
+      for (const cs of countryStatuses) {
+        if (cs.payoutEnabled && !result[cs.country]) {
+          result[cs.country] = [];
+        }
+      }
+
+      // Fill in operators that are active at operator level
+      const activeOutgoing = configs.filter(c => c.outgoingEnabled && payoutEnabledMap.has(`${c.provider}-${c.country}`));
       for (const config of activeOutgoing) {
         if (!result[config.country]) result[config.country] = [];
         if (!result[config.country].includes(config.operator)) {
           result[config.country].push(config.operator);
         }
       }
+
       res.json(result);
     } catch (error: any) {
       console.error("Get withdrawals config error:", error);
