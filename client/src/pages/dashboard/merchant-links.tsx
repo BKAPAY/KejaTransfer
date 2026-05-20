@@ -51,10 +51,91 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
-// Génère le poster professionnel complet (800×1130 px)
+// Opérateurs mobile money avec leurs couleurs officielles
+const OPERATORS = [
+  { name: "MTN",    short: "MTN",   bg: "#FFC107", fg: "#1a1a1a" },
+  { name: "Orange", short: "OR",    bg: "#FF6600", fg: "#ffffff" },
+  { name: "Wave",   short: "WV",    bg: "#0099FF", fg: "#ffffff" },
+  { name: "Airtel", short: "AT",    bg: "#E30613", fg: "#ffffff" },
+  { name: "Moov",   short: "MV",    bg: "#00A651", fg: "#ffffff" },
+  { name: "M-Pesa", short: "MP",    bg: "#00A651", fg: "#ffffff" },
+  { name: "Free",   short: "FR",    bg: "#CC0000", fg: "#ffffff" },
+  { name: "Expresso",short: "EX",   bg: "#003087", fg: "#ffffff" },
+];
+
+// Dessine les logos opérateurs en filigrane dans le fond
+function drawOperatorWatermarks(ctx: CanvasRenderingContext2D, W: number, H: number) {
+  const r = 38;
+  const positions = [
+    { x: 68,     y: 310 },
+    { x: 68,     y: 560 },
+    { x: 68,     y: 810 },
+    { x: W - 68, y: 310 },
+    { x: W - 68, y: 560 },
+    { x: W - 68, y: 810 },
+    { x: 120,    y: 435 },
+    { x: W - 120, y: 435 },
+    { x: 120,    y: 685 },
+    { x: W - 120, y: 685 },
+  ];
+
+  positions.forEach((pos, i) => {
+    const op = OPERATORS[i % OPERATORS.length];
+    ctx.save();
+    ctx.globalAlpha = 0.12;
+
+    // Cercle coloré
+    ctx.fillStyle = op.bg;
+    ctx.beginPath();
+    ctx.arc(pos.x, pos.y, r, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Texte court
+    ctx.globalAlpha = 0.18;
+    ctx.fillStyle = "#ffffff";
+    ctx.font = `bold ${r * 0.65}px system-ui, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(op.short, pos.x, pos.y);
+
+    ctx.restore();
+  });
+}
+
+// Dessine la rangée d'opérateurs en bas du poster
+function drawOperatorRow(ctx: CanvasRenderingContext2D, W: number, y: number) {
+  const r = 22;
+  const gap = 58;
+  const totalW = OPERATORS.length * gap;
+  const startX = (W - totalW) / 2 + r;
+
+  OPERATORS.forEach((op, i) => {
+    const cx = startX + i * gap;
+
+    // Cercle
+    ctx.fillStyle = op.bg;
+    ctx.beginPath();
+    ctx.arc(cx, y, r, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Initiale
+    ctx.fillStyle = op.fg;
+    ctx.font = `bold ${r * 0.7}px system-ui, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(op.short, cx, y);
+
+    // Nom en dessous
+    ctx.fillStyle = "#94a3b8";
+    ctx.font = `400 9px system-ui, sans-serif`;
+    ctx.fillText(op.name, cx, y + r + 10);
+  });
+}
+
+// Génère le poster professionnel complet (800×1180 px)
 async function generatePosterCanvas(url: string, merchantName: string): Promise<HTMLCanvasElement> {
   const W = 800;
-  const H = 1130;
+  const H = 1180;
 
   const canvas = document.createElement("canvas");
   canvas.width = W;
@@ -63,96 +144,113 @@ async function generatePosterCanvas(url: string, merchantName: string): Promise<
 
   // ── Fond global bleu marine dégradé ──────────────────────────────────────
   const bgGrad = ctx.createLinearGradient(0, 0, 0, H);
-  bgGrad.addColorStop(0, "#1a3058");
-  bgGrad.addColorStop(1, "#0c1d38");
+  bgGrad.addColorStop(0, "#162847");
+  bgGrad.addColorStop(0.6, "#0d1f35");
+  bgGrad.addColorStop(1, "#091526");
   ctx.fillStyle = bgGrad;
   ctx.fillRect(0, 0, W, H);
 
-  // ── Motif décoratif (cercles flous en arrière-plan) ───────────────────────
-  const drawCircle = (x: number, y: number, r: number, color: string) => {
-    const grad = ctx.createRadialGradient(x, y, 0, x, y, r);
-    grad.addColorStop(0, color);
-    grad.addColorStop(1, "transparent");
-    ctx.fillStyle = grad;
+  // ── Filigranes opérateurs en arrière-plan ────────────────────────────────
+  drawOperatorWatermarks(ctx, W, H);
+
+  // ── Halos lumineux décoratifs ────────────────────────────────────────────
+  const halo = (x: number, y: number, r: number, color: string) => {
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, color);
+    g.addColorStop(1, "transparent");
+    ctx.fillStyle = g;
     ctx.beginPath();
     ctx.arc(x, y, r, 0, Math.PI * 2);
     ctx.fill();
   };
-  drawCircle(680, 120, 200, "rgba(37,99,235,0.18)");
-  drawCircle(120, 900, 180, "rgba(245,158,11,0.12)");
-  drawCircle(400, 560, 280, "rgba(37,99,235,0.08)");
+  halo(W * 0.85, 200, 220, "rgba(37,99,235,0.14)");
+  halo(W * 0.15, H - 200, 200, "rgba(245,158,11,0.10)");
 
-  // ── En-tête blanc ─────────────────────────────────────────────────────────
+  // ── En-tête blanc arrondi ─────────────────────────────────────────────────
   ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, W, 138);
+  ctx.beginPath();
+  ctx.roundRect(0, 0, W, 150, [0, 0, 0, 0]);
+  ctx.fill();
 
-  // Logo BKApay
+  // Logo BKApay (grand et centré)
   try {
     const logo = await loadImage("/bkapay-logo-full.png");
-    const logoH = 72;
+    const logoH = 82;
     const logoW = Math.round((logo.width / logo.height) * logoH);
-    ctx.drawImage(logo, (W - logoW) / 2, 20, logoW, logoH);
+    ctx.drawImage(logo, (W - logoW) / 2, 18, logoW, logoH);
   } catch {
-    // Fallback texte si logo absent
     ctx.fillStyle = QR_COLORS.accent;
-    ctx.font = "bold 40px Georgia, serif";
+    ctx.font = "bold 44px Georgia, serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText("BKAPAY", W / 2, 64);
+    ctx.fillText("BKAPAY", W / 2, 72);
   }
 
-  // Tagline sous le logo
+  // Tagline
   ctx.fillStyle = "#64748b";
-  ctx.font = "500 15px system-ui, sans-serif";
+  ctx.font = "500 14px system-ui, sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "top";
-  ctx.fillText("Mobile Monnaie pour l'Afrique", W / 2, 104);
+  ctx.letterSpacing = "2px";
+  ctx.fillText("MOBILE MONNAIE POUR L'AFRIQUE", W / 2, 112);
+  ctx.letterSpacing = "0px";
 
-  // ── Barre or ──────────────────────────────────────────────────────────────
-  ctx.fillStyle = QR_COLORS.gold;
-  ctx.fillRect(0, 138, W, 5);
+  // ── Barre or épaisse ──────────────────────────────────────────────────────
+  const grad = ctx.createLinearGradient(0, 150, W, 150);
+  grad.addColorStop(0, "#d97706");
+  grad.addColorStop(0.5, "#f59e0b");
+  grad.addColorStop(1, "#d97706");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 150, W, 6);
 
   // ── Section message ───────────────────────────────────────────────────────
-  const msgTop = 170;
-
+  const msgTop = 186;
   ctx.textAlign = "center";
   ctx.textBaseline = "top";
 
-  // "Scannez pour payer au marchand"
   ctx.fillStyle = "#94a3b8";
-  ctx.font = "300 20px system-ui, sans-serif";
+  ctx.font = "300 19px system-ui, sans-serif";
   ctx.fillText("Scannez pour payer au marchand", W / 2, msgTop);
 
-  // Nom du marchand (doré, grand)
+  // Nom du marchand avec glow
+  ctx.shadowColor = "rgba(245,158,11,0.35)";
+  ctx.shadowBlur = 20;
   ctx.fillStyle = QR_COLORS.gold;
-  ctx.font = "bold 52px system-ui, sans-serif";
-  ctx.fillText(merchantName, W / 2, msgTop + 34);
+  ctx.font = "bold 58px system-ui, sans-serif";
+  ctx.fillText(merchantName, W / 2, msgTop + 32);
+  ctx.shadowBlur = 0;
 
-  // "via lien marchand BKAPAY"
   ctx.fillStyle = "#cbd5e1";
-  ctx.font = "400 18px system-ui, sans-serif";
-  ctx.fillText("via lien marchand BKAPAY", W / 2, msgTop + 102);
+  ctx.font = "400 17px system-ui, sans-serif";
+  ctx.fillText("via lien marchand BKAPAY", W / 2, msgTop + 108);
 
   // ── Card QR code ──────────────────────────────────────────────────────────
-  const qrSize = 460;
-  const qrCardPad = 24;
+  const qrSize = 450;
+  const qrCardPad = 26;
   const qrCardW = qrSize + qrCardPad * 2;
   const qrCardH = qrSize + qrCardPad * 2;
   const qrCardX = (W - qrCardW) / 2;
-  const qrCardY = msgTop + 142;
+  const qrCardY = msgTop + 148;
 
-  // Ombre portée
-  ctx.shadowColor = "rgba(0,0,0,0.4)";
-  ctx.shadowBlur = 32;
-  ctx.shadowOffsetY = 8;
+  // Ombre portée profonde
+  ctx.shadowColor = "rgba(0,0,0,0.55)";
+  ctx.shadowBlur = 40;
+  ctx.shadowOffsetY = 12;
   ctx.fillStyle = "#ffffff";
   ctx.beginPath();
-  ctx.roundRect(qrCardX, qrCardY, qrCardW, qrCardH, 20);
+  ctx.roundRect(qrCardX, qrCardY, qrCardW, qrCardH, 22);
   ctx.fill();
   ctx.shadowBlur = 0;
   ctx.shadowOffsetY = 0;
 
-  // Génération et dessin du QR code
+  // Bordure fine or sur la card
+  ctx.strokeStyle = "rgba(245,158,11,0.4)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.roundRect(qrCardX, qrCardY, qrCardW, qrCardH, 22);
+  ctx.stroke();
+
+  // QR code
   const qrCanvas = document.createElement("canvas");
   await QRCode.toCanvas(qrCanvas, url, {
     width: qrSize,
@@ -163,46 +261,34 @@ async function generatePosterCanvas(url: string, merchantName: string): Promise<
   drawCenterLabel(qrCanvas, Math.round(qrSize * 0.072));
   ctx.drawImage(qrCanvas, qrCardX + qrCardPad, qrCardY + qrCardPad, qrSize, qrSize);
 
-  // ── Pied de page ──────────────────────────────────────────────────────────
-  const footerY = qrCardY + qrCardH + 32;
+  // ── Section pied de page ──────────────────────────────────────────────────
+  const footerTop = qrCardY + qrCardH + 28;
 
-  // Ligne or
-  ctx.fillStyle = "rgba(245,158,11,0.5)";
-  ctx.fillRect(60, footerY, W - 120, 1);
+  // Ligne séparatrice or
+  const sepGrad = ctx.createLinearGradient(0, 0, W, 0);
+  sepGrad.addColorStop(0, "transparent");
+  sepGrad.addColorStop(0.3, "rgba(245,158,11,0.6)");
+  sepGrad.addColorStop(0.7, "rgba(245,158,11,0.6)");
+  sepGrad.addColorStop(1, "transparent");
+  ctx.fillStyle = sepGrad;
+  ctx.fillRect(0, footerTop, W, 1);
 
-  // Icône bouclier dessiné
-  const shX = W / 2 - 10;
-  const shY = footerY + 20;
-  ctx.fillStyle = "#f59e0b";
-  ctx.beginPath();
-  ctx.moveTo(shX + 10, shY);
-  ctx.lineTo(shX + 20, shY + 5);
-  ctx.lineTo(shX + 20, shY + 14);
-  ctx.quadraticCurveTo(shX + 20, shY + 22, shX + 10, shY + 26);
-  ctx.quadraticCurveTo(shX, shY + 22, shX, shY + 14);
-  ctx.lineTo(shX, shY + 5);
-  ctx.closePath();
-  ctx.fill();
-
-  // "Paiement sécurisé par BKAPAY"
+  // "Paiement sécurisé par BKAPAY" avec bouclier
   ctx.fillStyle = "#94a3b8";
-  ctx.font = "400 15px system-ui, sans-serif";
+  ctx.font = "400 14px system-ui, sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "top";
-  ctx.fillText("Paiement sécurisé par BKAPAY", W / 2 + 12, footerY + 24);
+  ctx.fillText("Paiement sécurisé par BKAPAY", W / 2, footerTop + 14);
 
-  // URL en bas (petite, discrète)
-  ctx.fillStyle = "#475569";
-  ctx.font = "400 11px system-ui, sans-serif";
-  ctx.fillText(url, W / 2, footerY + 50);
+  // ── Rangée opérateurs ─────────────────────────────────────────────────────
+  drawOperatorRow(ctx, W, footerTop + 64);
 
-  // Points décoratifs
-  [0.25, 0.5, 0.75].forEach((f) => {
-    ctx.fillStyle = "rgba(245,158,11,0.5)";
-    ctx.beginPath();
-    ctx.arc(W * f, H - 20, 3, 0, Math.PI * 2);
-    ctx.fill();
-  });
+  // "Accepté par" au-dessus des opérateurs
+  ctx.fillStyle = "#64748b";
+  ctx.font = "400 12px system-ui, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  ctx.fillText("Paiements acceptés via", W / 2, footerTop + 34);
 
   return canvas;
 }
