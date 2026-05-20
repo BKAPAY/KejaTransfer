@@ -51,16 +51,16 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
-// Opérateurs mobile money — fichiers SVG dans /operator-logos/
+// Opérateurs mobile money — logos réels (PNG téléchargés) + SVG pour Wave et Free
 const OPERATORS = [
-  { name: "MTN",      file: "/operator-logos/mtn.svg"      },
-  { name: "Orange",   file: "/operator-logos/orange.svg"   },
+  { name: "MTN",      file: "/operator-logos/mtn.png"      },
+  { name: "Orange",   file: "/operator-logos/orange.png"   },
   { name: "Wave",     file: "/operator-logos/wave.svg"     },
-  { name: "Airtel",   file: "/operator-logos/airtel.svg"   },
-  { name: "Moov",     file: "/operator-logos/moov.svg"     },
-  { name: "M-Pesa",   file: "/operator-logos/mpesa.svg"    },
+  { name: "Airtel",   file: "/operator-logos/airtel.png"   },
+  { name: "Moov",     file: "/operator-logos/moov.png"     },
+  { name: "M-Pesa",   file: "/operator-logos/mpesa.png"    },
   { name: "Free",     file: "/operator-logos/free.svg"     },
-  { name: "Expresso", file: "/operator-logos/expresso.svg" },
+  { name: "Expresso", file: "/operator-logos/expresso.png" },
 ];
 
 // Génère le poster professionnel haute résolution (2400×3540 px ≈ A4 300dpi)

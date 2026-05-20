@@ -1,4 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100">
-  <rect width="200" height="100" rx="12" fill="#1A6FE0"/>
-  <text x="100" y="66" font-family="Arial,sans-serif" font-size="46" font-weight="800" fill="#ffffff" text-anchor="middle">Wave</text>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 120">
+    <rect width="300" height="120" rx="0" fill="#1A6FE0"/>
+    <!-- Cercle blanc stylisé -->
+    <circle cx="42" cy="60" r="30" fill="white" opacity="0.15"/>
+    <circle cx="42" cy="60" r="22" fill="white" opacity="0.2"/>
+    <!-- Texte "wave" minimaliste -->
+    <text x="165" y="75" font-family="'Helvetica Neue',Arial,sans-serif" font-size="52" font-weight="300" fill="white" text-anchor="middle" letter-spacing="-1">wave</text>
+    <!-- Symbole W stylisé -->
+    <text x="42" y="79" font-family="'Helvetica Neue',Arial,sans-serif" font-size="44" font-weight="700" fill="white" text-anchor="middle">W</text>
+  </svg>
