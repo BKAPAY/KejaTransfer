@@ -7531,10 +7531,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
     
-    if (enabledConfigs.length > 0) {
-      return enabledConfigs[0].provider;
-    }
-    
+    // Ne pas utiliser de fallback opérateur seul : si le niveau pays est désactivé,
+    // le paiement sortant doit être bloqué même si l'opérateur est encore marqué actif.
     return null;
   }
   

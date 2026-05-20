@@ -128,21 +128,17 @@ export async function getActivePayoutProviderForCountry(storage: any, country: s
         activeProviders.has(cs.provider)
       );
       
-      // Find provider that has both operator-level and country-level enabled
+      // Find provider that has BOTH operator-level AND country-level enabled
+      // Le niveau pays (payoutEnabled) doit toujours primer — pas de fallback opérateur seul.
       for (const config of enabledConfigs) {
         const hasCountryLevel = enabledCountries.some((c: any) => c.provider === config.provider);
         if (hasCountryLevel) {
           return config.provider.toLowerCase();
         }
       }
-      
-      // If only operator-level is configured, use that
-      if (enabledConfigs.length > 0) {
-        return enabledConfigs[0].provider.toLowerCase();
-      }
     }
     
-    // Fallback to country-level only
+    // Fallback to country-level only (quand pas d'opérateur précisé)
     const activeStatus = countryStatuses.find((status: any) => 
       status.country === country.toUpperCase() && 
       status.payoutEnabled === true &&
@@ -155,7 +151,7 @@ export async function getActivePayoutProviderForCountry(storage: any, country: s
   } catch (error) {
     console.warn(`[FEES] Failed to get active payout provider for ${country}/${operator}:`, error);
   }
-  return 'paydunya'; // Default fallback
+  return 'paydunya'; // Default fallback pour calcul de frais uniquement
 }
 
 /**
