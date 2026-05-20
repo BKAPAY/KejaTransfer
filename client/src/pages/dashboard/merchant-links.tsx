@@ -53,6 +53,8 @@ async function generateBrandedQRCanvas(url: string, merchantName: string, size =
     },
     errorCorrectionLevel: "H",
   });
+  // Inscrire BKAPAY au centre du QR brut
+  drawCenterLabel(qrCanvas, Math.round(size * 0.072));
 
   // 2. Créer le canvas final avec branding
   const padding = 32;
@@ -104,6 +106,38 @@ async function generateBrandedQRCanvas(url: string, merchantName: string, size =
   return finalCanvas.toDataURL("image/png", 1.0);
 }
 
+// Dessine "BKAPAY" au centre d'un canvas QR déjà généré
+function drawCenterLabel(canvas: HTMLCanvasElement, fontSize = 13) {
+  const ctx = canvas.getContext("2d")!;
+  const cx = canvas.width / 2;
+  const cy = canvas.height / 2;
+  const label = "BKAPAY";
+
+  ctx.font = `bold ${fontSize}px system-ui, sans-serif`;
+  const textW = ctx.measureText(label).width;
+  const padX = 8;
+  const padY = 5;
+  const boxW = textW + padX * 2;
+  const boxH = fontSize + padY * 2;
+
+  // Fond blanc avec bordure bleue
+  ctx.fillStyle = "#ffffff";
+  ctx.beginPath();
+  ctx.roundRect(cx - boxW / 2, cy - boxH / 2, boxW, boxH, 5);
+  ctx.fill();
+  ctx.strokeStyle = QR_COLORS.accent;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.roundRect(cx - boxW / 2, cy - boxH / 2, boxW, boxH, 5);
+  ctx.stroke();
+
+  // Texte
+  ctx.fillStyle = QR_COLORS.dark;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(label, cx, cy);
+}
+
 // Composant QR affiché dans la page — taille responsive
 function MerchantQRCode({ url }: { url: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -115,6 +149,8 @@ function MerchantQRCode({ url }: { url: string }) {
       margin: 2,
       color: { dark: QR_COLORS.dark, light: QR_COLORS.light },
       errorCorrectionLevel: "H",
+    }).then(() => {
+      drawCenterLabel(canvasRef.current!, 13);
     }).catch(console.error);
   }, [url]);
 
