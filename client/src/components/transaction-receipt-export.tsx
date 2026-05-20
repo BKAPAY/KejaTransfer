@@ -337,21 +337,33 @@ const ReceiptTemplate = forwardRef<HTMLDivElement, ReceiptTemplateProps>(
 
                 {isIncoming && isCustomerPaysFee && (() => {
                   const isCrossCcy = !!(metadata?.providerCurrency && metadata.providerCurrency !== currency);
-                  const providerCcy = metadata?.providerCurrency || currency;
                   const displayServiceFee = effectiveCustomerServiceFee || Math.max(0, serviceFee - exchangeFee);
-                  const serviceFeeCcy = isCrossCcy ? providerCcy : currency;
-                  const grossFromClientAmount = isCrossCcy
-                    ? (metadata?.providerAmount || transaction.amount)
-                    : transaction.amount + displayServiceFee;
-                  const grossFromClientCcy = isCrossCcy ? providerCcy : currency;
+
+                  // Tous les montants affichés en devise de l'utilisateur (currency)
+                  // Cross-devise : conversion proportionnelle via le taux implicite de la transaction
+                  let grossFromClientAmount: number;
+                  let displayServiceFeeUser: number;
+                  if (isCrossCcy && metadata?.providerAmount && displayServiceFee > 0) {
+                    const providerBase = (metadata.providerAmount as number) - displayServiceFee;
+                    const ratio = providerBase > 0 ? transaction.amount / providerBase : 1;
+                    displayServiceFeeUser = Math.round(displayServiceFee * ratio);
+                    grossFromClientAmount = transaction.amount + displayServiceFeeUser;
+                  } else if (isCrossCcy) {
+                    displayServiceFeeUser = 0;
+                    grossFromClientAmount = transaction.amount;
+                  } else {
+                    displayServiceFeeUser = displayServiceFee;
+                    grossFromClientAmount = transaction.amount + displayServiceFee;
+                  }
+
                   const creditedToOwner = Math.max(0, transaction.amount - exchangeFee);
                   return (
                     <>
-                      <ReceiptRow label="Total payé par le client" value={fmtAmt(grossFromClientAmount, grossFromClientCcy)} />
-                      {displayServiceFee > 0 && (
+                      <ReceiptRow label="Total payé par le client" value={fmtAmt(grossFromClientAmount, currency)} />
+                      {displayServiceFeeUser > 0 && (
                         <ReceiptRow
                           label="Frais réglés par le client"
-                          value={`+${fmtAmt(displayServiceFee, serviceFeeCcy)}`}
+                          value={`+${fmtAmt(displayServiceFeeUser, currency)}`}
                           sublabel="pris en charge par le payeur"
                           color="#64748b"
                         />

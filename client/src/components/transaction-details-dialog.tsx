@@ -222,14 +222,24 @@ function FinancialBreakdown({
       // Frais de service payés par le client (dans la devise du fournisseur)
       // Priorité : valeur stockée → valeur inférée depuis providerAmount-amount → fallback tx.fee
       const displayServiceFee = effectiveCustomerServiceFee || Math.max(0, serviceFee - exchangeFee);
-      const serviceFeeCcy = isCrossCurrency ? providerCcy : currency;
 
-      // Total payé par le client :
-      // cross-devise → providerAmount (ex: 212 XAF) ; même devise → gross + service fee
-      const grossFromClientAmount = isCrossCurrency
-        ? (metadata?.providerAmount || gross)
-        : gross + displayServiceFee;
-      const grossFromClientCcy = isCrossCurrency ? providerCcy : currency;
+      // Conversion des montants en devise de l'utilisateur (currency) pour l'affichage
+      // Cross-devise : on convertit proportionnellement via le taux implicite de la transaction
+      // Taux implicite = gross (devise utilisateur) / (providerAmount - displayServiceFee en devise réseau)
+      let grossFromClientAmount: number;
+      let displayServiceFeeUser: number;
+      if (isCrossCurrency && metadata?.providerAmount && displayServiceFee > 0) {
+        const providerBase = (metadata.providerAmount as number) - displayServiceFee;
+        const ratio = providerBase > 0 ? gross / providerBase : 1;
+        displayServiceFeeUser = Math.round(displayServiceFee * ratio);
+        grossFromClientAmount = gross + displayServiceFeeUser;
+      } else if (isCrossCurrency) {
+        displayServiceFeeUser = 0;
+        grossFromClientAmount = gross;
+      } else {
+        displayServiceFeeUser = displayServiceFee;
+        grossFromClientAmount = gross + displayServiceFee;
+      }
 
       const creditedToOwner = Math.max(0, gross - exchangeFee);
 
@@ -241,10 +251,10 @@ function FinancialBreakdown({
           </div>
           <div className="rounded-lg border overflow-hidden">
             <div className="p-4 space-y-3 bg-card">
-              <FinancialRow label="Total payé par le client" value={fmtAmount(grossFromClientAmount, grossFromClientCcy)} />
+              <FinancialRow label="Total payé par le client" value={fmtAmount(grossFromClientAmount, currency)} />
               <FinancialRow
                 label="Frais réglés par le client"
-                value={displayServiceFee > 0 ? `+${fmtAmount(displayServiceFee, serviceFeeCcy)}` : `Inclus`}
+                value={displayServiceFeeUser > 0 ? `+${fmtAmount(displayServiceFeeUser, currency)}` : `Inclus`}
                 sublabel="pris en charge par le payeur"
                 color="muted"
               />
