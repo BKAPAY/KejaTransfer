@@ -1,8 +1,11 @@
 const EXCHANGERATE_API_URL = "https://v6.exchangerate-api.com/v6";
 
+// Source: PawaPay active-configuration & ISO 4217
+// 0-decimal: XOF, XAF, CDF, RWF, UGX, TZS, MWK, GNF, GMD, MGA
+// 2-decimal: USD, GHS, KES, NGN, ZMW, MZN, LSL, SLE
 const NO_DECIMAL_CURRENCIES = [
   "XOF", "XAF", "CDF", "GNF", "GMD", "RWF",
-  "UGX", "TZS", "MWK", "SLE", "NGN", "KES", "MGA",
+  "UGX", "TZS", "MWK", "MGA",
 ];
 
 function getCurrencyDecimals(currency: string): number {

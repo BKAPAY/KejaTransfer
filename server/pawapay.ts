@@ -5,9 +5,11 @@ import { randomUUID } from "crypto";
 const PAWAPAY_SANDBOX_URL = "https://api.sandbox.pawapay.io";
 const PAWAPAY_PRODUCTION_URL = "https://api.pawapay.io";
 
+// Source: PawaPay active-configuration — decimalPlaces per correspondent
+// 0-decimal: XOF, XAF, CDF, RWF, UGX, TZS, MWK, GNF, MGA
+// 2-decimal: USD, GHS, KES, NGN, ZMW, MZN, LSL, SLE
 export const ZERO_DECIMAL_CURRENCIES = new Set([
-  "XOF", "XAF", "CDF", "RWF", "UGX", "TZS", "MWK", "SLE", "NGN",
-  "KES", "GNF", "MGA",
+  "XOF", "XAF", "CDF", "RWF", "UGX", "TZS", "MWK", "GNF", "MGA",
 ]);
 
 export function roundForCurrency(amount: number, currency: string): number {
