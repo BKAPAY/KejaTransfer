@@ -8343,10 +8343,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.getUser(req.session.userId!);
       
       // Use converted amount for provider, original amount for balance credit
-      const providerAmount = Math.floor(amount);
-      const balanceAmount = originalAmount ? Math.floor(originalAmount) : providerAmount;
+      // roundForCurrency: Math.floor for zero-decimal currencies (XOF, XAF, CDF…), Math.round(×100)/100 for USD etc.
       const providerCurrency = currency || "XOF";
       const userCurrency = originalCurrency || providerCurrency;
+      const { roundForCurrency: _roundPC } = await import("./pawapay");
+      const providerAmount = _roundPC(amount, providerCurrency);
+      const balanceAmount = originalAmount ? _roundPC(originalAmount, userCurrency) : providerAmount;
 
       if (!user) {
         return res.status(404).json({ success: false, error: "Utilisateur non trouve" });
