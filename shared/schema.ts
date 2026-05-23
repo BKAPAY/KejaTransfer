@@ -999,7 +999,7 @@ export const salaryTransactions = pgTable("salary_transactions", {
   type: text("type").notNull(), // 'credit' | 'withdrawal'
   amount: real("amount").notNull(),
   currency: text("currency").notNull(),
-  status: text("status").notNull().default("completed"), // 'completed' | 'failed' | 'pending'
+  status: text("status").notNull().default("pending"), // 'completed' | 'failed' | 'pending' | 'rejected'
   description: text("description"),
   country: text("country"),
   operator: text("operator"),
