@@ -13,7 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { COUNTRIES, OPERATORS } from "@shared/schema";
-import { Wallet, ArrowUpFromLine, History, Loader2, CheckCircle2, Calendar, Clock, AlertCircle, ArrowRight } from "lucide-react";
+import { Wallet, ArrowUpFromLine, History, Loader2, CheckCircle2, Calendar, Clock, AlertCircle, ArrowRight, Briefcase } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
@@ -192,9 +192,12 @@ export default function SalaryPage() {
     <div className="p-6 space-y-6 max-w-2xl mx-auto">
       <div>
         <h1 className="text-2xl font-bold">Salaire</h1>
-        {salaryAccount?.label && (
-          <p className="text-muted-foreground text-sm mt-1">{salaryAccount.label}</p>
-        )}
+        <div className="flex items-center gap-2 mt-1">
+          <Briefcase className="w-4 h-4 text-muted-foreground" />
+          <span className={`text-sm ${salaryAccount?.label ? "font-medium" : "text-muted-foreground italic"}`} data-testid="text-job-label">
+            {salaryAccount?.label || "Aucun poste défini"}
+          </span>
+        </div>
       </div>
 
       {/* Solde */}

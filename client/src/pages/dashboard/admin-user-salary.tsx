@@ -10,7 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { ArrowLeft, Wallet, PlusCircle, Trash2, Edit2, CheckCircle, XCircle, History, Calendar, Clock } from "lucide-react";
+import { ArrowLeft, Wallet, PlusCircle, Trash2, Edit2, CheckCircle, XCircle, History, Calendar, Clock, Briefcase, Pencil } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import {
@@ -91,6 +91,8 @@ export default function AdminUserSalary() {
   const [scheduleForm, setScheduleForm] = useState<ScheduleFormState>(emptyForm);
   const [editScheduleId, setEditScheduleId] = useState<string | null>(null);
   const [showScheduleDialog, setShowScheduleDialog] = useState(false);
+  const [editingLabel, setEditingLabel] = useState(false);
+  const [labelInput, setLabelInput] = useState("");
 
   const { data: user } = useQuery<User>({
     queryKey: [`/api/admin/user/${userId}/profile`],
@@ -199,6 +201,22 @@ export default function AdminUserSalary() {
     },
   });
 
+  const updateLabelMutation = useMutation({
+    mutationFn: async (newLabel: string) => {
+      const res = await apiRequest("PATCH", `/api/admin/user/${userId}/salary/label`, { label: newLabel });
+      return res.json();
+    },
+    onSuccess: (res: any) => {
+      if (res.success) {
+        toast({ title: "Poste mis à jour" });
+        setEditingLabel(false);
+        queryClient.invalidateQueries({ queryKey: [`/api/admin/user/${userId}/salary`] });
+      } else {
+        toast({ title: "Erreur", description: res.error, variant: "destructive" });
+      }
+    },
+  });
+
   function openCreateDialog() {
     setScheduleForm(emptyForm);
     setEditScheduleId(null);
@@ -296,7 +314,55 @@ export default function AdminUserSalary() {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              {account.label && <p className="text-sm text-muted-foreground">{account.label}</p>}
+              {/* Poste / Libellé */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <Briefcase className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                {editingLabel ? (
+                  <div className="flex items-center gap-2 flex-1 flex-wrap">
+                    <Input
+                      className="h-8 flex-1 min-w-[140px]"
+                      placeholder="Poste / Libellé"
+                      value={labelInput}
+                      onChange={e => setLabelInput(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === "Enter") updateLabelMutation.mutate(labelInput);
+                        if (e.key === "Escape") setEditingLabel(false);
+                      }}
+                      autoFocus
+                      data-testid="input-edit-label"
+                    />
+                    <Button
+                      size="sm"
+                      onClick={() => updateLabelMutation.mutate(labelInput)}
+                      disabled={updateLabelMutation.isPending}
+                      data-testid="button-save-label"
+                    >
+                      {updateLabelMutation.isPending ? "..." : "Enregistrer"}
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setEditingLabel(false)}>
+                      Annuler
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <span
+                      className={`text-sm font-medium ${account.label ? "" : "text-muted-foreground italic"}`}
+                      data-testid="text-salary-label"
+                    >
+                      {account.label || "Aucun poste défini"}
+                    </span>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-6 w-6"
+                      onClick={() => { setLabelInput(account.label || ""); setEditingLabel(true); }}
+                      data-testid="button-edit-label"
+                    >
+                      <Pencil className="w-3 h-3" />
+                    </Button>
+                  </>
+                )}
+              </div>
               <div>
                 <p className="text-sm text-muted-foreground">Solde actuel</p>
                 <p className="text-3xl font-bold" data-testid="text-admin-salary-balance">
