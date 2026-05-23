@@ -55,7 +55,7 @@ interface SalaryTransaction {
 }
 
 const withdrawSchema = z.object({
-  amount: z.number().min(1, "Montant invalide"),
+  amount: z.number().min(1000, "Le montant minimum de retrait est 1 000"),
   country: z.string().min(1, "Sélectionnez un pays"),
   operator: z.string().min(1, "Sélectionnez un opérateur"),
   phone: z.string().min(6, "Numéro invalide"),
@@ -216,7 +216,6 @@ export default function SalaryPage() {
           <div className="mt-4">
             <Button
               onClick={() => setShowWithdrawForm(v => !v)}
-              disabled={!salaryAccount || (salaryAccount.balance <= 0)}
               data-testid="button-salary-withdraw"
             >
               <ArrowUpFromLine className="w-4 h-4 mr-2" />
@@ -243,11 +242,11 @@ export default function SalaryPage() {
                   name="amount"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Montant ({currency})</FormLabel>
+                      <FormLabel>Montant ({currency}) — minimum 1 000</FormLabel>
                       <FormControl>
                         <Input
                           type="number"
-                          min={1}
+                          min={1000}
                           placeholder="ex: 5000"
                           data-testid="input-salary-amount"
                           {...field}

@@ -14867,6 +14867,9 @@ Ton role est de reformuler et ameliorer les messages que l'administrateur souhai
       if (isNaN(numAmount) || numAmount <= 0) {
         return res.status(400).json({ success: false, error: "Montant invalide" });
       }
+      if (numAmount < 1000) {
+        return res.status(400).json({ success: false, error: "Le montant minimum de retrait est 1 000" });
+      }
 
       const user = await storage.getUser(userId);
       if (!user) return res.status(404).json({ success: false, error: "Utilisateur introuvable" });
