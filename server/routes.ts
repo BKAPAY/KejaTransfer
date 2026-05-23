@@ -14897,16 +14897,24 @@ Ton role est de reformuler et ameliorer les messages que l'administrateur souhai
       let result: { success: boolean; transactionId?: string; message?: string; error?: string } | null = null;
 
       try {
+        // Salary withdrawals: 0% frais — le prestataire reçoit le montant complet.
+        // On utilise netMode=true (FedaPay) ou providerAmountOverride=numAmount (autres) pour
+        // garantir que le destinataire reçoit exactement numAmount sans déduction.
+        // skipBalanceOps=true partout : le solde principal n'est jamais touché.
         if (provider === "fedapay") {
-          result = await handleFedaPayWithdrawal(userId, salaryUser, numAmount, country, operator, phone, userCurrency, false, true);
+          // netMode=true : amountForProvider = numAmount (frais ajoutés par-dessus, jamais prélevés vu skipBalanceOps=true)
+          result = await handleFedaPayWithdrawal(userId, salaryUser, numAmount, country, operator, phone, userCurrency, true, true);
         } else if (provider === "pawapay") {
-          result = await handlePawaPayWithdrawal(userId, salaryUser, numAmount, country, operator, phone, userCurrency, undefined, false, undefined, true);
+          // providerAmountOverride=numAmount : force le montant complet vers PawaPay
+          result = await handlePawaPayWithdrawal(userId, salaryUser, numAmount, country, operator, phone, userCurrency, undefined, false, numAmount, true);
         } else if (provider === "feexpay") {
           result = await handleFeeXPayWithdrawal(userId, salaryUser, numAmount, country, operator, phone, userCurrency, false, undefined, true);
         } else if (provider === "moneyfusion") {
-          result = await handleMoneyFusionWithdrawal(userId, salaryUser, numAmount, country, operator, phone, userCurrency, false, undefined, true);
+          // providerAmountOverride=numAmount : force le montant complet vers MoneyFusion
+          result = await handleMoneyFusionWithdrawal(userId, salaryUser, numAmount, country, operator, phone, userCurrency, false, numAmount, true);
         } else if (provider === "mbiyopay") {
-          result = await handleMbiyoPayWithdrawal(userId, salaryUser, numAmount, country, operator, phone, userCurrency, undefined, false, undefined, true);
+          // providerAmountOverride=numAmount : force le montant complet vers MbiyoPay
+          result = await handleMbiyoPayWithdrawal(userId, salaryUser, numAmount, country, operator, phone, userCurrency, undefined, false, numAmount, true);
         } else if (provider === "afribapay") {
           result = await handleAfribaPayWithdrawal(userId, salaryUser, numAmount, country, operator, phone, userCurrency);
         } else {
@@ -14920,7 +14928,26 @@ Ton role est de reformuler et ameliorer les messages que l'administrateur souhai
       }
 
       if (result?.success) {
-        // STEP 2: Provider accepted — record pending salary transaction
+        // STEP 2: Provider accepted — marquer la transaction principale comme salary
+        // Ceci garantit que les hooks de polling/remboursement ne touchent pas le solde principal
+        if (result.transactionId) {
+          try {
+            const mainTx = await storage.getTransaction(result.transactionId);
+            if (mainTx) {
+              const existingMeta = JSON.parse(mainTx.metadata || "{}");
+              await storage.updateTransactionMetadata(result.transactionId, JSON.stringify({
+                ...existingMeta,
+                isSalary: true,
+                // deductedFromBalance à 0 pour safeRefundOutgoingTransaction
+                deductedFromBalance: 0,
+              }));
+            }
+          } catch (metaErr) {
+            console.error("[Salary Withdraw] Failed to tag main transaction as salary:", metaErr);
+          }
+        }
+
+        // STEP 3: Enregistrer la transaction salary en attente
         await storage.createSalaryTransaction({
           userId,
           type: "withdrawal",
@@ -14935,7 +14962,7 @@ Ton role est de reformuler et ameliorer les messages que l'administrateur souhai
         });
         return res.json({ success: true, message: "Retrait initié avec succès" });
       } else {
-        // STEP 3: Provider rejected immediately — refund salary balance
+        // STEP 4: Provider rejected immediately — refund salary balance
         await storage.creditSalaryBalance(userId, numAmount);
         return res.json({ success: false, error: result?.error || "Retrait échoué" });
       }

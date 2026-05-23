@@ -725,13 +725,27 @@ export async function pollPawaPayTransaction(txId: string): Promise<void> {
         const completed = await storage.atomicCompleteTransaction(txId);
         if (completed) {
           console.log(`[PawaPay Poll] Payout ${txId} completed`);
+          // Sync salary transaction if linked
+          try { await storage.updateSalaryTransactionByInternalId(txId, "completed"); } catch (_) {}
           setImmediate(() => sendApiPayoutCallback(txId, meta, "completed"));
           setImmediate(() => sendBusinessWebhookCallback(txId, "completed", "payout"));
         } else {
           console.log(`[PawaPay Poll] Payout ${txId} already processed by another process`);
         }
       } else if (mappedStatus === "failed") {
-        if (meta.scope === "business") {
+        if (meta.isSalary) {
+          // Salary payout: solde principal jamais débité — on échoue sans rembourser le solde principal.
+          // Le hook updateSalaryTransactionByInternalId gère le remboursement du solde salaire.
+          const failed = await storage.atomicFailTransaction(txId);
+          if (failed) {
+            console.log(`[PawaPay Poll] Salary payout ${txId} failed — salary hook handles refund`);
+            try { await storage.updateSalaryTransactionByInternalId(txId, "failed"); } catch (_) {}
+            setImmediate(() => sendApiPayoutCallback(txId, meta, "failed"));
+            setImmediate(() => sendBusinessWebhookCallback(txId, "failed", "payout"));
+          } else {
+            console.log(`[PawaPay Poll] Salary payout ${txId} already processed by another process`);
+          }
+        } else if (meta.scope === "business") {
           const refundAmount = (meta.deductedFromBalance || meta.totalDebited || tx.amount) + (meta.exchangeFee || 0);
           const country = tx.country || meta.country;
           const currency = tx.currency || meta.balanceCurrency;

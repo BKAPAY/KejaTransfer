@@ -218,6 +218,13 @@ export async function safeRefundOutgoingTransaction(
   }
 
   const latestMeta = JSON.parse(latestTx.metadata || "{}");
+
+  // Salary transactions: solde principal jamais débité — le hook salary gère le remboursement
+  if (latestMeta.isSalary) {
+    console.log(`[SafeRefund] Skipping main balance refund for salary tx ${transactionId} — salary hook handles refund (source: ${source})`);
+    return false;
+  }
+
   // deductedFromBalance / totalDebited = montant + frais de service (stockés par le handler fournisseur)
   // exchangeFee = frais d'échange déduits SÉPARÉMENT dans routes.ts pour les transferts cross-devises
   // → il faut rembourser les deux pour restituer la totalité du solde débité
