@@ -14774,6 +14774,17 @@ Ton role est de reformuler et ameliorer les messages que l'administrateur souhai
     }
   });
 
+  app.delete("/api/admin/user/:userId/salary", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { userId } = req.params;
+      await storage.deleteSalaryAccountCompletely(userId);
+      await storage.updateUserSalaryFlag(userId, false);
+      return res.json({ success: true });
+    } catch (error: any) {
+      return res.status(500).json({ success: false, error: "Erreur serveur" });
+    }
+  });
+
   app.patch("/api/admin/user/:userId/salary/label", requireAdmin, async (req: Request, res: Response) => {
     try {
       const { userId } = req.params;

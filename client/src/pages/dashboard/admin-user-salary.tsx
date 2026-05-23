@@ -150,6 +150,26 @@ export default function AdminUserSalary() {
     },
   });
 
+  const deleteCompletelyMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("DELETE", `/api/admin/user/${userId}/salary`, {});
+      return res.json();
+    },
+    onSuccess: (res: any) => {
+      if (res.success) {
+        toast({
+          title: "Compte salarié supprimé",
+          description: "Toutes les données salariales (compte, plannings, historique) ont été effacées définitivement.",
+        });
+        queryClient.invalidateQueries({ queryKey: [`/api/admin/user/${userId}/salary`] });
+        queryClient.invalidateQueries({ queryKey: [`/api/admin/user/${userId}/profile`] });
+        queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      } else {
+        toast({ title: "Erreur", description: res.error, variant: "destructive" });
+      }
+    },
+  });
+
   const creditMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", `/api/admin/user/${userId}/salary/credit`, { amount: Number(creditAmount) });
@@ -296,26 +316,56 @@ export default function AdminUserSalary() {
                   <Wallet className="w-4 h-4" />
                   Compte salarié actif
                 </CardTitle>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button size="sm" variant="outline" data-testid="button-deactivate-salary">
-                      <XCircle className="w-3 h-3 mr-1" />
-                      Désactiver
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Désactiver ce salarié ?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        L'accès au menu Salaire sera supprimé pour {user?.firstName}. Le solde est conservé.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Annuler</AlertDialogCancel>
-                      <AlertDialogAction onClick={() => deactivateMutation.mutate()}>Confirmer</AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button size="sm" variant="outline" data-testid="button-deactivate-salary">
+                        <XCircle className="w-3 h-3 mr-1" />
+                        Désactiver
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Désactiver ce salarié ?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          L'accès au menu Salaire sera supprimé pour {user?.firstName}. Le solde, les plannings et l'historique sont conservés et seront restaurés si vous réactivez ce salarié.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Annuler</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => deactivateMutation.mutate()}>Confirmer</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button size="sm" variant="destructive" data-testid="button-delete-salary">
+                        <Trash2 className="w-3 h-3 mr-1" />
+                        Supprimer
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Supprimer définitivement le compte salarié ?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Cette action est <strong>irréversible</strong>. Le compte salarié de {user?.firstName} {user?.lastName}, tous les plannings de versement et tout l'historique des transactions salariales seront effacés définitivement.
+                          <br /><br />
+                          Vous pourrez toujours réactiver cette personne comme salarié plus tard, mais ce sera un nouveau compte vierge — les anciennes données ne seront pas restaurées.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Annuler</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => deleteCompletelyMutation.mutate()}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          Supprimer définitivement
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">

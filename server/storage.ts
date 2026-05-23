@@ -294,6 +294,7 @@ export interface IStorage {
   updateSalaryTransactionByInternalId(internalTransactionId: string, status: string): Promise<void>;
   getAllSalaryAccountsForAdmin(): Promise<(schema.SalaryAccount & { user?: User })[]>;
   updateUserSalaryFlag(userId: string, isSalary: boolean): Promise<void>;
+  deleteSalaryAccountCompletely(userId: string): Promise<void>;
 }
 
 export class DbStorage implements IStorage {
@@ -3377,6 +3378,12 @@ export class DbStorage implements IStorage {
   async deleteSalarySchedule(id: string): Promise<boolean> {
     const deleted = await db.delete(schema.salarySchedules).where(eq(schema.salarySchedules.id, id)).returning();
     return deleted.length > 0;
+  }
+
+  async deleteSalaryAccountCompletely(userId: string): Promise<void> {
+    await db.delete(schema.salaryTransactions).where(eq(schema.salaryTransactions.userId, userId));
+    await db.delete(schema.salarySchedules).where(eq(schema.salarySchedules.userId, userId));
+    await db.delete(schema.salaryAccounts).where(eq(schema.salaryAccounts.userId, userId));
   }
 
   async getAllActiveSalarySchedulesDue(): Promise<(schema.SalarySchedule & { user?: User })[]> {
