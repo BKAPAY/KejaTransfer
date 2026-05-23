@@ -14816,11 +14816,18 @@ Ton role est de reformuler et ameliorer les messages que l'administrateur souhai
 
   app.get("/api/salary", requireAuth, async (req: Request, res: Response) => {
     try {
-      const user = (req as any).user;
-      if (user?.accountType !== "personal") return res.json(null);
       const account = await storage.getSalaryAccount(req.session.userId!);
       if (!account || !account.isActive) return res.json(null);
       return res.json(account);
+    } catch (error: any) {
+      return res.status(500).json({ error: "Erreur serveur" });
+    }
+  });
+
+  app.get("/api/salary/schedules", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const schedules = await storage.getSalarySchedules(req.session.userId!);
+      return res.json(schedules);
     } catch (error: any) {
       return res.status(500).json({ error: "Erreur serveur" });
     }

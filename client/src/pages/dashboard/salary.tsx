@@ -13,8 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { COUNTRIES, OPERATORS } from "@shared/schema";
-import type { User } from "@shared/schema";
-import { Wallet, ArrowUpFromLine, History, Loader2, CheckCircle2 } from "lucide-react";
+import { Wallet, ArrowUpFromLine, History, Loader2, CheckCircle2, Calendar, Clock, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
@@ -25,6 +24,19 @@ interface SalaryAccount {
   currency: string;
   isActive: boolean;
   label: string | null;
+  createdAt: string;
+}
+
+interface SalarySchedule {
+  id: string;
+  userId: string;
+  amount: number;
+  scheduleType: string;
+  scheduleValue: number;
+  label: string | null;
+  isActive: boolean;
+  lastPaidAt: string | null;
+  nextPayAt: string | null;
   createdAt: string;
 }
 
@@ -59,7 +71,8 @@ function formatAmount(amount: number, currency: string) {
   }).format(amount);
 }
 
-function formatDate(dateStr: string) {
+function formatDate(dateStr: string | null) {
+  if (!dateStr) return "—";
   try {
     return format(new Date(dateStr), "dd MMM yyyy HH:mm", { locale: fr });
   } catch {
@@ -67,14 +80,25 @@ function formatDate(dateStr: string) {
   }
 }
 
+function scheduleLabel(s: SalarySchedule): string {
+  if (s.scheduleType === "monthly_day") {
+    return `Chaque ${s.scheduleValue}${s.scheduleValue === 1 ? "er" : "ème"} du mois`;
+  }
+  if (s.scheduleValue < 60) return `Toutes les ${s.scheduleValue} minute(s)`;
+  if (s.scheduleValue < 1440) return `Toutes les ${Math.round(s.scheduleValue / 60)} heure(s)`;
+  return `Tous les ${Math.round(s.scheduleValue / 1440)} jour(s)`;
+}
+
 export default function SalaryPage() {
   const { toast } = useToast();
   const [showWithdrawForm, setShowWithdrawForm] = useState(false);
 
-  const { data: user } = useQuery<User>({ queryKey: ["/api/auth/me"] });
-
-  const { data: salaryAccount, isLoading: loadingAccount } = useQuery<SalaryAccount>({
+  const { data: salaryAccount, isLoading: loadingAccount } = useQuery<SalaryAccount | null>({
     queryKey: ["/api/salary"],
+  });
+
+  const { data: schedules, isLoading: loadingSchedules } = useQuery<SalarySchedule[]>({
+    queryKey: ["/api/salary/schedules"],
   });
 
   const { data: transactions, isLoading: loadingTx } = useQuery<SalaryTransaction[]>({
@@ -127,33 +151,24 @@ export default function SalaryPage() {
     return (
       <div className="p-6 space-y-4">
         <Skeleton className="h-40 w-full" />
+        <Skeleton className="h-32 w-full" />
         <Skeleton className="h-60 w-full" />
       </div>
     );
   }
 
-  if (!salaryAccount || !salaryAccount.isActive) {
-    return (
-      <div className="p-6 flex items-center justify-center min-h-[300px]">
-        <Card className="w-full max-w-md">
-          <CardContent className="pt-8 pb-8 text-center">
-            <Wallet className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-            <p className="text-muted-foreground">Aucun compte salaire actif pour ce compte.</p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  const currency = salaryAccount?.currency || "XOF";
 
   return (
     <div className="p-6 space-y-6 max-w-2xl mx-auto">
       <div>
         <h1 className="text-2xl font-bold">Salaire</h1>
-        {salaryAccount.label && (
+        {salaryAccount?.label && (
           <p className="text-muted-foreground text-sm mt-1">{salaryAccount.label}</p>
         )}
       </div>
 
+      {/* Solde */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
@@ -163,12 +178,13 @@ export default function SalaryPage() {
         </CardHeader>
         <CardContent>
           <p className="text-4xl font-bold" data-testid="text-salary-balance">
-            {formatAmount(salaryAccount.balance, salaryAccount.currency)}
+            {formatAmount(salaryAccount?.balance ?? 0, currency)}
           </p>
-          <p className="text-sm text-muted-foreground mt-1">{salaryAccount.currency}</p>
+          <p className="text-sm text-muted-foreground mt-1">{currency}</p>
           <div className="mt-4">
             <Button
               onClick={() => setShowWithdrawForm(v => !v)}
+              disabled={!salaryAccount || (salaryAccount.balance <= 0)}
               data-testid="button-salary-withdraw"
             >
               <ArrowUpFromLine className="w-4 h-4 mr-2" />
@@ -178,7 +194,8 @@ export default function SalaryPage() {
         </CardContent>
       </Card>
 
-      {showWithdrawForm && (
+      {/* Formulaire de retrait */}
+      {showWithdrawForm && salaryAccount && (
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Retrait salaire — sans frais</CardTitle>
@@ -194,7 +211,7 @@ export default function SalaryPage() {
                   name="amount"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Montant ({salaryAccount.currency})</FormLabel>
+                      <FormLabel>Montant ({currency})</FormLabel>
                       <FormControl>
                         <Input
                           type="number"
@@ -313,6 +330,57 @@ export default function SalaryPage() {
         </Card>
       )}
 
+      {/* Programmes de versement automatique */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Calendar className="w-4 h-4" />
+            Versements automatiques
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loadingSchedules ? (
+            <div className="space-y-2">
+              {[1, 2].map(i => <Skeleton key={i} className="h-14 w-full" />)}
+            </div>
+          ) : !schedules || schedules.length === 0 ? (
+            <div className="flex items-start gap-3 py-4 text-muted-foreground">
+              <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              <p className="text-sm">
+                Aucun programme de salaire automatique n'est configuré pour le moment.
+                Contactez votre administrateur pour mettre en place des versements automatiques.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {schedules.filter(s => s.isActive).map(s => (
+                <div key={s.id} className="rounded-md border p-3 space-y-1" data-testid={`row-user-schedule-${s.id}`}>
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <p className="font-semibold text-green-600 dark:text-green-400">
+                      +{formatAmount(s.amount, currency)}
+                    </p>
+                    <Badge variant="secondary" className="text-xs">
+                      <Clock className="w-3 h-3 mr-1" />
+                      {scheduleLabel(s)}
+                    </Badge>
+                  </div>
+                  {s.label && <p className="text-xs text-muted-foreground">{s.label}</p>}
+                  <p className="text-xs text-muted-foreground">
+                    Prochain versement : <span className="font-medium">{formatDate(s.nextPayAt)}</span>
+                  </p>
+                  {s.lastPaidAt && (
+                    <p className="text-xs text-muted-foreground">
+                      Dernier versement : {formatDate(s.lastPaidAt)}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Historique */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">

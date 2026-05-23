@@ -118,6 +118,7 @@ export default function AdminUserSalary() {
         toast({ title: "Salarié activé", description: `${user?.firstName} ${user?.lastName} est maintenant salarié.` });
         queryClient.invalidateQueries({ queryKey: [`/api/admin/user/${userId}/salary`] });
         queryClient.invalidateQueries({ queryKey: [`/api/admin/user/${userId}/profile`] });
+        queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
         setActivateLabel("");
       } else {
         toast({ title: "Erreur", description: res.error, variant: "destructive" });
@@ -135,6 +136,7 @@ export default function AdminUserSalary() {
         toast({ title: "Salarié désactivé" });
         queryClient.invalidateQueries({ queryKey: [`/api/admin/user/${userId}/salary`] });
         queryClient.invalidateQueries({ queryKey: [`/api/admin/user/${userId}/profile`] });
+        queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
       } else {
         toast({ title: "Erreur", description: res.error, variant: "destructive" });
       }
