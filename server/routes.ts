@@ -14693,12 +14693,46 @@ Ton role est de reformuler et ameliorer les messages que l'administrateur souhai
 
   // ===== SALARY ROUTES (Admin) =====
 
+  async function enrichSalaryTransactionsWithProviderRef(transactions: Awaited<ReturnType<typeof storage.getSalaryTransactions>>) {
+    const internalIds = transactions
+      .map(t => t.internalTransactionId)
+      .filter((id): id is string => !!id);
+
+    const mainTxMap: Record<string, { metadata: string | null; id: string }> = {};
+    if (internalIds.length > 0) {
+      const mainTxs = await Promise.all(internalIds.map(id => storage.getTransaction(id)));
+      for (const tx of mainTxs) {
+        if (tx) mainTxMap[tx.id] = { metadata: tx.metadata, id: tx.id };
+      }
+    }
+
+    return transactions.map(tx => {
+      let providerReference: string | null = null;
+      if (tx.internalTransactionId && mainTxMap[tx.internalTransactionId]) {
+        try {
+          const meta = JSON.parse(mainTxMap[tx.internalTransactionId].metadata || "{}");
+          providerReference =
+            meta.pawaPayPayoutId ||
+            meta.fedaPayTransferId ||
+            meta.feeXPayTransferId ||
+            meta.moneyFusionTransactionId ||
+            meta.mbiyoPayTransactionId ||
+            meta.afribaPayTransactionId ||
+            meta.externalId ||
+            null;
+        } catch {}
+      }
+      return { ...tx, providerReference };
+    });
+  }
+
   app.get("/api/admin/user/:userId/salary", requireAdmin, async (req: Request, res: Response) => {
     try {
       const { userId } = req.params;
       const account = await storage.getSalaryAccount(userId);
       const schedules = await storage.getSalarySchedules(userId);
-      const transactions = await storage.getSalaryTransactions(userId, 50);
+      const rawTransactions = await storage.getSalaryTransactions(userId, 50);
+      const transactions = await enrichSalaryTransactionsWithProviderRef(rawTransactions);
       return res.json({ account, schedules, transactions });
     } catch (error: any) {
       return res.status(500).json({ error: "Erreur serveur" });
@@ -14857,40 +14891,8 @@ Ton role est de reformuler et ameliorer les messages que l'administrateur souhai
 
   app.get("/api/salary/transactions", requireAuth, async (req: Request, res: Response) => {
     try {
-      const transactions = await storage.getSalaryTransactions(req.session.userId!, 50);
-
-      // Enrichir avec les références prestataire depuis les transactions principales
-      const internalIds = transactions
-        .map(t => t.internalTransactionId)
-        .filter((id): id is string => !!id);
-
-      let mainTxMap: Record<string, { metadata: string | null; id: string }> = {};
-      if (internalIds.length > 0) {
-        const mainTxs = await Promise.all(internalIds.map(id => storage.getTransaction(id)));
-        for (const tx of mainTxs) {
-          if (tx) mainTxMap[tx.id] = { metadata: tx.metadata, id: tx.id };
-        }
-      }
-
-      const enriched = transactions.map(tx => {
-        let providerReference: string | null = null;
-        if (tx.internalTransactionId && mainTxMap[tx.internalTransactionId]) {
-          try {
-            const meta = JSON.parse(mainTxMap[tx.internalTransactionId].metadata || "{}");
-            providerReference =
-              meta.pawaPayPayoutId ||
-              meta.fedaPayTransferId ||
-              meta.feeXPayTransferId ||
-              meta.moneyFusionTransactionId ||
-              meta.mbiyoPayTransactionId ||
-              meta.afribaPayTransactionId ||
-              meta.externalId ||
-              null;
-          } catch {}
-        }
-        return { ...tx, providerReference };
-      });
-
+      const rawTransactions = await storage.getSalaryTransactions(req.session.userId!, 50);
+      const enriched = await enrichSalaryTransactionsWithProviderRef(rawTransactions);
       return res.json(enriched);
     } catch (error: any) {
       return res.status(500).json({ error: "Erreur serveur" });

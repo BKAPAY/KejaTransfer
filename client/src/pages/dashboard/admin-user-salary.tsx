@@ -10,7 +10,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { ArrowLeft, Wallet, PlusCircle, Trash2, Edit2, CheckCircle, XCircle, History, Calendar, Clock, Briefcase, Pencil } from "lucide-react";
+import { ArrowLeft, Wallet, PlusCircle, Trash2, Edit2, CheckCircle, XCircle, History, Calendar, Clock, Briefcase, Pencil, Search, ArrowUpFromLine, ArrowDownToLine, Loader2 } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import {
@@ -52,6 +53,8 @@ interface SalaryTransaction {
   country: string | null;
   operator: string | null;
   phone: string | null;
+  internalTransactionId: string | null;
+  providerReference: string | null;
   createdAt: string;
 }
 
@@ -93,6 +96,8 @@ export default function AdminUserSalary() {
   const [showScheduleDialog, setShowScheduleDialog] = useState(false);
   const [editingLabel, setEditingLabel] = useState(false);
   const [labelInput, setLabelInput] = useState("");
+  const [txSearch, setTxSearch] = useState("");
+  const [selectedTx, setSelectedTx] = useState<SalaryTransaction | null>(null);
 
   const { data: user } = useQuery<User>({
     queryKey: [`/api/admin/user/${userId}/profile`],
@@ -466,38 +471,199 @@ export default function AdminUserSalary() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {transactions.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">Aucune transaction</p>
-              ) : (
-                <div className="space-y-1">
-                  {transactions.map(tx => (
-                    <div key={tx.id} className="flex items-center justify-between py-2.5 border-b last:border-0" data-testid={`row-admin-salary-tx-${tx.id}`}>
-                      <div>
-                        <p className="text-sm font-medium">
-                          {tx.type === "credit" ? "Versement" : "Retrait"}
-                          {tx.description ? ` — ${tx.description}` : ""}
-                        </p>
-                        <p className="text-xs text-muted-foreground">{formatDate(tx.createdAt)}</p>
-                        {tx.type === "withdrawal" && tx.phone && (
-                          <p className="text-xs text-muted-foreground">{tx.phone}{tx.operator ? ` · ${tx.operator}` : ""}</p>
-                        )}
-                      </div>
-                      <div className="text-right">
-                        <span className={`font-semibold text-sm ${tx.type === "credit" ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
-                          {tx.type === "credit" ? "+" : "-"}{formatAmount(tx.amount, tx.currency)}
-                        </span>
-                        <div>
-                          <Badge variant={tx.status === "completed" ? "default" : tx.status === "failed" ? "destructive" : "secondary"} className="text-xs">
-                            {tx.status === "completed" ? "Complété" : tx.status === "failed" ? "Échoué" : "En cours"}
-                          </Badge>
+              <div className="relative mb-3">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                <Input
+                  placeholder="Rechercher par ID ou référence interne..."
+                  value={txSearch}
+                  onChange={e => setTxSearch(e.target.value)}
+                  className="pl-9"
+                  data-testid="input-admin-salary-search"
+                />
+              </div>
+              {(() => {
+                const q = txSearch.trim().toLowerCase();
+                const filtered = q
+                  ? transactions.filter(tx =>
+                      tx.id.toLowerCase().includes(q) ||
+                      (tx.internalTransactionId || "").toLowerCase().includes(q) ||
+                      (tx.providerReference || "").toLowerCase().includes(q)
+                    )
+                  : transactions;
+                if (transactions.length === 0) {
+                  return <p className="text-sm text-muted-foreground text-center py-4">Aucune transaction</p>;
+                }
+                if (filtered.length === 0) {
+                  return <p className="text-sm text-muted-foreground text-center py-4">Aucun résultat pour « {txSearch} »</p>;
+                }
+                return (
+                  <div className="space-y-0">
+                    {filtered.map(tx => (
+                      <div
+                        key={tx.id}
+                        className="flex items-center justify-between py-2.5 border-b last:border-0 cursor-pointer hover-elevate rounded-sm px-1"
+                        data-testid={`row-admin-salary-tx-${tx.id}`}
+                        onClick={() => setSelectedTx(tx)}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium">
+                            {tx.type === "credit" ? "Versement" : "Retrait"}
+                            {tx.description ? ` — ${tx.description}` : ""}
+                          </p>
+                          <p className="text-xs text-muted-foreground">{formatDate(tx.createdAt)}</p>
+                          {tx.type === "withdrawal" && tx.phone && (
+                            <p className="text-xs text-muted-foreground">{tx.phone}{tx.operator ? ` · ${tx.operator.toUpperCase()}` : ""}</p>
+                          )}
+                        </div>
+                        <div className="text-right ml-3 flex-shrink-0">
+                          <span className={`font-semibold text-sm ${tx.type === "credit" ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                            {tx.type === "credit" ? "+" : "-"}{formatAmount(tx.amount, tx.currency)}
+                          </span>
+                          <div>
+                            <Badge
+                              variant={
+                                tx.status === "completed" ? "default" :
+                                tx.status === "rejected" || tx.status === "failed" ? "destructive" :
+                                "secondary"
+                              }
+                              className="text-xs"
+                            >
+                              {tx.status === "completed" ? "Complété" :
+                               tx.status === "rejected" || tx.status === "failed" ? "Rejeté" :
+                               "En attente"}
+                            </Badge>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    ))}
+                  </div>
+                );
+              })()}
             </CardContent>
           </Card>
+
+          {/* Modal de détail de transaction */}
+          <Dialog open={!!selectedTx} onOpenChange={open => { if (!open) setSelectedTx(null); }}>
+            <DialogContent className="max-w-sm">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  {selectedTx?.type === "credit" ? (
+                    <ArrowDownToLine className="w-4 h-4 text-green-600" />
+                  ) : (
+                    <ArrowUpFromLine className="w-4 h-4 text-red-600" />
+                  )}
+                  {selectedTx?.type === "credit" ? "Versement salaire" : "Retrait salaire"}
+                </DialogTitle>
+              </DialogHeader>
+
+              {selectedTx && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className={`text-2xl font-bold ${selectedTx.type === "credit" ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                      {selectedTx.type === "credit" ? "+" : "-"}{formatAmount(selectedTx.amount, selectedTx.currency)}
+                    </span>
+                    <Badge
+                      variant={
+                        selectedTx.status === "completed" ? "default" :
+                        selectedTx.status === "rejected" || selectedTx.status === "failed" ? "destructive" :
+                        "secondary"
+                      }
+                    >
+                      {selectedTx.status === "completed" ? "Complété" :
+                       selectedTx.status === "rejected" || selectedTx.status === "failed" ? "Rejeté" :
+                       "En attente"}
+                    </Badge>
+                  </div>
+
+                  <Separator />
+
+                  <div className="space-y-3 text-sm">
+                    <div className="flex justify-between gap-4">
+                      <span className="text-muted-foreground">Date</span>
+                      <span className="font-medium text-right">{formatDate(selectedTx.createdAt)}</span>
+                    </div>
+
+                    {selectedTx.description && (
+                      <div className="flex justify-between gap-4">
+                        <span className="text-muted-foreground">Description</span>
+                        <span className="font-medium text-right">{selectedTx.description}</span>
+                      </div>
+                    )}
+
+                    {selectedTx.type === "withdrawal" && selectedTx.country && (
+                      <>
+                        <div className="flex justify-between gap-4">
+                          <span className="text-muted-foreground">Pays</span>
+                          <span className="font-medium">{COUNTRIES.find(c => c.code === selectedTx.country)?.name || selectedTx.country}</span>
+                        </div>
+                        {selectedTx.operator && (
+                          <div className="flex justify-between gap-4">
+                            <span className="text-muted-foreground">Opérateur</span>
+                            <span className="font-medium">{selectedTx.operator.toUpperCase()}</span>
+                          </div>
+                        )}
+                        {selectedTx.phone && (
+                          <div className="flex justify-between gap-4">
+                            <span className="text-muted-foreground">Téléphone</span>
+                            <span className="font-medium font-mono">{selectedTx.phone}</span>
+                          </div>
+                        )}
+                      </>
+                    )}
+
+                    <Separator />
+
+                    <div className="flex justify-between gap-4 items-start">
+                      <span className="text-muted-foreground flex-shrink-0">ID transaction</span>
+                      <button
+                        className="font-mono text-xs text-right break-all hover:text-foreground text-muted-foreground transition-colors"
+                        onClick={() => { navigator.clipboard?.writeText(selectedTx.id); toast({ title: "Copié" }); }}
+                        title="Copier"
+                      >
+                        {selectedTx.id}
+                      </button>
+                    </div>
+
+                    {selectedTx.internalTransactionId && (
+                      <div className="flex justify-between gap-4 items-start">
+                        <span className="text-muted-foreground flex-shrink-0">Réf. interne</span>
+                        <button
+                          className="font-mono text-xs text-right break-all hover:text-foreground text-muted-foreground transition-colors"
+                          onClick={() => { navigator.clipboard?.writeText(selectedTx.internalTransactionId!); toast({ title: "Copié" }); }}
+                          title="Copier"
+                        >
+                          {selectedTx.internalTransactionId}
+                        </button>
+                      </div>
+                    )}
+
+                    {selectedTx.providerReference && (
+                      <div className="flex justify-between gap-4 items-start">
+                        <span className="text-muted-foreground flex-shrink-0">Réf. fournisseur</span>
+                        <button
+                          className="font-mono text-xs text-right break-all hover:text-foreground text-muted-foreground transition-colors"
+                          onClick={() => { navigator.clipboard?.writeText(selectedTx.providerReference!); toast({ title: "Copié" }); }}
+                          title="Copier"
+                        >
+                          {selectedTx.providerReference}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {selectedTx.status === "pending" && (
+                    <>
+                      <Separator />
+                      <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        En attente de confirmation du fournisseur…
+                      </p>
+                    </>
+                  )}
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
         </>
       )}
 

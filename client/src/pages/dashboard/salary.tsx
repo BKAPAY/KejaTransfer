@@ -18,7 +18,7 @@ import { COUNTRIES, OPERATORS } from "@shared/schema";
 import { CountryFlag } from "@/components/country-flag";
 import { OperatorSelector } from "@/components/operator-selector";
 import { PhoneInputWithPrefix } from "@/components/phone-input-with-prefix";
-import { Wallet, ArrowUpFromLine, History, Loader2, CheckCircle2, Calendar, Clock, AlertCircle, ArrowRight, Briefcase, ArrowDownToLine, X, Copy } from "lucide-react";
+import { Wallet, ArrowUpFromLine, History, Loader2, CheckCircle2, Calendar, Clock, AlertCircle, ArrowRight, Briefcase, ArrowDownToLine, X, Copy, Search } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
@@ -100,6 +100,7 @@ export default function SalaryPage() {
   const { toast } = useToast();
   const [showWithdrawForm, setShowWithdrawForm] = useState(false);
   const [selectedTx, setSelectedTx] = useState<SalaryTransaction | null>(null);
+  const [txSearch, setTxSearch] = useState("");
 
   const { data: salaryAccount, isLoading: loadingAccount } = useQuery<SalaryAccount | null>({
     queryKey: ["/api/salary"],
@@ -472,50 +473,77 @@ export default function SalaryPage() {
           ) : !transactions || transactions.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-6">Aucune transaction salaire</p>
           ) : (
-            <div className="space-y-0">
-              {transactions.map(tx => (
-                <div
-                  key={tx.id}
-                  className="flex items-center justify-between py-3 border-b last:border-0 cursor-pointer hover-elevate rounded-sm px-1"
-                  data-testid={`row-salary-tx-${tx.id}`}
-                  onClick={() => setSelectedTx(tx)}
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium">
-                      {tx.type === "credit" ? "Versement" : "Retrait"}
-                      {tx.description ? ` — ${tx.description}` : ""}
-                    </p>
-                    <p className="text-xs text-muted-foreground">{formatDate(tx.createdAt)}</p>
-                    {tx.type === "withdrawal" && tx.country && (
-                      <p className="text-xs text-muted-foreground">
-                        {COUNTRIES.find(c => c.code === tx.country)?.name || tx.country}
-                        {tx.operator ? ` · ${tx.operator.toUpperCase()}` : ""}
-                        {tx.phone ? ` · ${tx.phone}` : ""}
-                      </p>
-                    )}
-                  </div>
-                  <div className="text-right ml-3 flex-shrink-0">
-                    <span className={`font-semibold text-sm ${tx.type === "credit" ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
-                      {tx.type === "credit" ? "+" : "-"}{formatAmount(tx.amount, tx.currency)}
-                    </span>
-                    <div className="mt-0.5">
-                      <Badge
-                        variant={
-                          tx.status === "completed" ? "default" :
-                          tx.status === "rejected" || tx.status === "failed" ? "destructive" :
-                          "secondary"
-                        }
-                        className="text-xs"
+            <>
+              <div className="relative mb-3">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                <Input
+                  placeholder="Rechercher par ID ou référence interne..."
+                  value={txSearch}
+                  onChange={e => setTxSearch(e.target.value)}
+                  className="pl-9"
+                  data-testid="input-salary-search"
+                />
+              </div>
+              {(() => {
+                const q = txSearch.trim().toLowerCase();
+                const filtered = q
+                  ? transactions.filter(tx =>
+                      tx.id.toLowerCase().includes(q) ||
+                      (tx.internalTransactionId || "").toLowerCase().includes(q) ||
+                      (tx.providerReference || "").toLowerCase().includes(q)
+                    )
+                  : transactions;
+                if (filtered.length === 0) {
+                  return <p className="text-sm text-muted-foreground text-center py-6">Aucun résultat pour « {txSearch} »</p>;
+                }
+                return (
+                  <div className="space-y-0">
+                    {filtered.map(tx => (
+                      <div
+                        key={tx.id}
+                        className="flex items-center justify-between py-3 border-b last:border-0 cursor-pointer hover-elevate rounded-sm px-1"
+                        data-testid={`row-salary-tx-${tx.id}`}
+                        onClick={() => setSelectedTx(tx)}
                       >
-                        {tx.status === "completed" ? "Complété" :
-                         tx.status === "rejected" || tx.status === "failed" ? "Rejeté" :
-                         "En attente"}
-                      </Badge>
-                    </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium">
+                            {tx.type === "credit" ? "Versement" : "Retrait"}
+                            {tx.description ? ` — ${tx.description}` : ""}
+                          </p>
+                          <p className="text-xs text-muted-foreground">{formatDate(tx.createdAt)}</p>
+                          {tx.type === "withdrawal" && tx.country && (
+                            <p className="text-xs text-muted-foreground">
+                              {COUNTRIES.find(c => c.code === tx.country)?.name || tx.country}
+                              {tx.operator ? ` · ${tx.operator.toUpperCase()}` : ""}
+                              {tx.phone ? ` · ${tx.phone}` : ""}
+                            </p>
+                          )}
+                        </div>
+                        <div className="text-right ml-3 flex-shrink-0">
+                          <span className={`font-semibold text-sm ${tx.type === "credit" ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                            {tx.type === "credit" ? "+" : "-"}{formatAmount(tx.amount, tx.currency)}
+                          </span>
+                          <div className="mt-0.5">
+                            <Badge
+                              variant={
+                                tx.status === "completed" ? "default" :
+                                tx.status === "rejected" || tx.status === "failed" ? "destructive" :
+                                "secondary"
+                              }
+                              className="text-xs"
+                            >
+                              {tx.status === "completed" ? "Complété" :
+                               tx.status === "rejected" || tx.status === "failed" ? "Rejeté" :
+                               "En attente"}
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                </div>
-              ))}
-            </div>
+                );
+              })()}
+            </>
           )}
         </CardContent>
       </Card>
