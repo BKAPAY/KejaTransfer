@@ -13,6 +13,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { COUNTRIES, OPERATORS } from "@shared/schema";
+import { CountryFlag } from "@/components/country-flag";
+import { OperatorSelector } from "@/components/operator-selector";
+import { PhoneInputWithPrefix } from "@/components/phone-input-with-prefix";
 import { Wallet, ArrowUpFromLine, History, Loader2, CheckCircle2, Calendar, Clock, AlertCircle, ArrowRight, Briefcase } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -266,9 +269,9 @@ export default function SalaryPage() {
                   name="country"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Pays</FormLabel>
+                      <FormLabel>Pays de destination</FormLabel>
                       <Select
-                        onValueChange={v => { field.onChange(v); form.setValue("operator", ""); }}
+                        onValueChange={v => { field.onChange(v); form.setValue("operator", ""); form.setValue("phone", ""); }}
                         value={field.value}
                       >
                         <FormControl>
@@ -279,7 +282,10 @@ export default function SalaryPage() {
                         <SelectContent>
                           {availableCountries.map(c => (
                             <SelectItem key={c.code} value={c.code} data-testid={`option-country-${c.code}`}>
-                              {c.name}
+                              <span className="flex items-center gap-2">
+                                <CountryFlag code={c.code} size="xs" />
+                                {c.name}
+                              </span>
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -289,34 +295,29 @@ export default function SalaryPage() {
                   )}
                 />
 
-                <FormField
-                  control={form.control}
-                  name="operator"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Opérateur</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        value={field.value}
-                        disabled={!selectedCountry}
-                      >
-                        <FormControl>
-                          <SelectTrigger data-testid="select-salary-operator">
-                            <SelectValue placeholder="Choisir un opérateur" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {operatorsForCountry.map(op => (
-                            <SelectItem key={op.code} value={op.code} data-testid={`option-operator-${op.code}`}>
-                              {op.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                {selectedCountry && (
+                  <FormField
+                    control={form.control}
+                    name="operator"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Opérateur / Porte-monnaie</FormLabel>
+                        {operatorsForCountry.length === 0 ? (
+                          <div className="text-sm text-muted-foreground p-3 bg-muted rounded-md">
+                            Aucun opérateur disponible pour ce pays
+                          </div>
+                        ) : (
+                          <OperatorSelector
+                            operators={operatorsForCountry}
+                            selectedOperator={field.value}
+                            onSelect={field.onChange}
+                          />
+                        )}
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
 
                 {/* Prévisualisation de conversion */}
                 {needsConversion && watchedAmount > 0 && (
@@ -358,11 +359,11 @@ export default function SalaryPage() {
                     <FormItem>
                       <FormLabel>Numéro de téléphone</FormLabel>
                       <FormControl>
-                        <Input
-                          type="tel"
-                          placeholder="ex: +22996000000"
+                        <PhoneInputWithPrefix
+                          country={selectedCountry}
+                          value={field.value}
+                          onChange={field.onChange}
                           data-testid="input-salary-phone"
-                          {...field}
                         />
                       </FormControl>
                       <FormMessage />
