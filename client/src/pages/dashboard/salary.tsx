@@ -95,14 +95,17 @@ export default function SalaryPage() {
 
   const { data: salaryAccount, isLoading: loadingAccount } = useQuery<SalaryAccount | null>({
     queryKey: ["/api/salary"],
+    refetchInterval: 30000,
   });
 
   const { data: schedules, isLoading: loadingSchedules } = useQuery<SalarySchedule[]>({
     queryKey: ["/api/salary/schedules"],
+    refetchInterval: 30000,
   });
 
   const { data: transactions, isLoading: loadingTx } = useQuery<SalaryTransaction[]>({
     queryKey: ["/api/salary/transactions"],
+    refetchInterval: 30000,
   });
 
   const { data: enabledWithdrawals } = useQuery<Record<string, string[]>>({
