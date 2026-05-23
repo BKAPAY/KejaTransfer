@@ -14891,54 +14891,36 @@ Ton role est de reformuler et ameliorer les messages que l'administrateur souhai
       const salaryUser = { ...user, kycStatus: "verified", balance: numAmount };
       const userCurrency = account.currency;
 
-      // Delegate to the appropriate provider handler with skipBalanceOps=true (no main balance deduction)
+      // STEP 1: Debit salary balance first (lock funds), refund if provider fails
+      await storage.debitSalaryBalance(userId, numAmount);
+
       let result: { success: boolean; transactionId?: string; message?: string; error?: string } | null = null;
 
-      if (provider === "fedapay") {
-        result = await handleFedaPayWithdrawal(userId, salaryUser, numAmount, country, operator, phone, userCurrency, false, true);
-      } else if (provider === "pawapay") {
-        result = await handlePawaPayWithdrawal(userId, salaryUser, numAmount, country, operator, phone, userCurrency, undefined, false, undefined, true);
-      } else if (provider === "feexpay") {
-        result = await handleFeeXPayWithdrawal(userId, salaryUser, numAmount, country, operator, phone, userCurrency, false, undefined, true);
-      } else if (provider === "moneyfusion") {
-        result = await handleMoneyFusionWithdrawal(userId, salaryUser, numAmount, country, operator, phone, userCurrency, false, undefined, true);
-      } else if (provider === "mbiyopay") {
-        result = await handleMbiyoPayWithdrawal(userId, salaryUser, numAmount, country, operator, phone, userCurrency, undefined, false, undefined, true);
-      } else if (provider === "afribapay") {
-        // AfribaPay does not support skipBalanceOps — deduct salary balance proactively then call handler
-        if (account.balance < numAmount) {
-          return res.status(400).json({ success: false, error: "Solde insuffisant" });
-        }
-        await storage.debitSalaryBalance(userId, numAmount);
-        result = await handleAfribaPayWithdrawal(userId, salaryUser, numAmount, country, operator, phone, userCurrency);
-        if (!result?.success) {
-          // Refund salary balance on failure
+      try {
+        if (provider === "fedapay") {
+          result = await handleFedaPayWithdrawal(userId, salaryUser, numAmount, country, operator, phone, userCurrency, false, true);
+        } else if (provider === "pawapay") {
+          result = await handlePawaPayWithdrawal(userId, salaryUser, numAmount, country, operator, phone, userCurrency, undefined, false, undefined, true);
+        } else if (provider === "feexpay") {
+          result = await handleFeeXPayWithdrawal(userId, salaryUser, numAmount, country, operator, phone, userCurrency, false, undefined, true);
+        } else if (provider === "moneyfusion") {
+          result = await handleMoneyFusionWithdrawal(userId, salaryUser, numAmount, country, operator, phone, userCurrency, false, undefined, true);
+        } else if (provider === "mbiyopay") {
+          result = await handleMbiyoPayWithdrawal(userId, salaryUser, numAmount, country, operator, phone, userCurrency, undefined, false, undefined, true);
+        } else if (provider === "afribapay") {
+          result = await handleAfribaPayWithdrawal(userId, salaryUser, numAmount, country, operator, phone, userCurrency);
+        } else {
           await storage.creditSalaryBalance(userId, numAmount);
+          return res.status(400).json({ success: false, error: `Provider ${provider} non pris en charge pour les retraits salaire` });
         }
-        if (result?.success) {
-          await storage.createSalaryTransaction({
-            userId,
-            type: "withdrawal",
-            amount: numAmount,
-            currency: account.currency,
-            status: "completed",
-            description: null,
-            country: country.toUpperCase(),
-            operator,
-            phone,
-          });
-        }
-        return res.json(result?.success
-          ? { success: true, message: "Retrait initié avec succès" }
-          : { success: false, error: result?.error || "Retrait échoué" }
-        );
-      } else {
-        return res.status(400).json({ success: false, error: `Provider ${provider} non pris en charge pour les retraits salaire` });
+      } catch (providerErr: any) {
+        // Provider threw — refund and abort
+        await storage.creditSalaryBalance(userId, numAmount);
+        throw providerErr;
       }
 
       if (result?.success) {
-        // Deduct from salary balance immediately to lock funds
-        await storage.debitSalaryBalance(userId, numAmount);
+        // STEP 2: Provider accepted — record pending salary transaction
         await storage.createSalaryTransaction({
           userId,
           type: "withdrawal",
@@ -14953,6 +14935,8 @@ Ton role est de reformuler et ameliorer les messages que l'administrateur souhai
         });
         return res.json({ success: true, message: "Retrait initié avec succès" });
       } else {
+        // STEP 3: Provider rejected immediately — refund salary balance
+        await storage.creditSalaryBalance(userId, numAmount);
         return res.json({ success: false, error: result?.error || "Retrait échoué" });
       }
     } catch (error: any) {
