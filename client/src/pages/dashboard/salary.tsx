@@ -487,6 +487,19 @@ export default function SalaryPage() {
                         {tx.phone ? ` · ${tx.phone}` : ""}
                       </p>
                     )}
+                    <p className="text-xs text-muted-foreground font-mono">
+                      ID : {tx.id.slice(0, 8)}…
+                    </p>
+                    {(tx as any).providerReference && (
+                      <p className="text-xs text-muted-foreground font-mono">
+                        Réf. : {(tx as any).providerReference}
+                      </p>
+                    )}
+                    {!( tx as any).providerReference && tx.internalTransactionId && (
+                      <p className="text-xs text-muted-foreground font-mono">
+                        Réf. : {tx.internalTransactionId.slice(0, 8)}…
+                      </p>
+                    )}
                   </div>
                   <div className="text-right">
                     <span className={`font-semibold ${tx.type === "credit" ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
