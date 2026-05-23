@@ -5740,7 +5740,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/transactions", requireAuth, async (req: Request, res: Response) => {
     try {
       const transactions = await storage.getTransactions(req.session.userId!);
-      const sanitized = transactions.map(sanitizeTransactionForUser);
+      // Exclure les transactions de retrait salaire — elles ont leur propre historique dédié
+      const filtered = transactions.filter(tx => {
+        try {
+          const meta = JSON.parse(tx.metadata || "{}");
+          return !meta.isSalary;
+        } catch {
+          return true;
+        }
+      });
+      const sanitized = filtered.map(sanitizeTransactionForUser);
       res.json(sanitized);
     } catch (error: any) {
       res.status(500).json({ error: "Une erreur est survenue" });
@@ -14939,7 +14948,8 @@ Ton role est de reformuler et ameliorer les messages que l'administrateur souhai
           result = await handleFedaPayWithdrawal(userId, salaryUser, numAmount, country, operator, phone, userCurrency, true, true);
         } else if (provider === "pawapay") {
           // providerAmountOverride=numAmount : force le montant complet vers PawaPay
-          result = await handlePawaPayWithdrawal(userId, salaryUser, numAmount, country, operator, phone, userCurrency, undefined, false, numAmount, true);
+          // isSalary=true : bake le flag dans la metadata DÈS la création (évite race condition)
+          result = await handlePawaPayWithdrawal(userId, salaryUser, numAmount, country, operator, phone, userCurrency, undefined, false, numAmount, true, true);
         } else if (provider === "feexpay") {
           result = await handleFeeXPayWithdrawal(userId, salaryUser, numAmount, country, operator, phone, userCurrency, false, undefined, true);
         } else if (provider === "moneyfusion") {

@@ -3408,16 +3408,17 @@ export class DbStorage implements IStorage {
   }
 
   async updateSalaryTransactionByInternalId(internalTransactionId: string, status: string): Promise<void> {
-    const rows = await db.select().from(schema.salaryTransactions)
-      .where(eq(schema.salaryTransactions.internalTransactionId, internalTransactionId))
-      .limit(1);
-    if (!rows.length) return;
-    const salaryTx = rows[0];
     const finalStatus = status === "completed" ? "completed" : "rejected";
-    await db.update(schema.salaryTransactions)
+    // Atomic conditional update: only transition from 'pending'. Returns rows updated.
+    const updated = await db.update(schema.salaryTransactions)
       .set({ status: finalStatus })
-      .where(eq(schema.salaryTransactions.id, salaryTx.id));
-    // If rejected, refund the salary balance
+      .where(and(
+        eq(schema.salaryTransactions.internalTransactionId, internalTransactionId),
+        eq(schema.salaryTransactions.status, "pending")
+      ))
+      .returning();
+    if (!updated.length) return; // déjà transitionné — ne pas re-rembourser
+    const salaryTx = updated[0];
     if (finalStatus === "rejected") {
       await db.update(schema.salaryAccounts)
         .set({ balance: sql`${schema.salaryAccounts.balance} + ${salaryTx.amount}` })

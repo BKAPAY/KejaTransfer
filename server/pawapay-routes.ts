@@ -217,7 +217,8 @@ export async function handlePawaPayWithdrawal(
   targetCurrency?: string,
   netMode?: boolean,
   providerAmountOverride?: number,
-  skipBalanceOps?: boolean
+  skipBalanceOps?: boolean,
+  isSalary?: boolean
 ): Promise<{ success: boolean; transactionId?: string; message?: string; error?: string }> {
   try {
     const countryUpper = country.toUpperCase();
@@ -285,7 +286,7 @@ export async function handlePawaPayWithdrawal(
       customerPhone: phone,
       metadata: JSON.stringify({
         phone,
-        deductedFromBalance: feeInfo.totalDeductedFromBalance,
+        deductedFromBalance: isSalary ? 0 : feeInfo.totalDeductedFromBalance,
         amountReceived: feeInfo.amountReceived,
         providerAmount: amountForProvider,
         providerCurrency,
@@ -296,6 +297,7 @@ export async function handlePawaPayWithdrawal(
         orderId,
         startTime,
         netMode: netMode || false,
+        ...(isSalary ? { isSalary: true } : {}),
       }),
     });
 
@@ -316,7 +318,13 @@ export async function handlePawaPayWithdrawal(
 
         if (!result.success) {
           console.error(`[PawaPay Withdrawal] Dispatch failed for ${txId} - refunding:`, result.error);
-          if (!skipBalanceOps) {
+          if (isSalary) {
+            // Salary: marque la tx failed + rembourse via hook salary (idempotent)
+            const failed = await storage.atomicFailTransaction(txId);
+            if (failed) {
+              try { await storage.updateSalaryTransactionByInternalId(txId, "failed"); } catch (_) {}
+            }
+          } else if (!skipBalanceOps) {
             await safeRefundOutgoingTransaction(txId, userId, { deductedFromBalance: feeInfo.totalDeductedFromBalance }, "pawapay-dispatch-failed");
           } else {
             await safeRefundOutgoingTransaction(txId, userId, { deductedFromBalance: feeInfo.totalDeductedFromBalance, scope: "business" }, "pawapay-dispatch-failed-biz");
@@ -330,7 +338,7 @@ export async function handlePawaPayWithdrawal(
           ...existingMetaW,
           pawaPayPayoutId: result.payoutId,
           phone,
-          deductedFromBalance: feeInfo.totalDeductedFromBalance,
+          deductedFromBalance: isSalary ? 0 : feeInfo.totalDeductedFromBalance,
           amountReceived: feeInfo.amountReceived,
           providerAmount: amountForProvider,
           providerCurrency,
@@ -341,13 +349,21 @@ export async function handlePawaPayWithdrawal(
           orderId,
           startTime,
           netMode: netMode || false,
+          ...(isSalary ? { isSalary: true } : {}),
         }));
         console.log(`[PawaPay Withdrawal] Dispatched tx ${txId}, pawaPayPayoutId: ${result.payoutId}`);
         // Immediately poll to handle race condition where webhook arrived before payoutId was stored
         setImmediate(() => pollPawaPayTransaction(txId));
       } catch (dispatchErr) {
         console.error(`[PawaPay Withdrawal] Dispatch error for ${txId}:`, dispatchErr);
-        await safeRefundOutgoingTransaction(txId, userId, { deductedFromBalance: feeInfo.totalDeductedFromBalance }, "pawapay-dispatch-error");
+        if (isSalary) {
+          const failed = await storage.atomicFailTransaction(txId);
+          if (failed) {
+            try { await storage.updateSalaryTransactionByInternalId(txId, "failed"); } catch (_) {}
+          }
+        } else {
+          await safeRefundOutgoingTransaction(txId, userId, { deductedFromBalance: feeInfo.totalDeductedFromBalance }, "pawapay-dispatch-error");
+        }
       }
     }, 5000);
 
@@ -614,13 +630,25 @@ export async function handlePawaPayWebhook(req: Request, res: Response): Promise
           const completed = await storage.atomicCompleteTransaction(tx.id);
           if (completed) {
             console.log(`[PawaPay Webhook] Payout ${tx.id} completed`);
+            if (meta.isSalary) {
+              try { await storage.updateSalaryTransactionByInternalId(tx.id, "completed"); } catch (_) {}
+            }
             setImmediate(() => sendApiPayoutCallback(tx.id, meta, "completed"));
             setImmediate(() => sendBusinessWebhookCallback(tx.id, "completed", "payout"));
           } else {
             console.log(`[PawaPay Webhook] Payout ${tx.id} already processed by another process`);
           }
         } else if (mappedStatus === "failed") {
-          if (meta.scope === "business") {
+          if (meta.isSalary) {
+            // Salary payout: solde principal jamais débité — utiliser le hook salary pour rembourser le solde salaire
+            const failed = await storage.atomicFailTransaction(tx.id);
+            if (failed) {
+              console.log(`[PawaPay Webhook] Salary payout ${tx.id} failed — salary hook handles refund`);
+              try { await storage.updateSalaryTransactionByInternalId(tx.id, "failed"); } catch (_) {}
+            } else {
+              console.log(`[PawaPay Webhook] Salary payout ${tx.id} already processed by another process`);
+            }
+          } else if (meta.scope === "business") {
             const refundAmount = (meta.deductedFromBalance || meta.totalDebited || tx.amount) + (meta.exchangeFee || 0);
             const country = tx.country || meta.country;
             const currency = tx.currency || meta.balanceCurrency;

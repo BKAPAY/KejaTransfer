@@ -1102,24 +1102,46 @@ async function processPawaPayPayout(transaction: Transaction & { user?: User }, 
     console.log(`[PaymentPolling] PawaPay payout ${transaction.id} - raw: ${result.status} → mapped: ${mappedStatus}`);
 
     if (mappedStatus === "completed") {
-      await storage.updateTransactionStatus(transaction.id, "completed");
-      console.log(`[PaymentPolling] ✅ PawaPay payout ${transaction.id} COMPLETED`);
-      const updatedTx = await storage.getTransaction(transaction.id);
-      if (updatedTx) {
-        trySendPaymentCallback(updatedTx, 'payment.completed', '[PaymentPolling/PawaPay/Payout]');
+      // ATOMIC: only completes if still pending — évite overwrite si déjà traité par webhook
+      const completed = await storage.atomicCompleteTransaction(transaction.id);
+      if (completed) {
+        console.log(`[PaymentPolling] ✅ PawaPay payout ${transaction.id} COMPLETED`);
+        if (metadata.isSalary) {
+          try { await storage.updateSalaryTransactionByInternalId(transaction.id, "completed"); } catch (_) {}
+        }
+        const updatedTx = await storage.getTransaction(transaction.id);
+        if (updatedTx) {
+          trySendPaymentCallback(updatedTx, 'payment.completed', '[PaymentPolling/PawaPay/Payout]');
+        }
+        setImmediate(() => sendBusinessWebhookCallback(transaction.id, "completed", "payout"));
       }
-      setImmediate(() => sendBusinessWebhookCallback(transaction.id, "completed", "payout"));
     } else if (mappedStatus === "failed") {
       console.log(`[PaymentPolling] ❌ PawaPay payout ${transaction.id} failed (raw: ${result.status}) - refunding`);
-      await safeRefundOutgoingTransaction(transaction.id, transaction.userId, metadata, "polling-pawapay-payout-failed");
-      await storage.updateTransactionStatus(transaction.id, "failed");
-      setImmediate(() => sendBusinessWebhookCallback(transaction.id, "failed", "payout"));
+      if (metadata.isSalary) {
+        const failed = await storage.atomicFailTransaction(transaction.id);
+        if (failed) {
+          try { await storage.updateSalaryTransactionByInternalId(transaction.id, "failed"); } catch (_) {}
+          setImmediate(() => sendBusinessWebhookCallback(transaction.id, "failed", "payout"));
+        }
+      } else {
+        await safeRefundOutgoingTransaction(transaction.id, transaction.userId, metadata, "polling-pawapay-payout-failed");
+        await storage.updateTransactionStatus(transaction.id, "failed");
+        setImmediate(() => sendBusinessWebhookCallback(transaction.id, "failed", "payout"));
+      }
     } else {
       if (hasPaymentExpired(transaction)) {
         console.log(`[PaymentPolling] ⏱️ PawaPay payout ${transaction.id} TIMEOUT - refunding`);
-        await safeRefundOutgoingTransaction(transaction.id, transaction.userId, metadata, "polling-pawapay-payout-timeout");
-        await storage.updateTransactionStatus(transaction.id, "failed");
-        setImmediate(() => sendBusinessWebhookCallback(transaction.id, "failed", "payout"));
+        if (metadata.isSalary) {
+          const failed = await storage.atomicFailTransaction(transaction.id);
+          if (failed) {
+            try { await storage.updateSalaryTransactionByInternalId(transaction.id, "failed"); } catch (_) {}
+            setImmediate(() => sendBusinessWebhookCallback(transaction.id, "failed", "payout"));
+          }
+        } else {
+          await safeRefundOutgoingTransaction(transaction.id, transaction.userId, metadata, "polling-pawapay-payout-timeout");
+          await storage.updateTransactionStatus(transaction.id, "failed");
+          setImmediate(() => sendBusinessWebhookCallback(transaction.id, "failed", "payout"));
+        }
       } else {
         console.log(`[PaymentPolling] ⏳ PawaPay payout ${transaction.id} still pending (${remainingSeconds}s remaining)`);
       }
