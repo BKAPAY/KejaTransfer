@@ -14937,18 +14937,19 @@ Ton role est de reformuler et ameliorer les messages que l'administrateur souhai
       }
 
       if (result?.success) {
-        // Deduct from salary balance
+        // Deduct from salary balance immediately to lock funds
         await storage.debitSalaryBalance(userId, numAmount);
         await storage.createSalaryTransaction({
           userId,
           type: "withdrawal",
           amount: numAmount,
           currency: account.currency,
-          status: "completed",
+          status: "pending",
           description: null,
           country: country.toUpperCase(),
           operator,
           phone,
+          internalTransactionId: result.transactionId || null,
         });
         return res.json({ success: true, message: "Retrait initié avec succès" });
       } else {

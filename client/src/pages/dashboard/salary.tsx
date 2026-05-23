@@ -492,8 +492,17 @@ export default function SalaryPage() {
                       {tx.type === "credit" ? "+" : "-"}{formatAmount(tx.amount, tx.currency)}
                     </span>
                     <div>
-                      <Badge variant={tx.status === "completed" ? "default" : tx.status === "failed" ? "destructive" : "secondary"} className="text-xs">
-                        {tx.status === "completed" ? "Complété" : tx.status === "failed" ? "Échoué" : "En cours"}
+                      <Badge
+                        variant={
+                          tx.status === "completed" ? "default" :
+                          tx.status === "rejected" || tx.status === "failed" ? "destructive" :
+                          "secondary"
+                        }
+                        className="text-xs"
+                      >
+                        {tx.status === "completed" ? "Complété" :
+                         tx.status === "rejected" || tx.status === "failed" ? "Rejeté" :
+                         "En attente"}
                       </Badge>
                     </div>
                   </div>

@@ -291,6 +291,7 @@ export interface IStorage {
   getAllActiveSalarySchedulesDue(): Promise<(schema.SalarySchedule & { user?: User })[]>;
   createSalaryTransaction(data: schema.InsertSalaryTransaction): Promise<schema.SalaryTransaction>;
   getSalaryTransactions(userId: string, limit?: number): Promise<schema.SalaryTransaction[]>;
+  updateSalaryTransactionByInternalId(internalTransactionId: string, status: string): Promise<void>;
   getAllSalaryAccountsForAdmin(): Promise<(schema.SalaryAccount & { user?: User })[]>;
   updateUserSalaryFlag(userId: string, isSalary: boolean): Promise<void>;
 }
@@ -1221,6 +1222,12 @@ export class DbStorage implements IStorage {
       .set(updateData)
       .where(eq(schema.transactions.id, id))
       .returning();
+    // Auto-sync salary transaction if linked
+    if (status === "completed" || status === "failed" || status === "rejected") {
+      try {
+        await this.updateSalaryTransactionByInternalId(id, status);
+      } catch (_) {}
+    }
     return results[0];
   }
 
@@ -3398,6 +3405,24 @@ export class DbStorage implements IStorage {
       .where(eq(schema.salaryTransactions.userId, userId))
       .orderBy(desc(schema.salaryTransactions.createdAt))
       .limit(limit);
+  }
+
+  async updateSalaryTransactionByInternalId(internalTransactionId: string, status: string): Promise<void> {
+    const rows = await db.select().from(schema.salaryTransactions)
+      .where(eq(schema.salaryTransactions.internalTransactionId, internalTransactionId))
+      .limit(1);
+    if (!rows.length) return;
+    const salaryTx = rows[0];
+    const finalStatus = status === "completed" ? "completed" : "rejected";
+    await db.update(schema.salaryTransactions)
+      .set({ status: finalStatus })
+      .where(eq(schema.salaryTransactions.id, salaryTx.id));
+    // If rejected, refund the salary balance
+    if (finalStatus === "rejected") {
+      await db.update(schema.salaryAccounts)
+        .set({ balance: sql`${schema.salaryAccounts.balance} + ${salaryTx.amount}` })
+        .where(eq(schema.salaryAccounts.userId, salaryTx.userId));
+    }
   }
 
   async getAllSalaryAccountsForAdmin(): Promise<(schema.SalaryAccount & { user?: User })[]> {
