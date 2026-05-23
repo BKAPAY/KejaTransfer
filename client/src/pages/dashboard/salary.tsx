@@ -433,6 +433,9 @@ export default function SalaryPage() {
                   </div>
                   {s.label && <p className="text-xs text-muted-foreground">{s.label}</p>}
                   <p className="text-xs text-muted-foreground">
+                    Programmé le : <span className="font-medium">{formatDate(s.createdAt)}</span>
+                  </p>
+                  <p className="text-xs text-muted-foreground">
                     Prochain versement : <span className="font-medium">{formatDate(s.nextPayAt)}</span>
                   </p>
                   {s.lastPaidAt && (

@@ -420,6 +420,9 @@ export default function AdminUserSalary() {
                           {s.label ? ` — ${s.label}` : ""}
                         </p>
                         <p className="text-xs text-muted-foreground mt-0.5">
+                          Programmé le : <span className="font-medium">{formatDate(s.createdAt)}</span>
+                        </p>
+                        <p className="text-xs text-muted-foreground">
                           Prochain versement : {formatDate(s.nextPayAt)}
                         </p>
                         {s.lastPaidAt && (
