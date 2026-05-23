@@ -10,13 +10,15 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { COUNTRIES, OPERATORS } from "@shared/schema";
 import { CountryFlag } from "@/components/country-flag";
 import { OperatorSelector } from "@/components/operator-selector";
 import { PhoneInputWithPrefix } from "@/components/phone-input-with-prefix";
-import { Wallet, ArrowUpFromLine, History, Loader2, CheckCircle2, Calendar, Clock, AlertCircle, ArrowRight, Briefcase } from "lucide-react";
+import { Wallet, ArrowUpFromLine, History, Loader2, CheckCircle2, Calendar, Clock, AlertCircle, ArrowRight, Briefcase, ArrowDownToLine, X, Copy } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
@@ -54,6 +56,8 @@ interface SalaryTransaction {
   country: string | null;
   operator: string | null;
   phone: string | null;
+  internalTransactionId: string | null;
+  providerReference: string | null;
   createdAt: string;
 }
 
@@ -95,6 +99,7 @@ function scheduleLabel(s: SalarySchedule): string {
 export default function SalaryPage() {
   const { toast } = useToast();
   const [showWithdrawForm, setShowWithdrawForm] = useState(false);
+  const [selectedTx, setSelectedTx] = useState<SalaryTransaction | null>(null);
 
   const { data: salaryAccount, isLoading: loadingAccount } = useQuery<SalaryAccount | null>({
     queryKey: ["/api/salary"],
@@ -108,7 +113,7 @@ export default function SalaryPage() {
 
   const { data: transactions, isLoading: loadingTx } = useQuery<SalaryTransaction[]>({
     queryKey: ["/api/salary/transactions"],
-    refetchInterval: 30000,
+    refetchInterval: 8000,
   });
 
   const { data: enabledWithdrawals } = useQuery<Record<string, string[]>>({
@@ -467,14 +472,15 @@ export default function SalaryPage() {
           ) : !transactions || transactions.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-6">Aucune transaction salaire</p>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-0">
               {transactions.map(tx => (
                 <div
                   key={tx.id}
-                  className="flex items-center justify-between py-3 border-b last:border-0"
+                  className="flex items-center justify-between py-3 border-b last:border-0 cursor-pointer hover-elevate rounded-sm px-1"
                   data-testid={`row-salary-tx-${tx.id}`}
+                  onClick={() => setSelectedTx(tx)}
                 >
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium">
                       {tx.type === "credit" ? "Versement" : "Retrait"}
                       {tx.description ? ` — ${tx.description}` : ""}
@@ -483,29 +489,16 @@ export default function SalaryPage() {
                     {tx.type === "withdrawal" && tx.country && (
                       <p className="text-xs text-muted-foreground">
                         {COUNTRIES.find(c => c.code === tx.country)?.name || tx.country}
-                        {tx.operator ? ` · ${tx.operator}` : ""}
+                        {tx.operator ? ` · ${tx.operator.toUpperCase()}` : ""}
                         {tx.phone ? ` · ${tx.phone}` : ""}
                       </p>
                     )}
-                    <p className="text-xs text-muted-foreground font-mono">
-                      ID : {tx.id.slice(0, 8)}…
-                    </p>
-                    {(tx as any).providerReference && (
-                      <p className="text-xs text-muted-foreground font-mono">
-                        Réf. : {(tx as any).providerReference}
-                      </p>
-                    )}
-                    {!( tx as any).providerReference && tx.internalTransactionId && (
-                      <p className="text-xs text-muted-foreground font-mono">
-                        Réf. : {tx.internalTransactionId.slice(0, 8)}…
-                      </p>
-                    )}
                   </div>
-                  <div className="text-right">
-                    <span className={`font-semibold ${tx.type === "credit" ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                  <div className="text-right ml-3 flex-shrink-0">
+                    <span className={`font-semibold text-sm ${tx.type === "credit" ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
                       {tx.type === "credit" ? "+" : "-"}{formatAmount(tx.amount, tx.currency)}
                     </span>
-                    <div>
+                    <div className="mt-0.5">
                       <Badge
                         variant={
                           tx.status === "completed" ? "default" :
@@ -526,6 +519,132 @@ export default function SalaryPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Modal de détail de transaction */}
+      <Dialog open={!!selectedTx} onOpenChange={open => { if (!open) setSelectedTx(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {selectedTx?.type === "credit" ? (
+                <ArrowDownToLine className="w-4 h-4 text-green-600" />
+              ) : (
+                <ArrowUpFromLine className="w-4 h-4 text-red-600" />
+              )}
+              {selectedTx?.type === "credit" ? "Versement salaire" : "Retrait salaire"}
+            </DialogTitle>
+          </DialogHeader>
+
+          {selectedTx && (
+            <div className="space-y-4">
+              {/* Montant + statut */}
+              <div className="flex items-center justify-between">
+                <span className={`text-2xl font-bold ${selectedTx.type === "credit" ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                  {selectedTx.type === "credit" ? "+" : "-"}{formatAmount(selectedTx.amount, selectedTx.currency)}
+                </span>
+                <Badge
+                  variant={
+                    selectedTx.status === "completed" ? "default" :
+                    selectedTx.status === "rejected" || selectedTx.status === "failed" ? "destructive" :
+                    "secondary"
+                  }
+                >
+                  {selectedTx.status === "completed" ? "Complété" :
+                   selectedTx.status === "rejected" || selectedTx.status === "failed" ? "Rejeté" :
+                   "En attente"}
+                </Badge>
+              </div>
+
+              <Separator />
+
+              {/* Détails */}
+              <div className="space-y-3 text-sm">
+                <div className="flex justify-between gap-4">
+                  <span className="text-muted-foreground">Date</span>
+                  <span className="font-medium text-right">{formatDate(selectedTx.createdAt)}</span>
+                </div>
+
+                {selectedTx.description && (
+                  <div className="flex justify-between gap-4">
+                    <span className="text-muted-foreground">Description</span>
+                    <span className="font-medium text-right">{selectedTx.description}</span>
+                  </div>
+                )}
+
+                {selectedTx.type === "withdrawal" && selectedTx.country && (
+                  <>
+                    <div className="flex justify-between gap-4">
+                      <span className="text-muted-foreground">Pays</span>
+                      <span className="font-medium">{COUNTRIES.find(c => c.code === selectedTx.country)?.name || selectedTx.country}</span>
+                    </div>
+                    {selectedTx.operator && (
+                      <div className="flex justify-between gap-4">
+                        <span className="text-muted-foreground">Opérateur</span>
+                        <span className="font-medium">{selectedTx.operator.toUpperCase()}</span>
+                      </div>
+                    )}
+                    {selectedTx.phone && (
+                      <div className="flex justify-between gap-4">
+                        <span className="text-muted-foreground">Téléphone</span>
+                        <span className="font-medium font-mono">{selectedTx.phone}</span>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                <Separator />
+
+                {/* IDs */}
+                <div className="flex justify-between gap-4 items-start">
+                  <span className="text-muted-foreground flex-shrink-0">ID transaction</span>
+                  <button
+                    className="font-mono text-xs text-right break-all hover:text-foreground text-muted-foreground transition-colors"
+                    onClick={() => { navigator.clipboard?.writeText(selectedTx.id); }}
+                    title="Copier"
+                  >
+                    {selectedTx.id}
+                  </button>
+                </div>
+
+                {selectedTx.internalTransactionId && (
+                  <div className="flex justify-between gap-4 items-start">
+                    <span className="text-muted-foreground flex-shrink-0">Réf. interne</span>
+                    <button
+                      className="font-mono text-xs text-right break-all hover:text-foreground text-muted-foreground transition-colors"
+                      onClick={() => { navigator.clipboard?.writeText(selectedTx.internalTransactionId!); }}
+                      title="Copier"
+                    >
+                      {selectedTx.internalTransactionId}
+                    </button>
+                  </div>
+                )}
+
+                {selectedTx.providerReference && (
+                  <div className="flex justify-between gap-4 items-start">
+                    <span className="text-muted-foreground flex-shrink-0">Réf. fournisseur</span>
+                    <button
+                      className="font-mono text-xs text-right break-all hover:text-foreground text-muted-foreground transition-colors"
+                      onClick={() => { navigator.clipboard?.writeText(selectedTx.providerReference!); }}
+                      title="Copier"
+                    >
+                      {selectedTx.providerReference}
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {selectedTx.status === "pending" && (
+                <>
+                  <Separator />
+                  <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    En attente de confirmation du fournisseur…
+                  </p>
+                </>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
