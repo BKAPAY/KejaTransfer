@@ -120,7 +120,7 @@ function SidebarMenuItems({
   location,
   onMenuClick,
 }: {
-  items: typeof generalItems;
+  items: (typeof generalItems[0] & { color?: string })[];
   location: string;
   onMenuClick: () => void;
 }) {
@@ -135,13 +135,13 @@ function SidebarMenuItems({
           >
             {item.url.startsWith("http") ? (
               <a href={item.url} target="_blank" rel="noopener noreferrer" onClick={onMenuClick}>
-                <item.icon className="w-4 h-4" />
-                <span>{item.title}</span>
+                <item.icon className="w-4 h-4" style={item.color ? { color: item.color } : undefined} />
+                <span style={item.color ? { color: item.color, fontWeight: 600 } : undefined}>{item.title}</span>
               </a>
             ) : (
               <Link href={item.url} onClick={onMenuClick}>
-                <item.icon className="w-4 h-4" />
-                <span>{item.title}</span>
+                <item.icon className="w-4 h-4" style={item.color ? { color: item.color } : undefined} />
+                <span style={item.color ? { color: item.color, fontWeight: 600 } : undefined}>{item.title}</span>
               </Link>
             )}
           </SidebarMenuButton>
@@ -181,8 +181,8 @@ export function AppSidebar() {
     ? [{ title: "Administration", url: "/dashboard/admin", icon: Shield, testId: "nav-admin" }]
     : [];
 
-  const salaryItems = (user as any)?.isSalary
-    ? [{ title: "Salaire", url: "/dashboard/salary", icon: Banknote, testId: "nav-salary" }]
+  const salaryItems = user?.isSalary
+    ? [{ title: "Salaire", url: "/dashboard/salary", icon: Banknote, testId: "nav-salary", color: "#16a34a" }]
     : [];
 
   const logoutMutation = useMutation({

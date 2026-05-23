@@ -1,6 +1,6 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { eq, desc, or, and, sql, gte, inArray, ne, isNull } from "drizzle-orm";
+import { eq, desc, or, and, sql, gte, lte, inArray, ne, isNull, isNotNull } from "drizzle-orm";
 import * as schema from "@shared/schema";
 import type {
   User,
@@ -359,6 +359,7 @@ export class DbStorage implements IStorage {
       securityCode: schema.users.securityCode,
       isAdmin: schema.users.isAdmin,
       isPrimaryAdmin: schema.users.isPrimaryAdmin,
+      isSalary: schema.users.isSalary,
       suspended: schema.users.suspended,
       transfersEnabled: schema.users.transfersEnabled,
       withdrawalsEnabled: schema.users.withdrawalsEnabled,
@@ -3376,8 +3377,8 @@ export class DbStorage implements IStorage {
     const schedules = await db.select().from(schema.salarySchedules)
       .where(and(
         eq(schema.salarySchedules.isActive, true),
-        sql`${schema.salarySchedules.nextPayAt} IS NOT NULL`,
-        sql`${schema.salarySchedules.nextPayAt} <= ${now}`
+        isNotNull(schema.salarySchedules.nextPayAt),
+        lte(schema.salarySchedules.nextPayAt, now)
       ));
     const result: (schema.SalarySchedule & { user?: User })[] = [];
     for (const s of schedules) {
