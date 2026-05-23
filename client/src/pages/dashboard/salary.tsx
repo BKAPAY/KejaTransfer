@@ -13,7 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { COUNTRIES, OPERATORS } from "@shared/schema";
-import { Wallet, ArrowUpFromLine, History, Loader2, CheckCircle2, Calendar, Clock, AlertCircle } from "lucide-react";
+import { Wallet, ArrowUpFromLine, History, Loader2, CheckCircle2, Calendar, Clock, AlertCircle, ArrowRight } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
@@ -115,6 +115,7 @@ export default function SalaryPage() {
   });
 
   const selectedCountry = form.watch("country");
+  const watchedAmount = form.watch("amount");
 
   const availableCountries = enabledWithdrawals
     ? COUNTRIES.filter(c => (enabledWithdrawals[c.code] || []).length > 0)
@@ -125,6 +126,34 @@ export default function SalaryPage() {
         op => (enabledWithdrawals[selectedCountry] || []).includes(op.code)
       )
     : [];
+
+  const salaryCurrency = salaryAccount?.currency || "XOF";
+  const destCurrency = selectedCountry
+    ? (COUNTRIES.find(c => c.code === selectedCountry)?.currency || "XOF")
+    : null;
+  const needsConversion = !!(destCurrency && destCurrency !== salaryCurrency);
+  const conversionEnabled = needsConversion && !!watchedAmount && Number(watchedAmount) > 0;
+
+  const { data: conversionPreview, isFetching: loadingConversion } = useQuery<{
+    success: boolean;
+    convertedAmount: number;
+    conversionRate: number;
+    targetCurrency: string;
+    error?: string;
+  } | null>({
+    queryKey: ["/api/convert-currency", watchedAmount, salaryCurrency, destCurrency],
+    queryFn: async () => {
+      if (!watchedAmount || !destCurrency) return null;
+      const res = await apiRequest("POST", "/api/convert-currency", {
+        amount: Number(watchedAmount),
+        fromCurrency: salaryCurrency,
+        toCurrency: destCurrency,
+      });
+      return res.json();
+    },
+    enabled: conversionEnabled,
+    staleTime: 60 * 60 * 1000,
+  });
 
   const withdrawMutation = useMutation({
     mutationFn: async (data: WithdrawFormData) => {
@@ -283,6 +312,39 @@ export default function SalaryPage() {
                     </FormItem>
                   )}
                 />
+
+                {/* Prévisualisation de conversion */}
+                {needsConversion && watchedAmount > 0 && (
+                  <div className="rounded-md border p-3 space-y-1" data-testid="div-conversion-preview">
+                    {loadingConversion ? (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        Calcul de la conversion en cours...
+                      </div>
+                    ) : conversionPreview?.success ? (
+                      <>
+                        <p className="text-xs text-muted-foreground">Montant estimé que vous recevrez</p>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm text-muted-foreground">
+                            {formatAmount(Number(watchedAmount), salaryCurrency)}
+                          </span>
+                          <ArrowRight className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+                          <span className="font-bold text-green-600 dark:text-green-400" data-testid="text-converted-amount">
+                            {formatAmount(conversionPreview.convertedAmount, destCurrency!)}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Taux : 1 {salaryCurrency} = {conversionPreview.conversionRate.toFixed(4)} {destCurrency}
+                        </p>
+                      </>
+                    ) : conversionPreview && !conversionPreview.success ? (
+                      <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3 flex-shrink-0" />
+                        Taux de change indisponible — la conversion sera effectuée automatiquement lors du retrait.
+                      </p>
+                    ) : null}
+                  </div>
+                )}
 
                 <FormField
                   control={form.control}
