@@ -57,8 +57,8 @@ let schedulerInterval: NodeJS.Timeout | null = null;
 
 export function startSalaryScheduler() {
   if (schedulerInterval) return;
-  console.log("[SalaryScheduler] Démarrage du planificateur de salaires (intervalle: 60s)");
-  schedulerInterval = setInterval(processDueSchedules, 60 * 1000);
+  console.log("[SalaryScheduler] Démarrage du planificateur de salaires (intervalle: 300s)");
+  schedulerInterval = setInterval(processDueSchedules, 300 * 1000);
   processDueSchedules();
 }
 

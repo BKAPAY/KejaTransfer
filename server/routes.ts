@@ -516,7 +516,7 @@ async function callPaydunyaSoftpay(
 }
 
 const platformSettingsCache: Record<string, { value: any; expiry: number }> = {};
-const SETTINGS_CACHE_TTL = 30_000;
+const SETTINGS_CACHE_TTL = 300_000;
 
 function getCachedSetting(key: string): any | undefined {
   const entry = platformSettingsCache[key];

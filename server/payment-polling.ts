@@ -272,7 +272,7 @@ export async function safeRefundOutgoingTransaction(
 }
 
 // Polling every 3 seconds for active transactions
-const POLLING_INTERVAL = 3000;
+const POLLING_INTERVAL = 30000;
 const PAYMENT_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes timeout (Mobile Money)
 const CRYPTO_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes timeout (Crypto)
 
