@@ -14682,6 +14682,261 @@ Ton role est de reformuler et ameliorer les messages que l'administrateur souhai
     }
   });
 
+  // ===== SALARY ROUTES (Admin) =====
+
+  app.get("/api/admin/user/:userId/salary", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { userId } = req.params;
+      const account = await storage.getSalaryAccount(userId);
+      const schedules = await storage.getSalarySchedules(userId);
+      const transactions = await storage.getSalaryTransactions(userId, 50);
+      return res.json({ account, schedules, transactions });
+    } catch (error: any) {
+      return res.status(500).json({ error: "Erreur serveur" });
+    }
+  });
+
+  app.post("/api/admin/user/:userId/salary/activate", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { userId } = req.params;
+      const { label, currency } = req.body;
+      const user = await storage.getUser(userId);
+      if (!user) return res.json({ success: false, error: "Utilisateur introuvable" });
+      if (user.accountType !== "personal") return res.json({ success: false, error: "Réservé aux comptes personnels" });
+
+      let account = await storage.getSalaryAccount(userId);
+      if (account) {
+        account = await storage.updateSalaryAccount(userId, { isActive: true, label: label || account.label || undefined });
+      } else {
+        const userCurrency = user.country ? getCurrencyForCountry(user.country) : "XOF";
+        account = await storage.createSalaryAccount(userId, currency || userCurrency, label || undefined);
+      }
+      await storage.updateUserSalaryFlag(userId, true);
+      return res.json({ success: true, account });
+    } catch (error: any) {
+      return res.status(500).json({ success: false, error: "Erreur serveur" });
+    }
+  });
+
+  app.post("/api/admin/user/:userId/salary/deactivate", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { userId } = req.params;
+      const account = await storage.getSalaryAccount(userId);
+      if (!account) return res.json({ success: false, error: "Pas de compte salarié" });
+      await storage.updateSalaryAccount(userId, { isActive: false });
+      await storage.updateUserSalaryFlag(userId, false);
+      return res.json({ success: true });
+    } catch (error: any) {
+      return res.status(500).json({ success: false, error: "Erreur serveur" });
+    }
+  });
+
+  app.post("/api/admin/user/:userId/salary/credit", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { userId } = req.params;
+      const { amount, description } = req.body;
+      if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
+        return res.json({ success: false, error: "Montant invalide" });
+      }
+      const account = await storage.getSalaryAccount(userId);
+      if (!account || !account.isActive) return res.json({ success: false, error: "Pas de compte salarié actif" });
+
+      await storage.creditSalaryBalance(userId, Number(amount));
+      await storage.createSalaryTransaction({
+        userId,
+        type: "credit",
+        amount: Number(amount),
+        currency: account.currency,
+        status: "completed",
+        description: description || "Crédit manuel par admin",
+        country: null,
+        operator: null,
+        phone: null,
+      });
+      return res.json({ success: true });
+    } catch (error: any) {
+      return res.status(500).json({ success: false, error: "Erreur serveur" });
+    }
+  });
+
+  app.post("/api/admin/user/:userId/salary/schedules", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { userId } = req.params;
+      const { amount, scheduleType, scheduleValue, label } = req.body;
+      if (!amount || !scheduleType || !scheduleValue) {
+        return res.json({ success: false, error: "Paramètres manquants" });
+      }
+      const { computeInitialNextPayAt } = await import("./salary-scheduler");
+      const nextPayAt = computeInitialNextPayAt(scheduleType, Number(scheduleValue));
+      const schedule = await storage.createSalarySchedule({
+        userId,
+        amount: Number(amount),
+        scheduleType,
+        scheduleValue: Number(scheduleValue),
+        label: label || null,
+        isActive: true,
+        nextPayAt,
+      });
+      return res.json({ success: true, schedule });
+    } catch (error: any) {
+      return res.status(500).json({ success: false, error: "Erreur serveur" });
+    }
+  });
+
+  app.patch("/api/admin/user/:userId/salary/schedules/:scheduleId", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { scheduleId } = req.params;
+      const { amount, scheduleType, scheduleValue, label } = req.body;
+      const { computeInitialNextPayAt } = await import("./salary-scheduler");
+      const nextPayAt = computeInitialNextPayAt(scheduleType, Number(scheduleValue));
+      const updated = await storage.updateSalarySchedule(scheduleId, {
+        amount: Number(amount),
+        scheduleType,
+        scheduleValue: Number(scheduleValue),
+        label: label || null,
+        nextPayAt,
+      });
+      return res.json({ success: true, schedule: updated });
+    } catch (error: any) {
+      return res.status(500).json({ success: false, error: "Erreur serveur" });
+    }
+  });
+
+  app.delete("/api/admin/user/:userId/salary/schedules/:scheduleId", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { scheduleId } = req.params;
+      await storage.deleteSalarySchedule(scheduleId);
+      return res.json({ success: true });
+    } catch (error: any) {
+      return res.status(500).json({ success: false, error: "Erreur serveur" });
+    }
+  });
+
+  // ===== SALARY ROUTES (User) =====
+
+  app.get("/api/salary", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const user = (req as any).user;
+      if (user?.accountType !== "personal") return res.json(null);
+      const account = await storage.getSalaryAccount(req.session.userId!);
+      if (!account || !account.isActive) return res.json(null);
+      return res.json(account);
+    } catch (error: any) {
+      return res.status(500).json({ error: "Erreur serveur" });
+    }
+  });
+
+  app.get("/api/salary/transactions", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const transactions = await storage.getSalaryTransactions(req.session.userId!, 50);
+      return res.json(transactions);
+    } catch (error: any) {
+      return res.status(500).json({ error: "Erreur serveur" });
+    }
+  });
+
+  app.post("/api/salary/withdraw", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session.userId!;
+      const { amount, country, operator, phone } = req.body;
+
+      if (!amount || !country || !operator || !phone) {
+        return res.status(400).json({ success: false, error: "Tous les champs sont requis" });
+      }
+      const numAmount = Number(amount);
+      if (isNaN(numAmount) || numAmount <= 0) {
+        return res.status(400).json({ success: false, error: "Montant invalide" });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ success: false, error: "Utilisateur introuvable" });
+
+      const account = await storage.getSalaryAccount(userId);
+      if (!account || !account.isActive) {
+        return res.status(403).json({ success: false, error: "Pas de compte salarié actif" });
+      }
+      if (account.balance < numAmount) {
+        return res.status(400).json({ success: false, error: `Solde insuffisant. Disponible : ${account.balance} ${account.currency}` });
+      }
+
+      const provider = await getActiveProviderForWithdrawal(country.toUpperCase(), operator);
+      if (!provider) {
+        return res.status(400).json({ success: false, error: "Aucun opérateur actif pour ce pays/opérateur" });
+      }
+
+      // Create a mock user with kycStatus verified for salary (bypasses KYC check)
+      const salaryUser = { ...user, kycStatus: "verified", balance: numAmount };
+      const userCurrency = account.currency;
+
+      // Delegate to the appropriate provider handler with skipBalanceOps=true (no main balance deduction)
+      let result: { success: boolean; transactionId?: string; message?: string; error?: string } | null = null;
+
+      if (provider === "fedapay") {
+        result = await handleFedaPayWithdrawal(userId, salaryUser, numAmount, country, operator, phone, userCurrency, false, true);
+      } else if (provider === "pawapay") {
+        result = await handlePawaPayWithdrawal(userId, salaryUser, numAmount, country, operator, phone, userCurrency, undefined, false, undefined, true);
+      } else if (provider === "feexpay") {
+        result = await handleFeeXPayWithdrawal(userId, salaryUser, numAmount, country, operator, phone, userCurrency, false, undefined, true);
+      } else if (provider === "moneyfusion") {
+        result = await handleMoneyFusionWithdrawal(userId, salaryUser, numAmount, country, operator, phone, userCurrency, false, undefined, true);
+      } else if (provider === "mbiyopay") {
+        result = await handleMbiyoPayWithdrawal(userId, salaryUser, numAmount, country, operator, phone, userCurrency, undefined, false, undefined, true);
+      } else if (provider === "afribapay") {
+        // AfribaPay does not support skipBalanceOps — deduct salary balance proactively then call handler
+        if (account.balance < numAmount) {
+          return res.status(400).json({ success: false, error: "Solde insuffisant" });
+        }
+        await storage.debitSalaryBalance(userId, numAmount);
+        result = await handleAfribaPayWithdrawal(userId, salaryUser, numAmount, country, operator, phone, userCurrency);
+        if (!result?.success) {
+          // Refund salary balance on failure
+          await storage.creditSalaryBalance(userId, numAmount);
+        }
+        if (result?.success) {
+          await storage.createSalaryTransaction({
+            userId,
+            type: "withdrawal",
+            amount: numAmount,
+            currency: account.currency,
+            status: "completed",
+            description: null,
+            country: country.toUpperCase(),
+            operator,
+            phone,
+          });
+        }
+        return res.json(result?.success
+          ? { success: true, message: "Retrait initié avec succès" }
+          : { success: false, error: result?.error || "Retrait échoué" }
+        );
+      } else {
+        return res.status(400).json({ success: false, error: `Provider ${provider} non pris en charge pour les retraits salaire` });
+      }
+
+      if (result?.success) {
+        // Deduct from salary balance
+        await storage.debitSalaryBalance(userId, numAmount);
+        await storage.createSalaryTransaction({
+          userId,
+          type: "withdrawal",
+          amount: numAmount,
+          currency: account.currency,
+          status: "completed",
+          description: null,
+          country: country.toUpperCase(),
+          operator,
+          phone,
+        });
+        return res.json({ success: true, message: "Retrait initié avec succès" });
+      } else {
+        return res.json({ success: false, error: result?.error || "Retrait échoué" });
+      }
+    } catch (error: any) {
+      console.error("[Salary Withdraw] Error:", error);
+      return res.status(500).json({ success: false, error: "Erreur serveur lors du retrait" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

@@ -70,6 +70,7 @@ export const users = pgTable("users", {
   securityCode: text("security_code"), // 6-digit security code for transfers/withdrawals
   isAdmin: boolean("is_admin").notNull().default(false),
   isPrimaryAdmin: boolean("is_primary_admin").notNull().default(false), // Super admin that cannot be removed
+  isSalary: boolean("is_salary").notNull().default(false), // Employee with salary account
   suspended: boolean("suspended").notNull().default(false),
   transfersEnabled: boolean("transfers_enabled").notNull().default(true),
   withdrawalsEnabled: boolean("withdrawals_enabled").notNull().default(true),
@@ -958,6 +959,58 @@ export const CURRENCY_EXCHANGE_PAIRS = [
   // ── EUR ↔ USD ───────────────────────────────────────────────────────────────
   { from: "EUR", to: "USD" }, { from: "USD", to: "EUR" },
 ] as const;
+
+// ===== Salary System =====
+
+export const salaryAccounts = pgTable("salary_accounts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id).unique(),
+  balance: real("balance").notNull().default(0),
+  currency: text("currency").notNull().default("XOF"),
+  isActive: boolean("is_active").notNull().default(true),
+  label: text("label"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type SalaryAccount = typeof salaryAccounts.$inferSelect;
+export const insertSalaryAccountSchema = createInsertSchema(salaryAccounts).omit({ id: true, createdAt: true });
+export type InsertSalaryAccount = z.infer<typeof insertSalaryAccountSchema>;
+
+export const salarySchedules = pgTable("salary_schedules", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  amount: real("amount").notNull(),
+  scheduleType: text("schedule_type").notNull(), // 'monthly_day' | 'interval_minutes'
+  scheduleValue: integer("schedule_value").notNull(), // day 1-31 for monthly_day, minutes for interval_minutes
+  label: text("label"),
+  isActive: boolean("is_active").notNull().default(true),
+  lastPaidAt: timestamp("last_paid_at"),
+  nextPayAt: timestamp("next_pay_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type SalarySchedule = typeof salarySchedules.$inferSelect;
+export const insertSalaryScheduleSchema = createInsertSchema(salarySchedules).omit({ id: true, createdAt: true });
+export type InsertSalarySchedule = z.infer<typeof insertSalaryScheduleSchema>;
+
+export const salaryTransactions = pgTable("salary_transactions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  type: text("type").notNull(), // 'credit' | 'withdrawal'
+  amount: real("amount").notNull(),
+  currency: text("currency").notNull(),
+  status: text("status").notNull().default("completed"), // 'completed' | 'failed' | 'pending'
+  description: text("description"),
+  country: text("country"),
+  operator: text("operator"),
+  phone: text("phone"),
+  internalTransactionId: text("internal_transaction_id"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type SalaryTransaction = typeof salaryTransactions.$inferSelect;
+export const insertSalaryTransactionSchema = createInsertSchema(salaryTransactions).omit({ id: true, createdAt: true });
+export type InsertSalaryTransaction = z.infer<typeof insertSalaryTransactionSchema>;
 
 // Chat schema for EMALI
 export * from "./models/chat";

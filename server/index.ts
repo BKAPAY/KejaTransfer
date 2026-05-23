@@ -3,6 +3,7 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { bootstrapDatabase } from "./db-bootstrap";
 import { startPaymentPolling, stopPaymentPolling } from "./payment-polling";
+import { startSalaryScheduler, stopSalaryScheduler } from "./salary-scheduler";
 
 const app = express();
 
@@ -100,6 +101,8 @@ app.use((req, res, next) => {
         bootstrapComplete = true;
         log("✅ Bootstrap complete, starting payment polling");
         startPaymentPolling();
+        startSalaryScheduler();
+        log("✅ Salary scheduler started");
       } catch (error) {
         bootstrapError = String(error);
         log("❌ Database bootstrap failed: " + bootstrapError);
@@ -111,12 +114,14 @@ app.use((req, res, next) => {
   process.on("SIGTERM", () => {
     log("Received SIGTERM, stopping payment polling...");
     stopPaymentPolling();
+    stopSalaryScheduler();
     process.exit(0);
   });
 
   process.on("SIGINT", () => {
     log("Received SIGINT, stopping payment polling...");
     stopPaymentPolling();
+    stopSalaryScheduler();
     process.exit(0);
   });
 })();

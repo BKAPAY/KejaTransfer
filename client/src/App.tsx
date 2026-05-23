@@ -104,6 +104,8 @@ const AdminUserMerchant = lazy(() => import("@/pages/dashboard/admin-user-mercha
 const AdminUserApi = lazy(() => import("@/pages/dashboard/admin-user-api"));
 const AdminUserConnections = lazy(() => import("@/pages/dashboard/admin-user-connections"));
 const AdminUserFeesPage = lazy(() => import("@/pages/dashboard/admin-user-fees-page"));
+const SalaryPage = lazy(() => import("@/pages/dashboard/salary"));
+const AdminUserSalary = lazy(() => import("@/pages/dashboard/admin-user-salary"));
 const BusinessDashboard = lazy(() => import("@/pages/dashboard/business/index"));
 const BusinessProfile = lazy(() => import("@/pages/dashboard/business/profile"));
 const BusinessKyc = lazy(() => import("@/pages/dashboard/business/kyc"));
@@ -350,6 +352,8 @@ function Router() {
           <Route path="/dashboard/admin/user/:userId/merchant" component={AdminUserMerchant} />
           <Route path="/dashboard/admin/user/:userId/api" component={AdminUserApi} />
           <Route path="/dashboard/admin/user/:userId/connections" component={AdminUserConnections} />
+          <Route path="/dashboard/admin/user/:userId/salary" component={AdminUserSalary} />
+          <Route path="/dashboard/salary" component={SalaryPage} />
           <Route path="/dashboard/documentation-business" component={DocumentationBusiness} />
           <Route path="/dashboard/admin/business/users/:userId/profile" component={AdminUserProfile} />
           <Route path="/dashboard/admin/business/users/:userId/history" component={AdminUserHistory} />

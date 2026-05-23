@@ -455,6 +455,59 @@ async function bootstrapDatabase() {
     }
     await plClient.end();
 
+    // Salary system migrations
+    const salaryClient = postgres(DATABASE_URL);
+    try {
+      await salaryClient`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_salary BOOLEAN NOT NULL DEFAULT false`;
+      await salaryClient`
+        CREATE TABLE IF NOT EXISTS salary_accounts (
+          id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+          user_id VARCHAR NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+          balance REAL NOT NULL DEFAULT 0,
+          currency TEXT NOT NULL DEFAULT 'XOF',
+          is_active BOOLEAN NOT NULL DEFAULT true,
+          label TEXT,
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        )
+      `;
+      await salaryClient`DROP TABLE IF EXISTS salary_schedules CASCADE`;
+      await salaryClient`
+        CREATE TABLE IF NOT EXISTS salary_schedules (
+          id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+          user_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          amount REAL NOT NULL,
+          schedule_type TEXT NOT NULL,
+          schedule_value INTEGER NOT NULL,
+          label TEXT,
+          is_active BOOLEAN NOT NULL DEFAULT true,
+          last_paid_at TIMESTAMP,
+          next_pay_at TIMESTAMP,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `;
+      await salaryClient`
+        CREATE TABLE IF NOT EXISTS salary_transactions (
+          id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+          user_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          type TEXT NOT NULL,
+          amount REAL NOT NULL,
+          currency TEXT NOT NULL DEFAULT 'XOF',
+          status TEXT NOT NULL DEFAULT 'completed',
+          description TEXT,
+          country TEXT,
+          operator TEXT,
+          phone TEXT,
+          internal_transaction_id TEXT,
+          created_at TIMESTAMP DEFAULT NOW()
+        )
+      `;
+      console.log("✅ Salary tables and is_salary column ready");
+    } catch (e) {
+      console.error("⚠️ Salary migration error:", e);
+    }
+    await salaryClient.end();
+
     // Step 7: Ensure primary admin exists
     console.log("👤 Ensuring primary admin exists...");
     const seedClient = postgres(DATABASE_URL);

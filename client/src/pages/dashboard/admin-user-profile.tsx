@@ -558,6 +558,32 @@ export default function AdminUserProfile() {
             </div>
           </div>
 
+          {/* Compte salarié — uniquement pour les comptes personnels */}
+          {!isBusinessAccount && (
+          <div className="pt-4 border-t">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <p className="text-sm font-semibold flex items-center gap-2">
+                  <span className="text-base">💼</span> Compte salarié
+                </p>
+                {(user as any).isSalary ? (
+                  <p className="text-xs text-muted-foreground">Ce compte dispose d'un compte salarié actif.</p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">Pas de compte salarié configuré.</p>
+                )}
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setLocation(`/dashboard/admin/user/${userId}/salary`)}
+                data-testid="button-nav-salary"
+              >
+                Gérer le salaire
+              </Button>
+            </div>
+          </div>
+          )}
+
           {/* Ajustement manuel du solde — uniquement pour les comptes personnels */}
           {!isBusinessAccount && (
           <div className="pt-4 border-t space-y-3">

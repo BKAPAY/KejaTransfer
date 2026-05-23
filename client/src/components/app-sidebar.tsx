@@ -26,6 +26,7 @@ import {
   TrendingUp,
   Shield,
   Send,
+  Banknote,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -180,6 +181,10 @@ export function AppSidebar() {
     ? [{ title: "Administration", url: "/dashboard/admin", icon: Shield, testId: "nav-admin" }]
     : [];
 
+  const salaryItems = (user as any)?.isSalary
+    ? [{ title: "Salaire", url: "/dashboard/salary", icon: Banknote, testId: "nav-salary" }]
+    : [];
+
   const logoutMutation = useMutation({
     mutationFn: async () => {
       await apiRequest("POST", "/api/auth/logout", {});
@@ -221,7 +226,7 @@ export function AppSidebar() {
           <SidebarGroupLabel>Général</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenuItems
-              items={[...generalItems, ...adminItems]}
+              items={[...generalItems, ...salaryItems, ...adminItems]}
               location={location}
               onMenuClick={handleMenuClick}
             />

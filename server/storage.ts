@@ -277,6 +277,22 @@ export interface IStorage {
   // Search
   searchUsers(query: string): Promise<User[]>;
   searchBusinessUsers(query: string): Promise<User[]>;
+
+  // Salary
+  getSalaryAccount(userId: string): Promise<schema.SalaryAccount | undefined>;
+  createSalaryAccount(userId: string, currency: string, label?: string): Promise<schema.SalaryAccount>;
+  updateSalaryAccount(userId: string, updates: Partial<Pick<schema.SalaryAccount, 'isActive' | 'label' | 'currency'>>): Promise<schema.SalaryAccount | undefined>;
+  creditSalaryBalance(userId: string, amount: number): Promise<schema.SalaryAccount | undefined>;
+  debitSalaryBalance(userId: string, amount: number): Promise<schema.SalaryAccount | undefined>;
+  getSalarySchedules(userId: string): Promise<schema.SalarySchedule[]>;
+  createSalarySchedule(data: schema.InsertSalarySchedule): Promise<schema.SalarySchedule>;
+  updateSalarySchedule(id: string, updates: Partial<schema.InsertSalarySchedule> & { nextPayAt?: Date | null; lastPaidAt?: Date | null }): Promise<schema.SalarySchedule | undefined>;
+  deleteSalarySchedule(id: string): Promise<boolean>;
+  getAllActiveSalarySchedulesDue(): Promise<(schema.SalarySchedule & { user?: User })[]>;
+  createSalaryTransaction(data: schema.InsertSalaryTransaction): Promise<schema.SalaryTransaction>;
+  getSalaryTransactions(userId: string, limit?: number): Promise<schema.SalaryTransaction[]>;
+  getAllSalaryAccountsForAdmin(): Promise<(schema.SalaryAccount & { user?: User })[]>;
+  updateUserSalaryFlag(userId: string, isSalary: boolean): Promise<void>;
 }
 
 export class DbStorage implements IStorage {
@@ -3284,6 +3300,121 @@ export class DbStorage implements IStorage {
         });
       }
     }
+  }
+
+  // ===== Salary =====
+  async getSalaryAccount(userId: string): Promise<schema.SalaryAccount | undefined> {
+    const results = await db.select().from(schema.salaryAccounts).where(eq(schema.salaryAccounts.userId, userId));
+    return results[0];
+  }
+
+  async createSalaryAccount(userId: string, currency: string, label?: string): Promise<schema.SalaryAccount> {
+    const existing = await this.getSalaryAccount(userId);
+    if (existing) {
+      const updated = await db.update(schema.salaryAccounts)
+        .set({ isActive: true, currency, ...(label !== undefined ? { label } : {}) })
+        .where(eq(schema.salaryAccounts.userId, userId))
+        .returning();
+      return updated[0];
+    }
+    const created = await db.insert(schema.salaryAccounts)
+      .values({ userId, currency, balance: 0, isActive: true, ...(label ? { label } : {}) })
+      .returning();
+    return created[0];
+  }
+
+  async updateSalaryAccount(userId: string, updates: Partial<Pick<schema.SalaryAccount, 'isActive' | 'label' | 'currency'>>): Promise<schema.SalaryAccount | undefined> {
+    const updated = await db.update(schema.salaryAccounts)
+      .set(updates)
+      .where(eq(schema.salaryAccounts.userId, userId))
+      .returning();
+    return updated[0];
+  }
+
+  async creditSalaryBalance(userId: string, amount: number): Promise<schema.SalaryAccount | undefined> {
+    const updated = await db.update(schema.salaryAccounts)
+      .set({ balance: sql`${schema.salaryAccounts.balance} + ${amount}` })
+      .where(eq(schema.salaryAccounts.userId, userId))
+      .returning();
+    return updated[0];
+  }
+
+  async debitSalaryBalance(userId: string, amount: number): Promise<schema.SalaryAccount | undefined> {
+    const updated = await db.update(schema.salaryAccounts)
+      .set({ balance: sql`GREATEST(${schema.salaryAccounts.balance} - ${amount}, 0)` })
+      .where(eq(schema.salaryAccounts.userId, userId))
+      .returning();
+    return updated[0];
+  }
+
+  async getSalarySchedules(userId: string): Promise<schema.SalarySchedule[]> {
+    return db.select().from(schema.salarySchedules)
+      .where(eq(schema.salarySchedules.userId, userId))
+      .orderBy(desc(schema.salarySchedules.createdAt));
+  }
+
+  async createSalarySchedule(data: schema.InsertSalarySchedule): Promise<schema.SalarySchedule> {
+    const created = await db.insert(schema.salarySchedules).values(data).returning();
+    return created[0];
+  }
+
+  async updateSalarySchedule(id: string, updates: Partial<schema.InsertSalarySchedule> & { nextPayAt?: Date | null; lastPaidAt?: Date | null }): Promise<schema.SalarySchedule | undefined> {
+    const updated = await db.update(schema.salarySchedules)
+      .set(updates as any)
+      .where(eq(schema.salarySchedules.id, id))
+      .returning();
+    return updated[0];
+  }
+
+  async deleteSalarySchedule(id: string): Promise<boolean> {
+    const deleted = await db.delete(schema.salarySchedules).where(eq(schema.salarySchedules.id, id)).returning();
+    return deleted.length > 0;
+  }
+
+  async getAllActiveSalarySchedulesDue(): Promise<(schema.SalarySchedule & { user?: User })[]> {
+    const now = new Date();
+    const schedules = await db.select().from(schema.salarySchedules)
+      .where(and(
+        eq(schema.salarySchedules.isActive, true),
+        sql`${schema.salarySchedules.nextPayAt} IS NOT NULL`,
+        sql`${schema.salarySchedules.nextPayAt} <= ${now}`
+      ));
+    const result: (schema.SalarySchedule & { user?: User })[] = [];
+    for (const s of schedules) {
+      const user = await this.getUser(s.userId);
+      result.push({ ...s, user });
+    }
+    return result;
+  }
+
+  async createSalaryTransaction(data: schema.InsertSalaryTransaction): Promise<schema.SalaryTransaction> {
+    const created = await db.insert(schema.salaryTransactions).values(data).returning();
+    return created[0];
+  }
+
+  async getSalaryTransactions(userId: string, limit: number = 50): Promise<schema.SalaryTransaction[]> {
+    return db.select().from(schema.salaryTransactions)
+      .where(eq(schema.salaryTransactions.userId, userId))
+      .orderBy(desc(schema.salaryTransactions.createdAt))
+      .limit(limit);
+  }
+
+  async getAllSalaryAccountsForAdmin(): Promise<(schema.SalaryAccount & { user?: User })[]> {
+    const accounts = await db.select().from(schema.salaryAccounts)
+      .where(eq(schema.salaryAccounts.isActive, true))
+      .orderBy(desc(schema.salaryAccounts.createdAt));
+    const result: (schema.SalaryAccount & { user?: User })[] = [];
+    for (const acc of accounts) {
+      const user = await this.getUser(acc.userId);
+      result.push({ ...acc, user });
+    }
+    return result;
+  }
+
+  async updateUserSalaryFlag(userId: string, isSalary: boolean): Promise<void> {
+    await db.update(schema.users)
+      .set({ isSalary })
+      .where(eq(schema.users.id, userId));
   }
 }
 
