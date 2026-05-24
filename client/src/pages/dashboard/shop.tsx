@@ -908,7 +908,7 @@ function SettingsSection({ shop }: { shop: Shop }) {
               <Button size="icon" variant="ghost"><ExternalLink className="w-4 h-4" /></Button>
             </a>
           </div>
-          <div className="space-y-3">
+          {false && <div className="space-y-3">
             <Label>Domaine personnalisé (optionnel)</Label>
             <div className="flex gap-2">
               <Input
@@ -1028,7 +1028,7 @@ function SettingsSection({ shop }: { shop: Shop }) {
                 </div>
               );
             })()}
-          </div>
+          </div>}
         </CardContent>
       </Card>
 
