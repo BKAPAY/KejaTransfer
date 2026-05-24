@@ -319,6 +319,7 @@ export interface IStorage {
 
   // Shop orders
   getShopOrders(shopId: string): Promise<schema.ShopOrder[]>;
+  getShopOrder(id: string): Promise<schema.ShopOrder | undefined>;
   createShopOrder(data: schema.InsertShopOrder): Promise<schema.ShopOrder>;
   updateShopOrder(id: string, updates: Partial<schema.InsertShopOrder>): Promise<schema.ShopOrder | undefined>;
 }
@@ -3578,6 +3579,11 @@ export class DbStorage implements IStorage {
     return db.select().from(schema.shopOrders)
       .where(eq(schema.shopOrders.shopId, shopId))
       .orderBy(desc(schema.shopOrders.createdAt));
+  }
+
+  async getShopOrder(id: string): Promise<schema.ShopOrder | undefined> {
+    const rows = await db.select().from(schema.shopOrders).where(eq(schema.shopOrders.id, id)).limit(1);
+    return rows[0];
   }
 
   async createShopOrder(data: schema.InsertShopOrder): Promise<schema.ShopOrder> {

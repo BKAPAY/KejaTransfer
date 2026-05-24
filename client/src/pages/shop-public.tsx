@@ -123,6 +123,20 @@ function Slideshow({ urls, shopName, description, font, color }: {
 }
 
 // ── Product Detail Page (full screen) ────────────────────────────────────────
+// Attend que BKAPayInline soit disponible sur window (chargement async du script)
+function waitForBKAPayInline(timeout = 10000): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (window.BKAPayInline) { resolve(true); return; }
+    const start = Date.now();
+    const check = setInterval(() => {
+      if (window.BKAPayInline) { clearInterval(check); resolve(true); return; }
+      if (Date.now() - start > timeout) { clearInterval(check); resolve(false); }
+    }, 200);
+  });
+}
+
+type PaymentPhase = "idle" | "preparing" | "waiting" | "success" | "failed" | "cancelled";
+
 function ProductDetailPage({ product, shop, categories, onBack }: {
   product: ShopProduct; shop: PublicShopData["shop"];
   categories: ShopCategory[]; onBack: () => void;
@@ -134,7 +148,12 @@ function ProductDetailPage({ product, shop, categories, onBack }: {
   const [customerEmail, setCustomerEmail] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [deliveryMethod, setDeliveryMethod] = useState(product.deliveryMethod || "email");
-  const [paying, setPaying] = useState(false);
+
+  // ── Payment state machine ──────────────────────────────────────────────────
+  const [phase, setPhase] = useState<PaymentPhase>("idle");
+  const [payRef, setPayRef] = useState<string | null>(null);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const currentOrderIdRef = useRef<string | null>(null);
 
   const hasDownloadable = (product.downloadableFiles?.length ?? 0) > 0;
   const checkoutFields = (product.checkoutFields as { label: string; required: boolean }[]) || [];
@@ -143,8 +162,56 @@ function ProductDetailPage({ product, shop, categories, onBack }: {
   const color = (shop as any).primaryColor || "#6366f1";
   const font = (shop as any).fontFamily || "Poppins";
 
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => { if (pollingRef.current) clearInterval(pollingRef.current); };
+  }, []);
+
   // Scroll to top when page opens
   useEffect(() => { window.scrollTo({ top: 0 }); }, []);
+
+  const stopPolling = () => {
+    if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; }
+  };
+
+  // Annule la commande côté serveur
+  const cancelOrder = async (orderId: string) => {
+    try {
+      await fetch(`/api/shop/orders/${orderId}/cancel`, { method: "POST" });
+    } catch { /* silencieux */ }
+  };
+
+  // Démarre le polling toutes les 5 secondes pour vérifier le statut côté serveur
+  const startPolling = (orderId: string) => {
+    stopPolling();
+    let attempts = 0;
+    const MAX = 72; // 72 × 5s = 6 min max
+
+    pollingRef.current = setInterval(async () => {
+      attempts++;
+      if (attempts > MAX) {
+        stopPolling();
+        setPhase("failed");
+        toast({ title: "Délai expiré", description: "Aucune confirmation de paiement reçue.", variant: "destructive" });
+        return;
+      }
+      try {
+        const res = await fetch(`/api/shop/orders/${orderId}/status`);
+        const data = await res.json();
+        if (data.status === "completed") {
+          stopPolling();
+          setPayRef(data.paymentReference);
+          setPhase("success");
+        } else if (data.status === "failed") {
+          stopPolling();
+          setPhase("failed");
+        } else if (data.status === "cancelled") {
+          stopPolling();
+          setPhase("cancelled");
+        }
+      } catch { /* continue polling */ }
+    }, 5000);
+  };
 
   const { data: paymentConfig } = useQuery<{ publicKey: string; siteName: string } | null>({
     queryKey: ["/api/shop/public", shop.slug, "api-public-key"],
@@ -175,52 +242,155 @@ function ProductDetailPage({ product, shop, categories, onBack }: {
       return data;
     },
     onSuccess: async (data) => {
+      const orderId: string = data.order.id;
+      currentOrderIdRef.current = orderId;
+
       if (!paymentConfig?.publicKey) {
         toast({ title: "Paiement non configuré", description: "Cette boutique n'accepte pas encore les paiements en ligne.", variant: "destructive" });
         return;
       }
-      if (!window.BKAPayInline) {
-        toast({ title: "Erreur", description: "Module de paiement non chargé.", variant: "destructive" });
+
+      // Attendre que le script BKAPayInline soit chargé (max 10s)
+      setPhase("preparing");
+      const loaded = await waitForBKAPayInline(10000);
+      if (!loaded) {
+        setPhase("idle");
+        toast({ title: "Erreur", description: "Le module de paiement n'a pas pu se charger. Vérifiez votre connexion.", variant: "destructive" });
+        await cancelOrder(orderId);
         return;
       }
-      setPaying(true);
+
       try {
-        // redirect_url utilise window.location.origin pour respecter le domaine courant
-        // (domaine personnalisé OU domaine BKApay) — le retour revient toujours sur le bon domaine
         const baseReturnUrl = `${window.location.origin}/shop/${shop.slug}`;
-        window.BKAPayInline.setup({
+        window.BKAPayInline!.setup({
           public_key: paymentConfig.publicKey,
-          tx_ref: data.order.id,
+          tx_ref: orderId,
           amount: product.price,
           currency: shop.currency,
-          customer: { name: customerName || "Client", email: customerEmail || "", phone: customerPhone || "" },
-          meta: { orderId: data.order.id },
-          redirect_url: `${baseReturnUrl}?payment_status=success&order_id=${data.order.id}`,
-          cancel_url: `${baseReturnUrl}?payment_status=cancelled`,
+          customer: {
+            name: customerName || "Client",
+            email: customerEmail || "",
+            phone: customerPhone || "",
+          },
+          meta: { orderId },
+          redirect_url: `${baseReturnUrl}?payment_status=success&order_id=${orderId}`,
+          cancel_url: `${baseReturnUrl}?payment_status=cancelled&order_id=${orderId}`,
+
+          // Callback déclenché par le widget (popup) quand le statut change
           callback: async (response: any) => {
-            if (response.status === "completed" || response.status === "success") {
-              await fetch(`/api/shop/orders/${data.order.id}/confirm`, {
+            const status: string = (response.status || "").toLowerCase();
+
+            if (status === "completed" || status === "success") {
+              stopPolling();
+              // Confirmer côté serveur
+              await fetch(`/api/shop/orders/${orderId}/confirm`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ paymentReference: response.reference || data.order.id }),
+                body: JSON.stringify({ paymentReference: response.transaction_id || response.reference || orderId }),
               });
-              toast({ title: "Paiement réussi !", description: "Merci pour votre achat." });
-              onBack();
+              setPayRef(response.transaction_id || response.reference || null);
+              setPhase("success");
+
+            } else if (status === "failed" || status === "error") {
+              stopPolling();
+              setPhase("failed");
+
+            } else if (status === "cancelled" || status === "canceled") {
+              stopPolling();
+              await cancelOrder(orderId);
+              setPhase("cancelled");
             }
-            setPaying(false);
+            // Pour tout autre statut intermédiaire, le polling continue
           },
-          onclose: () => setPaying(false),
+
+          // Déclenché quand le client ferme le widget sans payer
+          onclose: async () => {
+            // Vérifier le statut réel avant d'annuler
+            // (le callback peut avoir déjà changé le statut)
+            if (phase !== "success" && phase !== "failed") {
+              try {
+                const res = await fetch(`/api/shop/orders/${orderId}/status`);
+                const d = await res.json();
+                if (d.status === "completed") {
+                  stopPolling();
+                  setPayRef(d.paymentReference);
+                  setPhase("success");
+                  return;
+                }
+              } catch { /* ignore */ }
+              stopPolling();
+              await cancelOrder(orderId);
+              setPhase("cancelled");
+            }
+          },
         });
-        window.BKAPayInline.open();
+
+        window.BKAPayInline!.open();
+        setPhase("waiting");
+        // Démarrer le polling pour récupérer les mises à jour webhook
+        startPolling(orderId);
+
       } catch {
-        setPaying(false);
+        setPhase("idle");
+        await cancelOrder(orderId);
         toast({ title: "Erreur paiement", variant: "destructive" });
       }
     },
-    onError: (err: any) => toast({ title: "Erreur", description: err?.message, variant: "destructive" }),
+    onError: (err: any) => {
+      setPhase("idle");
+      toast({ title: "Erreur", description: err?.message, variant: "destructive" });
+    },
   });
 
   const canSubmit = () => !checkoutFields.some(f => f.required && !checkoutData[f.label]?.trim());
+  const isPaying = phase === "preparing" || phase === "waiting";
+
+  // ── Écran résultat inline (succès / échec / annulation) ───────────────────
+  if (phase === "success" || phase === "failed" || phase === "cancelled") {
+    const isSuccess = phase === "success";
+    const isFailed = phase === "failed";
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center bg-background">
+        <div className="w-24 h-24 rounded-full flex items-center justify-center mb-6"
+          style={{ background: isSuccess ? `${color}15` : "hsl(var(--destructive)/0.1)" }}>
+          {isSuccess
+            ? <CheckCircle2 className="w-14 h-14" style={{ color }} />
+            : <XCircle className="w-14 h-14 text-destructive" />
+          }
+        </div>
+        <h1 className="text-2xl font-black mb-2">
+          {isSuccess ? "Paiement réussi !" : isFailed ? "Paiement échoué" : "Paiement annulé"}
+        </h1>
+        <p className="text-muted-foreground mb-2 max-w-sm">
+          {isSuccess
+            ? "Votre commande a bien été enregistrée. Merci pour votre achat."
+            : isFailed
+            ? "Votre paiement a échoué. Veuillez réessayer ou utiliser un autre moyen de paiement."
+            : "Vous avez annulé le paiement. Aucun montant n'a été débité."}
+        </p>
+        {payRef && isSuccess && (
+          <p className="text-xs text-muted-foreground mb-6 font-mono">Réf : {payRef}</p>
+        )}
+        <div className="flex gap-3 mt-4">
+          {!isSuccess && (
+            <button
+              onClick={() => { stopPolling(); setPhase("idle"); }}
+              className="px-6 py-3 rounded-xl font-bold text-white text-sm"
+              style={{ background: `linear-gradient(135deg, ${color}, ${color}cc)` }}
+            >
+              Réessayer
+            </button>
+          )}
+          <button
+            onClick={onBack}
+            className="px-6 py-3 rounded-xl font-bold text-sm border border-border text-foreground"
+          >
+            {isSuccess ? "Retour à la boutique" : "Annuler"}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -402,13 +572,15 @@ function ProductDetailPage({ product, shop, categories, onBack }: {
           {/* Pay button */}
           <button
             onClick={() => createOrderMutation.mutate()}
-            disabled={createOrderMutation.isPending || paying || !canSubmit() || product.stock === 0}
+            disabled={createOrderMutation.isPending || isPaying || !canSubmit() || product.stock === 0}
             className="w-full py-4 rounded-2xl font-black text-white text-lg transition-opacity disabled:opacity-60 flex items-center justify-center gap-3 mt-2"
             style={{ background: `linear-gradient(135deg, ${color}, ${color}cc)` }}
             data-testid="button-pay-now"
           >
-            {(createOrderMutation.isPending || paying)
-              ? <><Loader2 className="w-5 h-5 animate-spin" />Préparation du paiement...</>
+            {(createOrderMutation.isPending || phase === "preparing")
+              ? <><Loader2 className="w-5 h-5 animate-spin" />Chargement du module de paiement...</>
+              : phase === "waiting"
+              ? <><Loader2 className="w-5 h-5 animate-spin" />Paiement en cours...</>
               : <><ShoppingCart className="w-6 h-6" />Acheter — {product.price.toLocaleString()} {shop.currency}</>
             }
           </button>

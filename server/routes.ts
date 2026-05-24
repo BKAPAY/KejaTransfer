@@ -15463,10 +15463,33 @@ Ton role est de reformuler et ameliorer les messages que l'administrateur souhai
     } catch (e: any) { return res.status(500).json({ error: "Erreur serveur" }); }
   });
 
+  // GET /api/shop/orders/:id/status — vérifier statut commande (polling frontend)
+  app.get("/api/shop/orders/:id/status", async (req: Request, res: Response) => {
+    try {
+      const order = await storage.getShopOrder(req.params.id);
+      if (!order) return res.status(404).json({ error: "Commande introuvable" });
+      return res.json({ status: order.status, paymentReference: order.paymentReference || null });
+    } catch (e) { return res.status(500).json({ error: "Erreur serveur" }); }
+  });
+
+  // POST /api/shop/orders/:id/cancel — annuler commande (onclose ou abandon)
+  app.post("/api/shop/orders/:id/cancel", async (req: Request, res: Response) => {
+    try {
+      const order = await storage.getShopOrder(req.params.id);
+      if (!order) return res.status(404).json({ error: "Commande introuvable" });
+      // Ne pas annuler une commande déjà complétée
+      if (order.status === "completed") return res.json({ success: true, order });
+      const updated = await storage.updateShopOrder(req.params.id, { status: "cancelled" });
+      return res.json({ success: true, order: updated });
+    } catch (e) { return res.status(500).json({ error: "Erreur serveur" }); }
+  });
+
   // POST /api/shop/orders/:id/confirm — confirmer paiement
   app.post("/api/shop/orders/:id/confirm", async (req: Request, res: Response) => {
     try {
       const { paymentReference } = req.body;
+      const order = await storage.getShopOrder(req.params.id);
+      if (!order) return res.status(404).json({ error: "Commande introuvable" });
       const updated = await storage.updateShopOrder(req.params.id, {
         status: "completed",
         paymentReference: paymentReference || null,
