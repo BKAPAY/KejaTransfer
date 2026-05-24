@@ -873,13 +873,19 @@ export class DbStorage implements IStorage {
       .where(and(eq(schema.apiKeys.id, id), eq(schema.apiKeys.userId, userId)))
       .limit(1);
     if (existing.length === 0) return false;
-    // Délier les boutiques qui référencent cette clé (FK shops.apiKeyId → apiKeys.id)
-    await db.update(schema.shops)
-      .set({ apiKeyId: null })
-      .where(eq(schema.shops.apiKeyId, id));
-    // Supprimer les sessions de paiement dépendantes
-    await db.delete(schema.paymentSessions).where(eq(schema.paymentSessions.apiKeyId, id));
-    await db.delete(schema.apiKeys).where(eq(schema.apiKeys.id, id));
+
+    // Transaction atomique pour respecter les contraintes FK dans le bon ordre
+    await db.transaction(async (tx) => {
+      // 1. Délier les boutiques qui référencent cette clé
+      await tx.update(schema.shops)
+        .set({ apiKeyId: null })
+        .where(eq(schema.shops.apiKeyId, id));
+      // 2. Supprimer les sessions de paiement dépendantes
+      await tx.delete(schema.paymentSessions).where(eq(schema.paymentSessions.apiKeyId, id));
+      // 3. Supprimer la clé
+      await tx.delete(schema.apiKeys).where(eq(schema.apiKeys.id, id));
+    });
+
     return true;
   }
 
