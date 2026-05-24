@@ -422,7 +422,7 @@ function ProductDialog({
               <Select value={categoryId} onValueChange={setCategoryId}>
                 <SelectTrigger><SelectValue placeholder="Choisir..." /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Aucune</SelectItem>
+                  <SelectItem value="none">Aucune</SelectItem>
                   {categories.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                 </SelectContent>
               </Select>
@@ -799,18 +799,35 @@ function SettingsSection({ shop }: { shop: Shop }) {
           {slideshowUrls.length > 0 ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {slideshowUrls.map((url, i) => (
-                <div key={i} className="relative rounded-xl overflow-hidden h-28 group bg-muted">
+                <div key={i} className="relative rounded-xl overflow-hidden h-28 bg-muted">
                   <img src={url} alt="" className="w-full h-full object-cover" />
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <button
-                      onClick={() => setSlideshowUrls(p => p.filter((_, j) => j !== i))}
-                      className="bg-destructive text-white rounded-full p-1.5">
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
                   <div className="absolute bottom-1.5 left-2 text-white text-xs font-bold drop-shadow">
                     {i + 1}
                   </div>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <button className="absolute top-1.5 right-1.5 bg-destructive text-white rounded-full p-1 shadow-md">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Supprimer cette photo ?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          La photo numéro {i + 1} sera retirée du diaporama. Cliquez sur "Enregistrer le diaporama" après pour valider.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Annuler</AlertDialogCancel>
+                        <AlertDialogAction
+                          className="bg-destructive hover:bg-destructive/90"
+                          onClick={() => setSlideshowUrls(p => p.filter((_, j) => j !== i))}
+                        >
+                          Supprimer
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               ))}
             </div>
