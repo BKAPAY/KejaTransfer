@@ -15470,25 +15470,32 @@ Ton role est de reformuler et ameliorer les messages que l'administrateur souhai
     const domain = ((req.query.domain as string) || "").trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
     if (!domain) return res.status(400).json({ ok: false, status: "error", message: "Domaine manquant" });
     const targetHost = new URL(process.env.BASE_URL || "https://bkapay.com").hostname;
+    const withTimeout = <T>(p: Promise<T>, ms: number): Promise<T> =>
+      Promise.race([p, new Promise<T>((_, rej) => setTimeout(() => rej(new Error("timeout")), ms))]);
     try {
-      const dns = await import("dns/promises");
-      // 1. Essayer CNAME
+      const { Resolver } = await import("dns/promises") as any;
+      const resolver = new Resolver();
+      resolver.setServers(["8.8.8.8", "1.1.1.1"]);
+      // 1. Essayer CNAME via DNS public
       try {
-        const cnames: string[] = await (dns as any).resolveCname(domain);
+        const cnames: string[] = await withTimeout(resolver.resolveCname(domain), 6000);
         const normalizedCnames = cnames.map((c: string) => c.replace(/\.$/, ""));
         const match = normalizedCnames.some((c: string) => c === targetHost || c.endsWith(`.${targetHost}`));
         if (match) return res.json({ ok: true, status: "ok", type: "CNAME", target: targetHost });
         return res.json({ ok: false, status: "wrong_target", type: "CNAME", found: normalizedCnames[0], target: targetHost });
       } catch { /* pas de CNAME */ }
-      // 2. Essayer A record (ALIAS/ANAME résout en A record)
+      // 2. Essayer A record (ALIAS/ANAME résout en A record) via DNS public
       try {
-        const domainIps: string[] = await (dns as any).resolve4(domain);
-        const targetIps: string[] = await (dns as any).resolve4(targetHost).catch(() => [] as string[]);
+        const domainIps: string[] = await withTimeout(resolver.resolve4(domain), 6000);
+        const targetIps: string[] = await withTimeout(resolver.resolve4(targetHost), 6000).catch(() => [] as string[]);
+        if (targetIps.length === 0) {
+          return res.json({ ok: false, status: "target_unresolvable", message: "Impossible de résoudre la cible", target: targetHost });
+        }
         const match = domainIps.some((ip: string) => targetIps.includes(ip));
         if (match) return res.json({ ok: true, status: "ok", type: "ALIAS/A", target: targetHost });
         return res.json({ ok: false, status: "wrong_ip", type: "A", found: domainIps[0], target: targetHost });
       } catch { /* pas de A record */ }
-      return res.json({ ok: false, status: "not_found", message: "Aucun enregistrement DNS trouvé", target: targetHost });
+      return res.json({ ok: false, status: "not_found", message: "Aucun enregistrement DNS trouvé pour ce domaine", target: targetHost });
     } catch (e: any) {
       return res.json({ ok: false, status: "error", message: e.message, target: targetHost });
     }

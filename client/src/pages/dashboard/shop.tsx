@@ -750,10 +750,11 @@ function SettingsSection({ shop }: { shop: Shop }) {
   const [dnsStatus, setDnsStatus] = useState<"ok" | "error" | "checking" | null>(null);
 
   const checkDns = async () => {
-    if (!customDomain) return;
+    const domainToCheck = shop.customDomain;
+    if (!domainToCheck) return;
     setDnsStatus("checking");
     try {
-      const res = await fetch(`/api/shop/check-domain?domain=${encodeURIComponent(customDomain)}`, { credentials: "include" });
+      const res = await fetch(`/api/shop/check-domain?domain=${encodeURIComponent(domainToCheck)}`, { credentials: "include" });
       const data = await res.json();
       setDnsStatus(data.ok ? "ok" : "error");
     } catch {
@@ -813,8 +814,9 @@ function SettingsSection({ shop }: { shop: Shop }) {
               </Button>
             </div>
 
-            {customDomain && (() => {
-              const parts = customDomain.replace(/^https?:\/\//, "").split(".");
+            {shop.customDomain && (() => {
+              const savedDomain = shop.customDomain!.replace(/^https?:\/\//, "").replace(/\/.*$/, "").toLowerCase();
+              const parts = savedDomain.split(".");
               const isSubdomain = parts.length > 2;
               const subName = isSubdomain ? parts[0] : "@";
               const target = "bkapay.com";
@@ -822,20 +824,18 @@ function SettingsSection({ shop }: { shop: Shop }) {
                 <div className="rounded-md border bg-muted/30 p-3 space-y-3 text-xs">
                   <div className="flex items-center gap-1.5 font-medium text-foreground">
                     <Info className="w-3.5 h-3.5 text-muted-foreground" />
-                    Configuration DNS requise chez votre registrar
+                    DNS à configurer chez votre registrar pour <code className="font-mono bg-muted px-1 rounded">{savedDomain}</code>
                   </div>
 
                   {isSubdomain ? (
                     <div className="space-y-1.5">
-                      <p className="text-muted-foreground">
-                        Pour un <strong>sous-domaine</strong> (ex : <code>{customDomain}</code>), ajoutez un enregistrement <strong>CNAME</strong> :
-                      </p>
+                      <p className="text-muted-foreground">Ajoutez cet enregistrement <strong>CNAME</strong> :</p>
                       <div className="overflow-hidden rounded border">
                         <div className="grid grid-cols-4 gap-2 bg-muted px-3 py-1.5 font-semibold text-muted-foreground">
                           <span>Type</span><span>Nom</span><span>Valeur</span><span>TTL</span>
                         </div>
-                        <div className="grid grid-cols-4 gap-2 px-3 py-1.5 font-mono bg-background">
-                          <span className="font-bold">CNAME</span>
+                        <div className="grid grid-cols-4 gap-2 px-3 py-2 font-mono bg-background">
+                          <span className="font-bold text-foreground">CNAME</span>
                           <span>{subName}</span>
                           <span>{target}</span>
                           <span>14400</span>
@@ -844,17 +844,14 @@ function SettingsSection({ shop }: { shop: Shop }) {
                     </div>
                   ) : (
                     <div className="space-y-2">
-                      <p className="text-muted-foreground">
-                        Pour un <strong>domaine racine</strong> (ex : <code>{customDomain}</code>), choisissez selon votre registrar :
-                      </p>
                       <div className="space-y-1.5">
                         <p className="text-muted-foreground font-medium">Option A — si votre registrar supporte ALIAS ou ANAME (Hostinger, Cloudflare…) :</p>
                         <div className="overflow-hidden rounded border">
                           <div className="grid grid-cols-4 gap-2 bg-muted px-3 py-1.5 font-semibold text-muted-foreground">
                             <span>Type</span><span>Nom</span><span>Valeur</span><span>TTL</span>
                           </div>
-                          <div className="grid grid-cols-4 gap-2 px-3 py-1.5 font-mono bg-background">
-                            <span className="font-bold">ALIAS</span>
+                          <div className="grid grid-cols-4 gap-2 px-3 py-2 font-mono bg-background">
+                            <span className="font-bold text-foreground">ALIAS</span>
                             <span>@</span>
                             <span>{target}</span>
                             <span>14400</span>
@@ -862,13 +859,13 @@ function SettingsSection({ shop }: { shop: Shop }) {
                         </div>
                       </div>
                       <div className="space-y-1.5">
-                        <p className="text-muted-foreground font-medium">Option B — rediriger le sous-domaine www (toujours disponible) :</p>
+                        <p className="text-muted-foreground font-medium">Option B — via www (toujours disponible) :</p>
                         <div className="overflow-hidden rounded border">
                           <div className="grid grid-cols-4 gap-2 bg-muted px-3 py-1.5 font-semibold text-muted-foreground">
                             <span>Type</span><span>Nom</span><span>Valeur</span><span>TTL</span>
                           </div>
-                          <div className="grid grid-cols-4 gap-2 px-3 py-1.5 font-mono bg-background">
-                            <span className="font-bold">CNAME</span>
+                          <div className="grid grid-cols-4 gap-2 px-3 py-2 font-mono bg-background">
+                            <span className="font-bold text-foreground">CNAME</span>
                             <span>www</span>
                             <span>{target}</span>
                             <span>14400</span>
@@ -879,7 +876,7 @@ function SettingsSection({ shop }: { shop: Shop }) {
                   )}
 
                   <p className="text-muted-foreground">
-                    La propagation DNS peut prendre de <strong>15 minutes à 24 heures</strong>. Une fois configuré, vérifiez ci-dessous.
+                    La propagation DNS peut prendre de <strong>15 minutes à 24 heures</strong>.
                   </p>
 
                   {/* Vérificateur de statut DNS */}
@@ -897,13 +894,13 @@ function SettingsSection({ shop }: { shop: Shop }) {
                     {dnsStatus === "ok" && (
                       <span className="flex items-center gap-1 text-green-600 dark:text-green-400 font-medium">
                         <CheckCircle2 className="w-3.5 h-3.5" />
-                        Domaine correctement configuré
+                        DNS configuré
                       </span>
                     )}
                     {dnsStatus === "error" && (
                       <span className="flex items-center gap-1 text-destructive font-medium">
                         <XCircle className="w-3.5 h-3.5" />
-                        Domaine non encore configuré — vérifiez vos DNS
+                        DNS non configuré ou propagation en cours
                       </span>
                     )}
                   </div>
