@@ -1668,7 +1668,7 @@ export default function Merchant() {
           </div>
         )}
 
-        {(merchantLink as any)?.customerPaysFee && watchedAmount && watchedAmount > 0 && (
+        {(merchantLink as any)?.customerPaysFee && watchedAmount && watchedAmount > 0 && selectedCountry && selectedOperator && (
           <div className="bg-amber-50 dark:bg-amber-950 p-3 rounded-md border border-amber-200 dark:border-amber-800">
             <p className="text-xs text-amber-700 dark:text-amber-300 font-medium mb-1">
               Frais de service inclus
