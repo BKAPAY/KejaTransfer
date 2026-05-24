@@ -1663,7 +1663,7 @@ export default function Merchant() {
               return (
                 <div className="space-y-0.5">
                   <div className="flex justify-between text-xs text-amber-600 dark:text-amber-400">
-                    <span>Frais de service (6%)</span>
+                    <span>Frais de service</span>
                     <span>+{new Intl.NumberFormat("fr-FR").format(feeAmount)} {targetCurrency}</span>
                   </div>
                   <div className="flex justify-between text-sm font-bold text-amber-800 dark:text-amber-200">
