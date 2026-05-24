@@ -21,7 +21,7 @@ import { Label } from "@/components/ui/label";
 import {
   Store, Plus, Pencil, Trash2, Link as LinkIcon, Package, Tag, ShoppingBag,
   Globe, Key, Eye, EyeOff, Copy, Check, ImagePlus, X, Download, Loader2, ExternalLink,
-  CheckCircle2, AlertTriangle, RefreshCw
+  CheckCircle2, AlertTriangle, RefreshCw, XCircle, Info
 } from "lucide-react";
 import type { Shop, ShopCategory, ShopProduct, ShopOrder } from "@shared/schema";
 
@@ -701,6 +701,19 @@ function SettingsSection({ shop }: { shop: Shop }) {
   const [currency, setCurrency] = useState(shop.currency);
   const [customDomain, setCustomDomain] = useState(shop.customDomain || "");
   const [description, setDescription] = useState((shop as any).description || "");
+  const [dnsStatus, setDnsStatus] = useState<"ok" | "error" | "checking" | null>(null);
+
+  const checkDns = async () => {
+    if (!customDomain) return;
+    setDnsStatus("checking");
+    try {
+      const res = await fetch(`/api/shop/check-domain?domain=${encodeURIComponent(customDomain)}`, { credentials: "include" });
+      const data = await res.json();
+      setDnsStatus(data.ok ? "ok" : "error");
+    } catch {
+      setDnsStatus("error");
+    }
+  };
   const [slideshowUrls, setSlideshowUrls] = useState<string[]>(shop.slideshowUrls || []);
   const [fontFamily, setFontFamily] = useState((shop as any).fontFamily || "Poppins");
   const [primaryColor, setPrimaryColor] = useState((shop as any).primaryColor || "#6366f1");
@@ -738,25 +751,119 @@ function SettingsSection({ shop }: { shop: Shop }) {
               <Button size="icon" variant="ghost"><ExternalLink className="w-4 h-4" /></Button>
             </a>
           </div>
-          <div className="space-y-2">
+          <div className="space-y-3">
             <Label>Domaine personnalisé (optionnel)</Label>
             <div className="flex gap-2">
               <Input
                 value={customDomain}
-                onChange={e => setCustomDomain(e.target.value)}
-                placeholder="maboutique.com"
+                onChange={e => { setCustomDomain(e.target.value); setDnsStatus(null); }}
+                placeholder="maboutique.com ou shop.maboutique.com"
                 data-testid="input-custom-domain"
               />
-              <Button variant="outline" onClick={() => mutation.mutate({ customDomain })}
+              <Button variant="outline"
+                onClick={() => { mutation.mutate({ customDomain }); setDnsStatus(null); }}
                 disabled={mutation.isPending}>
                 {mutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Enregistrer"}
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Chez votre registrar DNS, créez un enregistrement <strong>CNAME</strong> qui pointe{" "}
-              <code>{customDomain || "votre-domaine.com"}</code> vers{" "}
-              <code>{window.location.hostname}</code>. Une fois configuré, votre boutique sera accessible sur votre domaine.
-            </p>
+
+            {customDomain && (() => {
+              const parts = customDomain.replace(/^https?:\/\//, "").split(".");
+              const isSubdomain = parts.length > 2;
+              const subName = isSubdomain ? parts[0] : "@";
+              const target = "bkapay.com";
+              return (
+                <div className="rounded-md border bg-muted/30 p-3 space-y-3 text-xs">
+                  <div className="flex items-center gap-1.5 font-medium text-foreground">
+                    <Info className="w-3.5 h-3.5 text-muted-foreground" />
+                    Configuration DNS requise chez votre registrar
+                  </div>
+
+                  {isSubdomain ? (
+                    <div className="space-y-1.5">
+                      <p className="text-muted-foreground">
+                        Pour un <strong>sous-domaine</strong> (ex : <code>{customDomain}</code>), ajoutez un enregistrement <strong>CNAME</strong> :
+                      </p>
+                      <div className="overflow-hidden rounded border">
+                        <div className="grid grid-cols-4 gap-2 bg-muted px-3 py-1.5 font-semibold text-muted-foreground">
+                          <span>Type</span><span>Nom</span><span>Valeur</span><span>TTL</span>
+                        </div>
+                        <div className="grid grid-cols-4 gap-2 px-3 py-1.5 font-mono bg-background">
+                          <span className="font-bold">CNAME</span>
+                          <span>{subName}</span>
+                          <span>{target}</span>
+                          <span>14400</span>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <p className="text-muted-foreground">
+                        Pour un <strong>domaine racine</strong> (ex : <code>{customDomain}</code>), choisissez selon votre registrar :
+                      </p>
+                      <div className="space-y-1.5">
+                        <p className="text-muted-foreground font-medium">Option A — si votre registrar supporte ALIAS ou ANAME (Hostinger, Cloudflare…) :</p>
+                        <div className="overflow-hidden rounded border">
+                          <div className="grid grid-cols-4 gap-2 bg-muted px-3 py-1.5 font-semibold text-muted-foreground">
+                            <span>Type</span><span>Nom</span><span>Valeur</span><span>TTL</span>
+                          </div>
+                          <div className="grid grid-cols-4 gap-2 px-3 py-1.5 font-mono bg-background">
+                            <span className="font-bold">ALIAS</span>
+                            <span>@</span>
+                            <span>{target}</span>
+                            <span>14400</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="space-y-1.5">
+                        <p className="text-muted-foreground font-medium">Option B — rediriger le sous-domaine www (toujours disponible) :</p>
+                        <div className="overflow-hidden rounded border">
+                          <div className="grid grid-cols-4 gap-2 bg-muted px-3 py-1.5 font-semibold text-muted-foreground">
+                            <span>Type</span><span>Nom</span><span>Valeur</span><span>TTL</span>
+                          </div>
+                          <div className="grid grid-cols-4 gap-2 px-3 py-1.5 font-mono bg-background">
+                            <span className="font-bold">CNAME</span>
+                            <span>www</span>
+                            <span>{target}</span>
+                            <span>14400</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <p className="text-muted-foreground">
+                    La propagation DNS peut prendre de <strong>15 minutes à 24 heures</strong>. Une fois configuré, vérifiez ci-dessous.
+                  </p>
+
+                  {/* Vérificateur de statut DNS */}
+                  <div className="flex items-center gap-2 pt-1 flex-wrap">
+                    <Button size="sm" variant="outline"
+                      onClick={checkDns}
+                      disabled={dnsStatus === "checking"}
+                      data-testid="button-check-dns"
+                    >
+                      {dnsStatus === "checking"
+                        ? <Loader2 className="w-3 h-3 animate-spin mr-1.5" />
+                        : <RefreshCw className="w-3 h-3 mr-1.5" />}
+                      Vérifier la configuration
+                    </Button>
+                    {dnsStatus === "ok" && (
+                      <span className="flex items-center gap-1 text-green-600 dark:text-green-400 font-medium">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        Domaine correctement configuré
+                      </span>
+                    )}
+                    {dnsStatus === "error" && (
+                      <span className="flex items-center gap-1 text-destructive font-medium">
+                        <XCircle className="w-3.5 h-3.5" />
+                        Domaine non encore configuré — vérifiez vos DNS
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </CardContent>
       </Card>

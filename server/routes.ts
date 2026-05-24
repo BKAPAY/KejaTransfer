@@ -15465,6 +15465,35 @@ Ton role est de reformuler et ameliorer les messages que l'administrateur souhai
     } catch (e: any) { return res.status(500).json({ error: "Erreur serveur" }); }
   });
 
+  // GET /api/shop/check-domain — vérifie si un domaine personnalisé pointe bien vers ce serveur
+  app.get("/api/shop/check-domain", async (req: Request, res: Response) => {
+    const domain = ((req.query.domain as string) || "").trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+    if (!domain) return res.status(400).json({ ok: false, status: "error", message: "Domaine manquant" });
+    const targetHost = new URL(process.env.BASE_URL || "https://bkapay.com").hostname;
+    try {
+      const dns = await import("dns/promises");
+      // 1. Essayer CNAME
+      try {
+        const cnames: string[] = await (dns as any).resolveCname(domain);
+        const normalizedCnames = cnames.map((c: string) => c.replace(/\.$/, ""));
+        const match = normalizedCnames.some((c: string) => c === targetHost || c.endsWith(`.${targetHost}`));
+        if (match) return res.json({ ok: true, status: "ok", type: "CNAME", target: targetHost });
+        return res.json({ ok: false, status: "wrong_target", type: "CNAME", found: normalizedCnames[0], target: targetHost });
+      } catch { /* pas de CNAME */ }
+      // 2. Essayer A record (ALIAS/ANAME résout en A record)
+      try {
+        const domainIps: string[] = await (dns as any).resolve4(domain);
+        const targetIps: string[] = await (dns as any).resolve4(targetHost).catch(() => [] as string[]);
+        const match = domainIps.some((ip: string) => targetIps.includes(ip));
+        if (match) return res.json({ ok: true, status: "ok", type: "ALIAS/A", target: targetHost });
+        return res.json({ ok: false, status: "wrong_ip", type: "A", found: domainIps[0], target: targetHost });
+      } catch { /* pas de A record */ }
+      return res.json({ ok: false, status: "not_found", message: "Aucun enregistrement DNS trouvé", target: targetHost });
+    } catch (e: any) {
+      return res.json({ ok: false, status: "error", message: e.message, target: targetHost });
+    }
+  });
+
   // GET /api/shop/orders/:id/status — vérifier statut commande (polling frontend)
   app.get("/api/shop/orders/:id/status", async (req: Request, res: Response) => {
     try {
