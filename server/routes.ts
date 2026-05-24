@@ -15566,6 +15566,53 @@ Ton role est de reformuler et ameliorer les messages que l'administrateur souhai
     } catch (e) { return res.status(500).json({ error: "Erreur serveur" }); }
   });
 
+  // GET /shop/:slug — OG tags dynamiques pour les crawlers (WhatsApp, Telegram, Facebook…)
+  app.get("/shop/:slug", async (req: Request, res: Response, next: NextFunction) => {
+    const ua = (req.headers["user-agent"] || "").toLowerCase();
+    const isCrawler = /whatsapp|facebookexternalhit|twitterbot|telegrambot|linkedinbot|slackbot|discordbot|googlebot|bingbot|applebot|pinterest|vkshare|w3c_validator|curl|wget|preview/.test(ua);
+    if (!isCrawler) return next();
+
+    try {
+      const shop = await storage.getShopBySlug(req.params.slug);
+      if (!shop || !shop.isActive) return next();
+
+      const baseUrl = process.env.BASE_URL || "https://bkapay.com";
+      const shopUrl = `${baseUrl}/shop/${shop.slug}`;
+      const title = shop.name;
+      const description = (shop as any).description || `Boutique ${shop.name} — paiement sécurisé via BKApay`;
+      const image = (shop as any).logoUrl || ((shop.slideshowUrls || []).length > 0 ? shop.slideshowUrls[0] : `${baseUrl}/bkapay-logo.png`);
+      const color = (shop as any).primaryColor || "#6366f1";
+
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      return res.send(`<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${title}</title>
+  <meta name="description" content="${description}" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="${title}" />
+  <meta property="og:description" content="${description}" />
+  <meta property="og:image" content="${image}" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:url" content="${shopUrl}" />
+  <meta property="og:site_name" content="${title}" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="${title}" />
+  <meta name="twitter:description" content="${description}" />
+  <meta name="twitter:image" content="${image}" />
+  <meta name="theme-color" content="${color}" />
+  <script>window.location.replace("${shopUrl}");</script>
+</head>
+<body>
+  <p>Redirection vers <a href="${shopUrl}">${title}</a>…</p>
+</body>
+</html>`);
+    } catch { return next(); }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
