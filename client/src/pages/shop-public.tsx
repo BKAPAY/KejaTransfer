@@ -640,8 +640,8 @@ export default function ShopPublicPage() {
             href="https://bkapay.com"
             target="_blank"
             rel="noopener noreferrer"
-            className="font-black text-base hover:opacity-80 transition-opacity"
-            style={{ color, fontFamily: `'${font}', sans-serif` }}
+            className="font-bold text-base hover:opacity-80 transition-opacity"
+            style={{ color: "#2563eb", fontFamily: "'Inter', 'Segoe UI', sans-serif" }}
           >
             BKApay
           </a>
