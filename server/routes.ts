@@ -9467,6 +9467,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         // Exchange fee when payer's currency differs from merchant's balance currency (personal accounts only)
+        let plExchangeFee = 0;
+        let plExchangeFeePct = 0;
         if (conversionApplied) {
           const { feeAmount: xFee, feePercentage: xFeePct } =
             await getIncomingExchangeFee(storage, paymentLink.amount, payerCurrency, ownerCurrency, owner?.accountType);
@@ -9474,6 +9476,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             netAmountForUser = Math.max(0, netAmountForUser - xFee);
             feeAmount += xFee;
             feePercentage += xFeePct;
+            plExchangeFee = xFee;
+            plExchangeFeePct = xFeePct;
           }
         }
         
@@ -9563,6 +9567,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               netAmountForUser: netAmountForUser, // In OWNER's currency
               balanceAmount: netAmountForUser,
               balanceCurrency: ownerCurrency,
+              ...(plExchangeFee > 0 ? { exchangeFee: plExchangeFee, exchangeFeePercentage: plExchangeFeePct } : {}),
               ...(customFieldResponses ? { customFieldResponses } : {}),
             }),
           });
