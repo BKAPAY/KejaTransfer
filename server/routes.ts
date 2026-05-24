@@ -15482,38 +15482,50 @@ Ton role est de reformuler et ameliorer les messages que l'administrateur souhai
 
   // GET /api/shop/check-domain — vérifie si le domaine personnalisé pointe vers {slug}.bkapay.com
   app.get("/api/shop/check-domain", requireAuth, async (req: Request, res: Response) => {
-    const domain = ((req.query.domain as string) || "").trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
-    if (!domain) return res.status(400).json({ ok: false, status: "error", message: "Domaine manquant" });
+    const rawDomain = ((req.query.domain as string) || "").trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+    if (!rawDomain) return res.status(400).json({ ok: false, status: "error", message: "Domaine manquant" });
     // Récupérer le slug de la boutique pour construire la cible unique
     const shop = await storage.getShopByUserId(req.session.userId!);
     if (!shop) return res.status(404).json({ ok: false, status: "error", message: "Boutique introuvable" });
     const targetHost = `${shop.slug}-${shop.id.substring(0, 8)}.bkapay.com`;
+
+    // Pour un domaine racine (ex: treizeinvest.pro), le CNAME est sur www.treizeinvest.pro
+    const parts = rawDomain.split(".");
+    const isRoot = parts.length === 2;
+    const domainsToCheck = isRoot ? [`www.${rawDomain}`, rawDomain] : [rawDomain];
+
     const withTimeout = <T>(p: Promise<T>, ms: number): Promise<T> =>
       Promise.race([p, new Promise<T>((_, rej) => setTimeout(() => rej(new Error("timeout")), ms))]);
     try {
       const { Resolver } = await import("dns/promises") as any;
       const resolver = new Resolver();
       resolver.setServers(["8.8.8.8", "1.1.1.1"]);
-      // Vérifier CNAME — accepter la cible exacte OU n'importe quel *.bkapay.com
+
+      // Vérifier CNAME sur chaque domaine candidat — accepter si pointe vers *.bkapay.com
+      for (const domain of domainsToCheck) {
+        try {
+          const cnames: string[] = await withTimeout(resolver.resolveCname(domain), 6000);
+          const normalizedCnames = cnames.map((c: string) => c.replace(/\.$/, "").toLowerCase());
+          const match = normalizedCnames.some((c: string) => c === targetHost || c.endsWith(".bkapay.com") || c === "bkapay.com");
+          if (match) {
+            return res.json({ ok: true, status: "ok", type: "CNAME", target: targetHost, found: normalizedCnames[0], checkedOn: domain });
+          }
+          // CNAME existe mais pointe ailleurs — retourner immédiatement
+          return res.json({ ok: false, status: "wrong_target", type: "CNAME", found: normalizedCnames[0], target: targetHost, checkedOn: domain });
+        } catch { /* pas de CNAME sur ce domaine, essayer le suivant */ }
+      }
+
+      // Essayer A record sur le domaine www (ALIAS résout parfois directement en A)
       try {
-        const cnames: string[] = await withTimeout(resolver.resolveCname(domain), 6000);
-        const normalizedCnames = cnames.map((c: string) => c.replace(/\.$/, "").toLowerCase());
-        const exactMatch = normalizedCnames.some((c: string) => c === targetHost);
-        const wildcardMatch = normalizedCnames.some((c: string) => c.endsWith(".bkapay.com") || c === "bkapay.com");
-        if (exactMatch || wildcardMatch) {
-          return res.json({ ok: true, status: "ok", type: "CNAME", target: targetHost, found: normalizedCnames[0] });
-        }
-        return res.json({ ok: false, status: "wrong_target", type: "CNAME", found: normalizedCnames[0], target: targetHost });
-      } catch { /* pas de CNAME */ }
-      // Essayer A record si pas de CNAME (certains registrars aplatissent le CNAME en A)
-      try {
-        const domainIps: string[] = await withTimeout(resolver.resolve4(domain), 6000);
+        const wwwDomain = isRoot ? `www.${rawDomain}` : rawDomain;
+        const domainIps: string[] = await withTimeout(resolver.resolve4(wwwDomain), 6000);
         const targetIps: string[] = await withTimeout(resolver.resolve4("bkapay.com"), 6000).catch(() => [] as string[]);
         if (targetIps.length > 0 && domainIps.some((ip: string) => targetIps.includes(ip))) {
           return res.json({ ok: true, status: "ok", type: "A", target: "bkapay.com", found: domainIps[0] });
         }
       } catch { /* pas de A record */ }
-      return res.json({ ok: false, status: "not_found", message: "Aucun enregistrement DNS pointant vers BKApay détecté", target: targetHost });
+
+      return res.json({ ok: false, status: "not_found", message: "CNAME non détecté. Vérifiez que l'enregistrement est bien enregistré chez votre registrar.", target: targetHost });
     } catch (e: any) {
       return res.json({ ok: false, status: "error", message: e.message, target: targetHost });
     }
