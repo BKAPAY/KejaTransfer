@@ -1,12 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams } from "wouter";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient } from "@/lib/queryClient";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { useQuery } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle
 } from "@/components/ui/dialog";
@@ -14,8 +13,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from "@/components/ui/select";
 import {
-  ShoppingCart, Package, ChevronLeft, ChevronRight, X, Download,
-  Phone, Mail, Store, Tag, Globe, Loader2, MessageCircle
+  ShoppingCart, Package, ChevronLeft, ChevronRight, Download,
+  Store, Loader2, MessageCircle, Mail, Search, X
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Shop, ShopCategory, ShopProduct } from "@shared/schema";
@@ -27,54 +26,97 @@ type PublicShopData = {
 };
 
 declare global {
-  interface Window {
-    BKAPayInline?: any;
-  }
+  interface Window { BKAPayInline?: any; }
 }
 
-function Slideshow({ urls }: { urls: string[] }) {
+// ── Google Fonts loader ─────────────────────────────────────────────────────
+function loadGoogleFont(family: string) {
+  const id = `gf-${family.replace(/\s+/g, "-")}`;
+  if (document.getElementById(id)) return;
+  const link = document.createElement("link");
+  link.id = id;
+  link.rel = "stylesheet";
+  link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(family)}:wght@400;600;700;900&display=swap`;
+  document.head.appendChild(link);
+}
+
+// ── Slideshow ───────────────────────────────────────────────────────────────
+function Slideshow({ urls, shopName, description, font, color }: {
+  urls: string[]; shopName: string; description?: string | null; font: string; color: string;
+}) {
   const [current, setCurrent] = useState(0);
+  const timerRef = useRef<NodeJS.Timeout>();
 
-  useEffect(() => {
+  const startTimer = () => {
+    if (timerRef.current) clearInterval(timerRef.current);
     if (urls.length <= 1) return;
-    const id = setInterval(() => setCurrent(c => (c + 1) % urls.length), 4000);
-    return () => clearInterval(id);
-  }, [urls.length]);
+    timerRef.current = setInterval(() => setCurrent(c => (c + 1) % urls.length), 5000);
+  };
 
-  if (!urls.length) return null;
+  useEffect(() => { startTimer(); return () => { if (timerRef.current) clearInterval(timerRef.current); }; }, [urls.length]);
+
+  const go = (dir: number) => {
+    setCurrent(c => (c + dir + urls.length) % urls.length);
+    startTimer();
+  };
+
+  if (!urls.length) {
+    return (
+      <div className="w-full h-64 md:h-80 flex items-center justify-center"
+        style={{ background: `linear-gradient(135deg, ${color}22 0%, ${color}44 100%)` }}>
+        <div className="text-center px-6">
+          <h1 className="text-5xl md:text-7xl font-black tracking-tight"
+            style={{ fontFamily: `'${font}', sans-serif`, color }}>
+            {shopName}
+          </h1>
+          {description && (
+            <p className="text-muted-foreground mt-3 max-w-lg mx-auto text-lg">{description}</p>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="relative w-full h-72 md:h-96 overflow-hidden bg-gray-900">
+    <div className="relative w-full h-72 md:h-[480px] overflow-hidden bg-gray-900">
       {urls.map((url, i) => (
-        <div
-          key={i}
-          className={`absolute inset-0 transition-opacity duration-700 ${i === current ? "opacity-100" : "opacity-0"}`}
-        >
+        <div key={i} className={`absolute inset-0 transition-opacity duration-1000 ${i === current ? "opacity-100" : "opacity-0"}`}>
           <img src={url} alt="" className="w-full h-full object-cover" />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
         </div>
       ))}
+      {/* Gradient overlay */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+
+      {/* Shop name as logo overlay */}
+      <div className="absolute bottom-0 left-0 right-0 px-6 pb-10 md:pb-14 text-center">
+        <h1
+          className="text-4xl md:text-6xl lg:text-7xl font-black text-white drop-shadow-lg tracking-tight leading-tight"
+          style={{ fontFamily: `'${font}', sans-serif`, textShadow: "0 2px 20px rgba(0,0,0,0.5)" }}
+        >
+          {shopName}
+        </h1>
+        {description && (
+          <p className="text-white/80 mt-2 text-sm md:text-base max-w-2xl mx-auto drop-shadow">
+            {description}
+          </p>
+        )}
+      </div>
+
+      {/* Navigation */}
       {urls.length > 1 && (
         <>
-          <button
-            onClick={() => setCurrent(c => (c - 1 + urls.length) % urls.length)}
-            className="absolute left-3 top-1/2 -translate-y-1/2 bg-black/40 text-white rounded-full p-1.5 hover:bg-black/60 transition-colors"
-          >
+          <button onClick={() => go(-1)}
+            className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/30 hover:bg-black/60 text-white rounded-full p-2.5 transition-colors backdrop-blur-sm">
             <ChevronLeft className="w-5 h-5" />
           </button>
-          <button
-            onClick={() => setCurrent(c => (c + 1) % urls.length)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 bg-black/40 text-white rounded-full p-1.5 hover:bg-black/60 transition-colors"
-          >
+          <button onClick={() => go(1)}
+            className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/30 hover:bg-black/60 text-white rounded-full p-2.5 transition-colors backdrop-blur-sm">
             <ChevronRight className="w-5 h-5" />
           </button>
-          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5">
             {urls.map((_, i) => (
-              <button
-                key={i}
-                onClick={() => setCurrent(i)}
-                className={`w-2 h-2 rounded-full transition-colors ${i === current ? "bg-white" : "bg-white/40"}`}
-              />
+              <button key={i} onClick={() => { setCurrent(i); startTimer(); }}
+                className={`rounded-full transition-all ${i === current ? "w-6 h-2 bg-white" : "w-2 h-2 bg-white/50"}`} />
             ))}
           </div>
         </>
@@ -83,14 +125,10 @@ function Slideshow({ urls }: { urls: string[] }) {
   );
 }
 
-function ProductDetailDialog({
-  product, shop, categories, open, onClose
-}: {
-  product: ShopProduct;
-  shop: PublicShopData["shop"];
-  categories: ShopCategory[];
-  open: boolean;
-  onClose: () => void;
+// ── Product Buy Dialog ──────────────────────────────────────────────────────
+function BuyDialog({ product, shop, categories, open, onClose }: {
+  product: ShopProduct; shop: PublicShopData["shop"];
+  categories: ShopCategory[]; open: boolean; onClose: () => void;
 }) {
   const { toast } = useToast();
   const [photoIndex, setPhotoIndex] = useState(0);
@@ -98,15 +136,15 @@ function ProductDetailDialog({
   const [customerName, setCustomerName] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
-  const [deliveryMethod, setDeliveryMethod] = useState<string>(product.deliveryMethod || "email");
+  const [deliveryMethod, setDeliveryMethod] = useState(product.deliveryMethod || "email");
   const [paying, setPaying] = useState(false);
 
   const hasDownloadable = (product.downloadableFiles?.length ?? 0) > 0;
   const checkoutFields = (product.checkoutFields as { label: string; required: boolean }[]) || [];
   const cat = categories.find(c => c.id === product.categoryId);
   const photos = product.imageUrls?.length ? product.imageUrls : [];
+  const color = (shop as any).primaryColor || "#6366f1";
 
-  // Fetch public key for payment
   const { data: paymentConfig } = useQuery<{ publicKey: string; siteName: string } | null>({
     queryKey: ["/api/shop/public", shop.slug, "api-public-key"],
     queryFn: async () => {
@@ -132,18 +170,15 @@ function ProductDetailDialog({
           deliveryMethod,
         }),
       });
-      return res.json();
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erreur");
+      return data;
     },
     onSuccess: async (data) => {
-      if (!data.success || !data.order) {
-        toast({ title: "Erreur", description: "Impossible de créer la commande.", variant: "destructive" });
-        return;
-      }
       if (!paymentConfig?.publicKey) {
-        toast({ title: "Paiement non configuré", description: "Cette boutique n'accepte pas encore les paiements.", variant: "destructive" });
+        toast({ title: "Paiement non configuré", description: "Cette boutique n'accepte pas encore les paiements en ligne.", variant: "destructive" });
         return;
       }
-      // Launch BKApay Inline
       if (!window.BKAPayInline) {
         toast({ title: "Erreur", description: "Module de paiement non chargé.", variant: "destructive" });
         return;
@@ -155,11 +190,7 @@ function ProductDetailDialog({
           tx_ref: data.order.id,
           amount: product.price,
           currency: shop.currency,
-          customer: {
-            name: customerName || "Client",
-            email: customerEmail || "",
-            phone: customerPhone || "",
-          },
+          customer: { name: customerName || "Client", email: customerEmail || "", phone: customerPhone || "" },
           meta: { orderId: data.order.id },
           callback: async (response: any) => {
             if (response.status === "completed" || response.status === "success") {
@@ -181,152 +212,173 @@ function ProductDetailDialog({
         toast({ title: "Erreur paiement", variant: "destructive" });
       }
     },
-    onError: () => toast({ title: "Erreur", variant: "destructive" }),
+    onError: (err: any) => toast({ title: "Erreur", description: err?.message, variant: "destructive" }),
   });
 
-  const canSubmit = () => {
-    if (checkoutFields.some(f => f.required && !checkoutData[f.label]?.trim())) return false;
-    return true;
-  };
+  const canSubmit = () => !checkoutFields.some(f => f.required && !checkoutData[f.label]?.trim());
 
   return (
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-left">{product.name}</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4">
-          {/* Photos */}
-          {photos.length > 0 && (
-            <div className="space-y-2">
-              <div className="relative h-56 rounded-lg overflow-hidden">
-                <img src={photos[photoIndex]} alt={product.name} className="w-full h-full object-cover" />
-              </div>
+      <DialogContent className="max-w-lg max-h-[92vh] overflow-y-auto p-0">
+        {/* Product header */}
+        <div className="relative">
+          {photos.length > 0 ? (
+            <div className="relative h-52 overflow-hidden rounded-t-lg">
+              <img src={photos[photoIndex]} alt={product.name} className="w-full h-full object-cover" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
               {photos.length > 1 && (
-                <div className="flex gap-2">
-                  {photos.map((url, i) => (
+                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5">
+                  {photos.map((_, i) => (
                     <button key={i} onClick={() => setPhotoIndex(i)}
-                      className={`w-14 h-14 rounded-md overflow-hidden border-2 transition-colors ${i === photoIndex ? "border-primary" : "border-transparent"}`}>
-                      <img src={url} alt="" className="w-full h-full object-cover" />
-                    </button>
+                      className={`w-2 h-2 rounded-full transition-colors ${i === photoIndex ? "bg-white" : "bg-white/40"}`} />
                   ))}
                 </div>
               )}
             </div>
+          ) : (
+            <div className="h-24 rounded-t-lg flex items-center justify-center"
+              style={{ background: `linear-gradient(135deg, ${color}20, ${color}40)` }}>
+              <Package className="w-12 h-12 opacity-30" />
+            </div>
           )}
+        </div>
 
-          {/* Infos */}
-          <div>
-            {cat && <Badge variant="outline" className="mb-2">{cat.name}</Badge>}
-            {product.description && <p className="text-sm text-muted-foreground">{product.description}</p>}
-            <p className="text-2xl font-bold mt-2">
-              {product.price.toLocaleString()} <span className="text-base font-normal text-muted-foreground">{shop.currency}</span>
-            </p>
-            {product.stock != null && (
-              <p className="text-xs text-muted-foreground">Stock disponible : {product.stock}</p>
-            )}
+        <div className="p-5 space-y-4">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-left">{product.name}</DialogTitle>
+          </DialogHeader>
+          {cat && <Badge variant="outline">{cat.name}</Badge>}
+          {product.description && <p className="text-sm text-muted-foreground">{product.description}</p>}
+
+          <div className="flex items-baseline gap-2">
+            <span className="text-3xl font-black" style={{ color }}>
+              {product.price.toLocaleString()}
+            </span>
+            <span className="text-muted-foreground font-medium">{shop.currency}</span>
           </div>
 
-          {/* Fichiers téléchargeables */}
           {hasDownloadable && (
-            <div className="bg-muted/50 rounded-md p-3 flex items-center gap-2">
-              <Download className="w-4 h-4 text-primary" />
-              <p className="text-xs">
-                Ce produit inclut {product.downloadableFiles!.length} fichier{product.downloadableFiles!.length > 1 ? "s" : ""} téléchargeable{product.downloadableFiles!.length > 1 ? "s" : ""} envoyé{product.downloadableFiles!.length > 1 ? "s" : ""} après paiement.
-              </p>
+            <div className="flex items-center gap-2 p-3 rounded-lg text-sm" style={{ background: `${color}10` }}>
+              <Download className="w-4 h-4" style={{ color }} />
+              <span>{product.downloadableFiles!.length} fichier{product.downloadableFiles!.length > 1 ? "s" : ""} inclus après paiement</span>
             </div>
           )}
 
-          {/* Mode de livraison (si fichiers) */}
           {hasDownloadable && (
-            <div className="space-y-2">
-              <Label>Comment souhaitez-vous recevoir vos fichiers ?</Label>
+            <div className="space-y-1.5">
+              <Label>Réception des fichiers</Label>
               <Select value={deliveryMethod} onValueChange={setDeliveryMethod}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="email"><Mail className="w-3 h-3 inline mr-1" />Par email</SelectItem>
-                  <SelectItem value="whatsapp"><MessageCircle className="w-3 h-3 inline mr-1" />Par WhatsApp</SelectItem>
-                  <SelectItem value="both"><Mail className="w-3 h-3 inline mr-1" />Email + WhatsApp</SelectItem>
+                  <SelectItem value="email"><Mail className="w-3 h-3 inline mr-1" />Email</SelectItem>
+                  <SelectItem value="whatsapp"><MessageCircle className="w-3 h-3 inline mr-1" />WhatsApp</SelectItem>
+                  <SelectItem value="both">Email + WhatsApp</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           )}
 
-          {/* Infos client */}
-          <div className="space-y-3">
-            <p className="text-sm font-medium">Vos informations</p>
-            <div className="space-y-2">
-              <Label>Nom complet</Label>
-              <Input
-                value={customerName}
-                onChange={e => setCustomerName(e.target.value)}
-                placeholder="Jean Dupont"
-                data-testid="input-customer-name"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Email {hasDownloadable && deliveryMethod !== "whatsapp" ? "*" : ""}</Label>
-              <Input
-                type="email"
-                value={customerEmail}
-                onChange={e => setCustomerEmail(e.target.value)}
-                placeholder="jean@exemple.com"
-                data-testid="input-customer-email"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Téléphone / WhatsApp {hasDownloadable && deliveryMethod !== "email" ? "*" : ""}</Label>
-              <Input
-                type="tel"
-                value={customerPhone}
-                onChange={e => setCustomerPhone(e.target.value)}
-                placeholder="+229 XXXXXXXXXX"
-                data-testid="input-customer-phone"
-              />
+          <div className="space-y-3 pt-1">
+            <p className="text-sm font-semibold text-foreground">Vos coordonnées</p>
+            <div className="grid grid-cols-1 gap-2">
+              <Input value={customerName} onChange={e => setCustomerName(e.target.value)}
+                placeholder="Nom complet" data-testid="input-customer-name" />
+              <Input type="email" value={customerEmail} onChange={e => setCustomerEmail(e.target.value)}
+                placeholder="Email" data-testid="input-customer-email" />
+              <Input type="tel" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)}
+                placeholder="Téléphone / WhatsApp (+229...)" data-testid="input-customer-phone" />
             </div>
           </div>
 
-          {/* Champs custom */}
           {checkoutFields.length > 0 && (
-            <div className="space-y-3">
-              <p className="text-sm font-medium">Informations supplémentaires</p>
+            <div className="space-y-2">
               {checkoutFields.map((field, i) => (
-                <div key={i} className="space-y-2">
-                  <Label>{field.label}{field.required ? " *" : ""}</Label>
-                  <Input
-                    value={checkoutData[field.label] || ""}
+                <div key={i}>
+                  <Label className="text-sm">{field.label}{field.required ? " *" : ""}</Label>
+                  <Input value={checkoutData[field.label] || ""}
                     onChange={e => setCheckoutData(d => ({ ...d, [field.label]: e.target.value }))}
-                    placeholder={field.label}
-                    data-testid={`input-checkout-field-${i}`}
-                  />
+                    placeholder={field.label} />
                 </div>
               ))}
             </div>
           )}
 
-          <Button
-            className="w-full"
+          <button
             onClick={() => createOrderMutation.mutate()}
             disabled={createOrderMutation.isPending || paying || !canSubmit()}
+            className="w-full py-3.5 rounded-xl font-bold text-white text-base transition-opacity disabled:opacity-60 flex items-center justify-center gap-2"
+            style={{ background: `linear-gradient(135deg, ${color}, ${color}cc)` }}
             data-testid="button-pay-now"
           >
             {(createOrderMutation.isPending || paying)
-              ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Préparation du paiement...</>
-              : <><ShoppingCart className="w-4 h-4 mr-2" />Payer {product.price.toLocaleString()} {shop.currency}</>
+              ? <><Loader2 className="w-5 h-5 animate-spin" />Préparation...</>
+              : <><ShoppingCart className="w-5 h-5" />Acheter — {product.price.toLocaleString()} {shop.currency}</>
             }
-          </Button>
+          </button>
         </div>
       </DialogContent>
     </Dialog>
   );
 }
 
+// ── Product Card ────────────────────────────────────────────────────────────
+function ProductCard({ product, shop, onSelect }: {
+  product: ShopProduct; shop: PublicShopData["shop"]; onSelect: () => void;
+}) {
+  const color = (shop as any).primaryColor || "#6366f1";
+  const hasImage = product.imageUrls?.length > 0;
+  const isOutOfStock = product.stock === 0;
+
+  return (
+    <button
+      onClick={onSelect}
+      disabled={isOutOfStock}
+      data-testid={`card-public-product-${product.id}`}
+      className="text-left group w-full bg-card border rounded-2xl overflow-hidden transition-all hover:shadow-lg hover:-translate-y-0.5 disabled:opacity-60 disabled:cursor-not-allowed"
+    >
+      <div className="aspect-square overflow-hidden relative"
+        style={{ background: hasImage ? undefined : `linear-gradient(135deg, ${color}15, ${color}30)` }}>
+        {hasImage ? (
+          <img src={product.imageUrls[0]} alt={product.name}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <Package className="w-10 h-10 opacity-20" />
+          </div>
+        )}
+        {isOutOfStock && (
+          <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+            <span className="text-white text-xs font-bold px-2 py-1 bg-black/60 rounded-full">Rupture de stock</span>
+          </div>
+        )}
+        {(product.downloadableFiles?.length ?? 0) > 0 && (
+          <div className="absolute top-2 right-2">
+            <span className="text-xs font-medium px-2 py-0.5 rounded-full text-white flex items-center gap-1"
+              style={{ background: color }}>
+              <Download className="w-2.5 h-2.5" />Numérique
+            </span>
+          </div>
+        )}
+      </div>
+      <div className="p-3">
+        <p className="font-semibold text-sm leading-snug line-clamp-2 text-foreground">{product.name}</p>
+        {product.description && (
+          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{product.description}</p>
+        )}
+        <p className="font-black text-base mt-2" style={{ color }}>
+          {product.price.toLocaleString()} <span className="text-xs font-normal text-muted-foreground">{shop.currency}</span>
+        </p>
+      </div>
+    </button>
+  );
+}
+
+// ── Main Public Page ────────────────────────────────────────────────────────
 export default function ShopPublicPage() {
   const { slug } = useParams<{ slug: string }>();
   const [activeCategoryId, setActiveCategoryId] = useState<string>("all");
   const [selectedProduct, setSelectedProduct] = useState<ShopProduct | null>(null);
+  const [search, setSearch] = useState("");
 
   const { data, isLoading, isError } = useQuery<PublicShopData>({
     queryKey: ["/api/shop/public", slug],
@@ -338,175 +390,276 @@ export default function ShopPublicPage() {
     retry: false,
   });
 
-  // Inject BKApay Inline script
+  const font = (data?.shop as any)?.fontFamily || "Poppins";
+  const color = (data?.shop as any)?.primaryColor || "#6366f1";
+
+  // Load Google Font + BKApay Inline script
   useEffect(() => {
-    if (document.getElementById("bkapay-inline-script")) return;
-    const script = document.createElement("script");
-    script.id = "bkapay-inline-script";
-    script.src = "https://bkapay.com/assets/inline/v1.6/bkapay-inline.js";
-    script.async = true;
-    document.head.appendChild(script);
-  }, []);
+    loadGoogleFont(font);
+    if (!document.getElementById("bkapay-inline-script")) {
+      const script = document.createElement("script");
+      script.id = "bkapay-inline-script";
+      script.src = "https://bkapay.com/assets/inline/v1.6/bkapay-inline.js";
+      script.async = true;
+      document.head.appendChild(script);
+    }
+  }, [font]);
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-10 h-10 animate-spin text-muted-foreground" />
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-3">
+          <Store className="w-10 h-10 text-muted-foreground animate-pulse" />
+          <p className="text-muted-foreground text-sm">Chargement de la boutique...</p>
+        </div>
       </div>
     );
   }
 
   if (isError || !data) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4 p-6 text-center">
-        <Store className="w-16 h-16 text-muted-foreground" />
-        <h1 className="text-2xl font-bold">Boutique introuvable</h1>
-        <p className="text-muted-foreground">Cette boutique n'existe pas ou n'est plus active.</p>
-        <a href="/" className="text-primary hover:underline text-sm">Retour à BKApay</a>
+      <div className="min-h-screen flex flex-col items-center justify-center gap-5 p-6 text-center bg-background">
+        <div className="w-20 h-20 rounded-2xl bg-muted flex items-center justify-center">
+          <Store className="w-10 h-10 text-muted-foreground" />
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold">Boutique introuvable</h1>
+          <p className="text-muted-foreground mt-1">Cette boutique n'existe pas ou n'est plus disponible.</p>
+        </div>
+        <a href="https://bkapay.com" className="text-sm font-medium" style={{ color }}>
+          Créer votre boutique sur BKApay →
+        </a>
       </div>
     );
   }
 
   const { shop, categories, products } = data;
 
-  const filteredProducts = activeCategoryId === "all"
-    ? products
-    : products.filter(p => p.categoryId === activeCategoryId);
+  // Filter products
+  const filtered = products.filter(p => {
+    const matchCat = activeCategoryId === "all" || p.categoryId === activeCategoryId;
+    const matchSearch = !search || p.name.toLowerCase().includes(search.toLowerCase());
+    return matchCat && matchSearch;
+  });
 
-  const categoriesWithProducts = categories.filter(cat =>
-    products.some(p => p.categoryId === cat.id)
-  );
+  // Group by category for "all" view
+  const productsByCat: Record<string, ShopProduct[]> = {};
+  if (activeCategoryId === "all" && !search) {
+    for (const p of products) {
+      const key = p.categoryId || "__none";
+      if (!productsByCat[key]) productsByCat[key] = [];
+      productsByCat[key].push(p);
+    }
+  }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header boutique */}
-      <header className="border-b bg-card sticky top-0 z-50">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+    <div className="min-h-screen bg-background flex flex-col">
+
+      {/* ── Sticky Header ── */}
+      <header className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b">
+        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
             {shop.logoUrl ? (
-              <img src={shop.logoUrl} alt={shop.name} className="w-9 h-9 rounded-full object-cover" />
+              <img src={shop.logoUrl} alt={shop.name}
+                className="w-10 h-10 rounded-xl object-cover flex-shrink-0" />
             ) : (
-              <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
-                <Store className="w-5 h-5 text-primary" />
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-black text-lg flex-shrink-0"
+                style={{ background: `linear-gradient(135deg, ${color}, ${color}99)` }}>
+                {shop.name.charAt(0).toUpperCase()}
               </div>
             )}
-            <div>
-              <h1 className="font-bold text-lg leading-tight">{shop.name}</h1>
-              <p className="text-xs text-muted-foreground">{products.length} produit{products.length > 1 ? "s" : ""}</p>
-            </div>
+            <span className="font-black text-xl truncate hidden sm:block"
+              style={{ fontFamily: `'${font}', sans-serif`, color }}>
+              {shop.name}
+            </span>
           </div>
-          <Badge variant="outline" className="text-xs">{shop.currency}</Badge>
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Rechercher..."
+                className="pl-8 pr-8 h-9 w-40 md:w-56 text-sm rounded-full"
+              />
+              {search && (
+                <button onClick={() => setSearch("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+            <Badge variant="outline" className="text-xs shrink-0">{shop.currency}</Badge>
+          </div>
         </div>
       </header>
 
-      {/* Diaporama */}
-      {(shop.slideshowUrls?.length ?? 0) > 0 && (
-        <div className="relative">
-          <Slideshow urls={shop.slideshowUrls!} />
-          <div className="absolute bottom-6 left-0 right-0 text-center px-4 z-10">
-            <h2 className="text-white text-3xl font-bold drop-shadow-lg">{shop.name}</h2>
-            {shop.description && (
-              <p className="text-white/90 text-sm mt-1 drop-shadow">{shop.description}</p>
-            )}
-          </div>
+      {/* ── Hero Slideshow ── */}
+      <Slideshow
+        urls={shop.slideshowUrls || []}
+        shopName={shop.name}
+        description={shop.description}
+        font={font}
+        color={color}
+      />
+
+      {/* ── Stats bar ── */}
+      <div className="border-b bg-muted/30">
+        <div className="max-w-6xl mx-auto px-4 py-2.5 flex items-center gap-4 text-sm text-muted-foreground">
+          <span className="font-medium">{products.length} produit{products.length > 1 ? "s" : ""}</span>
+          {categories.length > 0 && (
+            <>
+              <span className="w-1 h-1 rounded-full bg-muted-foreground/40" />
+              <span>{categories.length} catégorie{categories.length > 1 ? "s" : ""}</span>
+            </>
+          )}
         </div>
-      )}
+      </div>
 
-      <div className="max-w-5xl mx-auto px-4 py-8">
+      <div className="max-w-6xl mx-auto px-4 py-8 flex-1 w-full">
 
-        {/* Filtre catégories */}
-        {categoriesWithProducts.length > 0 && (
-          <div className="mb-6">
-            <div className="flex gap-2 overflow-x-auto pb-2">
+        {/* ── Category Filters ── */}
+        {categories.length > 0 && (
+          <div className="mb-8">
+            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
               <button
                 onClick={() => setActiveCategoryId("all")}
                 data-testid="filter-category-all"
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors border ${
-                  activeCategoryId === "all"
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-background border-border hover:bg-muted"
-                }`}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold whitespace-nowrap transition-all border-2 flex-shrink-0"
+                style={activeCategoryId === "all"
+                  ? { background: color, color: "white", borderColor: color }
+                  : { borderColor: "transparent", background: "var(--muted)" }}
               >
                 Tous
+                <span className="text-xs opacity-75">({products.length})</span>
               </button>
-              {categoriesWithProducts.map(cat => (
-                <button
-                  key={cat.id}
-                  onClick={() => setActiveCategoryId(cat.id)}
-                  data-testid={`filter-category-${cat.id}`}
-                  className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors border ${
-                    activeCategoryId === cat.id
-                      ? "bg-primary text-primary-foreground border-primary"
-                      : "bg-background border-border hover:bg-muted"
-                  }`}
-                >
-                  {cat.imageUrl && (
-                    <img src={cat.imageUrl} alt="" className="w-4 h-4 rounded-full object-cover" />
-                  )}
-                  {cat.name}
-                </button>
-              ))}
+              {categories.map(cat => {
+                const count = products.filter(p => p.categoryId === cat.id).length;
+                const isActive = activeCategoryId === cat.id;
+                return (
+                  <button
+                    key={cat.id}
+                    onClick={() => setActiveCategoryId(cat.id)}
+                    data-testid={`filter-category-${cat.id}`}
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold whitespace-nowrap transition-all border-2 flex-shrink-0"
+                    style={isActive
+                      ? { background: color, color: "white", borderColor: color }
+                      : { borderColor: "transparent", background: "var(--muted)" }}
+                  >
+                    {cat.imageUrl && (
+                      <img src={cat.imageUrl} alt="" className="w-4 h-4 rounded-full object-cover" />
+                    )}
+                    {cat.name}
+                    <span className="text-xs opacity-75">({count})</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
 
-        {/* Grille produits par catégorie */}
-        {activeCategoryId === "all" && categoriesWithProducts.length > 0 ? (
-          <div className="space-y-10">
-            {categoriesWithProducts.map(cat => {
-              const catProducts = products.filter(p => p.categoryId === cat.id);
-              if (!catProducts.length) return null;
+        {/* ── Products ── */}
+        {search ? (
+          // Search results
+          <div>
+            <p className="text-sm text-muted-foreground mb-4">
+              {filtered.length} résultat{filtered.length > 1 ? "s" : ""} pour « {search} »
+            </p>
+            {filtered.length === 0 ? (
+              <EmptyState color={color} message={`Aucun produit pour "${search}"`} />
+            ) : (
+              <ProductsGrid products={filtered} shop={shop} onSelect={setSelectedProduct} />
+            )}
+          </div>
+        ) : activeCategoryId !== "all" ? (
+          // Single category view
+          <div>
+            {filtered.length === 0 ? (
+              <EmptyState color={color} message="Aucun produit dans cette catégorie" />
+            ) : (
+              <ProductsGrid products={filtered} shop={shop} onSelect={setSelectedProduct} />
+            )}
+          </div>
+        ) : (
+          // All products, grouped by category
+          <div className="space-y-12">
+            {categories.map(cat => {
+              const catProducts = productsByCat[cat.id] || [];
               return (
                 <section key={cat.id}>
-                  <div className="flex items-center gap-3 mb-4">
-                    {cat.imageUrl && (
-                      <img src={cat.imageUrl} alt={cat.name} className="w-10 h-10 rounded-full object-cover" />
+                  <div className="flex items-center gap-4 mb-5">
+                    {cat.imageUrl ? (
+                      <img src={cat.imageUrl} alt={cat.name}
+                        className="w-11 h-11 rounded-xl object-cover shadow-sm flex-shrink-0" />
+                    ) : (
+                      <div className="w-11 h-11 rounded-xl flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
+                        style={{ background: `linear-gradient(135deg, ${color}60, ${color}30)`, color }}>
+                        {cat.name.charAt(0).toUpperCase()}
+                      </div>
                     )}
-                    <h2 className="text-xl font-semibold">{cat.name}</h2>
-                    <div className="flex-1 border-b" />
+                    <div>
+                      <h2 className="text-lg font-bold">{cat.name}</h2>
+                      <p className="text-xs text-muted-foreground">
+                        {catProducts.length} produit{catProducts.length > 1 ? "s" : ""}
+                      </p>
+                    </div>
+                    <div className="flex-1 h-px bg-border ml-2" />
                   </div>
-                  <ProductGrid products={catProducts} shop={shop} onSelect={setSelectedProduct} />
+                  {catProducts.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground text-sm border border-dashed rounded-2xl">
+                      Aucun produit dans cette catégorie pour le moment
+                    </div>
+                  ) : (
+                    <ProductsGrid products={catProducts} shop={shop} onSelect={setSelectedProduct} />
+                  )}
                 </section>
               );
             })}
-
-            {/* Produits sans catégorie */}
-            {(() => {
-              const uncategorized = products.filter(p => !p.categoryId);
-              if (!uncategorized.length) return null;
-              return (
-                <section>
-                  <div className="flex items-center gap-3 mb-4">
-                    <h2 className="text-xl font-semibold">Autres produits</h2>
-                    <div className="flex-1 border-b" />
+            {/* Uncategorized */}
+            {(productsByCat["__none"]?.length ?? 0) > 0 && (
+              <section>
+                <div className="flex items-center gap-4 mb-5">
+                  <div className="w-11 h-11 rounded-xl bg-muted flex items-center justify-center flex-shrink-0">
+                    <Package className="w-5 h-5 text-muted-foreground" />
                   </div>
-                  <ProductGrid products={uncategorized} shop={shop} onSelect={setSelectedProduct} />
-                </section>
-              );
-            })()}
-          </div>
-        ) : (
-          <div>
-            {filteredProducts.length === 0 ? (
-              <div className="text-center py-16 text-muted-foreground">
-                <Package className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                <p>Aucun produit dans cette catégorie.</p>
-              </div>
-            ) : (
-              <ProductGrid products={filteredProducts} shop={shop} onSelect={setSelectedProduct} />
+                  <div>
+                    <h2 className="text-lg font-bold">Autres produits</h2>
+                    <p className="text-xs text-muted-foreground">{productsByCat["__none"].length} produit{productsByCat["__none"].length > 1 ? "s" : ""}</p>
+                  </div>
+                  <div className="flex-1 h-px bg-border ml-2" />
+                </div>
+                <ProductsGrid products={productsByCat["__none"]} shop={shop} onSelect={setSelectedProduct} />
+              </section>
+            )}
+            {products.length === 0 && categories.length === 0 && (
+              <EmptyState color={color} message="Cette boutique n'a pas encore de produits" />
             )}
           </div>
         )}
       </div>
 
-      {/* Footer boutique */}
-      <footer className="border-t mt-12 py-6 text-center text-xs text-muted-foreground">
-        <p>Boutique propulsée par <a href="/" className="font-semibold text-primary hover:underline">BKApay</a></p>
+      {/* ── Footer ── */}
+      <footer className="mt-auto border-t py-8 text-center">
+        <div className="flex items-center justify-center gap-1.5 text-sm text-muted-foreground">
+          <span>Boutique propulsée par</span>
+          <a
+            href="https://bkapay.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-black text-base hover:opacity-80 transition-opacity"
+            style={{ color, fontFamily: `'${font}', sans-serif` }}
+          >
+            BKApay
+          </a>
+        </div>
+        <p className="text-xs text-muted-foreground mt-1.5">
+          Paiements sécurisés · Mobile Money · Afrique
+        </p>
       </footer>
 
-      {/* Product detail dialog */}
+      {/* ── Buy Dialog ── */}
       {selectedProduct && (
-        <ProductDetailDialog
+        <BuyDialog
           product={selectedProduct}
           shop={shop}
           categories={categories}
@@ -518,50 +671,26 @@ export default function ShopPublicPage() {
   );
 }
 
-function ProductGrid({
-  products, shop, onSelect
-}: {
-  products: ShopProduct[];
-  shop: PublicShopData["shop"];
-  onSelect: (p: ShopProduct) => void;
+function ProductsGrid({ products, shop, onSelect }: {
+  products: ShopProduct[]; shop: PublicShopData["shop"]; onSelect: (p: ShopProduct) => void;
 }) {
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
       {products.map(p => (
-        <button
-          key={p.id}
-          onClick={() => onSelect(p)}
-          data-testid={`card-public-product-${p.id}`}
-          className="text-left group"
-        >
-          <Card className="overflow-hidden hover-elevate">
-            <div className="aspect-square bg-muted overflow-hidden">
-              {p.imageUrls?.[0] ? (
-                <img
-                  src={p.imageUrls[0]}
-                  alt={p.name}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <Package className="w-10 h-10 text-muted-foreground/30" />
-                </div>
-              )}
-            </div>
-            <CardContent className="p-3">
-              <p className="font-medium text-sm leading-tight line-clamp-2">{p.name}</p>
-              <p className="font-bold text-sm mt-1">{p.price.toLocaleString()} <span className="font-normal text-muted-foreground text-xs">{shop.currency}</span></p>
-              {p.stock === 0 && <Badge variant="secondary" className="text-xs mt-1">Rupture</Badge>}
-              {(p.downloadableFiles?.length ?? 0) > 0 && (
-                <div className="flex items-center gap-1 mt-1">
-                  <Download className="w-3 h-3 text-muted-foreground" />
-                  <span className="text-xs text-muted-foreground">Téléchargeable</span>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </button>
+        <ProductCard key={p.id} product={p} shop={shop} onSelect={() => onSelect(p)} />
       ))}
+    </div>
+  );
+}
+
+function EmptyState({ color, message }: { color: string; message: string }) {
+  return (
+    <div className="text-center py-20 text-muted-foreground">
+      <div className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center"
+        style={{ background: `${color}15` }}>
+        <Package className="w-8 h-8" style={{ color: `${color}60` }} />
+      </div>
+      <p className="font-medium">{message}</p>
     </div>
   );
 }

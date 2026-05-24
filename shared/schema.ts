@@ -1027,6 +1027,10 @@ export const shops = pgTable("shops", {
   currency: text("currency").notNull().default("XOF"),
   // Custom domain (display only for now)
   customDomain: text("custom_domain"),
+  // Typography / logo font for public page
+  fontFamily: text("font_family").default("Poppins"),
+  // Primary color for the shop
+  primaryColor: text("primary_color").default("#6366f1"),
   // Linked API key id (auto-generated)
   apiKeyId: varchar("api_key_id").references(() => apiKeys.id),
   isActive: boolean("is_active").notNull().default(true),

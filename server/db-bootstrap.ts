@@ -579,6 +579,9 @@ async function bootstrapDatabase() {
       await shopClient`CREATE INDEX IF NOT EXISTS idx_shops_slug ON shops (slug)`;
       await shopClient`CREATE INDEX IF NOT EXISTS idx_shop_products_shop_id ON shop_products (shop_id)`;
       await shopClient`CREATE INDEX IF NOT EXISTS idx_shop_orders_shop_id ON shop_orders (shop_id)`;
+      // Add new columns if they don't exist
+      await shopClient`ALTER TABLE shops ADD COLUMN IF NOT EXISTS font_family TEXT DEFAULT 'Poppins'`;
+      await shopClient`ALTER TABLE shops ADD COLUMN IF NOT EXISTS primary_color TEXT DEFAULT '#6366f1'`;
       console.log("✅ Shop tables ready");
     } catch (e) {
       console.error("⚠️ Shop migration error:", e);

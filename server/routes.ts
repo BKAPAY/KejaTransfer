@@ -15126,7 +15126,7 @@ Ton role est de reformuler et ameliorer les messages que l'administrateur souhai
     try {
       const shop = await storage.getShopByUserId(req.session.userId!);
       if (!shop) return res.status(404).json({ error: "Boutique introuvable" });
-      const { name, description, currency, logoUrl, slideshowUrls, customDomain } = req.body;
+      const { name, description, currency, logoUrl, slideshowUrls, customDomain, fontFamily, primaryColor } = req.body;
       const updates: any = {};
       if (name !== undefined) updates.name = name;
       if (description !== undefined) updates.description = description;
@@ -15134,6 +15134,8 @@ Ton role est de reformuler et ameliorer les messages que l'administrateur souhai
       if (logoUrl !== undefined) updates.logoUrl = logoUrl;
       if (slideshowUrls !== undefined) updates.slideshowUrls = slideshowUrls;
       if (customDomain !== undefined) updates.customDomain = customDomain || null;
+      if (fontFamily !== undefined) updates.fontFamily = fontFamily;
+      if (primaryColor !== undefined) updates.primaryColor = primaryColor;
       const updated = await storage.updateShop(shop.id, updates);
       return res.json({ success: true, shop: updated });
     } catch (error: any) {

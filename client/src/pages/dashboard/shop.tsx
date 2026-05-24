@@ -492,12 +492,46 @@ function CategoryDialog({
   );
 }
 
+const FONT_OPTIONS = [
+  { value: "Poppins",          label: "Poppins",           style: "Poppins" },
+  { value: "Playfair Display", label: "Playfair Display",  style: "Playfair Display" },
+  { value: "Montserrat",       label: "Montserrat",        style: "Montserrat" },
+  { value: "Raleway",          label: "Raleway",           style: "Raleway" },
+  { value: "Bebas Neue",       label: "Bebas Neue",        style: "Bebas Neue" },
+  { value: "Dancing Script",   label: "Dancing Script",    style: "Dancing Script" },
+  { value: "Josefin Sans",     label: "Josefin Sans",      style: "Josefin Sans" },
+  { value: "Cinzel",           label: "Cinzel",            style: "Cinzel" },
+  { value: "Pacifico",         label: "Pacifico",          style: "Pacifico" },
+  { value: "Lobster",          label: "Lobster",           style: "Lobster" },
+];
+
+const COLOR_PRESETS = [
+  "#6366f1", "#8b5cf6", "#ec4899", "#ef4444",
+  "#f97316", "#eab308", "#22c55e", "#14b8a6",
+  "#3b82f6", "#06b6d4", "#000000", "#475569",
+];
+
+function loadGoogleFontDash(family: string) {
+  const id = `gf-${family.replace(/\s+/g, "-")}`;
+  if (document.getElementById(id)) return;
+  const link = document.createElement("link");
+  link.id = id;
+  link.rel = "stylesheet";
+  link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(family)}:wght@400;700;900&display=swap`;
+  document.head.appendChild(link);
+}
+
 function SettingsSection({ shop }: { shop: Shop }) {
   const { toast } = useToast();
   const [currency, setCurrency] = useState(shop.currency);
   const [customDomain, setCustomDomain] = useState(shop.customDomain || "");
   const [slideshowUrls, setSlideshowUrls] = useState<string[]>(shop.slideshowUrls || []);
   const [newSlide, setNewSlide] = useState("");
+  const [fontFamily, setFontFamily] = useState((shop as any).fontFamily || "Poppins");
+  const [primaryColor, setPrimaryColor] = useState((shop as any).primaryColor || "#6366f1");
+
+  // Précharger toutes les polices pour la prévisualisation
+  FONT_OPTIONS.forEach(f => loadGoogleFontDash(f.value));
 
   const mutation = useMutation({
     mutationFn: async (updates: any) => {
@@ -523,8 +557,8 @@ function SettingsSection({ shop }: { shop: Shop }) {
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex items-center gap-2 bg-muted rounded-md px-3 py-2">
-            <code className="text-sm flex-1">{shop.slug}.bkapay.com</code>
-            <CopyButton value={`https://${shop.slug}.bkapay.com`} />
+            <code className="text-sm flex-1">{window.location.host}/shop/{shop.slug}</code>
+            <CopyButton value={`${window.location.origin}/shop/${shop.slug}`} />
             <a href={`/shop/${shop.slug}`} target="_blank" rel="noopener noreferrer">
               <Button size="icon" variant="ghost"><ExternalLink className="w-4 h-4" /></Button>
             </a>
@@ -544,9 +578,88 @@ function SettingsSection({ shop }: { shop: Shop }) {
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
-              Pour activer votre domaine personnalisé, créez un enregistrement CNAME vers <code>shops.bkapay.com</code> chez votre registrar.
+              Créez un enregistrement CNAME vers <code>shops.bkapay.com</code> chez votre registrar.
             </p>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Design — Police logo */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Typographie du logo</CardTitle>
+          <CardDescription>
+            Le nom de votre boutique s'affiche en grand sur la page publique avec la police choisie
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Preview live */}
+          <div className="w-full py-6 px-4 rounded-xl border bg-muted/30 flex items-center justify-center"
+            style={{ background: `linear-gradient(135deg, ${primaryColor}15, ${primaryColor}30)` }}>
+            <span
+              className="text-4xl font-black tracking-tight"
+              style={{ fontFamily: `'${fontFamily}', sans-serif`, color: primaryColor }}
+            >
+              {shop.name}
+            </span>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Style de police</Label>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {FONT_OPTIONS.map(f => (
+                <button
+                  key={f.value}
+                  onClick={() => setFontFamily(f.value)}
+                  data-testid={`button-font-${f.value}`}
+                  className="px-3 py-2.5 rounded-lg border-2 text-sm transition-all"
+                  style={{
+                    fontFamily: `'${f.style}', sans-serif`,
+                    borderColor: fontFamily === f.value ? primaryColor : "transparent",
+                    background: fontFamily === f.value ? `${primaryColor}15` : "var(--muted)",
+                    color: fontFamily === f.value ? primaryColor : "inherit",
+                    fontWeight: 700,
+                  }}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Couleur principale</Label>
+            <div className="flex flex-wrap gap-2 items-center">
+              {COLOR_PRESETS.map(c => (
+                <button
+                  key={c}
+                  onClick={() => setPrimaryColor(c)}
+                  className="w-8 h-8 rounded-full border-2 transition-transform hover:scale-110"
+                  style={{
+                    background: c,
+                    borderColor: primaryColor === c ? "white" : "transparent",
+                    boxShadow: primaryColor === c ? `0 0 0 2px ${c}` : "none",
+                  }}
+                />
+              ))}
+              <input
+                type="color"
+                value={primaryColor}
+                onChange={e => setPrimaryColor(e.target.value)}
+                className="w-8 h-8 rounded-full border cursor-pointer"
+                title="Couleur personnalisée"
+              />
+            </div>
+          </div>
+
+          <Button
+            onClick={() => mutation.mutate({ fontFamily, primaryColor })}
+            disabled={mutation.isPending}
+            className="w-full"
+          >
+            {mutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+            Enregistrer le design
+          </Button>
         </CardContent>
       </Card>
 
@@ -558,7 +671,7 @@ function SettingsSection({ shop }: { shop: Shop }) {
         </CardHeader>
         <CardContent>
           <div className="flex gap-2 items-end">
-            <div className="flex-1 space-y-2">
+            <div className="flex-1">
               <Select value={currency} onValueChange={setCurrency}>
                 <SelectTrigger data-testid="select-shop-currency-settings">
                   <SelectValue />
@@ -579,33 +692,60 @@ function SettingsSection({ shop }: { shop: Shop }) {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Diaporama page d'accueil</CardTitle>
-          <CardDescription>Jusqu'à 5 images affichées en rotation sur votre boutique</CardDescription>
+          <CardDescription>Jusqu'à 5 images affichées en rotation sur votre boutique publique</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="grid grid-cols-2 gap-2">
-            {slideshowUrls.map((url, i) => (
-              <div key={i} className="relative rounded-md overflow-hidden h-24">
-                <img src={url} alt="" className="w-full h-full object-cover" />
-                <button
-                  onClick={() => setSlideshowUrls(p => p.filter((_, j) => j !== i))}
-                  className="absolute top-1 right-1 bg-destructive text-white rounded-full p-0.5">
-                  <X className="w-3 h-3" />
-                </button>
-              </div>
-            ))}
-          </div>
+          {slideshowUrls.length > 0 ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {slideshowUrls.map((url, i) => (
+                <div key={i} className="relative rounded-xl overflow-hidden h-28 group bg-muted">
+                  <img src={url} alt="" className="w-full h-full object-cover" />
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <button
+                      onClick={() => setSlideshowUrls(p => p.filter((_, j) => j !== i))}
+                      className="bg-destructive text-white rounded-full p-1.5">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="absolute bottom-1.5 left-2 text-white text-xs font-bold drop-shadow">
+                    {i + 1}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="border border-dashed rounded-xl p-6 text-center text-muted-foreground text-sm">
+              Aucune image ajoutée. Ajoutez des images pour illustrer votre boutique.
+            </div>
+          )}
           {slideshowUrls.length < 5 && (
             <div className="flex gap-2">
-              <Input value={newSlide} onChange={e => setNewSlide(e.target.value)} placeholder="URL de l'image" />
-              <Button size="sm" variant="outline" onClick={() => {
+              <Input
+                value={newSlide}
+                onChange={e => setNewSlide(e.target.value)}
+                placeholder="URL de l'image (https://...)"
+                onKeyDown={e => {
+                  if (e.key === "Enter" && newSlide.trim()) {
+                    setSlideshowUrls(p => [...p, newSlide.trim()]);
+                    setNewSlide("");
+                  }
+                }}
+              />
+              <Button size="icon" variant="outline" onClick={() => {
                 if (!newSlide.trim()) return;
                 setSlideshowUrls(p => [...p, newSlide.trim()]);
                 setNewSlide("");
               }}><Plus className="w-4 h-4" /></Button>
             </div>
           )}
-          <Button variant="outline" className="w-full" onClick={() => mutation.mutate({ slideshowUrls })} disabled={mutation.isPending}>
-            {mutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Enregistrer le diaporama"}
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => mutation.mutate({ slideshowUrls })}
+            disabled={mutation.isPending}
+          >
+            {mutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <ImagePlus className="w-4 h-4 mr-2" />}
+            Enregistrer le diaporama
           </Button>
         </CardContent>
       </Card>
