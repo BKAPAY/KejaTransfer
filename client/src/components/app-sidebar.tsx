@@ -187,7 +187,7 @@ export function AppSidebar() {
     : [];
 
   const shopItems = user?.accountType === "personal"
-    ? [{ title: "Ma boutique", url: "/dashboard/shop", icon: ShoppingBag, testId: "nav-shop", color: "#7c3aed" }]
+    ? [{ title: "Ma boutique", url: "/dashboard/shop", icon: ShoppingBag, testId: "nav-shop", color: "#f97316" }]
     : [];
 
   const logoutMutation = useMutation({
