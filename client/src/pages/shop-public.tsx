@@ -442,15 +442,6 @@ export default function ShopPublicPage() {
     return matchCat && matchSearch;
   });
 
-  // Group by category for "all" view
-  const productsByCat: Record<string, ShopProduct[]> = {};
-  if (activeCategoryId === "all" && !search) {
-    for (const p of products) {
-      const key = p.categoryId || "__none";
-      if (!productsByCat[key]) productsByCat[key] = [];
-      productsByCat[key].push(p);
-    }
-  }
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -560,7 +551,7 @@ export default function ShopPublicPage() {
 
         {/* ── Products ── */}
         {search ? (
-          // Search results
+          // Résultats de recherche
           <div>
             <p className="text-sm text-muted-foreground mb-4">
               {filtered.length} résultat{filtered.length > 1 ? "s" : ""} pour « {search} »
@@ -572,8 +563,31 @@ export default function ShopPublicPage() {
             )}
           </div>
         ) : activeCategoryId !== "all" ? (
-          // Single category view
+          // Vue catégorie sélectionnée
           <div>
+            {(() => {
+              const cat = categories.find(c => c.id === activeCategoryId);
+              return cat ? (
+                <div className="flex items-center gap-4 mb-6">
+                  {cat.imageUrl ? (
+                    <img src={cat.imageUrl} alt={cat.name}
+                      className="w-11 h-11 rounded-xl object-cover flex-shrink-0" />
+                  ) : (
+                    <div className="w-11 h-11 rounded-xl flex items-center justify-center font-bold text-sm flex-shrink-0"
+                      style={{ background: `linear-gradient(135deg, ${color}30, ${color}15)`, color }}>
+                      {cat.name.charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                  <div>
+                    <h2 className="text-lg font-bold">{cat.name}</h2>
+                    <p className="text-xs text-muted-foreground">
+                      {filtered.length} produit{filtered.length > 1 ? "s" : ""}
+                    </p>
+                  </div>
+                  <div className="flex-1 h-px bg-border ml-2" />
+                </div>
+              ) : null;
+            })()}
             {filtered.length === 0 ? (
               <EmptyState color={color} message="Aucun produit dans cette catégorie" />
             ) : (
@@ -581,52 +595,12 @@ export default function ShopPublicPage() {
             )}
           </div>
         ) : (
-          // All products, grouped by category
-          <div className="space-y-12">
-            {categories.filter(cat => (productsByCat[cat.id] || []).length > 0).map(cat => {
-              const catProducts = productsByCat[cat.id] || [];
-              return (
-                <section key={cat.id}>
-                  <div className="flex items-center gap-4 mb-5">
-                    {cat.imageUrl ? (
-                      <img src={cat.imageUrl} alt={cat.name}
-                        className="w-11 h-11 rounded-xl object-cover shadow-sm flex-shrink-0" />
-                    ) : (
-                      <div className="w-11 h-11 rounded-xl flex items-center justify-center font-bold text-sm flex-shrink-0"
-                        style={{ background: `linear-gradient(135deg, ${color}30, ${color}15)`, color }}>
-                        {cat.name.charAt(0).toUpperCase()}
-                      </div>
-                    )}
-                    <div>
-                      <h2 className="text-lg font-bold">{cat.name}</h2>
-                      <p className="text-xs text-muted-foreground">
-                        {catProducts.length} produit{catProducts.length > 1 ? "s" : ""}
-                      </p>
-                    </div>
-                    <div className="flex-1 h-px bg-border ml-2" />
-                  </div>
-                  <ProductsGrid products={catProducts} shop={shop} onSelect={setSelectedProduct} />
-                </section>
-              );
-            })}
-            {/* Uncategorized */}
-            {(productsByCat["__none"]?.length ?? 0) > 0 && (
-              <section>
-                <div className="flex items-center gap-4 mb-5">
-                  <div className="w-11 h-11 rounded-xl bg-muted flex items-center justify-center flex-shrink-0">
-                    <Package className="w-5 h-5 text-muted-foreground" />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-bold">Autres produits</h2>
-                    <p className="text-xs text-muted-foreground">{productsByCat["__none"].length} produit{productsByCat["__none"].length > 1 ? "s" : ""}</p>
-                  </div>
-                  <div className="flex-1 h-px bg-border ml-2" />
-                </div>
-                <ProductsGrid products={productsByCat["__none"]} shop={shop} onSelect={setSelectedProduct} />
-              </section>
-            )}
-            {products.length === 0 && categories.length === 0 && (
+          // Tous les produits mélangés
+          <div>
+            {products.length === 0 ? (
               <EmptyState color={color} message="Cette boutique n'a pas encore de produits" />
+            ) : (
+              <ProductsGrid products={products} shop={shop} onSelect={setSelectedProduct} />
             )}
           </div>
         )}
