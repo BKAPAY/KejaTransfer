@@ -9849,6 +9849,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // adjustedAmount = montant que le client paie au provider (majoré pour couvrir les frais)
       let adjustedAmount = Math.floor(amount);
       const netAmountForBalance = originalAmount ? Math.floor(originalAmount) : Math.floor(amount);
+      console.log(`[MERCHANT_LINK DIAG] token=${merchantLink.token} customerPaysFee=${merchantLink.customerPaysFee} (type=${typeof merchantLink.customerPaysFee}) amount=${amount}`);
       if (merchantLink.customerPaysFee) {
         const { calculateCustomerPaysFee } = await import("./utils/fees");
         // Utiliser le taux admin du provider/opérateur, pas un taux hardcodé
