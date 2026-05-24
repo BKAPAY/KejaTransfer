@@ -814,78 +814,53 @@ function SettingsSection({ shop }: { shop: Shop }) {
               </Button>
             </div>
 
-            {shop.customDomain && (() => {
-              const savedDomain = shop.customDomain!.replace(/^https?:\/\//, "").replace(/\/.*$/, "").toLowerCase();
-              const isSubdomain = savedDomain.split(".").length > 2;
-              const subName = isSubdomain ? savedDomain.split(".")[0] : "@";
-              const recordType = isSubdomain ? "CNAME" : "ALIAS";
-              return (
-                <div className="rounded-md border bg-muted/30 p-4 space-y-4 text-sm">
-                  <div className="flex items-center gap-2 text-foreground font-semibold">
-                    <Globe className="w-4 h-4 text-muted-foreground" />
-                    Connecter votre domaine
-                  </div>
-
-                  <p className="text-muted-foreground text-xs leading-relaxed">
-                    Rendez-vous dans les paramètres DNS de votre registrar (Hostinger, OVH, GoDaddy…)
-                    et ajoutez l'enregistrement suivant :
-                  </p>
-
-                  {/* Ligne type */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between rounded-md bg-background border px-3 py-2">
-                      <span className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Type</span>
-                      <span className="font-mono font-bold text-sm">{recordType}</span>
-                    </div>
-                    <div className="flex items-center justify-between rounded-md bg-background border px-3 py-2">
-                      <span className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Nom</span>
-                      <span className="font-mono font-bold text-sm">{subName}</span>
-                    </div>
-                    <div className="flex items-center justify-between rounded-md bg-background border px-3 py-2">
-                      <span className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Valeur</span>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono font-bold text-sm">bkapay.com</span>
-                        <CopyButton value="bkapay.com" />
-                      </div>
-                    </div>
-                  </div>
-
-                  {!isSubdomain && (
-                    <p className="text-xs text-muted-foreground leading-relaxed">
-                      Si votre registrar ne supporte pas ALIAS, utilisez le type <strong>CNAME</strong> avec le nom <strong>www</strong> — votre boutique sera alors accessible sur <code>www.{savedDomain}</code>.
-                    </p>
-                  )}
-
-                  <div className="flex items-center justify-between pt-1 border-t border-border/50 flex-wrap gap-2">
-                    <p className="text-xs text-muted-foreground">Propagation : 15 min à 24 h</p>
-                    <div className="flex items-center gap-2">
-                      <Button size="sm" variant="outline"
-                        onClick={checkDns}
-                        disabled={dnsStatus === "checking"}
-                        data-testid="button-check-dns"
-                      >
-                        {dnsStatus === "checking"
-                          ? <Loader2 className="w-3 h-3 animate-spin mr-1.5" />
-                          : <RefreshCw className="w-3 h-3 mr-1.5" />}
-                        Vérifier
-                      </Button>
-                      {dnsStatus === "ok" && (
-                        <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400 font-semibold">
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          Actif
-                        </span>
-                      )}
-                      {dnsStatus === "error" && (
-                        <span className="flex items-center gap-1 text-xs text-destructive font-semibold">
-                          <XCircle className="w-3.5 h-3.5" />
-                          En attente de propagation
-                        </span>
-                      )}
-                    </div>
-                  </div>
+            {shop.customDomain && (
+              <div className="rounded-md border bg-muted/30 p-4 space-y-3 text-sm">
+                <div className="flex items-center gap-2 text-foreground font-semibold">
+                  <Globe className="w-4 h-4 text-muted-foreground" />
+                  Configuration DNS
                 </div>
-              );
-            })()}
+
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Dans votre gestionnaire DNS (Hostinger, OVH, GoDaddy…), créez un enregistrement
+                  de type <strong className="text-foreground">CNAME</strong> qui pointe vers :
+                </p>
+
+                <div className="flex items-center gap-2 rounded-md bg-background border px-3 py-2.5">
+                  <span className="font-mono font-bold text-base flex-1 text-foreground">bkapay.com</span>
+                  <CopyButton value="bkapay.com" />
+                </div>
+
+                <p className="text-xs text-muted-foreground">
+                  C'est la seule valeur à renseigner. La propagation peut prendre <strong>15 min à 24 h</strong>.
+                </p>
+
+                <div className="flex items-center gap-3 pt-1 border-t border-border/50 flex-wrap">
+                  <Button size="sm" variant="outline"
+                    onClick={checkDns}
+                    disabled={dnsStatus === "checking"}
+                    data-testid="button-check-dns"
+                  >
+                    {dnsStatus === "checking"
+                      ? <Loader2 className="w-3 h-3 animate-spin mr-1.5" />
+                      : <RefreshCw className="w-3 h-3 mr-1.5" />}
+                    Vérifier la connexion
+                  </Button>
+                  {dnsStatus === "ok" && (
+                    <span className="flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400 font-semibold">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      Domaine connecté
+                    </span>
+                  )}
+                  {dnsStatus === "error" && (
+                    <span className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
+                      <AlertTriangle className="w-3.5 h-3.5" />
+                      Pas encore actif — réessayez dans quelques heures
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
