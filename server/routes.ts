@@ -9969,6 +9969,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               providerCurrency: providerCurrency,
               balanceAmount: mlNet2,
               balanceCurrency: ownerCurrency,
+              customerPaysFee: !!merchantLink.customerPaysFee,
               ...(mlXFee2 > 0 ? { exchangeFee: mlXFee2, exchangeFeePercentage: mlXFeePct2 } : {}),
             }),
           });

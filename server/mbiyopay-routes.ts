@@ -690,6 +690,7 @@ export async function handleMbiyoPayMerchantLink(
         paymentProvider: "mbiyopay",
         orderId,
         startTime,
+        customerPaysFee: !!merchantLink.customerPaysFee,
         ...(incomingExchangeFee > 0 ? { exchangeFee: incomingExchangeFee, exchangeFeePercentage } : {}),
       }),
     });

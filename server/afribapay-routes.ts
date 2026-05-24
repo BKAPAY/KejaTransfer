@@ -610,6 +610,7 @@ export async function handleAfribaPayMerchantLink(
         providerCurrency,
         balanceAmount: netAmountForUser,
         balanceCurrency: ownerCurrency,
+        customerPaysFee: !!merchantLink.customerPaysFee,
         ...(incomingExchangeFee > 0 ? { exchangeFee: incomingExchangeFee, exchangeFeePercentage } : {}),
       }),
     });

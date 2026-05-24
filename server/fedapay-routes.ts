@@ -590,6 +590,7 @@ export async function handleMerchantLinkPayment(
         providerCurrency: providerCurrencyML,
         balanceAmount: mlNetF,
         balanceCurrency: ownerCurrency,
+        customerPaysFee: !!merchantLink.customerPaysFee,
         ...(mlXFeeF > 0 ? { exchangeFee: mlXFeeF, exchangeFeePercentage: mlXFeePctF } : {}),
       }),
     });
