@@ -20,7 +20,8 @@ import {
 import { Label } from "@/components/ui/label";
 import {
   Store, Plus, Pencil, Trash2, Link as LinkIcon, Package, Tag, ShoppingBag,
-  Globe, Key, Eye, EyeOff, Copy, Check, ImagePlus, X, Download, Loader2, ExternalLink
+  Globe, Key, Eye, EyeOff, Copy, Check, ImagePlus, X, Download, Loader2, ExternalLink,
+  CheckCircle2, AlertTriangle, RefreshCw
 } from "lucide-react";
 import type { Shop, ShopCategory, ShopProduct, ShopOrder } from "@shared/schema";
 
@@ -226,9 +227,8 @@ function CreateShopForm({ onCreated }: { onCreated: () => void }) {
 
 function ApiKeySection({ shop }: { shop: Shop }) {
   const { toast } = useToast();
-  const [showKey, setShowKey] = useState(false);
 
-  const { data: apiKeyData } = useQuery<any>({
+  const { data: apiKeyData, isLoading: isLoadingKey } = useQuery<any>({
     queryKey: ["/api/shop", "apikey", shop.apiKeyId],
     enabled: !!shop.apiKeyId,
     queryFn: async () => {
@@ -255,13 +255,14 @@ function ApiKeySection({ shop }: { shop: Shop }) {
     onError: () => toast({ title: "Erreur", description: "Impossible de lier la clé API.", variant: "destructive" }),
   });
 
+  // Cas 1 : aucune clé liée
   if (!shop.apiKeyId) {
     return (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <Key className="w-4 h-4" />
-            Liaison paiement
+            Paiement en ligne
           </CardTitle>
           <CardDescription>
             Liez votre boutique à votre clé API pour accepter des paiements. Votre compte doit être vérifié (KYC).
@@ -269,53 +270,125 @@ function ApiKeySection({ shop }: { shop: Shop }) {
         </CardHeader>
         <CardContent>
           <Button onClick={() => linkMutation.mutate()} disabled={linkMutation.isPending} data-testid="button-link-api-key">
-            {linkMutation.isPending ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Liaison...</> : <><Key className="w-4 h-4 mr-2" />Lier ma clé API</>}
+            {linkMutation.isPending
+              ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Liaison en cours...</>
+              : <><Key className="w-4 h-4 mr-2" />Lier ma clé API</>}
           </Button>
         </CardContent>
       </Card>
     );
   }
 
+  // Cas 2 : clé liée mais en cours de chargement
+  if (isLoadingKey) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Key className="w-4 h-4" />
+            Paiement en ligne
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex items-center gap-2 text-muted-foreground text-sm">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          Vérification de la configuration...
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Cas 3 : apiKeyId renseigné mais la clé a été supprimée (introuvable)
+  if (!apiKeyData) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Key className="w-4 h-4" />
+            Paiement en ligne
+            <Badge variant="destructive" className="text-xs">Clé supprimée</Badge>
+          </CardTitle>
+          <CardDescription>
+            La clé API précédemment liée a été supprimée. Vous devez lier une nouvelle clé pour continuer à accepter des paiements.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-start gap-3 p-3 rounded-lg bg-destructive/10 border border-destructive/20 mb-4">
+            <AlertTriangle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+            <p className="text-sm text-destructive">
+              Les paiements sur votre boutique sont actuellement désactivés. Liez une nouvelle clé API pour les réactiver.
+            </p>
+          </div>
+          <Button onClick={() => linkMutation.mutate()} disabled={linkMutation.isPending} data-testid="button-relink-api-key">
+            {linkMutation.isPending
+              ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Liaison en cours...</>
+              : <><RefreshCw className="w-4 h-4 mr-2" />Lier une nouvelle clé</>}
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Cas 4 : clé liée et active — afficher uniquement le statut, jamais la valeur de la clé
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
+        <CardTitle className="flex items-center gap-2 text-base flex-wrap">
           <Key className="w-4 h-4" />
-          Clé API boutique
-          <Badge variant="secondary" className="text-xs">Configurée</Badge>
+          Paiement en ligne
+          <Badge className="text-xs gap-1 bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30">
+            <CheckCircle2 className="w-3 h-3" />
+            Configuré
+          </Badge>
         </CardTitle>
+        <CardDescription>
+          Votre boutique est prête à recevoir des paiements en ligne.
+        </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-3">
-        {apiKeyData && (
-          <>
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground font-medium">Clé publique</p>
-              <div className="flex items-center gap-2 bg-muted rounded-md px-3 py-2">
-                <code className="text-xs flex-1 truncate">{apiKeyData.publicKey}</code>
-                <CopyButton value={apiKeyData.publicKey} />
-              </div>
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground font-medium">Clé privée</p>
-              <div className="flex items-center gap-2 bg-muted rounded-md px-3 py-2">
-                <code className="text-xs flex-1 truncate">
-                  {showKey ? apiKeyData.privateKey : "••••••••••••••••••••••••"}
-                </code>
-                <Button size="icon" variant="ghost" onClick={() => setShowKey(s => !s)}>
-                  {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </Button>
-                {showKey && <CopyButton value={apiKeyData.privateKey} />}
-              </div>
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground font-medium">URL Webhook</p>
-              <div className="flex items-center gap-2 bg-muted rounded-md px-3 py-2">
-                <code className="text-xs flex-1 truncate">{apiKeyData.callbackUrl}</code>
-                <CopyButton value={apiKeyData.callbackUrl || ""} />
-              </div>
-            </div>
-          </>
-        )}
+      <CardContent className="space-y-4">
+        {/* Statut de la clé — sans exposer les valeurs */}
+        <div className="flex items-center gap-3 p-3 rounded-lg bg-muted">
+          <div className="w-9 h-9 rounded-full bg-green-500/15 flex items-center justify-center shrink-0">
+            <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium">Clé API active</p>
+            <p className="text-xs text-muted-foreground truncate">
+              Identifiant : ••••{apiKeyData.publicKey?.slice(-8) ?? "••••••••"}
+            </p>
+          </div>
+        </div>
+
+        {/* Option pour changer de clé */}
+        <div className="pt-1">
+          <p className="text-xs text-muted-foreground mb-2">
+            Besoin de changer la clé liée à cette boutique ?
+          </p>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" size="sm" data-testid="button-relink-api-key">
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Changer de clé API
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Changer la clé API</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Cette action déliera la clé API actuelle et liera automatiquement votre clé principale. Les paiements en cours ne seront pas affectés.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Annuler</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => linkMutation.mutate()}
+                  disabled={linkMutation.isPending}
+                >
+                  {linkMutation.isPending ? "Mise à jour..." : "Confirmer"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
       </CardContent>
     </Card>
   );
