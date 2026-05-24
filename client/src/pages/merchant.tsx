@@ -166,6 +166,7 @@ export default function Merchant() {
   const [copiedUssd, setCopiedUssd] = useState(false);
   const [conversionData, setConversionData] = useState<ConversionData | null>(null);
   const [selectedCurrency, setSelectedCurrency] = useState<string>("XOF");
+  const [feePercentage, setFeePercentage] = useState<number>(6); // taux par défaut 6%
   const { toast } = useToast();
   
   // État pour le flux crypto en 2 étapes - restauré depuis localStorage si paiement en cours
@@ -372,6 +373,22 @@ export default function Merchant() {
     form.setValue("amount", undefined as any);
     setConversionData(null);
   }, [selectedCurrency]);
+
+  // Récupérer le taux de frais réel depuis l'admin quand pays + opérateur sont sélectionnés
+  useEffect(() => {
+    const country = form.getValues("country");
+    const operator = form.getValues("operator");
+    if (!country || !operator) {
+      setFeePercentage(6);
+      return;
+    }
+    fetch(`/api/fee-rate?country=${encodeURIComponent(country)}&operator=${encodeURIComponent(operator)}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.feePercentage) setFeePercentage(data.feePercentage);
+      })
+      .catch(() => setFeePercentage(6));
+  }, [selectedCountry, selectedOperator]);
 
   const ownerCountry = (merchantLink as any)?.ownerCountry || null;
   const ownerCurrency = (merchantLink as any)?.ownerCurrency || "XOF";
@@ -1657,8 +1674,8 @@ export default function Merchant() {
               Frais de service inclus
             </p>
             {(() => {
-              const feeRate = 0.06;
-              const feeAmount = Math.ceil(watchedAmount * feeRate / (1 - feeRate));
+              const feeRate = feePercentage / 100;
+              const feeAmount = Math.floor(watchedAmount * feeRate);
               const total = watchedAmount + feeAmount;
               return (
                 <div className="space-y-0.5">

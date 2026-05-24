@@ -9841,6 +9841,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // Récupérer les frais configurés en admin pour ce pays/opérateur (TOUJOURS, même sans customerPaysFee)
+      const mlFeeConfig = await getDynamicFees(storage, country, operator);
+
       // Si frais Mobile Money à la charge du client, majorer le montant envoyé au provider
       // netAmountForBalance = montant net que le marchand doit recevoir (inchangé)
       // adjustedAmount = montant que le client paie au provider (majoré pour couvrir les frais)
@@ -9848,8 +9851,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const netAmountForBalance = originalAmount ? Math.floor(originalAmount) : Math.floor(amount);
       if (merchantLink.customerPaysFee) {
         const { calculateCustomerPaysFee } = await import("./utils/fees");
-        adjustedAmount = calculateCustomerPaysFee(adjustedAmount).totalForProvider;
-        console.log(`[MERCHANT_LINK] customerPaysFee actif: client paie ${adjustedAmount} pour que le marchand reçoive ${amount}`);
+        // Utiliser le taux admin du provider/opérateur, pas un taux hardcodé
+        adjustedAmount = calculateCustomerPaysFee(adjustedAmount, mlFeeConfig.incoming).totalForProvider;
+        console.log(`[MERCHANT_LINK] customerPaysFee actif (taux=${mlFeeConfig.incoming/10}%): client paie ${adjustedAmount} pour que le marchand reçoive ${amount}`);
       }
 
       if (activeProvider === "fedapay") {
@@ -10104,15 +10108,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else if (activeProvider === "pawapay") {
         console.log(`[MERCHANT_LINK] Using PawaPay for ${country}/${operator}`);
         const { otpCode } = req.body;
+        // PawaPay a sa propre logique customerPaysFee intégrée — passer le montant ORIGINAL
+        // + customerPaysFee:true pour qu'il gère lui-même la majoration et le crédit correct
         const result = await handlePawaPayDeposit(
           merchantLink.userId,
           owner!,
-          adjustedAmount, // montant majoré si customerPaysFee
+          Math.floor(amount), // montant ORIGINAL (non majoré) - PawaPay majore en interne
           country,
           operator,
           customerPhone,
           payerCurrency,
-          ownerCurrency !== payerCurrency ? netAmountForBalance : undefined,
+          ownerCurrency !== payerCurrency ? (originalAmount ? Math.floor(originalAmount) : undefined) : undefined,
           ownerCurrency !== payerCurrency ? ownerCurrency : undefined,
           otpCode,
           {
@@ -10120,6 +10126,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             transactionDescription: `Paiement marchand - ${merchantLink.merchantName}`,
             customerName: customerName || undefined,
             customerEmail: customerEmail || undefined,
+            customerPaysFee: merchantLink.customerPaysFee || false, // déléguer la gestion à PawaPay
             extraMetadata: { merchantLinkId: merchantLink.id },
           }
         );
@@ -10148,12 +10155,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`[MERCHANT_LINK] Using FeeXPay for ${country}/${operator}`);
         const mlOwnerCurrency = ownerCurrency;
         const mlPayerCurrency = payerCurrency;
-        const mlOriginalAmount = netAmountForBalance; // montant net pour crédit solde marchand
+        // FeeXPay a sa propre logique customerPaysFee intégrée — passer le montant ORIGINAL
+        const mlOriginalAmount = originalAmount ? Math.floor(originalAmount) : undefined;
         const mlOriginalCurrency = originalCurrency || mlOwnerCurrency;
         const result = await handleFeeXPayDeposit(
           merchantLink.userId,
           owner!,
-          adjustedAmount, // montant majoré si customerPaysFee
+          Math.floor(amount), // montant ORIGINAL (non majoré) - FeeXPay majore en interne
           country,
           operator,
           customerPhone,
@@ -10166,6 +10174,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             transactionDescription: `Paiement ${merchantLink.merchantName}`,
             customerName: customerName || "Client",
             customerEmail: customerEmail || undefined,
+            customerPaysFee: merchantLink.customerPaysFee || false, // déléguer la gestion à FeeXPay
             extraMetadata: { merchantLinkId: merchantLink.id },
           }
         );
@@ -12622,6 +12631,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Update country operator config error:", error);
       res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
+  // Route publique : taux de frais pour un pays/opérateur (utilisé côté client pour afficher les frais)
+  app.get("/api/fee-rate", async (req: Request, res: Response) => {
+    try {
+      const { country, operator } = req.query as { country?: string; operator?: string };
+      if (!country || !operator) {
+        return res.status(400).json({ error: "country et operator requis" });
+      }
+      const feeConfig = await getDynamicFees(storage, country, operator);
+      // feeConfig.incoming est en format "60" = 6%
+      const feePercentage = feeConfig.incoming / 10; // convertir en pourcentage lisible (6.0)
+      return res.json({ feePercentage, rawFee: feeConfig.incoming, provider: feeConfig.provider });
+    } catch (e) {
+      return res.status(500).json({ error: "Erreur lors de la récupération du taux" });
     }
   });
 
