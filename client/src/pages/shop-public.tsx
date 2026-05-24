@@ -583,7 +583,7 @@ export default function ShopPublicPage() {
         ) : (
           // All products, grouped by category
           <div className="space-y-12">
-            {categories.map(cat => {
+            {categories.filter(cat => (productsByCat[cat.id] || []).length > 0).map(cat => {
               const catProducts = productsByCat[cat.id] || [];
               return (
                 <section key={cat.id}>
@@ -592,8 +592,8 @@ export default function ShopPublicPage() {
                       <img src={cat.imageUrl} alt={cat.name}
                         className="w-11 h-11 rounded-xl object-cover shadow-sm flex-shrink-0" />
                     ) : (
-                      <div className="w-11 h-11 rounded-xl flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
-                        style={{ background: `linear-gradient(135deg, ${color}60, ${color}30)`, color }}>
+                      <div className="w-11 h-11 rounded-xl flex items-center justify-center font-bold text-sm flex-shrink-0"
+                        style={{ background: `linear-gradient(135deg, ${color}30, ${color}15)`, color }}>
                         {cat.name.charAt(0).toUpperCase()}
                       </div>
                     )}
@@ -605,13 +605,7 @@ export default function ShopPublicPage() {
                     </div>
                     <div className="flex-1 h-px bg-border ml-2" />
                   </div>
-                  {catProducts.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground text-sm border border-dashed rounded-2xl">
-                      Aucun produit dans cette catégorie pour le moment
-                    </div>
-                  ) : (
-                    <ProductsGrid products={catProducts} shop={shop} onSelect={setSelectedProduct} />
-                  )}
+                  <ProductsGrid products={catProducts} shop={shop} onSelect={setSelectedProduct} />
                 </section>
               );
             })}

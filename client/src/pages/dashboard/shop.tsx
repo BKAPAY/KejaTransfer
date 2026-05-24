@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -32,6 +32,92 @@ type ShopData = {
 };
 
 const CURRENCIES = ["XOF", "XAF", "CDF", "USD", "EUR", "GHS", "NGN", "MAD", "TND", "GNF", "GMD", "RWF"];
+
+// ── Utilitaire upload image ─────────────────────────────────────────────────
+async function uploadImage(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const base64 = (reader.result as string).split(",")[1];
+        const res = await fetch("/api/upload-image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ data: base64, filename: file.name, mimeType: file.type }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Upload échoué");
+        resolve(data.url);
+      } catch (e) { reject(e); }
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+// ── Composant sélecteur d'image depuis la galerie ───────────────────────────
+function ImagePickerBtn({ onUploaded, disabled, label }: {
+  onUploaded: (url: string) => void; disabled?: boolean; label?: string;
+}) {
+  const { toast } = useToast();
+  const [uploading, setUploading] = useState(false);
+  const ref = useRef<HTMLInputElement>(null);
+  const handle = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const url = await uploadImage(file);
+      onUploaded(url);
+    } catch {
+      toast({ title: "Erreur", description: "Impossible d'uploader l'image.", variant: "destructive" });
+    }
+    setUploading(false);
+    e.target.value = "";
+  };
+  return (
+    <>
+      <input ref={ref} type="file" accept="image/*" className="hidden" onChange={handle} />
+      <Button type="button" variant="outline" size="sm" disabled={uploading || disabled}
+        onClick={() => ref.current?.click()}>
+        {uploading ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <ImagePlus className="w-4 h-4 mr-1" />}
+        {label || "Choisir une photo"}
+      </Button>
+    </>
+  );
+}
+
+// ── Sélecteur fichier générique (documents, zips, pdfs...) ─────────────────
+function FilePickerBtn({ onUploaded, label }: {
+  onUploaded: (url: string, name: string) => void; label?: string;
+}) {
+  const { toast } = useToast();
+  const [uploading, setUploading] = useState(false);
+  const ref = useRef<HTMLInputElement>(null);
+  const handle = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const url = await uploadImage(file);
+      onUploaded(url, file.name);
+    } catch {
+      toast({ title: "Erreur", description: "Impossible d'uploader le fichier.", variant: "destructive" });
+    }
+    setUploading(false);
+    e.target.value = "";
+  };
+  return (
+    <>
+      <input ref={ref} type="file" className="hidden" onChange={handle} />
+      <Button type="button" variant="outline" size="sm" disabled={uploading} onClick={() => ref.current?.click()}>
+        {uploading ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Plus className="w-4 h-4 mr-1" />}
+        {label || "Fichier"}
+      </Button>
+    </>
+  );
+}
 
 const DELIVERY_METHODS = [
   { value: "email", label: "Email" },
@@ -352,21 +438,21 @@ function ProductDialog({
             <Label>Photos du produit (max 3)</Label>
             <div className="flex flex-wrap gap-2 mb-2">
               {imageUrls.map((url, i) => (
-                <div key={i} className="relative w-20 h-20 rounded-md overflow-hidden border">
+                <div key={i} className="relative w-24 h-24 rounded-xl overflow-hidden border group">
                   <img src={url} alt="" className="w-full h-full object-cover" />
-                  <button onClick={() => setImageUrls(p => p.filter((_, j) => j !== i))}
-                    className="absolute top-0 right-0 bg-destructive text-white rounded-bl-md p-0.5">
+                  <button type="button" onClick={() => setImageUrls(p => p.filter((_, j) => j !== i))}
+                    className="absolute top-1 right-1 bg-destructive text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                     <X className="w-3 h-3" />
                   </button>
                 </div>
               ))}
+              {imageUrls.length < 3 && (
+                <ImagePickerBtn
+                  label="Ajouter photo"
+                  onUploaded={url => setImageUrls(p => [...p, url])}
+                />
+              )}
             </div>
-            {imageUrls.length < 3 && (
-              <div className="flex gap-2">
-                <Input value={newImageUrl} onChange={e => setNewImageUrl(e.target.value)} placeholder="URL de l'image" />
-                <Button size="sm" variant="outline" onClick={addImage}><ImagePlus className="w-4 h-4" /></Button>
-              </div>
-            )}
           </div>
 
           {/* Fichiers téléchargeables */}
@@ -376,15 +462,19 @@ function ProductDialog({
               <div key={i} className="flex items-center gap-2 bg-muted rounded-md px-3 py-2">
                 <Download className="w-3 h-3 text-muted-foreground" />
                 <span className="text-xs flex-1 truncate">{downloadableFileNames[i] || url}</span>
-                <button onClick={() => {
+                <button type="button" onClick={() => {
                   setDownloadableFiles(p => p.filter((_, j) => j !== i));
                   setDownloadableFileNames(p => p.filter((_, j) => j !== i));
                 }}><X className="w-3 h-3 text-muted-foreground" /></button>
               </div>
             ))}
-            <div className="grid grid-cols-2 gap-2">
-              <Input value={newFileName} onChange={e => setNewFileName(e.target.value)} placeholder="Nom du fichier" />
-              <Input value={newFileUrl} onChange={e => setNewFileUrl(e.target.value)} placeholder="URL du fichier" />
+            <div className="space-y-2">
+              <Input value={newFileName} onChange={e => setNewFileName(e.target.value)} placeholder="Nom du fichier (ex: Licence Pro)" />
+              <div className="flex gap-2 items-center">
+                <Input value={newFileUrl} onChange={e => setNewFileUrl(e.target.value)} placeholder="URL du fichier téléchargeable" className="flex-1" />
+                <span className="text-xs text-muted-foreground">ou</span>
+                <FilePickerBtn label="Choisir" onUploaded={(url, name) => { setNewFileUrl(url); if (!newFileName) setNewFileName(name); }} />
+              </div>
             </div>
             <Button size="sm" variant="outline" onClick={addFile} className="w-full">
               <Plus className="w-3 h-3 mr-1" />Ajouter un fichier
@@ -476,9 +566,21 @@ function CategoryDialog({
             <Input value={name} onChange={e => setName(e.target.value)} placeholder="Ex: Vêtements" />
           </div>
           <div className="space-y-2">
-            <Label>Image (URL)</Label>
-            <Input value={imageUrl} onChange={e => setImageUrl(e.target.value)} placeholder="https://..." />
-            {imageUrl && <img src={imageUrl} alt="" className="w-full h-32 object-cover rounded-md" />}
+            <Label>Image de la catégorie</Label>
+            {imageUrl ? (
+              <div className="relative w-full h-36 rounded-xl overflow-hidden border group">
+                <img src={imageUrl} alt="" className="w-full h-full object-cover" />
+                <button type="button"
+                  onClick={() => setImageUrl("")}
+                  className="absolute top-2 right-2 bg-destructive text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ) : (
+              <div className="border border-dashed rounded-xl h-24 flex items-center justify-center bg-muted/30">
+                <ImagePickerBtn label="Choisir depuis la galerie" onUploaded={setImageUrl} />
+              </div>
+            )}
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={onClose} className="flex-1">Annuler</Button>
@@ -526,7 +628,6 @@ function SettingsSection({ shop }: { shop: Shop }) {
   const [currency, setCurrency] = useState(shop.currency);
   const [customDomain, setCustomDomain] = useState(shop.customDomain || "");
   const [slideshowUrls, setSlideshowUrls] = useState<string[]>(shop.slideshowUrls || []);
-  const [newSlide, setNewSlide] = useState("");
   const [fontFamily, setFontFamily] = useState((shop as any).fontFamily || "Poppins");
   const [primaryColor, setPrimaryColor] = useState((shop as any).primaryColor || "#6366f1");
 
@@ -719,27 +820,14 @@ function SettingsSection({ shop }: { shop: Shop }) {
             </div>
           )}
           {slideshowUrls.length < 5 && (
-            <div className="flex gap-2">
-              <Input
-                value={newSlide}
-                onChange={e => setNewSlide(e.target.value)}
-                placeholder="URL de l'image (https://...)"
-                onKeyDown={e => {
-                  if (e.key === "Enter" && newSlide.trim()) {
-                    setSlideshowUrls(p => [...p, newSlide.trim()]);
-                    setNewSlide("");
-                  }
-                }}
+            <div className="flex items-center justify-center py-2">
+              <ImagePickerBtn
+                label={`Ajouter une photo (${slideshowUrls.length}/5)`}
+                onUploaded={url => setSlideshowUrls(p => [...p, url])}
               />
-              <Button size="icon" variant="outline" onClick={() => {
-                if (!newSlide.trim()) return;
-                setSlideshowUrls(p => [...p, newSlide.trim()]);
-                setNewSlide("");
-              }}><Plus className="w-4 h-4" /></Button>
             </div>
           )}
           <Button
-            variant="outline"
             className="w-full"
             onClick={() => mutation.mutate({ slideshowUrls })}
             disabled={mutation.isPending}
@@ -764,6 +852,27 @@ export default function ShopPage() {
   const { data, isLoading } = useQuery<ShopData | null>({
     queryKey: ["/api/shop"],
   });
+
+  const seedMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/shop/seed-defaults", {});
+      return res.json();
+    },
+    onSuccess: (d) => {
+      if (d.created > 0) {
+        toast({ title: `${d.created} produits exemples créés`, description: "Vous pouvez les modifier ou supprimer depuis l'onglet Produits." });
+        queryClient.invalidateQueries({ queryKey: ["/api/shop"] });
+      }
+    },
+  });
+
+  const hasSeededRef = useRef(false);
+  useEffect(() => {
+    if (data?.shop && data.products.length === 0 && data.categories.length > 0 && !seedMutation.isPending && !hasSeededRef.current) {
+      hasSeededRef.current = true;
+      seedMutation.mutate();
+    }
+  }, [data?.products?.length, data?.categories?.length, data?.shop?.id]);
 
   const deleteProductMutation = useMutation({
     mutationFn: async (id: string) => {

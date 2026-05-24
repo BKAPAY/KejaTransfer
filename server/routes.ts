@@ -15071,6 +15071,22 @@ Ton role est de reformuler et ameliorer les messages que l'administrateur souhai
     }
   });
 
+  // POST /api/upload-image — upload base64 image, save to public/uploads
+  app.post("/api/upload-image", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { data, filename, mimeType } = req.body;
+      if (!data) return res.status(400).json({ error: "Données manquantes" });
+      const ext = (mimeType?.split("/")[1] || "jpg").replace("jpeg", "jpg");
+      const unique = `${Date.now()}-${randomUUID().slice(0, 8)}.${ext}`;
+      const uploadDir = path.join(process.cwd(), "public", "uploads");
+      if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+      fs.writeFileSync(path.join(uploadDir, unique), Buffer.from(data, "base64"));
+      return res.json({ url: `/uploads/${unique}` });
+    } catch (error: any) {
+      return res.status(500).json({ error: "Upload échoué" });
+    }
+  });
+
   // POST /api/shop — créer boutique
   app.post("/api/shop", requireAuth, async (req: Request, res: Response) => {
     try {
@@ -15138,6 +15154,78 @@ Ton role est de reformuler et ameliorer les messages que l'administrateur souhai
       if (primaryColor !== undefined) updates.primaryColor = primaryColor;
       const updated = await storage.updateShop(shop.id, updates);
       return res.json({ success: true, shop: updated });
+    } catch (error: any) {
+      return res.status(500).json({ error: "Erreur serveur" });
+    }
+  });
+
+  // POST /api/shop/seed-defaults — crée 2 produits exemples par catégorie vide
+  app.post("/api/shop/seed-defaults", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const shop = await storage.getShopByUserId(req.session.userId!);
+      if (!shop) return res.status(404).json({ error: "Boutique introuvable" });
+      const categories = await storage.getShopCategories(shop.id);
+      const products = await storage.getShopProducts(shop.id);
+      const catIds = new Set(products.map((p: any) => p.categoryId).filter(Boolean));
+      console.log(`[Seed] shopId=${shop.id} cats=${categories.length} prods=${products.length} catIds=${[...catIds].length}`);
+
+      const SAMPLE_MAP: Record<string, { name: string; desc: string; price: number; img: string }[]> = {
+        "Vêtements": [
+          { name: "Robe en wax imprimé", desc: "Superbe robe en tissu wax 100% coton, disponible en plusieurs tailles.", price: 15000, img: "https://images.unsplash.com/photo-1523381210434-271e8be1f52b?w=400" },
+          { name: "Chemise brodée homme", desc: "Chemise homme brodée à la main, coupe moderne et élégante.", price: 12000, img: "https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?w=400" },
+        ],
+        "Mode": [
+          { name: "Sac à main artisanal", desc: "Sac en cuir naturel fabriqué à la main par nos artisans.", price: 25000, img: "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=400" },
+          { name: "Chaussures mocassins", desc: "Mocassins en cuir véritable, confortables et durables.", price: 18000, img: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400" },
+        ],
+        "Électronique": [
+          { name: "Écouteurs sans fil", desc: "Écouteurs Bluetooth avec réduction de bruit active, autonomie 24h.", price: 35000, img: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400" },
+          { name: "Chargeur universel USB-C", desc: "Chargeur rapide 65W compatible tous appareils USB-C.", price: 8500, img: "https://images.unsplash.com/photo-1585771724684-38269d6639fd?w=400" },
+        ],
+        "Alimentation": [
+          { name: "Panier fruits tropicaux", desc: "Assortiment de fruits tropicaux frais livrés à domicile.", price: 7500, img: "https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=400" },
+          { name: "Épices premium du marché", desc: "Mélange d'épices artisanales, parfum intense et naturel.", price: 3500, img: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400" },
+        ],
+        "Services": [
+          { name: "Consultation en ligne 1h", desc: "Session de conseil personnalisé par visioconférence, disponible 7j/7.", price: 20000, img: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=400" },
+          { name: "Rédaction de CV professionnel", desc: "Rédaction et mise en page de votre CV par un expert RH.", price: 15000, img: "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=400" },
+        ],
+        "Numérique": [
+          { name: "Pack formation en ligne", desc: "Accès illimité à nos formations vidéo pendant 3 mois.", price: 29000, img: "https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=400" },
+          { name: "Logiciel de comptabilité", desc: "Licence annuelle du logiciel de gestion pour PME africaines.", price: 50000, img: "https://images.unsplash.com/photo-1516116216624-53e697fedbea?w=400" },
+        ],
+        "Beauté": [
+          { name: "Crème hydratante naturelle", desc: "Crème au karité et huile de coco, pour une peau lumineuse.", price: 6500, img: "https://images.unsplash.com/photo-1596755389378-c31d21fd1273?w=400" },
+          { name: "Sérum éclat visage", desc: "Sérum concentré à la vitamine C, anti-taches et anti-âge.", price: 12000, img: "https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?w=400" },
+        ],
+        "Santé": [
+          { name: "Complément alimentaire naturel", desc: "Gélules à base de plantes africaines, boost d'énergie naturel.", price: 9000, img: "https://images.unsplash.com/photo-1550572017-edd951b55104?w=400" },
+          { name: "Tisane bien-être premium", desc: "Mélange de plantes médicinales séchées, sachet de 100g.", price: 4500, img: "https://images.unsplash.com/photo-1544787219-7f47ccb76574?w=400" },
+        ],
+      };
+      const FALLBACK = [
+        { name: "Produit vedette", desc: "Notre produit le plus populaire, qualité garantie.", price: 10000, img: "https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=400" },
+        { name: "Offre spéciale", desc: "Profitez de notre offre exceptionnelle, stock limité.", price: 7500, img: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400" },
+      ];
+
+      const rawPool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+      let createdCount = 0;
+      for (const cat of categories) {
+        if (catIds.has(cat.id)) continue; // déjà des produits
+        const key = Object.keys(SAMPLE_MAP).find(k => cat.name.toLowerCase().includes(k.toLowerCase()));
+        const samples = key ? SAMPLE_MAP[key] : FALLBACK;
+        for (const s of samples) {
+          await rawPool.query(
+            `INSERT INTO shop_products (shop_id, category_id, name, description, price, image_urls, downloadable_files, downloadable_file_names, checkout_fields, delivery_method, is_active, sort_order)
+             VALUES ($1, $2, $3, $4, $5, ARRAY[$6]::text[], ARRAY[]::text[], ARRAY[]::text[], '[]'::json, 'email', true, 0)`,
+            [shop.id, cat.id, s.name, s.desc, s.price, s.img]
+          );
+          createdCount++;
+        }
+      }
+      await rawPool.end();
+      console.log(`[Seed] Créé ${createdCount} produits pour boutique ${shop.id}`);
+      return res.json({ success: true, created: createdCount });
     } catch (error: any) {
       return res.status(500).json({ error: "Erreur serveur" });
     }
