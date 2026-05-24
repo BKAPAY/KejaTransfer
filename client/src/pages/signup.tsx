@@ -232,7 +232,6 @@ export default function Signup() {
                   <li>• Nécessite une pièce d'identité</li>
                   <li>• Documents d'entreprise</li>
                   <li>• Preuve de résidence</li>
-                  <li>• Compte bancaire</li>
                 </ul>
               </CardContent>
             </Card>
