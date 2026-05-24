@@ -61,19 +61,22 @@ function CreateShopForm({ onCreated }: { onCreated: () => void }) {
 
   const mutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/shop", { name, description, currency });
-      return res.json();
+      const res = await fetch("/api/shop", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ name, description, currency }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Erreur ${res.status}`);
+      return data;
     },
     onSuccess: (data) => {
-      if (data.error) {
-        toast({ title: "Erreur", description: data.error, variant: "destructive" });
-        return;
-      }
       toast({ title: "Boutique créée !", description: `Votre boutique "${data.shop.name}" est prête.` });
       queryClient.invalidateQueries({ queryKey: ["/api/shop"] });
       onCreated();
     },
-    onError: () => toast({ title: "Erreur", description: "Impossible de créer la boutique.", variant: "destructive" }),
+    onError: (err: any) => toast({ title: "Erreur", description: err?.message || "Impossible de créer la boutique.", variant: "destructive" }),
   });
 
   return (
