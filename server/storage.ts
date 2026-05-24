@@ -297,6 +297,7 @@ export interface IStorage {
   deleteSalaryAccountCompletely(userId: string): Promise<void>;
 
   // Shops
+  getShopById(id: string): Promise<schema.Shop | undefined>;
   getShopByUserId(userId: string): Promise<schema.Shop | undefined>;
   getShopBySlug(slug: string): Promise<schema.Shop | undefined>;
   getShopByCustomDomain(domain: string): Promise<schema.Shop | undefined>;
@@ -3489,6 +3490,11 @@ export class DbStorage implements IStorage {
   }
 
   // ─── SHOPS ──────────────────────────────────────────────────────────────────
+
+  async getShopById(id: string): Promise<schema.Shop | undefined> {
+    const rows = await db.select().from(schema.shops).where(eq(schema.shops.id, id)).limit(1);
+    return rows[0];
+  }
 
   async getShopByUserId(userId: string): Promise<schema.Shop | undefined> {
     const rows = await db.select().from(schema.shops).where(eq(schema.shops.userId, userId)).limit(1);

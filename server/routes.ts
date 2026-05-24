@@ -15448,7 +15448,7 @@ Ton role est de reformuler et ameliorer les messages que l'administrateur souhai
       const product = await storage.getShopProduct(productId);
       if (!product || !product.isActive) return res.status(404).json({ error: "Produit introuvable" });
       if (product.shopId !== shopId) return res.status(400).json({ error: "Produit non disponible dans cette boutique" });
-      const shop = await storage.getShopByUserId((await storage.getShopByUserId(product.shopId) as any)?.userId || "");
+      const shop = await storage.getShopById(shopId);
       const order = await storage.createShopOrder({
         shopId,
         productId,
@@ -15457,7 +15457,7 @@ Ton role est de reformuler et ameliorer les messages que l'administrateur souhai
         customerPhone: customerPhone || null,
         checkoutData: checkoutData || {},
         amount: product.price,
-        currency: "XOF",
+        currency: shop?.currency || "XOF",
         status: "pending",
         deliveryMethod: deliveryMethod || product.deliveryMethod || "email",
       });

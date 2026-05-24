@@ -696,6 +696,52 @@ function loadGoogleFontDash(family: string) {
   document.head.appendChild(link);
 }
 
+function OrdersSection({ orders, products }: { orders: ShopOrder[]; products: ShopProduct[] }) {
+  const visibleOrders = orders.filter(o => o.status !== "pending");
+  return (
+    <div className="space-y-3">
+      <h2 className="font-semibold">Commandes reçues</h2>
+      {visibleOrders.length === 0 ? (
+        <Card>
+          <CardContent className="p-8 text-center text-muted-foreground">
+            <ShoppingBag className="w-12 h-12 mx-auto mb-3 opacity-30" />
+            <p>Aucune commande pour l'instant.</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-2">
+          {visibleOrders.map(order => {
+            const prod = products.find(p => p.id === order.productId);
+            return (
+              <Card key={order.id} data-testid={`card-order-${order.id}`}>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <div>
+                      <p className="font-medium text-sm">{prod?.name || "Produit"}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {order.customerName || "Client"} · {order.customerEmail || order.customerPhone || ""}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-semibold text-sm">{order.amount.toLocaleString()} {order.currency}</p>
+                      <Badge
+                        variant={order.status === "completed" ? "default" : "destructive"}
+                        className="text-xs"
+                      >
+                        {order.status === "completed" ? "Payé" : "Échoué"}
+                      </Badge>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SettingsSection({ shop }: { shop: Shop }) {
   const { toast } = useToast();
   const [currency, setCurrency] = useState(shop.currency);
@@ -1348,46 +1394,7 @@ export default function ShopPage() {
 
       {/* Commandes */}
       {activeTab === "orders" && (
-        <div className="space-y-3">
-          <h2 className="font-semibold">Commandes reçues</h2>
-          {orders.length === 0 ? (
-            <Card>
-              <CardContent className="p-8 text-center text-muted-foreground">
-                <ShoppingBag className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                <p>Aucune commande pour l'instant.</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-2">
-              {orders.map(order => {
-                const prod = products.find(p => p.id === order.productId);
-                return (
-                  <Card key={order.id} data-testid={`card-order-${order.id}`}>
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between gap-3 flex-wrap">
-                        <div>
-                          <p className="font-medium text-sm">{prod?.name || "Produit"}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {order.customerName || "Client"} · {order.customerEmail || order.customerPhone || ""}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-semibold text-sm">{order.amount.toLocaleString()} {order.currency}</p>
-                          <Badge
-                            variant={order.status === "completed" ? "default" : order.status === "failed" ? "destructive" : "secondary"}
-                            className="text-xs"
-                          >
-                            {order.status === "completed" ? "Payé" : order.status === "failed" ? "Échoué" : "En attente"}
-                          </Badge>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
-        </div>
+        <OrdersSection orders={orders} products={products} />
       )}
 
       {/* Paramètres */}
