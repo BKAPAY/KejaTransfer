@@ -679,7 +679,9 @@ function SettingsSection({ shop }: { shop: Shop }) {
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
-              Créez un enregistrement CNAME vers <code>shops.bkapay.com</code> chez votre registrar.
+              Chez votre registrar DNS, créez un enregistrement <strong>CNAME</strong> qui pointe{" "}
+              <code>{customDomain || "votre-domaine.com"}</code> vers{" "}
+              <code>{window.location.hostname}</code>. Une fois configuré, votre boutique sera accessible sur votre domaine.
             </p>
           </div>
         </CardContent>

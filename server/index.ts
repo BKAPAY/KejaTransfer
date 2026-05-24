@@ -4,6 +4,7 @@ import { setupVite, serveStatic, log } from "./vite";
 import { bootstrapDatabase } from "./db-bootstrap";
 import { startPaymentPolling, stopPaymentPolling } from "./payment-polling";
 import { startSalaryScheduler, stopSalaryScheduler } from "./salary-scheduler";
+import { storage } from "./storage";
 
 const app = express();
 
@@ -28,6 +29,42 @@ app.use((req, res, next) => {
     res.setHeader("X-Robots-Tag", "index, follow");
   }
   next();
+});
+
+// ── Custom domain middleware ──────────────────────────────────────────────────
+// Si le hostname ne correspond pas au domaine BKApay principal, on cherche
+// une boutique avec ce custom_domain et on redirige vers /shop/:slug
+app.use(async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const hostname = req.hostname;
+    // Ignorer les domaines internes (localhost, replit.dev, bkapay.com, sous-domaines)
+    const isInternalDomain = (
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname.endsWith(".replit.dev") ||
+      hostname.endsWith(".replit.app") ||
+      hostname.endsWith(".kirk.replit.dev") ||
+      hostname === "bkapay.com" ||
+      hostname.endsWith(".bkapay.com")
+    );
+    if (isInternalDomain) return next();
+
+    // On cherche uniquement pour les requêtes non-API et non-assets
+    if (req.path.startsWith("/api/") || req.path.startsWith("/assets/") || req.path.startsWith("/uploads/")) {
+      return next();
+    }
+
+    const shop = await storage.getShopByCustomDomain(hostname);
+    if (shop) {
+      // Si déjà sur /shop/:slug on continue normalement
+      if (req.path.startsWith(`/shop/${shop.slug}`)) return next();
+      // Sinon rediriger vers la boutique
+      return res.redirect(302, `/shop/${shop.slug}${req.path === "/" ? "" : req.path}`);
+    }
+    next();
+  } catch {
+    next();
+  }
 });
 
 app.get("/healthz", (_req, res) => {

@@ -299,6 +299,7 @@ export interface IStorage {
   // Shops
   getShopByUserId(userId: string): Promise<schema.Shop | undefined>;
   getShopBySlug(slug: string): Promise<schema.Shop | undefined>;
+  getShopByCustomDomain(domain: string): Promise<schema.Shop | undefined>;
   createShop(data: schema.InsertShop): Promise<schema.Shop>;
   updateShop(id: string, updates: Partial<schema.InsertShop>): Promise<schema.Shop | undefined>;
   deleteShop(id: string): Promise<void>;
@@ -3485,6 +3486,13 @@ export class DbStorage implements IStorage {
 
   async getShopBySlug(slug: string): Promise<schema.Shop | undefined> {
     const rows = await db.select().from(schema.shops).where(eq(schema.shops.slug, slug)).limit(1);
+    return rows[0];
+  }
+
+  async getShopByCustomDomain(domain: string): Promise<schema.Shop | undefined> {
+    const rows = await db.select().from(schema.shops)
+      .where(eq(schema.shops.customDomain, domain.toLowerCase()))
+      .limit(1);
     return rows[0];
   }
 
