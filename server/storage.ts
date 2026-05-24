@@ -873,7 +873,11 @@ export class DbStorage implements IStorage {
       .where(and(eq(schema.apiKeys.id, id), eq(schema.apiKeys.userId, userId)))
       .limit(1);
     if (existing.length === 0) return false;
-    // Delete dependent payment sessions first to avoid FK constraint violation
+    // Délier les boutiques qui référencent cette clé (FK shops.apiKeyId → apiKeys.id)
+    await db.update(schema.shops)
+      .set({ apiKeyId: null })
+      .where(eq(schema.shops.apiKeyId, id));
+    // Supprimer les sessions de paiement dépendantes
     await db.delete(schema.paymentSessions).where(eq(schema.paymentSessions.apiKeyId, id));
     await db.delete(schema.apiKeys).where(eq(schema.apiKeys.id, id));
     return true;
