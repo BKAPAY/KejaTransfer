@@ -295,6 +295,31 @@ export interface IStorage {
   getAllSalaryAccountsForAdmin(): Promise<(schema.SalaryAccount & { user?: User })[]>;
   updateUserSalaryFlag(userId: string, isSalary: boolean): Promise<void>;
   deleteSalaryAccountCompletely(userId: string): Promise<void>;
+
+  // Shops
+  getShopByUserId(userId: string): Promise<schema.Shop | undefined>;
+  getShopBySlug(slug: string): Promise<schema.Shop | undefined>;
+  createShop(data: schema.InsertShop): Promise<schema.Shop>;
+  updateShop(id: string, updates: Partial<schema.InsertShop>): Promise<schema.Shop | undefined>;
+  deleteShop(id: string): Promise<void>;
+
+  // Shop categories
+  getShopCategories(shopId: string): Promise<schema.ShopCategory[]>;
+  createShopCategory(data: schema.InsertShopCategory): Promise<schema.ShopCategory>;
+  updateShopCategory(id: string, updates: Partial<schema.InsertShopCategory>): Promise<schema.ShopCategory | undefined>;
+  deleteShopCategory(id: string): Promise<void>;
+
+  // Shop products
+  getShopProducts(shopId: string): Promise<schema.ShopProduct[]>;
+  getShopProduct(id: string): Promise<schema.ShopProduct | undefined>;
+  createShopProduct(data: schema.InsertShopProduct): Promise<schema.ShopProduct>;
+  updateShopProduct(id: string, updates: Partial<schema.InsertShopProduct>): Promise<schema.ShopProduct | undefined>;
+  deleteShopProduct(id: string): Promise<void>;
+
+  // Shop orders
+  getShopOrders(shopId: string): Promise<schema.ShopOrder[]>;
+  createShopOrder(data: schema.InsertShopOrder): Promise<schema.ShopOrder>;
+  updateShopOrder(id: string, updates: Partial<schema.InsertShopOrder>): Promise<schema.ShopOrder | undefined>;
 }
 
 export class DbStorage implements IStorage {
@@ -3449,6 +3474,105 @@ export class DbStorage implements IStorage {
     await db.update(schema.users)
       .set({ isSalary })
       .where(eq(schema.users.id, userId));
+  }
+
+  // ─── SHOPS ──────────────────────────────────────────────────────────────────
+
+  async getShopByUserId(userId: string): Promise<schema.Shop | undefined> {
+    const rows = await db.select().from(schema.shops).where(eq(schema.shops.userId, userId)).limit(1);
+    return rows[0];
+  }
+
+  async getShopBySlug(slug: string): Promise<schema.Shop | undefined> {
+    const rows = await db.select().from(schema.shops).where(eq(schema.shops.slug, slug)).limit(1);
+    return rows[0];
+  }
+
+  async createShop(data: schema.InsertShop): Promise<schema.Shop> {
+    const rows = await db.insert(schema.shops).values(data).returning();
+    return rows[0];
+  }
+
+  async updateShop(id: string, updates: Partial<schema.InsertShop>): Promise<schema.Shop | undefined> {
+    const rows = await db.update(schema.shops)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(schema.shops.id, id))
+      .returning();
+    return rows[0];
+  }
+
+  async deleteShop(id: string): Promise<void> {
+    await db.delete(schema.shops).where(eq(schema.shops.id, id));
+  }
+
+  async getShopCategories(shopId: string): Promise<schema.ShopCategory[]> {
+    return db.select().from(schema.shopCategories)
+      .where(eq(schema.shopCategories.shopId, shopId))
+      .orderBy(schema.shopCategories.sortOrder);
+  }
+
+  async createShopCategory(data: schema.InsertShopCategory): Promise<schema.ShopCategory> {
+    const rows = await db.insert(schema.shopCategories).values(data).returning();
+    return rows[0];
+  }
+
+  async updateShopCategory(id: string, updates: Partial<schema.InsertShopCategory>): Promise<schema.ShopCategory | undefined> {
+    const rows = await db.update(schema.shopCategories)
+      .set(updates)
+      .where(eq(schema.shopCategories.id, id))
+      .returning();
+    return rows[0];
+  }
+
+  async deleteShopCategory(id: string): Promise<void> {
+    await db.delete(schema.shopCategories).where(eq(schema.shopCategories.id, id));
+  }
+
+  async getShopProducts(shopId: string): Promise<schema.ShopProduct[]> {
+    return db.select().from(schema.shopProducts)
+      .where(eq(schema.shopProducts.shopId, shopId))
+      .orderBy(schema.shopProducts.sortOrder, desc(schema.shopProducts.createdAt));
+  }
+
+  async getShopProduct(id: string): Promise<schema.ShopProduct | undefined> {
+    const rows = await db.select().from(schema.shopProducts).where(eq(schema.shopProducts.id, id)).limit(1);
+    return rows[0];
+  }
+
+  async createShopProduct(data: schema.InsertShopProduct): Promise<schema.ShopProduct> {
+    const rows = await db.insert(schema.shopProducts).values(data).returning();
+    return rows[0];
+  }
+
+  async updateShopProduct(id: string, updates: Partial<schema.InsertShopProduct>): Promise<schema.ShopProduct | undefined> {
+    const rows = await db.update(schema.shopProducts)
+      .set(updates)
+      .where(eq(schema.shopProducts.id, id))
+      .returning();
+    return rows[0];
+  }
+
+  async deleteShopProduct(id: string): Promise<void> {
+    await db.delete(schema.shopProducts).where(eq(schema.shopProducts.id, id));
+  }
+
+  async getShopOrders(shopId: string): Promise<schema.ShopOrder[]> {
+    return db.select().from(schema.shopOrders)
+      .where(eq(schema.shopOrders.shopId, shopId))
+      .orderBy(desc(schema.shopOrders.createdAt));
+  }
+
+  async createShopOrder(data: schema.InsertShopOrder): Promise<schema.ShopOrder> {
+    const rows = await db.insert(schema.shopOrders).values(data).returning();
+    return rows[0];
+  }
+
+  async updateShopOrder(id: string, updates: Partial<schema.InsertShopOrder>): Promise<schema.ShopOrder | undefined> {
+    const rows = await db.update(schema.shopOrders)
+      .set(updates)
+      .where(eq(schema.shopOrders.id, id))
+      .returning();
+    return rows[0];
   }
 }
 

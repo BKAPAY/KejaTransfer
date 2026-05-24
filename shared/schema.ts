@@ -1012,5 +1012,95 @@ export type SalaryTransaction = typeof salaryTransactions.$inferSelect;
 export const insertSalaryTransactionSchema = createInsertSchema(salaryTransactions).omit({ id: true, createdAt: true });
 export type InsertSalaryTransaction = z.infer<typeof insertSalaryTransactionSchema>;
 
+// ─── BOUTIQUES ─────────────────────────────────────────────────────────────
+
+export const shops = pgTable("shops", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+  description: text("description"),
+  logoUrl: text("logo_url"),
+  // Slideshow: up to 5 images
+  slideshowUrls: text("slideshow_urls").array().default([]),
+  // Currency chosen by the shop owner
+  currency: text("currency").notNull().default("XOF"),
+  // Custom domain (display only for now)
+  customDomain: text("custom_domain"),
+  // Linked API key id (auto-generated)
+  apiKeyId: varchar("api_key_id").references(() => apiKeys.id),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export type Shop = typeof shops.$inferSelect;
+export const insertShopSchema = createInsertSchema(shops).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertShop = z.infer<typeof insertShopSchema>;
+
+export const shopCategories = pgTable("shop_categories", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  shopId: varchar("shop_id").notNull().references(() => shops.id),
+  name: text("name").notNull(),
+  imageUrl: text("image_url"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type ShopCategory = typeof shopCategories.$inferSelect;
+export const insertShopCategorySchema = createInsertSchema(shopCategories).omit({ id: true, createdAt: true });
+export type InsertShopCategory = z.infer<typeof insertShopCategorySchema>;
+
+export const shopProducts = pgTable("shop_products", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  shopId: varchar("shop_id").notNull().references(() => shops.id),
+  categoryId: varchar("category_id").references(() => shopCategories.id),
+  name: text("name").notNull(),
+  description: text("description"),
+  price: real("price").notNull(),
+  // up to 3 product photos
+  imageUrls: text("image_urls").array().default([]),
+  // downloadable files (URLs) sent after payment
+  downloadableFiles: text("downloadable_files").array().default([]),
+  downloadableFileNames: text("downloadable_file_names").array().default([]),
+  // Custom fields to fill at checkout (JSON array of {label, required})
+  checkoutFields: json("checkout_fields").default([]),
+  // Delivery method preference: "email" | "whatsapp" | "both"
+  deliveryMethod: text("delivery_method").default("email"),
+  stock: integer("stock"), // null = unlimited
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type ShopProduct = typeof shopProducts.$inferSelect;
+export const insertShopProductSchema = createInsertSchema(shopProducts).omit({ id: true, createdAt: true });
+export type InsertShopProduct = z.infer<typeof insertShopProductSchema>;
+
+export const shopOrders = pgTable("shop_orders", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  shopId: varchar("shop_id").notNull().references(() => shops.id),
+  productId: varchar("product_id").notNull().references(() => shopProducts.id),
+  // Customer info
+  customerName: text("customer_name"),
+  customerEmail: text("customer_email"),
+  customerPhone: text("customer_phone"),
+  // Dynamic checkout fields values (JSON)
+  checkoutData: json("checkout_data").default({}),
+  amount: real("amount").notNull(),
+  currency: text("currency").notNull().default("XOF"),
+  // Payment reference from BKApay inline
+  paymentReference: text("payment_reference"),
+  status: text("status").notNull().default("pending"), // pending | completed | failed
+  // Delivery tracking
+  deliveryMethod: text("delivery_method").default("email"),
+  deliverySentAt: timestamp("delivery_sent_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type ShopOrder = typeof shopOrders.$inferSelect;
+export const insertShopOrderSchema = createInsertSchema(shopOrders).omit({ id: true, createdAt: true });
+export type InsertShopOrder = z.infer<typeof insertShopOrderSchema>;
+
 // Chat schema for EMALI
 export * from "./models/chat";

@@ -15028,6 +15028,363 @@ Ton role est de reformuler et ameliorer les messages que l'administrateur souhai
     }
   });
 
+  // ─── BOUTIQUES ────────────────────────────────────────────────────────────
+
+  // Default slideshow images (BKApay branded)
+  const DEFAULT_SLIDESHOW = [
+    "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=1200&q=80",
+    "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=1200&q=80",
+    "https://images.unsplash.com/photo-1472851294608-062f824d29cc?w=1200&q=80",
+  ];
+
+  // Default categories (BKApay branded)
+  const DEFAULT_CATEGORIES = [
+    { name: "Vêtements & Mode", imageUrl: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=400&q=80" },
+    { name: "Électronique", imageUrl: "https://images.unsplash.com/photo-1498049794561-7780e7231661?w=400&q=80" },
+    { name: "Alimentation", imageUrl: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400&q=80" },
+    { name: "Services", imageUrl: "https://images.unsplash.com/photo-1521791136064-7986c2920216?w=400&q=80" },
+    { name: "Numérique", imageUrl: "https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=400&q=80" },
+    { name: "Beauté & Santé", imageUrl: "https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?w=400&q=80" },
+  ];
+
+  function generateShopSlug(name: string): string {
+    return name
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "")
+      .substring(0, 40);
+  }
+
+  // GET /api/shop — ma boutique
+  app.get("/api/shop", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const shop = await storage.getShopByUserId(req.session.userId!);
+      if (!shop) return res.json(null);
+      const categories = await storage.getShopCategories(shop.id);
+      const products = await storage.getShopProducts(shop.id);
+      const orders = await storage.getShopOrders(shop.id);
+      return res.json({ shop, categories, products, orders });
+    } catch (error: any) {
+      return res.status(500).json({ error: "Erreur serveur" });
+    }
+  });
+
+  // POST /api/shop — créer boutique
+  app.post("/api/shop", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ error: "Non authentifié" });
+      if (user.accountType !== "personal") return res.status(403).json({ error: "Réservé aux comptes personnels" });
+
+      const existing = await storage.getShopByUserId(req.session.userId!);
+      if (existing) return res.status(400).json({ error: "Vous avez déjà une boutique" });
+
+      const { name, description, currency } = req.body;
+      if (!name || typeof name !== "string" || name.trim().length < 2) {
+        return res.status(400).json({ error: "Nom de boutique requis (min 2 caractères)" });
+      }
+
+      let baseSlug = generateShopSlug(name.trim());
+      let slug = baseSlug;
+      let attempt = 0;
+      while (await storage.getShopBySlug(slug)) {
+        attempt++;
+        slug = `${baseSlug}-${attempt}`;
+      }
+
+      const shop = await storage.createShop({
+        userId: req.session.userId!,
+        name: name.trim(),
+        slug,
+        description: description || null,
+        currency: currency || "XOF",
+        slideshowUrls: DEFAULT_SLIDESHOW,
+        isActive: true,
+      });
+
+      // Create default categories
+      for (let i = 0; i < DEFAULT_CATEGORIES.length; i++) {
+        await storage.createShopCategory({
+          shopId: shop.id,
+          name: DEFAULT_CATEGORIES[i].name,
+          imageUrl: DEFAULT_CATEGORIES[i].imageUrl,
+          sortOrder: i,
+        });
+      }
+
+      return res.json({ success: true, shop });
+    } catch (error: any) {
+      console.error("[Shop] Create error:", error);
+      return res.status(500).json({ error: "Erreur serveur" });
+    }
+  });
+
+  // PATCH /api/shop — mettre à jour boutique
+  app.patch("/api/shop", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const shop = await storage.getShopByUserId(req.session.userId!);
+      if (!shop) return res.status(404).json({ error: "Boutique introuvable" });
+      const { name, description, currency, logoUrl, slideshowUrls, customDomain } = req.body;
+      const updates: any = {};
+      if (name !== undefined) updates.name = name;
+      if (description !== undefined) updates.description = description;
+      if (currency !== undefined) updates.currency = currency;
+      if (logoUrl !== undefined) updates.logoUrl = logoUrl;
+      if (slideshowUrls !== undefined) updates.slideshowUrls = slideshowUrls;
+      if (customDomain !== undefined) updates.customDomain = customDomain || null;
+      const updated = await storage.updateShop(shop.id, updates);
+      return res.json({ success: true, shop: updated });
+    } catch (error: any) {
+      return res.status(500).json({ error: "Erreur serveur" });
+    }
+  });
+
+  // POST /api/shop/link-api-key — lier automatiquement une clé API à la boutique
+  app.post("/api/shop/link-api-key", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ error: "Non authentifié" });
+
+      if (user.kycStatus !== "verified") {
+        return res.status(403).json({
+          error: "Vous devez vérifier votre identité (KYC) avant de lier votre clé API. Accédez à la section Vérification KYC."
+        });
+      }
+
+      const shop = await storage.getShopByUserId(req.session.userId!);
+      if (!shop) return res.status(404).json({ error: "Boutique introuvable" });
+
+      // If already linked, return existing key
+      if (shop.apiKeyId) {
+        const existingKey = await storage.getApiKeyById(shop.apiKeyId);
+        if (existingKey) return res.json({ success: true, apiKey: existingKey });
+      }
+
+      // Generate API key automatically for the shop
+      const publicKey = `pk_live_shop_${randomUUID().replace(/-/g, "")}`;
+      const privateKey = `sk_live_shop_${randomUUID().replace(/-/g, "")}`;
+      const payinPrivateKey = `sk_payin_live_shop_${randomUUID().replace(/-/g, "")}`;
+      const callbackSecret = randomUUID().replace(/-/g, "");
+
+      const webhookUrl = `${process.env.BASE_URL || "https://bkapay.com"}/api/shop/webhook/${shop.slug}`;
+
+      const apiKey = await storage.createApiKey({
+        userId: req.session.userId!,
+        name: `Boutique: ${shop.name}`,
+        siteName: shop.name,
+        publicKey,
+        privateKey,
+        payinPrivateKey,
+        callbackUrl: webhookUrl,
+        callbackSecret,
+        isActive: true,
+        customerPaysFee: false,
+      });
+
+      await storage.updateShop(shop.id, { apiKeyId: apiKey.id });
+
+      return res.json({ success: true, apiKey });
+    } catch (error: any) {
+      console.error("[Shop] Link API key error:", error);
+      return res.status(500).json({ error: "Erreur serveur" });
+    }
+  });
+
+  // GET /api/shop/public/:slug — boutique publique
+  app.get("/api/shop/public/:slug", async (req: Request, res: Response) => {
+    try {
+      const shop = await storage.getShopBySlug(req.params.slug);
+      if (!shop || !shop.isActive) return res.status(404).json({ error: "Boutique introuvable" });
+      const categories = await storage.getShopCategories(shop.id);
+      const products = (await storage.getShopProducts(shop.id)).filter(p => p.isActive);
+      // Don't expose apiKeyId on public page
+      const { apiKeyId, ...publicShop } = shop;
+      return res.json({ shop: publicShop, categories, products });
+    } catch (error: any) {
+      return res.status(500).json({ error: "Erreur serveur" });
+    }
+  });
+
+  // GET /api/shop/public/:slug/api-public-key — clé publique pour Inline
+  app.get("/api/shop/public/:slug/api-public-key", async (req: Request, res: Response) => {
+    try {
+      const shop = await storage.getShopBySlug(req.params.slug);
+      if (!shop || !shop.isActive || !shop.apiKeyId) return res.status(404).json({ error: "Paiement non configuré" });
+      const apiKey = await storage.getApiKeyById(shop.apiKeyId);
+      if (!apiKey || !apiKey.isActive) return res.status(404).json({ error: "Paiement non configuré" });
+      return res.json({ publicKey: apiKey.publicKey, siteName: apiKey.siteName });
+    } catch (error: any) {
+      return res.status(500).json({ error: "Erreur serveur" });
+    }
+  });
+
+  // POST /api/shop/webhook/:slug — webhook paiement inline
+  app.post("/api/shop/webhook/:slug", async (req: Request, res: Response) => {
+    try {
+      const shop = await storage.getShopBySlug(req.params.slug);
+      if (!shop) return res.status(404).json({ error: "Boutique introuvable" });
+      const { reference, status, orderId } = req.body;
+      if (orderId && status) {
+        await storage.updateShopOrder(orderId, {
+          status: status === "completed" ? "completed" : status === "failed" ? "failed" : "pending",
+          paymentReference: reference || undefined,
+        });
+      }
+      return res.json({ received: true });
+    } catch (error: any) {
+      return res.status(500).json({ error: "Erreur serveur" });
+    }
+  });
+
+  // ── Categories ──
+  app.get("/api/shop/categories", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const shop = await storage.getShopByUserId(req.session.userId!);
+      if (!shop) return res.status(404).json({ error: "Boutique introuvable" });
+      return res.json(await storage.getShopCategories(shop.id));
+    } catch (e) { return res.status(500).json({ error: "Erreur serveur" }); }
+  });
+
+  app.post("/api/shop/categories", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const shop = await storage.getShopByUserId(req.session.userId!);
+      if (!shop) return res.status(404).json({ error: "Boutique introuvable" });
+      const { name, imageUrl, sortOrder } = req.body;
+      if (!name) return res.status(400).json({ error: "Nom requis" });
+      const cat = await storage.createShopCategory({ shopId: shop.id, name, imageUrl: imageUrl || null, sortOrder: sortOrder ?? 0 });
+      return res.json(cat);
+    } catch (e) { return res.status(500).json({ error: "Erreur serveur" }); }
+  });
+
+  app.patch("/api/shop/categories/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const shop = await storage.getShopByUserId(req.session.userId!);
+      if (!shop) return res.status(404).json({ error: "Boutique introuvable" });
+      const { name, imageUrl, sortOrder } = req.body;
+      const updated = await storage.updateShopCategory(req.params.id, { name, imageUrl, sortOrder });
+      return res.json(updated);
+    } catch (e) { return res.status(500).json({ error: "Erreur serveur" }); }
+  });
+
+  app.delete("/api/shop/categories/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      await storage.deleteShopCategory(req.params.id);
+      return res.json({ success: true });
+    } catch (e) { return res.status(500).json({ error: "Erreur serveur" }); }
+  });
+
+  // ── Products ──
+  app.get("/api/shop/products", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const shop = await storage.getShopByUserId(req.session.userId!);
+      if (!shop) return res.status(404).json({ error: "Boutique introuvable" });
+      return res.json(await storage.getShopProducts(shop.id));
+    } catch (e) { return res.status(500).json({ error: "Erreur serveur" }); }
+  });
+
+  app.post("/api/shop/products", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const shop = await storage.getShopByUserId(req.session.userId!);
+      if (!shop) return res.status(404).json({ error: "Boutique introuvable" });
+      const { name, description, price, categoryId, imageUrls, downloadableFiles, downloadableFileNames, checkoutFields, deliveryMethod, stock, sortOrder } = req.body;
+      if (!name || price == null) return res.status(400).json({ error: "Nom et prix requis" });
+      const product = await storage.createShopProduct({
+        shopId: shop.id,
+        name,
+        description: description || null,
+        price: Number(price),
+        categoryId: categoryId || null,
+        imageUrls: imageUrls || [],
+        downloadableFiles: downloadableFiles || [],
+        downloadableFileNames: downloadableFileNames || [],
+        checkoutFields: checkoutFields || [],
+        deliveryMethod: deliveryMethod || "email",
+        stock: stock != null ? Number(stock) : null,
+        isActive: true,
+        sortOrder: sortOrder ?? 0,
+      });
+      return res.json(product);
+    } catch (e: any) { return res.status(500).json({ error: "Erreur serveur" }); }
+  });
+
+  app.patch("/api/shop/products/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const shop = await storage.getShopByUserId(req.session.userId!);
+      if (!shop) return res.status(404).json({ error: "Boutique introuvable" });
+      const { name, description, price, categoryId, imageUrls, downloadableFiles, downloadableFileNames, checkoutFields, deliveryMethod, stock, isActive, sortOrder } = req.body;
+      const updates: any = {};
+      if (name !== undefined) updates.name = name;
+      if (description !== undefined) updates.description = description;
+      if (price !== undefined) updates.price = Number(price);
+      if (categoryId !== undefined) updates.categoryId = categoryId || null;
+      if (imageUrls !== undefined) updates.imageUrls = imageUrls;
+      if (downloadableFiles !== undefined) updates.downloadableFiles = downloadableFiles;
+      if (downloadableFileNames !== undefined) updates.downloadableFileNames = downloadableFileNames;
+      if (checkoutFields !== undefined) updates.checkoutFields = checkoutFields;
+      if (deliveryMethod !== undefined) updates.deliveryMethod = deliveryMethod;
+      if (stock !== undefined) updates.stock = stock != null ? Number(stock) : null;
+      if (isActive !== undefined) updates.isActive = isActive;
+      if (sortOrder !== undefined) updates.sortOrder = sortOrder;
+      const updated = await storage.updateShopProduct(req.params.id, updates);
+      return res.json(updated);
+    } catch (e) { return res.status(500).json({ error: "Erreur serveur" }); }
+  });
+
+  app.delete("/api/shop/products/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      await storage.deleteShopProduct(req.params.id);
+      return res.json({ success: true });
+    } catch (e) { return res.status(500).json({ error: "Erreur serveur" }); }
+  });
+
+  // ── Orders ──
+  app.get("/api/shop/orders", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const shop = await storage.getShopByUserId(req.session.userId!);
+      if (!shop) return res.status(404).json({ error: "Boutique introuvable" });
+      return res.json(await storage.getShopOrders(shop.id));
+    } catch (e) { return res.status(500).json({ error: "Erreur serveur" }); }
+  });
+
+  // POST /api/shop/orders — créer commande (public)
+  app.post("/api/shop/orders", async (req: Request, res: Response) => {
+    try {
+      const { shopId, productId, customerName, customerEmail, customerPhone, checkoutData, deliveryMethod } = req.body;
+      if (!shopId || !productId) return res.status(400).json({ error: "Données manquantes" });
+      const product = await storage.getShopProduct(productId);
+      if (!product || !product.isActive) return res.status(404).json({ error: "Produit introuvable" });
+      if (product.shopId !== shopId) return res.status(400).json({ error: "Produit non disponible dans cette boutique" });
+      const shop = await storage.getShopByUserId((await storage.getShopByUserId(product.shopId) as any)?.userId || "");
+      const order = await storage.createShopOrder({
+        shopId,
+        productId,
+        customerName: customerName || null,
+        customerEmail: customerEmail || null,
+        customerPhone: customerPhone || null,
+        checkoutData: checkoutData || {},
+        amount: product.price,
+        currency: "XOF",
+        status: "pending",
+        deliveryMethod: deliveryMethod || product.deliveryMethod || "email",
+      });
+      return res.json({ success: true, order });
+    } catch (e: any) { return res.status(500).json({ error: "Erreur serveur" }); }
+  });
+
+  // POST /api/shop/orders/:id/confirm — confirmer paiement
+  app.post("/api/shop/orders/:id/confirm", async (req: Request, res: Response) => {
+    try {
+      const { paymentReference } = req.body;
+      const updated = await storage.updateShopOrder(req.params.id, {
+        status: "completed",
+        paymentReference: paymentReference || null,
+      });
+      return res.json({ success: true, order: updated });
+    } catch (e) { return res.status(500).json({ error: "Erreur serveur" }); }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

@@ -106,6 +106,8 @@ const AdminUserConnections = lazy(() => import("@/pages/dashboard/admin-user-con
 const AdminUserFeesPage = lazy(() => import("@/pages/dashboard/admin-user-fees-page"));
 const SalaryPage = lazy(() => import("@/pages/dashboard/salary"));
 const AdminUserSalary = lazy(() => import("@/pages/dashboard/admin-user-salary"));
+const ShopPage = lazy(() => import("@/pages/dashboard/shop"));
+const ShopPublicPage = lazy(() => import("@/pages/shop-public"));
 const BusinessDashboard = lazy(() => import("@/pages/dashboard/business/index"));
 const BusinessProfile = lazy(() => import("@/pages/dashboard/business/profile"));
 const BusinessKyc = lazy(() => import("@/pages/dashboard/business/kyc"));
@@ -354,6 +356,7 @@ function Router() {
           <Route path="/dashboard/admin/user/:userId/connections" component={AdminUserConnections} />
           <Route path="/dashboard/admin/user/:userId/salary" component={AdminUserSalary} />
           <Route path="/dashboard/salary" component={SalaryPage} />
+          <Route path="/dashboard/shop" component={ShopPage} />
           <Route path="/dashboard/documentation-business" component={DocumentationBusiness} />
           <Route path="/dashboard/admin/business/users/:userId/profile" component={AdminUserProfile} />
           <Route path="/dashboard/admin/business/users/:userId/history" component={AdminUserHistory} />
@@ -397,6 +400,7 @@ function Router() {
       <Route path="/terms" component={Terms} />
       <Route path="/privacy" component={Privacy} />
       <Route path="/cookies" component={Cookies} />
+      <Route path="/shop/:slug" component={ShopPublicPage} />
       <Route path="/pay/:token" component={Pay} />
       <Route path="/merchant/:token" component={Merchant} />
       <Route path="/api-payment/:transactionId" component={ApiPayment} />

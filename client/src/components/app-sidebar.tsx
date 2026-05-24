@@ -17,6 +17,7 @@ import {
   User,
   Link as LinkIcon,
   Store,
+  ShoppingBag,
   Code,
   History,
   Settings,
@@ -185,6 +186,10 @@ export function AppSidebar() {
     ? [{ title: "Salaire", url: "/dashboard/salary", icon: Banknote, testId: "nav-salary", color: "#16a34a" }]
     : [];
 
+  const shopItems = user?.accountType === "personal"
+    ? [{ title: "Ma boutique", url: "/dashboard/shop", icon: ShoppingBag, testId: "nav-shop", color: "#7c3aed" }]
+    : [];
+
   const logoutMutation = useMutation({
     mutationFn: async () => {
       await apiRequest("POST", "/api/auth/logout", {});
@@ -226,7 +231,7 @@ export function AppSidebar() {
           <SidebarGroupLabel>Général</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenuItems
-              items={[...generalItems, ...salaryItems, ...adminItems]}
+              items={[...generalItems, ...salaryItems, ...shopItems, ...adminItems]}
               location={location}
               onMenuClick={handleMenuClick}
             />

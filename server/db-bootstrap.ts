@@ -508,6 +508,83 @@ async function bootstrapDatabase() {
     }
     await salaryClient.end();
 
+    // Shop system migrations
+    const shopClient = postgres(DATABASE_URL);
+    try {
+      await shopClient`
+        CREATE TABLE IF NOT EXISTS shops (
+          id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+          user_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          name TEXT NOT NULL,
+          slug TEXT NOT NULL UNIQUE,
+          description TEXT,
+          logo_url TEXT,
+          slideshow_urls TEXT[] DEFAULT '{}',
+          currency TEXT NOT NULL DEFAULT 'XOF',
+          custom_domain TEXT,
+          api_key_id VARCHAR REFERENCES api_keys(id),
+          is_active BOOLEAN NOT NULL DEFAULT true,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `;
+      await shopClient`
+        CREATE TABLE IF NOT EXISTS shop_categories (
+          id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+          shop_id VARCHAR NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
+          name TEXT NOT NULL,
+          image_url TEXT,
+          sort_order INTEGER NOT NULL DEFAULT 0,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `;
+      await shopClient`
+        CREATE TABLE IF NOT EXISTS shop_products (
+          id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+          shop_id VARCHAR NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
+          category_id VARCHAR REFERENCES shop_categories(id) ON DELETE SET NULL,
+          name TEXT NOT NULL,
+          description TEXT,
+          price REAL NOT NULL,
+          image_urls TEXT[] DEFAULT '{}',
+          downloadable_files TEXT[] DEFAULT '{}',
+          downloadable_file_names TEXT[] DEFAULT '{}',
+          checkout_fields JSONB DEFAULT '[]',
+          delivery_method TEXT DEFAULT 'email',
+          stock INTEGER,
+          is_active BOOLEAN NOT NULL DEFAULT true,
+          sort_order INTEGER NOT NULL DEFAULT 0,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `;
+      await shopClient`
+        CREATE TABLE IF NOT EXISTS shop_orders (
+          id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+          shop_id VARCHAR NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
+          product_id VARCHAR NOT NULL REFERENCES shop_products(id) ON DELETE CASCADE,
+          customer_name TEXT,
+          customer_email TEXT,
+          customer_phone TEXT,
+          checkout_data JSONB DEFAULT '{}',
+          amount REAL NOT NULL,
+          currency TEXT NOT NULL DEFAULT 'XOF',
+          payment_reference TEXT,
+          status TEXT NOT NULL DEFAULT 'pending',
+          delivery_method TEXT DEFAULT 'email',
+          delivery_sent_at TIMESTAMP,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `;
+      await shopClient`CREATE INDEX IF NOT EXISTS idx_shops_user_id ON shops (user_id)`;
+      await shopClient`CREATE INDEX IF NOT EXISTS idx_shops_slug ON shops (slug)`;
+      await shopClient`CREATE INDEX IF NOT EXISTS idx_shop_products_shop_id ON shop_products (shop_id)`;
+      await shopClient`CREATE INDEX IF NOT EXISTS idx_shop_orders_shop_id ON shop_orders (shop_id)`;
+      console.log("✅ Shop tables ready");
+    } catch (e) {
+      console.error("⚠️ Shop migration error:", e);
+    }
+    await shopClient.end();
+
     // Step 7: Ensure primary admin exists
     console.log("👤 Ensuring primary admin exists...");
     const seedClient = postgres(DATABASE_URL);
