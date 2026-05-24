@@ -827,7 +827,14 @@ function SettingsSection({ shop }: { shop: Shop }) {
   const [customDomain, setCustomDomain] = useState(shop.customDomain || "");
   const [description, setDescription] = useState((shop as any).description || "");
   const [dnsStatus, setDnsStatus] = useState<"ok" | "error" | "checking" | null>(null);
+  const [dnsPollingExpired, setDnsPollingExpired] = useState(false);
   const dnsPollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const dnsPollingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const stopPolling = () => {
+    if (dnsPollingRef.current) { clearInterval(dnsPollingRef.current); dnsPollingRef.current = null; }
+    if (dnsPollingTimeoutRef.current) { clearTimeout(dnsPollingTimeoutRef.current); dnsPollingTimeoutRef.current = null; }
+  };
 
   const checkDns = async () => {
     const domainToCheck = shop.customDomain;
@@ -838,7 +845,8 @@ function SettingsSection({ shop }: { shop: Shop }) {
       const data = await res.json();
       if (data.ok) {
         setDnsStatus("ok");
-        if (dnsPollingRef.current) { clearInterval(dnsPollingRef.current); dnsPollingRef.current = null; }
+        setDnsPollingExpired(false);
+        stopPolling();
       } else {
         setDnsStatus("error");
       }
@@ -847,15 +855,21 @@ function SettingsSection({ shop }: { shop: Shop }) {
     }
   };
 
-  // Polling automatique toutes les 30s tant que le DNS n'est pas connecté
+  // Polling automatique toutes les 30s — s'arrête après 15 minutes ou dès que le DNS est connecté
   useEffect(() => {
     if (!shop.customDomain) return;
+    setDnsPollingExpired(false);
     checkDns();
     dnsPollingRef.current = setInterval(() => {
       setDnsStatus(prev => { if (prev === "ok") return prev; return "checking"; });
       checkDns();
     }, 30000);
-    return () => { if (dnsPollingRef.current) clearInterval(dnsPollingRef.current); };
+    // Arrêt automatique après 15 minutes
+    dnsPollingTimeoutRef.current = setTimeout(() => {
+      stopPolling();
+      setDnsPollingExpired(true);
+    }, 15 * 60 * 1000);
+    return () => stopPolling();
   }, [shop.customDomain]);
   const [slideshowUrls, setSlideshowUrls] = useState<string[]>(shop.slideshowUrls || []);
   const [fontFamily, setFontFamily] = useState((shop as any).fontFamily || "Poppins");
@@ -959,32 +973,56 @@ function SettingsSection({ shop }: { shop: Shop }) {
                           DNS connecté — votre domaine est actif
                         </span>
                       </div>
+                    ) : dnsPollingExpired ? (
+                      <div className="flex items-center gap-2 rounded-md bg-muted/30 border px-3 py-2">
+                        <Info className="w-4 h-4 text-muted-foreground shrink-0" />
+                        <span className="text-xs text-muted-foreground">
+                          Vérification automatique arrêtée — cliquez sur le bouton pour relancer
+                        </span>
+                      </div>
                     ) : dnsStatus === "checking" ? (
                       <div className="flex items-center gap-2 rounded-md bg-muted/50 border px-3 py-2">
                         <Loader2 className="w-4 h-4 animate-spin text-muted-foreground shrink-0" />
                         <span className="text-xs text-muted-foreground">
-                          Vérification DNS en cours… (toutes les 30s automatiquement)
+                          Recherche en cours… (toutes les 30s, max 15 min)
                         </span>
                       </div>
                     ) : dnsStatus === "error" ? (
                       <div className="flex items-center gap-2 rounded-md bg-muted/30 border px-3 py-2">
                         <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />
                         <span className="text-xs text-muted-foreground">
-                          Pas encore détecté — nouvelle vérification dans 30s
+                          Pas encore détecté — prochaine vérification dans 30s
                         </span>
                       </div>
                     ) : null}
 
                     {/* Bouton manuel */}
                     <Button size="sm" variant="outline"
-                      onClick={checkDns}
+                      onClick={() => {
+                        if (dnsPollingExpired) {
+                          // Relancer le polling complet de 15 min
+                          setDnsPollingExpired(false);
+                          stopPolling();
+                          checkDns();
+                          dnsPollingRef.current = setInterval(() => {
+                            setDnsStatus(prev => { if (prev === "ok") return prev; return "checking"; });
+                            checkDns();
+                          }, 30000);
+                          dnsPollingTimeoutRef.current = setTimeout(() => {
+                            stopPolling();
+                            setDnsPollingExpired(true);
+                          }, 15 * 60 * 1000);
+                        } else {
+                          checkDns();
+                        }
+                      }}
                       disabled={dnsStatus === "checking"}
                       data-testid="button-check-dns"
                     >
                       {dnsStatus === "checking"
                         ? <Loader2 className="w-3 h-3 animate-spin mr-1.5" />
                         : <RefreshCw className="w-3 h-3 mr-1.5" />}
-                      Vérifier maintenant
+                      {dnsPollingExpired ? "Relancer la vérification" : "Vérifier maintenant"}
                     </Button>
                   </div>
                 </div>
