@@ -700,6 +700,7 @@ function SettingsSection({ shop }: { shop: Shop }) {
   const { toast } = useToast();
   const [currency, setCurrency] = useState(shop.currency);
   const [customDomain, setCustomDomain] = useState(shop.customDomain || "");
+  const [description, setDescription] = useState((shop as any).description || "");
   const [slideshowUrls, setSlideshowUrls] = useState<string[]>(shop.slideshowUrls || []);
   const [fontFamily, setFontFamily] = useState((shop as any).fontFamily || "Poppins");
   const [primaryColor, setPrimaryColor] = useState((shop as any).primaryColor || "#6366f1");
@@ -757,6 +758,31 @@ function SettingsSection({ shop }: { shop: Shop }) {
               <code>{window.location.hostname}</code>. Une fois configuré, votre boutique sera accessible sur votre domaine.
             </p>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Description */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Description de la boutique</CardTitle>
+          <CardDescription>Ce texte apparaît sous le nom de votre boutique sur la page publique</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Textarea
+            value={description}
+            onChange={e => setDescription(e.target.value)}
+            rows={3}
+            placeholder="Décrivez votre boutique en quelques mots…"
+            data-testid="input-shop-description-settings"
+          />
+          <Button
+            variant="outline"
+            onClick={() => mutation.mutate({ description })}
+            disabled={mutation.isPending}
+          >
+            {mutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+            Enregistrer
+          </Button>
         </CardContent>
       </Card>
 
