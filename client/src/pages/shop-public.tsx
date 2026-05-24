@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/select";
 import {
   ShoppingCart, Package, ChevronLeft, ChevronRight, Download,
-  Store, Loader2, MessageCircle, Mail, Search, X, ArrowLeft
+  Store, Loader2, MessageCircle, Mail, Search, X, ArrowLeft, CheckCircle2, XCircle
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Shop, ShopCategory, ShopProduct } from "@shared/schema";
@@ -185,6 +185,9 @@ function ProductDetailPage({ product, shop, categories, onBack }: {
       }
       setPaying(true);
       try {
+        // redirect_url utilise window.location.origin pour respecter le domaine courant
+        // (domaine personnalisé OU domaine BKApay) — le retour revient toujours sur le bon domaine
+        const baseReturnUrl = `${window.location.origin}/shop/${shop.slug}`;
         window.BKAPayInline.setup({
           public_key: paymentConfig.publicKey,
           tx_ref: data.order.id,
@@ -192,12 +195,14 @@ function ProductDetailPage({ product, shop, categories, onBack }: {
           currency: shop.currency,
           customer: { name: customerName || "Client", email: customerEmail || "", phone: customerPhone || "" },
           meta: { orderId: data.order.id },
+          redirect_url: `${baseReturnUrl}?payment_status=success&order_id=${data.order.id}`,
+          cancel_url: `${baseReturnUrl}?payment_status=cancelled`,
           callback: async (response: any) => {
             if (response.status === "completed" || response.status === "success") {
               await fetch(`/api/shop/orders/${data.order.id}/confirm`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ paymentReference: response.reference }),
+                body: JSON.stringify({ paymentReference: response.reference || data.order.id }),
               });
               toast({ title: "Paiement réussi !", description: "Merci pour votre achat." });
               onBack();
@@ -477,12 +482,76 @@ function ProductCard({ product, shop, onSelect }: {
   );
 }
 
+// ── Payment Success / Cancel screen ─────────────────────────────────────────
+function PaymentResultScreen({ status, orderId, shop, color, onClose }: {
+  status: "success" | "cancelled"; orderId?: string | null;
+  shop: PublicShopData["shop"]; color: string; onClose: () => void;
+}) {
+  const isSuccess = status === "success";
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center bg-background">
+      <div className="w-24 h-24 rounded-full flex items-center justify-center mb-6"
+        style={{ background: isSuccess ? `${color}15` : "hsl(var(--destructive)/0.1)" }}>
+        {isSuccess
+          ? <CheckCircle2 className="w-14 h-14" style={{ color }} />
+          : <XCircle className="w-14 h-14 text-destructive" />
+        }
+      </div>
+      <h1 className="text-2xl font-black mb-2">
+        {isSuccess ? "Paiement réussi !" : "Paiement annulé"}
+      </h1>
+      <p className="text-muted-foreground mb-2">
+        {isSuccess
+          ? "Votre commande a bien été enregistrée. Merci pour votre achat."
+          : "Votre paiement a été annulé. Aucun montant n'a été débité."}
+      </p>
+      {orderId && isSuccess && (
+        <p className="text-xs text-muted-foreground mb-6 font-mono">Référence : {orderId}</p>
+      )}
+      <button
+        onClick={onClose}
+        className="px-8 py-3 rounded-xl font-bold text-white text-base"
+        style={{ background: `linear-gradient(135deg, ${color}, ${color}cc)` }}
+      >
+        Retour à la boutique
+      </button>
+    </div>
+  );
+}
+
 // ── Main Public Page ────────────────────────────────────────────────────────
 export default function ShopPublicPage() {
   const { slug } = useParams<{ slug: string }>();
   const [activeCategoryId, setActiveCategoryId] = useState<string>("all");
   const [selectedProduct, setSelectedProduct] = useState<ShopProduct | null>(null);
   const [search, setSearch] = useState("");
+
+  // ── Detect redirect-based payment return ───────────────────────────────────
+  // BKAPayInline can fall back to redirect on mobile (no popup).
+  // After redirect, it comes back with ?payment_status=success|cancelled&order_id=xxx
+  const urlParams = new URLSearchParams(window.location.search);
+  const paymentStatusParam = urlParams.get("payment_status") as "success" | "cancelled" | null;
+  const orderIdParam = urlParams.get("order_id");
+  const [paymentResult, setPaymentResult] = useState<{ status: "success" | "cancelled"; orderId: string | null } | null>(
+    paymentStatusParam ? { status: paymentStatusParam, orderId: orderIdParam } : null
+  );
+
+  // Confirm the order server-side if arriving from a redirect success
+  useEffect(() => {
+    if (paymentStatusParam === "success" && orderIdParam) {
+      fetch(`/api/shop/orders/${orderIdParam}/confirm`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ paymentReference: orderIdParam }),
+      }).catch(() => {});
+      // Clean URL so a refresh doesn't re-trigger
+      const cleanUrl = window.location.pathname;
+      window.history.replaceState({}, "", cleanUrl);
+    } else if (paymentStatusParam === "cancelled") {
+      const cleanUrl = window.location.pathname;
+      window.history.replaceState({}, "", cleanUrl);
+    }
+  }, []);
 
   const { data, isLoading, isError } = useQuery<PublicShopData>({
     queryKey: ["/api/shop/public", slug],
@@ -538,6 +607,19 @@ export default function ShopPublicPage() {
   }
 
   const { shop, categories, products } = data;
+
+  // ── Si retour d'un paiement par redirect (mobile), afficher l'écran résultat ─
+  if (paymentResult) {
+    return (
+      <PaymentResultScreen
+        status={paymentResult.status}
+        orderId={paymentResult.orderId}
+        shop={shop}
+        color={color}
+        onClose={() => setPaymentResult(null)}
+      />
+    );
+  }
 
   // ── If a product is selected → show its detail page ──────────────────────
   if (selectedProduct) {
