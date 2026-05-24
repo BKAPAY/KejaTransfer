@@ -2901,6 +2901,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return res.status(403).json({ error: "Les liens marchands ne peuvent pas être supprimés" });
   });
 
+  // PATCH /api/merchant-links/:id — mettre à jour frais à la charge du client
+  app.patch("/api/merchant-links/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const link = await storage.getMerchantLinkById(req.params.id);
+      if (!link || link.userId !== req.session.userId) {
+        return res.status(404).json({ error: "Lien marchand introuvable" });
+      }
+      const updates: { customerPaysFee?: boolean; customerPaysCryptoFee?: boolean } = {};
+      if (typeof req.body.customerPaysFee === "boolean") updates.customerPaysFee = req.body.customerPaysFee;
+      if (typeof req.body.customerPaysCryptoFee === "boolean") updates.customerPaysCryptoFee = req.body.customerPaysCryptoFee;
+      const updated = await storage.updateMerchantLink(link.id, updates);
+      return res.json({ success: true, link: updated });
+    } catch (e: any) {
+      return res.status(500).json({ error: "Erreur serveur" });
+    }
+  });
+
   // ===== API Keys Routes =====
   
   app.get("/api/api-keys", requireAuth, async (req: Request, res: Response) => {
@@ -6031,7 +6048,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const ownerCurrency = owner?.country ? getCurrencyForCountry(owner.country) : "XOF";
       const payduynaCountryCurrencies4166: Record<string, string> = { "CM": "XAF" };
       const providerCurrency = payduynaCountryCurrencies4166[country?.toUpperCase()] || "XOF";
-      const baseAmountInOwnerCurrency = Math.floor(amount);
+      let baseAmountInOwnerCurrency = Math.floor(amount);
+
+      // Si frais Mobile Money à la charge du client, on grossit le montant pour couvrir les frais
+      if (merchantLink.customerPaysFee) {
+        const { calculateCustomerPaysFee } = await import("./utils/fees");
+        const feeCalc = calculateCustomerPaysFee(baseAmountInOwnerCurrency);
+        baseAmountInOwnerCurrency = feeCalc.totalForProvider;
+        console.log(`[MERCHANT_LINK] customerPaysFee: base ${amount} -> total ${baseAmountInOwnerCurrency}`);
+      }
 
       // CRITICAL: Convert amount to provider currency (XOF) if owner's currency is different
       let convertedAmountForProvider = baseAmountInOwnerCurrency;

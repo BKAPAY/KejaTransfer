@@ -2,11 +2,13 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Copy, ExternalLink, Trash2, Store, Download, FileText, QrCode } from "lucide-react";
+import { Plus, Copy, ExternalLink, Trash2, Store, Download, FileText, QrCode, Wallet, Bitcoin } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { MerchantLink } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -364,6 +366,16 @@ function MerchantLinkCard({ link }: { link: MerchantLink }) {
   const [downloading, setDownloading] = useState<"png" | "pdf" | null>(null);
   const url = `${window.location.origin}/merchant/${link.token}`;
 
+  const feeMutation = useMutation({
+    mutationFn: async (updates: { customerPaysFee?: boolean; customerPaysCryptoFee?: boolean }) =>
+      apiRequest("PATCH", `/api/merchant-links/${link.id}`, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/merchant-links"] });
+      toast({ title: "Paramètre mis à jour", description: "Les frais ont été mis à jour avec succès." });
+    },
+    onError: () => toast({ title: "Erreur", description: "Impossible de mettre à jour les frais.", variant: "destructive" }),
+  });
+
   const copyToClipboard = () => {
     navigator.clipboard.writeText(url);
     toast({ title: "Copié", description: "Le lien a été copié dans le presse-papiers" });
@@ -496,6 +508,40 @@ function MerchantLinkCard({ link }: { link: MerchantLink }) {
             <li>Imprimez-le ou envoyez-le par WhatsApp</li>
             <li>Le client scanne et choisit le montant</li>
           </ol>
+        </div>
+
+        {/* Frais à la charge du client */}
+        <div className="border rounded-md divide-y">
+          <div className="flex items-center justify-between gap-3 px-3 py-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <Wallet className="w-4 h-4 text-muted-foreground shrink-0" />
+              <div className="min-w-0">
+                <p className="text-sm font-medium leading-tight">Frais Mobile Money client</p>
+                <p className="text-xs text-muted-foreground leading-tight mt-0.5">Le client paie les frais de transaction en plus du montant</p>
+              </div>
+            </div>
+            <Switch
+              data-testid={`switch-ml-fee-${link.id}`}
+              checked={!!(link as any).customerPaysFee}
+              disabled={feeMutation.isPending}
+              onCheckedChange={(val) => feeMutation.mutate({ customerPaysFee: val })}
+            />
+          </div>
+          <div className="flex items-center justify-between gap-3 px-3 py-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <Bitcoin className="w-4 h-4 text-muted-foreground shrink-0" />
+              <div className="min-w-0">
+                <p className="text-sm font-medium leading-tight">Frais Crypto client</p>
+                <p className="text-xs text-muted-foreground leading-tight mt-0.5">Le client paie les frais crypto en plus du montant</p>
+              </div>
+            </div>
+            <Switch
+              data-testid={`switch-ml-crypto-fee-${link.id}`}
+              checked={!!(link as any).customerPaysCryptoFee}
+              disabled={feeMutation.isPending}
+              onCheckedChange={(val) => feeMutation.mutate({ customerPaysCryptoFee: val })}
+            />
+          </div>
         </div>
       </CardContent>
     </Card>

@@ -128,6 +128,8 @@ export const merchantLinks = pgTable("merchant_links", {
   merchantName: text("merchant_name").notNull(),
   token: text("token").notNull().unique(), // Unique token for the merchant link
   isActive: boolean("is_active").notNull().default(true),
+  customerPaysFee: boolean("customer_pays_fee").notNull().default(false), // Frais Mobile Money à la charge du client
+  customerPaysCryptoFee: boolean("customer_pays_crypto_fee").notNull().default(false), // Frais Crypto à la charge du client
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

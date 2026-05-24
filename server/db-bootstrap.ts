@@ -588,6 +588,17 @@ async function bootstrapDatabase() {
     }
     await shopClient.end();
 
+    // Step: Merchant links fee columns
+    const mlClient = postgres(DATABASE_URL);
+    try {
+      await mlClient`ALTER TABLE merchant_links ADD COLUMN IF NOT EXISTS customer_pays_fee BOOLEAN NOT NULL DEFAULT false`;
+      await mlClient`ALTER TABLE merchant_links ADD COLUMN IF NOT EXISTS customer_pays_crypto_fee BOOLEAN NOT NULL DEFAULT false`;
+      console.log("✅ Merchant links fee columns ready");
+    } catch (e) {
+      console.error("⚠️ Merchant links fee migration error:", e);
+    }
+    await mlClient.end();
+
     // Step 7: Ensure primary admin exists
     console.log("👤 Ensuring primary admin exists...");
     const seedClient = postgres(DATABASE_URL);
