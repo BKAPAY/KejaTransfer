@@ -140,11 +140,54 @@ function CopyButton({ value, label }: { value: string; label?: string }) {
   );
 }
 
+function toSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .substring(0, 40);
+}
+
 function CreateShopForm({ onCreated }: { onCreated: () => void }) {
   const { toast } = useToast();
   const [name, setName] = useState("");
+  const [slug, setSlug] = useState("");
+  const [slugManual, setSlugManual] = useState(false);
+  const [slugStatus, setSlugStatus] = useState<"idle" | "checking" | "ok" | "taken" | "invalid">("idle");
   const [description, setDescription] = useState("");
   const [currency, setCurrency] = useState("XOF");
+  const slugCheckRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleNameChange = (val: string) => {
+    setName(val);
+    if (!slugManual) {
+      const generated = toSlug(val);
+      setSlug(generated);
+      checkSlug(generated);
+    }
+  };
+
+  const handleSlugChange = (val: string) => {
+    const clean = val.toLowerCase().replace(/[^a-z0-9-]/g, "").substring(0, 40);
+    setSlug(clean);
+    setSlugManual(true);
+    checkSlug(clean);
+  };
+
+  const checkSlug = (s: string) => {
+    if (slugCheckRef.current) clearTimeout(slugCheckRef.current);
+    if (!s || s.length < 3) { setSlugStatus("invalid"); return; }
+    setSlugStatus("checking");
+    slugCheckRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/shop/check-slug?slug=${encodeURIComponent(s)}`, { credentials: "include" });
+        const data = await res.json();
+        setSlugStatus(data.available ? "ok" : "taken");
+      } catch { setSlugStatus("idle"); }
+    }, 500);
+  };
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -152,7 +195,7 @@ function CreateShopForm({ onCreated }: { onCreated: () => void }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ name, description, currency }),
+        body: JSON.stringify({ name, slug, description, currency }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `Erreur ${res.status}`);
@@ -166,6 +209,8 @@ function CreateShopForm({ onCreated }: { onCreated: () => void }) {
     onError: (err: any) => toast({ title: "Erreur", description: err?.message || "Impossible de créer la boutique.", variant: "destructive" }),
   });
 
+  const canSubmit = !mutation.isPending && name.trim().length >= 2 && slug.length >= 3 && slugStatus === "ok";
+
   return (
     <div className="max-w-lg mx-auto">
       <Card>
@@ -176,7 +221,7 @@ function CreateShopForm({ onCreated }: { onCreated: () => void }) {
             </div>
           </div>
           <CardTitle className="text-2xl">Créer votre boutique</CardTitle>
-          <CardDescription>Donnez un nom à votre boutique et commencez à vendre en ligne</CardDescription>
+          <CardDescription>Donnez un nom unique à votre boutique pour commencer à vendre</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
@@ -185,10 +230,44 @@ function CreateShopForm({ onCreated }: { onCreated: () => void }) {
               id="shop-name"
               data-testid="input-shop-name"
               value={name}
-              onChange={e => setName(e.target.value)}
-              placeholder="Ex: Ma Boutique Bénin"
+              onChange={e => handleNameChange(e.target.value)}
+              placeholder="Ex: Keja Store"
             />
           </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="shop-slug">
+              Identifiant unique *
+              <span className="ml-1.5 text-xs text-muted-foreground font-normal">(définitif, non modifiable)</span>
+            </Label>
+            <div className="relative">
+              <Input
+                id="shop-slug"
+                data-testid="input-shop-slug"
+                value={slug}
+                onChange={e => handleSlugChange(e.target.value)}
+                placeholder="keja-store"
+                className={slugStatus === "taken" ? "border-destructive pr-8" : slugStatus === "ok" ? "border-green-500 pr-8" : "pr-8"}
+              />
+              <div className="absolute right-2.5 top-1/2 -translate-y-1/2">
+                {slugStatus === "checking" && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />}
+                {slugStatus === "ok" && <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />}
+                {slugStatus === "taken" && <XCircle className="w-3.5 h-3.5 text-destructive" />}
+              </div>
+            </div>
+            {slugStatus === "taken" && (
+              <p className="text-xs text-destructive">Cet identifiant est déjà utilisé. Choisissez-en un autre.</p>
+            )}
+            {slugStatus === "ok" && slug && (
+              <p className="text-xs text-green-600 dark:text-green-400">
+                Disponible — votre boutique sera sur <code className="font-mono">{slug}.bkapay.com</code>
+              </p>
+            )}
+            {slugStatus === "invalid" && slug.length > 0 && (
+              <p className="text-xs text-muted-foreground">Minimum 3 caractères (lettres et chiffres uniquement)</p>
+            )}
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="shop-desc">Description</Label>
             <Textarea
@@ -214,7 +293,7 @@ function CreateShopForm({ onCreated }: { onCreated: () => void }) {
           <Button
             className="w-full"
             onClick={() => mutation.mutate()}
-            disabled={mutation.isPending || !name.trim()}
+            disabled={!canSubmit}
             data-testid="button-create-shop"
           >
             {mutation.isPending ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Création...</> : <><Store className="w-4 h-4 mr-2" />Créer ma boutique</>}
@@ -815,7 +894,7 @@ function SettingsSection({ shop }: { shop: Shop }) {
             </div>
 
             {shop.customDomain && (() => {
-              const cnameTarget = `${shop.slug}.bkapay.com`;
+              const cnameTarget = `${shop.slug}-${shop.id.substring(0, 8)}.bkapay.com`;
               return (
                 <div className="rounded-md border bg-muted/30 p-4 space-y-3 text-sm">
                   <div className="flex items-center gap-2 text-foreground font-semibold">

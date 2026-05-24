@@ -15059,6 +15059,16 @@ Ton role est de reformuler et ameliorer les messages que l'administrateur souhai
       .substring(0, 40);
   }
 
+  // GET /api/shop/check-slug — vérifier disponibilité d'un slug
+  app.get("/api/shop/check-slug", requireAuth, async (req: Request, res: Response) => {
+    const slug = ((req.query.slug as string) || "").trim().toLowerCase();
+    if (!slug || slug.length < 2 || !/^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/.test(slug)) {
+      return res.json({ available: false, reason: "Format invalide (lettres, chiffres et tirets uniquement, min 3 caractères)" });
+    }
+    const existing = await storage.getShopBySlug(slug);
+    return res.json({ available: !existing });
+  });
+
   // GET /api/shop — ma boutique
   app.get("/api/shop", requireAuth, async (req: Request, res: Response) => {
     try {
@@ -15099,17 +15109,22 @@ Ton role est de reformuler et ameliorer les messages que l'administrateur souhai
       const existing = await storage.getShopByUserId(req.session.userId!);
       if (existing) return res.status(400).json({ error: "Vous avez déjà une boutique" });
 
-      const { name, description, currency } = req.body;
+      const { name, slug: rawSlug, description, currency } = req.body;
       if (!name || typeof name !== "string" || name.trim().length < 2) {
         return res.status(400).json({ error: "Nom de boutique requis (min 2 caractères)" });
       }
 
-      let baseSlug = generateShopSlug(name.trim());
-      let slug = baseSlug;
-      let attempt = 0;
-      while (await storage.getShopBySlug(slug)) {
-        attempt++;
-        slug = `${baseSlug}-${attempt}`;
+      // Utiliser le slug fourni par l'utilisateur (ou générer depuis le nom)
+      const slug = rawSlug
+        ? ((rawSlug as string).trim().toLowerCase())
+        : generateShopSlug(name.trim());
+
+      if (!slug || slug.length < 3 || !/^[a-z0-9][a-z0-9-]*[a-z0-9]$/.test(slug)) {
+        return res.status(400).json({ error: "Identifiant invalide (lettres minuscules, chiffres et tirets, min 3 caractères)" });
+      }
+
+      if (await storage.getShopBySlug(slug)) {
+        return res.status(400).json({ error: "Cet identifiant est déjà utilisé. Choisissez-en un autre." });
       }
 
       const shop = await storage.createShop({
@@ -15472,7 +15487,7 @@ Ton role est de reformuler et ameliorer les messages que l'administrateur souhai
     // Récupérer le slug de la boutique pour construire la cible unique
     const shop = await storage.getShopByUserId(req.session.userId!);
     if (!shop) return res.status(404).json({ ok: false, status: "error", message: "Boutique introuvable" });
-    const targetHost = `${shop.slug}.bkapay.com`;
+    const targetHost = `${shop.slug}-${shop.id.substring(0, 8)}.bkapay.com`;
     const withTimeout = <T>(p: Promise<T>, ms: number): Promise<T> =>
       Promise.race([p, new Promise<T>((_, rej) => setTimeout(() => rej(new Error("timeout")), ms))]);
     try {
