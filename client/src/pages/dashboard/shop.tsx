@@ -969,6 +969,7 @@ export default function ShopPage() {
 
   const { data, isLoading } = useQuery<ShopData | null>({
     queryKey: ["/api/shop"],
+    refetchInterval: 30000,
   });
 
   const seedMutation = useMutation({

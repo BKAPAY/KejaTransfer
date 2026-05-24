@@ -1671,6 +1671,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }
 
   // Cleanup old rate limit entries and expired suspensions every 5 minutes
+  // Also expires shop orders that have been pending for more than 30 minutes
   setInterval(() => {
     const now = Date.now();
     loginAttempts.forEach((record, key) => {
@@ -1683,6 +1684,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         temporarySuspensions.delete(email);
       }
     });
+    storage.expireOldShopOrders().catch(() => {});
   }, 5 * 60 * 1000);
 
   // ===== NOWPayments Routes =====

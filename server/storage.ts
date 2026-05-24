@@ -3598,6 +3598,18 @@ export class DbStorage implements IStorage {
       .returning();
     return rows[0];
   }
+
+  async expireOldShopOrders(): Promise<number> {
+    const cutoff = new Date(Date.now() - 30 * 60 * 1000);
+    const rows = await db.update(schema.shopOrders)
+      .set({ status: "cancelled" })
+      .where(and(
+        eq(schema.shopOrders.status, "pending"),
+        lte(schema.shopOrders.createdAt, cutoff)
+      ))
+      .returning();
+    return rows.length;
+  }
 }
 
 export const storage = new DbStorage();

@@ -162,9 +162,22 @@ function ProductDetailPage({ product, shop, categories, onBack }: {
   const color = (shop as any).primaryColor || "#6366f1";
   const font = (shop as any).fontFamily || "Poppins";
 
-  // Cleanup polling on unmount
+  // Cleanup polling on unmount + annule la commande en cours si le client quitte la page
   useEffect(() => {
-    return () => { if (pollingRef.current) clearInterval(pollingRef.current); };
+    const handleLeave = () => {
+      const orderId = currentOrderIdRef.current;
+      if (orderId) {
+        // sendBeacon est synchrone lors de la fermeture — le serveur ignorera si déjà completed
+        navigator.sendBeacon(`/api/shop/orders/${orderId}/cancel`);
+      }
+    };
+    window.addEventListener("beforeunload", handleLeave);
+    window.addEventListener("pagehide", handleLeave);
+    return () => {
+      window.removeEventListener("beforeunload", handleLeave);
+      window.removeEventListener("pagehide", handleLeave);
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
   }, []);
 
   // Scroll to top when page opens
