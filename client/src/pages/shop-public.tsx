@@ -23,7 +23,7 @@ type PublicShopData = {
 };
 
 declare global {
-  interface Window { BKAPayInline?: any; }
+  interface Window { BKApay?: { checkout: (options: any) => void; close: () => void }; }
 }
 
 // ── Google Fonts loader ─────────────────────────────────────────────────────
@@ -123,13 +123,13 @@ function Slideshow({ urls, shopName, description, font, color }: {
 }
 
 // ── Product Detail Page (full screen) ────────────────────────────────────────
-// Attend que BKAPayInline soit disponible sur window (chargement async du script)
-function waitForBKAPayInline(timeout = 10000): Promise<boolean> {
+// Attend que BKApay soit disponible sur window (chargement async du script)
+function waitForBKApay(timeout = 10000): Promise<boolean> {
   return new Promise((resolve) => {
-    if (window.BKAPayInline) { resolve(true); return; }
+    if (window.BKApay) { resolve(true); return; }
     const start = Date.now();
     const check = setInterval(() => {
-      if (window.BKAPayInline) { clearInterval(check); resolve(true); return; }
+      if (window.BKApay) { clearInterval(check); resolve(true); return; }
       if (Date.now() - start > timeout) { clearInterval(check); resolve(false); }
     }, 200);
   });
@@ -250,9 +250,9 @@ function ProductDetailPage({ product, shop, categories, onBack }: {
         return;
       }
 
-      // Attendre que le script BKAPayInline soit chargé (max 10s)
+      // Attendre que le script BKApay soit chargé (max 10s)
       setPhase("preparing");
-      const loaded = await waitForBKAPayInline(10000);
+      const loaded = await waitForBKApay(10000);
       if (!loaded) {
         setPhase("idle");
         toast({ title: "Erreur", description: "Le module de paiement n'a pas pu se charger. Vérifiez votre connexion.", variant: "destructive" });
@@ -261,77 +261,64 @@ function ProductDetailPage({ product, shop, categories, onBack }: {
       }
 
       try {
-        const baseReturnUrl = `${window.location.origin}/shop/${shop.slug}`;
-        window.BKAPayInline!.setup({
-          public_key: paymentConfig.publicKey,
-          tx_ref: orderId,
+        setPhase("waiting");
+        // Démarrer le polling pour récupérer les mises à jour via webhook
+        startPolling(orderId);
+
+        window.BKApay!.checkout({
+          key: paymentConfig.publicKey,
           amount: product.price,
           currency: shop.currency,
+          description: `${product.name} — ${shop.name}`,
+          orderId,
           customer: {
             name: customerName || "Client",
             email: customerEmail || "",
             phone: customerPhone || "",
           },
-          meta: { orderId },
-          redirect_url: `${baseReturnUrl}?payment_status=success&order_id=${orderId}`,
-          cancel_url: `${baseReturnUrl}?payment_status=cancelled&order_id=${orderId}`,
 
-          // Callback déclenché par le widget (popup) quand le statut change
-          callback: async (response: any) => {
-            const status: string = (response.status || "").toLowerCase();
-
-            if (status === "completed" || status === "success") {
-              stopPolling();
-              // Confirmer côté serveur
-              await fetch(`/api/shop/orders/${orderId}/confirm`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ paymentReference: response.transaction_id || response.reference || orderId }),
-              });
-              setPayRef(response.transaction_id || response.reference || null);
-              setPhase("success");
-
-            } else if (status === "failed" || status === "error") {
-              stopPolling();
-              setPhase("failed");
-
-            } else if (status === "cancelled" || status === "canceled") {
-              stopPolling();
-              await cancelOrder(orderId);
-              setPhase("cancelled");
-            }
-            // Pour tout autre statut intermédiaire, le polling continue
+          // Paiement validé par le client dans le widget
+          onSuccess: async (response: any) => {
+            stopPolling();
+            await fetch(`/api/shop/orders/${orderId}/confirm`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ paymentReference: response.transactionId || orderId }),
+            });
+            setPayRef(response.transactionId || null);
+            setPhase("success");
           },
 
-          // Déclenché quand le client ferme le widget sans payer
-          onclose: async () => {
-            // Vérifier le statut réel avant d'annuler
-            // (le callback peut avoir déjà changé le statut)
-            if (phase !== "success" && phase !== "failed") {
-              try {
-                const res = await fetch(`/api/shop/orders/${orderId}/status`);
-                const d = await res.json();
-                if (d.status === "completed") {
-                  stopPolling();
-                  setPayRef(d.paymentReference);
-                  setPhase("success");
-                  return;
-                }
-              } catch { /* ignore */ }
-              stopPolling();
-              await cancelOrder(orderId);
-              setPhase("cancelled");
-            }
+          // Paiement échoué ou expiré
+          onError: (_error: any) => {
+            stopPolling();
+            setPhase("failed");
+          },
+
+          // Fenêtre fermée par le client
+          onClose: async (_data: any) => {
+            // Ne pas annuler si le paiement a déjà abouti
+            if (phase === "success" || phase === "failed") return;
+            // Vérifier le statut réel (le webhook peut avoir confirmé entre-temps)
+            try {
+              const res = await fetch(`/api/shop/orders/${orderId}/status`);
+              const d = await res.json();
+              if (d.status === "completed") {
+                stopPolling();
+                setPayRef(d.paymentReference);
+                setPhase("success");
+                return;
+              }
+            } catch { /* ignore */ }
+            stopPolling();
+            await cancelOrder(orderId);
+            setPhase("cancelled");
           },
         });
 
-        window.BKAPayInline!.open();
-        setPhase("waiting");
-        // Démarrer le polling pour récupérer les mises à jour webhook
-        startPolling(orderId);
-
       } catch {
         setPhase("idle");
+        stopPolling();
         await cancelOrder(orderId);
         toast({ title: "Erreur paiement", variant: "destructive" });
       }
@@ -744,7 +731,7 @@ export default function ShopPublicPage() {
     if (!document.getElementById("bkapay-inline-script")) {
       const script = document.createElement("script");
       script.id = "bkapay-inline-script";
-      script.src = "https://bkapay.com/assets/inline/v1.6/bkapay-inline.js";
+      script.src = `${window.location.origin}/bkapay-inline.js`;
       script.async = true;
       document.head.appendChild(script);
     }
