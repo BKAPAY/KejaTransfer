@@ -31,7 +31,7 @@ type ShopData = {
   orders: ShopOrder[];
 };
 
-const CURRENCIES = ["XOF", "XAF", "USD", "EUR", "GHS", "NGN", "MAD", "TND"];
+const CURRENCIES = ["XOF", "XAF", "CDF", "USD", "EUR", "GHS", "NGN", "MAD", "TND", "GNF", "GMD", "RWF"];
 
 const DELIVERY_METHODS = [
   { value: "email", label: "Email" },
