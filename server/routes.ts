@@ -15494,15 +15494,26 @@ Ton role est de reformuler et ameliorer les messages que l'administrateur souhai
       const { Resolver } = await import("dns/promises") as any;
       const resolver = new Resolver();
       resolver.setServers(["8.8.8.8", "1.1.1.1"]);
-      // Vérifier CNAME vers {slug}.bkapay.com
+      // Vérifier CNAME — accepter la cible exacte OU n'importe quel *.bkapay.com
       try {
         const cnames: string[] = await withTimeout(resolver.resolveCname(domain), 6000);
-        const normalizedCnames = cnames.map((c: string) => c.replace(/\.$/, ""));
-        const match = normalizedCnames.some((c: string) => c === targetHost);
-        if (match) return res.json({ ok: true, status: "ok", type: "CNAME", target: targetHost });
+        const normalizedCnames = cnames.map((c: string) => c.replace(/\.$/, "").toLowerCase());
+        const exactMatch = normalizedCnames.some((c: string) => c === targetHost);
+        const wildcardMatch = normalizedCnames.some((c: string) => c.endsWith(".bkapay.com") || c === "bkapay.com");
+        if (exactMatch || wildcardMatch) {
+          return res.json({ ok: true, status: "ok", type: "CNAME", target: targetHost, found: normalizedCnames[0] });
+        }
         return res.json({ ok: false, status: "wrong_target", type: "CNAME", found: normalizedCnames[0], target: targetHost });
       } catch { /* pas de CNAME */ }
-      return res.json({ ok: false, status: "not_found", message: "Aucun CNAME trouvé pour ce domaine", target: targetHost });
+      // Essayer A record si pas de CNAME (certains registrars aplatissent le CNAME en A)
+      try {
+        const domainIps: string[] = await withTimeout(resolver.resolve4(domain), 6000);
+        const targetIps: string[] = await withTimeout(resolver.resolve4("bkapay.com"), 6000).catch(() => [] as string[]);
+        if (targetIps.length > 0 && domainIps.some((ip: string) => targetIps.includes(ip))) {
+          return res.json({ ok: true, status: "ok", type: "A", target: "bkapay.com", found: domainIps[0] });
+        }
+      } catch { /* pas de A record */ }
+      return res.json({ ok: false, status: "not_found", message: "Aucun enregistrement DNS pointant vers BKApay détecté", target: targetHost });
     } catch (e: any) {
       return res.json({ ok: false, status: "error", message: e.message, target: targetHost });
     }

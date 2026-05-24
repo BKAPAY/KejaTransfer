@@ -894,6 +894,10 @@ function SettingsSection({ shop }: { shop: Shop }) {
             </div>
 
             {shop.customDomain && (() => {
+              const savedDomain = shop.customDomain!.replace(/^https?:\/\//, "").replace(/\/.*$/, "").toLowerCase();
+              const parts = savedDomain.split(".");
+              const isSubdomain = parts.length > 2;
+              const cnameNom = isSubdomain ? parts[0] : "www";
               const cnameTarget = `${shop.slug}-${shop.id.substring(0, 8)}.bkapay.com`;
               return (
                 <div className="rounded-md border bg-muted/30 p-4 space-y-3 text-sm">
@@ -903,17 +907,30 @@ function SettingsSection({ shop }: { shop: Shop }) {
                   </div>
 
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    Dans votre gestionnaire DNS (Hostinger, OVH, GoDaddy…), créez un enregistrement
-                    de type <strong className="text-foreground">CNAME</strong> avec la valeur unique de votre boutique :
+                    Dans votre gestionnaire DNS (Hostinger, OVH, GoDaddy…), ajoutez un enregistrement
+                    de type <strong className="text-foreground">CNAME</strong> avec ces deux valeurs :
                   </p>
 
-                  <div className="flex items-center gap-2 rounded-md bg-background border px-3 py-2.5">
-                    <span className="font-mono font-bold text-sm flex-1 text-foreground">{cnameTarget}</span>
-                    <CopyButton value={cnameTarget} />
+                  {/* Nom */}
+                  <div className="space-y-1.5">
+                    <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Champ Nom</p>
+                    <div className="flex items-center gap-2 rounded-md bg-background border px-3 py-2.5">
+                      <span className="font-mono font-bold text-sm flex-1 text-foreground">{cnameNom}</span>
+                      <CopyButton value={cnameNom} />
+                    </div>
+                  </div>
+
+                  {/* Valeur/Cible */}
+                  <div className="space-y-1.5">
+                    <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Champ Valeur (ou Cible / Pointe vers)</p>
+                    <div className="flex items-center gap-2 rounded-md bg-background border px-3 py-2.5">
+                      <span className="font-mono font-bold text-sm flex-1 text-foreground">{cnameTarget}</span>
+                      <CopyButton value={cnameTarget} />
+                    </div>
                   </div>
 
                   <p className="text-xs text-muted-foreground">
-                    Cette valeur est propre à votre boutique. La propagation peut prendre <strong>15 min à 24 h</strong>.
+                    La propagation peut prendre <strong>15 min à 24 h</strong> selon votre registrar.
                   </p>
 
                   <div className="flex items-center gap-3 pt-1 border-t border-border/50 flex-wrap">
@@ -930,13 +947,13 @@ function SettingsSection({ shop }: { shop: Shop }) {
                     {dnsStatus === "ok" && (
                       <span className="flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400 font-semibold">
                         <CheckCircle2 className="w-3.5 h-3.5" />
-                        Domaine connecté
+                        DNS connecté — votre domaine est actif
                       </span>
                     )}
                     {dnsStatus === "error" && (
-                      <span className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
-                        <AlertTriangle className="w-3.5 h-3.5" />
-                        Pas encore actif — réessayez dans quelques heures
+                      <span className="flex items-center gap-1.5 text-xs text-destructive font-medium">
+                        <XCircle className="w-3.5 h-3.5" />
+                        DNS non détecté — vérifiez la configuration ou réessayez dans quelques heures
                       </span>
                     )}
                   </div>
