@@ -7,14 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle
-} from "@/components/ui/dialog";
-import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from "@/components/ui/select";
 import {
   ShoppingCart, Package, ChevronLeft, ChevronRight, Download,
-  Store, Loader2, MessageCircle, Mail, Search, X
+  Store, Loader2, MessageCircle, Mail, Search, X, ArrowLeft
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Shop, ShopCategory, ShopProduct } from "@shared/schema";
@@ -125,10 +122,10 @@ function Slideshow({ urls, shopName, description, font, color }: {
   );
 }
 
-// ── Product Buy Dialog ──────────────────────────────────────────────────────
-function BuyDialog({ product, shop, categories, open, onClose }: {
+// ── Product Detail Page (full screen) ────────────────────────────────────────
+function ProductDetailPage({ product, shop, categories, onBack }: {
   product: ShopProduct; shop: PublicShopData["shop"];
-  categories: ShopCategory[]; open: boolean; onClose: () => void;
+  categories: ShopCategory[]; onBack: () => void;
 }) {
   const { toast } = useToast();
   const [photoIndex, setPhotoIndex] = useState(0);
@@ -144,6 +141,10 @@ function BuyDialog({ product, shop, categories, open, onClose }: {
   const cat = categories.find(c => c.id === product.categoryId);
   const photos = product.imageUrls?.length ? product.imageUrls : [];
   const color = (shop as any).primaryColor || "#6366f1";
+  const font = (shop as any).fontFamily || "Poppins";
+
+  // Scroll to top when page opens
+  useEffect(() => { window.scrollTo({ top: 0 }); }, []);
 
   const { data: paymentConfig } = useQuery<{ publicKey: string; siteName: string } | null>({
     queryKey: ["/api/shop/public", shop.slug, "api-public-key"],
@@ -152,7 +153,6 @@ function BuyDialog({ product, shop, categories, open, onClose }: {
       if (!res.ok) return null;
       return res.json();
     },
-    enabled: open,
   });
 
   const createOrderMutation = useMutation({
@@ -200,7 +200,7 @@ function BuyDialog({ product, shop, categories, open, onClose }: {
                 body: JSON.stringify({ paymentReference: response.reference }),
               });
               toast({ title: "Paiement réussi !", description: "Merci pour votre achat." });
-              onClose();
+              onBack();
             }
             setPaying(false);
           },
@@ -218,106 +218,210 @@ function BuyDialog({ product, shop, categories, open, onClose }: {
   const canSubmit = () => !checkoutFields.some(f => f.required && !checkoutData[f.label]?.trim());
 
   return (
-    <Dialog open={open} onOpenChange={v => !v && onClose()}>
-      <DialogContent className="max-w-lg max-h-[92vh] overflow-y-auto p-0">
-        {/* Product header */}
-        <div className="relative">
-          {photos.length > 0 ? (
-            <div className="relative h-52 overflow-hidden rounded-t-lg">
-              <img src={photos[photoIndex]} alt={product.name} className="w-full h-full object-cover" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+    <div className="min-h-screen bg-background flex flex-col">
+      {/* ── Sticky header with back button ── */}
+      <header className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b">
+        <div className="max-w-3xl mx-auto px-4 py-3 flex items-center gap-3">
+          <button
+            onClick={onBack}
+            className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+            data-testid="button-back-to-shop"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span className="hidden sm:inline">Retour à la boutique</span>
+          </button>
+          <div className="flex-1 min-w-0 text-center">
+            <span className="font-bold text-sm truncate block" style={{ color, fontFamily: `'${font}', sans-serif` }}>
+              {shop.name}
+            </span>
+          </div>
+        </div>
+      </header>
+
+      <div className="max-w-3xl mx-auto w-full px-4 py-6 flex-1">
+
+        {/* ── Photo Gallery ── */}
+        {photos.length > 0 ? (
+          <div className="mb-6">
+            {/* Main photo */}
+            <div className="relative w-full rounded-2xl overflow-hidden bg-muted"
+              style={{ aspectRatio: "16/9" }}>
+              <img
+                src={photos[photoIndex]}
+                alt={product.name}
+                className="w-full h-full object-cover"
+              />
               {photos.length > 1 && (
-                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5">
-                  {photos.map((_, i) => (
-                    <button key={i} onClick={() => setPhotoIndex(i)}
-                      className={`w-2 h-2 rounded-full transition-colors ${i === photoIndex ? "bg-white" : "bg-white/40"}`} />
-                  ))}
-                </div>
+                <>
+                  <button
+                    onClick={() => setPhotoIndex(i => (i - 1 + photos.length) % photos.length)}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/70 text-white rounded-full p-2 transition-colors backdrop-blur-sm"
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={() => setPhotoIndex(i => (i + 1) % photos.length)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/70 text-white rounded-full p-2 transition-colors backdrop-blur-sm"
+                  >
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
+                  <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+                    {photos.map((_, i) => (
+                      <button key={i} onClick={() => setPhotoIndex(i)}
+                        className={`rounded-full transition-all ${i === photoIndex ? "w-6 h-2 bg-white" : "w-2 h-2 bg-white/50"}`} />
+                    ))}
+                  </div>
+                </>
               )}
             </div>
-          ) : (
-            <div className="h-24 rounded-t-lg flex items-center justify-center"
-              style={{ background: `linear-gradient(135deg, ${color}20, ${color}40)` }}>
-              <Package className="w-12 h-12 opacity-30" />
-            </div>
-          )}
-        </div>
+            {/* Thumbnails */}
+            {photos.length > 1 && (
+              <div className="flex gap-2 mt-3 overflow-x-auto pb-1">
+                {photos.map((url, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setPhotoIndex(i)}
+                    className={`flex-shrink-0 w-16 h-16 rounded-xl overflow-hidden border-2 transition-all ${i === photoIndex ? "border-primary scale-105" : "border-transparent opacity-60"}`}
+                    style={i === photoIndex ? { borderColor: color } : {}}
+                  >
+                    <img src={url} alt="" className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="w-full rounded-2xl mb-6 flex items-center justify-center"
+            style={{ aspectRatio: "16/9", background: `linear-gradient(135deg, ${color}15, ${color}30)` }}>
+            <Package className="w-16 h-16 opacity-20" />
+          </div>
+        )}
 
-        <div className="p-5 space-y-4">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-bold text-left">{product.name}</DialogTitle>
-          </DialogHeader>
-          {cat && <Badge variant="outline">{cat.name}</Badge>}
-          {product.description && <p className="text-sm text-muted-foreground">{product.description}</p>}
+        {/* ── Product Info ── */}
+        <div className="space-y-4">
+          {/* Category + Name */}
+          <div>
+            {cat && (
+              <Badge variant="outline" className="mb-2">{cat.name}</Badge>
+            )}
+            <h1 className="text-2xl sm:text-3xl font-black leading-tight">{product.name}</h1>
+          </div>
 
+          {/* Price */}
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-black" style={{ color }}>
+            <span className="text-4xl font-black" style={{ color }}>
               {product.price.toLocaleString()}
             </span>
-            <span className="text-muted-foreground font-medium">{shop.currency}</span>
+            <span className="text-lg text-muted-foreground font-semibold">{shop.currency}</span>
           </div>
 
-          {hasDownloadable && (
-            <div className="flex items-center gap-2 p-3 rounded-lg text-sm" style={{ background: `${color}10` }}>
-              <Download className="w-4 h-4" style={{ color }} />
-              <span>{product.downloadableFiles!.length} fichier{product.downloadableFiles!.length > 1 ? "s" : ""} inclus après paiement</span>
+          {/* Stock info */}
+          {product.stock != null && product.stock > 0 && (
+            <p className="text-sm text-muted-foreground">{product.stock} en stock</p>
+          )}
+          {product.stock === 0 && (
+            <Badge variant="destructive">Rupture de stock</Badge>
+          )}
+
+          {/* Description */}
+          {product.description && (
+            <div className="rounded-xl p-4 bg-muted/50">
+              <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap">{product.description}</p>
             </div>
           )}
 
+          {/* Downloadable files info */}
           {hasDownloadable && (
-            <div className="space-y-1.5">
-              <Label>Réception des fichiers</Label>
-              <Select value={deliveryMethod} onValueChange={setDeliveryMethod}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="email"><Mail className="w-3 h-3 inline mr-1" />Email</SelectItem>
-                  <SelectItem value="whatsapp"><MessageCircle className="w-3 h-3 inline mr-1" />WhatsApp</SelectItem>
-                  <SelectItem value="both">Email + WhatsApp</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="flex items-center gap-3 p-4 rounded-xl border" style={{ borderColor: `${color}40`, background: `${color}08` }}>
+              <Download className="w-5 h-5 flex-shrink-0" style={{ color }} />
+              <div>
+                <p className="text-sm font-semibold">{product.downloadableFiles!.length} fichier{product.downloadableFiles!.length > 1 ? "s" : ""} inclus</p>
+                <p className="text-xs text-muted-foreground">Vous recevrez les fichiers après paiement</p>
+              </div>
             </div>
           )}
 
-          <div className="space-y-3 pt-1">
-            <p className="text-sm font-semibold text-foreground">Vos coordonnées</p>
-            <div className="grid grid-cols-1 gap-2">
-              <Input value={customerName} onChange={e => setCustomerName(e.target.value)}
-                placeholder="Nom complet" data-testid="input-customer-name" />
-              <Input type="email" value={customerEmail} onChange={e => setCustomerEmail(e.target.value)}
-                placeholder="Email" data-testid="input-customer-email" />
-              <Input type="tel" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)}
-                placeholder="Téléphone / WhatsApp (+229...)" data-testid="input-customer-phone" />
-            </div>
-          </div>
+          {/* Separator */}
+          <div className="border-t pt-4">
+            <h2 className="text-base font-bold mb-4">Finaliser l'achat</h2>
 
-          {checkoutFields.length > 0 && (
-            <div className="space-y-2">
-              {checkoutFields.map((field, i) => (
+            <div className="space-y-3">
+              {/* Delivery method for downloadable products */}
+              {hasDownloadable && (
+                <div className="space-y-1.5">
+                  <Label>Réception des fichiers</Label>
+                  <Select value={deliveryMethod} onValueChange={setDeliveryMethod}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="email"><Mail className="w-3 h-3 inline mr-1" />Email</SelectItem>
+                      <SelectItem value="whatsapp"><MessageCircle className="w-3 h-3 inline mr-1" />WhatsApp</SelectItem>
+                      <SelectItem value="both">Email + WhatsApp</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {/* Customer info */}
+              <div>
+                <Label className="text-sm text-muted-foreground mb-2 block">Nom complet</Label>
+                <Input value={customerName} onChange={e => setCustomerName(e.target.value)}
+                  placeholder="Votre nom complet" data-testid="input-customer-name" />
+              </div>
+              <div>
+                <Label className="text-sm text-muted-foreground mb-2 block">Email</Label>
+                <Input type="email" value={customerEmail} onChange={e => setCustomerEmail(e.target.value)}
+                  placeholder="votre@email.com" data-testid="input-customer-email" />
+              </div>
+              <div>
+                <Label className="text-sm text-muted-foreground mb-2 block">Téléphone / WhatsApp</Label>
+                <Input type="tel" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)}
+                  placeholder="+229..." data-testid="input-customer-phone" />
+              </div>
+
+              {/* Custom checkout fields */}
+              {checkoutFields.length > 0 && checkoutFields.map((field, i) => (
                 <div key={i}>
-                  <Label className="text-sm">{field.label}{field.required ? " *" : ""}</Label>
-                  <Input value={checkoutData[field.label] || ""}
+                  <Label className="text-sm text-muted-foreground mb-2 block">
+                    {field.label}{field.required ? " *" : ""}
+                  </Label>
+                  <Input
+                    value={checkoutData[field.label] || ""}
                     onChange={e => setCheckoutData(d => ({ ...d, [field.label]: e.target.value }))}
-                    placeholder={field.label} />
+                    placeholder={field.label}
+                  />
                 </div>
               ))}
             </div>
-          )}
+          </div>
 
+          {/* Pay button */}
           <button
             onClick={() => createOrderMutation.mutate()}
-            disabled={createOrderMutation.isPending || paying || !canSubmit()}
-            className="w-full py-3.5 rounded-xl font-bold text-white text-base transition-opacity disabled:opacity-60 flex items-center justify-center gap-2"
+            disabled={createOrderMutation.isPending || paying || !canSubmit() || product.stock === 0}
+            className="w-full py-4 rounded-2xl font-black text-white text-lg transition-opacity disabled:opacity-60 flex items-center justify-center gap-3 mt-2"
             style={{ background: `linear-gradient(135deg, ${color}, ${color}cc)` }}
             data-testid="button-pay-now"
           >
             {(createOrderMutation.isPending || paying)
-              ? <><Loader2 className="w-5 h-5 animate-spin" />Préparation...</>
-              : <><ShoppingCart className="w-5 h-5" />Acheter — {product.price.toLocaleString()} {shop.currency}</>
+              ? <><Loader2 className="w-5 h-5 animate-spin" />Préparation du paiement...</>
+              : <><ShoppingCart className="w-6 h-6" />Acheter — {product.price.toLocaleString()} {shop.currency}</>
             }
           </button>
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+
+      {/* Footer */}
+      <footer className="border-t py-6 text-center mt-8">
+        <div className="flex items-center justify-center gap-1.5 text-sm text-muted-foreground">
+          <span>Boutique propulsée par</span>
+          <a href="https://bkapay.com" target="_blank" rel="noopener noreferrer"
+            className="font-bold hover:opacity-80 transition-opacity"
+            style={{ color: "#2563eb", fontFamily: "'Inter', 'Segoe UI', sans-serif" }}>
+            BKApay
+          </a>
+        </div>
+      </footer>
+    </div>
   );
 }
 
@@ -435,13 +539,24 @@ export default function ShopPublicPage() {
 
   const { shop, categories, products } = data;
 
+  // ── If a product is selected → show its detail page ──────────────────────
+  if (selectedProduct) {
+    return (
+      <ProductDetailPage
+        product={selectedProduct}
+        shop={shop}
+        categories={categories}
+        onBack={() => setSelectedProduct(null)}
+      />
+    );
+  }
+
   // Filter products
   const filtered = products.filter(p => {
     const matchCat = activeCategoryId === "all" || p.categoryId === activeCategoryId;
     const matchSearch = !search || p.name.toLowerCase().includes(search.toLowerCase());
     return matchCat && matchSearch;
   });
-
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -480,7 +595,6 @@ export default function ShopPublicPage() {
                 </button>
               )}
             </div>
-            <Badge variant="outline" className="text-xs shrink-0">{shop.currency}</Badge>
           </div>
         </div>
       </header>
@@ -625,16 +739,6 @@ export default function ShopPublicPage() {
         </p>
       </footer>
 
-      {/* ── Buy Dialog ── */}
-      {selectedProduct && (
-        <BuyDialog
-          product={selectedProduct}
-          shop={shop}
-          categories={categories}
-          open={!!selectedProduct}
-          onClose={() => setSelectedProduct(null)}
-        />
-      )}
     </div>
   );
 }
