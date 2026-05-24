@@ -15465,37 +15465,29 @@ Ton role est de reformuler et ameliorer les messages que l'administrateur souhai
     } catch (e: any) { return res.status(500).json({ error: "Erreur serveur" }); }
   });
 
-  // GET /api/shop/check-domain — vérifie si un domaine personnalisé pointe bien vers ce serveur
-  app.get("/api/shop/check-domain", async (req: Request, res: Response) => {
+  // GET /api/shop/check-domain — vérifie si le domaine personnalisé pointe vers {slug}.bkapay.com
+  app.get("/api/shop/check-domain", requireAuth, async (req: Request, res: Response) => {
     const domain = ((req.query.domain as string) || "").trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
     if (!domain) return res.status(400).json({ ok: false, status: "error", message: "Domaine manquant" });
-    const targetHost = new URL(process.env.BASE_URL || "https://bkapay.com").hostname;
+    // Récupérer le slug de la boutique pour construire la cible unique
+    const shop = await storage.getShopByUserId(req.session.userId!);
+    if (!shop) return res.status(404).json({ ok: false, status: "error", message: "Boutique introuvable" });
+    const targetHost = `${shop.slug}.bkapay.com`;
     const withTimeout = <T>(p: Promise<T>, ms: number): Promise<T> =>
       Promise.race([p, new Promise<T>((_, rej) => setTimeout(() => rej(new Error("timeout")), ms))]);
     try {
       const { Resolver } = await import("dns/promises") as any;
       const resolver = new Resolver();
       resolver.setServers(["8.8.8.8", "1.1.1.1"]);
-      // 1. Essayer CNAME via DNS public
+      // Vérifier CNAME vers {slug}.bkapay.com
       try {
         const cnames: string[] = await withTimeout(resolver.resolveCname(domain), 6000);
         const normalizedCnames = cnames.map((c: string) => c.replace(/\.$/, ""));
-        const match = normalizedCnames.some((c: string) => c === targetHost || c.endsWith(`.${targetHost}`));
+        const match = normalizedCnames.some((c: string) => c === targetHost);
         if (match) return res.json({ ok: true, status: "ok", type: "CNAME", target: targetHost });
         return res.json({ ok: false, status: "wrong_target", type: "CNAME", found: normalizedCnames[0], target: targetHost });
       } catch { /* pas de CNAME */ }
-      // 2. Essayer A record (ALIAS/ANAME résout en A record) via DNS public
-      try {
-        const domainIps: string[] = await withTimeout(resolver.resolve4(domain), 6000);
-        const targetIps: string[] = await withTimeout(resolver.resolve4(targetHost), 6000).catch(() => [] as string[]);
-        if (targetIps.length === 0) {
-          return res.json({ ok: false, status: "target_unresolvable", message: "Impossible de résoudre la cible", target: targetHost });
-        }
-        const match = domainIps.some((ip: string) => targetIps.includes(ip));
-        if (match) return res.json({ ok: true, status: "ok", type: "ALIAS/A", target: targetHost });
-        return res.json({ ok: false, status: "wrong_ip", type: "A", found: domainIps[0], target: targetHost });
-      } catch { /* pas de A record */ }
-      return res.json({ ok: false, status: "not_found", message: "Aucun enregistrement DNS trouvé pour ce domaine", target: targetHost });
+      return res.json({ ok: false, status: "not_found", message: "Aucun CNAME trouvé pour ce domaine", target: targetHost });
     } catch (e: any) {
       return res.json({ ok: false, status: "error", message: e.message, target: targetHost });
     }
