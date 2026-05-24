@@ -1651,6 +1651,31 @@ export default function Merchant() {
           </div>
         )}
 
+        {(merchantLink as any)?.customerPaysFee && watchedAmount && watchedAmount > 0 && (
+          <div className="bg-amber-50 dark:bg-amber-950 p-3 rounded-md border border-amber-200 dark:border-amber-800">
+            <p className="text-xs text-amber-700 dark:text-amber-300 font-medium mb-1">
+              Frais de service inclus
+            </p>
+            {(() => {
+              const feeRate = 0.06;
+              const feeAmount = Math.ceil(watchedAmount * feeRate / (1 - feeRate));
+              const total = watchedAmount + feeAmount;
+              return (
+                <div className="space-y-0.5">
+                  <div className="flex justify-between text-xs text-amber-600 dark:text-amber-400">
+                    <span>Frais de service (6%)</span>
+                    <span>+{new Intl.NumberFormat("fr-FR").format(feeAmount)} {targetCurrency}</span>
+                  </div>
+                  <div className="flex justify-between text-sm font-bold text-amber-800 dark:text-amber-200">
+                    <span>Total à payer</span>
+                    <span data-testid="text-total-with-fee">{new Intl.NumberFormat("fr-FR").format(total)} {targetCurrency}</span>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
         <Button
           type="submit"
           className="w-full"

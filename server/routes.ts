@@ -9841,17 +9841,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // Si frais Mobile Money à la charge du client, majorer le montant envoyé au provider
+      // netAmountForBalance = montant net que le marchand doit recevoir (inchangé)
+      // adjustedAmount = montant que le client paie au provider (majoré pour couvrir les frais)
+      let adjustedAmount = Math.floor(amount);
+      const netAmountForBalance = originalAmount ? Math.floor(originalAmount) : Math.floor(amount);
+      if (merchantLink.customerPaysFee) {
+        const { calculateCustomerPaysFee } = await import("./utils/fees");
+        adjustedAmount = calculateCustomerPaysFee(adjustedAmount).totalForProvider;
+        console.log(`[MERCHANT_LINK] customerPaysFee actif: client paie ${adjustedAmount} pour que le marchand reçoive ${amount}`);
+      }
+
       if (activeProvider === "fedapay") {
         // Pass original amount and currency for balance operations
         const result = await handleMerchantLinkPayment(
           merchantLink,
-          amount, // converted amount for provider
+          adjustedAmount, // montant envoyé au provider (majoré si customerPaysFee)
           customerName || "Client",
           customerEmail || null,
           customerPhone,
           country,
           operator,
-          originalAmount || amount, // original amount for balance credit
+          netAmountForBalance, // montant net pour crédit solde marchand
           originalCurrency || ownerCurrency, // owner's currency
           owner?.accountType
         );
@@ -9874,10 +9885,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const providerCurrency = payduynaMLCurrencies[country?.toUpperCase()] || "XOF";
         
         // CRITICAL: Calculate base amount in owner's currency for balance credit
-        const baseAmountInOwnerCurrency = originalAmount ? Math.floor(originalAmount) : Math.floor(amount);
+        // netAmountForBalance = montant net pour créditer le marchand (sans majoration frais)
+        const baseAmountInOwnerCurrency = netAmountForBalance;
         
         // Convert amount to provider currency if needed
-        let convertedAmountForProvider = Math.floor(amount);
+        // adjustedAmount est déjà majoré si customerPaysFee est activé
+        let convertedAmountForProvider = adjustedAmount;
         if (ownerCurrency !== providerCurrency && !originalAmount) {
           const { convertCurrency: convertCurrencyFn } = await import("./currency-converter");
           const conversionResult = await convertCurrencyFn(baseAmountInOwnerCurrency, ownerCurrency, providerCurrency);
@@ -10023,13 +10036,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         const result = await handleMbiyoPayMerchantLink(
           merchantLink,
-          amount,
+          adjustedAmount, // montant majoré si customerPaysFee
           customerPhone,
           customerName || "Client",
           customerEmail || "",
           operator,
           country,
-          originalAmount || amount,
+          netAmountForBalance, // montant net pour crédit solde marchand
           originalCurrency || ownerCurrency,
           payerCurrency,
           otpCode,
@@ -10057,7 +10070,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         const result = await handleAfribaPayMerchantLink(
           merchantLink,
-          amount,
+          adjustedAmount, // montant majoré si customerPaysFee
           customerPhone,
           country,
           operator,
@@ -10094,12 +10107,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const result = await handlePawaPayDeposit(
           merchantLink.userId,
           owner!,
-          amount,
+          adjustedAmount, // montant majoré si customerPaysFee
           country,
           operator,
           customerPhone,
           payerCurrency,
-          ownerCurrency !== payerCurrency ? (originalAmount || undefined) : undefined,
+          ownerCurrency !== payerCurrency ? netAmountForBalance : undefined,
           ownerCurrency !== payerCurrency ? ownerCurrency : undefined,
           otpCode,
           {
@@ -10135,12 +10148,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`[MERCHANT_LINK] Using FeeXPay for ${country}/${operator}`);
         const mlOwnerCurrency = ownerCurrency;
         const mlPayerCurrency = payerCurrency;
-        const mlOriginalAmount = originalAmount ? Math.floor(originalAmount) : Math.floor(amount);
+        const mlOriginalAmount = netAmountForBalance; // montant net pour crédit solde marchand
         const mlOriginalCurrency = originalCurrency || mlOwnerCurrency;
         const result = await handleFeeXPayDeposit(
           merchantLink.userId,
           owner!,
-          Math.floor(amount),
+          adjustedAmount, // montant majoré si customerPaysFee
           country,
           operator,
           customerPhone,
