@@ -1,0 +1,15 @@
+Bon j'aimerais que tu ajoutes bouton boutique dans le menu de tous les utilisateurs de compte personnel et non compte entreprise 
+
+Après avoir cliqué sur le bouton ils iront sur une autre interface de contrôle de la boutique c'est-à-dire il crée la boutique il commence par personnaliser avant de créer la boutique il écrit le nom de la boutique et j'aimerais que la boutique soit professionnel comme un site web et la boutique aura Diaporama de la page d'accueil et cette diapora, lors de la création la diaspora une diapora déjà personnalisé par BKAPAY et il peut changer la photo du diapora parce qu'il veut il commence à mettre les produits dedans les détails du produit pour les informations dont il a besoin et aussi les champs demandés à remplir lors de l'achat des clients 
+
+Il y aura aussi la partie catégorie personnalisée par BKAPAY et il pourra changer les images après 
+
+Concernant la boutique il peut avoir nom de domaine personnalisé par exemple maboutique/nom de domaine.com
+
+Pour le paiement des utilisateurs il devrait utiliser sa propre API ce qui veut dire que tu dois faire l'intégration de cet API https://bkapay.com/documentation/inline/v1.6 tu dois faire l'intégration dans la devise est envoyé à l'API parce que l'utilisateur est libre de choisir la devise de son site web il peut aussi changer toutefois donc quand il choisit la devise tout le site web sera tous les informations tous les les métaux de paiement sera en devise qu'il a choisi et c'est ça tu envoies à la paye de notre API va convertir automatiquement donc l'utilisateur peut toujours changer la devise de sa boutique 
+
+Maintenant voici la logique de l'API quand il a créé sa boutique il y aura la bouton où il peut lier sa clé API et à ce niveau tu crées toi-même la clé avec le nom du boutique qu'il a utilisé dans la session clé API je te demande de le faire toi-même et prendre la clé et la secret signature est configuré en même temps URL webhook parce que je ne veux pas que l'utilisateur crée la boutique sur un autre compte et prendre la clé depuis un autre compte et puis quand l'utilisateur va cliquer sur la liaison de la clé API tu vérifies d'abord si c'est un utilisateur vérifier si c'est un utilisateur vérifier tu acceptes si son compte n'est pas vérifié tu refuses et lui afficher le message que avant de faire la liaison il doit faire la vérification 
+
+Concernant le produit il peut mettre jusqu'à 3 photos pour chaque produit et quand les clients vont cliquer sur le produit ils verront les détails ainsi que les autres photos restant 
+
+En créant les produits ils peuvent ajouter les documents téléchargeables après paiement que ces clients  vont reçu par WhatsApp ou par mail
