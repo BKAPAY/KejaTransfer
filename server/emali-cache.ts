@@ -1,7 +1,7 @@
 import { storage } from "./storage";
 import { COUNTRIES, OPERATORS } from "@shared/schema";
 
-const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 interface CacheEntry {
   content: string;
@@ -220,18 +220,39 @@ export function invalidateEmaliCache() {
   cache.countries = null;
 }
 
+function msUntilNextMonday3am(): number {
+  const now = new Date();
+  const next = new Date(now);
+  next.setHours(3, 0, 0, 0);
+  const day = next.getDay();
+  const daysUntilMonday = day === 1 && next.getTime() > now.getTime() ? 0 : (8 - day) % 7 || 7;
+  next.setDate(next.getDate() + daysUntilMonday);
+  if (next.getTime() <= now.getTime()) next.setDate(next.getDate() + 7);
+  return next.getTime() - now.getTime();
+}
+
+async function refreshAll(label: string) {
+  try {
+    await Promise.all([refreshEntry("fees"), refreshEntry("countries")]);
+    console.log(`[EMALI Cache] ${label} OK (prochain rafraîchissement : lundi 03h00).`);
+  } catch (err: any) {
+    console.error(`[EMALI Cache] ${label} échec :`, err.message || err);
+  }
+}
+
 export function startEmaliCacheRefresher() {
-  const warmup = async () => {
-    try {
-      await Promise.all([refreshEntry("fees"), refreshEntry("countries")]);
-      console.log("[EMALI Cache] Données initiales chargées.");
-    } catch (err: any) {
-      console.error("[EMALI Cache] Échec du chargement initial :", err.message || err);
-    }
+  // Chargement initial 5s après démarrage : les données sont disponibles dès aujourd'hui.
+  setTimeout(() => { void refreshAll("Chargement initial"); }, 5000);
+
+  // Planification du prochain lundi 03h00, puis chaque lundi suivant via setInterval hebdomadaire.
+  const scheduleNextMonday = () => {
+    const delay = msUntilNextMonday3am();
+    const nextDate = new Date(Date.now() + delay).toISOString();
+    console.log(`[EMALI Cache] Prochain rafraîchissement programmé : ${nextDate}`);
+    setTimeout(() => {
+      void refreshAll("Rafraîchissement hebdomadaire (lundi)");
+      setInterval(() => { void refreshAll("Rafraîchissement hebdomadaire (lundi)"); }, CACHE_TTL_MS);
+    }, delay);
   };
-  setTimeout(warmup, 5000);
-  setInterval(() => {
-    refreshEntry("fees").catch((err) => console.error("[EMALI Cache] Refresh fees:", err.message || err));
-    refreshEntry("countries").catch((err) => console.error("[EMALI Cache] Refresh countries:", err.message || err));
-  }, CACHE_TTL_MS);
+  scheduleNextMonday();
 }
