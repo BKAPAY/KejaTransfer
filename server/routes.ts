@@ -13556,11 +13556,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const shortName = op.name.replace(/\s*Mobile\s+Money\s*$/i, " Money").replace(/\s+/g, " ").trim();
             activeOpLines.push(`| ${shortName} | ${inCell} | ${outCell} |`);
           }
+          // Détermine si le pays est lui-même "actif" (au moins un provider activé en payin ou payout pour ce pays)
+          const countryIsActive = noStatusData
+            ? countryFees.some((fc: any) => activeProvidersByKey.has(fc.provider))
+            : statuses.some((cs: any) => cs.payinEnabled || cs.payoutEnabled);
+
           if (activeOpLines.length > 0) {
             countryFeeDetailLines.push(`${flag} **${country.name.toUpperCase()}** | Devise: ${country.currency}`);
+            countryFeeDetailLines.push(``);
             countryFeeDetailLines.push(`| Opérateur | Entrant | Sortant |`);
             countryFeeDetailLines.push(`|---|---|---|`);
             countryFeeDetailLines.push(...activeOpLines);
+            countryFeeDetailLines.push(``);
+          } else if (countryIsActive) {
+            // Pays actif mais aucun opérateur actif — afficher le pays sans tableau avec un message
+            countryFeeDetailLines.push(`${flag} **${country.name.toUpperCase()}** | Devise: ${country.currency}`);
+            countryFeeDetailLines.push(`*Aucun opérateur actif pour ce pays.*`);
             countryFeeDetailLines.push(``);
           }
         }
@@ -13683,6 +13694,7 @@ RÈGLES STRICTES DU TABLEAU:
 - Affiche uniquement le nom commercial court de l'opérateur dans la cellule. N'ajoute JAMAIS de codes ou de mentions techniques entre crochets.
 - Tu DOIS mettre une ligne vide AVANT et APRÈS chaque tableau (entre le titre du pays et le tableau, puis entre la fin du tableau et le pays suivant).
 - N'écris JAMAIS "disponible" / "non disponible" / "actif" / "inactif" dans le tableau.
+- Si pour un pays actif les données ci-dessous indiquent "*Aucun opérateur actif pour ce pays.*" (sans tableau), tu DOIS reproduire le titre du pays suivi de cette ligne EXACTE en italique (avec des astérisques *...*), SANS générer de tableau ni inventer d'opérateur.
 
 A la toute fin de ta réponse sur les frais (après TOUS les pays), tu DOIS ajouter cette phrase EXACTE (sans rien ajouter de plus) :
 
