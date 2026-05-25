@@ -13552,8 +13552,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (!hasPayin && !hasPayout) continue;
             const inCell = hasPayin && detailFeeIn ? `${(detailFeeIn.incomingFeePercentage / 10).toFixed(1)}%` : "Néant";
             const outCell = hasPayout && detailFeeOut ? `${(detailFeeOut.outgoingFeePercentage / 10).toFixed(1)}%` : "Néant";
-            // Include operator code so EMALI knows the exact code to pass to tools
-            activeOpLines.push(`| ${op.name} [code: ${op.code}] | ${inCell} | ${outCell} |`);
+            // Nom affichable court (ex: "MTN Mobile Money" -> "MTN Money") — le code reste dans la section data principale pour les tool calls
+            const shortName = op.name.replace(/\s*Mobile\s+Money\s*$/i, " Money").replace(/\s+/g, " ").trim();
+            activeOpLines.push(`| ${shortName} | ${inCell} | ${outCell} |`);
           }
           if (activeOpLines.length > 0) {
             countryFeeDetailLines.push(`${flag} **${country.name.toUpperCase()}** | Devise: ${country.currency}`);
@@ -13679,7 +13680,7 @@ RÈGLES STRICTES DU TABLEAU:
 - Tu DOIS mettre le nom du pays en gras avec ** autour, et inclure le drapeau emoji.
 - Tu DOIS lister UNIQUEMENT les opérateurs ACTIFS — les données fournies plus bas contiennent déjà uniquement les opérateurs actifs des pays actifs. N'ajoute JAMAIS un opérateur de toi-même.
 - Si un opérateur n'a PAS de paiement sortant (Sortant), mets le texte exact "Néant" dans la cellule Sortant (idem pour Entrant si absent).
-- N'affiche PAS les codes [code: xxx] dans la cellule — ils sont uniquement pour les appels d'outils internes. Affiche uniquement le nom commercial de l'opérateur.
+- Affiche uniquement le nom commercial court de l'opérateur dans la cellule. N'ajoute JAMAIS de codes ou de mentions techniques entre crochets.
 - Tu DOIS mettre une ligne vide AVANT et APRÈS chaque tableau (entre le titre du pays et le tableau, puis entre la fin du tableau et le pays suivant).
 - N'écris JAMAIS "disponible" / "non disponible" / "actif" / "inactif" dans le tableau.
 

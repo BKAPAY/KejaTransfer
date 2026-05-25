@@ -239,7 +239,38 @@ export function EmaliChatButton() {
       .replace(/'/g, "&#x27;");
 
   const renderMarkdown = (text: string) => {
-    const safe = escapeHtml(text);
+    let safe = escapeHtml(text);
+
+    // Markdown tables: blocks of consecutive lines starting with | including a |---|---| separator row
+    safe = safe.replace(
+      /(^|\n)((?:\|[^\n]*\|\s*\n)(?:\|\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)+\|\s*\n)(?:\|[^\n]*\|\s*\n?)+)/g,
+      (_match, prefix, block) => {
+        const lines = block.trim().split("\n").filter((l: string) => l.trim().length > 0);
+        if (lines.length < 2) return prefix + block;
+        const parseRow = (line: string) =>
+          line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((c: string) => c.trim());
+        const header = parseRow(lines[0]);
+        const bodyRows = lines.slice(2).map(parseRow);
+        const th = header
+          .map((c: string) =>
+            `<th style="text-align:left;padding:6px 8px;font-weight:600;font-size:0.72rem;background:hsl(var(--muted));border-bottom:1px solid hsl(var(--border));color:hsl(var(--muted-foreground));text-transform:uppercase;letter-spacing:0.03em">${c}</th>`
+          )
+          .join("");
+        const trs = bodyRows
+          .map(
+            (row: string[]) =>
+              `<tr>${row
+                .map(
+                  (c: string, i: number) =>
+                    `<td style="padding:6px 8px;font-size:0.78rem;border-bottom:1px solid hsl(var(--border));${i === 0 ? "font-weight:500;" : "text-align:center;color:hsl(var(--foreground))"}">${c === "Néant" ? '<span style="color:hsl(var(--muted-foreground));font-style:italic">Néant</span>' : c}</td>`
+                )
+                .join("")}</tr>`
+          )
+          .join("");
+        return `${prefix}<div style="overflow-x:auto;margin:6px 0"><table style="width:100%;border-collapse:collapse;border:1px solid hsl(var(--border));border-radius:6px;overflow:hidden"><thead><tr>${th}</tr></thead><tbody>${trs}</tbody></table></div>`;
+      }
+    );
+
     return safe
       // Section headers ## / ###
       .replace(/^#{2,3} (.*?)$/gm, '<div style="font-weight:600;font-size:0.82rem;margin-top:10px;margin-bottom:4px;padding-left:8px;border-left:3px solid hsl(var(--primary));color:hsl(var(--foreground))">$1</div>')
