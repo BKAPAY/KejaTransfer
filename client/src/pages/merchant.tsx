@@ -1678,11 +1678,23 @@ export default function Merchant() {
                     const v = e.target.value;
                     field.onChange(v === "" ? undefined : parseFloat(v));
                   }}
+                  className={
+                    minAmountConverted !== null && field.value > 0 && field.value < minAmountConverted
+                      ? "border-destructive focus-visible:ring-destructive"
+                      : ""
+                  }
                 />
               </FormControl>
               <FormMessage />
               {selectedCountry && (minAmountConverted !== null || minAmountConvertedLoading) && (
-                <p className="text-xs text-muted-foreground mt-1" data-testid="text-min-amount">
+                <p
+                  className={`text-xs mt-1 ${
+                    !minAmountConvertedLoading && minAmountConverted !== null && field.value > 0 && field.value < minAmountConverted
+                      ? "text-destructive font-medium"
+                      : "text-muted-foreground"
+                  }`}
+                  data-testid="text-min-amount"
+                >
                   {minAmountConvertedLoading
                     ? "Calcul du minimum..."
                     : `Minimum requis : ${new Intl.NumberFormat("fr-FR").format(minAmountConverted!)} ${targetCurrency}`}
@@ -1741,7 +1753,7 @@ export default function Merchant() {
         <Button
           type="submit"
           className="w-full"
-          disabled={initMutation.isPending || isLoadingOperators || Boolean(noOperatorsAvailable) || !watchedAmount || watchedAmount <= 0 || (Boolean(needsConversion) && (!conversionData || conversionData.isLoading)) || (Boolean(showOtpOnForm) && !(isMbiyoOtpOperator ? mbiyoOtpCode : authCode).trim())}
+          disabled={initMutation.isPending || isLoadingOperators || Boolean(noOperatorsAvailable) || !watchedAmount || watchedAmount <= 0 || (minAmountConverted !== null && watchedAmount < minAmountConverted) || (Boolean(needsConversion) && (!conversionData || conversionData.isLoading)) || (Boolean(showOtpOnForm) && !(isMbiyoOtpOperator ? mbiyoOtpCode : authCode).trim())}
           data-testid="button-pay"
         >
           {initMutation.isPending ? (
