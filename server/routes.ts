@@ -13550,16 +13550,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
 
             if (!hasPayin && !hasPayout) continue;
-            const inPct = detailFeeIn ? (detailFeeIn.incomingFeePercentage / 10).toFixed(1) : "N/A";
-            const outPct = detailFeeOut ? (detailFeeOut.outgoingFeePercentage / 10).toFixed(1) : "N/A";
-            const parts: string[] = [];
-            if (hasPayin) parts.push(`Entrant: ${inPct}%`);
-            if (hasPayout) parts.push(`Sortant: ${outPct}%`);
+            const inCell = hasPayin && detailFeeIn ? `${(detailFeeIn.incomingFeePercentage / 10).toFixed(1)}%` : "Néant";
+            const outCell = hasPayout && detailFeeOut ? `${(detailFeeOut.outgoingFeePercentage / 10).toFixed(1)}%` : "Néant";
             // Include operator code so EMALI knows the exact code to pass to tools
-            activeOpLines.push(`  • ${op.name} [code: ${op.code}]: ${parts.join(" | ")}`);
+            activeOpLines.push(`| ${op.name} [code: ${op.code}] | ${inCell} | ${outCell} |`);
           }
           if (activeOpLines.length > 0) {
-            countryFeeDetailLines.push(`${flag} ${country.name.toUpperCase()} (${country.code}) | Devise: ${country.currency}`);
+            countryFeeDetailLines.push(`${flag} **${country.name.toUpperCase()}** | Devise: ${country.currency}`);
+            countryFeeDetailLines.push(`| Opérateur | Entrant | Sortant |`);
+            countryFeeDetailLines.push(`|---|---|---|`);
             countryFeeDetailLines.push(...activeOpLines);
             countryFeeDetailLines.push(``);
           }
@@ -13660,19 +13659,31 @@ Tu DOIS appliquer ces règles de mise en forme dans TOUS tes messages:
 6. Listes de pays ou d'opérateurs: un élément par ligne, avec le drapeau et le nom en gras.
 
 FORMAT OBLIGATOIRE POUR LES FRAIS DE TRANSACTION:
-Quand l'utilisateur demande les frais, tu DOIS reproduire CHAQUE pays dans ce format EXACT, pays par pays dans l'ordre (n'affiche PAS les codes opérateur entre crochets dans ta réponse utilisateur, affiche seulement le nom):
+Quand l'utilisateur demande les frais, tu DOIS reproduire CHAQUE pays actif dans ce format EXACT (tableau markdown), pays par pays dans l'ordre. Le nom du pays va EN HAUT, puis le tableau juste en dessous avec trois colonnes : Opérateur | Entrant | Sortant.
 
 [DRAPEAU] **NOM DU PAYS** | Devise: XXX
-• Opérateur1: Entrant: X.X% | Sortant: X.X%
-• Opérateur2: Entrant: X.X%
-(ligne vide)
-[DRAPEAU] **NOM DU PAYS SUIVANT** | Devise: XXX
-...
 
-Tu DOIS mettre le nom du pays en gras avec ** autour.
-Tu DOIS lister UNIQUEMENT les opérateurs actifs du pays, un par ligne avec •. N'écris jamais "disponible" ou "non disponible" — tu n'affiches que ce qui est actif. N'affiche pas les codes [code: xxx] dans la réponse utilisateur — ils sont uniquement pour les appels d'outils.
-Tu DOIS mettre une ligne vide entre chaque pays.
-A la toute fin de ta réponse sur les frais (après TOUS les pays), tu DOIS ajouter la section des frais d'échange de devise ET la note, dans cet ordre exact:
+| Opérateur | Entrant | Sortant |
+|---|---|---|
+| Nom opérateur 1 | X.X% | X.X% |
+| Nom opérateur 2 | X.X% | Néant |
+
+[DRAPEAU] **NOM DU PAYS SUIVANT** | Devise: XXX
+
+| Opérateur | Entrant | Sortant |
+|---|---|---|
+| ... | ... | ... |
+
+RÈGLES STRICTES DU TABLEAU:
+- Tu DOIS utiliser EXACTEMENT le tableau markdown ci-dessus (pipes | et séparateur |---|---|---|).
+- Tu DOIS mettre le nom du pays en gras avec ** autour, et inclure le drapeau emoji.
+- Tu DOIS lister UNIQUEMENT les opérateurs ACTIFS — les données fournies plus bas contiennent déjà uniquement les opérateurs actifs des pays actifs. N'ajoute JAMAIS un opérateur de toi-même.
+- Si un opérateur n'a PAS de paiement sortant (Sortant), mets le texte exact "Néant" dans la cellule Sortant (idem pour Entrant si absent).
+- N'affiche PAS les codes [code: xxx] dans la cellule — ils sont uniquement pour les appels d'outils internes. Affiche uniquement le nom commercial de l'opérateur.
+- Tu DOIS mettre une ligne vide AVANT et APRÈS chaque tableau (entre le titre du pays et le tableau, puis entre la fin du tableau et le pays suivant).
+- N'écris JAMAIS "disponible" / "non disponible" / "actif" / "inactif" dans le tableau.
+
+A la toute fin de ta réponse sur les frais (après TOUS les pays), tu DOIS ajouter cette phrase EXACTE (sans rien ajouter de plus) :
 
 **Frais d'échange de devise** (s'appliquent en plus des frais de transaction si les devises diffèrent) de 3 à 6 %.
 
