@@ -167,6 +167,8 @@ export default function Merchant() {
   const [conversionData, setConversionData] = useState<ConversionData | null>(null);
   const [selectedCurrency, setSelectedCurrency] = useState<string>("XOF");
   const [feePercentage, setFeePercentage] = useState<number>(6); // taux par défaut 6%
+  const [minAmountConverted, setMinAmountConverted] = useState<number | null>(null);
+  const [minAmountConvertedLoading, setMinAmountConvertedLoading] = useState(false);
   const { toast } = useToast();
   
   // État pour le flux crypto en 2 étapes - restauré depuis localStorage si paiement en cours
@@ -447,6 +449,33 @@ export default function Merchant() {
       setConversionData(null);
     }
   }, [needsConversion, watchedAmount, ownerCurrency, targetCurrency, fetchConversion, selectedCurrency]);
+
+  // Conversion du montant minimum dans la devise du client
+  useEffect(() => {
+    const rawMin = (merchantLink as any)?.minAmount;
+    const minCur = (merchantLink as any)?.minAmountCurrency || "XOF";
+    if (!rawMin || rawMin <= 0 || !selectedCountry) {
+      setMinAmountConverted(null);
+      return;
+    }
+    if (minCur === targetCurrency) {
+      setMinAmountConverted(rawMin);
+      return;
+    }
+    setMinAmountConvertedLoading(true);
+    fetch("/api/convert-currency", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ amount: rawMin, fromCurrency: minCur, toCurrency: targetCurrency }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.convertedAmount) setMinAmountConverted(Math.ceil(data.convertedAmount));
+        else setMinAmountConverted(null);
+      })
+      .catch(() => setMinAmountConverted(null))
+      .finally(() => setMinAmountConvertedLoading(false));
+  }, [merchantLink, selectedCountry, targetCurrency]);
 
   // Le montant est déjà saisi dans la devise locale du client → utilisé tel quel pour les codes USSD
   const amountForUssd = Math.round(watchedAmount || 0);
@@ -1643,6 +1672,13 @@ export default function Merchant() {
                 />
               </FormControl>
               <FormMessage />
+              {selectedCountry && (minAmountConverted !== null || minAmountConvertedLoading) && (
+                <p className="text-xs text-muted-foreground mt-1" data-testid="text-min-amount">
+                  {minAmountConvertedLoading
+                    ? "Calcul du minimum..."
+                    : `Minimum requis : ${new Intl.NumberFormat("fr-FR").format(minAmountConverted!)} ${targetCurrency}`}
+                </p>
+              )}
             </FormItem>
           )}
         />

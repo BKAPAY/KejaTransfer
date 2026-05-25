@@ -94,7 +94,7 @@ export interface IStorage {
   getMerchantLinkByName(merchantName: string): Promise<MerchantLink | undefined>;
   createMerchantLink(link: InsertMerchantLink & { userId: string }): Promise<MerchantLink>;
   updateMerchantLinkName(id: string, merchantName: string): Promise<MerchantLink | undefined>;
-  updateMerchantLink(id: string, updates: { customerPaysFee?: boolean; customerPaysCryptoFee?: boolean }): Promise<MerchantLink | undefined>;
+  updateMerchantLink(id: string, updates: { customerPaysFee?: boolean; customerPaysCryptoFee?: boolean; minAmount?: number | null; minAmountCurrency?: string }): Promise<MerchantLink | undefined>;
   deleteMerchantLink(id: string, userId: string): Promise<boolean>;
 
   // API Keys
@@ -812,7 +812,7 @@ export class DbStorage implements IStorage {
     return results[0];
   }
 
-  async updateMerchantLink(id: string, updates: { customerPaysFee?: boolean; customerPaysCryptoFee?: boolean }): Promise<MerchantLink | undefined> {
+  async updateMerchantLink(id: string, updates: { customerPaysFee?: boolean; customerPaysCryptoFee?: boolean; minAmount?: number | null; minAmountCurrency?: string }): Promise<MerchantLink | undefined> {
     const results = await db.update(schema.merchantLinks)
       .set(updates)
       .where(eq(schema.merchantLinks.id, id))

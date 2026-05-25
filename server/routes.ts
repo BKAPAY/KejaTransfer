@@ -2908,9 +2908,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!link || link.userId !== req.session.userId) {
         return res.status(404).json({ error: "Lien marchand introuvable" });
       }
-      const updates: { customerPaysFee?: boolean; customerPaysCryptoFee?: boolean } = {};
+      const updates: { customerPaysFee?: boolean; customerPaysCryptoFee?: boolean; minAmount?: number | null; minAmountCurrency?: string } = {};
       if (typeof req.body.customerPaysFee === "boolean") updates.customerPaysFee = req.body.customerPaysFee;
       if (typeof req.body.customerPaysCryptoFee === "boolean") updates.customerPaysCryptoFee = req.body.customerPaysCryptoFee;
+      if (req.body.minAmount === null || typeof req.body.minAmount === "number") updates.minAmount = req.body.minAmount;
+      if (typeof req.body.minAmountCurrency === "string") updates.minAmountCurrency = req.body.minAmountCurrency;
       const updated = await storage.updateMerchantLink(link.id, updates);
       return res.json({ success: true, link: updated });
     } catch (e: any) {

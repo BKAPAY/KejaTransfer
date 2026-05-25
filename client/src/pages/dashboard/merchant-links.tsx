@@ -2,13 +2,14 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Copy, ExternalLink, Trash2, Store, Download, FileText, QrCode, Wallet, Bitcoin } from "lucide-react";
+import { Plus, Copy, ExternalLink, Trash2, Store, Download, FileText, QrCode, Wallet, Bitcoin, ArrowDownToLine, X } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { MerchantLink } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -361,20 +362,42 @@ function BrandedQRPreview({ url, merchantName }: { url: string; merchantName: st
   );
 }
 
+const MIN_CURRENCIES = ["XOF", "XAF", "USD", "CDF"] as const;
+
 function MerchantLinkCard({ link }: { link: MerchantLink }) {
   const { toast } = useToast();
   const [downloading, setDownloading] = useState<"png" | "pdf" | null>(null);
+  const [minAmountInput, setMinAmountInput] = useState<string>(
+    (link as any).minAmount ? String((link as any).minAmount) : ""
+  );
+  const [minCurrency, setMinCurrency] = useState<string>(
+    (link as any).minAmountCurrency || "XOF"
+  );
   const url = `${window.location.origin}/merchant/${link.token}`;
 
   const feeMutation = useMutation({
-    mutationFn: async (updates: { customerPaysFee?: boolean; customerPaysCryptoFee?: boolean }) =>
+    mutationFn: async (updates: { customerPaysFee?: boolean; customerPaysCryptoFee?: boolean; minAmount?: number | null; minAmountCurrency?: string }) =>
       apiRequest("PATCH", `/api/merchant-links/${link.id}`, updates),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/merchant-links"] });
-      toast({ title: "Paramètre mis à jour", description: "Les frais ont été mis à jour avec succès." });
+      toast({ title: "Paramètre mis à jour", description: "Les paramètres ont été mis à jour avec succès." });
     },
-    onError: () => toast({ title: "Erreur", description: "Impossible de mettre à jour les frais.", variant: "destructive" }),
+    onError: () => toast({ title: "Erreur", description: "Impossible de mettre à jour.", variant: "destructive" }),
   });
+
+  const saveMinAmount = () => {
+    const val = minAmountInput.trim() === "" ? null : parseInt(minAmountInput, 10);
+    if (val !== null && (isNaN(val) || val <= 0)) {
+      toast({ title: "Montant invalide", description: "Le montant minimum doit être un nombre positif.", variant: "destructive" });
+      return;
+    }
+    feeMutation.mutate({ minAmount: val, minAmountCurrency: minCurrency });
+  };
+
+  const removeMinAmount = () => {
+    setMinAmountInput("");
+    feeMutation.mutate({ minAmount: null, minAmountCurrency: minCurrency });
+  };
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(url);
@@ -541,6 +564,63 @@ function MerchantLinkCard({ link }: { link: MerchantLink }) {
               disabled={feeMutation.isPending}
               onCheckedChange={(val) => feeMutation.mutate({ customerPaysCryptoFee: val })}
             />
+          </div>
+        </div>
+
+        {/* Montant minimum */}
+        <div className="border rounded-md p-3 space-y-3">
+          <div className="flex items-center gap-2">
+            <ArrowDownToLine className="w-4 h-4 text-muted-foreground shrink-0" />
+            <div>
+              <p className="text-sm font-medium leading-tight">Montant minimum</p>
+              <p className="text-xs text-muted-foreground leading-tight mt-0.5">
+                {(link as any).minAmount
+                  ? `Minimum actuel : ${new Intl.NumberFormat("fr-FR").format((link as any).minAmount)} ${(link as any).minAmountCurrency || "XOF"}`
+                  : "Aucun minimum défini — le client choisit librement le montant"}
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            <Input
+              type="number"
+              inputMode="numeric"
+              min={1}
+              placeholder="Ex: 1000"
+              data-testid={`input-min-amount-${link.id}`}
+              value={minAmountInput}
+              onChange={(e) => setMinAmountInput(e.target.value)}
+              className="w-32 shrink-0"
+            />
+            <Select value={minCurrency} onValueChange={setMinCurrency}>
+              <SelectTrigger data-testid={`select-min-currency-${link.id}`} className="w-24 shrink-0">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {MIN_CURRENCIES.map((c) => (
+                  <SelectItem key={c} value={c}>{c}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              size="sm"
+              onClick={saveMinAmount}
+              disabled={feeMutation.isPending}
+              data-testid={`button-save-min-amount-${link.id}`}
+            >
+              {feeMutation.isPending ? "..." : "Enregistrer"}
+            </Button>
+            {(link as any).minAmount && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={removeMinAmount}
+                disabled={feeMutation.isPending}
+                data-testid={`button-remove-min-amount-${link.id}`}
+              >
+                <X className="w-3.5 h-3.5 mr-1" />
+                Supprimer
+              </Button>
+            )}
           </div>
         </div>
       </CardContent>

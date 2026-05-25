@@ -130,6 +130,8 @@ export const merchantLinks = pgTable("merchant_links", {
   isActive: boolean("is_active").notNull().default(true),
   customerPaysFee: boolean("customer_pays_fee").notNull().default(false), // Frais Mobile Money à la charge du client
   customerPaysCryptoFee: boolean("customer_pays_crypto_fee").notNull().default(false), // Frais Crypto à la charge du client
+  minAmount: integer("min_amount"), // Montant minimum requis (null = aucun minimum)
+  minAmountCurrency: text("min_amount_currency").default("XOF"), // Devise du montant minimum
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

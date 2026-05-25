@@ -674,6 +674,14 @@ async function bootstrapDatabase() {
         console.error("⚠️ settlements batch_id column setup error:", e);
       }
 
+      try {
+        await seedClient`ALTER TABLE merchant_links ADD COLUMN IF NOT EXISTS min_amount INTEGER`;
+        await seedClient`ALTER TABLE merchant_links ADD COLUMN IF NOT EXISTS min_amount_currency TEXT DEFAULT 'XOF'`;
+        console.log("✅ merchant_links min_amount columns ready");
+      } catch (e) {
+        console.error("⚠️ merchant_links min_amount columns setup error:", e);
+      }
+
       console.log("⚙️ Ensuring database indexes exist...");
       await seedClient`CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions (user_id)`;
       await seedClient`CREATE INDEX IF NOT EXISTS idx_transactions_user_status ON transactions (user_id, status)`;
