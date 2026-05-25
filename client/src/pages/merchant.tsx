@@ -824,6 +824,15 @@ export default function Merchant() {
   });
 
   const onSubmit = async (data: MerchantPaymentFormData) => {
+    // Vérifier le montant minimum si défini
+    if (minAmountConverted !== null && data.amount < minAmountConverted) {
+      toast({
+        title: "Montant insuffisant",
+        description: `Le montant minimum requis est de ${new Intl.NumberFormat("fr-FR").format(minAmountConverted)} ${targetCurrency}.`,
+        variant: "destructive",
+      });
+      return;
+    }
     if (!showOtpOnForm) {
       countdown.startCountdown();
       setPaymentStage("polling");

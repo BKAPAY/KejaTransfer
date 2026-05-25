@@ -9839,6 +9839,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const ownerCurrency = owner?.country ? getCurrencyForCountry(owner.country) : "XOF";
       const payerCurrency = currency || getCurrencyForCountry(country);
 
+      // Vérification du montant minimum
+      const rawMin = (merchantLink as any).minAmount;
+      const minCur = (merchantLink as any).minAmountCurrency || "XOF";
+      if (rawMin && rawMin > 0) {
+        let minInPayerCurrency = rawMin;
+        if (minCur !== payerCurrency) {
+          const { convertCurrency } = await import("./currency-converter");
+          const conv = await convertCurrency(rawMin, minCur, payerCurrency);
+          if (conv.success) minInPayerCurrency = Math.ceil(conv.convertedAmount);
+        }
+        if (Math.floor(amount) < Math.floor(minInPayerCurrency)) {
+          return res.status(400).json({
+            success: false,
+            error: `Le montant minimum requis est de ${new Intl.NumberFormat("fr-FR").format(Math.ceil(minInPayerCurrency))} ${payerCurrency}.`,
+          });
+        }
+      }
+
       const activeProvider = await getActiveProviderForDeposit(country, operator);
       
       if (!activeProvider) {
