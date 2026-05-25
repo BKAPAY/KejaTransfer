@@ -131,7 +131,16 @@ app.use((req, res, next) => {
     reusePort: true,
   }, () => {
     log(`serving on port ${port}`);
-    
+
+    (async () => {
+      try {
+        const { startEmaliCacheRefresher } = await import("./emali-cache");
+        startEmaliCacheRefresher();
+      } catch (err: any) {
+        console.error("[EMALI Cache] init error:", err.message || err);
+      }
+    })();
+
     (async () => {
       try {
         await bootstrapDatabase();

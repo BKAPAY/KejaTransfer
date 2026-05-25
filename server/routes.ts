@@ -15704,5 +15704,28 @@ Ton role est de reformuler et ameliorer les messages que l'administrateur souhai
   });
 
   const httpServer = createServer(app);
+  // Routes EMALI simplifiées (servies depuis un cache 24h, aucun appel OpenAI)
+  app.get("/api/emali/fees", async (_req, res) => {
+    try {
+      const { getEmaliFees } = await import("./emali-cache");
+      const entry = await getEmaliFees();
+      res.json({ content: entry.content, generatedAt: entry.generatedAt });
+    } catch (err: any) {
+      console.error("[EMALI /api/emali/fees]", err);
+      res.status(500).json({ error: "Erreur lors de la récupération des frais" });
+    }
+  });
+
+  app.get("/api/emali/countries-operators", async (_req, res) => {
+    try {
+      const { getEmaliCountriesOperators } = await import("./emali-cache");
+      const entry = await getEmaliCountriesOperators();
+      res.json({ content: entry.content, generatedAt: entry.generatedAt });
+    } catch (err: any) {
+      console.error("[EMALI /api/emali/countries-operators]", err);
+      res.status(500).json({ error: "Erreur lors de la récupération des pays et opérateurs" });
+    }
+  });
+
   return httpServer;
 }
