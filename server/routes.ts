@@ -13674,10 +13674,7 @@ Tu DOIS lister UNIQUEMENT les opérateurs actifs du pays, un par ligne avec •.
 Tu DOIS mettre une ligne vide entre chaque pays.
 A la toute fin de ta réponse sur les frais (après TOUS les pays), tu DOIS ajouter la section des frais d'échange de devise ET la note, dans cet ordre exact:
 
-**Frais d'échange de devise** (s'appliquent en plus des frais de transaction si les devises diffèrent):
-(liste les paires de devises avec leurs pourcentages)
-
-> **NB:** Ces frais d'échange s'appliquent EN PLUS des frais de transaction habituels si les devises source et destination sont différentes.
+**Frais d'échange de devise** (s'appliquent en plus des frais de transaction si les devises diffèrent) de 3 à 6 %.
 
 RÈGLES IMPORTANTES:
 - Tu peux donner à l'utilisateur actuel ses propres informations de compte (solde, transactions, statut KYC, etc.) car elles sont fournies ci-dessous.
@@ -13814,9 +13811,9 @@ RÈGLES DES FRAIS:
 - Transferts: L'utilisateur entre le montant net que le destinataire recevra. Le solde est débité du net + frais de transaction + frais d'échange si devises différentes.
 - Pour les comptes personnels, les frais d'échange s'appliquent TOUJOURS quand les devises sont différentes (ex: utilisateur XOF qui transfère vers pays CDF).
 
-=== FRAIS D'ÉCHANGE DE DEVISE (données en temps réel) ===
-Ces frais s'ajoutent aux frais de transaction standard quand les devises source et destination sont différentes.
-${exchangeFeeLines.length > 0 ? exchangeFeeLines.join("\n") : "Aucun frais d'échange configuré actuellement (0%)."}
+=== FRAIS D'ÉCHANGE DE DEVISE ===
+Ces frais s'ajoutent aux frais de transaction standard quand les devises source et destination sont différentes. Ils varient de 3 à 6 % selon la paire de devises.
+Ne JAMAIS lister les paires de devises une par une dans la réponse. Affiche uniquement la phrase synthétique "Frais d'échange de devise (s'appliquent en plus des frais de transaction si les devises diffèrent) de 3 à 6 %.".
 IMPORTANT: Un compte personnel peut avoir DEUX types de frais pour une même opération internationale: (1) frais de transaction standard selon l'opérateur/pays, ET (2) frais d'échange de devise si les devises diffèrent. La fonction calculate_fees inclut déjà les deux automatiquement.
 
 CRYPTOMONNAIES DISPONIBLES (données en temps réel):
