@@ -32,6 +32,7 @@ export const PAYDUNYA_COUNTRIES: PaydunyaCountry[] = [
       { code: "expresso", name: "Expresso", requiresOtp: false, payin: true, payout: false },
       { code: "wave", name: "Wave", requiresOtp: false, payin: true, payout: true },
       { code: "wizall", name: "Wizall", requiresOtp: false, payin: true, payout: false },
+      { code: "djamo", name: "Djamo", requiresOtp: false, payin: true, payout: false },
     ],
   },
   {
@@ -86,6 +87,7 @@ export const PAYDUNYA_COUNTRIES: PaydunyaCountry[] = [
       { code: "mtn", name: "MTN Mobile Money", requiresOtp: false, payin: true, payout: true },
       { code: "moov", name: "Moov Money", requiresOtp: false, payin: true, payout: true },
       { code: "wave", name: "Wave", requiresOtp: false, payin: true, payout: true },
+      { code: "djamo", name: "Djamo", requiresOtp: false, payin: true, payout: false },
     ],
   },
   {
