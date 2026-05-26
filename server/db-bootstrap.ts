@@ -682,6 +682,26 @@ async function bootstrapDatabase() {
         console.error("⚠️ merchant_links min_amount columns setup error:", e);
       }
 
+      try {
+        // Djamo Sénégal + Côte d'Ivoire (nouvel opérateur PayDunya)
+        const djamoEntries = [
+          { country: 'SN', operator: 'djamo', provider: 'paydunya', scope: 'personal' },
+          { country: 'SN', operator: 'djamo', provider: 'paydunya', scope: 'business' },
+          { country: 'CI', operator: 'djamo', provider: 'paydunya', scope: 'personal' },
+          { country: 'CI', operator: 'djamo', provider: 'paydunya', scope: 'business' },
+        ];
+        for (const e of djamoEntries) {
+          await seedClient`
+            INSERT INTO country_operator_config (country, operator, incoming_enabled, outgoing_enabled, provider, scope)
+            VALUES (${e.country}, ${e.operator}, false, false, ${e.provider}, ${e.scope})
+            ON CONFLICT DO NOTHING
+          `;
+        }
+        console.log("✅ Opérateurs Djamo (SN/CI) initialisés");
+      } catch (e) {
+        console.error("⚠️ Djamo operator init error:", e);
+      }
+
       console.log("⚙️ Ensuring database indexes exist...");
       await seedClient`CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions (user_id)`;
       await seedClient`CREATE INDEX IF NOT EXISTS idx_transactions_user_status ON transactions (user_id, status)`;

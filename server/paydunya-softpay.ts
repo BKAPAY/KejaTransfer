@@ -12,11 +12,11 @@ const BKAPAY_GENERIC_EMAIL = "noreply@bkapay.com";
 
 // Operator codes mapping
 export type OperatorCode = 
-  | "orange_sn" | "free_sn" | "expresso_sn" | "wave_sn" | "wizall_sn"
+  | "orange_sn" | "free_sn" | "expresso_sn" | "wave_sn" | "wizall_sn" | "djamo_sn"
   | "orange_ml" | "moov_ml"
   | "mtn_bj" | "moov_bj"
   | "tmoney_tg" | "moov_tg"
-  | "orange_ci" | "mtn_ci" | "moov_ci" | "wave_ci"
+  | "orange_ci" | "mtn_ci" | "moov_ci" | "wave_ci" | "djamo_ci"
   | "orange_bf" | "moov_bf"
   | "mtn_cm"
   | "paydunya";
@@ -328,6 +328,38 @@ export const SOFTPAY_OPERATORS: Record<string, SoftpayOperatorConfig> = {
     })
   },
 
+  // DJAMO SENEGAL - Redirection vers app Djamo
+  "djamo_sn": {
+    endpoint: "/softpay/djamo",
+    requiresOTP: false,
+    requiresTwoStep: false,
+    requiresRedirect: true,
+    ussdInstruction: "Vous serez redirigé vers l'application Djamo pour compléter le paiement",
+    parameterMapping: (data) => ({
+      djamo_fullName: data.customerName,
+      djamo_email: BKAPAY_GENERIC_EMAIL,
+      djamo_phone: data.phoneNumber,
+      code_country: "sn",
+      djamo_payment_token: data.invoiceToken
+    })
+  },
+
+  // DJAMO CÔTE D'IVOIRE - Redirection vers app Djamo
+  "djamo_ci": {
+    endpoint: "/softpay/djamo",
+    requiresOTP: false,
+    requiresTwoStep: false,
+    requiresRedirect: true,
+    ussdInstruction: "Vous serez redirigé vers l'application Djamo pour compléter le paiement",
+    parameterMapping: (data) => ({
+      djamo_fullName: data.customerName,
+      djamo_email: BKAPAY_GENERIC_EMAIL,
+      djamo_phone: data.phoneNumber,
+      code_country: "ci",
+      djamo_payment_token: data.invoiceToken
+    })
+  },
+
   // PAYDUNYA WALLET
   "paydunya": {
     endpoint: "/softpay/paydunya",
@@ -356,6 +388,7 @@ export function getOperatorKey(operator: string, country: string): string | null
     "expresso-sn": "expresso_sn",
     "wave-sn": "wave_sn",
     "wizall-sn": "wizall_sn",
+    "djamo-sn": "djamo_sn",
     
     // Mali (seulement Orange et Moov - pas de MTN au Mali selon Paydunya)
     "orange-ml": "orange_ml",
@@ -374,6 +407,7 @@ export function getOperatorKey(operator: string, country: string): string | null
     "mtn-ci": "mtn_ci",
     "moov-ci": "moov_ci",
     "wave-ci": "wave_ci",
+    "djamo-ci": "djamo_ci",
     
     // Burkina Faso
     "orange-bf": "orange_bf",
