@@ -2379,10 +2379,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // KYC Final Submit - just changes status to submitted
   app.post("/api/kyc/submit", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { kycIdFront, kycIdBack, kycSelfie, kycSignature, kycActivityDescription, kycLatitude, kycLongitude, kycAddress, kycAcceptedTerms, kycPhone, kycWhatsapp, kycActivityUrl, kycUrlWebsite, kycUrlInstagram, kycUrlFacebook, kycUrlTiktok, kycUrlYoutube, kycUrlWhatsappGroup, kycUrlWhatsappChannel, kycDocumentType, kycDocumentNumber, kycDocumentExpiryDate } = req.body;
+      const { kycActivityDescription, kycLatitude, kycLongitude, kycAddress, kycAcceptedTerms, kycPhone, kycWhatsapp, kycActivityUrl, kycUrlWebsite, kycUrlInstagram, kycUrlFacebook, kycUrlTiktok, kycUrlYoutube, kycUrlWhatsappGroup, kycUrlWhatsappChannel, kycDocumentType, kycDocumentNumber, kycDocumentExpiryDate } = req.body;
+
+      // Images already uploaded via /api/kyc/upload — read from DB to avoid huge payload
+      const existingDocs = await storage.getKycDocuments(req.session.userId!);
+      const kycIdFront = existingDocs?.kycIdFront;
+      const kycIdBack = existingDocs?.kycIdBack;
+      const kycSelfie = existingDocs?.kycSelfie;
+      const kycSignature = existingDocs?.kycSignature;
 
       if (!kycIdFront || !kycIdBack || !kycSelfie || !kycSignature) {
-        return res.status(400).json({ error: "Tous les documents sont requis" });
+        return res.status(400).json({ error: "Tous les documents sont requis. Veuillez telecharger votre piece d'identite (recto/verso), selfie et signature." });
       }
 
       const KYC_URL_VALIDATORS: Record<string, { field: string; test: RegExp; label: string }> = {

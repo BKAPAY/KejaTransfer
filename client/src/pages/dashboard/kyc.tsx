@@ -501,10 +501,6 @@ export default function KYC() {
       ];
 
       await apiRequest("POST", "/api/kyc/submit", {
-        kycIdFront: idFrontData,
-        kycIdBack: idBackData,
-        kycSelfie: selfieData,
-        kycSignature: signatureData,
         kycActivityDescription: activityDescription,
         kycLatitude: locationData?.lat.toString() || "",
         kycLongitude: locationData?.lng.toString() || "",

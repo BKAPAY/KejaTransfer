@@ -48,6 +48,7 @@ export interface IStorage {
   updateUserPassword(id: string, hashedPassword: string): Promise<User | undefined>;
   submitKyc(userId: string, kycData: { kycIdFront: string; kycIdBack: string; kycSelfie: string; kycSignature: string; kycActivityDescription: string; kycLatitude: string; kycLongitude: string; kycAddress: string; kycAcceptedTerms: string; kycPhone?: string; kycWhatsapp?: string; kycActivityUrl?: string; kycUrlWebsite?: string; kycUrlInstagram?: string; kycUrlFacebook?: string; kycUrlTiktok?: string; kycUrlYoutube?: string; kycUrlWhatsappGroup?: string; kycUrlWhatsappChannel?: string; kycDocumentType?: string; kycDocumentNumber?: string; kycDocumentExpiryDate?: string }): Promise<User | undefined>;
   updateKycDocument(userId: string, data: Partial<{ kycIdFront: string; kycIdBack: string; kycSelfie: string; kycSignature: string; kycActivityDescription: string; kycLatitude: string; kycLongitude: string; kycAddress: string; kycAcceptedTerms: string }>): Promise<void>;
+  getKycDocuments(userId: string): Promise<{ kycIdFront: string | null; kycIdBack: string | null; kycSelfie: string | null; kycSignature: string | null } | undefined>;
   approveKyc(userId: string): Promise<User | undefined>;
   rejectKyc(userId: string, reason?: string): Promise<User | undefined>;
   getPendingKycSubmissions(): Promise<User[]>;
