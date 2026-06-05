@@ -20,13 +20,13 @@ type MonthlyLimitStatus = {
 export default function MonthlyLimitPage() {
   const [, setLocation] = useLocation();
 
-  const { data: user } = useQuery<User>({
+  const { data: user, isLoading: userLoading } = useQuery<User>({
     queryKey: ["/api/auth/me"],
   });
 
-  const { data: limitStatus, isLoading } = useQuery<MonthlyLimitStatus>({
+  const { data: limitStatus, isLoading: limitLoading } = useQuery<MonthlyLimitStatus>({
     queryKey: ["/api/user/monthly-limit-status"],
-    staleTime: 30000,
+    staleTime: 0,
     refetchInterval: 60000,
     enabled: user?.accountType === "personal",
   });
@@ -34,6 +34,8 @@ export default function MonthlyLimitPage() {
   if (user && user.accountType !== "personal") {
     return null;
   }
+
+  const isLoading = userLoading || (user?.accountType === "personal" && limitLoading);
 
   const pct = limitStatus?.percentage ?? 0;
   const barColor =
