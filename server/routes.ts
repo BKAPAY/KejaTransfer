@@ -2732,14 +2732,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updated = await storage.setUserActivitySector(req.session.userId!, {
         kycSector,
         kycSubSector: kycSubSector || null,
-        sectorStatus: "pending",
+        sectorStatus: "approved",
         multiCountryEnabled: isInternationalActivity(kycSector, kycSubSector || null),
       });
       clearAuthCache(req.session.userId!);
 
       res.json({
         success: true,
-        message: "Secteur d'activité enregistré. Il sera validé par un administrateur avant que vous puissiez effectuer des retraits.",
+        message: "Secteur d'activité enregistré et validé. Vos retraits et transferts sont maintenant disponibles.",
         user: updated,
       });
     } catch (error: any) {

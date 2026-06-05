@@ -33,7 +33,7 @@ export function SectorCard() {
     onSuccess: () => {
       toast({
         title: "Secteur d'activité enregistré",
-        description: "Votre choix est définitif. Il sera validé par un administrateur avant que vos retraits soient de nouveau possibles.",
+        description: "Votre secteur d'activité a été enregistré avec succès. Vos retraits et transferts sont maintenant disponibles.",
       });
       setSelectedSector("");
       setSelectedSubSector("");
@@ -99,9 +99,9 @@ export function SectorCard() {
             <div className="flex items-start gap-2 p-3 bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-800 rounded-md">
               <Clock className="w-4 h-4 text-yellow-600 dark:text-yellow-400 mt-0.5" />
               <div className="text-sm text-yellow-700 dark:text-yellow-300">
-                <p className="font-medium">Secteur en attente de validation</p>
+                <p className="font-medium">Secteur en cours de traitement</p>
                 <p className="text-xs mt-1">
-                  Votre choix est définitif et ne peut plus être modifié. Vos retraits et transferts seront possibles dès la validation par un administrateur.
+                  Votre secteur d'activité est en cours de validation. Vos retraits et transferts seront disponibles sous peu.
                 </p>
               </div>
             </div>
@@ -126,7 +126,7 @@ export function SectorCard() {
               <div className="text-sm text-yellow-700 dark:text-yellow-300">
                 <p className="font-medium">Secteur d'activité requis</p>
                 <p className="text-xs mt-1">
-                  Pour des raisons de conformité, vous devez renseigner votre secteur d'activité. Ce choix est définitif : une fois enregistré, il ne pourra plus être modifié. Après validation par un administrateur, vos retraits seront de nouveau possibles.
+                  Pour des raisons de conformité, vous devez renseigner votre secteur d'activité. Ce choix est définitif : une fois enregistré, il ne pourra plus être modifié. Vos retraits et transferts seront immédiatement disponibles après enregistrement.
                 </p>
               </div>
             </div>

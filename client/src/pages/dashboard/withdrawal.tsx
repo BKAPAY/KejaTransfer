@@ -342,6 +342,42 @@ export default function Withdrawal() {
   const hasNoWithdrawalPhones = withdrawalPhones.length === 0;
   const hasNoSecurityCode = !user?.securityCode;
   const hasNoCountry = !user?.country;
+  const hasNoSector = user?.kycStatus === "verified" && !(user as any)?.kycSector;
+
+  if (hasNoSector) {
+    return (
+      <div className="space-y-4">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground mb-1 flex items-center gap-2">
+            <ArrowUpFromLine className="h-5 w-5" />
+            Retrait
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Retirez vers vos numeros pre-configures
+          </p>
+        </div>
+
+        <Alert className="border-orange-200 bg-orange-50 dark:bg-orange-950 dark:border-orange-800">
+          <AlertCircle className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+          <AlertDescription className="text-sm text-orange-900 dark:text-orange-100 ml-2">
+            <strong>Secteur d'activité requis</strong>
+            <p className="mt-1 text-xs">
+              Pour des raisons de conformité, vous devez renseigner votre secteur d'activité avant d'effectuer un retrait.
+            </p>
+          </AlertDescription>
+        </Alert>
+
+        <Button
+          onClick={() => setLocation("/dashboard/profile")}
+          className="w-full"
+          data-testid="button-go-to-profile-sector"
+        >
+          <Settings className="h-4 w-4 mr-2" />
+          Compléter mon profil
+        </Button>
+      </div>
+    );
+  }
 
   if (hasNoCountry || hasNoWithdrawalPhones || hasNoSecurityCode) {
     return (
