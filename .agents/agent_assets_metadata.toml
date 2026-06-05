@@ -30,3 +30,9 @@ id = "yU5-J1iGkxT0RXZjbf6XF"
 uri = "file://BKApay_Dossier_Presentation.pdf"
 type = "pdf"
 title = "BKApay — Version PDF"
+
+[[outputs]]
+id = "av7fEAoO6rqGT3tIdyr5g"
+uri = "file://attached_assets/KEJA_SUBMERCHANTS_FILLED.xlsx"
+type = "table"
+title = "KEJA_SUBMERCHANTS_FILLED.xlsx — Colonnes SUBMERCHANT remplies"
