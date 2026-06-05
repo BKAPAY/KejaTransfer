@@ -1,8 +1,4 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { PhoneInputWithPrefix } from "@/components/phone-input-with-prefix";
 import { useAuth } from "@/hooks/use-auth";
@@ -96,51 +92,6 @@ export default function KYC() {
   const [kycSubSector, setKycSubSector] = useState("");
   const [activePlatform, setActivePlatform] = useState<string | null>(null);
 
-  // OCR - lecture automatique de la pièce d'identité recto
-  const lastScannedFrontRef = useRef<string | null>(null);
-  const [ocrScanning, setOcrScanning] = useState(false);
-  const [ocrDialogOpen, setOcrDialogOpen] = useState(false);
-  const [ocrExtracted, setOcrExtracted] = useState<{ firstName: string; lastName: string } | null>(null);
-
-  // Déclenchement OCR direct (appelé dans capturePhoto, pas via useEffect)
-  const triggerOcrScan = async (imageData: string) => {
-    if (!imageData || imageData === lastScannedFrontRef.current) return;
-    lastScannedFrontRef.current = imageData;
-    const normalize = (s: string) =>
-      s.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    setOcrScanning(true);
-    try {
-      const res = await apiRequest("POST", "/api/kyc/scan-id", { imageData });
-      const result: any = await res.json();
-      const { firstName: extFirst, lastName: extLast } = result;
-      if (extFirst && extLast) {
-        const uFirst = normalize(user?.firstName || "");
-        const uLast = normalize(user?.lastName || "");
-        if (normalize(extFirst) !== uFirst || normalize(extLast) !== uLast) {
-          setOcrExtracted({ firstName: extFirst, lastName: extLast });
-          setOcrDialogOpen(true);
-        }
-      }
-    } catch {
-      // Silently fail — OCR est un service complémentaire
-    } finally {
-      setOcrScanning(false);
-    }
-  };
-
-  const handleOcrConfirmName = async () => {
-    if (!ocrExtracted) return;
-    try {
-      await apiRequest("PATCH", "/api/user/update-name", { firstName: ocrExtracted.firstName, lastName: ocrExtracted.lastName });
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
-      toast({ title: "Nom mis à jour", description: `Votre nom a été corrigé en ${ocrExtracted.firstName} ${ocrExtracted.lastName}.` });
-    } catch (e: any) {
-      toast({ title: "Erreur", description: e.message, variant: "destructive" });
-    } finally {
-      setOcrDialogOpen(false);
-      setOcrExtracted(null);
-    }
-  };
   const [kycDocumentType, setKycDocumentType] = useState("");
   const [kycDocumentNumber, setKycDocumentNumber] = useState("");
   const [kycDocumentExpiryDate, setKycDocumentExpiryDate] = useState("");
@@ -343,8 +294,6 @@ export default function KYC() {
 
     if (currentMode === "front") {
       setIdFrontData(imageData);
-      // Déclencher OCR immédiatement après capture (sans passer par useEffect)
-      triggerOcrScan(imageData);
     } else if (currentMode === "back") {
       setIdBackData(imageData);
     } else if (currentMode === "selfie") {
@@ -1938,45 +1887,6 @@ export default function KYC() {
         </CardContent>
       </Card>
 
-      {/* Dialog OCR : correction automatique du nom via pièce d'identité */}
-      <AlertDialog open={ocrDialogOpen} onOpenChange={setOcrDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Nom différent de la pièce d'identité</AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="space-y-3 text-sm">
-                <p>La lecture automatique de votre pièce d'identité a détecté un nom différent de celui enregistré sur votre compte :</p>
-                <div className="grid grid-cols-2 gap-3 bg-muted/40 rounded-md p-3">
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">Nom sur la pièce d'identité</p>
-                    <p className="font-semibold">{ocrExtracted?.firstName} {ocrExtracted?.lastName}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">Nom sur le compte</p>
-                    <p className="font-semibold">{user?.firstName} {user?.lastName}</p>
-                  </div>
-                </div>
-                <p>Souhaitez-vous mettre à jour votre nom pour qu'il corresponde à votre pièce d'identité ?</p>
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => { setOcrDialogOpen(false); setOcrExtracted(null); }}>
-              Conserver mon nom actuel
-            </AlertDialogCancel>
-            <AlertDialogAction onClick={handleOcrConfirmName}>
-              Mettre à jour le nom
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {ocrScanning && (
-        <div className="fixed bottom-6 right-6 flex items-center gap-2 bg-card border rounded-md px-4 py-2 shadow-md z-50 text-sm">
-          <Loader2 className="w-4 h-4 animate-spin text-primary" />
-          Lecture de la pièce d'identité en cours…
-        </div>
-      )}
     </div>
   );
 }

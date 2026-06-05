@@ -131,8 +131,6 @@ declare module "express-session" {
 }
 
 const authCache = new Map<string, { user: any; timestamp: number }>();
-// Stockage temporaire des images OCR (TTL 60s) pour contourner la restriction base64 du proxy Replit
-const ocrTempImages = new Map<string, { data: Buffer; mime: string; expires: number }>();
 const AUTH_CACHE_TTL = 10000;
 
 async function requireAuth(req: Request, res: Response, next: Function) {
@@ -2417,103 +2415,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("KYC upload error:", error);
       res.status(500).json({ error: "Erreur lors du telechargement" });
-    }
-  });
-
-  // ===== OCR : endpoint public pour servir les images temporaires (sans auth, TTL 60s) =====
-  app.get("/api/kyc/temp-img/:token", (req: Request, res: Response) => {
-    const entry = ocrTempImages.get(req.params.token);
-    if (!entry || Date.now() > entry.expires) {
-      ocrTempImages.delete(req.params.token);
-      return res.status(404).send("Not found");
-    }
-    res.set("Content-Type", entry.mime);
-    res.set("Cache-Control", "no-store");
-    res.send(entry.data);
-  });
-
-  // ===== OCR : lecture automatique de la pièce d'identité =====
-  // Le proxy OpenAI Replit (localhost:1106) ne supporte pas base64 inline → on expose l'image via URL publique
-  app.post("/api/kyc/scan-id", requireAuth, async (req: Request, res: Response) => {
-    let token: string | null = null;
-    try {
-      const { imageData } = req.body;
-      if (!imageData || typeof imageData !== "string") {
-        return res.status(400).json({ error: "Image requise." });
-      }
-      const base64 = imageData.includes(",") ? imageData.split(",")[1] : imageData;
-      const mediaType = imageData.startsWith("data:image/png") ? "image/png" : "image/jpeg";
-      const imgBuffer = Buffer.from(base64, "base64");
-
-      // Stocker l'image en mémoire avec un token unique (60s TTL)
-      token = randomUUID();
-      ocrTempImages.set(token, { data: imgBuffer, mime: mediaType, expires: Date.now() + 60000 });
-
-      // Construire l'URL publique que OpenAI peut télécharger
-      const devDomain = process.env.REPLIT_DEV_DOMAIN;
-      const baseDomain = devDomain
-        ? `https://${devDomain}`
-        : (process.env.BASE_URL || "http://localhost:3000");
-      const imageUrl = `${baseDomain}/api/kyc/temp-img/${token}`;
-      console.log("[OCR] Using image URL:", imageUrl.substring(0, 60) + "...");
-
-      const openai = new OpenAI({
-        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-      });
-      const response = await openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [
-          {
-            role: "user",
-            content: [
-              {
-                type: "image_url",
-                image_url: { url: imageUrl, detail: "high" },
-              },
-              {
-                type: "text",
-                text: "Analyse cette pièce d'identité (carte nationale, passeport ou permis de conduire). Extrais le prénom (first name / given name / prénoms) et le nom de famille (last name / surname / nom). Réponds uniquement en JSON strict: {\"firstName\": \"...\", \"lastName\": \"...\"}. Si tu ne peux pas lire clairement un champ, retourne une chaîne vide pour ce champ. Ne retourne rien d'autre que ce JSON.",
-              },
-            ],
-          },
-        ],
-        max_tokens: 100,
-      });
-      const content = response.choices[0]?.message?.content?.trim() || "";
-      console.log("[OCR] GPT response:", JSON.stringify(content));
-      const match = content.match(/\{[\s\S]*\}/);
-      if (!match) return res.json({ firstName: "", lastName: "" });
-      const parsed = JSON.parse(match[0]);
-      return res.json({
-        firstName: (parsed.firstName || "").trim(),
-        lastName: (parsed.lastName || "").trim(),
-      });
-    } catch (error: any) {
-      console.error("[OCR] scan-id error:", error?.message || error);
-      return res.json({ firstName: "", lastName: "" });
-    } finally {
-      if (token) ocrTempImages.delete(token);
-    }
-  });
-
-  // ===== Mise à jour du nom/prénom (après autorisation suite OCR) =====
-  app.patch("/api/user/update-name", requireAuth, async (req: Request, res: Response) => {
-    try {
-      const { firstName, lastName } = req.body;
-      if (!firstName || typeof firstName !== "string" || !firstName.trim()) {
-        return res.status(400).json({ error: "Le prénom est requis." });
-      }
-      if (!lastName || typeof lastName !== "string" || !lastName.trim()) {
-        return res.status(400).json({ error: "Le nom est requis." });
-      }
-      const updated = await storage.updateUserName(req.session.userId!, firstName.trim(), lastName.trim());
-      if (!updated) return res.status(404).json({ error: "Utilisateur non trouvé." });
-      clearAuthCache(req.session.userId!);
-      return res.json({ success: true, firstName: updated.firstName, lastName: updated.lastName });
-    } catch (error: any) {
-      console.error("Update name error:", error);
-      return res.status(500).json({ error: "Erreur lors de la mise à jour du nom." });
     }
   });
 
