@@ -38,6 +38,8 @@ export async function checkPersonalMonthlyLimit(
     now.getMonth() + 1
   );
 
+  console.log(`[LimitemensuelleCheck] user=${owner.id} | limit=${limit} ${ownerCurrency} | used=${used} | incoming=${incomingAmount} | total=${used + incomingAmount} | allowed=${used + incomingAmount <= limit}`);
+
   if (used + incomingAmount > limit) {
     const remaining = Math.max(0, limit - used);
     return {
