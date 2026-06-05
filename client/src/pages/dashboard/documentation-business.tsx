@@ -348,7 +348,7 @@ echo json_encode(['received' => true]);
     { code: "BJ", flag: "🇧🇯", name: "Bénin", currency: "XOF", operators: ["MTN", "Moov", "Celtiis"], otpOperators: [] as string[], pinOperators: [] as string[] },
     { code: "TG", flag: "🇹🇬", name: "Togo", currency: "XOF", operators: ["Moov", "T-Money"], otpOperators: [] as string[], pinOperators: [] as string[] },
     { code: "CI", flag: "🇨🇮", name: "Côte d'Ivoire", currency: "XOF", operators: ["MTN", "Orange", "Moov"], otpOperators: ["Orange — #144*82#"], pinOperators: [] as string[] },
-    { code: "BF", flag: "🇧🇫", name: "Burkina Faso", currency: "XOF", operators: ["Orange", "Moov", "Coris"], otpOperators: ["Orange — *144*4*6*MONTANT#"], pinOperators: [] as string[] },
+    { code: "BF", flag: "🇧🇫", name: "Burkina Faso", currency: "XOF", operators: ["Orange", "Moov", "Coris"], otpOperators: ["Orange — *144*4*6#"], pinOperators: [] as string[] },
     { code: "SN", flag: "🇸🇳", name: "Sénégal", currency: "XOF", operators: ["Orange", "Free", "Expresso", "Wizall"], otpOperators: ["Orange — #144#391#"], pinOperators: [] as string[] },
     { code: "ML", flag: "🇲🇱", name: "Mali", currency: "XOF", operators: ["Orange", "Moov"], otpOperators: ["Orange — #144#77#"], pinOperators: [] as string[] },
     { code: "NE", flag: "🇳🇪", name: "Niger", currency: "XOF", operators: ["Airtel"], otpOperators: [] as string[], pinOperators: [] as string[] },

@@ -672,7 +672,7 @@ def webhook_bkapay():
                 <Badge variant="outline" className="w-fit">amount</Badge>
                 <Badge variant="default" className="w-fit text-xs">Oui</Badge>
                 <div>
-                  <p className="text-muted-foreground">Montant a payer en nombre entier (pas de decimales). Minimum : 200 dans la devise de votre compte.</p>
+                  <p className="text-muted-foreground">Montant a payer en nombre entier (pas de decimales).</p>
                   <p className="text-xs text-muted-foreground mt-1">
                     Par defaut, la devise est celle de votre compte (XOF, XAF, CDF, GNF selon votre pays d'inscription).
                     Si vous fournissez le parametre <code className="bg-muted px-1 rounded font-mono">currency</code>, le montant sera automatiquement converti vers la devise de votre compte.

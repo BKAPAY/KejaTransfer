@@ -3627,10 +3627,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`[API-PAY INIT] Conversion devise: ${requestedAmountRaw} ${normalizedRequestCurrency} → ${baseAmount} ${ownerCurrency}`);
       }
 
-      if (baseAmount < 200) {
-        return res.status(400).json({ error: "Montant minimum: 200" });
-      }
-
       // Calculate fees on the amount in owner's currency with dynamic fee from database
       const { calculateIncomingFee, calculateCustomerPaysFee, getFeeFromDatabase, getIncomingExchangeFee: getApiPayXFee } = await import("./utils/fees");
       const apiInitFeeScope = owner?.accountType === "business" ? "business" : "personal";
@@ -4569,13 +4565,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`[SESSIONS CREATE] Conversion devise: ${requestedAmountRaw} ${normalizedSessionCurrency} → ${sessionAmount} ${ownerCurrency}`);
       }
 
-      if (sessionAmount < 200) {
-        return res.status(400).json({
-          success: false,
-          error: { code: "INVALID_AMOUNT", message: "Montant invalide. Minimum équivalent à 200 dans la devise du compte" }
-        });
-      }
-
       const expiresInSeconds = Math.max(1800, Math.min(Number(expires_in) || 3600, 86400));
       const expiresAt = new Date(Date.now() + expiresInSeconds * 1000);
 
@@ -5291,17 +5280,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({
           success: false,
           error: { code: "INVALID_PARAMETERS", message: "Le montant doit être un nombre positif" }
-        });
-      }
-
-      const PAYOUT_MIN_AMOUNT = 500;
-      if (parsedAmount < PAYOUT_MIN_AMOUNT) {
-        return res.status(400).json({
-          success: false,
-          error: {
-            code: "AMOUNT_TOO_LOW",
-            message: `Le montant minimum est de ${PAYOUT_MIN_AMOUNT} ${currency || "XOF"}. Valeur reçue: ${parsedAmount}`
-          }
         });
       }
 
@@ -8280,11 +8258,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ success: false, error: { code: "INVALID_PARAMETERS", message: "Le montant doit être un nombre positif" } });
       }
 
-      const PAYOUT_MIN_AMOUNT = 500;
-      if (parsedAmount < PAYOUT_MIN_AMOUNT) {
-        return res.status(400).json({ success: false, error: { code: "AMOUNT_TOO_LOW", message: `Le montant minimum est de ${PAYOUT_MIN_AMOUNT}` } });
-      }
-
       const requestedAmount = Math.floor(parsedAmount);
       const countryCode = String(country).toUpperCase();
       let normalizedOperator = String(operator).toLowerCase()
@@ -11001,11 +10974,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (!amount || amount <= 0) {
-        return res.status(400).json({ error: "Retrait échoué" });
-      }
-
-      const minAmount = 1000;
-      if (amount < minAmount) {
         return res.status(400).json({ error: "Retrait échoué" });
       }
 

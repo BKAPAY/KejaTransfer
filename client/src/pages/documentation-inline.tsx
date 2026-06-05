@@ -375,7 +375,7 @@ def api_verifier():
   const configOptionsExample = `BKApay.checkout({
   // === REQUIS ===
   key: "pk_live_VOTRE_CLE_PUBLIQUE",   // Votre cle API publique
-  amount: 5000,                          // Montant a payer (minimum 200)
+  amount: 5000,                          // Montant a payer
 
   // === OPTIONNELS ===
   description: "Achat produit",          // Description du paiement
@@ -1573,13 +1573,6 @@ def webhook_bkapay():
               </p>
             </div>
 
-            <div className="p-3 rounded-lg bg-muted/50">
-              <p className="font-semibold mb-1" data-testid="text-faq-4">Le montant minimum est rejete</p>
-              <p className="text-muted-foreground">
-                Le montant minimum pour un paiement est de 200 unites dans votre devise (200 XOF, 200 XAF ou 200 CDF). 
-                Si vous passez un montant inferieur, l'erreur sera affichee dans la fenetre de paiement.
-              </p>
-            </div>
 
             <div className="p-3 rounded-lg bg-muted/50">
               <p className="font-semibold mb-1" data-testid="text-faq-5">Mon webhook ne recoit pas les notifications</p>

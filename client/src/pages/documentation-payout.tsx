@@ -397,7 +397,7 @@ app.post('/api/webhook/bkapay-payout', express.raw({ type: 'application/json' })
                   ["phone", "string", true, "Numero du destinataire avec indicatif (+221771234567)"],
                   ["operator", "string", true, "Operateur mobile: orange, mtn, moov, wave, free, airtel..."],
                   ["country", "string", true, "Code ISO 2 lettres du pays: SN, CI, BF, BJ, TG, ML, GN..."],
-                  ["amount", "number", true, "Montant exact que le destinataire recoit (minimum: 500)"],
+                  ["amount", "number", true, "Montant exact que le destinataire recoit"],
                   ["currency", "string", false, "Devise: XOF, XAF, CDF, GNF. Defaut: devise du pays"],
                   ["reference", "string", false, "Votre reference interne (order_id, facture_123, etc.)"],
                 ].map(([param, type, req, desc]) => (
@@ -560,7 +560,6 @@ app.post('/api/webhook/bkapay-payout', express.raw({ type: 'application/json' })
               { code: "OPERATOR_UNAVAILABLE", http: "400", desc: "Operateur non disponible dans ce pays" },
               { code: "INVALID_PHONE", http: "400", desc: "Numero de telephone invalide ou manquant" },
               { code: "INVALID_PARAMETERS", http: "400", desc: "Parametres manquants ou incorrects" },
-              { code: "AMOUNT_TOO_LOW", http: "400", desc: "Montant inferieur au minimum requis (500 dans la devise demandee)" },
               { code: "TRANSACTION_FAILED", http: "400", desc: "Echec cote fournisseur — reessayer" },
               { code: "INTERNAL_ERROR", http: "500", desc: "Erreur interne — reessayer plus tard" },
             ].map(({ code, http, desc }) => (

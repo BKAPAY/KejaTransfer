@@ -403,7 +403,7 @@ app.post("/api/webhook/bkapay-payout", express.raw({ type: "*/*" }), (req, res) 
             <div className="grid gap-2 text-sm">
               <div className="flex gap-2">
                 <Badge variant="outline">amount</Badge>
-                <span className="text-muted-foreground">Montant en XOF (minimum 100)</span>
+                <span className="text-muted-foreground">Montant en XOF</span>
               </div>
               <div className="flex gap-2">
                 <Badge variant="outline">description</Badge>
@@ -832,7 +832,7 @@ app.post("/api/webhook/bkapay-payout", express.raw({ type: "*/*" }), (req, res) 
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  <tr><td className="px-3 py-2 font-mono">amount</td><td className="px-3 py-2">number</td><td className="px-3 py-2 text-green-600">Oui</td><td className="px-3 py-2 text-muted-foreground">Montant a payer (minimum 200)</td></tr>
+                  <tr><td className="px-3 py-2 font-mono">amount</td><td className="px-3 py-2">number</td><td className="px-3 py-2 text-green-600">Oui</td><td className="px-3 py-2 text-muted-foreground">Montant a payer</td></tr>
                   <tr><td className="px-3 py-2 font-mono">currency</td><td className="px-3 py-2">string</td><td className="px-3 py-2 text-muted-foreground">Non</td><td className="px-3 py-2 text-muted-foreground">Devise (defaut: XOF)</td></tr>
                   <tr><td className="px-3 py-2 font-mono">description</td><td className="px-3 py-2">string</td><td className="px-3 py-2 text-muted-foreground">Non</td><td className="px-3 py-2 text-muted-foreground">Description du paiement</td></tr>
                   <tr><td className="px-3 py-2 font-mono">success_url</td><td className="px-3 py-2">string</td><td className="px-3 py-2 text-muted-foreground">Non</td><td className="px-3 py-2 text-muted-foreground">URL de redirection apres succes</td></tr>
