@@ -259,13 +259,6 @@ export const ACTIVITY_SECTORS: ActivitySector[] = [
       { code: "entrepreneur_individuel", label: "Entrepreneur individuel" },
     ],
   },
-  {
-    code: "autre",
-    label: "Autre",
-    subSectors: [
-      { code: "autre_activite", label: "Autre activité commerciale" },
-    ],
-  },
 ];
 
 export function getSectorLabel(sectorCode: string): string {

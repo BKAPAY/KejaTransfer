@@ -497,6 +497,9 @@ export default function KYC() {
       if (!kycSector) {
         throw new Error("Le secteur d'activité est requis");
       }
+      if (getSubSectorsForSector(kycSector).length > 0 && !kycSubSector) {
+        throw new Error("Le sous-secteur d'activité est requis");
+      }
 
       const acceptedTerms = [
         "Je certifie que les informations personnelles fournies sont exactes et correspondent a mes documents officiels.",

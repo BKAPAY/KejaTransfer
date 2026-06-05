@@ -2464,6 +2464,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!kycSectorObj) {
         return res.status(400).json({ error: "Secteur d'activité invalide." });
       }
+      if (kycSectorObj.subSectors.length > 0 && (!kycSubSector || typeof kycSubSector !== "string")) {
+        return res.status(400).json({ error: "Le sous-secteur d'activité est obligatoire." });
+      }
       if (kycSubSector && (typeof kycSubSector !== "string" || !kycSectorObj.subSectors.some((ss) => ss.code === kycSubSector))) {
         return res.status(400).json({ error: "Sous-secteur d'activité invalide." });
       }
@@ -2582,6 +2585,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!bizSectorObj) {
         return res.status(400).json({ error: "Secteur d'activité invalide." });
       }
+      if (bizSectorObj.subSectors.length > 0 && (!kycSubSector || typeof kycSubSector !== "string")) {
+        return res.status(400).json({ error: "Le sous-secteur d'activité est obligatoire." });
+      }
       if (kycSubSector && (typeof kycSubSector !== "string" || !bizSectorObj.subSectors.some((ss) => ss.code === kycSubSector))) {
         return res.status(400).json({ error: "Sous-secteur d'activité invalide." });
       }
@@ -2675,6 +2681,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const sector = ACTIVITY_SECTORS.find((s) => s.code === kycSector);
       if (!sector) {
         return res.status(400).json({ error: "Secteur d'activité invalide." });
+      }
+      if (sector.subSectors.length > 0 && (!kycSubSector || typeof kycSubSector !== "string")) {
+        return res.status(400).json({ error: "Le sous-secteur d'activité est obligatoire." });
       }
       if (kycSubSector) {
         if (typeof kycSubSector !== "string" || !sector.subSectors.some((ss) => ss.code === kycSubSector)) {

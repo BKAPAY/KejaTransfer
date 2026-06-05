@@ -151,7 +151,7 @@ export function SectorCard() {
 
               {currentSectorObj && currentSectorObj.subSectors.length > 0 && (
                 <div>
-                  <label className="text-sm font-medium mb-1 block">Sous-secteur (optionnel)</label>
+                  <label className="text-sm font-medium mb-1 block">Sous-secteur <span className="text-destructive">*</span></label>
                   <Select value={selectedSubSector} onValueChange={setSelectedSubSector}>
                     <SelectTrigger data-testid="select-subsector">
                       <SelectValue placeholder="Sélectionnez un sous-secteur" />
@@ -169,7 +169,11 @@ export function SectorCard() {
             <Button
               className="w-full"
               onClick={() => setConfirmOpen(true)}
-              disabled={!selectedSector || updateSectorMutation.isPending}
+              disabled={
+                !selectedSector ||
+                (!!currentSectorObj && currentSectorObj.subSectors.length > 0 && !selectedSubSector) ||
+                updateSectorMutation.isPending
+              }
               data-testid="button-save-sector"
             >
               {updateSectorMutation.isPending ? "Enregistrement..." : "Enregistrer le secteur d'activité"}
