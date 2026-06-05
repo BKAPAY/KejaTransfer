@@ -4183,6 +4183,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           description: description || "Paiement API BKApay",
           externalId,
           preAuthorisationCode: apiPayOtpCode,
+          submerchantLegalName: owner ? (owner.accountType === "business"
+            ? (owner.businessName || `${owner.firstName || ""} ${owner.lastName || ""}`.trim() || undefined)
+            : (`${owner.firstName || ""} ${owner.lastName || ""}`.trim() || undefined)) : undefined,
+          submerchantSegment: owner ? (owner.kycSubSector || owner.kycSector || undefined) : undefined,
         });
 
         if (!pawaResult.success) {
@@ -4767,6 +4771,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           description: session.description || "Paiement BKApay",
           externalId: randomUUID(),
           preAuthorisationCode: otpCode,
+          submerchantLegalName: owner ? (owner.accountType === "business"
+            ? (owner.businessName || `${owner.firstName || ""} ${owner.lastName || ""}`.trim() || undefined)
+            : (`${owner.firstName || ""} ${owner.lastName || ""}`.trim() || undefined)) : undefined,
+          submerchantSegment: owner ? (owner.kycSubSector || owner.kycSector || undefined) : undefined,
         });
 
         if (!pawaResult.success) {
@@ -10768,6 +10776,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         const providerCurrency = currency || getPawaPayCurrencyForOp(country.toUpperCase(), operator);
+        const apiOwner = await storage.getUser(apiKey.userId);
         const pawaResult = await createPawaPayDeposit({
           amount: transaction.amount,
           currency: providerCurrency,
@@ -10777,6 +10786,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           description: transaction.description || "Paiement API BKApay",
           externalId: randomUUID(),
           preAuthorisationCode: otpCode,
+          submerchantLegalName: apiOwner ? (apiOwner.accountType === "business"
+            ? (apiOwner.businessName || `${apiOwner.firstName || ""} ${apiOwner.lastName || ""}`.trim() || undefined)
+            : (`${apiOwner.firstName || ""} ${apiOwner.lastName || ""}`.trim() || undefined)) : undefined,
+          submerchantSegment: apiOwner ? (apiOwner.kycSubSector || apiOwner.kycSector || undefined) : undefined,
         });
 
         if (!pawaResult.success) {
