@@ -494,6 +494,9 @@ export default function KYC() {
       if (!locationData || !locationAddress) {
         throw new Error("La localisation est requise");
       }
+      if (!kycSector) {
+        throw new Error("Le secteur d'activité est requis");
+      }
 
       const acceptedTerms = [
         "Je certifie que les informations personnelles fournies sont exactes et correspondent a mes documents officiels.",

@@ -924,6 +924,7 @@ export default function BusinessKyc() {
                 <StatusRow label="Profil entreprise" done={step1Complete()} />
                 <StatusRow label="Informations légales" done={!!(u?.kycBusinessAccountNumber || step2.kycBusinessAccountNumber)} />
                 <StatusRow label="Documents" done={step3Complete()} />
+                <StatusRow label="Secteur d'activité" done={!!bizSector} />
                 <StatusRow label="Description" done={description.trim().length >= 20} />
               </div>
             </div>
@@ -935,7 +936,7 @@ export default function BusinessKyc() {
               </Button>
               <Button
                 onClick={() => submitMutation.mutate()}
-                disabled={description.trim().length < 20 || submitMutation.isPending}
+                disabled={description.trim().length < 20 || !bizSector || submitMutation.isPending}
                 data-testid="button-submit-kyc"
               >
                 {submitMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Shield className="w-4 h-4 mr-2" />}

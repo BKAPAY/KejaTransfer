@@ -71,7 +71,10 @@ export interface IStorage {
     businessPhone?: string | null;
     businessEnterprisePhone?: string | null;
     businessEmail?: string | null;
+    multiCountryEnabled?: boolean;
+    sectorStatus?: string;
   }): Promise<User | undefined>;
+  setUserActivitySector(userId: string, data: { kycSector: string; kycSubSector?: string | null; sectorStatus: string; multiCountryEnabled: boolean }): Promise<User | undefined>;
   saveBusinessKycStep2(userId: string, data: {
     kycBusinessAccountNumber?: string; kycTaxId?: string; kycBusinessAddress?: string;
     kycBusinessCity?: string; kycBusinessDepartment?: string; kycDirectorIdNumber?: string;
@@ -508,6 +511,7 @@ export class DbStorage implements IStorage {
         kycDocumentExpiryDate: kycData.kycDocumentExpiryDate || null,
         kycSector: kycData.kycSector || null,
         kycSubSector: kycData.kycSubSector || null,
+        sectorStatus: "approved", // Secteur choisi au KYC => approuve d'office (nouveau user)
       })
       .where(eq(schema.users.id, userId))
       .returning();
@@ -674,6 +678,7 @@ export class DbStorage implements IStorage {
     businessEnterprisePhone?: string | null;
     businessEmail?: string | null;
     multiCountryEnabled?: boolean;
+    sectorStatus?: string;
   }): Promise<User | undefined> {
     const cleaned: Record<string, any> = {};
     for (const [k, v] of Object.entries(data)) {
@@ -686,6 +691,20 @@ export class DbStorage implements IStorage {
       .update(schema.users)
       .set(cleaned)
       .where(eq(schema.users.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async setUserActivitySector(userId: string, data: { kycSector: string; kycSubSector?: string | null; sectorStatus: string; multiCountryEnabled: boolean }): Promise<User | undefined> {
+    const results = await db
+      .update(schema.users)
+      .set({
+        kycSector: data.kycSector,
+        kycSubSector: data.kycSubSector ?? null,
+        sectorStatus: data.sectorStatus,
+        multiCountryEnabled: data.multiCountryEnabled,
+      })
+      .where(eq(schema.users.id, userId))
       .returning();
     return results[0];
   }
@@ -740,6 +759,7 @@ export class DbStorage implements IStorage {
         kycActivityDescription: description,
         ...(kycSector ? { kycSector } : {}),
         ...(kycSubSector ? { kycSubSector } : {}),
+        sectorStatus: "approved", // Secteur choisi au KYC entreprise => approuve d'office
       })
       .where(eq(schema.users.id, userId))
       .returning();

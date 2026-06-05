@@ -51,6 +51,7 @@ export const users = pgTable("users", {
   kycDocumentExpiryDate: text("kyc_document_expiry_date"), // Date d'expiration (YYYY-MM-DD), null si sans expiration
   kycSector: text("kyc_sector"), // Secteur d'activite principal (code)
   kycSubSector: text("kyc_sub_sector"), // Sous-secteur d'activite (code)
+  sectorStatus: text("sector_status").notNull().default("approved"), // Statut de validation du secteur: "approved" (valide / nouveau user via KYC) ou "pending" (ancien user en attente de validation admin)
   kycRejectionReason: text("kyc_rejection_reason"), // Reason for KYC rejection
   kycRejectionCount: integer("kyc_rejection_count").notNull().default(0), // Number of KYC rejections
   // Business KYC Step 2 - legal info

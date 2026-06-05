@@ -146,6 +146,27 @@ export default function AdminUserProfile() {
     },
   });
 
+  const validateSectorMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("PATCH", `/api/admin/user/${userId}/profile`, { sectorStatus: "approved" });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Secteur validé",
+        description: "L'utilisateur peut désormais effectuer des retraits.",
+      });
+      queryClient.invalidateQueries({ queryKey: [`/api/admin/user/${userId}/profile`] });
+    },
+    onError: (err: any) => {
+      toast({
+        title: "Erreur",
+        description: err?.message || "Impossible de valider le secteur",
+        variant: "destructive",
+      });
+    },
+  });
+
   const resetSecurityCodeMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", `/api/admin/user/${userId}/reset-security-code`, {});
@@ -582,9 +603,9 @@ export default function AdminUserProfile() {
               </Badge>
             </div>
             {((user as any).kycSector || (user as any).kycSubSector) && (
-              <div className="sm:col-span-2 flex flex-wrap gap-2 pt-1">
+              <div className="sm:col-span-2 flex flex-wrap items-center gap-2 pt-1">
                 {(user as any).kycSector && (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-primary/10 text-primary text-xs font-medium">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-primary/10 text-primary text-xs font-medium" data-testid="text-admin-sector">
                     {getSectorLabel((user as any).kycSector)}
                   </span>
                 )}
@@ -593,6 +614,27 @@ export default function AdminUserProfile() {
                     {getSubSectorLabel((user as any).kycSector, (user as any).kycSubSector)}
                   </span>
                 )}
+                <Badge
+                  variant={(user as any).sectorStatus === "pending" ? "secondary" : "default"}
+                  data-testid="badge-sector-status"
+                >
+                  {(user as any).sectorStatus === "pending" ? "Secteur en attente" : "Secteur validé"}
+                </Badge>
+              </div>
+            )}
+            {(user as any).sectorStatus === "pending" && (user as any).kycSector && (
+              <div className="sm:col-span-2 flex flex-wrap items-center gap-3 pt-1">
+                <p className="text-xs text-muted-foreground flex-1 min-w-[200px]">
+                  Ce secteur a été renseigné par l'utilisateur et doit être validé avant qu'il puisse effectuer des retraits.
+                </p>
+                <Button
+                  size="sm"
+                  onClick={() => validateSectorMutation.mutate()}
+                  disabled={validateSectorMutation.isPending}
+                  data-testid="button-validate-sector"
+                >
+                  {validateSectorMutation.isPending ? "Validation..." : "Valider le secteur"}
+                </Button>
               </div>
             )}
           </div>

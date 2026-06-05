@@ -61,7 +61,11 @@ async function bootstrapDatabase() {
     try {
       await client`ALTER TABLE users ADD COLUMN IF NOT EXISTS kyc_sector TEXT`;
       await client`ALTER TABLE users ADD COLUMN IF NOT EXISTS kyc_sub_sector TEXT`;
-      console.log("✅ users.kyc_sector/kyc_sub_sector columns ensured (early)");
+      // Statut de validation du secteur. Defaut "approved" pour ne PAS bloquer les utilisateurs
+      // existants (qui ont deja un secteur via KYC). Les anciens users SANS secteur restent bloques
+      // par la garde de retrait (secteur absent), puis passent en "pending" quand ils le configurent.
+      await client`ALTER TABLE users ADD COLUMN IF NOT EXISTS sector_status TEXT NOT NULL DEFAULT 'approved'`;
+      console.log("✅ users.kyc_sector/kyc_sub_sector/sector_status columns ensured (early)");
     } catch (e) {
       console.error("⚠️ Early kyc_sector/kyc_sub_sector column migration error:", e);
     }

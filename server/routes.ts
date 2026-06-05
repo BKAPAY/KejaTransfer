@@ -118,7 +118,8 @@ import {
   isMoneyFusionPayoutFailed,
 } from "./moneyfusion";
 import { AFRIBAPAY_COUNTRIES, getCurrencyForCountry as getAfribaCurrency, getPaymentInstructions as getAfribaPaymentInstructions } from "@shared/afribapay-countries";
-import { isInternationalActivity } from "@shared/activity-sectors";
+import { isInternationalActivity, ACTIVITY_SECTORS } from "@shared/activity-sectors";
+import { getSectorWithdrawalBlockMessage } from "./sector-guard";
 
 declare module "express-session" {
   interface SessionData {
@@ -2455,6 +2456,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Vous devez renseigner au moins 1 lien d'activite" });
       }
 
+      // Secteur d'activité obligatoire (les nouveaux utilisateurs le renseignent au KYC)
+      if (!kycSector || typeof kycSector !== "string") {
+        return res.status(400).json({ error: "Le secteur d'activité est obligatoire." });
+      }
+      const kycSectorObj = ACTIVITY_SECTORS.find((s) => s.code === kycSector);
+      if (!kycSectorObj) {
+        return res.status(400).json({ error: "Secteur d'activité invalide." });
+      }
+      if (kycSubSector && (typeof kycSubSector !== "string" || !kycSectorObj.subSectors.some((ss) => ss.code === kycSubSector))) {
+        return res.status(400).json({ error: "Sous-secteur d'activité invalide." });
+      }
+
       const user = await storage.submitKyc(req.session.userId!, {
         kycIdFront,
         kycIdBack,
@@ -2561,6 +2574,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!description || description.trim().length < 20) {
         return res.status(400).json({ error: "La description doit contenir au moins 20 caractères" });
       }
+      // Secteur d'activité obligatoire (les nouveaux utilisateurs le renseignent au KYC)
+      if (!kycSector || typeof kycSector !== "string") {
+        return res.status(400).json({ error: "Le secteur d'activité est obligatoire." });
+      }
+      const bizSectorObj = ACTIVITY_SECTORS.find((s) => s.code === kycSector);
+      if (!bizSectorObj) {
+        return res.status(400).json({ error: "Secteur d'activité invalide." });
+      }
+      if (kycSubSector && (typeof kycSubSector !== "string" || !bizSectorObj.subSectors.some((ss) => ss.code === kycSubSector))) {
+        return res.status(400).json({ error: "Sous-secteur d'activité invalide." });
+      }
       const user = await storage.getUser(req.session.userId!);
       if (!user) return res.status(404).json({ error: "Utilisateur non trouvé" });
       if (!user.kycIdFront || !user.kycIdBack) {
@@ -2634,6 +2658,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Withdrawal phones update error:", error);
       res.status(500).json({ error: "Erreur lors de la mise à jour des numéros" });
+    }
+  });
+
+  // ===== Secteur d'activité (anciens utilisateurs sans secteur) =====
+  // Permet a un utilisateur de renseigner son secteur depuis Parametres.
+  // Applique automatiquement la restriction pays (multiCountryEnabled) et passe
+  // le statut en "pending" jusqu'a validation par un administrateur.
+  app.post("/api/user/activity-sector", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { kycSector, kycSubSector } = req.body;
+      if (!kycSector || typeof kycSector !== "string") {
+        return res.status(400).json({ error: "Veuillez sélectionner un secteur d'activité." });
+      }
+
+      const sector = ACTIVITY_SECTORS.find((s) => s.code === kycSector);
+      if (!sector) {
+        return res.status(400).json({ error: "Secteur d'activité invalide." });
+      }
+      if (kycSubSector) {
+        if (typeof kycSubSector !== "string" || !sector.subSectors.some((ss) => ss.code === kycSubSector)) {
+          return res.status(400).json({ error: "Sous-secteur d'activité invalide." });
+        }
+      }
+
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) {
+        return res.status(404).json({ error: "Utilisateur non trouvé" });
+      }
+
+      // Verrou: un secteur deja valide ne peut plus etre modifie par l'utilisateur.
+      if (user.kycSector && user.sectorStatus === "approved") {
+        return res.status(400).json({
+          error: "Votre secteur d'activité est déjà validé et ne peut plus être modifié. Contactez le support pour toute modification.",
+        });
+      }
+
+      const updated = await storage.setUserActivitySector(req.session.userId!, {
+        kycSector,
+        kycSubSector: kycSubSector || null,
+        sectorStatus: "pending",
+        multiCountryEnabled: isInternationalActivity(kycSector, kycSubSector || null),
+      });
+      clearAuthCache(req.session.userId!);
+
+      res.json({
+        success: true,
+        message: "Secteur d'activité enregistré. Il sera validé par un administrateur avant que vous puissiez effectuer des retraits.",
+        user: updated,
+      });
+    } catch (error: any) {
+      console.error("Activity sector update error:", error);
+      res.status(500).json({ error: "Erreur lors de l'enregistrement du secteur d'activité" });
     }
   });
 
@@ -5070,6 +5146,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({
           success: false,
           error: { code: "INVALID_API_KEY", message: "Compte associé introuvable" }
+        });
+      }
+
+      // Garde secteur d'activité: bloque les payouts tant que le secteur n'est pas configuré et validé
+      const sectorBlockPayout = getSectorWithdrawalBlockMessage(user);
+      if (sectorBlockPayout) {
+        return res.status(403).json({
+          success: false,
+          error: { code: "SECTOR_NOT_VALIDATED", message: sectorBlockPayout }
         });
       }
 
@@ -8059,6 +8144,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (user.kycStatus !== "verified") {
         return res.status(403).json({ success: false, error: { code: "ACCOUNT_NOT_VERIFIED", message: "KYC non vérifié" } });
       }
+      const sectorBlockBizPayout = getSectorWithdrawalBlockMessage(user);
+      if (sectorBlockBizPayout) {
+        return res.status(403).json({ success: false, error: { code: "SECTOR_NOT_VALIDATED", message: sectorBlockBizPayout } });
+      }
       if (!user.payoutApiEnabled) {
         return res.status(403).json({ success: false, error: { code: "PAYOUT_NOT_ACTIVATED", message: "Le payout API n'est pas activé" } });
       }
@@ -8900,6 +8989,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (user.kycStatus !== "verified") {
         return res.status(403).json({ success: false, error: "Verification KYC requise" });
+      }
+
+      // Garde secteur d'activité: bloque retrait/transfert tant que le secteur n'est pas validé
+      const sectorBlockWeb = getSectorWithdrawalBlockMessage(user);
+      if (sectorBlockWeb) {
+        return res.status(403).json({ success: false, error: sectorBlockWeb });
       }
 
       // Validate security code for withdrawals (not transfers)
@@ -10749,6 +10844,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // Garde secteur d'activité: bloque le retrait tant que le secteur n'est pas configuré et validé
+      const sectorBlockWd = getSectorWithdrawalBlockMessage(user);
+      if (sectorBlockWd) {
+        return res.status(403).json({ error: sectorBlockWd });
+      }
+
       if (!amount || amount <= 0) {
         return res.status(400).json({ error: "Retrait échoué" });
       }
@@ -12186,6 +12287,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         businessEnterprisePhone: z.string().trim().max(30).nullable().optional(),
         businessEmail: z.string().trim().toLowerCase().email("Email entreprise invalide").max(200).nullable().or(z.literal("")).optional(),
         multiCountryEnabled: z.boolean().optional(),
+        sectorStatus: z.enum(["approved", "pending"]).optional(),
       });
 
       const parsed = updateSchema.safeParse(req.body);
@@ -14169,6 +14271,9 @@ SUPPORT ET CONTACT:
               if (user.kycStatus !== "verified") return JSON.stringify({ success: false, error: "KYC non vérifié. Veuillez compléter votre vérification KYC." });
               if (!user.securityCode) return JSON.stringify({ success: false, error: "Code de sécurité non configuré. Allez dans Paramètres pour le configurer." });
 
+              const sectorBlockEmaliW = getSectorWithdrawalBlockMessage(user);
+              if (sectorBlockEmaliW) return JSON.stringify({ success: false, error: sectorBlockEmaliW });
+
               const sanitizedPhoneCheck = phone.replace(/\s+/g, "").replace(/^(\+|00)/, "");
               const allowedPhones = (user.withdrawalPhones || []).map((p: string) => p.replace(/\s+/g, "").replace(/^(\+|00)/, ""));
               if (allowedPhones.length === 0) return JSON.stringify({ success: false, error: "Aucun numéro de retrait configuré. Allez dans Paramètres pour ajouter vos numéros." });
@@ -14370,6 +14475,8 @@ SUPPORT ET CONTACT:
               if (user.kycStatus !== "verified") return JSON.stringify({ success: false, error: "KYC non vérifié. Veuillez compléter votre vérification KYC." });
 
               if (!user.securityCode) return JSON.stringify({ success: false, error: "Code de sécurité non configuré. Allez dans Paramètres pour le configurer." });
+              const sectorBlockEmaliT = getSectorWithdrawalBlockMessage(user);
+              if (sectorBlockEmaliT) return JSON.stringify({ success: false, error: sectorBlockEmaliT });
               if (!transferCode) return JSON.stringify({ success: false, error: "Code de sécurité requis pour effectuer un transfert." });
               const bcryptModT = await import("bcrypt");
               const isValidCodeT = await bcryptModT.compare(transferCode, user.securityCode);
