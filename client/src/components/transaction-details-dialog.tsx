@@ -39,6 +39,7 @@ interface TransactionMetadata {
   mbiyopayTransactionId?: string;
   afribaPayTransactionId?: string;
   afribaPayOrderId?: string;
+  pawaPayProviderTxId?: string;
   moneyfusionRef?: string;
   wizallTransactionId?: string;
   operatorKey?: string;
@@ -540,8 +541,8 @@ export function TransactionDetailsDialog({
           </div>
 
           {/* Transaction ID */}
-          <div className="bg-muted/50 p-3 rounded-md border">
-            <label className="text-xs font-medium text-muted-foreground block mb-1.5">ID Transaction</label>
+          <div className="bg-muted/50 p-3 rounded-md border space-y-2">
+            <label className="text-xs font-medium text-muted-foreground block">ID Transaction</label>
             <div className="flex items-center gap-2">
               <code className="text-xs font-mono break-all flex-1 text-foreground">{displayTransactionId}</code>
               <Button size="icon" variant="ghost" onClick={() => copyToClipboard(displayTransactionId, "ID Transaction")} data-testid="button-copy-tx-id">
@@ -549,9 +550,20 @@ export function TransactionDetailsDialog({
               </Button>
             </div>
             {displayTransactionId !== transaction.id && (
-              <div className="flex items-center gap-2 mt-2 pt-2 border-t border-border/40">
+              <div className="flex items-center gap-2 pt-1.5 border-t border-border/40">
                 <code className="text-xs font-mono break-all flex-1 text-muted-foreground">{transaction.id}</code>
                 <Button size="icon" variant="ghost" onClick={() => copyToClipboard(transaction.id, "ID")} data-testid="button-copy-internal-id">
+                  <Copy className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+            )}
+            {metadata?.pawaPayProviderTxId && (
+              <div className="flex items-center gap-2 pt-1.5 border-t border-border/40">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-muted-foreground mb-0.5">ID réseau opérateur</p>
+                  <code className="text-xs font-mono break-all text-muted-foreground">{metadata.pawaPayProviderTxId}</code>
+                </div>
+                <Button size="icon" variant="ghost" onClick={() => copyToClipboard(metadata!.pawaPayProviderTxId!, "ID réseau")} data-testid="button-copy-network-id">
                   <Copy className="w-3.5 h-3.5" />
                 </Button>
               </div>

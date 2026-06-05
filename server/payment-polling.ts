@@ -1053,6 +1053,13 @@ async function processPawaPayDeposit(transaction: Transaction & { user?: User },
     console.log(`[PaymentPolling] PawaPay deposit ${transaction.id} - raw: ${result.status} → mapped: ${mappedStatus}`);
 
     if (mappedStatus === "completed") {
+      if (result.data?.providerTransactionId) {
+        try {
+          const existingMeta = JSON.parse(typeof transaction.metadata === "string" ? transaction.metadata : JSON.stringify(transaction.metadata || {}));
+          existingMeta.pawaPayProviderTxId = result.data.providerTransactionId;
+          await storage.updateTransactionMetadata(transaction.id, JSON.stringify(existingMeta));
+        } catch {}
+      }
       const finalized = await storage.finalizeIncomingTransaction(transaction.id, {});
       if (finalized) {
         console.log(`[PaymentPolling] ✅ PawaPay deposit ${transaction.id} CONFIRMED - credited=${finalized.credited}`);
@@ -1102,6 +1109,13 @@ async function processPawaPayPayout(transaction: Transaction & { user?: User }, 
     console.log(`[PaymentPolling] PawaPay payout ${transaction.id} - raw: ${result.status} → mapped: ${mappedStatus}`);
 
     if (mappedStatus === "completed") {
+      if (result.data?.providerTransactionId) {
+        try {
+          const existingMeta = JSON.parse(typeof transaction.metadata === "string" ? transaction.metadata : JSON.stringify(transaction.metadata || {}));
+          existingMeta.pawaPayProviderTxId = result.data.providerTransactionId;
+          await storage.updateTransactionMetadata(transaction.id, JSON.stringify(existingMeta));
+        } catch {}
+      }
       // ATOMIC: only completes if still pending — évite overwrite si déjà traité par webhook
       const completed = await storage.atomicCompleteTransaction(transaction.id);
       if (completed) {

@@ -16,6 +16,7 @@ interface TransactionMetadata {
   mbiyopayTransactionId?: string;
   afribaPayTransactionId?: string;
   afribaPayOrderId?: string;
+  pawaPayProviderTxId?: string;
   moneyfusionRef?: string;
   wizallTransactionId?: string;
   pawaPayDepositId?: string;
@@ -487,20 +488,31 @@ const ReceiptTemplate = forwardRef<HTMLDivElement, ReceiptTemplateProps>(
             </>
           )}
 
-          {/* Perforation + Transaction ID — même ID que le dialog */}
+          {/* Perforation + Transaction IDs */}
           <PerforationLine />
 
-          <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 9, color: "#94a3b8", letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 6 }}>
-              ID Transaction
+          <div>
+            <div style={{ fontSize: 9, color: "#94a3b8", letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 6, textAlign: "center" }}>
+              Identifiants
             </div>
             <div style={{
               fontSize: 9, fontFamily: "monospace", color: "#475569",
               background: "#f8fafc", border: "1px solid #e2e8f0",
-              borderRadius: 4, padding: "4px 8px", wordBreak: "break-all",
-              lineHeight: 1.6,
+              borderRadius: 4, padding: "6px 8px", wordBreak: "break-all",
+              lineHeight: 1.8,
             }}>
-              {displayTransactionId}
+              <div>{displayTransactionId}</div>
+              {displayTransactionId !== transaction.id && (
+                <div style={{ color: "#94a3b8", borderTop: "1px dashed #e2e8f0", marginTop: 4, paddingTop: 4 }}>
+                  {transaction.id}
+                </div>
+              )}
+              {metadata?.pawaPayProviderTxId && (
+                <div style={{ color: "#64748b", borderTop: "1px dashed #e2e8f0", marginTop: 4, paddingTop: 4 }}>
+                  <div style={{ fontSize: 8, color: "#94a3b8", fontFamily: "system-ui, sans-serif", marginBottom: 2 }}>ID réseau opérateur</div>
+                  {metadata.pawaPayProviderTxId}
+                </div>
+              )}
             </div>
           </div>
 

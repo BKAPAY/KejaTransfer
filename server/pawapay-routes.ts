@@ -581,6 +581,12 @@ export async function handlePawaPayWebhook(req: Request, res: Response): Promise
               continue;
             }
           }
+          if (apiData?.providerTransactionId) {
+            try {
+              meta.pawaPayProviderTxId = apiData.providerTransactionId;
+              await storage.updateTransactionMetadata(tx.id, JSON.stringify(meta));
+            } catch {}
+          }
 
           // ATOMIC: Use finalizeIncomingTransaction which atomically sets status=completed
           // WHERE status='pending' — prevents double-credit if webhook fires twice
@@ -626,9 +632,11 @@ export async function handlePawaPayWebhook(req: Request, res: Response): Promise
 
         // SECURITY: Re-verify status via PawaPay API
         let verifiedStatus: string;
+        let payoutApiData: any;
         try {
           const apiResult = await getPawaPayPayoutStatus(payoutId);
           verifiedStatus = apiResult.status;
+          payoutApiData = apiResult.data;
           console.log(`[PawaPay Webhook] API verification for payoutId=${payoutId}: status=${verifiedStatus}`);
         } catch (err) {
           console.error(`[PawaPay Webhook] API verification failed for payoutId=${payoutId}, aborting:`, err);
@@ -640,6 +648,12 @@ export async function handlePawaPayWebhook(req: Request, res: Response): Promise
         const meta = JSON.parse(tx.metadata || "{}");
 
         if (mappedStatus === "completed") {
+          if (payoutApiData?.providerTransactionId) {
+            try {
+              meta.pawaPayProviderTxId = payoutApiData.providerTransactionId;
+              await storage.updateTransactionMetadata(tx.id, JSON.stringify(meta));
+            } catch {}
+          }
           // ATOMIC: Only completes if still pending
           const completed = await storage.atomicCompleteTransaction(tx.id);
           if (completed) {
@@ -727,6 +741,12 @@ export async function pollPawaPayTransaction(txId: string): Promise<void> {
           }
         }
 
+        if (apiData?.providerTransactionId) {
+          try {
+            meta.pawaPayProviderTxId = apiData.providerTransactionId;
+            await storage.updateTransactionMetadata(txId, JSON.stringify(meta));
+          } catch {}
+        }
         // ATOMIC: finalizeIncomingTransaction — atomically sets completed WHERE pending
         const result = await storage.finalizeIncomingTransaction(txId);
         if (result && result.credited) {
@@ -757,12 +777,18 @@ export async function pollPawaPayTransaction(txId: string): Promise<void> {
     }
 
     if (payoutId) {
-      const { status } = await getPawaPayPayoutStatus(payoutId);
+      const { status, data: payoutApiData } = await getPawaPayPayoutStatus(payoutId);
       const mappedStatus = mapPawaPayStatus(status);
 
       console.log(`[PawaPay Poll] payoutId=${payoutId}, API status=${status}, mapped=${mappedStatus}`);
 
       if (mappedStatus === "completed") {
+        if (payoutApiData?.providerTransactionId) {
+          try {
+            meta.pawaPayProviderTxId = payoutApiData.providerTransactionId;
+            await storage.updateTransactionMetadata(txId, JSON.stringify(meta));
+          } catch {}
+        }
         // ATOMIC: Only completes if still pending
         const completed = await storage.atomicCompleteTransaction(txId);
         if (completed) {
