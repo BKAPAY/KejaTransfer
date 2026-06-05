@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import {
   ArrowLeft, User, Mail, Phone, MapPin, Calendar, Shield, CheckCircle, XCircle,
-  PlusCircle, MinusCircle, Pencil, Save, X, Building2, KeyRound, RotateCcw,
+  PlusCircle, MinusCircle, Pencil, Save, X, Building2, KeyRound, RotateCcw, TrendingUp,
 } from "lucide-react";
 import type { User as UserType } from "@shared/schema";
 import { getSectorLabel, getSubSectorLabel } from "@shared/activity-sectors";
@@ -214,6 +214,24 @@ export default function AdminUserProfile() {
         description: err.message || "Impossible d'ajuster le solde",
         variant: "destructive",
       });
+    },
+  });
+
+  const [monthlyLimitInput, setMonthlyLimitInput] = useState<string>("");
+
+  const DEFAULT_LIMITS: Record<string, number> = { XOF: 1_000_000, XAF: 1_000_000, CDF: 5_000_000 };
+
+  const setMonthlyLimitMutation = useMutation({
+    mutationFn: async (limit: number | null) => {
+      const res = await apiRequest("PATCH", `/api/admin/user/${userId}/monthly-limit`, { limit });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Limite mise à jour", description: "La limite mensuelle a été modifiée avec succès." });
+      queryClient.invalidateQueries({ queryKey: [`/api/admin/user/${userId}/profile`] });
+    },
+    onError: (err: any) => {
+      toast({ title: "Erreur", description: err?.message || "Impossible de modifier la limite", variant: "destructive" });
     },
   });
 
@@ -578,6 +596,78 @@ export default function AdminUserProfile() {
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
+              </div>
+            </div>
+          )}
+
+          {/* Limite mensuelle — uniquement pour les comptes personnels */}
+          {!isBusinessAccount && (
+            <div className="pt-4 border-t space-y-3">
+              <h3 className="text-sm font-semibold flex items-center gap-2">
+                <TrendingUp className="w-4 h-4" />
+                Limite mensuelle de réception
+              </h3>
+              <div className="rounded-md bg-muted/50 p-3 space-y-1">
+                <p className="text-xs text-muted-foreground">
+                  Limite actuelle :{" "}
+                  <strong className="text-foreground">
+                    {(user as any).monthlyLimit != null
+                      ? Number((user as any).monthlyLimit).toLocaleString("fr-FR")
+                      : (DEFAULT_LIMITS[userCurrency] ?? 1_000_000).toLocaleString("fr-FR")}{" "}
+                    {userCurrency}
+                  </strong>
+                  {(user as any).monthlyLimit == null && (
+                    <span className="ml-1 text-muted-foreground">(valeur par défaut)</span>
+                  )}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Limite par défaut : {(DEFAULT_LIMITS[userCurrency] ?? 1_000_000).toLocaleString("fr-FR")} {userCurrency} / mois.
+                  Laissez vide pour revenir à la valeur par défaut.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-end gap-2">
+                <div className="space-y-1 flex-1 min-w-[160px]">
+                  <Label htmlFor="monthly-limit-input">Nouvelle limite ({userCurrency})</Label>
+                  <Input
+                    id="monthly-limit-input"
+                    type="number"
+                    min="0"
+                    placeholder={`ex: ${(DEFAULT_LIMITS[userCurrency] ?? 1_000_000).toLocaleString("fr-FR")}`}
+                    value={monthlyLimitInput}
+                    onChange={e => setMonthlyLimitInput(e.target.value)}
+                    data-testid="input-monthly-limit-profile"
+                  />
+                </div>
+                <Button
+                  size="sm"
+                  disabled={setMonthlyLimitMutation.isPending}
+                  onClick={() => {
+                    const val = monthlyLimitInput.trim();
+                    const limit = val === "" ? null : Number(val);
+                    if (val !== "" && (isNaN(limit!) || limit! < 0)) {
+                      toast({ title: "Valeur invalide", description: "Entrez un montant valide ou laissez vide pour la valeur par défaut.", variant: "destructive" });
+                      return;
+                    }
+                    setMonthlyLimitMutation.mutate(limit);
+                  }}
+                  data-testid="button-save-monthly-limit-profile"
+                >
+                  {setMonthlyLimitMutation.isPending ? "Enregistrement..." : "Enregistrer"}
+                </Button>
+                {(user as any).monthlyLimit != null && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={setMonthlyLimitMutation.isPending}
+                    onClick={() => {
+                      setMonthlyLimitInput("");
+                      setMonthlyLimitMutation.mutate(null);
+                    }}
+                    data-testid="button-reset-monthly-limit-profile"
+                  >
+                    Remettre par défaut
+                  </Button>
+                )}
               </div>
             </div>
           )}
