@@ -8,6 +8,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { BusinessSidebar } from "@/components/business-sidebar";
 import { useEffect, useRef, useState, lazy, Suspense } from "react";
 import { useAuth } from "@/hooks/use-auth";
+import { useInactivityLogout } from "@/hooks/use-inactivity-logout";
 import { Wallet, Loader2, ShieldCheck, ShieldAlert, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { EmaliChatButton } from "@/components/emali-chat";
@@ -141,6 +142,8 @@ function DashboardLayout({ children, type = "personal" }: { children: React.Reac
   const [location, setLocation] = useLocation();
   const { user, isLoading, isAuthenticated, isUnauthenticated, isServerError } = useAuth();
   const redirectedRef = useRef(false);
+
+  useInactivityLogout(isAuthenticated);
 
   useEffect(() => {
     if (!isLoading && isAuthenticated && user?.accountType !== type) {
