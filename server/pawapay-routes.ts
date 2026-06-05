@@ -159,6 +159,11 @@ export async function handlePawaPayDeposit(
       }),
     });
 
+    const submerchantLegalName = user.accountType === "business"
+      ? (user.businessName || `${user.firstName || ""} ${user.lastName || ""}`.trim() || undefined)
+      : (`${user.firstName || ""} ${user.lastName || ""}`.trim() || undefined);
+    const submerchantSegment = user.kycSubSector || user.kycSector || undefined;
+
     const result = await createPawaPayDeposit({
       amount: providerAmount,
       currency: providerCurrency,
@@ -168,6 +173,8 @@ export async function handlePawaPayDeposit(
       description: "Depot BKApay",
       externalId: randomUUID(),
       preAuthorisationCode: otpCode,
+      submerchantLegalName: submerchantLegalName || undefined,
+      submerchantSegment: submerchantSegment || undefined,
     });
 
     if (!result.success) {

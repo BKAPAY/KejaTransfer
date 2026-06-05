@@ -235,10 +235,13 @@ export async function createPawaPayDeposit(params: PawaPayDepositParams): Promis
   }
 
   if (params.submerchantLegalName) {
-    body.metadata = [
-      { fieldName: "submerchant_legal_name", fieldValue: params.submerchantLegalName.substring(0, 50), isPII: false },
-      ...(params.submerchantSegment ? [{ fieldName: "submerchant_segment", fieldValue: params.submerchantSegment.substring(0, 50), isPII: false }] : []),
+    const metaItems: Record<string, any>[] = [
+      { submerchant_legal_name: params.submerchantLegalName.substring(0, 50) },
     ];
+    if (params.submerchantSegment) {
+      metaItems.push({ submerchant_segment: params.submerchantSegment.substring(0, 50) });
+    }
+    body.metadata = metaItems;
   }
 
   const mode = config.isSandbox ? "SANDBOX" : "PRODUCTION";
@@ -328,10 +331,13 @@ export async function createPawaPayPayout(params: PawaPayPayoutParams): Promise<
   };
 
   if (params.submerchantLegalName) {
-    body.metadata = [
-      { fieldName: "submerchant_legal_name", fieldValue: params.submerchantLegalName.substring(0, 50), isPII: false },
-      ...(params.submerchantSegment ? [{ fieldName: "submerchant_segment", fieldValue: params.submerchantSegment.substring(0, 50), isPII: false }] : []),
+    const metaItems: Record<string, any>[] = [
+      { submerchant_legal_name: params.submerchantLegalName.substring(0, 50) },
     ];
+    if (params.submerchantSegment) {
+      metaItems.push({ submerchant_segment: params.submerchantSegment.substring(0, 50) });
+    }
+    body.metadata = metaItems;
   }
 
   const mode = config.isSandbox ? "SANDBOX" : "PRODUCTION";
