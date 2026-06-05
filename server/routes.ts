@@ -13149,11 +13149,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         let operatorCurrency: string | undefined;
         
         if (config.provider === "paydunya") {
-          const { requiresOTP, getUSSDInstruction } = await import("./paydunya-softpay");
+          const { requiresOTP, getUSSDInstruction, getUSSDCode } = await import("./paydunya-softpay");
           const operatorKey = `${config.operator}_${config.country.toLowerCase()}`;
           requiresOtp = requiresOTP(operatorKey);
           if (requiresOtp) {
             otpInstructions = getUSSDInstruction(operatorKey) || undefined;
+            otpUssdCode = getUSSDCode(operatorKey) || undefined;
           }
         } else if (config.provider === "mbiyopay") {
           const { mbiyoPayOperatorRequiresOtp, getMbiyoPayOtpInstructions } = await import("./mbiyopay");

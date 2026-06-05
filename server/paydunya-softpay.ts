@@ -27,6 +27,7 @@ export interface SoftpayOperatorConfig {
   requiresTwoStep: boolean;
   requiresRedirect?: boolean; // For Wave and similar operators that return redirect URL
   ussdInstruction?: string;
+  ussdCode?: string; // Short USSD code to copy (separate from full instruction text)
   parameterMapping: (data: SoftpayPaymentData) => any;
 }
 
@@ -224,6 +225,7 @@ export const SOFTPAY_OPERATORS: Record<string, SoftpayOperatorConfig> = {
     requiresTwoStep: false,
     requiresRedirect: false,
     ussdInstruction: "Composez #144*82# puis choisissez l'option 2 pour obtenir votre code de paiement",
+    ussdCode: "#144*82#",
     parameterMapping: (data) => ({
       orange_money_ci_customer_fullname: data.customerName,
       orange_money_ci_email: BKAPAY_GENERIC_EMAIL,
@@ -280,13 +282,14 @@ export const SOFTPAY_OPERATORS: Record<string, SoftpayOperatorConfig> = {
   },
 
   // BURKINA FASO OPERATORS
-  // Orange Money BF nécessite un OTP généré via *144*4*6*MONTANT#
+  // Orange Money BF nécessite un OTP généré via *144*4*6# (SANS montant — doc PayDunya officielle)
   "orange_bf": {
     endpoint: "/softpay/orange-money-burkina",
     requiresOTP: true,
     requiresTwoStep: false,
     requiresRedirect: false,
-    ussdInstruction: "Composez *144*4*6*MONTANT# pour obtenir votre code OTP",
+    ussdInstruction: "Composez *144*4*6# sur votre téléphone Orange Money pour obtenir votre code de paiement à usage unique",
+    ussdCode: "*144*4*6#",
     parameterMapping: (data) => ({
       name_bf: data.customerName,
       email_bf: BKAPAY_GENERIC_EMAIL,
@@ -447,11 +450,19 @@ export function requiresTwoStep(operatorKey: string): boolean {
 }
 
 /**
- * Get USSD instruction for operator
+ * Get USSD instruction for operator (full descriptive text)
  */
 export function getUSSDInstruction(operatorKey: string): string | null {
   const config = SOFTPAY_OPERATORS[operatorKey];
   return config?.ussdInstruction || null;
+}
+
+/**
+ * Get short USSD code for operator (to display in copy button)
+ */
+export function getUSSDCode(operatorKey: string): string | null {
+  const config = SOFTPAY_OPERATORS[operatorKey];
+  return config?.ussdCode || null;
 }
 
 /**
