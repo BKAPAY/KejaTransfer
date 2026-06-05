@@ -159,6 +159,11 @@ export async function handlePawaPayDeposit(
       }),
     });
 
+    const submerchantLegalName = user.accountType === "business"
+      ? (user.businessName || `${user.firstName || ""} ${user.lastName || ""}`.trim() || undefined)
+      : (`${user.firstName || ""} ${user.lastName || ""}`.trim() || undefined);
+    const submerchantSegment = user.kycSubSector || user.kycSector || undefined;
+
     const result = await createPawaPayDeposit({
       amount: providerAmount,
       currency: providerCurrency,
@@ -168,6 +173,8 @@ export async function handlePawaPayDeposit(
       description: "Depot BKApay",
       externalId: randomUUID(),
       preAuthorisationCode: otpCode,
+      submerchantLegalName,
+      submerchantSegment,
     });
 
     if (!result.success) {
@@ -306,6 +313,11 @@ export async function handlePawaPayWithdrawal(
     const txId = tx.id;
     setTimeout(async () => {
       try {
+        const submerchantLegalNameW = user.accountType === "business"
+          ? (user.businessName || `${user.firstName || ""} ${user.lastName || ""}`.trim() || undefined)
+          : (`${user.firstName || ""} ${user.lastName || ""}`.trim() || undefined);
+        const submerchantSegmentW = user.kycSubSector || user.kycSector || undefined;
+
         const result = await createPawaPayPayout({
           amount: amountForProvider,
           currency: providerCurrency,
@@ -314,6 +326,8 @@ export async function handlePawaPayWithdrawal(
           phone,
           description: netMode ? "Payout API BKApay" : "Retrait BKApay",
           externalId: pawaPayExternalId,
+          submerchantLegalName: submerchantLegalNameW,
+          submerchantSegment: submerchantSegmentW,
         });
 
         if (!result.success) {

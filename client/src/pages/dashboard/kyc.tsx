@@ -8,6 +8,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { CheckCircle2, Clock, AlertCircle, X, Camera, Shield, ArrowRight, ArrowLeft, User, FileText, PenTool, Trash2, Loader2, MapPin, Briefcase, Navigation, Globe, Check, Pencil, CreditCard } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ACTIVITY_SECTORS, getSubSectorsForSector } from "@shared/activity-sectors";
 import { SiFacebook, SiInstagram, SiTiktok, SiYoutube, SiWhatsapp } from "react-icons/si";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -87,6 +88,8 @@ export default function KYC() {
   const [kycUrlYoutube, setKycUrlYoutube] = useState("");
   const [kycUrlWhatsappGroup, setKycUrlWhatsappGroup] = useState("");
   const [kycUrlWhatsappChannel, setKycUrlWhatsappChannel] = useState("");
+  const [kycSector, setKycSector] = useState("");
+  const [kycSubSector, setKycSubSector] = useState("");
   const [activePlatform, setActivePlatform] = useState<string | null>(null);
   const [kycDocumentType, setKycDocumentType] = useState("");
   const [kycDocumentNumber, setKycDocumentNumber] = useState("");
@@ -519,6 +522,8 @@ export default function KYC() {
         kycDocumentType: kycDocumentType,
         kycDocumentNumber: kycDocumentNumber,
         kycDocumentExpiryDate: kycDocumentExpiryDate,
+        kycSector: kycSector,
+        kycSubSector: kycSubSector,
       });
     },
     onSuccess: () => {
@@ -867,22 +872,57 @@ export default function KYC() {
 
       <Card className="border-2">
         <CardContent className="pt-6">
-          <div className="space-y-3">
-            <label className="text-sm font-medium text-foreground block">
-              Quelle est votre activite ?
-            </label>
-            <Textarea
-              value={activityDescription}
-              onChange={(e) => setActivityDescription(e.target.value)}
-              placeholder="Decrivez votre activite professionnelle, le type de produits ou services que vous proposez, et comment vous comptez utiliser BKApay... (minimum 100 caracteres)"
-              className="min-h-[120px] resize-none"
-              data-testid="input-activity-description"
-            />
-            <p className={`text-xs ${activityDescription.length < 100 ? "text-red-500" : "text-muted-foreground"}`}>
-              {activityDescription.length}/100 caracteres minimum
-            </p>
+          <div className="space-y-5">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground block">
+                Secteur d'activité <span className="text-destructive">*</span>
+              </label>
+              <Select value={kycSector} onValueChange={(v) => { setKycSector(v); setKycSubSector(""); }}>
+                <SelectTrigger data-testid="select-kyc-sector">
+                  <SelectValue placeholder="Sélectionnez votre secteur..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {ACTIVITY_SECTORS.map((s) => (
+                    <SelectItem key={s.code} value={s.code}>{s.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {kycSector && getSubSectorsForSector(kycSector).length > 0 && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground block">
+                  Sous-secteur <span className="text-destructive">*</span>
+                </label>
+                <Select value={kycSubSector} onValueChange={setKycSubSector}>
+                  <SelectTrigger data-testid="select-kyc-subsector">
+                    <SelectValue placeholder="Sélectionnez votre sous-secteur..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {getSubSectorsForSector(kycSector).map((ss) => (
+                      <SelectItem key={ss.code} value={ss.code}>{ss.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground block">
+                Quelle est votre activite ?
+              </label>
+              <Textarea
+                value={activityDescription}
+                onChange={(e) => setActivityDescription(e.target.value)}
+                placeholder="Decrivez votre activite professionnelle, le type de produits ou services que vous proposez, et comment vous comptez utiliser BKApay... (minimum 100 caracteres)"
+                className="min-h-[120px] resize-none"
+                data-testid="input-activity-description"
+              />
+              <p className={`text-xs ${activityDescription.length < 100 ? "text-red-500" : "text-muted-foreground"}`}>
+                {activityDescription.length}/100 caracteres minimum
+              </p>
+            </div>
           </div>
-          
         </CardContent>
       </Card>
 

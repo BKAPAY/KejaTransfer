@@ -46,7 +46,7 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   updateUserBalance(id: string, amount: number): Promise<User | undefined>;
   updateUserPassword(id: string, hashedPassword: string): Promise<User | undefined>;
-  submitKyc(userId: string, kycData: { kycIdFront: string; kycIdBack: string; kycSelfie: string; kycSignature: string; kycActivityDescription: string; kycLatitude: string; kycLongitude: string; kycAddress: string; kycAcceptedTerms: string; kycPhone?: string; kycWhatsapp?: string; kycActivityUrl?: string; kycUrlWebsite?: string; kycUrlInstagram?: string; kycUrlFacebook?: string; kycUrlTiktok?: string; kycUrlYoutube?: string; kycUrlWhatsappGroup?: string; kycUrlWhatsappChannel?: string; kycDocumentType?: string; kycDocumentNumber?: string; kycDocumentExpiryDate?: string }): Promise<User | undefined>;
+  submitKyc(userId: string, kycData: { kycIdFront: string; kycIdBack: string; kycSelfie: string; kycSignature: string; kycActivityDescription: string; kycLatitude: string; kycLongitude: string; kycAddress: string; kycAcceptedTerms: string; kycPhone?: string; kycWhatsapp?: string; kycActivityUrl?: string; kycUrlWebsite?: string; kycUrlInstagram?: string; kycUrlFacebook?: string; kycUrlTiktok?: string; kycUrlYoutube?: string; kycUrlWhatsappGroup?: string; kycUrlWhatsappChannel?: string; kycDocumentType?: string; kycDocumentNumber?: string; kycDocumentExpiryDate?: string; kycSector?: string; kycSubSector?: string }): Promise<User | undefined>;
   updateKycDocument(userId: string, data: Partial<{ kycIdFront: string; kycIdBack: string; kycSelfie: string; kycSignature: string; kycActivityDescription: string; kycLatitude: string; kycLongitude: string; kycAddress: string; kycAcceptedTerms: string }>): Promise<void>;
   getKycDocuments(userId: string): Promise<{ kycIdFront: string | null; kycIdBack: string | null; kycSelfie: string | null; kycSignature: string | null } | undefined>;
   approveKyc(userId: string): Promise<User | undefined>;
@@ -78,7 +78,7 @@ export interface IStorage {
     kycDirectorCountry?: string; kycDirectorDob?: string; kycIdIssueDate?: string; kycIdExpiryDate?: string;
   }): Promise<User | undefined>;
   uploadBusinessKycDocument(userId: string, type: string, data: string): Promise<void>;
-  submitBusinessKyc(userId: string, description: string): Promise<User | undefined>;
+  submitBusinessKyc(userId: string, description: string, kycSector?: string, kycSubSector?: string): Promise<User | undefined>;
 
   // Payment Links
   getPaymentLinks(userId: string): Promise<PaymentLink[]>;
@@ -479,7 +479,7 @@ export class DbStorage implements IStorage {
     return results[0];
   }
 
-  async submitKyc(userId: string, kycData: { kycIdFront: string; kycIdBack: string; kycSelfie: string; kycSignature: string; kycActivityDescription: string; kycLatitude: string; kycLongitude: string; kycAddress: string; kycAcceptedTerms: string; kycPhone?: string; kycWhatsapp?: string; kycActivityUrl?: string; kycUrlWebsite?: string; kycUrlInstagram?: string; kycUrlFacebook?: string; kycUrlTiktok?: string; kycUrlYoutube?: string; kycUrlWhatsappGroup?: string; kycUrlWhatsappChannel?: string; kycDocumentType?: string; kycDocumentNumber?: string; kycDocumentExpiryDate?: string }): Promise<User | undefined> {
+  async submitKyc(userId: string, kycData: { kycIdFront: string; kycIdBack: string; kycSelfie: string; kycSignature: string; kycActivityDescription: string; kycLatitude: string; kycLongitude: string; kycAddress: string; kycAcceptedTerms: string; kycPhone?: string; kycWhatsapp?: string; kycActivityUrl?: string; kycUrlWebsite?: string; kycUrlInstagram?: string; kycUrlFacebook?: string; kycUrlTiktok?: string; kycUrlYoutube?: string; kycUrlWhatsappGroup?: string; kycUrlWhatsappChannel?: string; kycDocumentType?: string; kycDocumentNumber?: string; kycDocumentExpiryDate?: string; kycSector?: string; kycSubSector?: string }): Promise<User | undefined> {
     const results = await db
       .update(schema.users)
       .set({
@@ -506,6 +506,8 @@ export class DbStorage implements IStorage {
         kycDocumentType: kycData.kycDocumentType || null,
         kycDocumentNumber: kycData.kycDocumentNumber || null,
         kycDocumentExpiryDate: kycData.kycDocumentExpiryDate || null,
+        kycSector: kycData.kycSector || null,
+        kycSubSector: kycData.kycSubSector || null,
       })
       .where(eq(schema.users.id, userId))
       .returning();
@@ -729,10 +731,15 @@ export class DbStorage implements IStorage {
     }
   }
 
-  async submitBusinessKyc(userId: string, description: string): Promise<User | undefined> {
+  async submitBusinessKyc(userId: string, description: string, kycSector?: string, kycSubSector?: string): Promise<User | undefined> {
     const results = await db
       .update(schema.users)
-      .set({ kycStatus: "submitted", kycActivityDescription: description })
+      .set({
+        kycStatus: "submitted",
+        kycActivityDescription: description,
+        ...(kycSector ? { kycSector } : {}),
+        ...(kycSubSector ? { kycSubSector } : {}),
+      })
       .where(eq(schema.users.id, userId))
       .returning();
     return results[0];

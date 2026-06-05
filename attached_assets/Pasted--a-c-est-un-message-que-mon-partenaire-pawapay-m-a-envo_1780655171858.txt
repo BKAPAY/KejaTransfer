@@ -1,0 +1,190 @@
+Ça c'est un message que mon partenaire pawapay m'a envoyé 
+
+Dans le cadre de notre surveillance de routine de l'activité des sous-marchands, nous avons identifié des transactions pour lesquelles les métadonnées requises (submerchant_legal_name et submerchant_segment) n'étaient pas fournies.
+
+Donc en gros tu dois regarder dans la documentation et comprendre comment envoyer les métadonnées de chaque utilisateur de compte entreprise et de compte personnel
+
+Commerce et Vente
+├── Commerce général
+├── Boutique physique
+├── Commerce de détail
+├── Commerce de gros
+├── Supermarché / Épicerie
+├── Import / Export
+├── Marketplace
+└── Vente sur réseaux sociaux
+
+E-commerce
+├── Boutique en ligne
+├── Marketplace en ligne
+├── Vente de produits numériques
+├── Vente de logiciels
+├── Vente de licences
+├── Vente de formations en ligne
+├── Vente d'abonnements
+└── Print on Demand
+
+Technologie et Informatique
+├── Développement logiciel
+├── SaaS
+├── Développement web
+├── Développement mobile
+├── Hébergement web
+├── Cybersécurité
+├── Intelligence artificielle
+├── Maintenance informatique
+└── Services informatiques
+
+Éducation et Formation
+├── Centre de formation
+├── Formation professionnelle
+├── Formation en ligne
+├── Coaching
+├── Tutorat
+└── E-learning
+
+Santé et Médical
+├── Clinique
+├── Cabinet médical
+├── Cabinet dentaire
+├── Pharmacie
+├── Laboratoire médical
+├── Optique
+└── Télémédecine
+
+Transport et Logistique
+├── Livraison
+├── Logistique
+├── Messagerie
+├── Transport de marchandises
+├── Transport de personnes
+├── Taxi
+├── VTC
+└── Location de véhicules
+
+Hôtellerie et Tourisme
+├── Hôtel
+├── Auberge
+├── Maison d'hôtes
+├── Résidence hôtelière
+├── Agence de voyage
+├── Tour opérateur
+└── Location saisonnière
+
+Restauration et Alimentation
+├── Restaurant
+├── Fast-food
+├── Café
+├── Boulangerie
+├── Pâtisserie
+├── Glacier
+├── Traiteur
+└── Livraison de repas
+
+Immobilier
+├── Agence immobilière
+├── Gestion locative
+├── Location immobilière
+├── Promotion immobilière
+└── Services immobiliers
+
+BTP et Construction
+├── Construction
+├── Architecture
+├── Génie civil
+├── Bureau d'études
+├── Électricité bâtiment
+├── Plomberie
+├── Menuiserie
+├── Peinture
+└── Rénovation
+
+Industrie et Fabrication
+├── Industrie manufacturière
+├── Production industrielle
+├── Assemblage
+├── Textile
+├── Confection
+├── Imprimerie
+├── Fabrication de meubles
+└── Transformation industrielle
+
+Médias et Communication
+├── Marketing digital
+├── Publicité
+├── Agence de communication
+├── Production audiovisuelle
+├── Création de contenu
+├── Presse
+├── Radio
+└── Télévision
+
+Événementiel et Divertissement
+├── Organisation d'événements
+├── Concerts
+├── Festivals
+├── Production musicale
+├── Cinéma
+└── Théâtre
+
+Services Professionnels
+├── Cabinet juridique
+├── Cabinet comptable
+├── Audit
+├── Conseil
+├── Ressources humaines
+├── Recrutement
+├── Traduction
+└── Services professionnels
+
+Beauté et Bien-être
+├── Salon de coiffure
+├── Institut de beauté
+├── Spa
+├── Cosmétique
+├── Parfumerie
+├── Salle de sport
+└── Fitness
+
+Mode et Accessoires
+├── Vêtements
+├── Chaussures
+├── Bijoux
+├── Montres
+├── Accessoires de mode
+└── Maroquinerie
+
+Automobile
+├── Vente de véhicules
+├── Garage
+├── Carrosserie
+├── Pièces détachées
+├── Lavage automobile
+└── Location de véhicules
+
+Services à la Personne
+├── Ménage
+├── Nettoyage
+├── Gardiennage
+├── Conciergerie
+└── Assistance personnelle
+
+Freelance et Indépendants
+├── Développeur freelance
+├── Designer freelance
+├── Consultant indépendant
+├── Créateur de contenu
+├── Prestataire de services
+└── Entrepreneur individuel
+
+Autre
+└── Autre activité commerciale
+
+1 - je veux que lors de la vérification de compte personnel et de compte entreprise la personne sélectionne :
+Secteur d'activité 
+└── Sous-secteur d'activité
+
+Ce qui veut dire que quand tu dois afficher les secteurs d'activité en premier quand il choisit secteur d'activité tu lui affiche le sous secteur d'activité qui est dans cette secteur d'activité 
+Et tous ces informations sont classées automatiquement dans son profil pour que lui il puisse voir tous les jours et même l'administrateur peut aussi le voir et aussi tu dois classer dans les formulaires de vérification que tu envoies sur l'interface administrateur .
+
+2- Assure-toi au niveau du compte personnel les métadonnées comme le nom et prénom de l'utilisateur est bien envoyé et aussi le secteur d'activité est bien envoyé a pawapay et que au niveau de compte entreprise le nom de l'entreprise est bien envoyé et puis le secteur d'activité aussi est bien envoyé

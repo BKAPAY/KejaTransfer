@@ -702,6 +702,14 @@ async function bootstrapDatabase() {
         console.error("⚠️ Djamo operator init error:", e);
       }
 
+      try {
+        await seedClient`ALTER TABLE users ADD COLUMN IF NOT EXISTS kyc_sector TEXT`;
+        await seedClient`ALTER TABLE users ADD COLUMN IF NOT EXISTS kyc_sub_sector TEXT`;
+        console.log("✅ users.kyc_sector/kyc_sub_sector columns ready");
+      } catch (e) {
+        console.error("⚠️ users kyc_sector/kyc_sub_sector columns error:", e);
+      }
+
       console.log("⚙️ Ensuring database indexes exist...");
       await seedClient`CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions (user_id)`;
       await seedClient`CREATE INDEX IF NOT EXISTS idx_transactions_user_status ON transactions (user_id, status)`;

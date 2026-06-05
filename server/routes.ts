@@ -2379,7 +2379,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // KYC Final Submit - just changes status to submitted
   app.post("/api/kyc/submit", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { kycActivityDescription, kycLatitude, kycLongitude, kycAddress, kycAcceptedTerms, kycPhone, kycWhatsapp, kycActivityUrl, kycUrlWebsite, kycUrlInstagram, kycUrlFacebook, kycUrlTiktok, kycUrlYoutube, kycUrlWhatsappGroup, kycUrlWhatsappChannel, kycDocumentType, kycDocumentNumber, kycDocumentExpiryDate } = req.body;
+      const { kycActivityDescription, kycLatitude, kycLongitude, kycAddress, kycAcceptedTerms, kycPhone, kycWhatsapp, kycActivityUrl, kycUrlWebsite, kycUrlInstagram, kycUrlFacebook, kycUrlTiktok, kycUrlYoutube, kycUrlWhatsappGroup, kycUrlWhatsappChannel, kycDocumentType, kycDocumentNumber, kycDocumentExpiryDate, kycSector, kycSubSector } = req.body;
 
       // Images already uploaded via /api/kyc/upload — read from DB to avoid huge payload
       const existingDocs = await storage.getKycDocuments(req.session.userId!);
@@ -2438,6 +2438,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         kycDocumentType: kycDocumentType || "",
         kycDocumentNumber: kycDocumentNumber || "",
         kycDocumentExpiryDate: kycDocumentExpiryDate || "",
+        kycSector: kycSector || "",
+        kycSubSector: kycSubSector || "",
       });
 
       if (!user) {
@@ -2505,7 +2507,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/kyc/business/submit", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { description } = req.body;
+      const { description, kycSector, kycSubSector } = req.body;
       if (!description || description.trim().length < 20) {
         return res.status(400).json({ error: "La description doit contenir au moins 20 caractères" });
       }
@@ -2514,7 +2516,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!user.kycIdFront || !user.kycIdBack) {
         return res.status(400).json({ error: "Les pièces d'identité (recto/verso) sont requises" });
       }
-      const submitted = await storage.submitBusinessKyc(req.session.userId!, description);
+      const submitted = await storage.submitBusinessKyc(req.session.userId!, description, kycSector || undefined, kycSubSector || undefined);
       res.json({ success: true, user: submitted });
     } catch (error: any) {
       console.error("Business KYC submit error:", error);

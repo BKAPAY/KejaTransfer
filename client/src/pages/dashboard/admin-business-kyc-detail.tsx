@@ -1,5 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { User, COUNTRIES } from "@shared/schema";
+import { getSectorLabel, getSubSectorLabel } from "@shared/activity-sectors";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -393,6 +394,20 @@ export default function AdminBusinessKycDetail() {
           </Section>
 
           <Section title="Activité déclarée" icon={Scale}>
+            {(user.kycSector || user.kycSubSector) && (
+              <div className="flex flex-wrap gap-2 mb-3">
+                {user.kycSector && (
+                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-primary/10 text-primary text-xs font-medium">
+                    {getSectorLabel(user.kycSector)}
+                  </span>
+                )}
+                {user.kycSubSector && user.kycSector && (
+                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-muted text-muted-foreground text-xs">
+                    {getSubSectorLabel(user.kycSector, user.kycSubSector)}
+                  </span>
+                )}
+              </div>
+            )}
             <p className="text-sm leading-relaxed whitespace-pre-wrap">
               {user.kycActivityDescription || <span className="text-muted-foreground italic">Non fournie</span>}
             </p>

@@ -171,6 +171,8 @@ export interface PawaPayDepositParams {
   description: string;
   externalId?: string;
   preAuthorisationCode?: string;
+  submerchantLegalName?: string;
+  submerchantSegment?: string;
 }
 
 export interface PawaPayDepositResult {
@@ -232,6 +234,13 @@ export async function createPawaPayDeposit(params: PawaPayDepositParams): Promis
     body.preAuthorisationCode = params.preAuthorisationCode;
   }
 
+  if (params.submerchantLegalName) {
+    body.metadata = [
+      { fieldName: "submerchant_legal_name", fieldValue: params.submerchantLegalName.substring(0, 50), isPII: false },
+      ...(params.submerchantSegment ? [{ fieldName: "submerchant_segment", fieldValue: params.submerchantSegment.substring(0, 50), isPII: false }] : []),
+    ];
+  }
+
   const mode = config.isSandbox ? "SANDBOX" : "PRODUCTION";
   console.log(`[PawaPay Deposit] [${mode}] Initiating ${amountStr} ${params.currency} via ${correspondent}, phone: ***${sanitizedPhone.slice(-4)}${params.preAuthorisationCode ? " [OTP provided]" : ""}`);
 
@@ -273,6 +282,8 @@ export interface PawaPayPayoutParams {
   phone: string;
   description: string;
   externalId?: string;
+  submerchantLegalName?: string;
+  submerchantSegment?: string;
 }
 
 export interface PawaPayPayoutResult {
@@ -315,6 +326,13 @@ export async function createPawaPayPayout(params: PawaPayPayoutParams): Promise<
     },
     customerMessage,
   };
+
+  if (params.submerchantLegalName) {
+    body.metadata = [
+      { fieldName: "submerchant_legal_name", fieldValue: params.submerchantLegalName.substring(0, 50), isPII: false },
+      ...(params.submerchantSegment ? [{ fieldName: "submerchant_segment", fieldValue: params.submerchantSegment.substring(0, 50), isPII: false }] : []),
+    ];
+  }
 
   const mode = config.isSandbox ? "SANDBOX" : "PRODUCTION";
   console.log(`[PawaPay Payout] [${mode}] Initiating ${amountStr} ${params.currency} via ${correspondent}, phone: ***${sanitizedPhone.slice(-4)}`);

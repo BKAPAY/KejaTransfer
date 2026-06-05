@@ -49,6 +49,8 @@ export const users = pgTable("users", {
   kycDocumentType: text("kyc_document_type"), // Type de piece d'identite: cni, passport, driving_license, residence_card, voter_card
   kycDocumentNumber: text("kyc_document_number"), // Numero de la piece d'identite
   kycDocumentExpiryDate: text("kyc_document_expiry_date"), // Date d'expiration (YYYY-MM-DD), null si sans expiration
+  kycSector: text("kyc_sector"), // Secteur d'activite principal (code)
+  kycSubSector: text("kyc_sub_sector"), // Sous-secteur d'activite (code)
   kycRejectionReason: text("kyc_rejection_reason"), // Reason for KYC rejection
   kycRejectionCount: integer("kyc_rejection_count").notNull().default(0), // Number of KYC rejections
   // Business KYC Step 2 - legal info

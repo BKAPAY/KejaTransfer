@@ -15,6 +15,7 @@ import {
   Check, Shield, FileCheck, FileBadge, Image as ImageIcon
 } from "lucide-react";
 import { COUNTRIES } from "@shared/schema";
+import { ACTIVITY_SECTORS, getSubSectorsForSector } from "@shared/activity-sectors";
 import { PhoneInputWithPrefix } from "@/components/phone-input-with-prefix";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -300,8 +301,11 @@ export default function BusinessKyc() {
     },
   });
 
+  const [bizSector, setBizSector] = useState("");
+  const [bizSubSector, setBizSubSector] = useState("");
+
   const submitMutation = useMutation({
-    mutationFn: () => apiRequest("POST", "/api/kyc/business/submit", { description }),
+    mutationFn: () => apiRequest("POST", "/api/kyc/business/submit", { description, kycSector: bizSector || undefined, kycSubSector: bizSubSector || undefined }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
       await queryClient.refetchQueries({ queryKey: ["/api/auth/me"] });
@@ -861,12 +865,46 @@ export default function BusinessKyc() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label>
+                Secteur d'activité <span className="text-destructive">*</span>
+              </Label>
+              <Select value={bizSector} onValueChange={(v) => { setBizSector(v); setBizSubSector(""); }}>
+                <SelectTrigger data-testid="select-biz-sector">
+                  <SelectValue placeholder="Sélectionnez le secteur d'activité..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {ACTIVITY_SECTORS.map((s) => (
+                    <SelectItem key={s.code} value={s.code}>{s.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {bizSector && getSubSectorsForSector(bizSector).length > 0 && (
+              <div className="space-y-2">
+                <Label>
+                  Sous-secteur <span className="text-destructive">*</span>
+                </Label>
+                <Select value={bizSubSector} onValueChange={setBizSubSector}>
+                  <SelectTrigger data-testid="select-biz-subsector">
+                    <SelectValue placeholder="Sélectionnez le sous-secteur..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {getSubSectorsForSector(bizSector).map((ss) => (
+                      <SelectItem key={ss.code} value={ss.code}>{ss.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label>
                 Description <span className="text-destructive">*</span>
                 <span className="text-xs text-muted-foreground ml-2">(minimum 20 caractères)</span>
               </Label>
               <Textarea
                 rows={8}
-                placeholder="Décrivez en détail les activités de votre entreprise : secteur d'activité, produits ou services offerts, clientèle cible, zones géographiques couvertes, chiffre d'affaires estimé, volume de transactions mensuel attendu, etc."
+                placeholder="Décrivez en détail les activités de votre entreprise : produits ou services offerts, clientèle cible, zones géographiques couvertes, chiffre d'affaires estimé, volume de transactions mensuel attendu, etc."
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 data-testid="textarea-description"

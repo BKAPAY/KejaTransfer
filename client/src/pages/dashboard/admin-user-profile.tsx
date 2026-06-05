@@ -13,6 +13,7 @@ import {
   PlusCircle, MinusCircle, Pencil, Save, X, Building2, KeyRound, RotateCcw,
 } from "lucide-react";
 import type { User as UserType } from "@shared/schema";
+import { getSectorLabel, getSubSectorLabel } from "@shared/activity-sectors";
 import { COUNTRIES } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -556,6 +557,20 @@ export default function AdminUserProfile() {
                 {user.kycStatus === "verified" ? "Vérifié" : user.kycStatus === "pending" ? "En attente" : user.kycStatus === "submitted" ? "Soumis" : "Rejeté"}
               </Badge>
             </div>
+            {((user as any).kycSector || (user as any).kycSubSector) && (
+              <div className="sm:col-span-2 flex flex-wrap gap-2 pt-1">
+                {(user as any).kycSector && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-primary/10 text-primary text-xs font-medium">
+                    {getSectorLabel((user as any).kycSector)}
+                  </span>
+                )}
+                {(user as any).kycSubSector && (user as any).kycSector && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-muted text-muted-foreground text-xs">
+                    {getSubSectorLabel((user as any).kycSector, (user as any).kycSubSector)}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Compte salarié — uniquement pour les comptes personnels */}
