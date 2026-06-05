@@ -247,6 +247,24 @@ function TransactionList({ direction }: { direction: "incoming" | "outgoing" }) 
                         {tx.customerPhone && <p>Tél: {tx.customerPhone}</p>}
                       </div>
                     )}
+                    {(() => {
+                      try {
+                        const meta = tx.metadata ? JSON.parse(tx.metadata as string) : null;
+                        const refId = (tx as any).paydunyaToken || meta?.fedapayTransactionId || meta?.mbiyopayTransactionId || meta?.afribaPayTransactionId || meta?.pawaPayDepositId || meta?.pawaPayPayoutId || meta?.nowpaymentsId || meta?.orderId;
+                        return (
+                          <>
+                            {refId && (
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                <span className="font-medium">Réf:</span> {refId}
+                              </p>
+                            )}
+                            <p className="text-xs text-muted-foreground font-mono mt-0.5 break-all">
+                              <span className="font-sans font-medium not-italic">ID:</span> {tx.id}
+                            </p>
+                          </>
+                        );
+                      } catch { return null; }
+                    })()}
                   </div>
                 </div>
                 <div className="text-right flex-shrink-0">

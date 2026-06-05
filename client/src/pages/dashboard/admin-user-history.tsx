@@ -189,7 +189,7 @@ export default function AdminUserHistory() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <input
               type="text"
-              placeholder="Rechercher par token, nom, email, téléphone..."
+              placeholder="Rechercher par ID, token, nom, email, téléphone..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-9 pr-9 h-10 rounded-md border border-input bg-background text-sm"
@@ -313,14 +313,18 @@ export default function AdminUserHistory() {
                         try {
                           const meta = tx.metadata ? JSON.parse(tx.metadata as string) : null;
                           const refId = tx.paydunyaToken || meta?.fedapayTransactionId || meta?.mbiyopayTransactionId || meta?.afribaPayTransactionId || meta?.pawaPayDepositId || meta?.pawaPayPayoutId || meta?.nowpaymentsId || meta?.orderId;
-                          if (refId) {
-                            return (
-                              <p className="text-xs text-muted-foreground mt-1">
-                                <span className="font-medium">Réf:</span> {refId}
+                          return (
+                            <>
+                              {refId && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  <span className="font-medium">Réf:</span> {refId}
+                                </p>
+                              )}
+                              <p className="text-xs text-muted-foreground font-mono mt-0.5 break-all">
+                                <span className="font-sans font-medium not-italic">ID:</span> {tx.id}
                               </p>
-                            );
-                          }
-                          return null;
+                            </>
+                          );
                         } catch { return null; }
                       })()}
                     </div>

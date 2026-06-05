@@ -548,6 +548,14 @@ export function TransactionDetailsDialog({
                 <Copy className="w-3.5 h-3.5" />
               </Button>
             </div>
+            {displayTransactionId !== transaction.id && (
+              <div className="flex items-center gap-2 mt-2 pt-2 border-t border-border/40">
+                <code className="text-xs font-mono break-all flex-1 text-muted-foreground">{transaction.id}</code>
+                <Button size="icon" variant="ghost" onClick={() => copyToClipboard(transaction.id, "ID")} data-testid="button-copy-internal-id">
+                  <Copy className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+            )}
           </div>
 
           {/* Download Receipt */}
