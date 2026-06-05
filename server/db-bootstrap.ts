@@ -57,6 +57,15 @@ async function bootstrapDatabase() {
     `;
     console.log("✅ Drizzle metadata tables ready");
 
+    // Step 2b: Ensure new columns exist BEFORE any Drizzle ORM query (schema reconciliation)
+    try {
+      await client`ALTER TABLE users ADD COLUMN IF NOT EXISTS kyc_sector TEXT`;
+      await client`ALTER TABLE users ADD COLUMN IF NOT EXISTS kyc_sub_sector TEXT`;
+      console.log("✅ users.kyc_sector/kyc_sub_sector columns ensured (early)");
+    } catch (e) {
+      console.error("⚠️ Early kyc_sector/kyc_sub_sector column migration error:", e);
+    }
+
     // Step 3: Get currently tracked migrations
     console.log("🔍 Checking migration tracking...");
     const appliedMigrations = await client`
