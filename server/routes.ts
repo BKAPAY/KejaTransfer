@@ -1867,6 +1867,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create user
       const user = await storage.createUser({
         ...validatedData,
+        // Pour un compte entreprise, le pays choisi devient aussi le pays de l'entreprise
+        ...(validatedData.accountType === "business" && validatedData.country
+          ? { businessCountry: validatedData.country }
+          : {}),
         password: hashedPassword,
       });
       

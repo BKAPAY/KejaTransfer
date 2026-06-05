@@ -27,13 +27,14 @@ const COUNTRY_NAMES: Record<string, string> = {
   CM: "Cameroun",
   CD: "RD Congo",
   CG: "Congo Brazzaville",
+  GA: "Gabon",
 };
 
 const signupSchema = z.object({
   firstName: z.string().min(2, "Le prénom doit contenir au moins 2 caractères"),
   lastName: z.string().min(2, "Le nom doit contenir au moins 2 caractères"),
   email: z.string().email("Email invalide"),
-  country: z.enum(["BJ", "BF", "TG", "CI", "SN", "CM", "CD", "CG"], {
+  country: z.enum(["BJ", "BF", "TG", "CI", "SN", "CM", "CD", "CG", "GA"], {
     required_error: "Veuillez sélectionner votre pays",
   }),
   password: z.string().min(8, "Le mot de passe doit contenir au moins 8 caractères"),
@@ -67,7 +68,7 @@ export default function Signup() {
         firstName: z.string().min(2, "Le prénom doit contenir au moins 2 caractères"),
         lastName: z.string().min(2, "Le nom doit contenir au moins 2 caractères"),
         email: z.string().email("Email invalide"),
-        country: z.enum(["BJ", "BF", "TG", "CI", "SN", "CM", "CD", "CG"]).optional(),
+        country: z.enum(["BJ", "BF", "TG", "CI", "SN", "CM", "CD", "CG", "GA"]).optional(),
         businessName: z.string().optional(),
         password: z.string().min(8, "Le mot de passe doit contenir au moins 8 caractères"),
         confirmPassword: z.string(),
@@ -80,7 +81,7 @@ export default function Signup() {
         message: "Le nom de l'entreprise est requis",
         path: ["businessName"],
       }).refine((data) => {
-        if (accountType === "personal" && !data.country) {
+        if (!data.country) {
           return false;
         }
         return true;
@@ -437,13 +438,12 @@ export default function Signup() {
                 )}
               />
 
-              {accountType === "personal" && (
-                <FormField
+              <FormField
                   control={form.control}
                   name="country"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Pays</FormLabel>
+                      <FormLabel>{accountType === "business" ? "Pays de l'entreprise" : "Pays"}</FormLabel>
                       <Select value={field.value} onValueChange={field.onChange}>
                         <FormControl>
                           <SelectTrigger data-testid="select-country">
@@ -465,7 +465,6 @@ export default function Signup() {
                     </FormItem>
                   )}
                 />
-              )}
 
               <FormField
                 control={form.control}

@@ -1,1 +1,2 @@
 - [Restriction pays par secteur](country-sector-restriction.md) — multiCountryEnabled: override allowedCountries (affichage) + isCountryBlockedForOwner (enforcement) sur toutes routes; deposits filtré seulement si ?scope=self.
+- [Country lists divergence](country-lists.md) — signup uses ALLOWED_REGISTRATION_COUNTRIES; profile-edit & payin/payout keep separate divergent lists.
