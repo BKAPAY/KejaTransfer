@@ -93,9 +93,15 @@ export default function Transfer() {
   const selectedCountry = form.watch("country");
   const amount = form.watch("amount");
 
-  // Filter countries to only show those enabled by admin (have at least one enabled operator for payout)
-  const payoutCountries = enabledCountriesOperators 
-    ? COUNTRIES.filter(c => Object.keys(enabledCountriesOperators).includes(c.code))
+  // Filter countries: only admin-enabled ones, and restricted to home country if multiCountryEnabled is false
+  const payoutCountries = enabledCountriesOperators
+    ? COUNTRIES.filter(c => {
+        if (!Object.keys(enabledCountriesOperators).includes(c.code)) return false;
+        const multiEnabled = (user as any)?.multiCountryEnabled;
+        const homeCountry = user?.country;
+        if (multiEnabled === false && homeCountry) return c.code === homeCountry;
+        return true;
+      })
     : [];
   
   const allCountryOperators = selectedCountry

@@ -416,6 +416,10 @@ export class DbStorage implements IStorage {
       momoOperator: schema.users.momoOperator,
       momoPhone: schema.users.momoPhone,
       createdAt: schema.users.createdAt,
+      kycSector: schema.users.kycSector,
+      kycSubSector: schema.users.kycSubSector,
+      sectorStatus: schema.users.sectorStatus,
+      multiCountryEnabled: schema.users.multiCountryEnabled,
       // Large KYC image/document fields replaced with NULL to avoid large data transfer
       kycIdFront: sql<string | null>`NULL`.as('kycIdFront'),
       kycIdBack: sql<string | null>`NULL`.as('kycIdBack'),
