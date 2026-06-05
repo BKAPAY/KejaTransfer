@@ -185,18 +185,14 @@ function getUserHomeCountry(user: any): string | null {
   return user.country || null;
 }
 
-// Pays autorises effectifs pour un lien/cle API en tenant compte de la restriction par secteur.
-// Proprietaire restreint (non multi-pays) -> uniquement son pays. Sinon -> pays du lien (ou tous).
+// Restriction pays par secteur désactivée — retourne tous les pays du lien sans filtrage.
 function effectiveAllowedCountries(owner: any, linkAllowed?: string[] | null): string[] {
-  const home = getUserHomeCountry(owner);
-  if (owner && !owner.multiCountryEnabled && home) return [home];
   return linkAllowed || [];
 }
 
-// Verifie qu'un pays est autorise pour le proprietaire restreint. true = bloque.
+// Restriction pays par secteur désactivée — aucun pays n'est bloqué.
 function isCountryBlockedForOwner(owner: any, country?: string | null): boolean {
-  const home = getUserHomeCountry(owner);
-  return !!(owner && !owner.multiCountryEnabled && home && country && country !== home);
+  return false;
 }
 
 async function requireAdmin(req: Request, res: Response, next: Function) {
@@ -1472,18 +1468,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "SELECT value FROM platform_settings WHERE key = 'disabled_business_wallet_countries'"
       );
       const disabled: string[] = result.rows[0] ? JSON.parse(result.rows[0].value) : [];
-
-      // Restriction pays par secteur: desactiver tous les wallets sauf le pays de l'utilisateur.
-      // On couvre l'ensemble du referentiel wallets (et pas seulement COLLECT_COUNTRIES)
-      // afin que TOUS les autres pays apparaissent inactifs cote tableau de bord entreprise.
-      const sessionUser = await storage.getUser(req.session.userId!);
-      const homeCountry = getUserHomeCountry(sessionUser);
-      if (sessionUser && !sessionUser.multiCountryEnabled && homeCountry) {
-        const ALL_WALLET_COUNTRIES = ["BJ", "TG", "CI", "BF", "SN", "ML", "NE", "GN", "GM", "CM", "TD", "CG", "CF", "GA", "CD", "RW", "KE", "TZ", "UG", "ZM", "MW", "MZ", "LS", "GH", "NG", "SL"];
-        for (const c of ALL_WALLET_COUNTRIES) {
-          if (c !== homeCountry && !disabled.includes(c)) disabled.push(c);
-        }
-      }
 
       res.json({ disabled });
     } catch {
@@ -6431,12 +6415,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!country || !operator || !phone) {
         return res.status(400).json({ error: "Pays, opérateur et numéro de téléphone requis" });
-      }
-
-      // Restriction pays par secteur: si non autorise multi-pays, seul son propre pays est permis
-      const depositHomeCountry = getUserHomeCountry(user);
-      if (user && !user.multiCountryEnabled && depositHomeCountry && country !== depositHomeCountry) {
-        return res.status(403).json({ error: "Votre secteur d'activité ne vous autorise à collecter que dans votre pays. Contactez le support pour activer les autres pays." });
       }
 
       // Wave payin activation check
@@ -12995,18 +12973,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Avoid duplicates if same operator enabled for multiple providers
         if (!result[config.country].includes(config.operator)) {
           result[config.country].push(config.operator);
-        }
-      }
-
-      // Restriction pays par secteur (uniquement pour les pages du marchand connecte: scope=self).
-      // Les pages publiques de paiement sont restreintes via allowedCountries du lien.
-      if (req.query.scope === "self" && req.session.userId) {
-        const sessionUser = await storage.getUser(req.session.userId);
-        const homeCountry = getUserHomeCountry(sessionUser);
-        if (sessionUser && !sessionUser.multiCountryEnabled && homeCountry) {
-          const filtered: Record<string, string[]> = {};
-          if (result[homeCountry]) filtered[homeCountry] = result[homeCountry];
-          return res.json(filtered);
         }
       }
 
