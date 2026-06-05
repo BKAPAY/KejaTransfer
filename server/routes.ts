@@ -2,6 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { registerOgRoutes } from "./og-middleware";
 import { storage } from "./storage";
+import OpenAI from "openai";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import pg from "pg";
@@ -2417,6 +2418,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== OCR : lecture automatique de la pièce d'identité =====
+  app.post("/api/kyc/scan-id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { imageData } = req.body;
+      if (!imageData || typeof imageData !== "string") {
+        return res.status(400).json({ error: "Image requise." });
+      }
+      const openai = new OpenAI({
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+      });
+      const base64 = imageData.includes(",") ? imageData.split(",")[1] : imageData;
+      const mediaType = imageData.startsWith("data:image/png") ? "image/png" : "image/jpeg";
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "image_url",
+                image_url: { url: `data:${mediaType};base64,${base64}`, detail: "high" },
+              },
+              {
+                type: "text",
+                text: "Analyse cette pièce d'identité (carte nationale, passeport ou permis de conduire). Extrais le prénom (first name / given name / prénoms) et le nom de famille (last name / surname / nom). Réponds uniquement en JSON strict: {\"firstName\": \"...\", \"lastName\": \"...\"}. Si tu ne peux pas lire clairement un champ, retourne une chaîne vide pour ce champ. Ne retourne rien d'autre que ce JSON.",
+              },
+            ],
+          },
+        ],
+        max_tokens: 100,
+      });
+      const content = response.choices[0]?.message?.content?.trim() || "";
+      const match = content.match(/\{[\s\S]*\}/);
+      if (!match) return res.json({ firstName: "", lastName: "" });
+      const parsed = JSON.parse(match[0]);
+      return res.json({
+        firstName: (parsed.firstName || "").trim(),
+        lastName: (parsed.lastName || "").trim(),
+      });
+    } catch (error: any) {
+      console.error("Scan ID OCR error:", error);
+      return res.json({ firstName: "", lastName: "" });
+    }
+  });
+
+  // ===== Mise à jour du nom/prénom (après autorisation suite OCR) =====
+  app.patch("/api/user/update-name", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { firstName, lastName } = req.body;
+      if (!firstName || typeof firstName !== "string" || !firstName.trim()) {
+        return res.status(400).json({ error: "Le prénom est requis." });
+      }
+      if (!lastName || typeof lastName !== "string" || !lastName.trim()) {
+        return res.status(400).json({ error: "Le nom est requis." });
+      }
+      const updated = await storage.updateUserName(req.session.userId!, firstName.trim(), lastName.trim());
+      if (!updated) return res.status(404).json({ error: "Utilisateur non trouvé." });
+      clearAuthCache(req.session.userId!);
+      return res.json({ success: true, firstName: updated.firstName, lastName: updated.lastName });
+    } catch (error: any) {
+      console.error("Update name error:", error);
+      return res.status(500).json({ error: "Erreur lors de la mise à jour du nom." });
+    }
+  });
+
   // KYC Final Submit - just changes status to submitted
   app.post("/api/kyc/submit", requireAuth, async (req: Request, res: Response) => {
     try {
@@ -2469,6 +2536,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       if (kycSubSector && (typeof kycSubSector !== "string" || !kycSectorObj.subSectors.some((ss) => ss.code === kycSubSector))) {
         return res.status(400).json({ error: "Sous-secteur d'activité invalide." });
+      }
+
+      // Vérification doublon : même nom+prénom avec compte vérifié ou suspendu
+      const currentUserForDup = await storage.getUser(req.session.userId!);
+      if (currentUserForDup) {
+        const duplicate = await storage.findVerifiedOrSuspendedUserByName(
+          currentUserForDup.firstName,
+          currentUserForDup.lastName,
+          req.session.userId!
+        );
+        if (duplicate) {
+          if (duplicate.kycStatus === "verified") {
+            return res.status(409).json({
+              error: "Un compte vérifié existe déjà avec votre nom et prénom. Vous ne pouvez pas posséder plusieurs comptes vérifiés sur BKApay. Contactez le support si vous pensez qu'il s'agit d'une erreur.",
+            });
+          } else if (duplicate.kycStatus === "suspended") {
+            return res.status(409).json({
+              error: "Un compte suspendu existe déjà avec votre nom et prénom. Ce compte a été suspendu par BKApay. Vous ne pouvez pas créer un second compte. Veuillez contacter le support pour toute assistance.",
+            });
+          }
+        }
       }
 
       const user = await storage.submitKyc(req.session.userId!, {
@@ -2596,6 +2684,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!user.kycIdFront || !user.kycIdBack) {
         return res.status(400).json({ error: "Les pièces d'identité (recto/verso) sont requises" });
       }
+
+      // Vérification doublon : même nom+prénom avec compte vérifié ou suspendu
+      const dupBiz = await storage.findVerifiedOrSuspendedUserByName(
+        user.firstName,
+        user.lastName,
+        req.session.userId!
+      );
+      if (dupBiz) {
+        if (dupBiz.kycStatus === "verified") {
+          return res.status(409).json({
+            error: "Un compte vérifié existe déjà avec votre nom et prénom. Vous ne pouvez pas posséder plusieurs comptes vérifiés sur BKApay. Contactez le support si vous pensez qu'il s'agit d'une erreur.",
+          });
+        } else if (dupBiz.kycStatus === "suspended") {
+          return res.status(409).json({
+            error: "Un compte suspendu existe déjà avec votre nom et prénom. Ce compte a été suspendu par BKApay. Vous ne pouvez pas créer un second compte. Veuillez contacter le support pour toute assistance.",
+          });
+        }
+      }
+
       const submitted = await storage.submitBusinessKyc(req.session.userId!, description, kycSector || undefined, kycSubSector || undefined);
       // Restriction pays par secteur: activite internationale -> tous pays, sinon restreint au pays
       try {

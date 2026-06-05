@@ -75,6 +75,8 @@ export interface IStorage {
     sectorStatus?: string;
   }): Promise<User | undefined>;
   setUserActivitySector(userId: string, data: { kycSector: string; kycSubSector?: string | null; sectorStatus: string; multiCountryEnabled: boolean }): Promise<User | undefined>;
+  updateUserName(id: string, firstName: string, lastName: string): Promise<User | undefined>;
+  findVerifiedOrSuspendedUserByName(firstName: string, lastName: string, excludeUserId: string): Promise<{ id: string; kycStatus: string } | undefined>;
   saveBusinessKycStep2(userId: string, data: {
     kycBusinessAccountNumber?: string; kycTaxId?: string; kycBusinessAddress?: string;
     kycBusinessCity?: string; kycBusinessDepartment?: string; kycDirectorIdNumber?: string;
@@ -654,6 +656,34 @@ export class DbStorage implements IStorage {
       .set({ securityCode: null })
       .where(eq(schema.users.id, id))
       .returning();
+    return results[0];
+  }
+
+  async updateUserName(id: string, firstName: string, lastName: string): Promise<User | undefined> {
+    const results = await db
+      .update(schema.users)
+      .set({ firstName: firstName.trim(), lastName: lastName.trim() })
+      .where(eq(schema.users.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async findVerifiedOrSuspendedUserByName(firstName: string, lastName: string, excludeUserId: string): Promise<{ id: string; kycStatus: string } | undefined> {
+    const results = await db
+      .select({ id: schema.users.id, kycStatus: schema.users.kycStatus })
+      .from(schema.users)
+      .where(
+        and(
+          sql`LOWER(${schema.users.firstName}) = LOWER(${firstName.trim()})`,
+          sql`LOWER(${schema.users.lastName}) = LOWER(${lastName.trim()})`,
+          or(
+            eq(schema.users.kycStatus, "verified"),
+            eq(schema.users.kycStatus, "suspended"),
+          ),
+          sql`${schema.users.id} != ${excludeUserId}`,
+        )
+      )
+      .limit(1);
     return results[0];
   }
 
