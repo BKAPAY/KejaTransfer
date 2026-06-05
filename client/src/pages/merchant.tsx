@@ -1464,6 +1464,10 @@ export default function Merchant() {
                 <SelectContent>
                   {(enabledCountriesOperators 
                     ? COUNTRIES.filter(c => Object.keys(enabledCountriesOperators).includes(c.code))
+                        .filter(c => {
+                          const allowed = (merchantLink as any)?.allowedCountries as string[] | undefined;
+                          return !allowed || allowed.length === 0 || allowed.includes(c.code);
+                        })
                         .sort((a, b) => {
                           const aHasOps = (enabledCountriesOperators[a.code] || []).length > 0;
                           const bHasOps = (enabledCountriesOperators[b.code] || []).length > 0;

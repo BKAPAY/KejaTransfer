@@ -132,7 +132,7 @@ export default function PaymentLinks() {
 
   // Fetch enabled countries for deposits (incoming payments)
   const { data: enabledCountriesOperators } = useQuery<Record<string, string[]>>({
-    queryKey: ["/api/countries-operators/deposits"],
+    queryKey: ["/api/countries-operators/deposits?scope=self"],
   });
 
   // Filter countries to only show those enabled by admin

@@ -1,0 +1,1 @@
+- [Restriction pays par secteur](country-sector-restriction.md) — multiCountryEnabled: override allowedCountries (affichage) + isCountryBlockedForOwner (enforcement) sur toutes routes; deposits filtré seulement si ?scope=self.

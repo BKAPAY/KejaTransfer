@@ -1471,12 +1471,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
       const disabled: string[] = result.rows[0] ? JSON.parse(result.rows[0].value) : [];
 
-      // Restriction pays par secteur: desactiver tous les wallets sauf le pays de l'utilisateur
+      // Restriction pays par secteur: desactiver tous les wallets sauf le pays de l'utilisateur.
+      // On couvre l'ensemble du referentiel wallets (et pas seulement COLLECT_COUNTRIES)
+      // afin que TOUS les autres pays apparaissent inactifs cote tableau de bord entreprise.
       const sessionUser = await storage.getUser(req.session.userId!);
       const homeCountry = getUserHomeCountry(sessionUser);
       if (sessionUser && !sessionUser.multiCountryEnabled && homeCountry) {
-        const { COLLECT_COUNTRIES } = await import("@shared/schema");
-        for (const c of COLLECT_COUNTRIES) {
+        const ALL_WALLET_COUNTRIES = ["BJ", "TG", "CI", "BF", "SN", "ML", "NE", "GN", "GM", "CM", "TD", "CG", "CF", "GA", "CD", "RW", "KE", "TZ", "UG", "ZM", "MW", "MZ", "LS", "GH", "NG", "SL"];
+        for (const c of ALL_WALLET_COUNTRIES) {
           if (c !== homeCountry && !disabled.includes(c)) disabled.push(c);
         }
       }
@@ -3339,7 +3341,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         siteName: (apiKey as any).siteName || apiKey.name,
         isActive: apiKey.isActive,
-        allowedCountries: apiKey.allowedCountries || [],
+        allowedCountries: effectiveAllowedCountries(owner, apiKey.allowedCountries),
         customerPaysFee: apiKey.customerPaysFee || false,
         customerPaysCryptoFee: (apiKey as any).customerPaysCryptoFee || false,
         ownerCountry: owner?.country || null,
@@ -3424,6 +3426,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           message: "Transaction recente retournee (meme telephone/montant dans les 30 dernieres secondes)",
           duplicate: true,
         });
+      }
+
+      // Restriction pays par secteur du marchand: paiement bloque hors de son pays
+      const apiPayOwner = await storage.getUser(apiKey.userId);
+      if (isCountryBlockedForOwner(apiPayOwner, country)) {
+        return res.status(403).json({ error: "Marchand restreint : ce marchand ne peut accepter des paiements que depuis son propre pays." });
       }
 
       // Check if country is allowed
@@ -4480,7 +4488,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         api_key_id: session.apiKeyId,
         customerPaysCryptoFee: (apiKey as any)?.customerPaysCryptoFee || false,
         customerPaysFee: apiKey?.customerPaysFee || false,
-        allowedCountries: apiKey?.allowedCountries || [],
+        allowedCountries: effectiveAllowedCountries(apiKey ? await storage.getUser(apiKey.userId) : null, apiKey?.allowedCountries),
       });
     } catch (error: any) {
       console.error("[Payment Session Get] Error:", error);
@@ -4527,6 +4535,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (operator.toLowerCase() === "wave" && !owner.wavePayinEnabled) {
         return res.status(403).json({ success: false, error: "Le wave de votre marchand n'est pas activée" });
+      }
+
+      // Restriction pays par secteur du marchand: paiement bloque hors de son pays
+      if (isCountryBlockedForOwner(owner, country)) {
+        return res.status(403).json({ success: false, error: "Marchand restreint : ce marchand ne peut accepter des paiements que depuis son propre pays." });
       }
 
       if (apiKey.allowedCountries && apiKey.allowedCountries.length > 0 && !apiKey.allowedCountries.includes(country)) {
@@ -5109,6 +5122,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const requestedAmount = Math.floor(parsedAmount);
       const countryCode = String(country).toUpperCase();
+
+      // Restriction pays par secteur du marchand: payout bloque hors de son pays
+      if (isCountryBlockedForOwner(user, countryCode)) {
+        return res.status(403).json({
+          success: false,
+          error: { code: "COUNTRY_RESTRICTED", message: "Marchand restreint par ce pays : votre compte est limité aux opérations dans votre propre pays selon votre secteur d'activité." }
+        });
+      }
 
       // 6. Normalize operator: lowercase, strip country suffix, strip common suffixes
       let normalizedOperator = String(operator).toLowerCase()
@@ -7753,6 +7774,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      if (isCountryBlockedForOwner(user, countryCode)) {
+        return res.status(403).json({ success: false, error: { code: "COUNTRY_RESTRICTED", message: "Marchand restreint par ce pays : ce compte entreprise est limité aux opérations dans son propre pays selon son secteur d'activité." } });
+      }
+
       if (businessToken.allowedCountries && businessToken.allowedCountries.length > 0) {
         if (!businessToken.allowedCountries.includes(countryCode)) {
           return res.status(400).json({ success: false, error: { code: "COUNTRY_NOT_ALLOWED", message: `Ce pays n'est pas autorisé pour ce token` } });
@@ -8071,6 +8096,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (!_local.startsWith("0")) _local = "0" + _local;
           localPhone = _local;
         }
+      }
+
+      if (isCountryBlockedForOwner(user, countryCode)) {
+        return res.status(403).json({ success: false, error: { code: "COUNTRY_RESTRICTED", message: "Marchand restreint par ce pays : ce compte entreprise est limité aux opérations dans son propre pays selon son secteur d'activité." } });
       }
 
       if (businessToken.allowedCountries && businessToken.allowedCountries.length > 0) {
@@ -9449,6 +9478,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ success: false, error: "Ce lien n'existe pas" });
       }
 
+      // Restriction pays par secteur du marchand: paiement bloque hors de son pays
+      if (isCountryBlockedForOwner(owner, country)) {
+        return res.status(403).json({ success: false, error: "Marchand restreint : ce marchand ne peut accepter des paiements que depuis son propre pays." });
+      }
+
       // Wave payin activation check (on behalf of the merchant)
       if (operator && operator.toLowerCase() === "wave" && !owner?.wavePayinEnabled) {
         return res.status(403).json({ success: false, error: "Le wave de votre marchand n'est pas activée" });
@@ -9897,6 +9931,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const owner = await storage.getUser(merchantLink.userId);
       if (owner?.suspended) {
         return res.status(404).json({ success: false, error: "Ce lien n'existe pas" });
+      }
+
+      // Restriction pays par secteur du marchand: paiement bloque hors de son pays
+      if (isCountryBlockedForOwner(owner, country)) {
+        return res.status(403).json({ success: false, error: "Marchand restreint : ce marchand ne peut accepter des paiements que depuis son propre pays." });
       }
 
       // Wave payin activation check (on behalf of the merchant)
@@ -12789,9 +12828,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Restriction pays par secteur: si l'utilisateur connecte n'est pas autorise multi-pays,
-      // ne renvoyer que les operateurs de son propre pays.
-      if (req.session.userId) {
+      // Restriction pays par secteur (uniquement pour les pages du marchand connecte: scope=self).
+      // Les pages publiques de paiement sont restreintes via allowedCountries du lien.
+      if (req.query.scope === "self" && req.session.userId) {
         const sessionUser = await storage.getUser(req.session.userId);
         const homeCountry = getUserHomeCountry(sessionUser);
         if (sessionUser && !sessionUser.multiCountryEnabled && homeCountry) {

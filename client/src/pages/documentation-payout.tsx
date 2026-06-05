@@ -554,6 +554,7 @@ app.post('/api/webhook/bkapay-payout', express.raw({ type: 'application/json' })
               { code: "ACCOUNT_SUSPENDED", http: "403", desc: "Compte suspendu — contacter le support" },
               { code: "ACCOUNT_NOT_VERIFIED", http: "403", desc: "KYC non verifie — completez la verification" },
               { code: "PAYOUT_NOT_ACTIVATED", http: "403", desc: "API Payout non activee — contacter le support" },
+              { code: "COUNTRY_RESTRICTED", http: "403", desc: "Marchand restreint par ce pays — votre secteur d'activite limite les operations a votre propre pays" },
               { code: "INSUFFICIENT_FUNDS", http: "400", desc: "Solde insuffisant sur votre compte" },
               { code: "COUNTRY_UNAVAILABLE", http: "400", desc: "Pays non supporte pour le payout" },
               { code: "OPERATOR_UNAVAILABLE", http: "400", desc: "Operateur non disponible dans ce pays" },

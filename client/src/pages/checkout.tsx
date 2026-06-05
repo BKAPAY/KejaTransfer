@@ -855,7 +855,12 @@ export default function Checkout() {
             <SelectValue placeholder="Selectionnez un pays" />
           </SelectTrigger>
           <SelectContent>
-            {collectCountries.map((c) => (
+            {collectCountries
+              .filter((c) => {
+                const allowed = session?.allowedCountries;
+                return !allowed || allowed.length === 0 || allowed.includes(c.code);
+              })
+              .map((c) => (
               <SelectItem key={c.code} value={c.code}>
                 <span className="flex items-center gap-2"><CountryFlag code={c.code} size="xs" />{c.name}</span>
               </SelectItem>

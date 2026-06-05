@@ -141,7 +141,7 @@ export default function Deposit() {
   const { depositMin, cryptoMin } = useConvertedMinimums(userBalanceCurrency);
 
   const { data: enabledCountriesOperators, isLoading: isLoadingOperators } = useQuery<Record<string, string[]>>({
-    queryKey: ["/api/countries-operators/deposits"],
+    queryKey: ["/api/countries-operators/deposits?scope=self"],
   });
 
   interface OtpDetailInfo {
