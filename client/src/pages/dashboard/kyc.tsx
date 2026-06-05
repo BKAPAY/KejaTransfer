@@ -954,8 +954,18 @@ export default function KYC() {
         </Button>
         <Button
           className="flex-1"
-          onClick={() => setCurrentStep(3)}
-          disabled={activityDescription.trim().length < 100}
+          onClick={() => {
+            if (!kycSector) {
+              toast({ title: "Champ requis", description: "Veuillez sélectionner un secteur d'activité.", variant: "destructive" });
+              return;
+            }
+            if (getSubSectorsForSector(kycSector).length > 0 && !kycSubSector) {
+              toast({ title: "Champ requis", description: "Veuillez sélectionner un sous-secteur d'activité.", variant: "destructive" });
+              return;
+            }
+            setCurrentStep(3);
+          }}
+          disabled={activityDescription.trim().length < 100 || !kycSector || (getSubSectorsForSector(kycSector).length > 0 && !kycSubSector)}
           data-testid="button-next-step-2"
         >
           Etape suivante
