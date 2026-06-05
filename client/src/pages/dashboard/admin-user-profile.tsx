@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import {
   ArrowLeft, User, Mail, Phone, MapPin, Calendar, Shield, CheckCircle, XCircle,
   PlusCircle, MinusCircle, Pencil, Save, X, Building2, KeyRound, RotateCcw,
@@ -117,6 +118,29 @@ export default function AdminUserProfile() {
       toast({
         title: "Erreur",
         description: err?.message || "Impossible de mettre à jour le profil",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const multiCountryMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const res = await apiRequest("PATCH", `/api/admin/user/${userId}/profile`, { multiCountryEnabled: enabled });
+      return res.json();
+    },
+    onSuccess: (_data, enabled) => {
+      toast({
+        title: "Restriction pays mise à jour",
+        description: enabled
+          ? "L'utilisateur peut désormais opérer dans tous les pays."
+          : "L'utilisateur est restreint à son propre pays.",
+      });
+      queryClient.invalidateQueries({ queryKey: [`/api/admin/user/${userId}/profile`] });
+    },
+    onError: (err: any) => {
+      toast({
+        title: "Erreur",
+        description: err?.message || "Impossible de mettre à jour la restriction pays",
         variant: "destructive",
       });
     },
@@ -571,6 +595,28 @@ export default function AdminUserProfile() {
                 )}
               </div>
             )}
+          </div>
+
+          {/* Restriction pays par secteur d'activité */}
+          <div className="pt-4 border-t">
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div className="flex-1 min-w-[200px]">
+                <p className="text-sm font-semibold flex items-center gap-2">
+                  <MapPin className="w-4 h-4" /> Autoriser tous les pays
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {(user as any).multiCountryEnabled
+                    ? "L'utilisateur peut collecter et opérer dans tous les pays disponibles."
+                    : "L'utilisateur est restreint à son propre pays (secteur d'activité local). Activez pour autoriser tous les pays."}
+                </p>
+              </div>
+              <Switch
+                checked={!!(user as any).multiCountryEnabled}
+                onCheckedChange={(v) => multiCountryMutation.mutate(v)}
+                disabled={multiCountryMutation.isPending}
+                data-testid="switch-multi-country"
+              />
+            </div>
           </div>
 
           {/* Compte salarié — uniquement pour les comptes personnels */}

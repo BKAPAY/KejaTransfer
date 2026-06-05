@@ -118,6 +118,7 @@ import {
   isMoneyFusionPayoutFailed,
 } from "./moneyfusion";
 import { AFRIBAPAY_COUNTRIES, getCurrencyForCountry as getAfribaCurrency, getPaymentInstructions as getAfribaPaymentInstructions } from "@shared/afribapay-countries";
+import { isInternationalActivity } from "@shared/activity-sectors";
 
 declare module "express-session" {
   interface SessionData {
@@ -172,6 +173,28 @@ function clearAuthCache(userId?: string) {
   } else {
     authCache.clear();
   }
+}
+
+// Pays "principal" d'un utilisateur pour la restriction par secteur d'activite.
+// Compte entreprise -> pays de l'entreprise (fallback pays perso). Compte perso -> pays perso.
+function getUserHomeCountry(user: any): string | null {
+  if (!user) return null;
+  if (user.accountType === "business") return user.businessCountry || user.country || null;
+  return user.country || null;
+}
+
+// Pays autorises effectifs pour un lien/cle API en tenant compte de la restriction par secteur.
+// Proprietaire restreint (non multi-pays) -> uniquement son pays. Sinon -> pays du lien (ou tous).
+function effectiveAllowedCountries(owner: any, linkAllowed?: string[] | null): string[] {
+  const home = getUserHomeCountry(owner);
+  if (owner && !owner.multiCountryEnabled && home) return [home];
+  return linkAllowed || [];
+}
+
+// Verifie qu'un pays est autorise pour le proprietaire restreint. true = bloque.
+function isCountryBlockedForOwner(owner: any, country?: string | null): boolean {
+  const home = getUserHomeCountry(owner);
+  return !!(owner && !owner.multiCountryEnabled && home && country && country !== home);
 }
 
 async function requireAdmin(req: Request, res: Response, next: Function) {
@@ -1447,6 +1470,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "SELECT value FROM platform_settings WHERE key = 'disabled_business_wallet_countries'"
       );
       const disabled: string[] = result.rows[0] ? JSON.parse(result.rows[0].value) : [];
+
+      // Restriction pays par secteur: desactiver tous les wallets sauf le pays de l'utilisateur
+      const sessionUser = await storage.getUser(req.session.userId!);
+      const homeCountry = getUserHomeCountry(sessionUser);
+      if (sessionUser && !sessionUser.multiCountryEnabled && homeCountry) {
+        const { COLLECT_COUNTRIES } = await import("@shared/schema");
+        for (const c of COLLECT_COUNTRIES) {
+          if (c !== homeCountry && !disabled.includes(c)) disabled.push(c);
+        }
+      }
+
       res.json({ disabled });
     } catch {
       res.json({ disabled: [] });
@@ -2446,6 +2480,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Utilisateur non trouvé" });
       }
 
+      // Restriction pays par secteur: activite internationale -> tous pays, sinon restreint au pays
+      try {
+        await storage.adminUpdateUserProfile(req.session.userId!, {
+          multiCountryEnabled: isInternationalActivity(kycSector || null, kycSubSector || null),
+        });
+        clearAuthCache(req.session.userId!);
+      } catch (mcErr) {
+        console.error("Error setting multiCountryEnabled on KYC submit:", mcErr);
+      }
+
       // Send KYC submitted email
       try {
         const { sendKycSubmittedEmail } = await import("./email-service");
@@ -2517,6 +2561,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Les pièces d'identité (recto/verso) sont requises" });
       }
       const submitted = await storage.submitBusinessKyc(req.session.userId!, description, kycSector || undefined, kycSubSector || undefined);
+      // Restriction pays par secteur: activite internationale -> tous pays, sinon restreint au pays
+      try {
+        await storage.adminUpdateUserProfile(req.session.userId!, {
+          multiCountryEnabled: isInternationalActivity(kycSector || null, kycSubSector || null),
+        });
+        clearAuthCache(req.session.userId!);
+      } catch (mcErr) {
+        console.error("Error setting multiCountryEnabled on business KYC submit:", mcErr);
+      }
       res.json({ success: true, user: submitted });
     } catch (error: any) {
       console.error("Business KYC submit error:", error);
@@ -2680,6 +2733,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { documentUrls: _docUrls, documentNames: _docNames, ...publicLink } = link;
       res.json({
         ...publicLink,
+        allowedCountries: effectiveAllowedCountries(owner, link.allowedCountries),
         ownerCountry: owner?.country || null,
         ownerCurrency,
         ownerWavePayinEnabled: owner?.wavePayinEnabled || false,
@@ -2871,6 +2925,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({
         ...link,
+        allowedCountries: effectiveAllowedCountries(owner, (link as any).allowedCountries),
         ownerCountry: owner?.country || null,
         ownerCurrency,
         ownerWavePayinEnabled: owner?.wavePayinEnabled || false,
@@ -6207,6 +6262,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!country || !operator || !phone) {
         return res.status(400).json({ error: "Pays, opérateur et numéro de téléphone requis" });
+      }
+
+      // Restriction pays par secteur: si non autorise multi-pays, seul son propre pays est permis
+      const depositHomeCountry = getUserHomeCountry(user);
+      if (user && !user.multiCountryEnabled && depositHomeCountry && country !== depositHomeCountry) {
+        return res.status(403).json({ error: "Votre secteur d'activité ne vous autorise à collecter que dans votre pays. Contactez le support pour activer les autres pays." });
       }
 
       // Wave payin activation check
@@ -12081,6 +12142,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         businessPhone: z.string().trim().max(30).nullable().optional(),
         businessEnterprisePhone: z.string().trim().max(30).nullable().optional(),
         businessEmail: z.string().trim().toLowerCase().email("Email entreprise invalide").max(200).nullable().or(z.literal("")).optional(),
+        multiCountryEnabled: z.boolean().optional(),
       });
 
       const parsed = updateSchema.safeParse(req.body);
@@ -12112,6 +12174,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const updated = await storage.adminUpdateUserProfile(userId, data);
+      clearAuthCache(userId);
       const adminEmail = (req as any).user?.email || "admin";
       console.log(`[Admin Profile Update] ${adminEmail} updated profile of user ${userId} (${target.email}). Fields: ${Object.keys(data).join(", ")}`);
       res.json(updated);
@@ -12725,6 +12788,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           result[config.country].push(config.operator);
         }
       }
+
+      // Restriction pays par secteur: si l'utilisateur connecte n'est pas autorise multi-pays,
+      // ne renvoyer que les operateurs de son propre pays.
+      if (req.session.userId) {
+        const sessionUser = await storage.getUser(req.session.userId);
+        const homeCountry = getUserHomeCountry(sessionUser);
+        if (sessionUser && !sessionUser.multiCountryEnabled && homeCountry) {
+          const filtered: Record<string, string[]> = {};
+          if (result[homeCountry]) filtered[homeCountry] = result[homeCountry];
+          return res.json(filtered);
+        }
+      }
+
       res.json(result);
     } catch (error: any) {
       console.error("Get deposits config error:", error);
