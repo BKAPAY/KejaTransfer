@@ -107,7 +107,8 @@ function TransactionList({ direction }: { direction: "incoming" | "outgoing" }) 
       (tx.customerPhone || "").toLowerCase().includes(q) ||
       (tx.paydunyaToken || "").toLowerCase().includes(q) ||
       tx.id.toLowerCase().includes(q) ||
-      (tx.description || "").toLowerCase().includes(q)
+      (tx.description || "").toLowerCase().includes(q) ||
+      (typeof tx.metadata === "string" ? tx.metadata : JSON.stringify(tx.metadata || "")).toLowerCase().includes(q)
     );
   }, [transactions, direction, searchQuery, statusFilter]);
 
