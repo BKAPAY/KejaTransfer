@@ -7,11 +7,10 @@ import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useState, useEffect } from "react";
-import { CheckCircle2, AlertCircle, Phone, Lock, Plus, Trash2, Briefcase, Clock } from "lucide-react";
+import { CheckCircle2, AlertCircle, Phone, Lock, Plus, Trash2 } from "lucide-react";
 import { PhoneInputWithPrefix } from "@/components/phone-input-with-prefix";
 import { COUNTRIES } from "@shared/schema";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ACTIVITY_SECTORS, getSectorLabel, getSubSectorLabel } from "@shared/activity-sectors";
 
 export default function Settings() {
   const { user } = useAuth();
@@ -24,9 +23,6 @@ export default function Settings() {
   const [securityCode, setSecurityCode] = useState("");
   const [currentSecurityCode, setCurrentSecurityCode] = useState("");
   const [confirmSecurityCode, setConfirmSecurityCode] = useState("");
-
-  const [selectedSector, setSelectedSector] = useState("");
-  const [selectedSubSector, setSelectedSubSector] = useState("");
 
   useEffect(() => {
     if (user?.withdrawalPhones) {
@@ -76,49 +72,6 @@ export default function Settings() {
       });
     },
   });
-
-  const updateSectorMutation = useMutation({
-    mutationFn: async (data: { kycSector: string; kycSubSector: string }) => {
-      await apiRequest("POST", "/api/user/activity-sector", data);
-    },
-    onSuccess: () => {
-      toast({
-        title: "Secteur d'activité enregistré",
-        description: "Votre secteur sera validé par un administrateur avant de pouvoir effectuer des retraits.",
-      });
-      setSelectedSector("");
-      setSelectedSubSector("");
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Erreur",
-        description: error.message || "Erreur lors de l'enregistrement du secteur",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const handleSaveSector = () => {
-    if (!selectedSector) {
-      toast({
-        title: "Secteur requis",
-        description: "Veuillez sélectionner un secteur d'activité",
-        variant: "destructive",
-      });
-      return;
-    }
-    updateSectorMutation.mutate({ kycSector: selectedSector, kycSubSector: selectedSubSector });
-  };
-
-  const sectorStatus = (user as any)?.sectorStatus as string | undefined;
-  const userSector = (user as any)?.kycSector as string | undefined;
-  const userSubSector = (user as any)?.kycSubSector as string | undefined;
-  const sectorApproved = !!userSector && sectorStatus === "approved";
-  const sectorPending = sectorStatus === "pending";
-  const sectorNeedsConfig = !userSector;
-  const showSectorCard = user?.kycStatus === "verified" || !!userSector;
-  const currentSectorObj = ACTIVITY_SECTORS.find((s) => s.code === selectedSector);
 
   const handleAddPhone = () => {
     if (!newPhone || !/^\d{8,15}$/.test(newPhone)) {
@@ -194,109 +147,6 @@ export default function Settings() {
         <h1 className="text-2xl font-bold text-foreground mb-1">Parametres</h1>
         <p className="text-sm text-muted-foreground">Configurez votre compte</p>
       </div>
-
-      {showSectorCard && (
-        <Card>
-          <CardHeader className="pb-4">
-            <div className="flex items-center gap-2">
-              <Briefcase className="w-5 h-5" />
-              <CardTitle className="text-lg">Secteur d'activité</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {sectorApproved ? (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-md">
-                  <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />
-                  <span className="text-sm text-green-700 dark:text-green-300">Secteur d'activité validé</span>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-primary/10 text-primary text-xs font-medium" data-testid="text-sector-label">
-                    {getSectorLabel(userSector!)}
-                  </span>
-                  {userSubSector && (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-muted text-muted-foreground text-xs" data-testid="text-subsector-label">
-                      {getSubSectorLabel(userSector!, userSubSector)}
-                    </span>
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Votre secteur est validé. Pour toute modification, veuillez contacter le support.
-                </p>
-              </div>
-            ) : (
-              <>
-                {sectorPending ? (
-                  <div className="flex items-start gap-2 p-3 bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-800 rounded-md">
-                    <Clock className="w-4 h-4 text-yellow-600 dark:text-yellow-400 mt-0.5" />
-                    <div className="text-sm text-yellow-700 dark:text-yellow-300">
-                      <p className="font-medium">Secteur en attente de validation</p>
-                      <p className="text-xs mt-1">
-                        {userSector ? `${getSectorLabel(userSector)}${userSubSector ? ` — ${getSubSectorLabel(userSector, userSubSector)}` : ""}. ` : ""}
-                        Vos retraits et transferts seront possibles dès la validation par un administrateur. Vous pouvez modifier votre choix ci-dessous tant qu'il n'est pas validé.
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex items-start gap-2 p-3 bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-800 rounded-md">
-                    <AlertCircle className="w-4 h-4 text-yellow-600 dark:text-yellow-400 mt-0.5" />
-                    <div className="text-sm text-yellow-700 dark:text-yellow-300">
-                      <p className="font-medium">Secteur d'activité requis</p>
-                      <p className="text-xs mt-1">
-                        Pour des raisons de conformité, vous devez renseigner votre secteur d'activité. Une fois enregistré et validé par un administrateur, vos retraits seront de nouveau possibles.
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                <div className="space-y-3">
-                  <div>
-                    <label className="text-sm font-medium mb-1 block">Secteur principal</label>
-                    <Select
-                      value={selectedSector}
-                      onValueChange={(v) => { setSelectedSector(v); setSelectedSubSector(""); }}
-                    >
-                      <SelectTrigger data-testid="select-sector">
-                        <SelectValue placeholder="Sélectionnez votre secteur" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {ACTIVITY_SECTORS.map((s) => (
-                          <SelectItem key={s.code} value={s.code}>{s.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {currentSectorObj && currentSectorObj.subSectors.length > 0 && (
-                    <div>
-                      <label className="text-sm font-medium mb-1 block">Sous-secteur (optionnel)</label>
-                      <Select value={selectedSubSector} onValueChange={setSelectedSubSector}>
-                        <SelectTrigger data-testid="select-subsector">
-                          <SelectValue placeholder="Sélectionnez un sous-secteur" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {currentSectorObj.subSectors.map((ss) => (
-                            <SelectItem key={ss.code} value={ss.code}>{ss.label}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-                </div>
-
-                <Button
-                  className="w-full"
-                  onClick={handleSaveSector}
-                  disabled={!selectedSector || updateSectorMutation.isPending}
-                  data-testid="button-save-sector"
-                >
-                  {updateSectorMutation.isPending ? "Enregistrement..." : "Enregistrer le secteur d'activité"}
-                </Button>
-              </>
-            )}
-          </CardContent>
-        </Card>
-      )}
 
       <Card>
         <CardHeader className="pb-4">

@@ -15,6 +15,7 @@ import { PhoneInputWithPrefix } from "@/components/phone-input-with-prefix";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
+import { SectorCard } from "@/components/sector-card";
 
 function KycStatusBadge({ status }: { status: string }) {
   if (status === "verified") return (
@@ -485,6 +486,8 @@ export default function BusinessProfile() {
           )}
         </CardContent>
       </Card>
+
+      <SectorCard />
     </div>
   );
 }

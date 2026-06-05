@@ -2,7 +2,7 @@ import type { User } from "../shared/schema";
 
 // Message affiche quand l'utilisateur n'a PAS encore configure son secteur d'activite.
 export const SECTOR_NOT_CONFIGURED_MESSAGE =
-  "Votre secteur d'activité n'est pas encore configuré. Rendez-vous dans Paramètres pour le renseigner, puis attendez sa validation par un administrateur avant de pouvoir effectuer un retrait.";
+  "Votre secteur d'activité n'est pas encore configuré. Rendez-vous dans votre Profil pour le renseigner, puis attendez sa validation par un administrateur avant de pouvoir effectuer un retrait.";
 
 // Message affiche quand le secteur est configure mais en attente de validation par un admin.
 export const SECTOR_PENDING_MESSAGE =

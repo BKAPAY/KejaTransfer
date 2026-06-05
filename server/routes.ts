@@ -2662,7 +2662,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ===== Secteur d'activité (anciens utilisateurs sans secteur) =====
-  // Permet a un utilisateur de renseigner son secteur depuis Parametres.
+  // Permet a un utilisateur de renseigner son secteur depuis son Profil.
   // Applique automatiquement la restriction pays (multiCountryEnabled) et passe
   // le statut en "pending" jusqu'a validation par un administrateur.
   app.post("/api/user/activity-sector", requireAuth, async (req: Request, res: Response) => {
@@ -2687,10 +2687,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Utilisateur non trouvé" });
       }
 
-      // Verrou: un secteur deja valide ne peut plus etre modifie par l'utilisateur.
-      if (user.kycSector && user.sectorStatus === "approved") {
+      // Verrou: choix definitif. Des qu'un secteur a ete enregistre par
+      // l'utilisateur (en attente OU valide), il ne peut plus etre modifie.
+      if (user.kycSector) {
         return res.status(400).json({
-          error: "Votre secteur d'activité est déjà validé et ne peut plus être modifié. Contactez le support pour toute modification.",
+          error: "Votre secteur d'activité est déjà enregistré et ne peut plus être modifié. Contactez le support pour toute modification.",
         });
       }
 

@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { User as UserIcon, Mail, Calendar, Lock, MapPin } from "lucide-react";
 import { useState } from "react";
 import { ChangePasswordDialog } from "@/components/change-password-dialog";
+import { SectorCard } from "@/components/sector-card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -182,6 +183,8 @@ export default function Profile() {
           ) : null}
         </CardContent>
       </Card>
+
+      <SectorCard />
 
       <ChangePasswordDialog 
         open={changePasswordOpen} 
