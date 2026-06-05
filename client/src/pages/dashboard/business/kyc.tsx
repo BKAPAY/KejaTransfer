@@ -267,7 +267,6 @@ export default function BusinessKyc() {
   const [uploadingType, setUploadingType] = useState<string | null>(null);
 
   // OCR - lecture automatique de la pièce d'identité recto
-  const idFrontJustUploadedRef = useRef(false);
   const lastScannedBizFrontRef = useRef<string | null>(null);
   const [bizOcrScanning, setBizOcrScanning] = useState(false);
   const [bizOcrDialogOpen, setBizOcrDialogOpen] = useState(false);
@@ -284,6 +283,31 @@ export default function BusinessKyc() {
     } finally {
       setBizOcrDialogOpen(false);
       setBizOcrExtracted(null);
+    }
+  };
+
+  // Déclenchement OCR direct (appelé dans handleUploadDoc, pas via useEffect)
+  const triggerBizOcrScan = async (imageData: string) => {
+    if (!imageData || imageData === lastScannedBizFrontRef.current) return;
+    lastScannedBizFrontRef.current = imageData;
+    const normalize = (s: string) =>
+      s.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    setBizOcrScanning(true);
+    try {
+      const result: any = await apiRequest("POST", "/api/kyc/scan-id", { imageData });
+      const { firstName: extFirst, lastName: extLast } = result;
+      if (extFirst && extLast) {
+        const uFirst = normalize(u?.firstName || "");
+        const uLast = normalize(u?.lastName || "");
+        if (normalize(extFirst) !== uFirst || normalize(extLast) !== uLast) {
+          setBizOcrExtracted({ firstName: extFirst, lastName: extLast });
+          setBizOcrDialogOpen(true);
+        }
+      }
+    } catch {
+      // Silently fail — OCR est un service complémentaire
+    } finally {
+      setBizOcrScanning(false);
     }
   };
 
@@ -364,7 +388,6 @@ export default function BusinessKyc() {
 
   const handleUploadDoc = async (type: string, base64: string) => {
     setUploadingType(type);
-    if (type === "idFront") idFrontJustUploadedRef.current = true;
     try {
       await uploadDocMutation.mutateAsync({ type, data: base64 });
       if (type === "businessDocuments") {
@@ -372,40 +395,14 @@ export default function BusinessKyc() {
       } else {
         setDocs(prev => ({ ...prev, [type === "idFront" ? "idFront" : type === "idBack" ? "idBack" : type === "taxDocument" ? "taxDocument" : "addressDocument"]: base64 }));
       }
+      // OCR déclenché directement après l'upload réussi du recto
+      if (type === "idFront") {
+        triggerBizOcrScan(base64);
+      }
     } finally {
       setUploadingType(null);
     }
   };
-
-  // Déclenchement OCR automatique dès qu'un nouveau recto de pièce d'identité est uploadé
-  useEffect(() => {
-    if (!docs.idFront) return;
-    if (!idFrontJustUploadedRef.current) return;
-    if (docs.idFront === lastScannedBizFrontRef.current) return;
-    lastScannedBizFrontRef.current = docs.idFront;
-    idFrontJustUploadedRef.current = false;
-    const normalize = (s: string) => s.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    const doScan = async () => {
-      setBizOcrScanning(true);
-      try {
-        const result: any = await apiRequest("POST", "/api/kyc/scan-id", { imageData: docs.idFront });
-        const { firstName: extFirst, lastName: extLast } = result;
-        if (extFirst && extLast) {
-          const uFirst = normalize(u?.firstName || "");
-          const uLast = normalize(u?.lastName || "");
-          if (normalize(extFirst) !== uFirst || normalize(extLast) !== uLast) {
-            setBizOcrExtracted({ firstName: extFirst, lastName: extLast });
-            setBizOcrDialogOpen(true);
-          }
-        }
-      } catch {
-        // Silently fail
-      } finally {
-        setBizOcrScanning(false);
-      }
-    };
-    doScan();
-  }, [docs.idFront]);
 
   const handleRemoveDoc = async (type: string, index = 0) => {
     await removeDocMutation.mutateAsync({ type, index });

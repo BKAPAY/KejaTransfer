@@ -2425,6 +2425,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!imageData || typeof imageData !== "string") {
         return res.status(400).json({ error: "Image requise." });
       }
+      console.log("[OCR] image received, length:", imageData.length, "starts:", imageData.substring(0, 30));
+      console.log("[OCR] baseURL:", process.env.AI_INTEGRATIONS_OPENAI_BASE_URL ? "SET" : "NOT SET", "apiKey:", process.env.AI_INTEGRATIONS_OPENAI_API_KEY ? "SET" : "NOT SET");
       const openai = new OpenAI({
         apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
         baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
@@ -2451,15 +2453,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         max_tokens: 100,
       });
       const content = response.choices[0]?.message?.content?.trim() || "";
+      console.log("[OCR] raw GPT response:", JSON.stringify(content), "finish_reason:", response.choices[0]?.finish_reason);
       const match = content.match(/\{[\s\S]*\}/);
-      if (!match) return res.json({ firstName: "", lastName: "" });
+      if (!match) {
+        console.log("[OCR] no JSON match in response");
+        return res.json({ firstName: "", lastName: "" });
+      }
       const parsed = JSON.parse(match[0]);
+      console.log("[OCR] parsed:", parsed);
       return res.json({
         firstName: (parsed.firstName || "").trim(),
         lastName: (parsed.lastName || "").trim(),
       });
     } catch (error: any) {
-      console.error("Scan ID OCR error:", error);
+      console.error("[OCR] scan-id error:", error?.message || error, "status:", error?.status, "code:", error?.code);
       return res.json({ firstName: "", lastName: "" });
     }
   });

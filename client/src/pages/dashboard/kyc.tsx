@@ -102,6 +102,31 @@ export default function KYC() {
   const [ocrDialogOpen, setOcrDialogOpen] = useState(false);
   const [ocrExtracted, setOcrExtracted] = useState<{ firstName: string; lastName: string } | null>(null);
 
+  // Déclenchement OCR direct (appelé dans capturePhoto, pas via useEffect)
+  const triggerOcrScan = async (imageData: string) => {
+    if (!imageData || imageData === lastScannedFrontRef.current) return;
+    lastScannedFrontRef.current = imageData;
+    const normalize = (s: string) =>
+      s.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    setOcrScanning(true);
+    try {
+      const result: any = await apiRequest("POST", "/api/kyc/scan-id", { imageData });
+      const { firstName: extFirst, lastName: extLast } = result;
+      if (extFirst && extLast) {
+        const uFirst = normalize(user?.firstName || "");
+        const uLast = normalize(user?.lastName || "");
+        if (normalize(extFirst) !== uFirst || normalize(extLast) !== uLast) {
+          setOcrExtracted({ firstName: extFirst, lastName: extLast });
+          setOcrDialogOpen(true);
+        }
+      }
+    } catch {
+      // Silently fail — OCR est un service complémentaire
+    } finally {
+      setOcrScanning(false);
+    }
+  };
+
   const handleOcrConfirmName = async () => {
     if (!ocrExtracted) return;
     try {
@@ -317,6 +342,8 @@ export default function KYC() {
 
     if (currentMode === "front") {
       setIdFrontData(imageData);
+      // Déclencher OCR immédiatement après capture (sans passer par useEffect)
+      triggerOcrScan(imageData);
     } else if (currentMode === "back") {
       setIdBackData(imageData);
     } else if (currentMode === "selfie") {
@@ -327,33 +354,6 @@ export default function KYC() {
 
     await uploadDocument(currentMode, imageData);
   };
-
-  // Déclenchement OCR automatique dès que la photo recto de la pièce est capturée
-  useEffect(() => {
-    if (!idFrontData || idFrontData === lastScannedFrontRef.current) return;
-    lastScannedFrontRef.current = idFrontData;
-    const normalize = (s: string) => s.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    const doScan = async () => {
-      setOcrScanning(true);
-      try {
-        const result: any = await apiRequest("POST", "/api/kyc/scan-id", { imageData: idFrontData });
-        const { firstName: extFirst, lastName: extLast } = result;
-        if (extFirst && extLast) {
-          const uFirst = normalize(user?.firstName || "");
-          const uLast = normalize(user?.lastName || "");
-          if (normalize(extFirst) !== uFirst || normalize(extLast) !== uLast) {
-            setOcrExtracted({ firstName: extFirst, lastName: extLast });
-            setOcrDialogOpen(true);
-          }
-        }
-      } catch {
-        // Silently fail — OCR est un service complémentaire
-      } finally {
-        setOcrScanning(false);
-      }
-    };
-    doScan();
-  }, [idFrontData]);
 
   useEffect(() => {
     return () => {
