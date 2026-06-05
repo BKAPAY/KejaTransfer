@@ -7,6 +7,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { BusinessSidebar } from "@/components/business-sidebar";
 import { useEffect, useRef, useState, lazy, Suspense } from "react";
+import { ErrorBoundary } from "@/components/error-boundary";
 import { useAuth } from "@/hooks/use-auth";
 import { useInactivityLogout } from "@/hooks/use-inactivity-logout";
 import { Wallet, Loader2, ShieldCheck, ShieldAlert, Clock } from "lucide-react";
@@ -528,12 +529,14 @@ function AppInitializer() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <AppInitializer />
-      </TooltipProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <Toaster />
+          <AppInitializer />
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 
