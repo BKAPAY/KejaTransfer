@@ -93,15 +93,9 @@ export default function Transfer() {
   const selectedCountry = form.watch("country");
   const amount = form.watch("amount");
 
-  // Filter countries: only admin-enabled ones, and restricted to home country if multiCountryEnabled is false
+  // Afficher tous les pays activés par l'admin
   const payoutCountries = enabledCountriesOperators
-    ? COUNTRIES.filter(c => {
-        if (!Object.keys(enabledCountriesOperators).includes(c.code)) return false;
-        const multiEnabled = (user as any)?.multiCountryEnabled;
-        const homeCountry = user?.country;
-        if (multiEnabled === false && homeCountry) return c.code === homeCountry;
-        return true;
-      })
+    ? COUNTRIES.filter(c => Object.keys(enabledCountriesOperators).includes(c.code))
     : [];
   
   const allCountryOperators = selectedCountry
