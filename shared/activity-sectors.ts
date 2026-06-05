@@ -280,3 +280,41 @@ export function getSubSectorLabel(sectorCode: string, subSectorCode: string): st
 export function getSubSectorsForSector(sectorCode: string): ActivitySubSector[] {
   return ACTIVITY_SECTORS.find(s => s.code === sectorCode)?.subSectors || [];
 }
+
+// ===== Restriction pays par secteur d'activite =====
+// Certains secteurs/sous-secteurs font des ventes internationales (tous pays autorises).
+// Les autres (commerce local, restaurant, salon, etc.) sont restreints au pays de l'utilisateur.
+
+// Secteurs entierement internationaux (tous leurs sous-secteurs autorisent tous les pays)
+const INTERNATIONAL_SECTORS = new Set<string>([
+  "ecommerce",
+  "technologie_informatique",
+  "freelance_independants",
+  "medias_communication",
+]);
+
+// Sous-secteurs internationaux appartenant a des secteurs autrement "locaux"
+const INTERNATIONAL_SUBSECTORS = new Set<string>([
+  // Commerce et Vente
+  "import_export",
+  "marketplace",
+  "vente_reseaux_sociaux",
+  // Education et Formation
+  "formation_en_ligne",
+  "elearning",
+  // Sante et Medical
+  "telemedecine",
+]);
+
+/**
+ * Determine si l'activite choisie autorise par defaut tous les pays (ventes internationales).
+ * Retourne true -> tous les pays. false -> restreint au pays de l'utilisateur.
+ */
+export function isInternationalActivity(
+  sectorCode?: string | null,
+  subSectorCode?: string | null,
+): boolean {
+  if (sectorCode && INTERNATIONAL_SECTORS.has(sectorCode)) return true;
+  if (subSectorCode && INTERNATIONAL_SUBSECTORS.has(subSectorCode)) return true;
+  return false;
+}

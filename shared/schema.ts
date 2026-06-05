@@ -79,6 +79,7 @@ export const users = pgTable("users", {
   payoutApiEnabled: boolean("payout_api_enabled").notNull().default(false),
   wavePayinEnabled: boolean("wave_payin_enabled").notNull().default(false),
   depositOverrideEnabled: boolean("deposit_override_enabled").notNull().default(false),
+  multiCountryEnabled: boolean("multi_country_enabled").notNull().default(false), // true = tous les pays autorises; false = restreint au pays de l'utilisateur
   bankAccountHolder: text("bank_account_holder"),
   bankAccountNumber: text("bank_account_number"),
   bankName: text("bank_name"),
@@ -399,6 +400,7 @@ export const insertUserSchema = createInsertSchema(users).omit({
   isAdmin: true,
   isPrimaryAdmin: true,
   suspended: true,
+  multiCountryEnabled: true,
   createdAt: true,
 });
 

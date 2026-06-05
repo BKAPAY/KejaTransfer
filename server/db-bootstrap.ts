@@ -66,6 +66,25 @@ async function bootstrapDatabase() {
       console.error("⚠️ Early kyc_sector/kyc_sub_sector column migration error:", e);
     }
 
+    // Step 2c: Restriction pays par secteur (multi_country_enabled)
+    // Nouvelle colonne par defaut false (restreint au pays de l'utilisateur).
+    // Les utilisateurs EXISTANTS sont mis a true pour preserver leur comportement actuel (ne rien casser).
+    try {
+      const mcCol = await client`
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'users' AND column_name = 'multi_country_enabled'
+      `;
+      if (mcCol.length === 0) {
+        await client`ALTER TABLE users ADD COLUMN multi_country_enabled BOOLEAN NOT NULL DEFAULT false`;
+        await client`UPDATE users SET multi_country_enabled = true`;
+        console.log("✅ users.multi_country_enabled column created (existing users set to true)");
+      } else {
+        console.log("✅ users.multi_country_enabled column already exists");
+      }
+    } catch (e) {
+      console.error("⚠️ Early multi_country_enabled column migration error:", e);
+    }
+
     // Step 3: Get currently tracked migrations
     console.log("🔍 Checking migration tracking...");
     const appliedMigrations = await client`

@@ -673,6 +673,7 @@ export class DbStorage implements IStorage {
     businessPhone?: string | null;
     businessEnterprisePhone?: string | null;
     businessEmail?: string | null;
+    multiCountryEnabled?: boolean;
   }): Promise<User | undefined> {
     const cleaned: Record<string, any> = {};
     for (const [k, v] of Object.entries(data)) {
