@@ -81,6 +81,7 @@ export const users = pgTable("users", {
   wavePayinEnabled: boolean("wave_payin_enabled").notNull().default(false),
   depositOverrideEnabled: boolean("deposit_override_enabled").notNull().default(false),
   multiCountryEnabled: boolean("multi_country_enabled").notNull().default(false), // true = tous les pays autorises; false = restreint au pays de l'utilisateur
+  monthlyLimit: integer("monthly_limit"), // Limite mensuelle entrante personnalisée en XOF/XAF (null = limite par défaut selon devise)
   bankAccountHolder: text("bank_account_holder"),
   bankAccountNumber: text("bank_account_number"),
   bankName: text("bank_name"),

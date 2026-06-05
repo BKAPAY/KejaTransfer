@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Users, Shield, Trash2, Plus, Minus, History, Link as LinkIcon, Store, Key, User as UserIcon, Check, X, FileCheck, AlertCircle, Unlock, Lock, Clock, CheckCircle, XCircle, ArrowDownLeft, ArrowUpRight, Loader2, Monitor, RotateCcw, Waves, ArrowDownToLine } from "lucide-react";
+import { Users, Shield, Trash2, Plus, Minus, History, Link as LinkIcon, Store, Key, User as UserIcon, Check, X, FileCheck, AlertCircle, Unlock, Lock, Clock, CheckCircle, XCircle, ArrowDownLeft, ArrowUpRight, Loader2, Monitor, RotateCcw, Waves, ArrowDownToLine, TrendingUp } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
@@ -18,6 +18,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -50,6 +51,8 @@ export default function Management() {
   const [subtractFundsDialog, setSubtractFundsDialog] = useState<{ open: boolean; userId?: string; userName?: string; amount?: number; currency?: string }>({ open: false });
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; userId?: string; userName?: string }>({ open: false });
   const [resetDialog, setResetDialog] = useState<{ open: boolean; userId?: string | null; userName?: string }>({ open: false, userId: null, userName: "" });
+  const [monthlyLimitDialog, setMonthlyLimitDialog] = useState<{ open: boolean; userId?: string; userName?: string; currentLimit?: number | null; currency?: string }>({ open: false });
+  const [monthlyLimitInput, setMonthlyLimitInput] = useState<string>("");
   const [suspendDialog, setSuspendDialog] = useState<{ open: boolean; userId?: string; userName?: string }>({ open: false });
   const [unsuspendDialog, setUnsuspendDialog] = useState<{ open: boolean; userId?: string; userName?: string }>({ open: false });
   const [rejectKycDialog, setRejectKycDialog] = useState<{ open: boolean; userId?: string; userName?: string; isRemoval?: boolean }>({ open: false });
@@ -435,6 +438,22 @@ export default function Management() {
     },
     onError: () => {
       toast({ title: "Erreur", description: "Impossible de modifier le dépôt", variant: "destructive" });
+    },
+  });
+
+  const setMonthlyLimitMutation = useMutation({
+    mutationFn: async ({ userId, limit }: { userId: string; limit: number | null }) => {
+      const res = await apiRequest("PATCH", `/api/admin/user/${userId}/monthly-limit`, { limit });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Succès", description: "Limite mensuelle mise à jour" });
+      setMonthlyLimitDialog({ open: false });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      refetchUsers();
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible de modifier la limite mensuelle", variant: "destructive" });
     },
   });
 
@@ -854,6 +873,21 @@ export default function Management() {
                           Retirer KYC
                         </Button>
                       ) : null}
+                      {user.accountType === "personal" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            const currency = getCurrencyForUser(user);
+                            setMonthlyLimitDialog({ open: true, userId: user.id, userName: `${user.firstName} ${user.lastName}`, currentLimit: (user as any).monthlyLimit ?? null, currency });
+                            setMonthlyLimitInput((user as any).monthlyLimit != null ? String((user as any).monthlyLimit) : "");
+                          }}
+                          data-testid={`button-monthly-limit-${user.id}`}
+                        >
+                          <TrendingUp className="w-4 h-4 mr-1" />
+                          Limite mensuelle
+                        </Button>
+                      )}
                       <Button
                         size="sm"
                         variant="outline"
@@ -888,6 +922,54 @@ export default function Management() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Monthly Limit Dialog */}
+      <Dialog open={monthlyLimitDialog.open} onOpenChange={(open) => setMonthlyLimitDialog({ ...monthlyLimitDialog, open })}>
+        <DialogContent data-testid="dialog-monthly-limit">
+          <DialogHeader>
+            <DialogTitle>Limite mensuelle — {monthlyLimitDialog.userName}</DialogTitle>
+            <DialogDescription>
+              Modifiez la limite mensuelle de transactions entrantes pour ce compte personnel.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Limite pour les transactions entrantes ce mois (dépôts, liens de paiement, API payin, liens marchands).
+              Limites par défaut : <strong>1 000 000 XOF/XAF</strong>, <strong>5 000 000 CDF</strong>.
+              {monthlyLimitDialog.currentLimit != null && (
+                <span className="ml-1 text-foreground">Limite actuelle : <strong>{monthlyLimitDialog.currentLimit.toLocaleString("fr-FR")} {monthlyLimitDialog.currency}</strong>.</span>
+              )}
+            </p>
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Nouvelle limite ({monthlyLimitDialog.currency || "XOF"})</label>
+              <Input
+                type="number"
+                min={1}
+                placeholder="Vide = limite par défaut"
+                value={monthlyLimitInput}
+                onChange={(e) => setMonthlyLimitInput(e.target.value)}
+                data-testid="input-monthly-limit"
+              />
+              <p className="text-xs text-muted-foreground">Laisser vide pour revenir à la limite par défaut.</p>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setMonthlyLimitDialog({ open: false })} className="flex-1">Annuler</Button>
+              <Button
+                onClick={() => {
+                  if (!monthlyLimitDialog.userId) return;
+                  const limit = monthlyLimitInput.trim() === "" ? null : Number(monthlyLimitInput);
+                  setMonthlyLimitMutation.mutate({ userId: monthlyLimitDialog.userId, limit });
+                }}
+                disabled={setMonthlyLimitMutation.isPending}
+                className="flex-1"
+                data-testid="button-confirm-monthly-limit"
+              >
+                {setMonthlyLimitMutation.isPending ? "En cours..." : "Confirmer"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Promotion Dialog */}
       <AlertDialog open={promoteDialog.open} onOpenChange={(open) => setPromoteDialog({ ...promoteDialog, open })}>

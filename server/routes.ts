@@ -2803,6 +2803,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Statut de la limite mensuelle de l'utilisateur connecté
+  app.get("/api/user/monthly-limit-status", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(404).json({ error: "Utilisateur non trouvé" });
+      if (user.accountType !== "personal") {
+        return res.json({ applicable: false });
+      }
+      const { DEFAULT_MONTHLY_LIMITS } = await import("./monthly-limit");
+      const userCurrency = user.country ? getCurrencyForCountry(user.country) : "XOF";
+      const defaultLimit = DEFAULT_MONTHLY_LIMITS[userCurrency];
+      if (!defaultLimit) {
+        return res.json({ applicable: false });
+      }
+      const limit = user.monthlyLimit ?? defaultLimit;
+      const now = new Date();
+      const used = await storage.getUserMonthlyIncomingByCurrency(user.id, userCurrency, now.getFullYear(), now.getMonth() + 1);
+      const remaining = Math.max(0, limit - used);
+      const percentage = Math.min(100, Math.round((used / limit) * 100));
+      res.json({
+        applicable: true,
+        currency: userCurrency,
+        limit,
+        used,
+        remaining,
+        percentage,
+        isDefault: user.monthlyLimit === null || user.monthlyLimit === undefined,
+        resetDate: new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString(),
+      });
+    } catch (error: any) {
+      console.error("Monthly limit status error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
   app.get("/api/analytics", requireAuth, async (req: Request, res: Response) => {
     try {
       const analytics = await storage.getAnalytics(req.session.userId!);
@@ -3628,6 +3663,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         feeAmount = feeInfo.feeAmount;
         feePercentage = feeInfo.feePercentage;
         netAmountForUser = feeInfo.netAmount;
+      }
+
+      // Vérification limite mensuelle — comptes personnels uniquement (API payin)
+      if (owner?.accountType === "personal") {
+        const { checkPersonalMonthlyLimit } = await import("./monthly-limit");
+        const limitCheck = await checkPersonalMonthlyLimit(owner, netAmountForUser, ownerCurrency, storage);
+        if (!limitCheck.allowed) {
+          return res.status(403).json({ error: limitCheck.message });
+        }
       }
 
       if (activeProvider === "mbiyopay") {
@@ -6269,6 +6313,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const providerCurrency = payduynaCountryCurrencies4166[country?.toUpperCase()] || "XOF";
       let baseAmountInOwnerCurrency = Math.floor(amount);
 
+      // Vérification limite mensuelle — comptes personnels uniquement
+      if (owner?.accountType === "personal") {
+        const { checkPersonalMonthlyLimit } = await import("./monthly-limit");
+        const limitCheck = await checkPersonalMonthlyLimit(owner, Math.floor(amount), ownerCurrency, storage);
+        if (!limitCheck.allowed) {
+          return res.status(403).json({ error: limitCheck.message });
+        }
+      }
+
       // Si frais Mobile Money à la charge du client, on grossit le montant pour couvrir les frais
       if (merchantLink.customerPaysFee) {
         const { calculateCustomerPaysFee } = await import("./utils/fees");
@@ -6420,6 +6473,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Wave payin activation check
       if (operator.toLowerCase() === "wave" && !user?.wavePayinEnabled) {
         return res.status(403).json({ error: "Pour faire les opérations Via wave, contacter le support pour l'activer" });
+      }
+
+      // Vérification limite mensuelle — comptes personnels uniquement
+      if (user?.accountType === "personal") {
+        const { checkPersonalMonthlyLimit } = await import("./monthly-limit");
+        const userMLCurrency = user.country ? getCurrencyForCountry(user.country) : "XOF";
+        const limitCheck = await checkPersonalMonthlyLimit(user, Math.floor(amount), userMLCurrency, storage);
+        if (!limitCheck.allowed) {
+          return res.status(403).json({ error: limitCheck.message });
+        }
       }
 
       // Create Paydunya invoice to get token
@@ -8645,6 +8708,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ success: false, error: "Pour faire les opérations Via wave, contacter le support pour l'activer" });
       }
 
+      // Vérification limite mensuelle — comptes personnels uniquement
+      if (user.accountType === "personal") {
+        const { checkPersonalMonthlyLimit } = await import("./monthly-limit");
+        const limitCheck = await checkPersonalMonthlyLimit(user, balanceAmount, userCurrency, storage);
+        if (!limitCheck.allowed) {
+          return res.status(403).json({ success: false, error: limitCheck.message });
+        }
+      }
+
       // Determine which provider to use based on configuration
       const activeProvider = await getActiveProviderForDeposit(country, operator);
       
@@ -9628,6 +9700,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // IMPORTANT: Use currency from request if provided (for multi-currency countries like RDC)
       const ownerCurrency = owner?.country ? getCurrencyForCountry(owner.country) : "XOF";
       const payerCurrency = currency || getCurrencyForCountry(country);
+
+      // Vérification limite mensuelle — comptes personnels uniquement
+      if (owner?.accountType === "personal") {
+        const { checkPersonalMonthlyLimit } = await import("./monthly-limit");
+        const limitCheck = await checkPersonalMonthlyLimit(owner, paymentLink.amount, ownerCurrency, storage);
+        if (!limitCheck.allowed) {
+          return res.status(403).json({ success: false, error: limitCheck.message });
+        }
+      }
       
       // Convert amount if currencies are different
       let amountInPayerCurrency = paymentLink.amount;
@@ -12388,6 +12469,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true, message: "Code de retrait réinitialisé. L'utilisateur peut maintenant en définir un nouveau depuis Paramètres." });
     } catch (error: any) {
       console.error("Reset security code error:", error);
+      res.status(500).json({ error: "Une erreur est survenue" });
+    }
+  });
+
+  // Modifier la limite mensuelle d'un utilisateur (admin seulement)
+  app.patch("/api/admin/user/:userId/monthly-limit", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { userId } = req.params;
+      const { limit } = req.body; // null = remettre à la valeur par défaut, nombre = nouvelle limite
+      const target = await storage.getUser(userId);
+      if (!target) {
+        return res.status(404).json({ error: "Utilisateur non trouvé" });
+      }
+      if (target.accountType !== "personal") {
+        return res.status(400).json({ error: "La limite mensuelle ne s'applique qu'aux comptes personnels" });
+      }
+      const parsedLimit = limit === null || limit === undefined ? null : Math.floor(Number(limit));
+      if (parsedLimit !== null && (isNaN(parsedLimit) || parsedLimit <= 0)) {
+        return res.status(400).json({ error: "La limite doit être un nombre positif ou null (défaut)" });
+      }
+      const updated = await storage.setUserMonthlyLimit(userId, parsedLimit);
+      const adminEmail = (req as any).user?.email || "admin";
+      console.log(`[Admin Monthly Limit] ${adminEmail} set monthly limit for ${target.email} → ${parsedLimit ?? "défaut"}`);
+      res.json({ success: true, user: updated });
+    } catch (error: any) {
+      console.error("Set monthly limit error:", error);
       res.status(500).json({ error: "Une erreur est survenue" });
     }
   });

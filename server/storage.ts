@@ -75,6 +75,8 @@ export interface IStorage {
     sectorStatus?: string;
   }): Promise<User | undefined>;
   setUserActivitySector(userId: string, data: { kycSector: string; kycSubSector?: string | null; sectorStatus: string; multiCountryEnabled: boolean }): Promise<User | undefined>;
+  getUserMonthlyIncomingByCurrency(userId: string, currency: string, year: number, month: number): Promise<number>;
+  setUserMonthlyLimit(userId: string, limit: number | null): Promise<User | undefined>;
   updateUserName(id: string, firstName: string, lastName: string): Promise<User | undefined>;
   findVerifiedOrSuspendedUserByName(firstName: string, lastName: string, excludeUserId: string): Promise<{ id: string; kycStatus: string } | undefined>;
   saveBusinessKycStep2(userId: string, data: {
@@ -725,6 +727,32 @@ export class DbStorage implements IStorage {
       .update(schema.users)
       .set(cleaned)
       .where(eq(schema.users.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async getUserMonthlyIncomingByCurrency(userId: string, _currency: string, year: number, month: number): Promise<number> {
+    const incomingTypes = ["deposit", "payment_link", "merchant_link", "api_payin"];
+    const result = await db
+      .select({ total: sql<string>`COALESCE(SUM(${schema.transactions.amount}), 0)` })
+      .from(schema.transactions)
+      .where(
+        and(
+          eq(schema.transactions.userId, userId),
+          inArray(schema.transactions.type, incomingTypes),
+          eq(schema.transactions.status, "completed"),
+          sql`EXTRACT(YEAR FROM ${schema.transactions.createdAt}) = ${year}`,
+          sql`EXTRACT(MONTH FROM ${schema.transactions.createdAt}) = ${month}`
+        )
+      );
+    return Number(result[0]?.total ?? 0);
+  }
+
+  async setUserMonthlyLimit(userId: string, limit: number | null): Promise<User | undefined> {
+    const results = await db
+      .update(schema.users)
+      .set({ monthlyLimit: limit })
+      .where(eq(schema.users.id, userId))
       .returning();
     return results[0];
   }
