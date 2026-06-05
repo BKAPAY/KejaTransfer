@@ -4741,6 +4741,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         netAmountForUser = feeInfo.netAmount;
       }
 
+      // Vérification de la limite mensuelle de réception (comptes personnels uniquement)
+      if (owner.accountType === "personal") {
+        const { checkPersonalMonthlyLimit } = await import("./monthly-limit");
+        const limitCheck = await checkPersonalMonthlyLimit(owner, Math.floor(netAmountForUser), ownerCurrency, storage);
+        if (!limitCheck.allowed) {
+          return res.status(403).json({ success: false, error: limitCheck.message });
+        }
+      }
+
       // Mark session as processing
       await storage.updatePaymentSession(session.id, { status: "processing" });
 
@@ -6189,6 +6198,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } else {
           console.error("[PAYMENT_LINK] Currency conversion failed:", conversionResult.error);
           return res.status(500).json({ error: "Erreur de conversion de devise" });
+        }
+      }
+
+      // Vérification de la limite mensuelle de réception (comptes personnels uniquement)
+      if (owner?.accountType === "personal") {
+        const { checkPersonalMonthlyLimit } = await import("./monthly-limit");
+        const limitCheck = await checkPersonalMonthlyLimit(owner, Math.floor(netAmountForUser), ownerCurrency, storage);
+        if (!limitCheck.allowed) {
+          return res.status(403).json({ success: false, error: limitCheck.message });
         }
       }
 
@@ -10205,6 +10223,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Utiliser le taux admin du provider/opérateur, pas un taux hardcodé
         adjustedAmount = calculateCustomerPaysFee(adjustedAmount, mlFeeConfig.incoming).totalForProvider;
         console.log(`[MERCHANT_LINK] customerPaysFee actif (taux=${mlFeeConfig.incoming/10}%): client paie ${adjustedAmount} pour que le marchand reçoive ${amount}`);
+      }
+
+      // Vérification de la limite mensuelle de réception (comptes personnels uniquement)
+      if (owner?.accountType === "personal") {
+        const { checkPersonalMonthlyLimit } = await import("./monthly-limit");
+        const limitCheck = await checkPersonalMonthlyLimit(owner, Math.floor(netAmountForBalance), ownerCurrency, storage);
+        if (!limitCheck.allowed) {
+          return res.status(403).json({ success: false, error: limitCheck.message });
+        }
       }
 
       if (activeProvider === "fedapay") {
