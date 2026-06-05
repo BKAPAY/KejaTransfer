@@ -50,7 +50,7 @@ type MerchantPaymentFormData = z.infer<typeof merchantPaymentSchema>;
 const ORANGE_INSTRUCTIONS: Record<string, string> = {
   SN: "Composez #144#391*VOTRE CODE PIN ORANGE MONEY# pour obtenir votre code de paiement",
   CI: "Composez #144*82# puis choisissez l'option 2 pour obtenir votre code de paiement",
-  BF: "Composez *144*4*6*MONTANT# pour obtenir votre code de paiement",
+  BF: "Composez *144*4*6# pour obtenir votre code de paiement",
   ML: "Composez #144#77# pour obtenir votre code de paiement",
   GN: "Composez #144*6# pour obtenir votre code de paiement",
   CM: "Composez #150*50# pour obtenir votre code de paiement",
@@ -64,7 +64,7 @@ const ORANGE_INSTRUCTIONS: Record<string, string> = {
 const ORANGE_USSD_CODES: Record<string, string> = {
   SN: "#144#391*PIN#",
   CI: "#144*82#",
-  BF: "*144*4*6*MONTANT#",
+  BF: "*144*4*6#",
   ML: "#144#77#",
   GN: "#144*6#",
   CM: "#150*50#",

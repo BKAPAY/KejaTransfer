@@ -208,8 +208,8 @@ export function getMbiyoPayOtpInstructions(countryCode: string, amount?: number)
       hint: "Selectionnez l'option 2 dans le menu",
     },
     BF: {
-      ussdCode: `*144*4*6*${amountStr}#`,
-      instructions: `Composez *144*4*6*${amountStr}# puis suivez les instructions pour obtenir votre code de paiement`,
+      ussdCode: "*144*4*6#",
+      instructions: "Composez *144*4*6# puis suivez les instructions pour obtenir votre code de paiement",
       hint: "Entrez votre code secret Orange Money quand demande",
     },
     ML: {
