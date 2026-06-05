@@ -3670,7 +3670,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const { checkPersonalMonthlyLimit } = await import("./monthly-limit");
         const limitCheck = await checkPersonalMonthlyLimit(owner, netAmountForUser, ownerCurrency, storage);
         if (!limitCheck.allowed) {
-          return res.status(403).json({ error: limitCheck.message });
+          return res.status(403).json({ error: "La limite mensuelle de transactions de ce marchand est atteinte." });
         }
       }
 
@@ -6318,7 +6318,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const { checkPersonalMonthlyLimit } = await import("./monthly-limit");
         const limitCheck = await checkPersonalMonthlyLimit(owner, Math.floor(amount), ownerCurrency, storage);
         if (!limitCheck.allowed) {
-          return res.status(403).json({ error: limitCheck.message });
+          return res.status(403).json({ error: "La limite mensuelle de transactions de ce marchand est atteinte." });
         }
       }
 
@@ -6481,7 +6481,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const userMLCurrency = user.country ? getCurrencyForCountry(user.country) : "XOF";
         const limitCheck = await checkPersonalMonthlyLimit(user, Math.floor(amount), userMLCurrency, storage);
         if (!limitCheck.allowed) {
-          return res.status(403).json({ error: limitCheck.message });
+          return res.status(403).json({ error: `Votre limite mensuelle de transactions entrantes est atteinte. Il vous reste ${Math.max(0, limitCheck.limit - limitCheck.used).toLocaleString("fr-FR")} ${userMLCurrency} disponibles ce mois. Pour augmenter votre limite, contactez le support assistant BKApay.` });
         }
       }
 
@@ -8713,7 +8713,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const { checkPersonalMonthlyLimit } = await import("./monthly-limit");
         const limitCheck = await checkPersonalMonthlyLimit(user, balanceAmount, userCurrency, storage);
         if (!limitCheck.allowed) {
-          return res.status(403).json({ success: false, error: limitCheck.message });
+          return res.status(403).json({ success: false, error: `Votre limite mensuelle de transactions entrantes est atteinte. Il vous reste ${Math.max(0, limitCheck.limit - limitCheck.used).toLocaleString("fr-FR")} ${userCurrency} disponibles ce mois. Pour augmenter votre limite, contactez le support assistant BKApay.` });
         }
       }
 
@@ -9706,7 +9706,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const { checkPersonalMonthlyLimit } = await import("./monthly-limit");
         const limitCheck = await checkPersonalMonthlyLimit(owner, paymentLink.amount, ownerCurrency, storage);
         if (!limitCheck.allowed) {
-          return res.status(403).json({ success: false, error: limitCheck.message });
+          return res.status(403).json({ success: false, error: "La limite mensuelle de transactions de ce marchand est atteinte." });
         }
       }
       

@@ -48,6 +48,7 @@ import DocumentationBusiness from "@/pages/dashboard/documentation-business";
 // partager les promesses avec lazy() — ce qui permet les retry en cas d'erreur réseau
 import("@/pages/dashboard/index");
 import("@/pages/dashboard/history");
+import("@/pages/dashboard/monthly-limit");
 import("@/pages/dashboard/analytics");
 import("@/pages/dashboard/settings");
 import("@/pages/dashboard/profile");
@@ -70,6 +71,7 @@ const ApiPayoutPage = lazy(() => import("@/pages/dashboard/api-payout"));
 const Analytics = lazy(() => import("@/pages/dashboard/analytics"));
 const AnalyticsBusiness = lazy(() => import("@/pages/dashboard/analytics-business"));
 const History = lazy(() => import("@/pages/dashboard/history"));
+const MonthlyLimitPage = lazy(() => import("@/pages/dashboard/monthly-limit"));
 const Settings = lazy(() => import("@/pages/dashboard/settings"));
 const Support = lazy(() => import("@/pages/dashboard/support"));
 const Deposit = lazy(() => import("@/pages/dashboard/deposit"));
@@ -306,6 +308,7 @@ function Router() {
           <Route path="/dashboard/api-payout" component={ApiPayoutPage} />
           <Route path="/dashboard/analytics" component={Analytics} />
           <Route path="/dashboard/history" component={History} />
+          <Route path="/dashboard/monthly-limit" component={MonthlyLimitPage} />
           <Route path="/dashboard/settings" component={Settings} />
           <Route path="/dashboard/documentation/redirect/:version">
             {(params) => <DocumentationRedirect version={params.version} />}

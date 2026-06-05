@@ -76,6 +76,12 @@ const generalItems = [
     testId: "nav-history",
   },
   {
+    title: "Ma limite",
+    url: "/dashboard/monthly-limit",
+    icon: TrendingUp,
+    testId: "nav-monthly-limit",
+  },
+  {
     title: "Paramètres",
     url: "/dashboard/settings",
     icon: Settings,

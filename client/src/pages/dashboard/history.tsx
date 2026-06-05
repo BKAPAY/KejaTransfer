@@ -3,24 +3,13 @@ import { Badge } from "@/components/ui/badge";
 import { useQuery } from "@tanstack/react-query";
 import type { Transaction, User } from "@shared/schema";
 import { COUNTRIES } from "@shared/schema";
-import { History as HistoryIcon, Search, X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, TrendingUp, RefreshCw } from "lucide-react";
+import { History as HistoryIcon, Search, X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TransactionDetailsDialog } from "@/components/transaction-details-dialog";
 import { useState, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-
-type MonthlyLimitStatus = {
-  applicable: boolean;
-  currency?: string;
-  limit?: number;
-  used?: number;
-  remaining?: number;
-  percentage?: number;
-  isDefault?: boolean;
-  resetDate?: string;
-};
 
 const ITEMS_PER_PAGE_OPTIONS = [10, 20, 50, 100];
 
@@ -44,13 +33,6 @@ export default function History() {
     refetchInterval: 15000,
   });
 
-  const { data: limitStatus } = useQuery<MonthlyLimitStatus>({
-    queryKey: ["/api/user/monthly-limit-status"],
-    staleTime: 30000,
-    refetchInterval: 60000,
-    enabled: user?.accountType === "personal",
-  });
-  
   const userCurrency = user?.country 
     ? COUNTRIES.find(c => c.code === user.country)?.currency || "XOF"
     : "XOF";
@@ -202,49 +184,6 @@ export default function History() {
           Toutes vos transactions
         </p>
       </div>
-
-      {/* Widget limite mensuelle — comptes personnels uniquement */}
-      {limitStatus?.applicable && (
-        <Card data-testid="card-monthly-limit">
-          <CardContent className="pt-4 pb-3">
-            <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm font-medium">Limite mensuelle entrante</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">
-                  {(limitStatus.used ?? 0).toLocaleString("fr-FR")} / {(limitStatus.limit ?? 0).toLocaleString("fr-FR")} {limitStatus.currency}
-                </span>
-                {limitStatus.resetDate && (
-                  <span className="text-xs text-muted-foreground flex items-center gap-1">
-                    <RefreshCw className="w-3 h-3" />
-                    Remise à zéro le {new Date(limitStatus.resetDate).toLocaleDateString("fr-FR", { day: "2-digit", month: "long" })}
-                  </span>
-                )}
-              </div>
-            </div>
-            {/* Barre de progression */}
-            <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all ${
-                  (limitStatus.percentage ?? 0) >= 90 ? "bg-red-500" :
-                  (limitStatus.percentage ?? 0) >= 70 ? "bg-orange-500" :
-                  "bg-green-500"
-                }`}
-                style={{ width: `${limitStatus.percentage ?? 0}%` }}
-                data-testid="progress-monthly-limit"
-              />
-            </div>
-            <div className="flex justify-between mt-1">
-              <span className="text-xs text-muted-foreground">{limitStatus.percentage ?? 0}% utilisé</span>
-              <span className="text-xs text-muted-foreground">
-                Disponible : <strong>{(limitStatus.remaining ?? 0).toLocaleString("fr-FR")} {limitStatus.currency}</strong>
-              </span>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       <Card>
         <CardHeader className="pb-3">
