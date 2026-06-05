@@ -668,7 +668,7 @@ export default function Merchant() {
             });
           }
         } else {
-          countdown.startCountdown();
+          if (showOtpOnForm) countdown.startCountdown();
           setPaymentStage("polling");
           if (token) {
             saveMerchantPaymentState(token, {

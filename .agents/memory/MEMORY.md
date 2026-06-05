@@ -1,2 +1,2 @@
-- [Restriction pays par secteur](country-sector-restriction.md) — multiCountryEnabled: override allowedCountries (affichage) + isCountryBlockedForOwner (enforcement) sur toutes routes; deposits filtré seulement si ?scope=self.
-- [Country lists divergence](country-lists.md) — signup uses ALLOWED_REGISTRATION_COUNTRIES; profile-edit & payin/payout keep separate divergent lists.
+- [PawaPay metadata submerchant](pawapay-submerchant-metadata.md) — ne JAMAIS envoyer submerchantLegalName/Segment à PawaPay sans feature activée côté compte.
+- [Double countdown pattern](double-countdown-pattern.md) — ne démarrer countdown qu'à un seul endroit : onSubmit (!showOtpOnForm) OU onSuccess (showOtpOnForm), jamais les deux.

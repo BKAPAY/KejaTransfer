@@ -430,7 +430,6 @@ export default function Deposit() {
             description: response.ussdInstruction || "Generez votre code de paiement",
           });
         } else if (response.redirectUrl || response.omUrl) {
-          countdown.startCountdown();
           setPaymentStep("redirect");
           setOtpCode("");
           toast({
@@ -440,7 +439,7 @@ export default function Deposit() {
               : "Cliquez sur le bouton pour finaliser le paiement",
           });
         } else {
-          countdown.startCountdown();
+          if (currentOperatorNeedsOtp) countdown.startCountdown();
           setPaymentStep("polling");
           setOtpCode("");
         }

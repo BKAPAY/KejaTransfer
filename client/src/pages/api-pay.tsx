@@ -631,7 +631,7 @@ export default function ApiPay() {
       
       setPaymentStage(newStage);
       
-      if (newStage === "polling") {
+      if (newStage === "polling" && showOtpOnForm) {
         countdown.startCountdown();
       }
       
