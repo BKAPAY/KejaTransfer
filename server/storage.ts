@@ -519,6 +519,20 @@ export class DbStorage implements IStorage {
       .where(eq(schema.users.id, userId));
   }
 
+  async getKycDocuments(userId: string): Promise<{ kycIdFront: string | null; kycIdBack: string | null; kycSelfie: string | null; kycSignature: string | null } | undefined> {
+    const results = await db
+      .select({
+        kycIdFront: schema.users.kycIdFront,
+        kycIdBack: schema.users.kycIdBack,
+        kycSelfie: schema.users.kycSelfie,
+        kycSignature: schema.users.kycSignature,
+      })
+      .from(schema.users)
+      .where(eq(schema.users.id, userId))
+      .limit(1);
+    return results[0];
+  }
+
   async approveKyc(userId: string): Promise<User | undefined> {
     const results = await db
       .update(schema.users)
