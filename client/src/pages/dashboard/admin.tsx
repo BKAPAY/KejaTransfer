@@ -439,7 +439,7 @@ export default function Admin() {
     enabled: activeTab === "active7d",
   });
 
-  // Get all transactions for admin (recent 500 for display)
+  // Tout l'historique admin — sans limite
   const { data: allTransactions = [], isLoading: transactionsLoading } = useQuery<TransactionWithUser[]>({
     queryKey: ["/api/admin/all-transactions"],
     enabled: mainTab === "transactions",

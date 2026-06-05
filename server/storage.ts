@@ -136,7 +136,7 @@ export interface IStorage {
   getRecentApiPaymentByPhoneAmount(userId: string, phone: string, amount: number, secondsAgo: number): Promise<Transaction | undefined>;
   getRecentTransactionsByDescription(userId: string, description: string, since: Date): Promise<Transaction[]>;
   getAllPendingTransactions(): Promise<(Transaction & { user?: User })[]>;
-  getAllTransactionsForAdmin(limit?: number): Promise<(Transaction & { user?: User })[]>;
+  getAllTransactionsForAdmin(limit?: number): Promise<(Transaction & { user?: User })[]>; // sans limite par défaut
   createTransaction(transaction: InsertTransaction): Promise<Transaction>;
   updateTransactionStatus(id: string, status: string, paydunyaData?: any): Promise<Transaction | undefined>;
   updateTransaction(id: string, updates: Partial<Pick<Transaction, 'paydunyaToken' | 'country' | 'operator' | 'status' | 'metadata' | 'paydunyaReceiptUrl' | 'type' | 'description'>>): Promise<Transaction | undefined>;
@@ -1311,22 +1311,24 @@ export class DbStorage implements IStorage {
     return transactionsWithUsers;
   }
 
-  async getAllTransactionsForAdmin(limit: number = 500): Promise<(Transaction & { user?: User })[]> {
-    const allTransactions = await db
+  async getAllTransactionsForAdmin(limit?: number): Promise<(Transaction & { user?: User })[]> {
+    const query = db
       .select()
       .from(schema.transactions)
-      .orderBy(desc(schema.transactions.createdAt))
-      .limit(limit);
-    
-    // Fetch user info for each transaction
-    const transactionsWithUsers = await Promise.all(
-      allTransactions.map(async (tx) => {
-        const user = await this.getUser(tx.userId);
-        return { ...tx, user };
-      })
-    );
-    
-    return transactionsWithUsers;
+      .orderBy(desc(schema.transactions.createdAt));
+    const allTransactions = limit ? await query.limit(limit) : await query;
+
+    if (allTransactions.length === 0) return [];
+
+    // Récupérer les utilisateurs uniques en 2 requêtes au lieu de N+1
+    const userIds = [...new Set(allTransactions.map(tx => tx.userId))];
+    const users = await db
+      .select()
+      .from(schema.users)
+      .where(inArray(schema.users.id, userIds));
+    const userMap = new Map(users.map(u => [u.id, u]));
+
+    return allTransactions.map(tx => ({ ...tx, user: userMap.get(tx.userId) }));
   }
 
   async createTransaction(transaction: InsertTransaction): Promise<Transaction> {

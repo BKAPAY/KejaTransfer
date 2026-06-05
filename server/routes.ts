@@ -12544,11 +12544,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get all transactions for admin (with user info)
+  // Get all transactions for admin (sans limite — tout l'historique)
   app.get("/api/admin/all-transactions", requireAdmin, async (req: Request, res: Response) => {
     try {
-      const limit = parseInt(req.query.limit as string) || 500;
-      const transactions = await storage.getAllTransactionsForAdmin(limit);
+      const transactions = await storage.getAllTransactionsForAdmin();
       res.json(transactions);
     } catch (error: any) {
       console.error("Get all transactions error:", error);
