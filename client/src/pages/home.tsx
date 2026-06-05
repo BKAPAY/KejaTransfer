@@ -213,11 +213,13 @@ export default function Home() {
         <div className="container mx-auto px-2 sm:px-4 md:px-8 max-w-7xl relative z-10">
           <div className="space-y-3 sm:space-y-6 lg:space-y-10 max-w-3xl">
             <div className="space-y-2 sm:space-y-4 lg:space-y-6">
-              <h1 className="text-sm sm:text-base md:text-xl lg:text-4xl xl:text-5xl font-bold text-white leading-tight" style={{ textShadow: "0 0 24px rgba(139,92,246,0.5), 0 0 4px rgba(255,255,255,0.2)" }}>
-                Paiements Mobile Money pour l'Afrique
+              <h1 className="text-xl sm:text-2xl md:text-4xl lg:text-5xl xl:text-6xl font-extrabold text-white leading-tight tracking-tight" style={{ textShadow: "0 0 24px rgba(139,92,246,0.5), 0 0 4px rgba(255,255,255,0.2)" }}>
+                Paiements Mobile Money<br className="hidden sm:block" />{" "}
+                <span style={{ color: "rgba(134,239,172,1)" }}>&amp; Boutique Personnalisée</span>{" "}
+                pour l'Afrique
               </h1>
               <p className="text-xs sm:text-sm md:text-base lg:text-xl xl:text-2xl leading-relaxed" style={{ color: "rgba(220,215,255,0.80)" }}>
-                Acceptez les paiements Orange Money, MTN, Moov, Wave et plus dans plus de 17 pays. Plateforme simple, sécurisée et fiable.
+                Acceptez les paiements via Orange Money, MTN, Moov, Wave et d'autres opérateurs. Créez votre boutique en ligne et développez votre activité commerciale partout en Afrique.
               </p>
             </div>
             <div className="flex flex-wrap gap-2 sm:gap-4 lg:gap-5">
@@ -246,8 +248,8 @@ export default function Home() {
       <section className="py-6 sm:py-8 md:py-12 lg:py-16 bg-card overflow-hidden">
         <div className="container mx-auto px-2 sm:px-4 md:px-8 max-w-7xl">
           <div className="text-center mb-4 sm:mb-8">
-            <h2 className="animate-on-scroll anim-fade-up text-lg sm:text-xl md:text-3xl lg:text-4xl font-bold mb-2 sm:mb-4 text-foreground">Disponible dans plus de 17 pays</h2>
-            <p className="animate-on-scroll anim-fade-up anim-delay-1 text-xs sm:text-sm md:text-base lg:text-lg text-muted-foreground">Couvrant toute l'Afrique francophone et anglophone</p>
+            <h2 className="animate-on-scroll anim-fade-up text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extrabold mb-2 sm:mb-4 text-foreground tracking-tight">Collectez vos Paiements<br className="hidden sm:block" /> dans Toute l'Afrique</h2>
+            <p className="animate-on-scroll anim-fade-up anim-delay-1 text-xs sm:text-sm md:text-base lg:text-lg text-muted-foreground">Présent dans plusieurs pays d'Afrique francophone et anglophone</p>
           </div>
           <div className="flex gap-2 sm:gap-4 carousel-scroll">
             {[...countries, ...countries].map((country, index) => (
@@ -466,7 +468,7 @@ export default function Home() {
                     </div>
                     <div className="flex items-center gap-2">
                       <ChevronRight className="w-3.5 h-3.5 text-primary flex-shrink-0" />
-                      <span>Disponible dans plus de 17 pays africains</span>
+                      <span>Présent dans plusieurs pays africains</span>
                     </div>
                   </div>
                   <Link href="/signup">
