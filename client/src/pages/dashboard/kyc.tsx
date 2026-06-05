@@ -110,7 +110,8 @@ export default function KYC() {
       s.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     setOcrScanning(true);
     try {
-      const result: any = await apiRequest("POST", "/api/kyc/scan-id", { imageData });
+      const res = await apiRequest("POST", "/api/kyc/scan-id", { imageData });
+      const result: any = await res.json();
       const { firstName: extFirst, lastName: extLast } = result;
       if (extFirst && extLast) {
         const uFirst = normalize(user?.firstName || "");
