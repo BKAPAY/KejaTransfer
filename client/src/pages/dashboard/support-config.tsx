@@ -68,14 +68,6 @@ export default function SupportConfig() {
   });
 
   const handleSave = () => {
-    if (!supportEmail || !supportPhone || !whatsappLink) {
-      toast({
-        title: "Erreur",
-        description: "Veuillez remplir les champs obligatoires (email, telephone, lien communaute)",
-        variant: "destructive",
-      });
-      return;
-    }
     updateMutation.mutate();
   };
 
@@ -168,7 +160,7 @@ export default function SupportConfig() {
           <div className="space-y-2">
             <Label htmlFor="whatsappLink" className="flex items-center gap-2">
               <SiWhatsapp className="w-4 h-4 text-green-600" />
-              Lien Communaute WhatsApp
+              Lien Chaîne WhatsApp
             </Label>
             <Input
               id="whatsappLink"
@@ -232,7 +224,7 @@ export default function SupportConfig() {
             <div className="border rounded-lg p-4">
               <div className="flex items-center gap-2 mb-2">
                 <SiWhatsapp className="w-4 h-4 text-green-600" />
-                <span className="font-medium">Communaute</span>
+                <span className="font-medium">Chaîne WhatsApp</span>
               </div>
               <p className="text-sm text-muted-foreground truncate">{whatsappLink || "Non defini"}</p>
             </div>
