@@ -447,8 +447,9 @@ function MaintenanceGuard({ children }: { children: React.ReactNode }) {
 
   // Ne jamais renvoyer null : le contenu doit se charger dessous pendant que le splash est visible.
   // Quand la vérification est terminée, on affiche la page maintenance si besoin.
+  // Exclure "/" et "/login" : "/" pour la landing, "/login" pour que l'admin puisse se connecter.
   if (checked && !authLoading && maintenanceEnabled && !(user?.isAdmin === true)) {
-    if (location !== "/") {
+    if (location !== "/" && location !== "/login") {
       return <MaintenancePage />;
     }
   }

@@ -10,7 +10,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Mail, Lock, KeyRound, ArrowLeft, AlertTriangle, Loader2 } from "lucide-react";
 
@@ -66,6 +66,26 @@ export default function Login() {
   const [credentials, setCredentials] = useState<LoginFormData | null>(null);
   const [resendCooldown, setResendCooldown] = useState(0);
   const [verificationCode, setVerificationCode] = useState("");
+
+  const { data: maintenanceData } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/platform-settings/maintenance"],
+    staleTime: 30000,
+  });
+  const maintenanceEnabled = maintenanceData?.enabled === true;
+
+  const blockIfMaintenance = async (user: any) => {
+    if (maintenanceEnabled && !user?.isAdmin) {
+      await apiRequest("POST", "/api/auth/logout", {});
+      queryClient.setQueryData(["/api/auth/me"], null);
+      toast({
+        title: "Accès refusé",
+        description: "La plateforme est en maintenance. Seuls les administrateurs peuvent se connecter.",
+        variant: "destructive",
+      });
+      return true;
+    }
+    return false;
+  };
 
   // Load persisted cooldown state when credentials change
   useEffect(() => {
@@ -127,8 +147,10 @@ export default function Login() {
       const response = await apiRequest("POST", "/api/auth/login/send-code", data);
       return await response.json();
     },
-    onSuccess: (response: any, data) => {
+    onSuccess: async (response: any, data) => {
       if (response.requiresCode === false || !response.requiresCode) {
+        // Bloquer les non-admins en mode maintenance
+        if (await blockIfMaintenance(response.user)) return;
         // Injecter l'utilisateur dans le cache immédiatement → navigation sans délai
         if (response.user) queryClient.setQueryData(["/api/auth/me"], response.user);
         if (response.user?.accountType === "business") {
@@ -168,10 +190,12 @@ export default function Login() {
       const response = await apiRequest("POST", "/api/auth/login", data);
       return await response.json();
     },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       if (credentials?.email) {
         clearStorage(credentials.email);
       }
+      // Bloquer les non-admins en mode maintenance
+      if (await blockIfMaintenance(data.user)) return;
       // Injecter l'utilisateur dans le cache immédiatement → navigation sans délai
       if (data.user) queryClient.setQueryData(["/api/auth/me"], data.user);
       if (data.user?.accountType === "business") {
