@@ -1877,7 +1877,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       console.error("[Signup] Error:", error);
-      res.status(400).json({ error: "Erreur lors de l'inscription" });
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors[0]?.message || "Données invalides" });
+      }
+      res.status(500).json({ error: "Erreur lors de l'inscription" });
     }
   });
 
@@ -2111,18 +2114,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Email ou mot de passe incorrect" });
       }
 
-      // Verify the login code
-      if (!verificationCode || typeof verificationCode !== "string") {
-        return res.status(400).json({ error: "Code de vérification requis" });
-      }
+      // Verify the login code (skip if 2FA is disabled)
+      const tfaEnabledForLogin = await isEmailSendingEnabled("login");
+      if (tfaEnabledForLogin) {
+        if (!verificationCode || typeof verificationCode !== "string") {
+          return res.status(400).json({ error: "Code de vérification requis" });
+        }
 
-      const isValid = await storage.verifyCode(email, verificationCode, "login");
-      if (!isValid) {
-        return res.status(400).json({ error: "Code de connexion invalide ou expiré" });
-      }
+        const isValid = await storage.verifyCode(email, verificationCode, "login");
+        if (!isValid) {
+          return res.status(400).json({ error: "Code de connexion invalide ou expiré" });
+        }
 
-      // Mark code as used
-      await storage.markCodeAsUsed(email, verificationCode, "login");
+        // Mark code as used
+        await storage.markCodeAsUsed(email, verificationCode, "login");
+      }
 
       // Reset rate limits on successful login
       resetRateLimit(loginRateLimitKey);
