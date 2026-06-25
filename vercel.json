@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "installCommand": "bash install.sh",
+  "installCommand": "npm install",
   "buildCommand": "npm run build",
   "outputDirectory": "dist/client",
   "routes": [
