@@ -557,9 +557,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Open Graph social media preview routes (must be before Vite/SPA handler)
   registerOgRoutes(app);
 
-  // Configure session - SESSION_SECRET doit être défini dans les variables d'environnement
   if (!process.env.SESSION_SECRET) {
-    console.error("ERREUR: SESSION_SECRET doit être configuré dans les variables d'environnement");
+    throw new Error("SESSION_SECRET must be configured in environment variables");
+  }
+  if (!process.env.DATABASE_URL) {
+    throw new Error("DATABASE_URL must be configured in environment variables");
   }
 
   // Enable trust proxy for production (behind reverse proxy)
@@ -580,7 +582,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         tableName: "session", // Table will be created automatically
         createTableIfMissing: true,
       }),
-      secret: process.env.SESSION_SECRET!,
+      secret: process.env.SESSION_SECRET,
+      proxy: process.env.NODE_ENV === "production",
       resave: false,
       saveUninitialized: false,
       rolling: true, // Reset expiration on each request (activity extends session)

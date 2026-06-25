@@ -317,7 +317,7 @@ router.post("/api/crypto/create-payment", async (req: Request, res: Response) =>
     const amountWithMarkup = customerAmount * (1 + cryptoSettings.markupPercent / 100);
     const usdAmount = amountWithMarkup * conversionToUsdRate;
 
-    const baseUrl = process.env.BASE_URL || `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`;
+    const baseUrl = process.env.BASE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:5000");
     const ipnCallbackUrl = `${baseUrl}/api/webhooks/nowpayments`;
 
     const payment = await client.createPayment({
@@ -823,7 +823,7 @@ router.post("/api/crypto/create-withdrawal", async (req: Request, res: Response)
 
     await storage.subtractFundsFromUser(user.id, totalToDebit);
 
-    const baseUrl = process.env.BASE_URL || `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`;
+    const baseUrl = process.env.BASE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:5000");
     const ipnCallbackUrl = `${baseUrl}/api/webhooks/nowpayments/payout`;
 
     let payoutId: string | null = null;

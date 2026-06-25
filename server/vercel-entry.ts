@@ -6,6 +6,21 @@
 let app: any = null;
 let appReady: Promise<void> | null = null;
 let appError: string | null = null;
+let bootstrapReady: Promise<void> | null = null;
+
+function bootstrapDbOnce() {
+  if (bootstrapReady) return bootstrapReady;
+  bootstrapReady = (async () => {
+    const { bootstrapDatabase } = require('./db-bootstrap') as {
+      bootstrapDatabase: () => Promise<void>;
+    };
+    await bootstrapDatabase();
+  })().catch((err: any) => {
+    bootstrapReady = null;
+    throw err;
+  });
+  return bootstrapReady;
+}
 
 function buildApp() {
   if (appReady) return appReady;
@@ -36,16 +51,17 @@ function buildApp() {
           missing,
           hint: missing.length
             ? 'Add these in Vercel: Settings -> Environment Variables -> Redeploy'
-            : 'Server ready - 695 users in DB',
+            : 'Server ready',
         });
       });
 
-      // Load the full route set lazily
-      const { registerRoutes } = require('./routes') as {
-        registerRoutes: (app: any) => Promise<any>;
-      };
-
-      registerRoutes(serverApp)
+      bootstrapDbOnce()
+        .then(() => {
+          const { registerRoutes } = require('./routes') as {
+            registerRoutes: (app: any) => Promise<any>;
+          };
+          return registerRoutes(serverApp);
+        })
         .then(() => {
           app = serverApp;
           resolve();
