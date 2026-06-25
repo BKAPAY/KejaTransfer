@@ -6,7 +6,7 @@ import OpenAI from "openai";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import pg from "pg";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import { z } from "zod";
 import fs from "fs";
 import path from "path";
