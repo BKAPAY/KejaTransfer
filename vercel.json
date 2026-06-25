@@ -4,8 +4,7 @@
   "outputDirectory": "dist",
   "devCommand": "npm run dev",
   "env": {
-    "NODE_ENV": "production",
-    "DATABASE_URL": "@database_url"
+    "NODE_ENV": "production"
   },
   "functions": {
     "server/index.ts": {
