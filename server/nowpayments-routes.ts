@@ -5,7 +5,7 @@ import { convertCurrency } from "./currency-converter";
 import QRCode from "qrcode";
 import { getFeeFromDatabase, calculateOutgoingFee } from "./utils/fees";
 import { sendPaymentCallback } from "./utils/callback";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import { safeRefundOutgoingTransaction } from "./payment-polling";
 
 const router = Router();
