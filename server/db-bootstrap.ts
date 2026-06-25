@@ -5,7 +5,7 @@ import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
 import { users } from "../shared/schema";
 import { eq } from "drizzle-orm";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 
 interface MigrationEntry {
   idx: number;
