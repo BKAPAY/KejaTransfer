@@ -85234,7 +85234,10 @@ async function registerRoutes(app2) {
       });
     } catch (error) {
       console.error("[Signup] Error:", error);
-      res.status(400).json({ error: "Erreur lors de l'inscription" });
+      if (error instanceof external_exports.ZodError) {
+        return res.status(400).json({ error: error.errors[0]?.message || "Donn\xE9es invalides" });
+      }
+      res.status(500).json({ error: "Erreur lors de l'inscription" });
     }
   });
   app2.post("/api/auth/forgot-password/send-code", async (req, res) => {
@@ -85404,14 +85407,17 @@ async function registerRoutes(app2) {
       if (!validPassword) {
         return res.status(401).json({ error: "Email ou mot de passe incorrect" });
       }
-      if (!verificationCode || typeof verificationCode !== "string") {
-        return res.status(400).json({ error: "Code de v\xE9rification requis" });
+      const tfaEnabledForLogin = await isEmailSendingEnabled("login");
+      if (tfaEnabledForLogin) {
+        if (!verificationCode || typeof verificationCode !== "string") {
+          return res.status(400).json({ error: "Code de v\xE9rification requis" });
+        }
+        const isValid2 = await storage.verifyCode(email, verificationCode, "login");
+        if (!isValid2) {
+          return res.status(400).json({ error: "Code de connexion invalide ou expir\xE9" });
+        }
+        await storage.markCodeAsUsed(email, verificationCode, "login");
       }
-      const isValid2 = await storage.verifyCode(email, verificationCode, "login");
-      if (!isValid2) {
-        return res.status(400).json({ error: "Code de connexion invalide ou expir\xE9" });
-      }
-      await storage.markCodeAsUsed(email, verificationCode, "login");
       resetRateLimit(loginRateLimitKey);
       resetRateLimit(`code:${email.toLowerCase()}`);
       req.session.userId = user2.id;
