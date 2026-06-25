@@ -30,6 +30,23 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/client"),
     emptyOutDir: true,
+    chunkSizeWarningLimit: 1500,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          "vendor-react": ["react", "react-dom"],
+          "vendor-ui": [
+            "@radix-ui/react-accordion",
+            "@radix-ui/react-alert-dialog",
+            "@radix-ui/react-aspect-ratio",
+            "@radix-ui/react-avatar",
+            "@radix-ui/react-checkbox",
+          ],
+          "vendor-charts": ["recharts"],
+          "vendor-utils": ["lodash", "date-fns", "zod"],
+        },
+      },
+    },
   },
   server: {
     fs: {
