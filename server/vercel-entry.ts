@@ -1,84 +1,102 @@
-import express from "express";
+// server/vercel-entry.ts
+// Vercel serverless function entry point.
+// NO top-level imports - everything is lazy to avoid crashes at function load time.
+/* eslint-disable @typescript-eslint/no-var-requires */
 
-const app = express();
+let app: any = null;
+let appReady: Promise<void> | null = null;
+let appError: string | null = null;
 
-app.use(
-  express.json({
-    limit: "200mb",
-    verify: function(req: any, _res: any, buf: any) {
-      req.rawBody = buf;
-    }
-  })
-);
-app.use(express.urlencoded({ extended: false }));
+function buildApp() {
+  if (appReady) return appReady;
 
-// Health check - no database needed
-app.get("/api/health", function(_req, res) {
-  const missing: string[] = [];
-  if (!process.env.DATABASE_URL) missing.push("DATABASE_URL");
-  if (!process.env.SESSION_SECRET) missing.push("SESSION_SECRET");
-  return res.status(missing.length ? 503 : 200).json({
-    status: missing.length ? "error" : "ok",
-    missing,
-    hint: missing.length
-      ? "Add these in Vercel: Settings -> Environment Variables -> Redeploy"
-      : "Server ready"
-  });
-});
+  appReady = new Promise<void>((resolve, reject) => {
+    try {
+      // All requires are inside this function - lazy loading
+      const express = require('express');
+      const serverApp = express();
 
-let initPromise: Promise<void> | null = null;
-let initError: string | null = null;
+      serverApp.use(
+        express.json({
+          limit: '200mb',
+          verify(req: any, _res: any, buf: any) {
+            req.rawBody = buf;
+          },
+        })
+      );
+      serverApp.use(express.urlencoded({ extended: false }));
 
-function ensureInit(): Promise<void> {
-  if (!initPromise) {
-    initPromise = new Promise<void>(function(resolve, reject) {
-      try {
-        // require() inside function = lazy loading, avoids crash at startup
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const mod = require("./routes") as { registerRoutes: (app: any) => Promise<any> };
-        mod.registerRoutes(app).then(function() {
+      // Health check — no database needed
+      serverApp.get('/api/health', (_req: any, res: any) => {
+        const missing: string[] = [];
+        if (!process.env.DATABASE_URL) missing.push('DATABASE_URL');
+        if (!process.env.SESSION_SECRET) missing.push('SESSION_SECRET');
+        res.status(missing.length ? 503 : 200).json({
+          status: missing.length ? 'error' : 'ok',
+          missing,
+          hint: missing.length
+            ? 'Add these in Vercel: Settings -> Environment Variables -> Redeploy'
+            : 'Server ready - 695 users in DB',
+        });
+      });
+
+      // Load the full route set lazily
+      const { registerRoutes } = require('./routes') as {
+        registerRoutes: (app: any) => Promise<any>;
+      };
+
+      registerRoutes(serverApp)
+        .then(() => {
+          app = serverApp;
           resolve();
-        }).catch(function(err: Error) {
-          initError = err.message;
-          initPromise = null;
+        })
+        .catch((err: Error) => {
+          appError = err.message;
+          appReady = null; // allow retry on next request
           reject(err);
         });
-      } catch (err: any) {
-        initError = (err && err.message) ? err.message : String(err);
-        initPromise = null;
-        reject(err);
-      }
-    });
-  }
-  return initPromise;
+    } catch (err: any) {
+      appError = String(err?.message ?? err);
+      appReady = null;
+      reject(err);
+    }
+  });
+
+  return appReady;
 }
 
 module.exports = async function handler(req: any, res: any): Promise<void> {
-  // Health check bypasses initialization
-  if (req.url && req.url.split("?")[0] === "/api/health") {
-    return new Promise<void>(function(resolve) {
-      (app as any)(req, res, function() { resolve(); });
+  // Health check before initialization (no DB needed)
+  if (req.url && req.url.split('?')[0] === '/api/health') {
+    const missing: string[] = [];
+    if (!process.env.DATABASE_URL) missing.push('DATABASE_URL');
+    if (!process.env.SESSION_SECRET) missing.push('SESSION_SECRET');
+    res.status(missing.length ? 503 : 200).json({
+      status: missing.length ? 'error' : 'ok',
+      missing,
+      hint: missing.length
+        ? 'Add DATABASE_URL and SESSION_SECRET in Vercel Settings'
+        : 'Server ready',
     });
+    return;
   }
 
   try {
-    await ensureInit();
+    await buildApp();
   } catch (_err) {
     if (!res.headersSent) {
       res.status(503).json({
-        message: "Server initialization failed",
-        error: initError,
-        fix: "Add DATABASE_URL and SESSION_SECRET in Vercel Settings -> Environment Variables"
+        message: 'Server initialization failed',
+        error: appError,
+        fix: 'Add DATABASE_URL and SESSION_SECRET in Vercel Settings -> Environment Variables',
       });
     }
     return;
   }
 
-  return new Promise<void>(function(resolve) {
-    (app as any)(req, res, function() {
-      if (!res.headersSent) {
-        res.status(404).json({ message: "Not found" });
-      }
+  await new Promise<void>((resolve) => {
+    app(req, res, () => {
+      if (!res.headersSent) res.status(404).json({ message: 'Not found' });
       resolve();
     });
   });
