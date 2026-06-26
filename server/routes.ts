@@ -2298,7 +2298,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  const uploadsDir = path.join(process.cwd(), "uploads", "videos");
+  const uploadsDir = process.env.NODE_ENV === "production" ? "/tmp/bkapay-uploads/videos" : path.join(process.cwd(), "uploads", "videos");
   if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir, { recursive: true });
   }
@@ -15576,7 +15576,7 @@ Ton role est de reformuler et ameliorer les messages que l'administrateur souhai
       if (!data) return res.status(400).json({ error: "Données manquantes" });
       const ext = (mimeType?.split("/")[1] || "jpg").replace("jpeg", "jpg");
       const unique = `${Date.now()}-${randomUUID().slice(0, 8)}.${ext}`;
-      const uploadDir = path.join(process.cwd(), "public", "uploads");
+      const uploadDir = process.env.NODE_ENV === "production" ? "/tmp/bkapay-uploads/images" : path.join(process.cwd(), "public", "uploads");
       if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
       fs.writeFileSync(path.join(uploadDir, unique), Buffer.from(data, "base64"));
       return res.json({ url: `/uploads/${unique}` });
@@ -16125,3 +16125,4 @@ Ton role est de reformuler et ameliorer les messages que l'administrateur souhai
 
   return httpServer;
 }
+
