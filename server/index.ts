@@ -10,6 +10,7 @@ const app = express();
 
 let bootstrapComplete = false;
 let bootstrapError: string | null = null;
+let bootstrapStarted = false;
 
 declare module 'http' {
   interface IncomingMessage {
@@ -75,6 +76,30 @@ app.get("/healthz", (_req, res) => {
     return res.status(503).json({ status: "starting", message: "Database bootstrap in progress" });
   }
   return res.status(200).json({ status: "healthy" });
+});
+
+// ── Bootstrap check middleware ──────────────────────────────────────────────────
+// Rejette les requêtes si bootstrap n'est pas complète (sauf healthz)
+app.use((req, res, next) => {
+  if (req.path === "/healthz") return next();
+  
+  if (bootstrapError) {
+    console.error("❌ Bootstrap failed, rejecting request:", bootstrapError);
+    return res.status(503).json({ 
+      status: "error", 
+      message: "Database bootstrap failed. Please check logs.",
+      error: bootstrapError 
+    });
+  }
+  
+  if (!bootstrapComplete) {
+    return res.status(503).json({ 
+      status: "starting", 
+      message: "Database bootstrap in progress, please try again in a moment" 
+    });
+  }
+  
+  next();
 });
 
 app.use((req, res, next) => {
@@ -143,6 +168,10 @@ app.use((req, res, next) => {
 
     (async () => {
       try {
+        if (bootstrapStarted) return;
+        bootstrapStarted = true;
+        
+        console.log("🔄 Starting database bootstrap at runtime...");
         await bootstrapDatabase();
         bootstrapComplete = true;
         log("✅ Bootstrap complete, starting payment polling");
@@ -152,7 +181,9 @@ app.use((req, res, next) => {
       } catch (error) {
         bootstrapError = String(error);
         log("❌ Database bootstrap failed: " + bootstrapError);
-        setTimeout(() => process.exit(1), 5000);
+        console.error("Bootstrap error details:", error);
+        // Don't exit immediately - let the app serve error responses
+        // setTimeout(() => process.exit(1), 5000);
       }
     })();
   });
