@@ -1,7 +1,7 @@
 {
   "version": 2,
-  "installCommand": "npm install --legacy-peer-deps --no-audit",
-  "buildCommand": "npm install --legacy-peer-deps --no-audit && npm run build",
+  "installCommand": "npm install --legacy-peer-deps --no-audit --include=dev",
+  "buildCommand": "npm install --legacy-peer-deps --no-audit --include=dev && npm run build",
   "outputDirectory": "dist/client",
   "env": {
     "NODE_ENV": "production"
