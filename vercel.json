@@ -1,8 +1,11 @@
 {
   "version": 2,
-  "installCommand": "npm install --legacy-peer-deps",
-  "buildCommand": "npm install && npm run build",
+  "installCommand": "npm install --legacy-peer-deps --no-audit",
+  "buildCommand": "npm install --legacy-peer-deps --no-audit && npm run build",
   "outputDirectory": "dist/client",
+  "env": {
+    "NODE_ENV": "production"
+  },
   "routes": [
     {
       "src": "/api/(.*)",
