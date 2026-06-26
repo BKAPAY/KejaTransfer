@@ -4913,7 +4913,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           },
           store: { name: "BKApay" },
           custom_data: { session_id: session.id, type: "api_payment", country, operator, phone: customerPhone },
-          actions: { callback_url: `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/paydunya` },
+          actions: { callback_url: `${getPublicBaseUrl()}/api/webhooks/paydunya` },
         };
 
         const paydunyaResp = await callPaydunyaAPI("/checkout-invoice/create", paydunyaData);
@@ -11607,7 +11607,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           customerPhone: customerPhone,
           country: country,
           operator: operator,
-          callbackUrl: `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/fedapay`,
+          callbackUrl: `${getPublicBaseUrl()}/api/webhooks/fedapay`,
         });
 
         if (result.success && result.transactionId) {

@@ -7,8 +7,8 @@ import {
   createFeeXPayPayout,
   translateFeeXPayError,
 } from "./feexpay";
-import {
 import { getPublicBaseUrl } from "./utils/public-base-url";
+import {
   FEEXPAY_COUNTRIES,
   getCurrencyForCountry,
   getNetworkKey,
