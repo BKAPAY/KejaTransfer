@@ -19,10 +19,17 @@ async function bootstrapDatabase() {
   // Ensure upload directories exist - use /tmp on Vercel, ./uploads locally
   console.log("📁 Creating upload directories...");
   try {
-    const uploadBase = process.env.NODE_ENV === "production" 
-      ? "/tmp/bkapay-uploads" 
-      : join(process.cwd(), "uploads");
+    let uploadBase: string;
     
+    // On Vercel, always use /tmp
+    if (process.env.VERCEL || process.env.NODE_ENV === "production") {
+      uploadBase = "/tmp/bkapay-uploads";
+    } else {
+      // Locally, use project root + uploads
+      uploadBase = join(process.cwd(), "uploads");
+    }
+    
+    console.log(`📁 Using upload base: ${uploadBase}`);
     mkdirSync(uploadBase, { recursive: true });
     mkdirSync(join(uploadBase, "videos"), { recursive: true });
     mkdirSync(join(uploadBase, "images"), { recursive: true });
