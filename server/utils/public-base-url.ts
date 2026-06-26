@@ -1,3 +1,6 @@
+const PRODUCTION_FALLBACK_URL = "https://bkapay.com";
+const DEVELOPMENT_FALLBACK_URL = "http://localhost:5000";
+
 function normalizeBaseUrl(value: string): string {
   const trimmed = value.trim();
   const withProtocol = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
@@ -19,6 +22,6 @@ export function getPublicBaseUrl(): string {
   }
 
   return process.env.NODE_ENV === "production"
-    ? "https://bkapay.com"
-    : "http://localhost:5000";
+    ? PRODUCTION_FALLBACK_URL
+    : DEVELOPMENT_FALLBACK_URL;
 }
