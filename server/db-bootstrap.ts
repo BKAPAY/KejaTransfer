@@ -16,15 +16,20 @@ async function bootstrapDatabase() {
 
   console.log("🔄 Starting database bootstrap...");
 
-  // Ensure upload directories exist
+  // Ensure upload directories exist - use /tmp on Vercel, ./uploads locally
   console.log("📁 Creating upload directories...");
   try {
-    mkdirSync(join(process.cwd(), "uploads"), { recursive: true });
-    mkdirSync(join(process.cwd(), "uploads", "videos"), { recursive: true });
-    mkdirSync(join(process.cwd(), "uploads", "images"), { recursive: true });
-    console.log("✅ Upload directories ready");
+    const uploadBase = process.env.NODE_ENV === "production" 
+      ? "/tmp/bkapay-uploads" 
+      : join(process.cwd(), "uploads");
+    
+    mkdirSync(uploadBase, { recursive: true });
+    mkdirSync(join(uploadBase, "videos"), { recursive: true });
+    mkdirSync(join(uploadBase, "images"), { recursive: true });
+    console.log(`✅ Upload directories ready at ${uploadBase}`);
   } catch (e) {
     console.error("⚠️ Upload directories error:", e);
+    // Continue anyway - uploads might fail but bootstrap shouldn't stop
   }
 
   const client = postgres(DATABASE_URL, { max: 1 });
