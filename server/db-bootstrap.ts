@@ -4,6 +4,8 @@ import postgres from "postgres";
 import { users } from "../shared/schema";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
+import { mkdirSync } from "fs";
+import { join } from "path";
 
 async function bootstrapDatabase() {
   const DATABASE_URL = process.env.DATABASE_URL;
@@ -13,6 +15,17 @@ async function bootstrapDatabase() {
   }
 
   console.log("🔄 Starting database bootstrap...");
+
+  // Ensure upload directories exist
+  console.log("📁 Creating upload directories...");
+  try {
+    mkdirSync(join(process.cwd(), "uploads"), { recursive: true });
+    mkdirSync(join(process.cwd(), "uploads", "videos"), { recursive: true });
+    mkdirSync(join(process.cwd(), "uploads", "images"), { recursive: true });
+    console.log("✅ Upload directories ready");
+  } catch (e) {
+    console.error("⚠️ Upload directories error:", e);
+  }
 
   const client = postgres(DATABASE_URL, { max: 1 });
   const db = drizzle(client);
