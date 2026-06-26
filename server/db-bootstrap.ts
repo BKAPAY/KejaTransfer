@@ -1,4 +1,5 @@
 import { readFileSync } from "fs";
+import { join } from "path";
 import { createHash } from "crypto";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
@@ -40,7 +41,10 @@ async function bootstrapDatabase() {
   try {
     // Step 1: Read migration journal
     console.log("📖 Reading migration journal...");
-    const journalPath = "./migrations/meta/_journal.json";
+    const migrationsDir = join(process.cwd(), "migrations");
+    const journalPath = join(migrationsDir, "meta", "_journal.json");
+    console.log(`📁 Using migrations path: ${journalPath}`);
+    
     const journal: MigrationJournal = JSON.parse(readFileSync(journalPath, "utf-8"));
     console.log(`✅ Found ${journal.entries.length} migration(s) in journal`);
 
@@ -119,7 +123,7 @@ async function bootstrapDatabase() {
         await client.begin(async (tx) => {
           for (let i = 0; i < journal.entries.length; i++) {
             const entry = journal.entries[i];
-            const sqlPath = `./migrations/${entry.tag}.sql`;
+            const sqlPath = join(migrationsDir, `${entry.tag}.sql`);
             
             try {
               const sqlContent = readFileSync(sqlPath, "utf-8");
@@ -152,7 +156,7 @@ async function bootstrapDatabase() {
 
     // Step 5: Run the Drizzle migrator
     console.log("📋 Running Drizzle migrator...");
-    await migrate(db, { migrationsFolder: "./migrations" });
+    await migrate(db, { migrationsFolder: migrationsDir });
     console.log("✅ Migrations completed successfully!");
 
     await client.end();
