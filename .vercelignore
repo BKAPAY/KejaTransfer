@@ -6,3 +6,4 @@ node_modules/
 dist/
 .next/
 migrations/
+api/index.ts
