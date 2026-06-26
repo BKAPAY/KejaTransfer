@@ -6,6 +6,7 @@ import { safeRefundOutgoingTransaction, sendApiPayoutCallback, sendBusinessWebho
 import { trySendPaymentCallback } from "./utils/callback";
 import { sendPaymentDocumentsEmail } from "./email-service";
 import { 
+import { getPublicBaseUrl } from "./utils/public-base-url";
   createMbiyoPayPayin, 
   createMbiyoPayPayout, 
   getMbiyoPayTransactionStatus,
@@ -94,7 +95,7 @@ export async function handleMbiyoPayDeposit(
       countryCode: country,
       network: operator,
       orderId,
-      callbackUrl: `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/mbiyopay`,
+      callbackUrl: `${getPublicBaseUrl()}/api/webhooks/mbiyopay`,
       otpCode,
     });
 
@@ -261,7 +262,7 @@ export async function handleMbiyoPayWithdrawal(
           countryCode: country,
           network: operator,
           orderId,
-          callbackUrl: `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/mbiyopay`,
+          callbackUrl: `${getPublicBaseUrl()}/api/webhooks/mbiyopay`,
           beneficiaryName,
         });
 
@@ -410,7 +411,7 @@ export async function handleMbiyoPayTransfer(
           countryCode: country,
           network: operator,
           orderId,
-          callbackUrl: `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/mbiyopay`,
+          callbackUrl: `${getPublicBaseUrl()}/api/webhooks/mbiyopay`,
           beneficiaryName,
         });
 
@@ -565,7 +566,7 @@ export async function handleMbiyoPayPaymentLink(
       countryCode: country,
       network: operator,
       orderId,
-      callbackUrl: `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/mbiyopay`,
+      callbackUrl: `${getPublicBaseUrl()}/api/webhooks/mbiyopay`,
       otpCode,
     });
 
@@ -702,7 +703,7 @@ export async function handleMbiyoPayMerchantLink(
       countryCode: country,
       network: operator,
       orderId,
-      callbackUrl: `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/mbiyopay`,
+      callbackUrl: `${getPublicBaseUrl()}/api/webhooks/mbiyopay`,
       otpCode,
     });
 
@@ -816,7 +817,7 @@ export async function handleMbiyoPayApiPayment(
       countryCode: country,
       network: operator,
       orderId,
-      callbackUrl: `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/mbiyopay`,
+      callbackUrl: `${getPublicBaseUrl()}/api/webhooks/mbiyopay`,
       otpCode,
     });
 

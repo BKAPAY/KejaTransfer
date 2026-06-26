@@ -1,4 +1,5 @@
 import { storage } from "./storage";
+import { getPublicBaseUrl } from "./utils/public-base-url";
 
 const MBIYOPAY_BASE_URL = "https://dashboard.mbiyo.africa/api/v1";
 const MBIYOPAY_TIMEOUT_MS = 30000; // 30 seconds timeout for API calls
@@ -291,7 +292,7 @@ export async function createMbiyoPayPayin(params: MbiyoPayPayinParams): Promise<
       currency: params.currency,
       payment_method: "mobile_money",
       order_id: params.orderId || `BKAPAY-${Date.now()}`,
-      callback_url: params.callbackUrl || `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/mbiyopay`,
+      callback_url: params.callbackUrl || `${getPublicBaseUrl()}/api/webhooks/mbiyopay`,
       metadata,
     };
     
@@ -497,7 +498,7 @@ export async function createMbiyoPayPayout(params: MbiyoPayPayoutParams): Promis
       currency: params.currency,
       payment_method: "mobile_money",
       order_id: params.orderId || `BKAPAY-PAYOUT-${Date.now()}`,
-      callback_url: params.callbackUrl || `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/mbiyopay`,
+      callback_url: params.callbackUrl || `${getPublicBaseUrl()}/api/webhooks/mbiyopay`,
       metadata: {
         network: apiOperatorCode.toLowerCase(),
         phone_number: formattedPhone,

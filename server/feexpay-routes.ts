@@ -8,6 +8,7 @@ import {
   translateFeeXPayError,
 } from "./feexpay";
 import {
+import { getPublicBaseUrl } from "./utils/public-base-url";
   FEEXPAY_COUNTRIES,
   getCurrencyForCountry,
   getNetworkKey,
@@ -67,7 +68,7 @@ export async function handleFeeXPayDeposit(
       return { success: false, error: "Reseau non supporte" };
     }
 
-    const webhookUrl = `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/feexpay`;
+    const webhookUrl = `${getPublicBaseUrl()}/api/webhooks/feexpay`;
 
     if (operatorConfig.requiresOtp && !otpCode) {
       const formattedPhone = formatPhoneForFeeXPay(phone, countryCode);

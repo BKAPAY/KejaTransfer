@@ -1,3 +1,4 @@
+import { getPublicBaseUrl } from "./utils/public-base-url";
 interface MailtrapConfig {
   apiToken: string | null;
   senderEmail: string | null;
@@ -10,7 +11,7 @@ interface MailtrapConfig {
   enableKycRejected: boolean;
 }
 
-const BASE_URL = process.env.BASE_URL || "https://bkapay.com";
+const BASE_URL = getPublicBaseUrl();
 const LOGO_URL = `${BASE_URL}/bkapay-logo.png`;
 
 function getEmailLogoHeader(): string {

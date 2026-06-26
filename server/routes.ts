@@ -16,6 +16,7 @@ import { randomUUID, createHmac } from "crypto";
 import { calculateIncomingFee, calculateOutgoingFee, calculateOutgoingFeeFromNet, calculateCustomerPaysFee, getFeeFromDatabase, getDynamicFees, getDynamicOutgoingFees, getActiveProviderForCountry, getActivePayoutProviderForCountry, getIncomingExchangeFee, getOutgoingExchangeFee } from "./utils/fees";
 import { trySendPaymentCallback } from "./utils/callback";
 import { recordLoginLog } from "./utils/login-tracker";
+import { getPublicBaseUrl } from "./utils/public-base-url";
 import { 
   SOFTPAY_OPERATORS, 
   getOperatorKey, 
@@ -3723,7 +3724,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           countryCode: country,
           network: operator,
           orderId: `BKAPAY-APIPAY-${Date.now()}`,
-          callbackUrl: `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/mbiyopay`,
+          callbackUrl: `${getPublicBaseUrl()}/api/webhooks/mbiyopay`,
           otpCode,
         });
 
@@ -3923,7 +3924,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             customerPaysFee: apiKey.customerPaysFee,
           },
           actions: {
-            callback_url: `${process.env.BASE_URL || 'https://bkapay.com'}/api/webhooks/paydunya`,
+            callback_url: `${getPublicBaseUrl()}/api/webhooks/paydunya`,
           },
         };
 
@@ -4079,7 +4080,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         const afribaOrderId = `BKAPAY-APIPAY-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-        const baseUrl = process.env.BASE_URL || "https://bkapay.com";
+        const baseUrl = getPublicBaseUrl();
 
         console.log(`[API-PAY INIT] Using AfribaPay for ${country}/${operator}, phone=${customerPhone}, providerCurrency=${providerCurrency}`);
 
@@ -4310,7 +4311,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const feexResult = await createFeeXPayPayin(feexConfig, {
           networkKey: feexNetKey, shopId: feexConfig.shopId,
           amount: feexConvertedAmount, phoneNumber: feexPhone, otpCode: fxOtpCode,
-          callbackUrl: `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/feexpay`,
+          callbackUrl: `${getPublicBaseUrl()}/api/webhooks/feexpay`,
         });
 
         if (!feexResult.success) {
@@ -4593,7 +4594,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         expiresAt,
       });
 
-      const baseUrl = process.env.BASE_URL || "https://bkapay.com";
+      const baseUrl = getPublicBaseUrl();
 
       return res.json({
         success: true,
@@ -4994,7 +4995,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const conv = await convertCurrency(amountForProvider, ownerCurrency, providerCurrency);
           if (conv.success) convertedAmount = Math.floor(conv.convertedAmount);
         }
-        const result = await createMbiyoPayPayin({ amount: convertedAmount, currency: providerCurrency, phone: customerPhone, countryCode: country, network: operator, orderId: `BKAPAY-SESSION-${Date.now()}`, callbackUrl: `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/mbiyopay`, otpCode });
+        const result = await createMbiyoPayPayin({ amount: convertedAmount, currency: providerCurrency, phone: customerPhone, countryCode: country, network: operator, orderId: `BKAPAY-SESSION-${Date.now()}`, callbackUrl: `${getPublicBaseUrl()}/api/webhooks/mbiyopay`, otpCode });
         if (!result.success) {
           await storage.updatePaymentSession(session.id, { status: "pending" });
           return res.status(400).json({ success: false, error: result.error || "Erreur de paiement" });
@@ -5106,7 +5107,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const sessFeexRes = await feexPayin(feexConf, {
           networkKey: sessFeexNetKey, shopId: feexConf.shopId,
           amount: sessFeexAmount, phoneNumber: sessFeexPhone(customerPhone, country.toUpperCase()), otpCode,
-          callbackUrl: `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/feexpay`,
+          callbackUrl: `${getPublicBaseUrl()}/api/webhooks/feexpay`,
         });
 
         if (!sessFeexRes.success) {
@@ -5458,7 +5459,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               netMode: true,
             }),
           });
-          const callbackBaseUrl = process.env.BASE_URL || "https://bkapay.com";
+          const callbackBaseUrl = getPublicBaseUrl();
           const txId = tx.id;
           const userId = apiKey.userId;
           setTimeout(async () => {
@@ -6224,7 +6225,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           customerPaysFee: paymentLink.customerPaysFee,
         },
         actions: {
-          callback_url: `${process.env.BASE_URL || 'https://bkapay.com'}/api/webhooks/paydunya`,
+          callback_url: `${getPublicBaseUrl()}/api/webhooks/paydunya`,
         },
       };
 
@@ -6375,7 +6376,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           operator,
         },
         actions: {
-          callback_url: `${process.env.BASE_URL || 'https://bkapay.com'}/api/webhooks/paydunya`,
+          callback_url: `${getPublicBaseUrl()}/api/webhooks/paydunya`,
         },
       };
 
@@ -6516,7 +6517,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           phone,
         },
         actions: {
-          callback_url: `${process.env.BASE_URL || 'https://bkapay.com'}/api/webhooks/paydunya`,
+          callback_url: `${getPublicBaseUrl()}/api/webhooks/paydunya`,
         },
       };
 
@@ -6792,7 +6793,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           operator,
         },
         actions: {
-          callback_url: `${process.env.BASE_URL || 'http://localhost:5000'}/api/webhooks/paydunya`,
+          callback_url: `${getPublicBaseUrl()}/api/webhooks/paydunya`,
         },
       };
 
@@ -8056,7 +8057,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             orderId: orderId || null,
           },
           actions: {
-            callback_url: `${process.env.BASE_URL || 'https://bkapay.com'}/api/webhooks/paydunya`,
+            callback_url: `${getPublicBaseUrl()}/api/webhooks/paydunya`,
           },
         };
 
@@ -8367,7 +8368,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
           const bizTxId = bizTx.id;
           const bizUserId = user.id;
-          const callbackBaseUrl = process.env.BASE_URL || "https://bkapay.com";
+          const callbackBaseUrl = getPublicBaseUrl();
           setTimeout(async () => {
             try {
               const getInvoiceResp = await callPaydunyaAPIv2("/disburse/get-invoice", {
@@ -8783,7 +8784,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             phone,
           },
           actions: {
-            callback_url: `${process.env.BASE_URL || 'https://bkapay.com'}/api/webhooks/paydunya`,
+            callback_url: `${getPublicBaseUrl()}/api/webhooks/paydunya`,
           },
         };
 
@@ -9313,7 +9314,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
 
-        const callbackUrl = `${process.env.BASE_URL || 'https://bkapay.com'}/api/webhooks/paydunya-disburse`;
+        const callbackUrl = `${getPublicBaseUrl()}/api/webhooks/paydunya-disburse`;
 
         // Logique différente pour transfert vs retrait
         // TRANSFERT: L'utilisateur écrit 1000 → débité 1060 → fournisseur reçoit 1000 → destinataire reçoit 1000
@@ -9851,7 +9852,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             customerPaysFee: paymentLink.customerPaysFee,
           },
           actions: {
-            callback_url: `${process.env.BASE_URL || 'https://bkapay.com'}/api/webhooks/paydunya`,
+            callback_url: `${getPublicBaseUrl()}/api/webhooks/paydunya`,
           },
         };
 
@@ -10285,7 +10286,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             phone: customerPhone,
           },
           actions: {
-            callback_url: `${process.env.BASE_URL || 'https://bkapay.com'}/api/webhooks/paydunya`,
+            callback_url: `${getPublicBaseUrl()}/api/webhooks/paydunya`,
           },
         };
 
@@ -10659,7 +10660,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             phone: effectivePhone,
           },
           actions: {
-            callback_url: `${process.env.BASE_URL || 'https://bkapay.com'}/api/webhooks/paydunya`,
+            callback_url: `${getPublicBaseUrl()}/api/webhooks/paydunya`,
           },
         };
 
@@ -10904,7 +10905,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           amount: transaction.amount,
           phoneNumber: fxExecPhone(effectivePhone, country.toUpperCase()),
           otpCode: fxExecOtpCode,
-          callbackUrl: process.env.BASE_URL ? `${process.env.BASE_URL}/api/webhooks/feexpay` : undefined,
+          callbackUrl: `${getPublicBaseUrl()}/api/webhooks/feexpay`,
         });
 
         if (!fxExecResult.success) {
@@ -11129,9 +11130,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`[Withdrawal] Original phone: ${phone}, Cleaned phone: ${cleanPhone}, Country: ${country}, Operator: ${operator}`);
 
-      const callbackUrl = process.env.BASE_URL
-        ? `${process.env.BASE_URL}/api/webhooks/paydunya-disburse`
-        : "https://bkapay.com/api/webhooks/paydunya-disburse";
+      const callbackUrl = `${getPublicBaseUrl()}/api/webhooks/paydunya-disburse`;
 
       const txCurrency = ({ "CM": "XAF" } as Record<string,string>)[country?.toUpperCase()] || "XOF";
 
@@ -11308,7 +11307,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           operator: operator || "wave",
         },
         actions: {
-          callback_url: `${process.env.BASE_URL || 'http://localhost:5000'}/api/webhooks/paydunya`,
+          callback_url: `${getPublicBaseUrl()}/api/webhooks/paydunya`,
         },
       };
 
@@ -11559,7 +11558,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           countryCode: country,
           network: operator,
           orderId: `BKAPAY-API-${transactionId}-${Date.now()}`,
-          callbackUrl: `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/mbiyopay`,
+          callbackUrl: `${getPublicBaseUrl()}/api/webhooks/mbiyopay`,
           otpCode,
         });
 
@@ -14534,7 +14533,7 @@ SUPPORT ET CONTACT:
                 res.write(emaliBalanceUpdateEvt);
                 const pendingTxW = await storage.createTransaction({ userId, type: "withdrawal", amount: Math.floor(amount), fee: feeInfoW.feeAmount, feePercentage: feeInfoW.feePercentage, currency: userCurrencyW, status: "pending", country, operator: normalizedOperatorW, customerPhone: cleanPhoneW, description: `Retrait de ${Math.floor(amount)} ${userCurrencyW}`, metadata: JSON.stringify({ provider: "paydunya", providerAmount: providerAmountW, providerCurrency: chatbotWProviderCurrency, exchangeFee: xFeeW.feeAmount }) });
 
-                const callbackUrlW = `${process.env.BASE_URL || 'https://bkapay.com'}/api/webhooks/paydunya-disburse`;
+                const callbackUrlW = `${getPublicBaseUrl()}/api/webhooks/paydunya-disburse`;
                 const getInvoiceW = await callPaydunyaAPIv2("/disburse/get-invoice", { account_alias: cleanPhoneW, amount: providerAmountW, withdraw_mode: withdrawModeW, callback_url: callbackUrlW });
                 if (getInvoiceW.response_code !== "00" || !getInvoiceW.disburse_token) {
                   await storage.updateUserBalance(userId, requiredBalanceW);
@@ -14732,7 +14731,7 @@ SUPPORT ET CONTACT:
                 res.write(emaliBalanceUpdateEvtT);
                 const pendingTxT = await storage.createTransaction({ userId, type: "transfer", amount: Math.floor(amount), fee: feeInfoT.feeAmount, feePercentage: feeInfoT.feePercentage, currency: userCurrencyT, status: "pending", country, operator: normalizedOperatorT, customerPhone: cleanPhoneT, description: `Transfert de ${Math.floor(amount)} ${userCurrencyT}`, metadata: JSON.stringify({ provider: "paydunya", providerAmount: providerAmountT, providerCurrency: chatbotTProviderCurrency, exchangeFee: xFeeT.feeAmount }) });
 
-                const callbackUrlT = `${process.env.BASE_URL || 'https://bkapay.com'}/api/webhooks/paydunya-disburse`;
+                const callbackUrlT = `${getPublicBaseUrl()}/api/webhooks/paydunya-disburse`;
                 const getInvoiceT = await callPaydunyaAPIv2("/disburse/get-invoice", { account_alias: cleanPhoneT, amount: providerAmountT, withdraw_mode: withdrawModeT, callback_url: callbackUrlT });
                 if (getInvoiceT.response_code !== "00" || !getInvoiceT.disburse_token) {
                   await storage.updateUserBalance(userId, requiredBalanceT);
@@ -15761,7 +15760,7 @@ Ton role est de reformuler et ameliorer les messages que l'administrateur souhai
       const payinPrivateKey = `sk_payin_live_shop_${randomUUID().replace(/-/g, "")}`;
       const callbackSecret = randomUUID().replace(/-/g, "");
 
-      const webhookUrl = `${process.env.BASE_URL || "https://bkapay.com"}/api/shop/webhook/${shop.slug}`;
+      const webhookUrl = `${getPublicBaseUrl()}/api/shop/webhook/${shop.slug}`;
 
       const apiKey = await storage.createApiKey({
         userId: req.session.userId!,
@@ -16062,7 +16061,7 @@ Ton role est de reformuler et ameliorer les messages que l'administrateur souhai
       const shop = await storage.getShopBySlug(req.params.slug);
       if (!shop || !shop.isActive) return next();
 
-      const baseUrl = process.env.BASE_URL || "https://bkapay.com";
+      const baseUrl = getPublicBaseUrl();
       const shopUrl = `${baseUrl}/shop/${shop.slug}`;
       const title = shop.name;
       const description = (shop as any).description || `Boutique ${shop.name} — paiement sécurisé via BKApay`;

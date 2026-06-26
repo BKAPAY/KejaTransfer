@@ -1,6 +1,7 @@
 import { storage } from "./storage";
 import { getMoneyFusionWithdrawMode, getMoneyFusionCurrency, isMoneyFusionSupported } from "@shared/moneyfusion-countries";
 import postgres from "postgres";
+import { getPublicBaseUrl } from "./utils/public-base-url";
 
 const MONEYFUSION_API_URL = "https://pay.moneyfusion.net/api/v1";
 const MONEYFUSION_TIMEOUT_MS = 30000;
@@ -100,7 +101,7 @@ export async function createMoneyFusionPayout(params: MoneyFusionPayoutParams): 
       cleanPhone = cleanPhone.substring(2 + dialCode.length);
     }
 
-    const baseUrl = process.env.BASE_URL || "https://bkapay.com";
+    const baseUrl = getPublicBaseUrl();
     const webhookUrl = params.webhookUrl || `${baseUrl}/api/webhooks/moneyfusion/payout`;
 
     const requestBody = {

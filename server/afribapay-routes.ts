@@ -15,6 +15,7 @@ import {
   translateAfribaPayError,
 } from "./afribapay";
 import { AFRIBAPAY_COUNTRIES, getCurrencyForCountry, getPaymentInstructions } from "@shared/afribapay-countries";
+import { getPublicBaseUrl } from "./utils/public-base-url";
 
 const router = Router();
 
@@ -78,7 +79,7 @@ export async function handleAfribaPayDeposit(
     const totalFeeAmount = feeInfo.feeAmount + incomingExchangeFee;
     const totalFeePercentage = feeInfo.feePercentage + exchangeFeePercentage;
 
-    const baseUrl = process.env.BASE_URL || "https://bkapay.com";
+    const baseUrl = getPublicBaseUrl();
     const orderId = `BKAPAY-DEP-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
     const result = await createAfribaPayPayin({
@@ -189,7 +190,7 @@ export async function handleAfribaPayWithdrawal(
     }
 
     const orderId = `BKAPAY-WD-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const baseUrl = process.env.BASE_URL || "https://bkapay.com";
+    const baseUrl = getPublicBaseUrl();
 
     const result = await createAfribaPayPayout({
       amount: amountForProvider,
@@ -298,7 +299,7 @@ export async function handleAfribaPayTransfer(
     }
 
     const orderId = `BKAPAY-TF-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const baseUrl = process.env.BASE_URL || "https://bkapay.com";
+    const baseUrl = getPublicBaseUrl();
 
     const result = await createAfribaPayPayout({
       amount: amountForProvider,
@@ -440,7 +441,7 @@ export async function handleAfribaPayPaymentLink(
     const totalAfribaFeeAmount = cpf ? incomingExchangeFee : (feeInfo.feeAmount + incomingExchangeFee);
     const totalAfribaFeePercentage = cpf ? incomingExchangeFeePercentage : (feeInfo.feePercentage + incomingExchangeFeePercentage);
 
-    const baseUrl = process.env.BASE_URL || "https://bkapay.com";
+    const baseUrl = getPublicBaseUrl();
     const orderId = `BKAPAY-PL-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
     const result = await createAfribaPayPayin({
@@ -564,7 +565,7 @@ export async function handleAfribaPayMerchantLink(
     const totalFeeAmount = feeInfo.feeAmount + incomingExchangeFee;
     const totalFeePercentage = feeInfo.feePercentage + exchangeFeePercentage;
 
-    const baseUrl = process.env.BASE_URL || "https://bkapay.com";
+    const baseUrl = getPublicBaseUrl();
     const orderId = `BKAPAY-ML-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
     const result = await createAfribaPayPayin({
@@ -688,7 +689,7 @@ export async function handleAfribaPayApiPayment(
     const totalFeeAmount = feeInfo.feeAmount + incomingExchangeFee;
     const totalFeePercentage = feeInfo.feePercentage + exchangeFeePercentage;
 
-    const baseUrl = process.env.BASE_URL || "https://bkapay.com";
+    const baseUrl = getPublicBaseUrl();
     const orderId = `BKAPAY-API-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
     const result = await createAfribaPayPayin({

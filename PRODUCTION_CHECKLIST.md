@@ -18,8 +18,8 @@
    - `PAYDUNYA_PUBLIC_KEY` (commence par `live_public_...`)
    - `PAYDUNYA_TOKEN` (Token)
 
-### C. Mettre à Jour les Secrets Replit
-1. Dans Replit, onglet **"Secrets"** (🔒 dans le menu latéral)
+### C. Mettre à Jour les Secrets Vercel
+1. Dans Vercel, onglet **"Secrets"** (🔒 dans le menu latéral)
 2. Remplacez les valeurs actuelles par les clés LIVE:
    ```
    PAYDUNYA_MASTER_KEY=votre_master_key_live

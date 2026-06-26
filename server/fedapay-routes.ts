@@ -14,6 +14,7 @@ import {
   FEDAPAY_SUPPORTED_COUNTRIES_PAYOUT,
 } from "./fedapay";
 import { sendPaymentCallback } from "./utils/callback";
+import { getPublicBaseUrl } from "./utils/public-base-url";
 
 export async function handleFedaPayDeposit(
   userId: string,
@@ -68,7 +69,7 @@ export async function handleFedaPayDeposit(
       customerPhone: phone,
       country: country,
       operator: operator,
-      callbackUrl: `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/fedapay`,
+      callbackUrl: `${getPublicBaseUrl()}/api/webhooks/fedapay`,
     });
 
     if (!result.success) {
@@ -449,7 +450,7 @@ export async function handlePaymentLinkPayment(
       customerPhone: customerPhone,
       country: country,
       operator: operator,
-      callbackUrl: `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/fedapay`,
+      callbackUrl: `${getPublicBaseUrl()}/api/webhooks/fedapay`,
     });
 
     if (!result.success) {
@@ -552,7 +553,7 @@ export async function handleMerchantLinkPayment(
       customerPhone: customerPhone,
       country: country,
       operator: operator,
-      callbackUrl: `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/fedapay`,
+      callbackUrl: `${getPublicBaseUrl()}/api/webhooks/fedapay`,
     });
 
     if (!result.success) {
@@ -671,7 +672,7 @@ export async function handleApiPayment(
       customerPhone: customerPhone,
       country: country,
       operator: operator,
-      callbackUrl: `${process.env.BASE_URL || "https://bkapay.com"}/api/webhooks/fedapay`,
+      callbackUrl: `${getPublicBaseUrl()}/api/webhooks/fedapay`,
       metadata: {
         apiKeyId: apiKey.id,
         apiKeyPublicKey: apiKey.publicKey,
