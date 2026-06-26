@@ -1,7 +1,7 @@
 {
   "version": 2,
-  "installCommand": "npm install",
-  "buildCommand": "npm run build",
+  "installCommand": "npm ci --legacy-peer-deps",
+  "buildCommand": "npm ci && npm run build",
   "outputDirectory": "dist/client",
   "routes": [
     {
