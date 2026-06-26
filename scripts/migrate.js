@@ -12,12 +12,22 @@ async function runMigrations() {
     await client.connect();
     console.log('Connected to database');
 
-    // Truncate the business_tokens table to resolve unique constraint conflict
-    try {
-      await client.query('TRUNCATE TABLE business_tokens CASCADE');
-      console.log('✓ Truncated business_tokens table');
-    } catch (err) {
-      console.log('Table business_tokens does not exist yet or already truncated');
+    // Tables that need to be truncated to resolve unique constraint conflicts
+    const tablesToTruncate = [
+      'business_tokens',
+      'api_keys',
+      'merchant_links',
+      'payment_links',
+      'settlements'
+    ];
+
+    for (const table of tablesToTruncate) {
+      try {
+        await client.query(`TRUNCATE TABLE ${table} CASCADE`);
+        console.log(`✓ Truncated ${table} table`);
+      } catch (err) {
+        console.log(`Table ${table} does not exist yet or already truncated`);
+      }
     }
 
     await client.end();
