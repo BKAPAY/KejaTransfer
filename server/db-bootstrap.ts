@@ -1,15 +1,9 @@
 import { createHash } from "crypto";
 import { drizzle } from "drizzle-orm/postgres-js";
-import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
 import { users } from "../shared/schema";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
-import { join } from "path";
-
-function computeMigrationHash(sqlContent: string): string {
-  return createHash("sha256").update(sqlContent).digest("hex");
-}
 
 async function bootstrapDatabase() {
   const DATABASE_URL = process.env.DATABASE_URL;
@@ -64,24 +58,13 @@ async function bootstrapDatabase() {
       console.error("⚠️ Early multi_country_enabled column migration error:", e);
     }
 
-    // Step 4: Run the Drizzle migrator (try to use migrations folder, but don't fail if it doesn't exist)
-    console.log("📋 Running Drizzle migrator...");
-    try {
-      const migrationsDir = join(process.cwd(), "migrations");
-      await migrate(db, { migrationsFolder: migrationsDir });
-      console.log("✅ Migrations completed successfully!");
-    } catch (err: any) {
-      if (err.message && err.message.includes("ENOENT")) {
-        console.warn("⚠️ Migrations folder not found (expected on Vercel), skipping file-based migrations");
-        console.log("✅ Drizzle schema will be created via direct SQL below");
-      } else {
-        throw err;
-      }
-    }
+    // Skip Drizzle migrator entirely - we don't have the migrations folder on Vercel
+    console.log("📋 Skipping file-based migrations (not available on Vercel)");
+    console.log("✅ Schema will be created via direct SQL below");
 
     await client.end();
 
-    // Step 5: Ensure platform_settings table exists
+    // Step 4: Ensure platform_settings table exists
     console.log("⚙️ Ensuring platform_settings table exists...");
     const settingsClient = postgres(DATABASE_URL);
     try {
@@ -103,7 +86,7 @@ async function bootstrapDatabase() {
     }
     await settingsClient.end();
 
-    // Step 6: Ensure login_logs table exists
+    // Step 5: Ensure login_logs table exists
     console.log("⚙️ Ensuring login_logs table exists...");
     const loginLogsClient = postgres(DATABASE_URL);
     try {
@@ -137,7 +120,7 @@ async function bootstrapDatabase() {
     }
     await loginLogsClient.end();
 
-    // Step 7: Ensure moneyfusion_ip_logs table exists
+    // Step 6: Ensure moneyfusion_ip_logs table exists
     console.log("⚙️ Ensuring moneyfusion_ip_logs table exists...");
     const ipLogsClient = postgres(DATABASE_URL);
     try {
@@ -159,7 +142,7 @@ async function bootstrapDatabase() {
     }
     await ipLogsClient.end();
 
-    // Step 8: Ensure additional user columns
+    // Step 7: Ensure additional user columns
     const userColsClient = postgres(DATABASE_URL);
     try {
       await userColsClient`ALTER TABLE users ADD COLUMN IF NOT EXISTS payout_api_enabled BOOLEAN NOT NULL DEFAULT FALSE`;
@@ -187,7 +170,7 @@ async function bootstrapDatabase() {
     }
     await userColsClient.end();
 
-    // Step 9: Ensure api_keys columns
+    // Step 8: Ensure api_keys columns
     const apiKeysClient = postgres(DATABASE_URL);
     try {
       await apiKeysClient`ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS payout_callback_url TEXT`;
@@ -199,7 +182,7 @@ async function bootstrapDatabase() {
     }
     await apiKeysClient.end();
 
-    // Step 10: Ensure business_tokens table exists
+    // Step 9: Ensure business_tokens table exists
     const btClient = postgres(DATABASE_URL);
     try {
       await btClient`
@@ -224,7 +207,7 @@ async function bootstrapDatabase() {
     }
     await btClient.end();
 
-    // Step 11: Ensure settlements table
+    // Step 10: Ensure settlements table
     const settlClient = postgres(DATABASE_URL);
     try {
       await settlClient`
@@ -258,7 +241,7 @@ async function bootstrapDatabase() {
     }
     await settlClient.end();
 
-    // Step 12: Ensure salary tables
+    // Step 11: Ensure salary tables
     const salaryClient = postgres(DATABASE_URL);
     try {
       await salaryClient`
@@ -308,7 +291,7 @@ async function bootstrapDatabase() {
     }
     await salaryClient.end();
 
-    // Step 13: Ensure shop tables
+    // Step 12: Ensure shop tables
     const shopClient = postgres(DATABASE_URL);
     try {
       await shopClient`
@@ -383,7 +366,7 @@ async function bootstrapDatabase() {
     }
     await shopClient.end();
 
-    // Step 14: Ensure primary admin exists
+    // Step 13: Ensure primary admin exists
     console.log("👤 Ensuring primary admin exists...");
     const seedClient = postgres(DATABASE_URL);
     const seedDb = drizzle(seedClient);
