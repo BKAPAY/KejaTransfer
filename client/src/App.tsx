@@ -17,6 +17,7 @@ import { CURRENT_VERSION } from "@/lib/doc-versions";
 import { COUNTRIES } from "@shared/schema";
 import type { User } from "@shared/schema";
 import { Analytics as VercelAnalytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 
 import Home from "@/pages/home";
 import Login from "@/pages/login";
@@ -537,6 +538,7 @@ function App() {
           <Toaster />
           <AppInitializer />
           <VercelAnalytics />
+          <SpeedInsights />
         </TooltipProvider>
       </QueryClientProvider>
     </ErrorBoundary>
