@@ -1044,6 +1044,7 @@ export const shops = pgTable("shops", {
   // Linked API key id (auto-generated)
   apiKeyId: varchar("api_key_id").references(() => apiKeys.id),
   isActive: boolean("is_active").notNull().default(true),
+  seededAt: timestamp("seeded_at"), // Date à laquelle les produits par défaut ont été seedés (évite re-seed)
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

@@ -40,6 +40,16 @@ export async function setupVite(app: Express, server: Server) {
     appType: "custom",
   });
 
+  // Serve uploads folder in development mode
+  const devUploadDir = path.resolve(import.meta.dirname, "..", "public", "uploads");
+  if (fs.existsSync(devUploadDir)) {
+    app.use("/uploads", express.static(devUploadDir));
+  } else {
+    // Create the directory if it doesn't exist
+    fs.mkdirSync(devUploadDir, { recursive: true });
+    app.use("/uploads", express.static(devUploadDir));
+  }
+
   app.use(vite.middlewares);
   app.use("*", async (req, res, next) => {
     const url = req.originalUrl;
@@ -77,6 +87,12 @@ export function serveStatic(app: Express) {
   }
 
   app.use(express.static(distPath));
+
+  // Servir les uploads depuis /tmp en production (les images uploadées par les utilisateurs)
+  const uploadDir = "/tmp/bkapay-uploads/images";
+  if (fs.existsSync(uploadDir)) {
+    app.use("/uploads", express.static(uploadDir));
+  }
 
   // fall through to index.html if the file doesn't exist
   app.use("*", (_req, res) => {

@@ -21,7 +21,7 @@ import { Label } from "@/components/ui/label";
 import {
   Store, Plus, Pencil, Trash2, Link as LinkIcon, Package, Tag, ShoppingBag,
   Globe, Key, Eye, EyeOff, Copy, Check, ImagePlus, X, Download, Loader2, ExternalLink,
-  CheckCircle2, AlertTriangle, RefreshCw, XCircle, Info
+  CheckCircle2, AlertTriangle, RefreshCw, XCircle, Info, Mail, MessageCircle
 } from "lucide-react";
 import type { Shop, ShopCategory, ShopProduct, ShopOrder } from "@shared/schema";
 
@@ -776,7 +776,12 @@ function loadGoogleFontDash(family: string) {
 }
 
 function OrdersSection({ orders, products }: { orders: ShopOrder[]; products: ShopProduct[] }) {
+  const [selectedOrder, setSelectedOrder] = useState<ShopOrder | null>(null);
   const visibleOrders = orders.filter(o => o.status !== "pending");
+
+  const selectedProduct = selectedOrder ? products.find(p => p.id === selectedOrder.productId) : null;
+  const checkoutData = selectedOrder?.checkoutData as Record<string, string> | null;
+
   return (
     <div className="space-y-3">
       <h2 className="font-semibold">Commandes reçues</h2>
@@ -792,7 +797,12 @@ function OrdersSection({ orders, products }: { orders: ShopOrder[]; products: Sh
           {visibleOrders.map(order => {
             const prod = products.find(p => p.id === order.productId);
             return (
-              <Card key={order.id} data-testid={`card-order-${order.id}`}>
+              <Card
+                key={order.id}
+                data-testid={`card-order-${order.id}`}
+                className="cursor-pointer hover:bg-muted/50 transition-colors"
+                onClick={() => setSelectedOrder(order)}
+              >
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between gap-3 flex-wrap">
                     <div>
@@ -816,6 +826,135 @@ function OrdersSection({ orders, products }: { orders: ShopOrder[]; products: Sh
             );
           })}
         </div>
+      )}
+
+      {/* Modal détails commande */}
+      {selectedOrder && (
+        <Dialog open={!!selectedOrder} onOpenChange={(v) => !v && setSelectedOrder(null)}>
+          <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <ShoppingBag className="w-5 h-5" />
+                Détails de la commande
+              </DialogTitle>
+              <DialogDescription>
+                Commande #{selectedOrder.id.slice(0, 8).toUpperCase()}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 mt-2">
+              {/* Statut et montant */}
+              <div className="flex items-center justify-between p-3 rounded-lg bg-muted">
+                <div>
+                  <p className="text-xs text-muted-foreground">Montant</p>
+                  <p className="text-xl font-bold">{selectedOrder.amount.toLocaleString()} {selectedOrder.currency}</p>
+                </div>
+                <Badge
+                  variant={selectedOrder.status === "completed" ? "default" : "destructive"}
+                  className="text-sm px-3 py-1"
+                >
+                  {selectedOrder.status === "completed" ? "Payé" : selectedOrder.status === "failed" ? "Échoué" : "Annulé"}
+                </Badge>
+              </div>
+
+              {/* Produit */}
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Produit</Label>
+                <div className="flex items-center gap-3 p-3 rounded-lg border">
+                  {selectedProduct?.imageUrls?.[0] ? (
+                    <img src={selectedProduct.imageUrls[0]} alt="" className="w-12 h-12 rounded-md object-cover" />
+                  ) : (
+                    <div className="w-12 h-12 rounded-md bg-muted flex items-center justify-center">
+                      <Package className="w-5 h-5 text-muted-foreground" />
+                    </div>
+                  )}
+                  <div>
+                    <p className="font-medium text-sm">{selectedProduct?.name || "Produit"}</p>
+                    <p className="text-xs text-muted-foreground">{selectedProduct?.price?.toLocaleString()} {selectedOrder.currency}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Client */}
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Informations client</Label>
+                <div className="p-3 rounded-lg border space-y-2">
+                  {selectedOrder.customerName && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground w-20">Nom:</span>
+                      <span className="text-sm font-medium">{selectedOrder.customerName}</span>
+                    </div>
+                  )}
+                  {selectedOrder.customerEmail && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground w-20">Email:</span>
+                      <a href={`mailto:${selectedOrder.customerEmail}`} className="text-sm text-primary hover:underline">{selectedOrder.customerEmail}</a>
+                    </div>
+                  )}
+                  {selectedOrder.customerPhone && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground w-20">Téléphone:</span>
+                      <a href={`tel:${selectedOrder.customerPhone}`} className="text-sm text-primary hover:underline">{selectedOrder.customerPhone}</a>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Champs personnalisés remplis par le client */}
+              {checkoutData && Object.keys(checkoutData).length > 0 && (
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Champs personnalisés</Label>
+                  <div className="p-3 rounded-lg border space-y-2">
+                    {Object.entries(checkoutData).map(([key, value]) => (
+                      <div key={key} className="flex items-start gap-2">
+                        <span className="text-xs text-muted-foreground min-w-[100px]">{key}:</span>
+                        <span className="text-sm font-medium flex-1">{value || "-"}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Mode de livraison */}
+              {selectedOrder.deliveryMethod && (
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Mode de livraison</Label>
+                  <div className="flex items-center gap-2 p-3 rounded-lg border">
+                    {selectedOrder.deliveryMethod === "email" && <Mail className="w-4 h-4 text-muted-foreground" />}
+                    {selectedOrder.deliveryMethod === "whatsapp" && <MessageCircle className="w-4 h-4 text-muted-foreground" />}
+                    {selectedOrder.deliveryMethod === "both" && <><Mail className="w-4 h-4 text-muted-foreground" /><MessageCircle className="w-4 h-4 text-muted-foreground" /></>}
+                    <span className="text-sm capitalize">{selectedOrder.deliveryMethod === "both" ? "Email + WhatsApp" : selectedOrder.deliveryMethod}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Référence de paiement */}
+              {selectedOrder.paymentReference && (
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Référence de paiement</Label>
+                  <div className="p-3 rounded-lg border">
+                    <code className="text-xs font-mono text-muted-foreground break-all">{selectedOrder.paymentReference}</code>
+                  </div>
+                </div>
+              )}
+
+              {/* Date */}
+              <div className="text-xs text-muted-foreground text-right">
+                {new Date(selectedOrder.createdAt).toLocaleDateString("fr-FR", {
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit"
+                })}
+              </div>
+            </div>
+
+            <div className="flex gap-2 mt-4">
+              <Button variant="outline" onClick={() => setSelectedOrder(null)} className="flex-1">Fermer</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );
@@ -1256,13 +1395,8 @@ export default function ShopPage() {
     },
   });
 
-  const hasSeededRef = useRef(false);
-  useEffect(() => {
-    if (data?.shop && data.products.length === 0 && data.categories.length > 0 && !seedMutation.isPending && !hasSeededRef.current) {
-      hasSeededRef.current = true;
-      seedMutation.mutate();
-    }
-  }, [data?.products?.length, data?.categories?.length, data?.shop?.id]);
+  // NOTE: Le seed automatique a été supprimé - les produits exemples ne sont créés qu'une seule fois
+  // lors de la création de la boutique, et jamais après suppression par l'utilisateur
 
   const deleteProductMutation = useMutation({
     mutationFn: async (id: string) => {
