@@ -231,7 +231,7 @@ function CreateShopForm({ onCreated }: { onCreated: () => void }) {
               data-testid="input-shop-name"
               value={name}
               onChange={e => handleNameChange(e.target.value)}
-              placeholder="Ex: Keja Store"
+              placeholder="Ex: Ma Boutique"
             />
           </div>
 
@@ -246,7 +246,7 @@ function CreateShopForm({ onCreated }: { onCreated: () => void }) {
                 data-testid="input-shop-slug"
                 value={slug}
                 onChange={e => handleSlugChange(e.target.value)}
-                placeholder="keja-store"
+                placeholder="ma-boutique"
                 className={slugStatus === "taken" ? "border-destructive pr-8" : slugStatus === "ok" ? "border-green-500 pr-8" : "pr-8"}
               />
               <div className="absolute right-2.5 top-1/2 -translate-y-1/2">
@@ -962,6 +962,7 @@ function OrdersSection({ orders, products }: { orders: ShopOrder[]; products: Sh
 
 function SettingsSection({ shop }: { shop: Shop }) {
   const { toast } = useToast();
+  const [shopName, setShopName] = useState(shop.name);
   const [currency, setCurrency] = useState(shop.currency);
   const [customDomain, setCustomDomain] = useState(shop.customDomain || "");
   const [description, setDescription] = useState((shop as any).description || "");
@@ -1027,6 +1028,17 @@ function SettingsSection({ shop }: { shop: Shop }) {
       queryClient.invalidateQueries({ queryKey: ["/api/shop"] });
     },
     onError: () => toast({ title: "Erreur", variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("DELETE", "/api/shop");
+    },
+    onSuccess: () => {
+      toast({ title: "Boutique supprimée", description: "Vous pouvez créer une nouvelle boutique." });
+      queryClient.invalidateQueries({ queryKey: ["/api/shop"] });
+    },
+    onError: (err: any) => toast({ title: "Erreur", description: err?.message, variant: "destructive" }),
   });
 
   return (
@@ -1168,6 +1180,30 @@ function SettingsSection({ shop }: { shop: Shop }) {
               );
             })()}
           </div>}
+        </CardContent>
+      </Card>
+
+      {/* Nom de la boutique */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Nom de la boutique</CardTitle>
+          <CardDescription>Ce nom s'affiche sur votre page publique et dans vos communications</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Input
+            value={shopName}
+            onChange={e => setShopName(e.target.value)}
+            placeholder="Nom de votre boutique"
+            data-testid="input-shop-name-settings"
+          />
+          <Button
+            variant="outline"
+            onClick={() => mutation.mutate({ name: shopName.trim() })}
+            disabled={mutation.isPending || !shopName.trim() || shopName.trim().length < 2}
+          >
+            {mutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+            Enregistrer
+          </Button>
         </CardContent>
       </Card>
 
@@ -1363,6 +1399,48 @@ function SettingsSection({ shop }: { shop: Shop }) {
             {mutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <ImagePlus className="w-4 h-4 mr-2" />}
             Enregistrer le diaporama
           </Button>
+        </CardContent>
+      </Card>
+
+      {/* Zone de danger — suppression boutique */}
+      <Card className="border-destructive/40">
+        <CardHeader>
+          <CardTitle className="text-base text-destructive flex items-center gap-2">
+            <Trash2 className="w-4 h-4" />
+            Zone de danger
+          </CardTitle>
+          <CardDescription>
+            La suppression de la boutique efface définitivement tous les produits, catégories et commandes.
+            Vous pourrez créer une nouvelle boutique après.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive" className="w-full" disabled={deleteMutation.isPending}>
+                {deleteMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Trash2 className="w-4 h-4 mr-2" />}
+                Supprimer ma boutique
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Supprimer la boutique "{shop.name}" ?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Cette action est irréversible. Tous vos produits, catégories et commandes seront définitivement supprimés.
+                  Vous pourrez créer une nouvelle boutique ensuite.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Annuler</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-destructive hover:bg-destructive/90"
+                  onClick={() => deleteMutation.mutate()}
+                >
+                  Oui, supprimer définitivement
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </CardContent>
       </Card>
     </div>

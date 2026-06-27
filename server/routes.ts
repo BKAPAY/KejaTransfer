@@ -15722,6 +15722,34 @@ Ton role est de reformuler et ameliorer les messages que l'administrateur souhai
     }
   });
 
+  // DELETE /api/shop — supprime la boutique et toutes ses données (produits, catégories, commandes)
+  app.delete("/api/shop", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const shop = await storage.getShopByUserId(req.session.userId!);
+      if (!shop) return res.status(404).json({ error: "Boutique introuvable" });
+      const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        await client.query("DELETE FROM shop_orders WHERE shop_id = $1", [shop.id]);
+        await client.query("DELETE FROM shop_products WHERE shop_id = $1", [shop.id]);
+        await client.query("DELETE FROM shop_categories WHERE shop_id = $1", [shop.id]);
+        await client.query("DELETE FROM shops WHERE id = $1", [shop.id]);
+        await client.query("COMMIT");
+      } catch (err) {
+        await client.query("ROLLBACK");
+        throw err;
+      } finally {
+        client.release();
+        await pool.end();
+      }
+      return res.json({ success: true });
+    } catch (error: any) {
+      console.error("Delete shop error:", error);
+      return res.status(500).json({ error: "Erreur lors de la suppression" });
+    }
+  });
+
   // POST /api/shop/seed-defaults — crée 2 produits exemples par catégorie vide (UNE SEULE FOIS)
   app.post("/api/shop/seed-defaults", requireAuth, async (req: Request, res: Response) => {
     try {
