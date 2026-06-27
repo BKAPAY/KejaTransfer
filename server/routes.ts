@@ -15609,17 +15609,14 @@ Ton role est de reformuler et ameliorer les messages que l'administrateur souhai
     }
   });
 
-  // POST /api/upload-image — upload base64 image, save to public/uploads
+  // POST /api/upload-image — retourne un data URI base64 (compatible Vercel/serverless)
   app.post("/api/upload-image", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { data, filename, mimeType } = req.body;
+      const { data, mimeType } = req.body;
       if (!data) return res.status(400).json({ error: "Données manquantes" });
-      const ext = (mimeType?.split("/")[1] || "jpg").replace("jpeg", "jpg");
-      const unique = `${Date.now()}-${randomUUID().slice(0, 8)}.${ext}`;
-      const uploadDir = process.env.NODE_ENV === "production" ? "/tmp/bkapay-uploads/images" : path.join(process.cwd(), "public", "uploads");
-      if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
-      fs.writeFileSync(path.join(uploadDir, unique), Buffer.from(data, "base64"));
-      return res.json({ url: `/uploads/${unique}` });
+      const mime = mimeType || "image/jpeg";
+      // Retourner directement le data URI — pas de fichier sur disque (éphémère sur Vercel)
+      return res.json({ url: `data:${mime};base64,${data}` });
     } catch (error: any) {
       return res.status(500).json({ error: "Upload échoué" });
     }

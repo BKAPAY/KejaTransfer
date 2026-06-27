@@ -88,11 +88,10 @@ export function serveStatic(app: Express) {
 
   app.use(express.static(distPath));
 
-  // Servir les uploads depuis /tmp en production (les images uploadées par les utilisateurs)
+  // Servir les uploads depuis /tmp en production
   const uploadDir = "/tmp/bkapay-uploads/images";
-  if (fs.existsSync(uploadDir)) {
-    app.use("/uploads", express.static(uploadDir));
-  }
+  if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+  app.use("/uploads", express.static(uploadDir));
 
   // fall through to index.html if the file doesn't exist
   app.use("*", (_req, res) => {
