@@ -64,6 +64,16 @@ function buildApp() {
         })
         .then(() => {
           app = serverApp;
+          // Démarrer le polling de paiements (critique pour les timeouts et mises à jour de statut)
+          const { startPaymentPolling } = require('./payment-polling') as {
+            startPaymentPolling: () => void;
+          };
+          startPaymentPolling();
+          // Démarrer le planificateur de salaires
+          const { startSalaryScheduler } = require('./salary-scheduler') as {
+            startSalaryScheduler: () => void;
+          };
+          startSalaryScheduler();
           resolve();
         })
         .catch((err: Error) => {

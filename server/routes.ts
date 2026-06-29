@@ -64,7 +64,7 @@ import {
   handlePawaPayWebhook,
   pollPawaPayTransaction,
 } from "./pawapay-routes";
-import { safeRefundOutgoingTransaction, sendApiPayoutCallback, sendBusinessWebhookCallback } from "./payment-polling";
+import { safeRefundOutgoingTransaction, sendApiPayoutCallback, sendBusinessWebhookCallback, triggerOnePollCycle, startPaymentPolling } from "./payment-polling";
 import {
   MBIYOPAY_SUPPORTED_COUNTRIES,
   MBIYOPAY_OPERATORS,
@@ -556,6 +556,24 @@ function invalidateCachedSetting(key: string): void {
 export async function registerRoutes(app: Express): Promise<Server> {
   // Open Graph social media preview routes (must be before Vite/SPA handler)
   registerOgRoutes(app);
+
+  // Cron endpoint — déclenche un cycle de vérification immédiat (appelé par Vercel Cron ou manuellement)
+  app.all("/api/cron-poll", async (req: Request, res: Response) => {
+    const cronSecret = process.env.CRON_SECRET;
+    const authHeader = req.headers.authorization;
+    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    try {
+      // S'assurer que le polling en arrière-plan tourne (redémarre si l'instance s'est refroidie)
+      startPaymentPolling();
+      // Lancer immédiatement un cycle de vérification
+      triggerOnePollCycle().catch(() => {});
+      return res.json({ ok: true, ts: new Date().toISOString() });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
 
   if (!process.env.SESSION_SECRET) {
     throw new Error("SESSION_SECRET must be configured in environment variables");

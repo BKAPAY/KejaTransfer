@@ -272,7 +272,7 @@ export async function safeRefundOutgoingTransaction(
 }
 
 // Polling every 3 seconds for active transactions
-const POLLING_INTERVAL = 30000;
+const POLLING_INTERVAL = 10000; // 10 secondes (was 30s)
 const PAYMENT_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes timeout (Mobile Money)
 const CRYPTO_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes timeout (Crypto)
 
@@ -1429,6 +1429,10 @@ export function stopPaymentPolling(): void {
     pollingInterval = null;
     console.log("[PaymentPolling] Stopped background payment verification");
   }
+}
+
+export async function triggerOnePollCycle(): Promise<void> {
+  await safePollPendingPayments();
 }
 
 export { checkPaydunyaStatus, hasPaymentExpired };
